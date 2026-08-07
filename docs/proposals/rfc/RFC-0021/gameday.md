@@ -464,7 +464,13 @@ drill. Fixed in this change unless marked tracked.
    documents the false positive; the rule is untouched.
 3. **Checkout maps its own database outage to `500` without `Retry-After`**
    (G3 finding 1) — owner: checkout-service, not homelab.
-4. **The one-minute doubt sweep is still untested.** G4's park was closed by the
+4. **~~The one-minute doubt sweep is still untested~~ — **tested 2026-08-07.** A
+`…13` no-answer payment was parked and mockpay was then scaled to 0 so the
+REQUEST path could not resolve it either (that 117 ms close is why G4 never
+reached the sweep). With the provider restored and the payment untouched by any
+request, the sweep re-asked under the original key three times — 10:18:13
+UNKNOWN → 10:19:23 UNKNOWN → **10:20:13 SUCCESS** — and the intent left
+`processing` for `authorized`. Previously untested.** G4's park was closed by the
    request path in 117 ms. Exercising the sweep needs a park nobody retries — an
    abandoned checkout against a silent provider.
 5. **Mid-activity kill is not reachable by hand** (G2b). A ~700 ms saga needs

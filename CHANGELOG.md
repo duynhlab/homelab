@@ -41,8 +41,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   advances `archived_count` ~3 times per 15m window on both clusters, so the
   no-progress clause carries a 3x margin and the post-promotion blip is
   suppressed. Verified empty against the live series before shipping.
+### Added
+
+- **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
+  Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
+  stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;
+  the two DR drills that only make sense on durable hardware (C promotion, D
+  platform-db restore) are deferred to RFC-0011 with the reason recorded.
 
 ### Changed
+
+- **RFC-0007 → `implemented`**: the program is written down and Drill A has
+  evidence. Both qualifications are stated rather than glossed — the recurring
+  cadence cannot meaningfully run on an ephemeral Kind cluster and activates with
+  durable hardware, and the RustFS retention hold is *inapplicable* here (the
+  bucket is rebuilt with the cluster; no in-tree prefix survives) rather than
+  "lifted".
+- **RFC-0012**: P3 rebuild parity and P4 isolation matrix (85/85 pairs) both
+  **PASS**; P2 rotation is **blocked, not skipped** — the documented OpenBAO
+  break-glass ceremony returns `403` on a cluster with a revoked root, so there
+  is currently no working documented way to write a secret there. Recorded as a
+  new RFC-0008 slice; the drill re-runs when that lands.
+- **RFC-0014**: the live pod-kill drill **falsified its own exit criterion** — the
+  liveness probe converts a wedged process into a restart in ~40 s, so
+  `MicroserviceDown` cannot fire for "a pod that exists but went silent". The
+  alert is right for node-loss and pipeline-break; the claim that a pod kill
+  proves it was never provable. Follow-up named.
+- **RFC-0021 deferred items 3, 4 and 6 resolved**, with evidence: G1 re-run shows
+  exactly one page (Sloth page `suppressed`, ticket twins active, other services
+  untouched, budget still burning); G2b's interleaving is now reachable via the
+  fault hook and commit proved replay-idempotent (SALE_COMMITTED exactly twice for
+  two orders); the reconciler verifies its window. Gameday follow-ups (b) and (c)
+  closed too — the one-minute doubt sweep is tested, and the provider-unknown
+  counter's park/resolve ambiguity is fixed.
+- `CheckoutAvailabilityErrors` runbook now warns that reproducing the alert needs
+  sustained traffic: the `[10m]` ratio window and `for: 10m` debounce are the same
+  length, so a burst expires exactly as the debounce matures (measured both ways).
+- `mockpay.yaml` records that its pin tracks payment by hand only — currently two
+  patches behind, no functional skew, but the F1 finding was exactly a skew here.
 
 - Debt-clearing wave pinned: order `1.13.2` (G2b fault hook
   `ORDER_FAULT_COMMIT_PAUSE`, GameDay-only + the `UNKNOWN_SKU` failure

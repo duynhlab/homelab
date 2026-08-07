@@ -108,7 +108,7 @@ for its own sake.
 | [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | P2 | provisional |
 | [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | P2 | provisional — **superseded by [RFC-0018](RFC-0018/)** (platform-db merge) |
 | [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) — future mesh; in-process mTLS now in [RFC-0020](RFC-0020/) | infra | defer | provisional |
-| [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | P2 | provisional |
+| [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | done | implemented — program documented and Drill A recorded (`DR-2026-08-A`, Barman gate closed); the recurring cadence and Drills C/D activate with durable hardware ([RFC-0011](RFC-0011/)) |
 | [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | implementable — Slice 1 (awskms auto-unseal, [ADR-024](../adr/ADR-024-floci-kms-emulator-auto-unseal/)) landed; cloud-bound items remain proposal-only |
 | [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | done | implemented |
 | [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | done | implemented (P1–P6 landed) |
@@ -147,4 +147,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-07 — registry synced to shipped reality: RFC-0008 implementable; RFC-0015, RFC-0017, RFC-0018, RFC-0019 implemented._
+_Last updated: 2026-08-07 — RFC-0007 implemented (program + Drill A evidence); see its Implementation History for what deliberately did not run._

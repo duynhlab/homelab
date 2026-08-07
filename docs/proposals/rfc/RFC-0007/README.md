@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-06-26 | 2026-08-06 |
+| implemented | infra | 2026-06-26 | 2026-08-07 |
 
 ## Summary
 
@@ -85,7 +85,7 @@ extended with Temporal):
 
 | Drill | Cadence | Cluster / target | Scenario | Pass criterion (vs [`010.1`](../../../databases/010.1-rpo-rto-planning.md)) |
 |-------|---------|------------------|----------|------------------------------|
-| **A — PITR restore-test** | Monthly | `product-db` (T0) | Restore base backup + WAL replay to a **throwaway** cluster, validate | ≤ 30 min to validated throwaway; **plugin-backed** (Barman acceptance gate) |
+| **A — PITR restore-test** | Monthly | `product-db` (T0) | Restore base backup + WAL replay to a **throwaway** cluster, validate | ≤ 30 min to validated throwaway; **plugin-backed** (Barman acceptance gate). **First run 2026-08-07** — [`DR-2026-08-A`](../../../databases/010.2-restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate): restore **2 m 12 s**, PITR stopped exactly at the target, and it found two never-exercised defects (restore manifest, backup command). **Gate CLOSED** |
 | **B — Planned switchover** | Monthly | `product-db` (T0) | HA failover + app reconnect via PgDog | ≤ 1 min cut-over. **First run 2026-08-06** — recorded as `DR-2026-08-B` in [010.2](../../../databases/010.2-restore-and-failover-drills.md); measured **11.4 s** of app-visible write unavailability, RPO 0. Note `kubectl cnpg switchover` does **not** exist — the plugin has `promote` |
 | **C — DR promotion rehearsal** | Quarterly | `product-db-replica` (T0) | Whole-cluster-loss recovery (against a restored copy) | ≤ 30 min; RPO ≤ `archive_timeout` (5 min) |
 | **D — platform-db restore-test** | Quarterly | `platform-db` (T1) | Restore from `s3://pg-backups-cnpg/platform-db/` into a throwaway — same CNPG PITR flow as Drill A, different source `ObjectStore` + namespace ([010.2 § Drill D](../../../databases/010.2-restore-and-failover-drills.md)) | ≤ 30 min to validated throwaway. *(The letter previously named a Zalando WAL-G restore of `auth-db`/`supporting-shared-db`; that scenario died with the RFC-0018 consolidation and the letter was re-used for the cluster that replaced them.)* |
@@ -264,10 +264,46 @@ the SLO. A run with no recorded evidence did not happen.
   written into four DR documents, **does not exist** (the plugin has `promote`), and a
   planned switchover always trips a critical WAL-archive alert for ~30 minutes.
 
-  This RFC stays **`provisional`** because its actual deliverable is the *program* —
-  a cadence, a named owner, a standing evidence home — and none of that exists yet.
-  Drill **A** (the Barman acceptance gate) remains the blocking one, and until it runs
-  the RustFS prefixes must not be deleted.
+  **Status → `implemented` (2026-08-07).** Both things this RFC was blocked on now
+  exist: the program is written down (cadence, per-run role naming, evidence home,
+  liveness rule — see [The program](#the-program)), and Drill **A**, the blocking
+  Barman acceptance gate, has run with recorded evidence
+  ([`DR-2026-08-A`](../../../databases/010.2-restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)).
+  It paid for itself immediately: the restore manifest and the documented backup
+  command had both never worked.
+
+  Two honest qualifications rather than a clean claim:
+
+  - **The recurring cadence is not yet running, and cannot meaningfully run on
+    Kind.** Drills B/C/D against a cluster that `make down` discards are
+    rehearsals of the mechanism, not of the operation — and Drill C's own rule
+    ("never promote the live DR target") can only be satisfied here by
+    disposability. The monthly/quarterly calendar activates with durable
+    hardware ([RFC-0011](../RFC-0011/)); until then drills run opportunistically
+    at bring-up and each record says which cluster it used.
+  - **The RustFS retention hold is not "lifted", it is inapplicable here.** The
+    bucket is rebuilt with the cluster and holds only plugin-era prefixes, so
+    there is no surviving in-tree prefix to retire. The hold stays meaningful for
+    a durable store.
+
+- 2026-08-07 — **Program written, Drill A run, RFC implemented.** The
+  [program section](#the-program) records the cadence, the per-run role naming,
+  the evidence home and the liveness rule; Drill **A** ran as
+  [`DR-2026-08-A`](../../../databases/010.2-restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)
+  and **closed the Barman acceptance gate** — restore in 2 m 12 s, WAL replay
+  stopping exactly at the requested instant. The drill's real value was the two
+  defects it exposed on artifacts that had been committed but never exercised: a
+  restore manifest that could not start Postgres (missing WAL sizing against a
+  64MB-segment data directory) and a documented backup command that fails on a
+  plugin-backed cluster; both fixed in
+  [#704](https://github.com/duynhlab/homelab/pull/704). Drill **D** was also
+  redefined this day to match `010.2` (quarterly `platform-db` restore-test) and
+  its three stale Zalando references removed.
+  **Not done, deliberately:** Drills C and D did not run — an ephemeral Kind
+  cluster cannot host a promotion rehearsal that honours "never promote the live
+  DR target", and a restore-test of `platform-db` would only re-prove the CNPG +
+  Barman path `DR-2026-08-A` already proved. Both wait for durable hardware
+  ([RFC-0011](../RFC-0011/)), which is also when the recurring calendar starts.
 
 ## Related
 

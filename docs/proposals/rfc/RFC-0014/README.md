@@ -335,6 +335,28 @@ one PR wave.
   policy page. Reviewed by code-reviewer + security-auditor (all Required
   findings fixed, incl. the otelzap Debug-level parity issue).
 
+- 2026-08-07 — **The live pod-kill drill ran and falsified its own exit
+  criterion.** A `cart` pod was wedged with SIGSTOP **from the node** (from
+  inside the container it is ignored — PID 1 in a PID namespace discards
+  uncaught signals, so the obvious attempt silently does nothing), which is the
+  "pod exists but went silent" state `MicroserviceDown` is written for. It never
+  fired, and cannot: the liveness probe (`/health`, period 10s,
+  failureThreshold 3) killed the wedged container in ~40 s — `restarts=1`, exit
+  137 — and the replacement resumed the heartbeat long before the 15m
+  `last_over_time` lookbehind could empty. Verified at the time: the heartbeat
+  series was present, the alert's `unless` clause returned 0 series, and the
+  `kube_pod_info` join half was healthy (`KubeStateMetricsAbsent` quiet
+  throughout).
+  **Reading:** the alert is not broken — it is written for states a pod kill
+  cannot produce: a lost node/kubelet (kube_pod_info persists, no probe runs), a
+  broken OTLP export path with the app still healthy, or a service without a
+  liveness probe. "A pod-kill test proves the alert fires" was never a provable
+  claim on this platform. Follow-up: either narrow the documented scenario to
+  node-loss / pipeline-break, or add a node-loss drill (`docker pause` a kind
+  node) as the way to exercise it. The Sloth side was checked in the same
+  session: SLI series present and burn-rate rules evaluable; the one-week soak
+  stays waived by ADR-016.
+
 ## Related
 
 - **Supersedes**: the review's "Option C — hybrid + policy" verdict (its

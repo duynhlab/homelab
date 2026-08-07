@@ -4,10 +4,17 @@
 # its */30 schedule, so tempo-traces / pyroscope-profiles may not exist for up
 # to 30 min after RustFS is up — Tempo/Pyroscope then crash-loop on a missing
 # bucket. This Job creates the buckets immediately. It lives in the
-# ./controllers/storage path (storage-local, wait: true), so Flux blocks until
-# it completes; tracing-local / profiling-local dependsOn storage-local and
-# therefore only start once the buckets exist. Idempotent (mc mb
+# ./controllers/storage path (storage-local, wait: true), so Flux blocks on it;
+# tracing-local / profiling-local dependsOn storage-local. Idempotent (mc mb
 # --ignore-existing) — the CronJob keeps them present thereafter.
+#
+# That dependency is only worth anything if a Complete Job PROVES the buckets
+# exist, which is exactly what the first version did not do: its wait loop fell
+# through after ten failed attempts and created buckets against a server that
+# had not opened /data yet, then exited 0. Flux released Tempo onto a bucket
+# that was never written. So the script below must fail rather than proceed —
+# it gates on `mc ls` (serving), not `mc alias set` (reachable), and stats every
+# bucket after creating it. Keep the two copies of this script in step.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -32,24 +39,60 @@ spec:
             - |
               set -e
               ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
+              BUCKETS="pg-backups-cnpg tempo-traces pyroscope-profiles"
 
-              echo "=== Waiting for RustFS ==="
-              for i in 1 2 3 4 5 6 7 8 9 10; do
-                if mc alias set rustfs "$ENDPOINT" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" 2>/dev/null; then
-                  echo "RustFS is ready."
+              # Gate on the server actually SERVING, not on the alias being writable.
+              # `mc alias set` can return 0 against an endpoint that is not yet backed by a
+              # formatted disk; `mc ls rustfs/` cannot. This distinction is the whole bug:
+              # on 2026-08-07 the old loop logged "not ready" ten times, fell through anyway,
+              # reported three buckets created, and the Job went Complete — while RustFS only
+              # opened /data 70s later and found it empty. Flux read that Complete as its gate
+              # and released Tempo onto a bucket that did not exist.
+              echo "=== Waiting for RustFS to serve ==="
+              ready=""
+              i=0
+              while [ "$i" -lt 60 ]; do
+                i=$((i + 1))
+                if mc alias set rustfs "$ENDPOINT" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" >/dev/null 2>&1 \
+                   && mc ls rustfs/ >/dev/null 2>&1; then
+                  echo "RustFS is serving (attempt $i)."
+                  ready=yes
                   break
                 fi
-                echo "Attempt $i: RustFS not ready, retrying in 10s..."
-                sleep 10
+                echo "Attempt $i: RustFS not serving yet, retrying in 5s..."
+                sleep 5
               done
 
-              echo "=== Creating buckets ==="
-              mc mb --ignore-existing rustfs/pg-backups-cnpg
-              mc mb --ignore-existing rustfs/tempo-traces
-              mc mb --ignore-existing rustfs/pyroscope-profiles
+              # Fail instead of proceeding. A non-zero exit is what makes the retry (Job
+              # backoffLimit / next CronJob run) happen, and what stops Flux from treating an
+              # ungated run as a satisfied dependency.
+              if [ -z "$ready" ]; then
+                echo "FATAL: RustFS did not serve within 300s — refusing to report success." >&2
+                exit 1
+              fi
 
+              echo "=== Creating buckets ==="
+              for b in $BUCKETS; do
+                mc mb --ignore-existing "rustfs/$b"
+              done
+
+              # Verify each bucket individually and fail on any miss. `mc ls rustfs/` alone
+              # printed the buckets in the broken run too, so a listing is not proof; a
+              # per-bucket stat that must succeed is.
               echo "=== Verifying ==="
-              mc ls rustfs/
+              missing=""
+              for b in $BUCKETS; do
+                if mc ls "rustfs/$b" >/dev/null 2>&1; then
+                  echo "  ok      $b"
+                else
+                  echo "  MISSING $b"
+                  missing="$missing $b"
+                fi
+              done
+              if [ -n "$missing" ]; then
+                echo "FATAL: bucket(s) absent after creation:$missing" >&2
+                exit 1
+              fi
               echo "=== Done ==="
           env:
             - name: AWS_ACCESS_KEY_ID

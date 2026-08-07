@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The RustFS bucket gate reported success without creating anything.** On a
+  fresh `make up` (2026-08-07) Tempo crash-looped on
+  `The specified bucket does not exist` even though
+  `Job/rustfs-setup-buckets-init` was `Complete` and had logged all three
+  buckets created. The wait loop tested `mc alias set` — which can succeed
+  against an endpoint whose disk is not open yet — and, worse, **fell through
+  after ten failed attempts and created buckets anyway with no non-zero exit**.
+  RustFS opened `/data` 70s later and found it empty. Flux's `wait: true` read
+  the Complete Job as a satisfied dependency and released `tracing-local` and
+  `profiling-local` onto buckets that were never written; `pg-backups-cnpg` was
+  missing too, so Barman archiving would have failed next. The gate now waits on
+  `mc ls` (serving, not merely reachable) for up to 5 minutes, stats every
+  bucket after creating it, and **exits non-zero** on either failure so the
+  retry actually happens. Same fix in the `*/30` CronJob, which carried an
+  identical copy.
 - **A recording rule outlived the metric it recorded.** The RFC-0021 baseline
   rule `rfc0021:product_stock_reservations:rate5m` read
   `product_stock_reservations_total`, which product 1.7.0 removed with the

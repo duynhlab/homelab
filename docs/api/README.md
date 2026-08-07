@@ -163,6 +163,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | Application observability (normative contract) | [observability.md](./observability.md) · [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md) |
 | Metrics platform ops (alerts, dashboards) | [Application metrics (platform)](../observability/metrics/metrics-apps.md) |
 | Valkey cache-aside behavior | [Application caching](./caching.md) · [Caching (platform)](../caching/README.md) |
+| Shared Go library (packages, consumers, bump ledger) | [pkg.md](./pkg.md) |
 | Local environment | [local-stack README](../../local-stack/README.md) |
 | Repository index (images + CI) | [docs/README.md § Repositories](../README.md#repositories) |
 

@@ -183,7 +183,7 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | **Infrastructure** | [duynhlab/homelab](https://github.com/duynhlab/homelab) | GitOps, K8s manifests, docs | [![CI](https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/homelab/actions) |
 | **Helm Charts** | [duynhlab/helm-charts](https://github.com/duynhlab/helm-charts) | `mop` chart — OCI `ghcr.io/duynhlab/helm-charts/mop` | [![CI](https://github.com/duynhlab/helm-charts/actions/workflows/e2e.yml/badge.svg)](https://github.com/duynhlab/helm-charts/actions) |
 | **Shared Workflows** | [duynhlab/gha-workflows](https://github.com/duynhlab/gha-workflows) | Reusable GitHub Actions | [![CI](https://github.com/duynhlab/gha-workflows/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/duynhlab/gha-workflows/actions) |
-| **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go packages | [![CI](https://github.com/duynhlab/pkg/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
+| **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go packages — summary + bump ledger in [docs/api/pkg.md](./api/pkg.md) | [![CI](https://github.com/duynhlab/pkg/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
 
 ### Microservices and frontend
 

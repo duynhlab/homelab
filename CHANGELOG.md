@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs/api/pkg.md` — platform-side summary of the shared Go library: package
+  table, per-service consumer matrix, adoption table, and the full release
+  ledger (v0.1.0 → v0.35.0); linked from the api hub and the repository index.
+
 ### Changed
 
 - RFC registry synced to shipped reality: RFC-0015 (checkout) and RFC-0017

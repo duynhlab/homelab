@@ -258,6 +258,7 @@ handler examples.
 docs/observability/
 ├── README.md                     # This file: index + 3-layer architecture + APM integration
 ├── stack-review.md               # Whole-stack review: per-signal maturity scorecard + ranked gaps
+├── audit-2026-08-07.md           # Findings log: api/observability.md contract vs the deployed platform
 ├── opentelemetry/                 # OTel collector topology, sampling, operations
 │   ├── README.md                  # Platform deployment doc (policy → api/observability.md)
 │   ├── fundamentals.md           # OTel primer: API vs SDK, signals, OTLP, propagation + RFC-0014 migration story
@@ -430,6 +431,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [VictoriaMetrics Operator](metrics/victoriametrics.md) -- migration from kube-prometheus-stack
 - [Grafana Datasources](grafana/datasources.md) -- VictoriaMetrics plugin metrics datasource
 - [Alerting Strategy](alerting/README.md) -- 2-layer alerting (threshold + SLO burn-rate)
+- [Telemetry audit 2026-08-07](audit-2026-08-07.md) -- findings log: the `api/observability.md` contract measured against the deployed platform (5 findings, 3 falsified suspicions)
 - [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers

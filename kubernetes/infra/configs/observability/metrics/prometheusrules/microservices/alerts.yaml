@@ -100,9 +100,19 @@ spec:
         # alert above — page when the collector fails to export metric points.
         # Requires the collector's self-telemetry scrape (:8888).
         - alert: OtelMetricsPipelineExportFailures
+          # COUNT-ONCE on a sparse counter, so increase() not rate(), and no
+          # debounce. otelcol_exporter_send_failed_metric_points does not exist
+          # until the first failure creates it (measured 2026-08-07: the success
+          # counter read 211587 while this one had NO series at all), and #709
+          # measured that a series born inside the window reads 1 under
+          # increase() and 0 under rate(). This alert guards the pipeline every
+          # other alert depends on: if it cannot fire on the FIRST failure, a
+          # broken export path shows up only as every dashboard quietly going
+          # stale. `for` also had to go — it equalled the window, so a bounded
+          # burst of failures could never mature it.
           expr: |
-            sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points[5m])) > 0
-          for: 5m
+            sum by (exporter) (increase(otelcol_exporter_send_failed_metric_points[15m])) > 0
+          for: 0m
           labels:
             severity: critical
             category: availability

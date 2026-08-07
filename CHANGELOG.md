@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The alert guarding the metrics pipeline could not report the first failure.**
+  `OtelMetricsPipelineExportFailures` — whose own comment calls the push pipeline
+  "a dependency of every alert above" — used
+  `rate(otelcol_exporter_send_failed_metric_points[5m]) > 0` with `for: 5m`.
+  Measured 2026-08-07: the success counter read 211 587 while the failure counter
+  had **no series at all**, so it is born by the first failure, and #709 measured
+  that such a series reads 0 under `rate()`. A broken export path would therefore
+  have surfaced only as every dashboard quietly going stale. Now
+  `sum(increase(...[15m])) > 0` with `for: 0m`, the fifth rule of this class
+  corrected.
+- **Kong's redis-shorthand deprecation notice was the entirety of its stored WARN
+  volume** — 3840 of 3840 records in the 90-day ClickHouse store, with no real
+  Kong warning present. The platform config is already the non-deprecated nested
+  `redis:` form in both the cluster plugins and local-stack; Kong 3.9.3
+  materialises the whole deprecated shorthand set from those values at
+  declarative-config load and warns on each (`redis_ssl` and `redis_ssl_verify`
+  warn just as often and appear nowhere in this repo). Dropped at the collector
+  with the reasoning recorded, so the notice stops buying retention cost and real
+  Kong warnings become visible again; it disappears on its own at the Kong 4.0
+  bump.
 - **The RustFS bucket gate reported success without creating anything.** On a
   fresh `make up` (2026-08-07) Tempo crash-looped on
   `The specified bucket does not exist` even though
@@ -93,6 +113,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Telemetry audit findings log added at
+  [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
+  — the `api/observability.md` contract measured against the deployed platform.
+  Six findings, four falsified suspicions (one of them my own bad test), and an
+  explicit compliant list so the next audit can diff instead of re-deriving.
 - **`CNPGWALArchiveFailing` verified by injection, and its runbook corrected.**
   Scaling the RustFS object store to zero for 19 minutes drove the alert through
   pending → firing → resolved exactly as the 2026-08-07 hardening intended, with

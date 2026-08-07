@@ -5,7 +5,7 @@
 | **Severity** | critical |
 | **Category** | correctness / money — ledger vs provider drift |
 | **Manifest** | [`rfc0021-phase6.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-phase6.yaml) |
-| **Metrics** | `payment_reconciliation_discrepancies_total{kind}` |
+| **Metrics** | `payment_reconciliation_discrepancies_total{class}` |
 
 ## Meaning
 A reconciliation pass found at least one payment whose internal state
@@ -17,7 +17,7 @@ their disagreement is not drift, it is a question the attempt log owns and the
 doubt sweep is working on. So anything counted here is real drift between what
 we believe and what the provider holds.
 
-Classes (`kind`):
+Classes (`class` — the label matches the DB column since payment 1.5.2; it was `kind` before):
 
 | Class | Meaning |
 |---|---|

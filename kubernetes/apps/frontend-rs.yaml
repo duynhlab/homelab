@@ -32,7 +32,8 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
-            tag: "1.1.2" # {"$imagepolicy": "flux-system:frontend:tag"}
+            tag: "1.2.1" # {"$imagepolicy": "flux-system:frontend:tag"}
+            # 1.2.1: one paced, jittered retry on 503 + Retry-After in the checkout funnel (frontend#84). Also picks up the 1.2.0 single-entry checkout that was released but never repinned.
             pullPolicy: IfNotPresent
           # mop >=0.14 values schema: the HTTP port pair lives under
           # service.http (the old top-level port/targetPort/containerPort keys

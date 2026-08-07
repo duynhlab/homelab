@@ -121,6 +121,25 @@ spec:
             description: "inventory is emitting {{ $value | humanize }} reservation errors/s (outcome=error) for 10m. This is the infra/unexpected bucket — a DB CHECK violation (oversell backstop trip), storage fault, or unhandled transition. Business rejections (insufficient/conflict) are excluded, so this is always actionable. Check inventory logs (SQLSTATE on the reservation span) and product-db health."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/InventoryReservationInfraErrors.md"
 
+        # FINDING: a reservation was attempted for a SKU inventory has never
+        # heard of (no balance row in ANY warehouse). Checkout fails closed on
+        # this class at create AND confirm, so reaching Reserve with an
+        # unknown SKU means the data changed mid-flight — a seeding/DELETE gap
+        # on the money path, never customer demand. Count-once semantics like
+        # the participant-skew alerts: any increase is a distinct order, and
+        # no threshold above zero would be honest.
+        - alert: InventoryReserveUnknownSKU
+          expr: |
+            increase(inventory_reservation_total{outcome="unknown_sku"}[10m]) > 0
+          for: 0m
+          labels:
+            severity: critical
+            category: errors
+          annotations:
+            summary: "a reservation hit a SKU inventory does not track"
+            description: "{{ $value | humanize }} reservation(s) in 10m answered SKU_NOT_FOUND — the order fails with reason UNKNOWN_SKU (payment voided, nothing reserved). This is a data gap on the money path: a balance row is missing for a purchasable product. Seed the balance (or an explicit RECEIVE movement) and find out how the product became purchasable without one."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/InventoryReserveUnknownSKU.md"
+
         # SYMPTOM: callers are seeing failed inventory RPCs. non-OK / all over
         # the whole service (aggregate, not per-method) so a single hot method
         # can't hide behind healthy ones. Business FailedPrecondition on shortage

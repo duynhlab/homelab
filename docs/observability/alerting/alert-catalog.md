@@ -444,6 +444,17 @@ Both order processes (API + worker) report the backlog, so a single pod restart
 cannot trip the `absent()` alert, and switching the reconciler off with
 `ORDER_RECONCILER_ENABLED=false` does not hide the number it exists to show.
 
+**`CNPGWALArchiveFailing` verified at runtime (2026-08-07).** Scaling the RustFS
+object store to zero for 19 minutes and forcing two WAL switches drove the whole
+cycle: `failed_count` rose within seconds, the alert went **pending** the moment
+`increase(archived_count[15m])` reached 0, **fired** 5m later, and **resolved**
+within four minutes of the store returning. Total outage-to-page latency was
+**18 minutes** — the `[15m]` no-progress window plus the `for: 5m` debounce — so
+this alert is a confirmation that archiving is stuck, never an early warning. The
+idle-cluster arm also held: the second cluster paged only because it genuinely had
+36 failures on a segment that was in flight, not merely because it was quiet. Full
+timeline in the [runbook](../runbooks/postgresql/CNPGWALArchiveFailing.md).
+
 Runbooks: one per alert under
 [`runbooks/microservices/`](../runbooks/microservices/).
 

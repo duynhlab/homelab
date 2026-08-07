@@ -93,6 +93,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`CNPGWALArchiveFailing` verified by injection, and its runbook corrected.**
+  Scaling the RustFS object store to zero for 19 minutes drove the alert through
+  pending → firing → resolved exactly as the 2026-08-07 hardening intended, with
+  the idle-cluster arm holding (the second cluster paged only because it really
+  had 36 failures on an in-flight segment). Measured outage-to-page latency is
+  **18 minutes**, so the runbook now says plainly that this alert confirms stuck
+  archiving rather than warning early, and tells the responder to check `pg_wal`
+  space first. Its `Meaning` section still quoted the old single-arm expression
+  and now describes both arms. Also recorded: Tempo and Pyroscope survived the
+  same outage without a restart — a crash-looping Tempo means a *missing bucket*,
+  not an unreachable store, so its health is not a proxy for the object store's.
 - `docs/api/` synced to what the RFC-0021 follow-up releases actually do:
   inventory's reservation path surfaces `SKU_NOT_FOUND` (0.4.1) rather than a
   generic `NOT_FOUND`, order's bounded failure reasons include `UNKNOWN_SKU`

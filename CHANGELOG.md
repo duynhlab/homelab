@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- checkout pinned to `0.6.2` (worker follows, same-tag rule): promo lock
+  queues answer SQLSTATE `55P03` (contention, a visible 500) instead of dying
+  at the query deadline and reading as a fake failover 503; `ExpireDue`
+  propagates infrastructure errors on the confirm-binding read so the
+  abandonment activity retries instead of abandoning the session forever
+  (checkout-service #48 — the two review follow-ups from #47).
+
 ## [0.110.0] - 2026-08-07
 
 <!-- markdown-link-check-disable -->

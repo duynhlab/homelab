@@ -9,7 +9,7 @@ listed beside them.
 | | |
 |---|---|
 | **Auto-instrumented** | 3 HTTP + 2 gRPC + 4 runtime + 15 DB-client families — identical across the fleet, zero per-service code |
-| **Hand-declared (business)** | **37 instruments** across the 10 services (28 counters, 6 second-histograms, 2 value-histograms + label-less counters) |
+| **Hand-declared (business)** | **63 instruments** across the 11 services (56 counters, 5 second-histograms, 2 value-histograms), 2 tombstoned |
 | **Source of truth** | Each service's `internal/logic/v1/metrics.go` (+ `internal/saga/`, `internal/core/{provider,cache}/` where noted) |
 | **Conventions** | RFC-0017 D-8 (instrument choice) / D-9 (bounded labels, no PII/ids) |
 | **Naming render** | vmagent `usePrometheusNaming`: dots→`_`, Counter gains `_total`, `WithUnit("s")` histogram gains `_seconds` |
@@ -46,7 +46,7 @@ These come from libraries wired once in `pkg` — never hand-write them
 Hand-declared in each service's own code (RFC-0017). Every label is a bounded
 enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 
-### payment (11)
+### payment (12)
 
 | Metric (PromQL) | Instrument | Labels | How to read / recorded when |
 |---|---|---|---|
@@ -63,7 +63,7 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 | `payment_doubt_sweep_failures_total` | `payment.doubt.sweep_failures.total` · Counter | `operation` | Worklist entries the sweep could not even attempt (row would not load, no key to replay under) — distinct from a resolution that ran and learned nothing |
 | `payment_idempotency_release_failures_total` | `payment.idempotency.release_failures.total` · Counter | — | Keys left locked after a failed attempt; the caller is told to retry immediately and would bounce off the lock until the takeover window |
 
-### order (22)
+### order (24)
 
 | Metric (PromQL) | Instrument | Labels | How to read / recorded when |
 |---|---|---|---|
@@ -102,7 +102,14 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 | `auth_family_revocations_total` | `auth.family_revocations.total` · Counter | `reason` = `logout`\|`reuse` | Only *successful* revocations count. Measures revoke operations, not distinct families (idempotent replays re-count) — read spikes as "revoke activity" |
 | `auth_password_hash_duration_seconds` | `auth.password_hash.duration` · Histogram, `s`, SLO buckets | `op` = `hash` (register)\|`compare` (login) | Isolates bcrypt cost from SQL/token work (stop-closure fires right after the bcrypt call) |
 
-### product (2)
+### inventory (2)
+
+| Metric (PromQL) | Instrument | Labels | How to read / recorded when |
+|---|---|---|---|
+| `inventory_check_total` | `inventory.check.total` · Counter | `outcome` = `fulfillable`\|`shortage`\|`unknown_sku`\|`error` | Whole-basket availability reads (checkout's fail-closed gate at session create and confirm). `unknown_sku` is split from `shortage` on purpose: one needs a balance row, the other needs a requote, and lumping them made a missing row look like a real stockout. Pairs with `checkout_availability_check_total` — the same question asked from the caller's side |
+| `inventory_reservation_total` | `inventory.reservation.total` · Counter | `operation` = `reserve`\|`release`\|`commit` · `outcome` = `ok`\|`replayed`\|`insufficient`\|`conflict`\|`concurrency`\|`invalid_transition`\|`not_found`\|`unknown_sku`\|`error` | The saga-side stock authority since the RFC-0021 P4 contraction. Every known rejection has its own value, so **`error` is the residual bucket and always actionable** ([`InventoryReservationInfraErrors`](../runbooks/microservices/InventoryReservationInfraErrors.md)). `unknown_sku` (0.4.1+) means no balance row in ANY warehouse — checkout already fails closed on that class, so reaching a reservation with it is a data gap that moved mid-flight, and it pages ([`InventoryReserveUnknownSKU`](../runbooks/microservices/InventoryReserveUnknownSKU.md)). `conflict` (divergent payload under a used key) is distinct from `replayed` (identical retry) |
+
+### product (1)
 
 | Metric (PromQL) | Instrument | Labels | How to read / recorded when |
 |---|---|---|---|
@@ -147,7 +154,7 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 | `notification_read_total` | `notification.read.total` · Counter | `mode` = `single`\|`all` | Added by `n` = rows actually flipped (mark-all of 5 adds 5); idempotent no-ops not counted |
 | `notification_send_duration_seconds` | `notification.send.duration` · Histogram, `s`, SLO buckets | `channel` = `email`\|`sms` | Send-path latency, validated-input → persisted. The seam where a real provider call would live |
 
-### checkout (6)
+### checkout (7)
 
 | Metric (PromQL) | Instrument | Labels | How to read / recorded when |
 |---|---|---|---|

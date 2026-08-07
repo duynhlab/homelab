@@ -19,7 +19,10 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**184 statically-defined alerts** across 9 domains, plus **64 Sloth-generated** SLO
+**198 statically-defined alerts** across 9 domains (re-derive with
+`grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
+— by domain: postgres 53, microservices 52, victoriametrics 31, kubernetes 29,
+kong 13, gitops 9, valkey 7, observability 3), plus **64 Sloth-generated** SLO
 burn-rate alerts (2 × 32 SLOs). The 32 SLOs cover all 11 Go services: 30 rendered
 by the `mop` chart through the five domain ResourceSets, plus inventory's 2
 hand-written gRPC SLOs. Two CNPG topology rules are **gated** (not
@@ -382,6 +385,7 @@ healthy.
 | OrderParticipantDisagreement | warning | `increase(order_reconciler_participant_disagreements_total[30m])>0` | An order ran the inventory branch while its row says otherwise — the hold is repaired, but every later judgement is reading a wrong record | 5m |
 | OrderStartParticipantUnrecognised | warning | `increase(order_fulfillment_start_participant_total{source="unrecognised"}[30m])>0` | A start could not use the recorded participant and chose the branch from this process's flag instead | 5m |
 | OrderInventoryCommitLagHigh | warning | commit-lag p99 `>300s` | Confirmed orders hold merely-RESERVED stock, understating available-to-promise; right-censored, so the backlog alert is the severe partner | 15m |
+| InventoryReserveUnknownSKU | **critical** | `increase(inventory_reservation_total{outcome="unknown_sku"}[10m])>0` (count-once) | A saga tried to reserve a SKU with no balance row in ANY warehouse — a data gap on the money path that checkout's fail-closed layer cannot see mid-flight. The order fails with reason `UNKNOWN_SKU`, payment voided, nothing reserved | [runbook](../runbooks/microservices/InventoryReserveUnknownSKU.md) |
 | InventoryReservationInfraErrors | warning | inventory reservation infra-error rate | Reserve/commit/release failing inside inventory-service — the saga's stock steps cannot complete | see manifest |
 
 ## 9b. RFC-0021 phase 6 (payment doubt)
@@ -405,6 +409,7 @@ minutes is not in flight, it is not converging.
 | PaymentDoubtStale | critical | `max(payment_doubt_oldest_age_seconds)>3600` | A customer's money has been in an unnamed state for an hour and both automatic escapes have failed; only a human asking the provider settles it | 10m |
 | PaymentAttemptEvidenceLost | critical | `increase(payment_attempt_write_failures_total[15m])>0` | The attempt log refused a write, so the park was refused and a state nobody confirmed stands (a capture keeps its posted ledger leg) | 5m |
 | PaymentReconciliationDiscrepancy | critical | `increase(payment_reconciliation_discrepancies_total[1h])>0` | Real ledger-vs-provider drift — parked payments are excluded by design, so anything counted is money booked-not-collected or collected-not-booked | 10m |
+| PaymentReconciliationWindowViolation | warning | `increase(payment_reconciliation_window_violations_total[1h])>0` | The provider returned transactions outside the requested `[from, through)` window; they were excluded and the watermark held, so the window re-scans. A provider ignoring its bounds is what manufactured the first GameDay's phantom discrepancy | [runbook](../runbooks/microservices/PaymentReconciliationWindowViolation.md) |
 | PaymentReconciliationStale | critical | `max(payment_reconciliation_watermark_age_seconds)>1800` | Reconciliation has not completed a pass in >30m — and while that is true the discrepancy page cannot fire at all, so real drift accumulates unseen | 15m |
 | PaymentDoubtBacklogGrowing | warning | `max(payment_doubt_open)>10` | Doubt is created faster than it is settled: a standing set of customers in limbo before any one is old enough to page | 30m |
 | PaymentDoubtSweepFailing | warning | `increase(payment_doubt_sweep_failures_total[30m])>0` | Worklist entries the sweep cannot act on at all — no automatic escape, so they will age into PaymentDoubtStale | 15m |

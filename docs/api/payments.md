@@ -364,6 +364,20 @@ the frontier stops moving. Run outcome, run duration, and heal failures per clas
 are series alongside it — a heal that never worked used to be only a log line
 ([PaymentReconciliationDiscrepancy](../observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md)).
 
+
+**The provider's answer is verified, not trusted** (since 1.5.2). Each returned
+transaction is checked against the half-open `[from, through)` window the pass
+asked for. A row outside it is **excluded from classification** — it cannot
+manufacture a phantom `missing_internal` — counted in
+`payment_reconciliation_window_violations_total`, and the pass then **holds the
+watermark** so the next run re-covers the same window.
+`PaymentReconciliationWindowViolation` (warning) makes that refusal visible,
+because a silently held frontier looks exactly like a reconciler that stopped.
+This exists because the first GameDay's critical discrepancy was a false
+positive of precisely this shape: a provider build that discarded its
+`from`/`to` bounds made a bounded internal set face the whole ledger, and every
+older charge read as missing on our side.
+
 ## Callers & dependencies
 
 | Direction | Peer | Contract |

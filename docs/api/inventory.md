@@ -164,9 +164,15 @@ storage failures are retryable (`DEPENDENCY_UNAVAILABLE`).
 `IDEMPOTENCY_CONFLICT` (`AlreadyExists`), `INVALID_TRANSITION`
 (`FailedPrecondition`), `CONCURRENCY_CONFLICT` (`Aborted`, retryable),
 `NOT_FOUND` (`NotFound`), `DEPENDENCY_UNAVAILABLE` (`Unavailable`, retryable —
-fail-closed on any storage error). `SKU_NOT_FOUND`/`WAREHOUSE_NOT_FOUND` are
-defined in the shared reason set for future availability paths; the reservation
-write path currently surfaces unknown-reservation as the generic `NOT_FOUND`.
+fail-closed on any storage error). `SKU_NOT_FOUND`
+(`FailedPrecondition`) — since 0.4.1 `Reserve` answers this for a SKU with **no
+balance row in any warehouse**, instead of counting it as ATP 0 and returning a
+fabricated `INSUFFICIENT_STOCK`. The classification uses the same
+any-warehouse rule as the availability read (a dark warehouse's exclusive SKUs
+are un-promisable, not unknowable), and in a mixed basket the data gap wins over
+the shortage. The ids stay in logs and spans, never the wire message. Unknown
+*reservation* ids still surface as the generic `NOT_FOUND`;
+`WAREHOUSE_NOT_FOUND` remains reserved for future paths.
 Versioning: [api.md § versioning](./api.md#versioning-and-compatibility) — not
 duplicated here.
 

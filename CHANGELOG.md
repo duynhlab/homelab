@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Pull requests now validate Markdown links.** CI checks only added or changed
+  Markdown files, retries rate-limited requests, and ignores URLs that are
+  intentionally reachable only from local environments.
+
+<!-- markdown-link-check-disable -->
+<!-- Historical entries below preserve release-time paths and are append-only. -->
+
 - **local-stack is now the explicit pre-release gate.** Its README is a concise
   operator entry point and the full A/B/C protocol lives in a dedicated E2E
   runbook with commit-SHA evidence and an `ELIGIBLE FOR TAG` decision. The docs

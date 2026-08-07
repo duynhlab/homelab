@@ -8,7 +8,7 @@ elsewhere.
 
 > **Contract stance:** As-built, and the cutover is **complete**. Every caller is
 > live: the order saga reserves/commits/releases here since the W7 write cutover
-> (2026-07-30), checkout reads availability here only (0.5.0), and product's
+> (2026-07-30), checkout reads availability here only (since 0.5.0; fail-closed hardened through 0.6.x), and product's
 > `/details` asks here for the page's availability. Phase 4 removed the alternative
 > rather than leaving it unused — product's stock RPCs, read fields, and schema are
 > all gone ([RFC-0021](../proposals/rfc/RFC-0021/), product migration `000006`). This
@@ -42,10 +42,11 @@ elsewhere.
 
 ## Temporal participation
 
-None — this service does not start or participate in Temporal workflows. See
-[workflows.md](./workflows.md). When the phase-3 write cutover lands, the
-order-fulfillment saga will call `Reserve`/`Release`/`Commit` as **Participant
-(gRPC)** activities (**Planned**); today those activities still target product.
+None — this service does not start or participate in Temporal workflows
+itself. See [workflows.md](./workflows.md). The order-fulfillment saga calls
+`Reserve`/`Release`/`Commit` here as **Participant (gRPC)** activities —
+live since the write cutover (2026-07-30); the worker, not inventory, owns
+the workflow.
 
 ## Why it exists
 
@@ -80,21 +81,20 @@ stock), or reservation auto-expiry.
 
 ## Architecture
 
-One question: **who calls inventory, what does it own, and what is not yet live?**
+One question: **who calls inventory and what does it own?**
 
 ```mermaid
 flowchart LR
-    CK["checkout"] -.->|"CheckAvailability /<br/>BatchGetAvailability (planned P2)"| INV["inventory-service<br/>:8080 health · :9090 gRPC"]
-    W["order-worker"] -->|"Reserve / Release / Commit<br/>(live, W7 cutover)"| INV
+    CK["checkout"] -->|"CheckAvailability"| INV["inventory-service<br/>:8080 health · :9090 gRPC"]
+    W["order-worker"] -->|"Reserve / Release / Commit"| INV
     OAPI["order API"] -->|"GetReservation<br/>(/details enrichment)"| INV
-    P["product"] -.->|"availability enrichment<br/>soft-fail (planned)"| INV
+    P["product"] -->|"BatchGetAvailability<br/>(/details enrichment, soft-fail)"| INV
     INV --> DB[("inventory DB<br/>on product-db via PgDog :6432")]
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
-    class CK,P,INV service;
+    class CK,P,INV,OAPI service;
     class W worker;
     class DB data;
 ```
@@ -227,14 +227,15 @@ browsing surfaces should prefer `status`.
 
 | Direction | Peer | Transport | Purpose | Status |
 |-----------|------|-----------|---------|--------|
-| Inbound | checkout | gRPC `CheckAvailability` / `BatchGetAvailability` | Confirm-time revalidation + snapshot availability | **Planned** (phase 2) |
-| Inbound | order-worker | gRPC `Reserve` / `Release` / `Commit` | Saga stock step, compensation, mandatory-forward commit — live since the W7 cutover (2026-07-30); cancellation disposition reads current state via `GetReservation` and releases RESERVED holds (`ORDER_CANCELLED`) | Implemented |
+| Inbound | checkout | gRPC `CheckAvailability` | Session-create and confirm-time revalidation (fail-closed) | Implemented |
+| Inbound | order-worker | gRPC `Reserve` / `Release` / `Commit` | Saga stock step, compensation, mandatory-forward commit — live since the write cutover (2026-07-30); cancellation disposition reads current state via `GetReservation` and releases RESERVED holds (`ORDER_CANCELLED`) | Implemented |
 | Inbound | order API | gRPC `GetReservation` | `/details` inventory block (soft-fail enrichment, RFC-0021 P5) | Implemented |
-| Inbound | product | gRPC availability enrichment (soft-fail) | Product-details availability | **Planned** |
+| Inbound | product | gRPC `BatchGetAvailability` (soft-fail) | Product-details availability | Implemented |
 | Outbound | inventory DB via PgDog | Postgres | All persistence | Implemented |
 
-New sagas run the inventory branch; old pinned builds may still run
-product's `ReserveStock`/`ReleaseStock` until drained ([product.md](./product.md)).
+Every saga runs the inventory branch — the pre-cutover worker builds were
+drained and retired, and product's stock RPCs left the contract
+([product.md](./product.md)).
 A cancelled order with a COMMITTED reservation is recorded as
 `RESTOCK_SKIPPED` — accepted shrinkage until inventory grows a `Return` RPC
 ([ADR-033](../proposals/adr/ADR-033-order-status-cancellation/)). The
@@ -337,4 +338,4 @@ Transport peers call `logic/v1`; logic calls `core` only
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
 
-_Last updated: 2026-08-01 — order write path marked live (W7); cancellation disposition + `/details` enrichment callers added._
+_Last updated: 2026-08-07 — cutover language retired: every caller is Implemented (checkout CheckAvailability, product BatchGetAvailability, saga Reserve/Release/Commit); pre-cutover worker builds drained and retired._

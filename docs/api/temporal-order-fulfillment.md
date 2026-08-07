@@ -808,7 +808,7 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
 Worker Deployment Versions, one worker manifest per build.
 
-- The worker registers as deployment **`order-fulfillment`** build **`1.8.0`**
+- The worker registers as deployment **`order-fulfillment`** build **`1.13.0`** (one manifest per pinned build; the number tracks the order release)
   (`TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, read by
   `pkg/temporalx`; both-or-neither, half-set refuses to start). The workflow
   registers **`VersioningBehaviorPinned`** — a saga holding money and stock is
@@ -845,9 +845,11 @@ Deliberate deviations from the original design:
   (PK `reservation_id,product_id`); that table was dropped in RFC-0021 phase 4
   (product migration `000006`) with the RPCs that wrote it.
 
-**Roadmap — all items Planned:** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
-server bump 1.27.x (**Planned**), Grafana dashboard (**Planned**), platform-db DR
-replica cluster (**Planned**), and GameDay drills (**Planned**) are follow-ups.
+**Roadmap:** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
+Grafana dashboard (**Planned**) and the platform-db DR replica cluster
+(**Planned**) remain; the server bump shipped past the 1.27.x target (1.31.2,
+ADR-030 re-platform) and the first GameDay drill ran 2026-08-06
+([RFC-0021 gameday](../proposals/rfc/RFC-0021/gameday.md), G2).
 Already shipped from that list: cache-bust on reserve (product's
 `ReserveStock`/`ReleaseStock` invalidated `product:{id}` — historical, the saga
 no longer calls them since RFC-0021 P4), workflow/activity RED
@@ -915,4 +917,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-08-01 — added the CancellationWorkflow section; terminal writes described against the P5 FSM._
+_Last updated: 2026-08-07 — worker build id tracks the current pin; roadmap reflects the shipped server bump and the recorded GameDay drill._

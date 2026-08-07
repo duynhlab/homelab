@@ -128,8 +128,6 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | checkout-worker | ✓ | ✓ | Implemented | — |
 | mockpay provider | ✓ | ✓ | Implemented | — |
 | frontend SPA | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
-| Legacy `POST /order/v1/private/orders` | ✓ | ✓ | Technical debt | — |
-| Legacy order→cart REST pricing | ✓ | ✓ | Technical debt | — |
 | gRPC mTLS east-west | — | — | Planned | — |
 
 | Service | One-line responsibility | Contract |
@@ -153,7 +151,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | [api.md](./api.md) | HTTP and gRPC architecture, call graph, user journeys, HTTP/2 load balancing, security, observability | Implemented |
 | [microservices.md](./microservices.md) | Service feature matrix, ownership, dependencies, and known gaps | Living reference |
 | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
-| [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | P1-P5 shipped (local-stack + cluster); P6 legacy removal planned |
+| [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | Implemented — P1-P5 shipped; the legacy order path was removed in RFC-0021 P5 |
 | [payments.md](./payments.md) | Money state machine, idempotency, ledger, provider, and reconciliation | Implemented |
 
 ## Related Areas
@@ -188,4 +186,4 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 Every substantive claim must match the service code, local-stack wiring, and
 GitOps manifests. Mark designed but undeployed behavior as **planned**.
 
-_Last updated: 2026-07-23_
+_Last updated: 2026-08-07 — deployment rollup drops the two legacy rows removed by RFC-0021 P5; checkout is fully shipped._

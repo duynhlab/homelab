@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- docs/api de-drift after the RFC-0021 closure: `GetProducts` (removed from the
+  contract) no longer described as live in checkout/api/microservices; the
+  Checkout→Inventory `CheckAvailability` edge added to every call graph and
+  journey; inventory.md caller matrix flipped from Planned to Implemented and
+  the drained pre-cutover notes retired; checkout.md documents the 0.6.1
+  datastore-unavailable contract (`503` + `Retry-After: 2` on every session
+  endpoint) and points its audit link at `local-stack/docs/e2e-audit.md`;
+  deployment rollup drops the two legacy rows removed in P5; order-worker build
+  id and Temporal roadmap corrected.
+
 ### Added
 
 - **inventory gets real SLOs, hand-written on its gRPC SLI.** The `mop` chart only

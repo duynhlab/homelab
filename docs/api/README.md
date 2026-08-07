@@ -4,7 +4,7 @@ Start here to learn the platform's shared API rules and then drill into one serv
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
-| **Status** | Living documentation checked against all ten service repositories | — |
+| **Status** | Living documentation checked against all 11 service repositories | — |
 | **Canonical shared guide** | [api.md](./api.md) | — |
 | **Service map** | [microservices.md](./microservices.md) | — |
 | **Workflow guide** | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | — |
@@ -95,7 +95,7 @@ doc has no owning RFC or ADR. Legacy v1 contracts may still say **Design record*
 | Deployed gateway, network, database, or observability backends/ops | The matching platform area under `docs/observability/` |
 | Repository URLs, images, and CI badges | [docs/README.md § Repositories](../README.md#repositories) |
 
-## Service Contracts {#service-contracts}
+## Service Contracts
 
 Per-service **At a glance** tables hold deployment detail; this rollup is the platform-wide view.
 

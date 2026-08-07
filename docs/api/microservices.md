@@ -17,7 +17,8 @@ feature has, and which technique implements it* — plus data ownership.
 
 ## 1. Platform shape
 
-10 Go backend services (Go 1.26, Gin, HTTP `:8080`) plus a React/Vite SPA,
+11 Go backend services (Go 1.26; ten HTTP APIs plus the gRPC-only inventory
+service) and a React/Vite SPA,
 fronted by **Kong pass-through** in both environments; each service follows the
 3-layer `web → logic → core` model and the Variant A URL shape
 `/{service}/v1/{audience}/{resource…}`. The topology diagram and shared
@@ -29,7 +30,7 @@ HTTP/gRPC rules are owned by
 ## 2. Deployment snapshot (local stack)
 
 The local end-to-end stack ([`local-stack/compose.yaml`](../../local-stack/compose.yaml))
-mirrors the **app plane** (10 HTTP services), **workflow plane** (Temporal +
+mirrors the **app plane** (ten HTTP services + inventory gRPC), **workflow plane** (Temporal +
 `order-worker` + `checkout-worker`), **provider stub** (`mockpay`), and edge
 (frontend + Kong). Shared infra (Postgres, Valkey) and the observability pipeline
 (OTel collector, Victoria*, ClickHouse, Grafana, Pyroscope) are internal-only —
@@ -44,10 +45,12 @@ Grafana until ready.
 ```mermaid
 flowchart LR
     SPA["frontend :3001"] --> Kong["gateway :8080"]
-    Kong --> SVC["10 Go services"]
+    Kong --> SVC["10 HTTP services"]
     MP["mockpay"] -->|"provider HTTP"| PAY["payment"]
     MP -->|"webhook"| Kong
-    SVC --> PG[("Postgres<br/>10 DBs")]
+    SVC --> PG[("Postgres<br/>11 DBs")]
+    SVC -->|"gRPC inventory calls"| INV["inventory<br/>gRPC only"]
+    INV --> PG
     SVC --> VALKEY[("Valkey")]
     CK["checkout"] -->|"gRPC + Temporal"| SVC
     ORD["order"] --> TMP["Temporal :8233 UI"]
@@ -63,7 +66,7 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
     class SPA,Kong edge;
-    class SVC,PAY,CK,ORD service;
+    class SVC,INV,PAY,CK,ORD service;
     class OW,CW worker;
     class TMP platform;
     class PG,VALKEY data;
@@ -74,26 +77,27 @@ flowchart LR
 |-----------|------|------|------------------|-------|------------------------|
 | auth | `:8080` | — | `auth` | — | none outbound (JWKS validated *by* everyone) |
 | user | `:8080` | — | `user` | — | auth (JWKS); caller: Kong |
-| product | `:8080` | `:9090` server | `product` | Valkey | review (gRPC); callers: Kong, checkout, order-worker |
+| product | `:8080` | `:9090` server | `product` | Valkey | review + inventory (gRPC); callers: Kong, checkout |
+| inventory | health only | `:9090` server | `inventory` | — | callers: product details, checkout, order API, order-worker |
 | cart | `:8080` | `:9090` server | `cart` | — | auth (JWKS); callers: Kong, checkout (`GetCart`), order/order-worker (REST) |
 | order | `:8080` | `:9090` server | `order` | — | auth (JWKS), Temporal, shipping/payment/inventory (gRPC), cart (REST); callers: Kong, checkout (`CreateOrder`) |
 | review | `:8080` | `:9090` server | `review` | — | auth (JWKS); callers: Kong, product (gRPC) |
 | shipping | `:8080` | `:9090` server | `shipping` | — | none outbound; callers: Kong, checkout, order, order-worker |
 | notification | `:8080` | `:9090` server | `notification` | — | auth (JWKS); callers: Kong, order-worker (`SendEmail`) |
 | payment | `:8080` | `:9090` server | `payment` | — | auth (JWKS), mockpay (HTTP); callers: Kong, order (GetPayment), order-worker (saga money) |
-| checkout | `:8080` internal-only | client only | `checkout` | — | auth (JWKS), cart/product/shipping/order (gRPC), Temporal; caller: Kong only |
-| order-worker | `:8080` health | client only | `order` | — | Temporal; product/shipping/notification/payment (gRPC), cart (REST clear) |
+| checkout | `:8080` internal-only | client only | `checkout` | — | auth (JWKS), cart/product/inventory/shipping/order (gRPC), Temporal; caller: Kong only |
+| order-worker | `:8080` health | client only | `order` | — | Temporal; inventory/shipping/notification/payment (gRPC), cart (REST clear) |
 | checkout-worker | `:8080` health | — | `checkout` | — | Temporal (`AbandonedCheckoutWorkflow`; DB-only activities) |
 | mockpay | `:8080` | — | — | — | called by payment; webhooks → gateway → payment public route |
 | temporal | — (`7233` gRPC, `8233` UI) | — | — (in-memory dev) | — | callers: order, checkout, both workers |
-| gateway (Kong 3.9) | `8000` → host `8080` | — | — | Valkey (rate-limit) | all 10 services + cache; callers: frontend, browser, mockpay webhooks |
+| gateway (Kong 3.9) | `8000` → host `8080` | — | — | Valkey (rate-limit) | ten HTTP services + cache; inventory remains east-west only; callers: frontend, browser, mockpay webhooks |
 | frontend | `80` → host `3001` | — | — | — | gateway only |
 
 > **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`platform-db-pooler-rw.platform.svc.cluster.local:5432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);
 > `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`checkout`/`payment`
 > databases; payment connects **direct over TLS, bypassing PgDog**).
-> Locally these collapse into one Postgres with 10 service databases. See [`../databases/`](../databases/).
-> **Logging is unified** — all 10 services log via the shared `pkg/logger` zap wrapper
+> Locally these collapse into one Postgres with 11 service databases. See [`../databases/`](../databases/).
+> **Logging is unified** — all 11 services log via the shared `pkg/logger` zap wrapper
 > (`zapx`), teed into the OTLP pipeline (RFC-0014 P4).
 
 ---
@@ -266,17 +270,17 @@ is never browser-facing.**
 |---|---|---|---|
 | **RS256 JWT + JWKS** | Stateless identity — no per-request auth hop | Mint: auth. Verify locally via `pkg/authmw`: user, cart, order, review, notification, payment, checkout | RFC-0009, [API auth model](api.md#authentication) |
 | **Rotating refresh tokens** | Long-lived sessions without long-lived access tokens; reuse detection | auth (sha256 at rest, family revoke) | — |
-| **Temporal saga** | All-or-nothing multi-service checkout with compensations | order (+ `order-worker`); participants: product, shipping, payment, notification, cart | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
+| **Temporal saga** | All-or-nothing multi-service checkout with compensations | order (+ `order-worker`); participants: inventory, shipping, payment, notification, cart | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
 | **Temporal abandonment timer** | Durable session expiry without polling the DB | checkout (+ `checkout-worker`); DB-authoritative `expires_at` (ADR-019) | [workflows.md](workflows.md#abandoned-checkout) |
 | **Cache-aside (Valkey)** | Read-heavy hot paths | product (SETNX stampede lock, TTL jitter, SCAN invalidation) | [caching](./caching.md) |
 | **Transactional outbox** | Reliable side-effects with the DB write (no dual-write gap) | payment (single-writer relay) | ADR-007 |
 | **Reconciliation** | Detect provider/ledger drift | payment (ticker + internal trigger API, flag-gated auto-heal) | ADR-011/012 |
 | **Webhook HMAC** | Authenticating an unauthenticated public caller | payment ← mockpay | RFC-0010 |
-| **gRPC east-west (`:9090`)** | Typed internal transport | Servers: product, cart, order, review, shipping, notification, payment. Clients: product→review; order/order-worker→product, shipping, notification, payment; checkout→cart, product, shipping, order | [API call graph](api.md#current-east-west-call-graph) |
+| **gRPC east-west (`:9090`)** | Typed internal transport | Servers: product, inventory, cart, order, review, shipping, notification, payment. Clients: product→review/inventory; order API→inventory/shipping/payment; order-worker→inventory/shipping/notification/payment; checkout→cart/product/inventory/shipping/order | [API call graph](api.md#current-east-west-call-graph) |
 | **Idempotency** | Exactly-once effects under retries | HTTP `Idempotency-Key`: checkout confirm, payment create/refund. gRPC order create key required. Saga natural keys: `reservation_id`, shipment `order_id`, payment recovery points; order status commands replay by `(order_id, command_id)` | ADR-010 |
 | **Server-side aggregation** | No client-side orchestration | product `/details`, order `/details` (soft-fail enrichment) | — |
 | **Ownership-scoped queries** | Anti-IDOR — rows fetched with `(id, user_id)` | checkout, order, notification, payment, cart, user (token-derived `user_id`) | — |
-| **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 10 services | [../databases/](../databases/) |
+| **Embedded migrations** | Schema self-management per binary (golang-migrate) | all 11 services | [../databases/](../databases/) |
 
 Rule: every value in a service table's **Technique** column appears here, and
 every row here is used by at least one service table — that is this doc's

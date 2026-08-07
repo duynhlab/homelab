@@ -1,13 +1,13 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
-# Brings up: Postgres (10 DBs) + Redis cache + per-service golang-migrate migrations
-# + 10 Go services + a Temporal dev server + the order-fulfillment worker + a
+# Brings up: Postgres (11 DBs) + Valkey cache + per-service golang-migrate migrations
+# + 11 Go services + a Temporal dev server + the order-fulfillment worker + a
 # Kong DB-less gateway (mirrors the in-cluster Kong) + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be
 # checked out next to homelab/. Run from this directory:
 #   docker compose up -d --build
-# Then open the SPA at http://localhost:3000 (API gateway at http://localhost:8080,
+# Then open the SPA at http://localhost:3001 (API gateway at http://localhost:8080,
 # Temporal UI at http://localhost:8233).
 #
 # A checkout starts the OrderFulfillmentWorkflow: it reserves stock (product),

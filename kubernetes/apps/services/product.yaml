@@ -57,7 +57,8 @@ spec:
     # every catalog read behind an ACCESS EXCLUSIVE waiter. A refusal leaves the
     # schema intact but marks the version dirty — recovery is in the migration
     # header.
-    image_tag: "1.11.0" # {"$imagepolicy": "flux-system:product:tag"}
+    # 1.11.1: pkg v0.35.0 wave (2026-08-07): dependency-only patch release, fleet aligned on one shared-library version.
+    image_tag: "1.11.1" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1

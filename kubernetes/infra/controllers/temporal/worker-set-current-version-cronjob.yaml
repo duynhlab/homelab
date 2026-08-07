@@ -102,7 +102,7 @@ spec:
                 - --deployment-name
                 - order-fulfillment
                 - --build-id
-                - "1.13.0"
+                - "1.13.1"
                 # Non-interactive: without --yes the CLI prompts for confirmation and
                 # the pod would sit there until activeDeadlineSeconds above.
                 - --yes

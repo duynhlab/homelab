@@ -43,7 +43,7 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: order-worker-1-13-0
+  name: order-worker-1-13-1
   namespace: order
 spec:
   interval: 10m
@@ -52,7 +52,7 @@ spec:
     kind: OCIRepository
     name: mop-chart-oci
     namespace: flux-system
-  releaseName: order-worker-1-13-0
+  releaseName: order-worker-1-13-1
   install:
     remediation:
       retries: 3
@@ -60,7 +60,7 @@ spec:
     remediation:
       retries: 3
   values:
-    name: order-worker-1-13-0
+    name: order-worker-1-13-1
     # Architectural component → app.kubernetes.io/component: worker (mop default
     # is "api"). The order-worker PodMonitor selects on this label.
     component: worker
@@ -73,7 +73,7 @@ spec:
       # file, never a tag bump here (a bump would strand the workflows pinned to
       # this version with no pollers). No migration init container; the API's
       # applies the schema this code expects.
-      tag: "1.13.0"
+      tag: "1.13.1"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.
@@ -113,7 +113,7 @@ spec:
       # worker version during the drain — without it the two workers are
       # indistinguishable in every signal except pod name.
       - name: OTEL_RESOURCE_ATTRIBUTES
-        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=1.13.0"
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=1.13.1"
       # RFC-0014 D-2: obsx reads these exact names for the Kubernetes resource
       # attributes on the OTLP path. OTEL_METRICS_ENABLED stays unset here —
       # the worker follows the fleet flip, not the product canary.
@@ -172,7 +172,7 @@ spec:
       - name: TEMPORAL_WORKER_DEPLOYMENT_NAME
         value: order-fulfillment
       - name: TEMPORAL_WORKER_BUILD_ID
-        value: "1.13.0"
+        value: "1.13.1"
       # The inventory reconciler — repairs terminal orders whose reservation
       # disagrees with their outcome, and reports rows that do not account for
       # one. ON here because this is the CURRENT build: the role is single-judge

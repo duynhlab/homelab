@@ -50,7 +50,8 @@ spec:
     # condition, so a shopper hitting a momentary inventory outage at the START of
     # checkout was told the server was broken while the same outage one step later
     # told them to retry.
-    image_tag: "0.6.0" # {"$imagepolicy": "flux-system:checkout:tag"}
+    # 0.6.1: 0.6.1: datastore-unavailable answers 503 + Retry-After: 2 on every session endpoint (repository-boundary classifier, checkout-service PR #47).
+    image_tag: "0.6.1" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as

@@ -248,12 +248,12 @@ only dependency is its database. Platform call graph:
 
 ## Known gaps
 
-- **Legacy order→cart REST pricing hop** — Technical debt. The legacy
-  `POST /order/v1/private/orders` path still reads
-  `GET /cart/v1/private/cart` for pricing, trusting cart's add-time price
-  snapshot — exactly the stale-price gap RFC-0015 closed. Removal is planned
-  for **P6** together with the legacy order create route
-  ([RFC-0015](../proposals/rfc/RFC-0015/)).
+- ~~Legacy order→cart REST pricing hop~~ — **Gone.** The legacy
+  `POST /order/v1/private/orders` path and its cart pricing read were removed
+  in RFC-0021 P5 (order 1.11.0); checkout is the single entry and product is
+  the price authority ([RFC-0015](../proposals/rfc/RFC-0015/), now
+  implemented). The one REST exception left on cart is the worker's
+  internal cart clear.
 - **gRPC mTLS** — Planned platform-wide (RFC-0020 research); `GetCart` is
   unauthenticated by design today, with NetworkPolicy as the fence.
 
@@ -305,4 +305,4 @@ Paths in [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service). Tr
 - [checkout.md](./checkout.md) · [product.md](./product.md) · [order.md](./order.md) — neighbor contracts
 - [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga deep dive
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-07 — the legacy order→cart pricing gap closed with RFC-0021 P5; RFC-0015 implemented._

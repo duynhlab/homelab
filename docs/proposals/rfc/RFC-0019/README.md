@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| accepted (Phase B) | platform-wide | [./research.md](./research.md) — gate passed 2026-07-17 | 2026-07-17 | 2026-07-19 |
+| implemented (Phase B) | platform-wide | [./research.md](./research.md) — gate passed 2026-07-17 | 2026-07-17 | 2026-08-07 |
 
 > **Decision (2026-07-19):** implementing **Phase B only** (OTel logs+traces SQL). **Phase A
 > (commerce facts) is out of scope** for this implementation — observability-only. ClickHouse
@@ -165,6 +165,8 @@ flowchart LR
 | Date | Note |
 |------|------|
 | 2026-07-17 | RFC opened (`provisional`); learning guide published under `docs/observability/clickhouse/` |
+| 2026-07-19 | Phase B landed: Altinity operator + CHI, OTel exporter tee for logs+traces, Grafana ClickHouse datasource — local-stack and cluster (#560); Kind e2e green ([ADR-023](../../adr/ADR-023-clickhouse-observability-olap/) Adoption: Complete) |
+| 2026-08-07 | Status → `implemented (Phase B)`. Phase A (commerce facts sync + panels) remains optional and out of scope, as scoped at creation |
 
 ## Related
 

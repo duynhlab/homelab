@@ -109,17 +109,17 @@ for its own sake.
 | [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | P2 | provisional — **superseded by [RFC-0018](RFC-0018/)** (platform-db merge) |
 | [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) — future mesh; in-process mTLS now in [RFC-0020](RFC-0020/) | infra | defer | provisional |
 | [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | P2 | provisional |
-| [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | provisional |
+| [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | implementable — Slice 1 (awskms auto-unseal, [ADR-024](../adr/ADR-024-floci-kms-emulator-auto-unseal/)) landed; cloud-bound items remain proposal-only |
 | [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | done | implemented |
 | [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | done | implemented (P1–P6 landed) |
 | [RFC-0011](RFC-0011/) | Homelab migration: Kind to bare-metal Talos (1 → 3 node HA) | infra | P2 | provisional |
 | [RFC-0012](RFC-0012/) | Converge CNPG role & database management on declarative CRDs | infra | done | implemented (P0–P4 landed) |
 | [RFC-0013](RFC-0013/) | App-metrics cardinality audit & streaming-aggregation scale playbook | platform-wide | — | superseded |
 | [RFC-0014](RFC-0014/) | Full OpenTelemetry adoption: OTLP push for metrics, logs and traces | platform-wide | done | implemented (live-cluster drill pending) |
-| [RFC-0015](RFC-0015/) | Checkout service: session state machine, price re-validation & order handoff | platform-wide | P0 | provisional |
-| [RFC-0017](RFC-0017/) | Platform telemetry standard: per-layer signal ownership + fleet instrumentation | platform-wide | P1 | implementable |
-| [RFC-0018](RFC-0018/) | Consolidate platform PostgreSQL: merge auth, shared, temporal into platform-db | infra | P1 | provisional |
-| [RFC-0019](RFC-0019/) | ClickHouse for OTel logs/traces SQL (+ optional commerce analytics) | platform-wide | P2 | provisional |
+| [RFC-0015](RFC-0015/) | Checkout service: session state machine, price re-validation & order handoff | platform-wide | done | implemented — P1–P5 shipped by this RFC; the P6 legacy-path removal shipped via [RFC-0021](RFC-0021/) P5 (order 1.11.0 removed `POST /orders` + the order→cart pricing read) |
+| [RFC-0017](RFC-0017/) | Platform telemetry standard: per-layer signal ownership + fleet instrumentation | platform-wide | done | implemented — W0/W1 landed fleet-wide; business-metric alerts/SLOs + ~16 catalog rows stay backlog |
+| [RFC-0018](RFC-0018/) | Consolidate platform PostgreSQL: merge auth, shared, temporal into platform-db | infra | done | implemented — every platform database runs on CNPG `platform-db`/`product-db` (#496, #543/#544; Kind audit green); the P4 DR drills stay on the RFC-0007 calendar |
+| [RFC-0019](RFC-0019/) | ClickHouse for OTel logs/traces SQL (+ optional commerce analytics) | platform-wide | done | implemented (Phase B) — OLAP for OTel logs+traces deployed in local-stack + cluster (#560, [ADR-023](../adr/ADR-023-clickhouse-observability-olap/)); Phase A commerce facts stays out of scope |
 | [RFC-0020](RFC-0020/) | Internal TLS everywhere on the `homelab-ca` root (DB, pooler, gRPC, OpenBAO) | platform-wide | P1 | provisional |
 | [RFC-0021](RFC-0021/) | Platform overhaul: inventory extraction, order aggregate, payment hardening (supersedes [RFC-0003](RFC-0003/)) | platform-wide | done | **implemented (P0–P7 landed)** — inventory is the sole stock authority; product's stock RPCs, read fields and schema are removed; the order aggregate ([ADR-033](../adr/ADR-033-order-status-cancellation/)) and payment ambiguity ([ADR-034](../adr/ADR-034-provider-outcome-ambiguity/)…[ADR-037](../adr/ADR-037-per-request-refund-identity/)) shipped; migration flags gone and the first [GameDay run](RFC-0021/gameday.md) recorded (5 faults, 2 claims falsified). Deferred items are listed in the RFC's Implementation History, not dropped |
 
@@ -147,4 +147,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-06_
+_Last updated: 2026-08-07 — registry synced to shipped reality: RFC-0008 implementable; RFC-0015, RFC-0017, RFC-0018, RFC-0019 implemented._

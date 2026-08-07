@@ -497,9 +497,11 @@ count and retention hit zero.
 
   **Deferred / tracked** — closing this RFC does not close these, and they are listed
   rather than left implied:
-  - **Checkout answers a bare `500` with no `Retry-After` when its own database fails
-    over**, while the same endpoint returns a clean `503` for an inventory outage
-    (G3). A service-code fix, same class as the 500→503 corrected in checkout 0.5.1.
+  - ~~Checkout answers a bare `500` with no `Retry-After` when its own database fails
+    over~~ — **resolved 2026-08-07**: checkout 0.6.1 classifies datastore failures at
+    the repository boundary and answers `503` + `Retry-After: 2` on every session
+    endpoint, including mid-confirm (checkout-service PR #47; same-key retry after
+    recovery proven to create exactly one order).
   - **`inventory.v1/CheckAvailability` still cannot express "no data for this SKU"** at
     the *reservation* layer; only the availability read gained `unknown_sku_ids`.
   - **G1's readings are pre-fix.** The duplicate-paging behaviour it observed was

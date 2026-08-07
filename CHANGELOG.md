@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- RFC registry synced to shipped reality: RFC-0015 (checkout) and RFC-0017
+  (telemetry standard) -> `implemented`; RFC-0018 (platform-db consolidation)
+  and RFC-0019 (ClickHouse Phase B) -> `implemented` with evidence rows in
+  their Implementation Histories; RFC-0008 index row now matches its
+  `implementable` body. RFC-0021's first deferred item (checkout bare 500 on
+  its own DB failover) marked resolved by checkout 0.6.1; RFC-0001's future
+  work acknowledges the recorded GameDay run, the shipped server bump and the
+  platform-db move; RFC-0015's dangling RFC-0016 pointer notes the retired
+  number; docs/README and cart.md drop the "P6 planned" claims.
+
+### Changed
+
 - docs/api de-drift after the RFC-0021 closure: `GetProducts` (removed from the
   contract) no longer described as live in checkout/api/microservices; the
   Checkout→Inventory `CheckAvailability` edge added to every call graph and

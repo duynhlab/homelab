@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-07-17 | 2026-07-17 |
+| implemented | infra | 2026-07-17 | 2026-08-07 |
 
 > **Origin:** the homelab runs **five** CloudNativePG clusters (four operational +
 > one DR) and **three** PgDog poolers. Operational overhead, doc drift
@@ -403,6 +403,8 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 | Date | Milestone |
 |------|-----------|
 | 2026-07-17 | RFC-0018 opened (`provisional`) |
+| 2026-07-17 | Consolidation landed: auth, shared and temporal databases merged onto the 3-node CNPG `platform-db` with Barman backups (#543, #544); `temporal_visibility` pg_hba fixed after the first Kind audit (#545); CNPG-native dashboards (#547) |
+| 2026-08-07 | Status → `implemented`. Every platform database runs on CNPG (`platform-db`/`product-db`); the Zalando operator and the pre-merge clusters are gone. The P4 DR drills (product-db-replica promotion, platform-db restore) were not re-run under this RFC — they live on the [RFC-0007](../RFC-0007/) calendar, which holds the evidence log |
 
 ## Related
 

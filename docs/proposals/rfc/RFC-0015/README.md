@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-07-11 | 2026-07-14 |
+| implemented | platform-wide | 2026-07-11 | 2026-08-07 |
 
 > **Don't forget: every decision is a tradeoff.** The headline tradeoffs in this
 > RFC: checkout does **not** own orders or the saga (it pays an extra internal
@@ -680,6 +680,15 @@ Phased P1→P6 as above. Blast-radius notes:
   addresses, auth JWKS allow-list, OpenBAO probe tolerances, staged
   bring-up for constrained hosts) are recorded in the delivery PRs.
 
+- 2026-08-07 — **P6 landed, RFC implemented.** The legacy-path removal
+  shipped via [RFC-0021](../RFC-0021/) phase 5 rather than as a standalone
+  phase here: order 1.11.0 removed `POST /order/v1/private/orders` and the
+  order→cart REST pricing read, and the SPA's single checkout entry landed
+  with frontend 1.2.0. The docs sweep (api.md, microservices.md, temporal
+  doc, deployment rollup) completed with the post-closure de-drift (#695).
+  Checkout itself has been P1–P5 complete since 2026-07-21 (0.4.x) and
+  hardened through 0.6.1.
+
 ## Related
 
 - [RFC-0003](../RFC-0003/) — inventory ownership: why checkout checks but never
@@ -693,9 +702,10 @@ Phased P1→P6 as above. Blast-radius notes:
 - [RFC-0014](../RFC-0014/) — OTLP observability pipeline checkout is born on.
 - [RFC-0002](../RFC-0002/) — east-west mTLS (deferred hardening for the four
   new gRPC edges).
-- **RFC-0016 (planned)** — asynchronous payment confirmation via Temporal
-  Signal (mockpay async-confirm mode) + post-confirmation order cancellation
-  (CancelOrderWorkflow with conditional compensation).
+- RFC-0016 — the async-payment/cancellation successor was absorbed into
+  [RFC-0021](../RFC-0021/) phase 6 (payment ambiguity, ADR-034…037) and
+  phase 5 (CancellationWorkflow, ADR-033); the number was retired, do not
+  backfill.
 - Expected spawned ADRs (shifted +1 on 2026-07-12 — ADR-017 was taken by the
   platform's [api-path-collection-noun](../../adr/ADR-017-api-path-collection-noun/)
   decision): ADR-018 checkout/order boundary (`CreateOrder` gRPC; order keeps

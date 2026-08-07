@@ -32,7 +32,7 @@ docs/
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
-│   │   └── RFC-0001 … RFC-0018   # reserve number → research.md → README.md
+│   │   └── RFC-0001 … RFC-0021   # reserve number → research.md → README.md
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
@@ -382,14 +382,14 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Service contracts](./api/README.md#service-contracts) - Platform deployment rollup and one file per Go service
 - [Workflow registry](./api/workflows.md) - Temporal workflows: owners, workers, task queues, and participants
 - [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Saga-vs-2PC learning, live compensations, Temporal infrastructure, and operations
-- [Checkout](./api/checkout.md) - Session orchestration, P1-P5 shipped (local-stack + cluster); P6 legacy removal planned
+- [Checkout](./api/checkout.md) - Session orchestration, fully shipped (local-stack + cluster); the legacy order path was removed in RFC-0021 P5
 - [Payments](./api/payments.md) - Payment API, state machine, ledger, provider, and reconciliation
-- [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Partially implemented; supersedes ADR-003 via ADR-006
+- [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Implemented (all six phases); supersedes ADR-003 via ADR-006
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
 - [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implemented (P0–P4); per-service triplets on CNPG `DatabaseRole`/`Database` CRDs + pg_hba isolation
-- [RFC-0014: Full OpenTelemetry adoption](./proposals/rfc/RFC-0014/) - Provisional; OTLP push for metrics/logs/traces + semconv naming, phases P0–P5, consumer tracking table
-- [RFC-0019: ClickHouse for OTel logs/traces SQL](./proposals/rfc/RFC-0019/) - Provisional; Phase B Collector→ClickHouse, Phase A optional Postgres facts; **planned**, no manifests
+- [RFC-0014: Full OpenTelemetry adoption](./proposals/rfc/RFC-0014/) - Implemented (live-cluster pod-kill drill pending); OTLP push for metrics/logs/traces + semconv naming, consumer tracking table
+- [RFC-0019: ClickHouse for OTel logs/traces SQL](./proposals/rfc/RFC-0019/) - Implemented (Phase B) — Collector→ClickHouse OLAP deployed in local-stack + cluster; Phase A commerce facts stays optional
 - [RFC-0021: Platform overhaul — inventory extraction, order aggregate, payment hardening](./proposals/rfc/RFC-0021/) - Implemented (P0–P7); supersedes RFC-0003. Inventory is the sole stock authority and product's stock is gone from code, contract and schema; order gained a status FSM with cancellation; payment can say it does not know. → ADR-027…031, ADR-033…037, [GameDay record](./proposals/rfc/RFC-0021/gameday.md)
 - [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 

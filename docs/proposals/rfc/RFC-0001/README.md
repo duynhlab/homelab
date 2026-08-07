@@ -200,19 +200,19 @@ flowchart LR
 - `testsuite` unit tests cover the saga pivot + reverse compensation.
 - Verified end-to-end on `local-stack`: a checkout drives the full saga to `confirmed`; an
   over-quantity checkout fails fast (non-retryable) and rolls back.
-- Live durability (kill-the-worker, mid-saga compensation) **GameDay drills** are future work.
+- Live durability was proven in the first GameDay run (2026-08-06): kill-the-worker mid-saga resumed with every side effect exactly once ([RFC-0021 gameday](../RFC-0021/gameday.md), G2).
 
 ## Future work
 
 Owned here (replaces the roadmap previously inline in `temporal-order-fulfillment.md` §9):
 
-- ⏳ **Bump server 1.24.2 → 1.27.x** once the operator re-publishes its chart for v0.22.0 (ADR-002; Renovate-tracked).
+- ✅ **Server bump** — shipped past the 1.27.x target: server 1.31.2 via the official chart (ADR-030 re-platform superseding ADR-002).
 - ✅ **Cache-bust on reserve** — `ReserveStock`/`ReleaseStock` invalidate the affected `product:{id}` Valkey keys (product-service; detail-only, list cache left to TTL).
 - ✅ **Workflow/activity RED metrics + burn alerts** — Temporal SDK `MetricsHandler` in `pkg/temporalx` (v0.10.0); scraped via the `order-worker` PodMonitor; `temporal-worker` alert group.
 - ⏳ **Grafana dashboard** adapted from `temporalio/dashboards` `server-general.json`.
 - ✅ **Internal cart-clear** (NetworkPolicy-fenced, by user id) — `DELETE /cart/v1/internal/cart/{userID}`; the bearer token no longer enters workflow input/history.
-- ⏳ **temporal-db HA + Barman backups** (single instance today; undefined RPO/RTO).
-- ⏳ **GameDay drills** for durability + live mid-saga compensation paths.
+- ✅ **temporal-db HA + backups** — temporal + temporal_visibility moved onto the 3-node `platform-db` CNPG cluster with Barman backups (RFC-0018 consolidation); drill evidence tracked in [RFC-0007](../RFC-0007/).
+- ✅ **GameDay drills** — first run recorded 2026-08-06 ([RFC-0021 gameday](../RFC-0021/gameday.md) G2, kill-the-worker); quarterly cadence owned by [RFC-0007](../RFC-0007/) Drill E. Mid-saga *compensation* drilling still wants an injectable pause (G2b follow-up).
 
 ## Implementation History
 

@@ -102,7 +102,8 @@ count by (app, namespace, k8s_pod_name) (go_goroutine_count{app!=""})
 
 VictoriaMetrics keeps returning the last sample for ~5 m (staleness window), so
 detection **lags a pod kill by about 5 minutes** — accepted in RFC-0014 D-4 and
-verified by the P3 pod-kill test. The push pipeline itself is now an availability
+verified by the P3 pod-kill test in local-stack; the live-cluster pod-kill
+drill is still pending on the RFC-0014 tracker. The push pipeline itself is now an availability
 dependency, so a collector export-failure alert
 (`otelcol_exporter_send_failed_metric_points`) runs alongside to
 disambiguate "service down" from "pipeline broken".

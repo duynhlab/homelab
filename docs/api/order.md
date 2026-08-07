@@ -106,6 +106,18 @@ migration 000006 — exact arithmetic, and the unit the payment path speaks:
 | Table | Key columns | Constraints |
 |-------|-------------|-------------|
 | `orders` | `id`, `user_id`, money columns, `status`, `version`, `idempotency_key`, reason columns (`failure_code`, `cancellation_reason`, `manual_review_reason`), workflow identity, per-state timestamps | `CHECK (total = subtotal + shipping + tax - discount)`; `CHECK (status IN …)` — the seven FSM states (000014); partial unique index on `(user_id, idempotency_key)` where key not null |
+
+**Bounded failure reasons** (`orders.failure_code` + `order_status_history.reason`,
+validated by the domain's `knownReasons` set): `PAYMENT_DECLINED`,
+`PAYMENT_OUTCOME_UNKNOWN`, `INVENTORY_UNAVAILABLE`, `INSUFFICIENT_STOCK`,
+**`UNKNOWN_SKU`** (since 1.13.2 — inventory has no balance row for a line, a data
+gap the saga must not file as customer demand; same terminal flow as a shortage,
+payment voided, and like a shortage it skips the ambiguous release because
+`SKU_NOT_FOUND` definitively took nothing), `SHIPMENT_UNAVAILABLE`,
+`CONFIRMATION_FAILED`, `COMPENSATION_INCOMPLETE`, `WORKFLOW_START_FAILED`,
+`CUSTOMER_REQUEST`, `OPERATOR_RESOLVED`. The column is `VARCHAR(64)` with no
+CHECK, so a new reason needs no migration — the domain set is the authority.
+
 | `order_items` | `order_id` (FK cascade), `product_id`, `product_name`, `quantity`, `price`, `subtotal` | `CHECK (subtotal = quantity * price)` |
 | `order_status_history` | `order_id`, `from_status`, `to_status`, `actor_type`, `actor_id`, `command_id`, `reason` | `UNIQUE (order_id, command_id)` — the replay anchor; `CHECK` on actor type. Append-only; begins at the v1.10.0 cutover (no backfill) |
 | `order_processing_projection` | `order_id` PK, `stage` (12-stage `CHECK`), `last_successful_step`, `last_error_code` | UX-only projection; best-effort writes, never a correctness gate |

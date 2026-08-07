@@ -36,12 +36,16 @@ spec:
               sum by (le) (rate(checkout_confirm_duration_seconds_bucket[5m])))
 
         # --- Product stock surface (what phases 2-4 replace) -------------
-        # ReserveStock outcomes, product-side authority view.
-        - record: rfc0021:product_stock_reservations:rate5m
-          expr: sum by (result) (rate(product_stock_reservations_total[5m]))
-
-        # Product gRPC checkout-facing RPC latency p95 per method
-        # (GetProducts today; BatchGetCurrentPrices joins after P2-1).
+        # The product-side ReserveStock view was DELETED with the surface it
+        # recorded: product 1.7.0 removed the stock RPCs and nothing emits
+        # product_stock_reservations_total any more. A recorded series that can
+        # only ever be empty looks like a signal, which is the same reason the
+        # dashboard panel was relabelled RETIRED. The saga-side view
+        # (rfc0021:order_stock_reservation:rate5m, below) is the live one.
+        #
+        # Product gRPC checkout-facing RPC latency p95 per method. The regex is
+        # deliberately a wildcard over the service, so it followed
+        # GetProducts -> BatchGetCurrentPrices without an edit.
         - record: rfc0021:product_rpc_duration:p95_5m
           expr: |
             histogram_quantile(0.95,

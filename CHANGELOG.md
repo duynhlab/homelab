@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A recording rule outlived the metric it recorded.** The RFC-0021 baseline
+  rule `rfc0021:product_stock_reservations:rate5m` read
+  `product_stock_reservations_total`, which product 1.7.0 removed with the
+  `ReserveStock` RPC. The dashboard panel that consumed it was relabelled
+  RETIRED at the time; the rule itself was missed, leaving a recorded series
+  that can only ever be empty — which reads as a signal, not as absence. Rule
+  deleted, with the saga-side replacement named in its place.
+- **Two alerts linked to runbooks that did not exist.**
+  `InventoryReservationInfraErrors` and `InventoryGrpcErrorRatio` shipped with
+  `runbook_url` annotations pointing at missing files, so the link an on-call
+  follows mid-incident 404'd. Both runbooks written, including the
+  business-vs-infra classification that keeps a sold-out promotion from being
+  worked as an incident.
+- **Catalog counts restated from the manifests.** The alert catalog claimed 184
+  static alerts against 198 in `prometheusrules/` (and now records the command
+  that re-derives the number, plus the per-domain split). The metrics catalog
+  claimed 37 instruments across 10 services against 63 across 11 — it was
+  missing the `inventory` section entirely, so neither of inventory's business
+  metrics was documented anywhere, and four per-service counts were stale.
+
 - **The committed PITR restore manifest had never worked.** The first Drill A run
   (2026-08-07) put `restore-cluster-example.yaml` through a real restore and
   Postgres refused to start: `FATAL: "min_wal_size" must be at least twice
@@ -32,6 +52,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lines are verdicts now (85/85 pairs pass, exit 0).
 
 ### Changed
+
+- `docs/api/` synced to what the RFC-0021 follow-up releases actually do:
+  inventory's reservation path surfaces `SKU_NOT_FOUND` (0.4.1) rather than a
+  generic `NOT_FOUND`, order's bounded failure reasons include `UNKNOWN_SKU`
+  (1.13.2), and payment verifies the provider's transaction window instead of
+  trusting it (1.5.2).
+- Stale in-manifest references corrected: the checkout-worker note named the
+  retired `order-worker-1-13-1.yaml`, and the `auth`/`user` NetworkPolicy
+  headers still credited the removed `pgdog-platform` pooler.
 
 - **`CNPGWALArchiveFailing` requires no progress, not just a failure.** A planned
   promotion always fails exactly one archive (the new timeline's `.history`

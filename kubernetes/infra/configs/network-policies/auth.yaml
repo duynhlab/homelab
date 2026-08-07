@@ -1,7 +1,8 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ (verified round 7) —
 # these rules are LIVE. Any ingress not explicitly allowed below is dropped.
 # auth namespace hosts the auth service (HTTP :8080 incl. the JWKS endpoint).
-# Database traffic moved to platform-db / pgdog-platform (RFC-0018).
+# Database traffic moved to platform-db, pooled by the CNPG PgBouncer
+# Pooler platform-db-pooler-rw (RFC-0018; ADR-026 replaced pgdog-platform).
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

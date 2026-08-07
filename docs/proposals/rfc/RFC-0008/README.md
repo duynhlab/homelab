@@ -210,6 +210,22 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
   Decision is the pooler groundwork (upgrade + passthrough, per-service users); enabling
   the DB engine, `pg_hba` group wiring, and app reconnection are later slices.
 
+- 2026-08-07 — **New slice identified by a drill: the break-glass write path
+  does not work.** RFC-0012's P2 rotation drill could not run on a fresh cluster,
+  because the documented ceremony in
+  [`add-secret-live-cluster.md`](../../../secrets/runbooks/add-secret-live-cluster.md)
+  fails at its first step: `bao operator generate-root -init` returns
+  `403 permission denied` on `PUT /v1/sys/generate-root-token/attempt`. The
+  cluster was healthy and the recovery key present (awskms seal, shamir recovery
+  seal, 1 share, threshold 1, OpenBAO 2.6.1, initialized, unsealed). The
+  Git-first path is blocked by the same revocation, since the bootstrap Job
+  detects the revoked root and exits. **Consequence: on a cluster with a revoked
+  root there is currently no working documented way to write a secret** — which
+  also blocks credential rotation. The fix is a slice of this RFC: either repair
+  the generate-root ceremony for an auto-unseal + recovery-key cluster, or ship
+  the AppRole write path this RFC already lists as planned, and then re-run the
+  RFC-0012 P2 drill.
+
 ## Related
 
 - [Research](./research.md) — plain-language deep dive + auto-unseal PoC + Context7 audit behind this RFC.

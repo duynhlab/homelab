@@ -504,17 +504,41 @@ count and retention hit zero.
     recovery proven to create exactly one order).
   - **`inventory.v1/CheckAvailability` still cannot express "no data for this SKU"** at
     the *reservation* layer; only the availability read gained `unknown_sku_ids`.
-  - **G1's readings are pre-fix.** The duplicate-paging behaviour it observed was
-    corrected mid-drill by #675, so that drill wants a re-run against the inhibition.
-  - **G2b (a kill between activity commit and response) was not reachable as designed**
-    — the saga completes in ~700 ms. The genuine interleaving came from G4's provider
-    hold; a deterministic version needs an injectable pause, not hand timing.
+  - ~~G1's readings are pre-fix~~ — **resolved 2026-08-07: G1 re-run, inhibition
+    verified.** With `CheckoutAvailabilityErrors` firing (10:11:39Z, 11 m 26 s
+    after sustained fail-closed traffic began — matching the original 11 m 22 s),
+    Alertmanager showed checkout's Sloth **page** alerts for availability and
+    error-rate `state=suppressed, inhibitedBy=1`, their **ticket** twins still
+    `active` (the budget record survives), and another service's page
+    (`AuthHighLatency`) untouched — the `equal: ['service']` scoping holds.
+    Budget still burning (`slo:sli_error:ratio_rate5m{...availability} = 1`).
+    Exactly one page for one incident. **New finding from the re-run:** a BURST
+    of fail-closed traffic can never fire this alert, because the rate window
+    `[10m]` and the debounce `for: 10m` are the same length — a short burst
+    leaves the window exactly as the debounce matures (measured: a ~30 s burst
+    left the alert inactive for 14 minutes with the ratio back to 0). The
+    gameday's caveat was about volume; this is about duration, and it is the
+    sharper trap for anyone reproducing the incident with a quick loop.
+  - ~~G2b was not reachable as designed~~ — **resolved 2026-08-07.** order 1.13.2
+    added `ORDER_FAULT_COMMIT_PAUSE` (GameDay-only, default off, fail-fast parsed,
+    ctx-aware, success-path only), which holds `CommitInventory` between the
+    durable server-side commit and the activity result. With a 25 s pause the
+    worker was force-deleted inside that window; on replay `inventory_movements`
+    recorded **SALE_COMMITTED exactly twice for two orders** (one per order, no
+    double commit), `order_status_history` held a single `pending → confirmed`
+    row, and the order reached terminal `completed`. Mandatory-forward commit is
+    genuinely replay-idempotent under the interleaving it claims to survive.
   - **Chaos tooling** (Litmus / Chaos Mesh) stays the backlog candidate it already was,
     and the **database** drill calendar stays [RFC-0007](../RFC-0007/)'s. This RFC owns
     the application-level scenarios it ran, nothing more.
-  - The reconciler **never verifies that the provider honoured the window** it asked
-    for — the mockpay skew is fixed, but a real provider that paginates differently
-    would manufacture the same phantom.
+  - ~~The reconciler never verifies that the provider honoured the window~~ —
+    **resolved 2026-08-07 (payment 1.5.2).** Each provider transaction is checked
+    against the requested half-open `[from, through)` window; violating rows are
+    excluded from classification (so they cannot manufacture phantom
+    `missing_internal`), counted in
+    `payment_reconciliation_window_violations_total`, and the watermark is held so
+    the window is re-covered. `PaymentReconciliationWindowViolation` (warning)
+    makes the refusal visible, with a runbook.
 
 ## Related
 

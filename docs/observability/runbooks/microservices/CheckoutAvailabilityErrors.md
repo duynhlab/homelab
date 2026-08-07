@@ -8,6 +8,16 @@
 | **Metrics** | `checkout_availability_check_total{result}` |
 | **Applies to** | checkout **0.5.0+** (RFC-0021 P4 made inventory the only availability authority). Earlier builds could fall back to product's stock column and this metric does not exist |
 
+> **Reproducing this alert needs SUSTAINED traffic, not a burst.** The ratio is
+> computed over `[10m]` and the debounce is `for: 10m` — the same length — so a
+> short burst of fail-closed requests leaves the rate window at exactly the
+> moment the debounce would mature and the alert never fires. Measured
+> 2026-08-07: a ~30 s burst of 45 × 503 left the alert `inactive` for 14 minutes
+> with the ratio back to 0; 13 minutes of paced traffic moved it
+> `inactive → pending` in ~2 min and **firing at 11 m 26 s**. If you are
+> verifying this alert, drive traffic for longer than the window — an operator
+> who tests with a quick loop will wrongly conclude it is broken.
+
 ## Meaning
 More than 1% of checkout's **answered** availability checks returned **error** for 10
 minutes: `inventory.v1/CheckAvailability` is failing or timing out.

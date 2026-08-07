@@ -40,6 +40,12 @@ spec:
       # imagepolicy marker below is deliberately payment's, not a mockpay-only
       # one, so the two cannot drift apart again.
       repository: ghcr.io/duynhlab/payment-service/payment-service
+      # NOTE: this tracks payment's release only by hand — image automation is not
+      # active, so each payment release needs this bumped too. Currently 2 patches
+      # behind payment 1.5.2; the mockpay server code did not change in 1.5.1/1.5.2,
+      # so there is no functional skew today. The F1 GameDay finding was exactly an
+      # image skew here (1.0.0 discarded the reconciliation window bounds), which is
+      # why the drift is called out rather than left implicit.
       tag: "1.5.0" # {"$imagepolicy": "flux-system:payment:tag"}
       pullPolicy: IfNotPresent
     args: ["mockpay"]

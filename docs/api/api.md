@@ -7,7 +7,7 @@ One place to learn how HTTP and gRPC contracts work across the duynhlab platform
 | **Status** | Implemented; checkout P1-P5 runs in local-stack and the cluster | — |
 | **Scope** | Shared HTTP conventions, gRPC conventions, and the current service call graph | — |
 | **Public transport** | HTTP/JSON through Kong on `:8080` | — |
-| **Internal transport** | gRPC on `:9090`; two documented cart REST exceptions remain | — |
+| **Internal transport** | gRPC on `:9090`; one documented cart REST exception remains (worker cart clear) | — |
 | **Contract source** | HTTP routers in each service repo; protobufs in `duynhlab/pkg` | — |
 | **Audience** | Readers learning the platform and engineers changing an API | — |
 | **Design record** | — | None |
@@ -65,6 +65,10 @@ flowchart TB
             OrderWorker["order-worker"]
         end
 
+        subgraph Fulfillment["Fulfillment domain"]
+            Inventory["inventory"]
+        end
+
         subgraph Comms["Comms domain"]
             Shipping["shipping"]
             Payment["payment"]
@@ -91,12 +95,10 @@ flowchart TB
     Checkout -->|"gRPC GetCart"| Cart
     Checkout -->|"gRPC BatchGetCurrentPrices (prices)"| Product
     Checkout -->|"gRPC CheckAvailability (stock)"| Inventory
-    Checkout -.->|"GetProducts — subject-less fallback"| Product
     Checkout -->|"gRPC GetQuote"| Shipping
     Checkout -->|"gRPC CreateOrder"| Order
     Order -->|"gRPC GetShipmentByOrder"| Shipping
     Order -->|"gRPC GetPayment"| Payment
-    Order -.->|"REST pricing read"| Cart
 
     %% Async / workflow layer
     Checkout -->|"start abandonment workflow"| Temporal
@@ -104,7 +106,7 @@ flowchart TB
     Temporal -->|"checkout task queue"| CheckoutWorker
     Temporal -->|"order task queue"| OrderWorker
 
-    OrderWorker -->|"gRPC stock"| Product
+    OrderWorker -->|"gRPC stock"| Inventory
     OrderWorker -->|"gRPC shipment"| Shipping
     OrderWorker -->|"gRPC money"| Payment
     OrderWorker -->|"gRPC email"| Notification
@@ -132,6 +134,7 @@ flowchart TB
     Product --> Valkey
     Cart --> ProductDB
     Checkout --> ProductDB
+    Inventory --> ProductDB
     Order --> ProductDB
     Payment --> ProductDB
     CheckoutWorker -.->|"expire sessions"| ProductDB
@@ -143,7 +146,7 @@ flowchart TB
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
     class Browser,Kong edge;
-    class Auth,User,Product,Review,Cart,Checkout,Order,Shipping,Payment,Notification service;
+    class Auth,User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification service;
     class CheckoutWorker,OrderWorker worker;
     class Temporal platform;
     class PlatformDB,ProductDB,Valkey data;
@@ -171,8 +174,8 @@ graph LR
 
 Read the diagram **top-down**: Internet → React SPA → Kong → HTTP services and
 workflows → data stores. It names every deployed service and worker. Solid arrows
-are current HTTP, gRPC, workflow, or data-store paths; dotted arrows are the two
-documented cart REST exceptions. Exact RPC names are in
+are current HTTP, gRPC, workflow, or data-store paths; the dotted arrow is the
+one documented cart REST exception (the worker's cart clear). Exact RPC names are in
 [Current East-West Call Graph](#current-east-west-call-graph), and each service
 file explains its own callers and data authority.
 
@@ -403,13 +406,13 @@ flowchart LR
     Product -->|"GetProductReviews"| Review
     OrderAPI["order API"] -->|"GetShipmentByOrder"| Shipping
     OrderAPI -->|"GetPayment"| Payment
-    Worker["order worker"] -->|"Reserve / Commit / Release stock<br/>(W7 write cutover)"| Inventory
-    Worker -.->|"Reserve / Release stock<br/>pre-cutover sagas draining"| Product
+    Worker["order worker"] -->|"Reserve / Commit / Release stock"| Inventory
     Worker -->|"Create / Cancel shipment"| Shipping
     Worker -->|"Send email"| Notification
     Worker -->|"Authorize / Capture / Void / Refund"| Payment
     Checkout -->|"GetCart"| Cart
-    Checkout -->|"GetProducts"| Product
+    Checkout -->|"BatchGetCurrentPrices (prices)"| Product
+    Checkout -->|"CheckAvailability (stock)"| Inventory
     Checkout -->|"GetQuote"| Shipping
     Checkout -->|"CreateOrder"| OrderAPI
     OrderAPI -->|"GetReservation (enrich)"| Inventory
@@ -432,7 +435,8 @@ flowchart LR
 | Order worker | Notification | `SendEmail` (`SendSMS` is served but has no live caller) | gRPC | Cluster and local-stack |
 | Order worker | Payment | `Authorize`, `Capture`, `Void`, `Refund` | gRPC | Cluster and local-stack |
 | Checkout | Cart | `GetCart` | gRPC | Cluster and local-stack |
-| Checkout | Product | `GetProducts` | gRPC | Cluster and local-stack |
+| Checkout | Product | `BatchGetCurrentPrices` | gRPC | Cluster and local-stack |
+| Checkout | Inventory | `CheckAvailability` | gRPC | Cluster and local-stack |
 | Checkout | Shipping | `GetQuote` | gRPC | Cluster and local-stack |
 | Checkout | Order | `CreateOrder` | gRPC | Cluster and local-stack |
 | Order worker | Cart | Clear cart | REST exception | Current |
@@ -543,6 +547,7 @@ sequenceDiagram
     participant CK as checkout
     participant Cart as cart
     participant Prod as product
+    participant Inv as inventory
     participant Ship as shipping
     participant Ord as order
     participant TMP as Temporal
@@ -550,7 +555,8 @@ sequenceDiagram
     SPA->>Kong: POST /checkout/v1/private/checkout/sessions (Bearer)
     Kong->>CK: pass-through (jwt-edge)
     CK->>Cart: gRPC CartService/GetCart (read-only snapshot)
-    CK->>Prod: gRPC ProductService/GetProducts (cache-bypass re-validation)
+    CK->>Prod: gRPC ProductService/BatchGetCurrentPrices (cache-bypass re-validation)
+    CK->>Inv: gRPC InventoryService/CheckAvailability (fail-closed)
     CK->>TMP: Signal-With-Start AbandonedCheckoutWorkflow (30 min TTL)
     CK-->>SPA: 201 session open (200 if an active session already exists)
 
@@ -563,7 +569,8 @@ sequenceDiagram
     CK-->>SPA: 200 ready (opaque tok_ reference only)
 
     SPA->>Kong: POST /checkout/v1/private/checkout/sessions/:id/confirm<br/>(Idempotency-Key required)
-    CK->>Prod: gRPC GetProducts — final price/stock re-check
+    CK->>Prod: gRPC BatchGetCurrentPrices — final price re-check
+    CK->>Inv: gRPC CheckAvailability — final availability re-check (fail-closed)
     alt price or stock changed
         CK-->>SPA: 409 PRICE_CHANGED / STOCK_UNAVAILABLE (requoted, key NOT consumed)
     else validated
@@ -807,4 +814,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-01 — call graph: order→cart pricing read removed with the legacy create; inventory enrichment edge added._
+_Last updated: 2026-08-07 — call graph and journeys reflect the post-RFC-0021 contract: checkout split-reads product (prices) + inventory (availability), GetProducts and the drained pre-cutover saga edges removed._

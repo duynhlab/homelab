@@ -10,17 +10,17 @@ order-service — which remains the only writer of orders.
 | **Deployment** | local-stack + cluster | Implemented |
 | **HTTP** | private only · `:8080` · Kong `/checkout/v1/private/` (edge JWT) | Implemented |
 | **gRPC server** | None — client only | None |
-| **gRPC client** | cart (`GetCart`), product (`BatchGetCurrentPrices`, `GetProducts` fallback), inventory (`CheckAvailability`), shipping (`GetQuote`), order (`CreateOrder`) | Implemented |
+| **gRPC client** | cart (`GetCart`), product (`BatchGetCurrentPrices`), inventory (`CheckAvailability`), shipping (`GetQuote`), order (`CreateOrder`) | Implemented |
 | **Worker** | `checkout-worker` · queue `checkout` | Implemented |
 | **Temporal** | Orchestrator · `AbandonedCheckoutWorkflow` · [workflows.md](./workflows.md#abandoned-checkout) | Implemented |
-| **Technical debt** | None — the P6 legacy path is order's debt ([order.md](./order.md)) | None |
+| **Technical debt** | None | None |
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **Repository** | [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-service) | — |
 | **Owns** | Checkout sessions: funnel state, price snapshots, confirm idempotency ledger, tax rules, promo codes | — |
 | **Database** | `checkout` on `product-db` via PgDog (`pgdog-product.product:6432`) | — |
-| **Design record** | — | [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (inventory is the only availability authority; fail-closed) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) |
+| **Design record** | — | [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (inventory is the only availability authority; fail-closed) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) (sole stock authority) · [ADR-019](../proposals/adr/ADR-019-session-expiry-model/) (session expiry model) |
 
 ## Temporal participation
 
@@ -61,8 +61,7 @@ flowchart LR
     Kong -->|"/checkout/v1/private/checkout/sessions…"| CK["checkout-service"]
     CK -->|"gRPC GetCart (read-only, ADR-021)"| CART[cart]
     CK -->|"gRPC BatchGetCurrentPrices (prices, cache-bypass)"| PROD[product]
-    CK -->|"gRPC CheckAvailability (stock — W8 read cutover)"| INV[inventory]
-    CK -.->|"GetProducts — fallback for subject-less calls"| PROD
+    CK -->|"gRPC CheckAvailability (stock — the only availability authority)"| INV[inventory]
     CK --> DB[(checkout DB)]
     CK -->|"gRPC GetQuote"| SHIP[shipping]
     CK -->|"gRPC CreateOrder"| ORD[order]
@@ -141,15 +140,15 @@ All routes are `private` — Kong edge-JWT is the coarse filter, in-service
 
 | Method | Path | Purpose | Errors worth knowing |
 |--------|------|---------|----------------------|
-| `POST` | `/checkout/v1/private/checkout/sessions` | Snapshot cart + re-validate prices → session `open`. **201** created, **200** existing active session (idempotent) | `409 CONFLICT` empty cart |
-| `GET` | `/checkout/v1/private/checkout/sessions/:id` | Session + items + totals | `404` unknown **or someone else's** (anti-IDOR — indistinguishable); `410 SESSION_EXPIRED` past TTL |
-| `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states |
-| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. The fee comes from shipping's `GetQuote` (method × destination region) and a flat tax (seeded `tax_rules`, basis points on subtotal + fee) composes the total — all in minor units, recomputed in SQL | `400 VALIDATION_ERROR` unknown method/region; `409 INVALID_TRANSITION` before an address exists; `500 INTERNAL_ERROR` on shipping outage (only confirm maps upstream failures to `503` + `Retry-After` — a known asymmetry) |
-| `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | `{"payment_method_token": "tok_…"}` → `ready`. Opaque `tok_` references ONLY — PAN-shaped input is rejected **before** any persistence and never echoed (the order/payment rule) | `400 VALIDATION_ERROR` non-tok\_ input |
-| `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | The idempotent order handoff (below). Header `Idempotency-Key` REQUIRED (≤120 chars). **201** with the completed session incl. `order_id`; replays return the cached 201 | `400 IDEMPOTENCY_KEY_REQUIRED`; `409 PRICE_CHANGED` / `409 STOCK_UNAVAILABLE` (session requoted → `shipping_set`, **key not consumed** — re-review and confirm again with the same key); `409 CONFLICT` another confirm in flight; `409 IDEMPOTENCY_CONFLICT` same key, different session; `503` + `Retry-After` order/product transient (retry with the SAME key); `503` + `Retry-After` **with the requoted session attached** when inventory does not track a SKU — the session is dropped back to `shipping_set` first, because that condition is persistent and `confirming` has no exit (see below) |
-| `POST` | `/checkout/v1/private/checkout/sessions/:id/promo` | `{"code"}` attaches a promo after a validated preview (see [Promo codes](#promo-codes-p4-implemented--apply-is-a-preview-confirm-is-the-ledger)) | `400`/`409` promo validation |
+| `POST` | `/checkout/v1/private/checkout/sessions` | Snapshot cart + re-validate prices → session `open`. **201** created, **200** existing active session (idempotent) | `409 CONFLICT` empty cart; `503` + `Retry-After: 2` when cart/product/inventory is unreachable (0.5.1) or checkout's own database is unavailable (0.6.1) |
+| `GET` | `/checkout/v1/private/checkout/sessions/:id` | Session + items + totals | `404` unknown **or someone else's** (anti-IDOR — indistinguishable); `410 SESSION_EXPIRED` past TTL; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/address` | Store the shipping address → `address_set` (re-editable from any pre-confirm state) | `400` missing/oversized fields; `409 INVALID_TRANSITION` from terminal states; `503` + `Retry-After: 2` datastore unavailable (0.6.1, see below) |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. The fee comes from shipping's `GetQuote` (method × destination region) and a flat tax (seeded `tax_rules`, basis points on subtotal + fee) composes the total — all in minor units, recomputed in SQL | `400 VALIDATION_ERROR` unknown method/region; `409 INVALID_TRANSITION` before an address exists; `500 INTERNAL_ERROR` on shipping outage (only create and confirm map upstream failures to `503` + `Retry-After` — a known asymmetry); `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
+| `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | `{"payment_method_token": "tok_…"}` → `ready`. Opaque `tok_` references ONLY — PAN-shaped input is rejected **before** any persistence and never echoed (the order/payment rule) | `400 VALIDATION_ERROR` non-tok\_ input; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
+| `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | The idempotent order handoff (below). Header `Idempotency-Key` REQUIRED (≤120 chars). **201** with the completed session incl. `order_id`; replays return the cached 201 | `400 IDEMPOTENCY_KEY_REQUIRED`; `409 PRICE_CHANGED` / `409 STOCK_UNAVAILABLE` (session requoted → `shipping_set`, **key not consumed** — re-review and confirm again with the same key); `409 CONFLICT` another confirm in flight; `409 IDEMPOTENCY_CONFLICT` same key, different session; `503` + `Retry-After` order/product transient OR checkout's own datastore unavailable (0.6.1) — retry with the SAME key; `503` + `Retry-After` **with the requoted session attached** when inventory does not track a SKU — the session is dropped back to `shipping_set` first, because that condition is persistent and `confirming` has no exit (see below) |
+| `POST` | `/checkout/v1/private/checkout/sessions/:id/promo` | `{"code"}` attaches a promo after a validated preview (see [Promo codes](#promo-codes-p4-implemented--apply-is-a-preview-confirm-is-the-ledger)) | `400`/`409` promo validation; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id/promo` | Detach the promo | — |
-| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled AND on a session the timer just expired) | `409 INVALID_TRANSITION` on completed |
+| `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled AND on a session the timer just expired) | `409 INVALID_TRANSITION` on completed; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
 
 Platform conventions apply: `snake_case` JSON, resources returned directly
 (no wrapper envelope), the `{"error","code"}` [error envelope](./api.md#error-envelope),
@@ -164,8 +163,7 @@ via `pkg/grpcx` on `dns:///<service>.<ns>.svc.cluster.local:9090`:
 |------------|----------|------|----------------|
 | `cart.v1/GetCart` | Session snapshot (read-only, ADR-021) | — | [cart.md](./cart.md) |
 | `product.v1/BatchGetCurrentPrices` | Price re-validation (cache-bypass, ADR-020) — the price half of the split read | — | [product.md](./product.md) |
-| `inventory.v1/CheckAvailability` | Availability re-validation (W8 read cutover, RFC-0021) — fails closed at confirm (`503`), never maps to out-of-stock. `unknown_sku_ids` (a SKU with no balance row) is failed closed **and** requoted out of `confirming`: the condition is persistent, and a persistent condition parked in `confirming` has no exit — no FSM edge to `cancelled`, `lazyExpire` skips the state, and `FindActiveByUserID` keeps returning it. The SKU ids go to the log and the span, never the response body | — | [inventory.md](./inventory.md) |
-| `product.v1/GetProducts` | Fallback read (price + availability) for subject-less callers only — the pre-cutover path, kept live by design | — | [product.md](./product.md) |
+| `inventory.v1/CheckAvailability` | Availability re-validation (RFC-0021 — inventory is the only availability authority) — fails closed at confirm (`503`), never maps to out-of-stock. `unknown_sku_ids` (a SKU with no balance row) is failed closed **and** requoted out of `confirming`: the condition is persistent, and a persistent condition parked in `confirming` has no exit — no FSM edge to `cancelled`, `lazyExpire` skips the state, and `FindActiveByUserID` keeps returning it. The SKU ids go to the log and the span, never the response body | — | [inventory.md](./inventory.md) |
 | `shipping.v1/GetQuote` | Shipping fee (method × region) | — | [shipping.md](./shipping.md) |
 | `order.v1/CreateOrder` | The confirm handoff (idempotent, ADR-018) | — | [order.md](./order.md) |
 
@@ -260,11 +258,12 @@ is down.
 ### Price re-validation (closing the stale-price gap)
 
 `POST /sessions` reads items from cart (`GetCart`), then split-reads the money
-data (W8 read cutover, RFC-0021): **prices from product**
+data (RFC-0021): **prices from product**
 (`BatchGetCurrentPrices` — deliberately cache-bypassing: the cache serves
 browsing, the money path must read the real DB row) and **availability from
-inventory** (`CheckAvailability`). Subject-less callers fall back to the
-pre-cutover `GetProducts` combined read. Prices are locked into the snapshot. A product that vanished from the catalog is
+inventory** (`CheckAvailability`). There is no fallback: `GetProducts` was
+removed from the contract in product 1.8.0, and a missing availability answer
+fails closed. Prices are locked into the snapshot. A product that vanished from the catalog is
 still snapshotted (at cart price) but flagged — the hard gate is confirm-time
 re-validation (P2). Re-validation runs **twice** by design: at session create
 (UX honesty) and at confirm (the money moment).
@@ -290,7 +289,7 @@ unique index.
 **Inbound:** only the SPA via Kong (`/checkout/v1/private/`, edge JWT). No
 service calls checkout — no gRPC server, no internal HTTP surface.
 
-**Outbound:** the four gRPC callees above (cart, product, shipping, order)
+**Outbound:** the five gRPC callees above (cart, product, inventory, shipping, order)
 plus Temporal (Signal-With-Start + timers) and the `checkout` DB.
 
 What checkout deliberately does NOT do (the boundary):
@@ -306,12 +305,12 @@ What checkout deliberately does NOT do (the boundary):
 
 ## Known gaps
 
-- **P6 legacy-path removal is planned** — `POST /order/v1/private/orders` and
-  the order→cart REST pricing hops are **order's** technical debt (RFC-0015);
-  checkout itself carries none.
-- **Error-mapping asymmetry** (accepted): a shipping outage during
-  `PUT …/shipping` answers `500`; only confirm maps upstream failures to
-  `503` + `Retry-After`.
+- **Error-mapping asymmetry** (accepted): a shipping-service outage during
+  `PUT …/shipping` still answers `500`; only session create and confirm map
+  *upstream* failures to `503` + `Retry-After`. Checkout's **own datastore**
+  being unavailable answers `503` + `Retry-After: 2` on every session
+  endpoint since 0.6.1 — safe to advertise as retryable because every write
+  is idempotency-keyed or a conditional update.
 - **Parked `confirming` session** (accepted trade-off): a crashed,
   never-retried confirm blocks new sessions for that user until manual
   recovery per the runbook.
@@ -324,10 +323,11 @@ What checkout deliberately does NOT do (the boundary):
   (the AbandonedCheckoutWorkflow poller, task queue `checkout`); migrations seed
   `tax_rules` and demo promo codes, sessions themselves have no seed; Kong route `/checkout/v1/private/` (edge JWT); no host port
   (platform convention — services are reached only through Kong). Audit:
-  section **A9** in [`local-stack/README.md`](../../local-stack/README.md)
-  (session lifecycle + price-change detection).
+  sections **A9-A10** in
+  [`local-stack/docs/e2e-audit.md`](../../local-stack/docs/e2e-audit.md)
+  (session lifecycle, price-change detection, confirm + abandonment).
 - **Key env:** `DB_*`, `AUTH_JWKS_URL`, `CART_GRPC_ADDR`,
-  `PRODUCT_GRPC_ADDR`, `SHIPPING_GRPC_ADDR`, `ORDER_GRPC_ADDR`,
+  `PRODUCT_GRPC_ADDR`, `INVENTORY_GRPC_ADDR`, `SHIPPING_GRPC_ADDR`, `ORDER_GRPC_ADDR`,
   `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, and `SESSION_TTL_SECONDS`
   (1800).
 - **Observability:** obsx OTLP (RFC-0014) — traces (chain
@@ -370,4 +370,4 @@ Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-serv
 - [cart.md](./cart.md) · [product.md](./product.md) · [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-07 — checkout 0.6.1: datastore-unavailable answers 503 + Retry-After on every session endpoint; GetProducts fallback removed from the contract._

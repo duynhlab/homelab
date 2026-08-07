@@ -31,7 +31,7 @@
 ## Overview
 
 Platform delivery hub: Kubernetes manifests (Flux + Kustomize + OCI), observability
-stack, database and secrets infra, and Kyverno policies. Deploys **10 Go microservices**
+stack, database and secrets infra, and Kyverno policies. Deploys **11 Go microservices**
 and a React frontend on **Kind** locally. Application source lives in separate
 repositories.
 
@@ -176,13 +176,16 @@ Demo login: `alice` / `password123` (by username).
 
 ## Local stack
 
-Without Kubernetes:
+Without Kubernetes, validate the exact source candidate before creating a
+release tag:
 
 ```bash
 cd local-stack && docker compose up -d --build
 ```
 
-SPA at http://localhost:3001, gateway at http://localhost:8080.
+SPA at http://localhost:3001, gateway at http://localhost:8080. The
+[full E2E release audit](local-stack/docs/e2e-audit.md) must pass before the
+candidate is tagged and pinned for Kind.
 
 ---
 

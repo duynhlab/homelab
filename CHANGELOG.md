@@ -35,6 +35,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Pull requests now validate Markdown links.** CI checks only added or changed
+  Markdown files, retries rate-limited requests, and ignores URLs that are
+  intentionally reachable only from local environments.
+
+<!-- markdown-link-check-disable -->
+<!-- Historical entries below preserve release-time paths and are append-only. -->
+
+- **local-stack is now the explicit pre-release gate.** Its README is a concise
+  operator entry point and the full A/B/C protocol lives in a dedicated E2E
+  runbook with commit-SHA evidence and an `ELIGIBLE FOR TAG` decision. The docs
+  now show the as-built manual handoff—signed semver tag, CI image, homelab pin,
+  `make validate`, then Flux/Kind verification—including checkout-worker,
+  mockpay, and the side-by-side versioned order-worker exception. Local-stack
+  inventory is corrected to 11 services and 11 databases.
+
 - **RFC-0021 is `implemented` (P0–P7).** The phase-7 gate — *GameDay scenarios
   converge; all migration flags removed* — is met, and the closure **cites** evidence
   rather than promising it: the [GameDay record](docs/proposals/rfc/RFC-0021/gameday.md)

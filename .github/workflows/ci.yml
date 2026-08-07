@@ -39,10 +39,26 @@ jobs:
       - name: Validate manifests
         run: ./scripts/flux-validate.sh
 
-  # 3. Final Status Notification
+  # 3. Validate links in Markdown added or changed by a pull request
+  markdown-links:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Check Markdown links
+        uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225 # v1.1.2
+        with:
+          use-quiet-mode: 'yes'
+          check-modified-files-only: 'yes'
+          base-branch: main
+          config-file: .github/markdown-link-check.json
+
+  # 4. Final Status Notification
   notify:
     if: always()
-    needs: [pr-checks, validate]
+    needs: [pr-checks, validate, markdown-links]
     uses: duynhlab/gha-workflows/.github/workflows/status.yml@main
     with:
       slack_channel_id: "C0AD82A9A74"

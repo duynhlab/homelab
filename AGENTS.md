@@ -74,7 +74,7 @@ Platform mindset — complements the behavioral guidelines below:
 6. **Validation before done** — `make validate`; e2e audit when touching
    local-stack, Kong, or gateway config (see Build section). Phase B: read the
    **agent-browser** skill from the agent IDE (see [Engineering skills workflow](#engineering-skills-workflow)),
-   then follow [`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser).
+   then follow the [`local-stack` E2E release audit](local-stack/docs/e2e-audit.md).
 7. **Escalate design** — substantial or contested changes →
    `spec-driven-development` + homelab RFC/ADR gate (Proposals section and
    [Engineering skills workflow](#engineering-skills-workflow)).
@@ -110,7 +110,7 @@ flowchart LR
 | Secrets / policy / high stakes | `doubt-driven-development`, `security-and-hardening` | Kyverno catalog |
 | Observability change | `observability-and-instrumentation` | alert catalog + runbook |
 | CI workflows | `ci-cd-and-automation` | often `gha-workflows` repo |
-| E2E Phase B (browser) | **`agent-browser`** ([vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser)) | [`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser); `agent-browser skills get core` |
+| E2E Phase B (browser) | **`agent-browser`** ([vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser)) | [`local-stack` E2E audit](local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-2-min); `agent-browser skills get core` |
 | GitOps incident | `gitops-cluster-debug` (fluxcd pack, if installed) | `make flux-status` |
 | Before PR | `code-review-and-quality` | one change per branch |
 | Rollout / deprecation | `shipping-and-launch`, `deprecation-and-migration` | Flux chain + CHANGELOG |
@@ -141,7 +141,7 @@ flowchart TD
 
 **E2E Phase B:** read the **agent-browser** skill from the agent IDE, run
 `agent-browser skills get core`, then execute Phase B commands in
-[`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser).
+[`local-stack` E2E audit](local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-2-min).
 Complements `browser-testing-with-devtools` in the Verify phase where applicable.
 
 ## Contribution workflow
@@ -199,9 +199,9 @@ Reduce common LLM coding mistakes. Bias toward caution over speed; use judgment 
 
 ## Project overview
 
-- **`duynhlab` microservices platform** — 10 Go microservice repositories + a React frontend. All ten services run in local-stack and the cluster; checkout P5 shipped (API + checkout-worker).
+- **`duynhlab` microservices platform** — 11 Go microservice repositories + a React frontend. All 11 services run in local-stack and the cluster; checkout P5 shipped (API + checkout-worker).
 - **This repo (`homelab`):** GitOps (Flux Operator + Kustomize + OCI), observability, databases/secrets infra, and docs. No application source here.
-- **Service repos:** `auth-service`, `user-service`, `product-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
+- **Service repos:** `auth-service`, `user-service`, `product-service`, `inventory-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
 - Full index: [`docs/README.md` § Repositories](docs/README.md#repositories), [`docs/api/README.md`](docs/api/README.md).
 
 ## Repository layout
@@ -213,7 +213,7 @@ kubernetes/
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
 terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
-local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 10 services + mockpay + Kong DB-less gateway + SPA)
+local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 11 services + mockpay + Kong DB-less gateway + SPA)
 docs/         # Documentation (start at docs/README.md)
 ```
 
@@ -236,13 +236,14 @@ make flux-sync    # force reconciliation
   YAML, never duplicate it in Terraform. See [`terraform/README.md`](terraform/README.md).
 
 - **e2e:** `cd local-stack && docker compose up -d --build` → SPA at `:3001`, API gateway at `:8080`. Demo login `alice` / `password123` (by **username**).
-  **Mandatory before pushing** any change touching a service repo, `pkg`, Kong/gateway
-  config, `compose.yaml`, or the SPA: run the **E2E audit** (API contract + real
-  browser + telemetry sanity) in [`local-stack/README.md`](local-stack/README.md#e2e-audit-before-pushing-backend--real-browser)
-  — scope the phases to the change, paste the pass/fail table into the PR; a failed row blocks the push.
+  **Mandatory before tagging** any change touching a service repo, `pkg`, Kong/gateway
+  config, `compose.yaml`, or the SPA: run the **full E2E release audit** (API contract + real
+  browser + telemetry sanity) in [`local-stack/docs/e2e-audit.md`](local-stack/docs/e2e-audit.md).
+  All A/B/C rows must pass; paste the evidence table into the PR or release record.
+  A failed row blocks the tag.
   **Phase B (browser):** read the **agent-browser** skill from the agent IDE and run
   `agent-browser skills get core` (see [Engineering skills workflow](#engineering-skills-workflow)),
-  then the Phase B commands in the local-stack README.
+  then the Phase B commands in the local-stack E2E runbook.
 - **Service dev:** in the service repo, `GOTOOLCHAIN=auto go build ./... && go test ./...`.
 
 ## Platform architecture & conventions
@@ -258,7 +259,7 @@ to work and **what** you need to know. Do not implement app code in homelab.
 
 ### Trusted API documentation (`docs/api/`)
 
-Homelab agents **trust `docs/api/`** as the canonical source for all ten
+Homelab agents **trust `docs/api/`** as the canonical source for all 11
 microservice API contracts and shared platform API behavior. Service-repo
 README/AGENTS files are implementation hints only — when they disagree with
 homelab, **`docs/api/` wins** (file a drift fix in homelab or the service repo).

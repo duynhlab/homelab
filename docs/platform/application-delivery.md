@@ -210,6 +210,57 @@ All 4 domain ResourceSets share the same `resourcesTemplate`. This is duplicated
 
 Each service's `ResourceSetInputProvider` supplies an explicit `image_tag` input that the domain ResourceSet renders into the HelmRelease (`tag: "<< inputs.image_tag >>"`). Tags are pinned to a specific `sha` or `vX.Y.Z` per service — `:latest` is **banned by Kyverno admission** and never used.
 
+### Promote a validated release to local Kind
+
+The current local delivery path is explicit and reviewable. A `vX.Y.Z` tag
+builds the immutable release image, but it does **not** update this repository or
+deploy to Kind automatically. The `$imagepolicy` comments are update markers;
+without active `ImagePolicy` and `ImageUpdateAutomation` resources they have no
+runtime effect.
+
+1. Run the mandatory [local-stack E2E release
+   audit](../../local-stack/docs/e2e-audit.md) against the exact commit intended
+   for the tag. Every Phase A, B, and C row must pass.
+2. Create the signed `vX.Y.Z` tag in the owning application repository and wait
+   for CI to test, scan, build, and sign the `X.Y.Z` image.
+3. Update every homelab consumer of that image:
+
+   | Release | Required homelab pin |
+   |---------|----------------------|
+   | Standard service | `kubernetes/apps/services/<service>.yaml` → `image_tag` |
+   | Checkout | Checkout service pin **and** `kubernetes/apps/checkout-worker.yaml` |
+   | Payment | Payment service pin **and** `kubernetes/apps/mockpay.yaml` |
+   | Frontend | `kubernetes/apps/frontend-rs.yaml` |
+   | Order API | Order service pin; do not edit an existing versioned worker |
+   | Order worker | Add a new `order-worker-<build-id>.yaml`, deploy it side by side, then activate it using [RFC-0021 cutover/rollback](../proposals/rfc/RFC-0021/cutover-rollback.md) |
+
+   For a versioned order worker, the filename, HelmRelease/name fields, image
+   tag, `TEMPORAL_WORKER_BUILD_ID`, and `service.version` must describe the new
+   build. The previous worker remains until Temporal reports its version
+   `DRAINED`; changing its tag in place would strand pinned workflows.
+4. Validate before publishing manifests:
+
+   ```bash
+   make validate
+   ```
+
+5. Reconcile Kind. Bootstrap a missing cluster with `make up`; use `make sync`
+   for an existing cluster:
+
+   ```bash
+   make sync
+   make flux-status
+   flux get helmreleases -A
+   kubectl get pods -n <service>
+   kubectl get pods -n <service> \
+     -o jsonpath='{.items[*].spec.containers[*].image}'
+   ```
+
+6. Confirm the affected Kustomization and HelmRelease are Ready, the rollout is
+   healthy, and the pod runs the exact `X.Y.Z` image. A local-stack pass does not
+   waive a Kind failure: admission, NetworkPolicy, TLS, CNPG, secrets, and Flux
+   behavior exist only in the cluster gate.
+
 ### Dynamic Tags via OCIArtifactTag (Future)
 
 To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` of type `OCIArtifactTag` per service and include its exported `tag` in the service's InputProvider using the `Permute` input strategy.
@@ -339,4 +390,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-07-22 — onboarding db_host examples use RFC-0018 PgDog/CNPG hostnames; checkout-worker standalone release._
+_Last updated: 2026-08-07 — explicit local-stack → semver → pinned Kind promotion; versioned order-worker exception._

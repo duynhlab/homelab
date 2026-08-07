@@ -1,6 +1,6 @@
 # Documentation Index
 
-Documentation for the **duynhlab microservices platform** — 10 Go services + a React SPA, with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
+Documentation for the **duynhlab microservices platform** — 11 Go services + a React SPA, with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
 
 ---
 
@@ -170,7 +170,7 @@ docs/
 
 6. **[GKE internal & private DNS](./platform/gke-internal-dns.md)** - `cluster.local`, Cloud DNS private zones, multi-environment naming (reference — not homelab)
 
-## Repositories {#repositories}
+## Repositories
 
 Polyrepo layout: application code lives in separate GitHub repositories; this
 repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
@@ -275,13 +275,13 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### API Reference
 
-1. **[API area hub](./api/README.md)** - Start here for the learning path and all ten service contracts
+1. **[API area hub](./api/README.md)** - Start here for the learning path and all 11 service contracts
 
 2. **[Shared API and communication guide](./api/api.md)** - URL naming, audiences, auth, errors, pagination, HTTP-vs-gRPC, current call graph, HTTP/2 load balancing, security, and observability
 
 3. **[Microservices catalog](./api/microservices.md)** - Feature ownership, service dependencies, techniques, and known gaps
 
-4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), and [Payment](./api/payments.md)
+4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Inventory](./api/inventory.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), and [Payment](./api/payments.md)
 
 5. **[Temporal order-fulfillment Saga](./api/temporal-order-fulfillment.md)** - Saga vs 2PC theory, live workflow steps and compensations, infrastructure, and operations
 
@@ -459,7 +459,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 - [Kong API Gateway](./platform/kong-gateway.md) - API-gateway concept + tradeoffs; DB-less Kong (plugins, routing, rate-limiting, TLS)
 - [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
-- [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 10 services)
+- [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 11 services)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
 - [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics/Logs, Flux, Grafana)
 - [Ruleset Automation](./platform/ruleset-automation.md) - GitHub repo ruleset provisioning

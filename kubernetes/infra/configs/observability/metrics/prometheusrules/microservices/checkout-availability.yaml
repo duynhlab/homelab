@@ -61,8 +61,8 @@ spec:
         # Data-gap rate. Not a ratio: any sustained value is actionable, and a
         # ratio would hide the case this exists for — every basket touching one
         # untracked SKU while healthy baskets keep the share small.
-        - record: checkout:availability_unknown_sku:rate5m
-          expr: sum(rate(checkout_availability_check_total{result="unknown_sku"}[5m]))
+        # No rate rule for unknown_sku: the only consumer was the alert, and a
+        # rate over a series that is born by the event reads 0 (see the alert).
 
     - name: checkout-availability-alerts
       rules:
@@ -137,16 +137,26 @@ spec:
               balances: check whether safety_stock is at or above on_hand
               (available-to-promise is then zero by policy, not by shortage).
 
-        # A SKU with no balance row anywhere. Not a ratio and no `for` grace
-        # beyond 5m: every one of these is a customer who got a 503 on a basket
+        # A SKU with no balance row anywhere. Not a ratio and no `for` grace at
+        # all: every one of these is a customer who got a 503 on a basket
         # that may well be fulfillable, and the condition is PERSISTENT — it
         # lasts until someone puts the row there. Nothing else fires on it:
         # checkout fails closed so the shopper sees a 503, but the error ratio
         # above deliberately excludes this value, and inventory itself answers
         # successfully.
         - alert: CheckoutAvailabilityUnknownSKU
-          expr: checkout:availability_unknown_sku:rate5m > 0
-          for: 5m
+          # COUNT-ONCE, so increase() not rate(). Measured on a live cluster
+          # 2026-08-07: after exactly one event the raw counter read 1,
+          # increase(...[10m]) read 1, and rate(...[5m]) read 0 — because the
+          # label's series is BORN by the event, and rate() needs two samples to
+          # subtract. A series that appears at 1 and stays at 1 has rate 0
+          # forever, so the previous expression could not fire on the first
+          # occurrence, which is the only occurrence this alert exists for.
+          # `for` must also stay well under the window: a bounded burst keeps
+          # increase() positive for one window length, so a debounce equal to
+          # (or longer than) the window can never mature.
+          expr: sum(increase(checkout_availability_check_total{result="unknown_sku"}[15m])) > 0
+          for: 0m
           labels:
             severity: critical
             rfc: "0021"

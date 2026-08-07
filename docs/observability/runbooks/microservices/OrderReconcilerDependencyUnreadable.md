@@ -29,7 +29,7 @@ Nothing is known to be wrong yet; nothing is being fixed either.
 ## Diagnosis
 ### PromQL
 ```promql
-sum(rate(order_reconciler_repairs_total{action="unreadable"}[10m]))
+sum(increase(order_reconciler_repairs_total{action="unreadable"}[15m]))
 sum by (action) (rate(order_reconciler_repairs_total[10m]))   # unreadable vs deferred
 ```
 

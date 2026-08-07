@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Severity** | warning |
-| **Signal** | `sum(rate(inventory_reservation_total{outcome="error"}[5m])) > 0` for 10m |
+| **Signal** | `sum(increase(inventory_reservation_total{outcome="error"}[15m])) > 0` (count-once, no debounce) |
 | **Meaning** | The reservation write path is failing for reasons that are **not** a business rejection — infra, storage, or an unhandled state |
 
 ## Why this fires

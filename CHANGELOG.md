@@ -26,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bucket after creating it, and **exits non-zero** on either failure so the
   retry actually happens. Same fix in the `*/30` CronJob, which carried an
   identical copy.
+- **Four count-once alerts could not fire on the event they exist for.** Proven
+  on a live cluster: after exactly one unknown-SKU checkout, the raw counter read
+  `1`, `increase(...[10m])` read `1`, and `rate(...[5m])` read **`0`** — the
+  labelled series is *born* by the event, and `rate()` needs two samples to
+  subtract, so a series that appears at 1 and stays at 1 has rate 0 forever.
+  `CheckoutAvailabilityUnknownSKU` therefore stayed silent (not even pending)
+  while the condition it pages for was live. Three siblings shared the defect and
+  two of them added a second one — a `for` **longer** than the rate window
+  (`InventoryReservationInfraErrors` 10m/5m, `OrderReconcilerDependencyUnreadable`
+  20m/10m), which no bounded burst can ever mature. All four now use
+  `sum(increase(counter[15m])) > 0` with `for: 0m`; the orphaned
+  `checkout:availability_unknown_sku:rate5m` recording rule is deleted with its
+  only consumer.
 - **A recording rule outlived the metric it recorded.** The RFC-0021 baseline
   rule `rfc0021:product_stock_reservations:rate5m` read
   `product_stock_reservations_total`, which product 1.7.0 removed with the

@@ -64,7 +64,10 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
   local out
   out=$(kubectl run "isolation-sweep-$label" --rm -i --restart=Never -n "$ns" \
     --image="$IMAGE" --command -- sh -c "$script" 2>/dev/null)
-  while read -r _ role db verdict; do
+  while read -r tag role db verdict; do
+    # Only PAIR lines are verdicts; kubectl's own chatter (e.g. the pod
+    # deletion notice) must not be parsed as a matrix row.
+    [ "$tag" = "PAIR" ] || continue
     [ "$role" ] || continue
     local key="$label/$role/$db" got=""
     case "$verdict" in

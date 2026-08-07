@@ -144,8 +144,24 @@ spec:
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGTransactionIDWraparoundCritical.md"
 
     # --- WAL archiving ----------------------------------------------------
+    # A failure COUNT alone cannot tell a broken archiver from a healthy one
+    # that hiccupped: a planned promotion always fails exactly one archive (the
+    # new timeline's .history file), and `increase(...[30m])` then held this
+    # critical alert for a full 30 minutes on a cluster that was archiving
+    # perfectly — measured during the first GameDay (DR-2026-08-B) and again
+    # confirmed on 2026-08-07.
+    #
+    # So the alert now requires the failure to be ONGOING rather than
+    # historical: failing AND making no progress. `archive_timeout: 5min` forces
+    # a WAL switch on both clusters, so a healthy archiver advances
+    # archived_count roughly every 5 minutes — measured 3 per 15m window on
+    # product-db and platform-db. A 15m no-progress window therefore carries a
+    # 3x margin, and the post-promotion single failure is suppressed because
+    # archiving keeps advancing right through it.
     - alert: CNPGWALArchiveFailing
-      expr: increase(cnpg_pg_stat_archiver_failed_count[30m]) > 0
+      expr: |
+        increase(cnpg_pg_stat_archiver_failed_count[30m]) > 0
+          and increase(cnpg_pg_stat_archiver_archived_count[15m]) == 0
       for: 5m
       labels:
         severity: critical
@@ -153,8 +169,9 @@ spec:
       annotations:
         summary: WAL archiving failing on {{ $labels.cnpg_io_cluster }}
         description: >-
-          archive_command has failed in the last 30m on {{ $labels.cnpg_io_cluster }}. WAL is
-          piling up in pg_wal and PITR/backup recovery is at risk — check the Barman object store.
+          archive_command has failed in the last 30m on {{ $labels.cnpg_io_cluster }} AND no WAL
+          has been archived for 15m — archiving is stuck, not merely hiccupping. WAL is piling up
+          in pg_wal and PITR/backup recovery is at risk — check the Barman object store.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGWALArchiveFailing.md"
 
     # --- Long-running / idle transactions --------------------------------

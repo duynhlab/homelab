@@ -24,6 +24,18 @@ metadata:
 spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+  # WAL segment size is baked into the RESTORED data directory (product-db is
+  # initdb'd with walSegmentSize: 64), but postgresql.parameters come from THIS
+  # manifest — so a restore that omits them gets CNPG's default min_wal_size
+  # (80MB) against 64MB segments and Postgres refuses to start:
+  #   FATAL: "min_wal_size" must be at least twice "wal_segment_size"
+  # Found by the first Drill A run (2026-08-07): this manifest had never been
+  # exercised. Mirror the source cluster's WAL sizing here; the rest of its
+  # tuning is irrelevant to a throwaway validation cluster.
+  postgresql:
+    parameters:
+      min_wal_size: "2GB"
+      max_wal_size: "8GB"
   bootstrap:
     recovery:
       source: product-db-backup

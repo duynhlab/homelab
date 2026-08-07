@@ -131,13 +131,19 @@ Expected:
 
 ### Trigger manual backup
 
-If the CNPG kubectl plugin is installed:
+If the CNPG kubectl plugin is installed — **the method flags are mandatory**.
+The plugin defaults to `barmanObjectStore` (the in-tree method these clusters no
+longer use), so the bare command fails with `cannot proceed with the backup as
+the cluster has no backup section`. Measured on 2026-08-07 during the first
+Drill A:
 
 ```bash
-kubectl cnpg backup product-db -n product
+kubectl cnpg backup product-db -n product \
+  --method plugin --plugin-name barman-cloud.cloudnative-pg.io
 ```
 
-Plain Kubernetes fallback:
+Plain Kubernetes equivalent (identical result — the plugin form above is just
+shorter):
 
 ```bash
 kubectl apply -f - <<EOF
@@ -157,7 +163,16 @@ EOF
 
 ### Restore to a new cluster
 
-Use the checked-in restore example as the starting point:
+Use the checked-in restore example as the starting point. It now carries
+`postgresql.parameters` with the source cluster's WAL sizing, and that is
+load-bearing rather than cosmetic: **WAL segment size is baked into the restored
+data directory** (`product-db` is initdb'd with `walSegmentSize: 64`) while
+`postgresql.parameters` come from the restore manifest. A restore that omits
+them takes CNPG's default `min_wal_size` (80MB) against 64MB segments and
+Postgres refuses to start —
+`FATAL: "min_wal_size" must be at least twice "wal_segment_size"` — leaving the
+cluster `unrecoverable and needs manual intervention`. Found by the first
+Drill A run; the manifest had never been exercised before that.
 
 ```bash
 kubectl apply -f kubernetes/infra/configs/databases/clusters/product-db/restore-cluster-example.yaml

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/db-isolation-sweep.sh` — the RFC-0012 P4 role×database isolation
+  matrix as the scripted psql sweep ADR-015 promised: credential-free (a
+  forbidden pair rejects at pg_hba BEFORE auth; an allowed pair probed with a
+  wrong password fails AT auth — the error message is the verdict), covering
+  product-db (6 allow / 30 reject) and platform-db (8 allow / 41 reject),
+  exit-code gated for Drill Day.
+
 ### Changed
 
 - RFC-0007 gains its actual deliverable on paper: a Program section (cadence,

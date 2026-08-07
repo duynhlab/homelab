@@ -18,8 +18,42 @@
 
 ## Meaning
 
-`increase(cnpg_pg_stat_archiver_failed_count[30m]) > 0` for **5 minutes** —
-`archive_command` (Barman/cloud plugin) failed at least once recently.
+Both arms must hold for **5 minutes**: `archive_command` (Barman/cloud plugin)
+failed at least once in the last 30 minutes **and** not one WAL segment has been
+archived in the last 15. A single failure alone does not page — a planned
+promotion produces one and keeps advancing. Silence alone does not page either:
+a quiescent cluster with nothing pending never raises `failed_count`.
+
+**Expect a delay.** The `[15m]` no-progress window plus the 5-minute debounce
+means the page arrives roughly **15–20 minutes after archiving stops**, not
+immediately. That is deliberate — anything shorter pages on every switchover —
+but it means `pg_wal` has already been growing for a quarter of an hour by the
+time you read this. Check free space early (Diagnosis step 3).
+
+### Verified at runtime (2026-08-07)
+
+Injected by scaling the RustFS object store to zero replicas for 19 minutes and
+forcing two WAL switches, then restoring it. The full cycle behaved as designed:
+
+| Time (UTC) | Observation |
+|---|---|
+| 15:39:49 | Baseline: `platform-db` 17 archived / **0** failed; `product-db` 18 / **0** |
+| 15:40:13 | RustFS scaled 1 → 0 |
+| 15:40:33 | Two `pg_switch_wal()` on `product-db` → `failed_count` **0 → 1** within seconds |
+| 15:52:19 | `increase(archived_count[15m])` reached **0** → alert **pending** on both clusters |
+| 15:58:06 | `product-db` → **firing** (its arms matured first) |
+| 15:58:16 | `platform-db` genuinely at **36** failures on WAL `…000F` — a segment was in flight when the store vanished, so its page is a true positive, not collateral |
+| 15:58:56 | RustFS scaled back to 1; Ready at 15:59:11 (15s) |
+| 15:59:18 / 15:59:57 | Both clusters archiving again, backlog drained (17→21, 18→23) |
+| ~16:03 | Alert **resolved** — zero rows; `increase(archived_count[15m])` back to 5 |
+
+Two things worth carrying into an incident. **The alert cannot be trusted to
+appear promptly** — 18 minutes elapsed between the store dying and the page.
+And **Tempo and Pyroscope survived the same outage untouched** (no restarts
+across 19 minutes), because they hold their buckets open and write
+periodically; a crash-looping Tempo means a *missing bucket*, not an
+unreachable store. Do not use Tempo's health as a proxy for object-store
+health.
 
 ## Impact
 

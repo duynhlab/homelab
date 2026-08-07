@@ -10,7 +10,8 @@ spec:
   type: Static
   defaultValues:
     name: auth
-    image_tag: "1.4.0" # {"$imagepolicy": "flux-system:auth:tag"}
+    # 1.4.1: pkg v0.35.0 wave (2026-08-07): dependency-only patch release, fleet aligned on one shared-library version.
+    image_tag: "1.4.1" # {"$imagepolicy": "flux-system:auth:tag"}
     namespace: auth
     # Phase 5: auth is HTTP-only — the gRPC GetMe server was removed (services
     # verify JWTs locally against the JWKS), so no grpc_server input.

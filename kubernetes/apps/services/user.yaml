@@ -10,7 +10,8 @@ spec:
   type: Static
   defaultValues:
     name: user
-    image_tag: "1.4.0" # {"$imagepolicy": "flux-system:user:tag"}
+    # 1.4.1: pkg v0.35.0 wave (2026-08-07): dependency-only patch release, fleet aligned on one shared-library version.
+    image_tag: "1.4.1" # {"$imagepolicy": "flux-system:user:tag"}
     namespace: user
     replicaCount: 1
     db_host: "platform-db-pooler-rw.platform.svc.cluster.local"

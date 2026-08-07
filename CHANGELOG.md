@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- pkg v0.35.0 wave pinned: every service repinned to its dependency-only
+  patch release (auth/user/cart/review/shipping 1.4.1, notification 1.5.1,
+  payment 1.5.1, product 1.11.1, order 1.13.1) and checkout to 0.6.1 (503 +
+  Retry-After on its own datastore failover, checkout-service PR #47);
+  checkout-worker follows to 0.6.1 (same-tag rule). Order worker build
+  1-13-1 staged and 1-13-0 retired in the same change (cluster down, nothing
+  to drain); activation via the ADR-030 CronJob at the next bring-up.
+
 ### Added
 
 - `docs/api/pkg.md` — platform-side summary of the shared Go library: package

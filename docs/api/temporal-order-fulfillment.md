@@ -808,7 +808,7 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
 Worker Deployment Versions, one worker manifest per build.
 
-- The worker registers as deployment **`order-fulfillment`** build **`1.13.0`** (one manifest per pinned build; the number tracks the order release)
+- The worker registers as deployment **`order-fulfillment`** build **`1.13.1`** (one manifest per pinned build; the number tracks the order release)
   (`TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, read by
   `pkg/temporalx`; both-or-neither, half-set refuses to start). The workflow
   registers **`VersioningBehaviorPinned`** — a saga holding money and stock is

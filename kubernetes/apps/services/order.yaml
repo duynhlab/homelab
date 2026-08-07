@@ -36,7 +36,13 @@ spec:
     # branch this phase deleted. 1.13.0 does not read it at all — there is one
     # servable participant left, so there is nothing to select.
     #
-    image_tag: "1.13.0" # {"$imagepolicy": "flux-system:order:tag"}
+    # 1.13.1: pkg v0.35.0 wave (2026-08-07) - dependency-only patch release.
+    # Worker build 1-13-1 is staged alongside this pin (1-13-0 retired in the
+    # same change; the cluster was down, so there was nothing to drain) and
+    # MUST be activated at the next bring-up: gate on
+    # `temporal worker deployment list` showing order-fulfillment, then run
+    # the set-current-version CronJob (ADR-030) - pod Ready is NOT the gate.
+    image_tag: "1.13.1" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     platform_backup_label: "cnpg"
     replicaCount: 1

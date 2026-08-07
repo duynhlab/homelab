@@ -32,7 +32,8 @@ spec:
     # schema cannot lag the code. Confirmed the hard way in the local-stack
     # audit: rebuilding the service without its migrator left the reconciler
     # querying a payment_attempts table that did not exist yet.
-    image_tag: "1.5.0" # {"$imagepolicy": "flux-system:payment:tag"}
+    # 1.5.1: pkg v0.35.0 wave (2026-08-07): dependency-only patch release, fleet aligned on one shared-library version.
+    image_tag: "1.5.1" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — payment's data lives on product-db

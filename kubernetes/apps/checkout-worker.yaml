@@ -2,7 +2,7 @@
 # that runs its `worker` subcommand (no HTTP API traffic, no Service). It polls
 # the `checkout` task queue and runs AbandonedCheckoutWorkflow's activity
 # (MarkSessionExpired — RFC-0015 P2, timer + lazy-backstop expiry). Modelled on
-# the order worker (now order-worker-1-10-0.yaml): same image as `checkout`, `args: ["worker"]`,
+# the order worker (now order-worker-1-13-1.yaml): same image as `checkout`, `args: ["worker"]`,
 # `service.enabled: false`. Deployed directly (not via the checkout ResourceSet)
 # because its shape is a one-off — no Service, no migrations, Temporal env.
 ---
@@ -46,7 +46,7 @@ spec:
       # activate and no side-by-side step. `repo.ExpireDue`, the only activity it
       # runs, is also unchanged.
       repository: ghcr.io/duynhlab/checkout-service/checkout-service
-      tag: "0.6.0"
+      tag: "0.6.1"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

@@ -9,1195 +9,206 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- pkg v0.35.0 wave pinned: every service repinned to its dependency-only
-  patch release (auth/user/cart/review/shipping 1.4.1, notification 1.5.1,
-  payment 1.5.1, product 1.11.1, order 1.13.1) and checkout to 0.6.1 (503 +
-  Retry-After on its own datastore failover, checkout-service PR #47);
-  checkout-worker follows to 0.6.1 (same-tag rule). Order worker build
-  1-13-1 staged and 1-13-0 retired in the same change (cluster down, nothing
-  to drain); activation via the ADR-030 CronJob at the next bring-up.
-
-### Added
-
-- `docs/api/pkg.md` — platform-side summary of the shared Go library: package
-  table, per-service consumer matrix, adoption table, and the full release
-  ledger (v0.1.0 → v0.35.0); linked from the api hub and the repository index.
-
-### Changed
-
-- RFC registry synced to shipped reality: RFC-0015 (checkout) and RFC-0017
-  (telemetry standard) -> `implemented`; RFC-0018 (platform-db consolidation)
-  and RFC-0019 (ClickHouse Phase B) -> `implemented` with evidence rows in
-  their Implementation Histories; RFC-0008 index row now matches its
-  `implementable` body. RFC-0021's first deferred item (checkout bare 500 on
-  its own DB failover) marked resolved by checkout 0.6.1; RFC-0001's future
-  work acknowledges the recorded GameDay run, the shipped server bump and the
-  platform-db move; RFC-0015's dangling RFC-0016 pointer notes the retired
-  number; docs/README and cart.md drop the "P6 planned" claims.
-
-### Changed
-
-- docs/api de-drift after the RFC-0021 closure: `GetProducts` (removed from the
-  contract) no longer described as live in checkout/api/microservices; the
-  Checkout→Inventory `CheckAvailability` edge added to every call graph and
-  journey; inventory.md caller matrix flipped from Planned to Implemented and
-  the drained pre-cutover notes retired; checkout.md documents the 0.6.1
-  datastore-unavailable contract (`503` + `Retry-After: 2` on every session
-  endpoint) and points its audit link at `local-stack/docs/e2e-audit.md`;
-  deployment rollup drops the two legacy rows removed in P5; order-worker build
-  id and Temporal roadmap corrected.
-
-### Added
-
-- **inventory gets real SLOs, hand-written on its gRPC SLI.** The `mop` chart only
-  builds HTTP SLIs, and inventory is gRPC-only — so its three chart SLOs had **no
-  series behind them at all** (no Kong route, health/ready not instrumented): a 0/0
-  SLI on the platform's sole stock authority. Replaced with `grpc-availability`
-  (99.9%, server faults only — business refusals excluded) and `reserve-latency`
-  (`Reserve` p95 < 250 ms), both RFC-0021's own targets. Needed a per-service opt-out
-  in the fulfillment ResourceSet (`slo_disabled`, an opt-*out* because the template
-  guard is truthiness-based).
-- **Alertmanager inhibition: one incident, one page.** Checkout's deliberate
-  fail-closed 503s paged twice — once through the precise
-  `CheckoutAvailabilityErrors`/`CheckoutAvailabilityUnknownSKU` rules and once
-  through the Sloth burn-rate page. The 503 keeps burning budget; the generic page is
-  suppressed while a precise one fires. Scoped by `service` + `sloth_severity=page` +
-  availability/error-rate only — never by severity alone, and never the ticket alert.
-- **First recorded GameDay drill run (RFC-0021 phase 7)** — `docs/proposals/rfc/RFC-0021/gameday.md`.
-  Five faults on Kind: inventory outage mid-checkout, order-worker kill mid-saga,
-  provider lost response, CNPG `product-db` switchover under load, and a root-cause
-  hunt on a live `PaymentReconciliationDiscrepancy`. All five converged in the data
-  (24/24 orders terminal, no double charge, no leaked reservation, no half-written
-  order); measured switchover RTO **11.4 s** against a `< 30 s` SLO. Filed as
-  `010.2` evidence record `DR-2026-08-B` — that file had a template and no results.
-
-### Changed
-
-- **Pull requests now validate Markdown links.** CI checks only added or changed
-  Markdown files, retries rate-limited requests, and ignores URLs that are
-  intentionally reachable only from local environments.
+## [0.110.0] - 2026-08-07
 
 <!-- markdown-link-check-disable -->
-<!-- Historical entries below preserve release-time paths and are append-only. -->
+<!-- Entries preserve release-time paths; some have moved since. -->
 
-- **local-stack is now the explicit pre-release gate.** Its README is a concise
-  operator entry point and the full A/B/C protocol lives in a dedicated E2E
-  runbook with commit-SHA evidence and an `ELIGIBLE FOR TAG` decision. The docs
-  now show the as-built manual handoff—signed semver tag, CI image, homelab pin,
-  `make validate`, then Flux/Kind verification—including checkout-worker,
-  mockpay, and the side-by-side versioned order-worker exception. Local-stack
-  inventory is corrected to 11 services and 11 databases.
-
-- **RFC-0021 is `implemented` (P0–P7).** The phase-7 gate — *GameDay scenarios
-  converge; all migration flags removed* — is met, and the closure **cites** evidence
-  rather than promising it: the [GameDay record](docs/proposals/rfc/RFC-0021/gameday.md)
-  (five faults, three claims held, **two falsified**) and the SLO work that found
-  inventory's three SLOs were *dead* rather than mis-scoped. Deferred items are listed
-  in the RFC's Implementation History instead of left implied — checkout's bare `500`
-  when its own database fails over, the reservation layer still unable to express an
-  unknown SKU, G1 wanting a re-run against the inhibition that landed mid-drill, and
-  the reconciler never verifying that a provider honoured the window it asked for. The
-  RFC-0020 east-west-TLS dependency is **disposed of, not inherited**: nothing in this
-  RFC's thesis waits on mTLS, and gating a closure on another `provisional` RFC would
-  keep it open indefinitely. `docs/README.md` gains the RFC-0021 design-record row it
-  never had.
-
-- **RFC-0007 de-staled.** It claimed *"no drill recorded yet"* while drills B and E had
-  just run, and its scenario catalog named `cnpg-db`, `auth-db` and
-  `supporting-shared-db` — clusters that stopped existing at the RFC-0018
-  consolidation. Drill D (Zalando WAL-G) is marked obsolete for the same reason. It
-  stays **`provisional`** on purpose: its deliverable is the *program* — cadence, named
-  owner, standing evidence home — and none of that exists yet.
-
-- **`MicroserviceLatencyCritical` demoted to `warning`** — it duplicated the Sloth
-  latency burn-rate page on the same metric (a static threshold cannot know how much
-  budget is left). P95/P99 were already `warning`. Catalog decision applied, not
-  re-litigated.
-- **`VMAgentScrapePoolHasNoTargets` root-caused instead of relaxed.** The only empty
-  pool on a rebuilt cluster is `podScrape/monitoring/sloth-ui/0` — sloth-ui ships at
-  `replicas: 0` by design — so it is excluded by name; threshold and `for:` untouched.
-  The vestigial `temporal-internal-frontend` exclusion is removed: a live run confirms
-  that pool is gone, which is the condition its comment set for removal.
-- **SLO docs made as-built:** 32 SLOs / 64 alerts across 11 services (was documented
-  as 30/60 across 8 listed services), the `mop`-chart origin of the
-  `PrometheusServiceLevel` CRs stated explicitly (why the repo contains almost none),
-  and the stale `slo.platform/job-label` default corrected — the OTLP push path has no
-  `job` label. `MicroserviceNoTraffic`/`NoSuccessfulRequests` runbooks now document
-  why they fire benignly for ~40 minutes after any traffic burst, and why `for:` was
-  deliberately not lengthened.
-- **`mockpay` pinned to `1.5.0` (was `1.0.0`) with payment's `$imagepolicy` marker.**
-  The skew manufactured a permanent critical `PaymentReconciliationDiscrepancy`:
-  `1.0.0`'s `GET /transactions` discards the `from`/`to` bounds, so windowed
-  reconciliation compared a bounded internal set against the provider's whole ledger
-  and every older charge read as `missing_internal`. It also made the phase-6
-  ambiguity faults (`…13` no answer, `…07` refund declined) uninjectable in the
-  cluster — they had only ever been verified on local-stack.
-- **`kubectl cnpg switchover` corrected to `kubectl cnpg promote <cluster> <instance>`**
-  in `005`, `010-drp`, `010.2`, and `010.4`. The plugin (v1.30.0) has no `switchover`
-  verb; the documented DR command returned `unknown command`. `010-drp` also claimed
-  the plugin was not installed — it is.
-- **`PaymentReconciliationDiscrepancy` runbook**: its first Diagnosis query never ran
-  (`scanned`/`found` are `transactions_scanned`/`discrepancies_found`). Added the
-  window-asymmetry false-positive check, the explicit-bounds warning, and the
-  in-memory-mockpay restart consequences.
-- **`CNPGWALArchiveFailing` runbook**: documents that a planned promotion always trips
-  it — the new primary fails one timeline-history archive, and `increase(…[30m])`
-  holds a critical alert for 30 minutes on a healthy cluster.
-- **`005` §Service Updates**: the `-rw` endpoint step measured **12.6 s**, not the
-  documented `< 5 s`, with the endpoint list empty for 10.9 s. The `< 30 s` RTO the
-  step serves still holds.
-
-- **`checkout-worker` re-aligned to the API's image (`0.3.1` → `0.6.0`).** It is the
-  *same* binary with a different subcommand, and it had drifted three minors behind —
-  carrying base layers that `trivy` gates the API on but had never re-checked here.
-  Moved in one step because the risk was verified, not assumed: between those tags
-  `internal/workflow/` changed by exactly one test file, so the workflow
-  **definition** is byte-identical and an in-flight `AbandonedCheckoutWorkflow`
-  (30-minute timer) replays without a non-determinism error. This worker is not under
-  ADR-030 versioning — only order is — so there is no build id to activate.
-
-- **Every service repo now pins the shared reusable workflows to a commit SHA, and
-  passes only the secrets each one declares.** `@main` meant anyone who could push to
-  `gha-workflows` changed twelve repositories' CI silently. The half that makes
-  pinning maintainable instead of a freeze: `gha-workflows` had **no tags**, and
-  Dependabot bumps a SHA-pinned ref only when it finds a newer *release* — so it is
-  now tagged `v1.0.0` and each ref carries `# v1.0.0` for Dependabot to read.
-  Separately, `secrets: inherit` was handing `SONAR_TOKEN`, `SLACK_BOT_TOKEN` and a
-  Google service-account private key to callees that declare **no secrets at all**;
-  every call site was re-checked against its callee's declared set, so nothing that
-  needs a secret lost one. Fleet hotspots went from 40+ to a single `docker:S6471`
-  per repo (builder stage as root — the stage is discarded and the runtime user is
-  non-root, so that one is a reviewed-safe verdict rather than a change).
-
-- **The RFC-0021 drain gate is now checkable, because its query was silently lying.**
-  `temporal worker deployment describe` prints a version as
-  `order-fulfillment` **`.`** `1.13.0` while the `TemporalWorkerDeploymentVersion`
-  search attribute stores `order-fulfillment` **`:`** `1.13.0` — and querying with the
-  dot returns **`Total: 0` instead of an error**. Measured against a workflow known to
-  be pinned to `1.13.0`: colon → 1, dot → 0. An operator copying the format from the
-  neighbouring CLI output would get a confident zero and delete a worker manifest that
-  was still serving pinned histories, stranding sagas holding stock and an
-  authorization. `cutover-rollback.md` now carries the two formats side by side, the
-  instruction to sanity-check the query against the *current* build first, why
-  `DrainageStatus: unspecified` is not evidence either, and a four-part falsifiable
-  criterion for deleting a build.
-
-- **The availability alerts stopped being able to suppress each other.** Adding a
-  fourth `result` value is not label-neutral, and an adversarial review caught two
-  ways it broke the existing pair: `unknown_sku` was **absent from
-  `CheckoutAvailabilityRefusingEverything`** (which selects `shortage`), so a total
-  data gap would have fired nothing at all; and it landed in
-  **`CheckoutAvailabilityErrors`' unfiltered denominator**, where a flood of missing
-  balance rows could push the error share under 1% and *suppress the critical page*
-  during a partial inventory outage. Every ratio now names its labels explicitly,
-  with the reason written next to it. `RefusingEverything` is deliberately
-  **narrower** — it used to double as the guard for the contract gap that
-  `unknown_sku_ids` closes, and its runbook now says not to widen it back. Catalogs,
-  the inventory dashboard panel, `docs/api/inventory.md` and `docs/api/checkout.md`
-  updated with it.
-
-- **RFC-0021 phase 4 closed, and the docs stopped describing a migration in flight.**
-  RFC status → *phases 0–6 shipped*, with a phase-4 implementation-history entry that
-  records the removal order and the four production-shaped bugs execution found that
-  review did not; [ADR-027](docs/proposals/adr/ADR-027-inventory-sole-stock-authority/)
-  **Adoption → Complete** and its banner corrected — it still said *"authority not yet
-  cut over, product remains the live authority"*, kept in banner shape so the ADR still
-  shows the decision was recorded before the cutover rather than after it.
-  `docs/api/inventory.md` said **no live caller**; it has three. `workflows.md`,
-  `order.md`, and `temporal-order-fulfillment.md` still named `order-worker-1-10-0` as
-  the worker and product as a saga participant. The order-side stock rules kept their
-  phase-3 framing (`ORDER_STOCK_PARTICIPANT` as a live switch, *"pre-cutover
-  readings"*) — re-framed as steady state, rules unchanged, with the
-  `participant="product"` series reinterpreted: it is no longer a progress signal but
-  a finding, since a value reappearing there would mean a pre-P4 history started on a
-  build that still has the branch.
-
-- **`docs/api/product.md` now describes a service that does not own stock.** It
-  still documented `ReserveStock`/`ReleaseStock`/`GetProducts` as live RPCs, the
-  `stock` block and `stock_quantity` in payloads, `stock_reservations` in the data
-  model, and the reservation semantics as product's own — all removed across
-  RFC-0021 phase 4. Rewritten to the as-built surface (`BatchGetCurrentPrices` as
-  the only RPC, the inventory-sourced `availability` block, the schema without
-  stock) with the stock rules pointing at `inventory.md` instead of being
-  duplicated in stale form.
-
-- **RFC-0021 P4 — checkout pinned to `0.5.1`**: `POST /sessions` answers **503 +
-  `Retry-After: 2`** when a dependency is down, instead of the 500 it shared with an
-  unhandled error. Found by the phase-4 e2e, and the asymmetry is what made it worth
-  a release: confirm already answered 503 for the same condition, so a shopper who
-  hit a momentary inventory outage at the *start* of checkout was told the server was
-  broken, while the same outage one step later told them to retry.
-
-- **RFC-0021 P4 — product pinned to `1.11.0`; the `PRODUCT_AVAILABILITY_SOURCE`
-  input and its template block are gone.** The flag's `product` position had become a
-  trap: since 1.8.0 it meant the detail page carried **no availability at all**, and
-  `1.10.0` dropped the column underneath it. Third default in this migration pointing
-  at an authority that was already removed, after `ORDER_STOCK_PARTICIPANT` and
-  `CHECKOUT_AVAILABILITY_SOURCE` — the pattern being that a migration flag outlives
-  its migration as a footgun unless removing it is part of the contraction. The pin
-  and the input removal ride in one PR on purpose: dropping the input while `1.10.0`
-  was pinned would trip exactly that default, and env and image live in the same
-  Deployment template so each pod rolls with both at once. Nothing is lost — an
-  unreachable inventory still resolves to `status: unknown` and the SPA still allows
-  add-to-cart, because checkout is where availability is enforced.
-
-- **RFC-0021 P4 — product pinned to `1.10.0`, the irreversible step**: migration
-  `000006` revokes the migration-`000005` cross-service grant, drops
-  `stock_reservations`, then drops `products.stock_quantity`. Product no longer owns
-  stock in the schema either. Sequenced behind inventory `0.3.0` (below) because the
-  retired backfill was the last thing that selected the column, through the grant
-  being revoked. **A data-bearing cluster needs a manual `pg_dump` first** — the
-  paired down-migration restores shape with every row at `0`, so the backup is the
-  data rollback; the completed backup + restore test is recorded as RFC-0021 gate 3.
-  Hardened after an adversarial review: the migration refuses to drop while any
-  undocumented role still holds `SELECT` on `products` (a `REVOKE` whose grantor
-  differs only WARNs and returns success), sets `lock_timeout` so it fails fast
-  instead of queueing every catalog read behind an `ACCESS EXCLUSIVE` waiter, and
-  stops claiming that revoking `CONNECT` is a boundary — Postgres grants
-  `CONNECT`/`TEMPORARY` and schema `USAGE` to PUBLIC by default, so the `pg_hba`
-  line removed in #663 is the actual boundary.
-
-- **RFC-0021 P4 — inventory pinned to `0.3.0`**: the phase-2 `backfill` subcommand
-  and its `PRODUCT_DB_*` config surface are retired. It read
-  `products.stock_quantity` through the cross-service grant, and phase 4 removes
-  both. This pin has to land **before** product 1.10.0 carries the migration that
-  drops the column: remove the reader, then the read. Running the retired verb now
-  refuses loudly — the deleted `case` used to fall through to `default`, which
-  serves the app, so `backfill --apply` would have started a full HTTP + gRPC
-  server inside a one-shot Job holding product-database credentials.
+The RFC-0021 release: inventory extracted as the platform's sole stock
+authority (expand → migrate → contract, all eight phases), the order aggregate
+and payment-ambiguity hardening shipped, ClickHouse OLAP and the platform-db
+consolidation landed, and the fleet closed on one shared-library version.
 
 ### Added
 
-- **inventory pinned to `0.4.0`, checkout to `0.6.0`** — an untracked SKU stops
-  reaching the shopper as *"no longer available"*. It used to arrive as a `Shortage`
-  at `available_to_promise = 0`, a quantity claim inventory cannot make about a SKU
-  it has never heard of; it is now `unknown_sku_ids` (pkg `v0.35.0`) and checkout
-  fails **closed** on it — 503 + `Retry-After`, because a missing balance row says
-  nothing about whether the item is buyable. Order matters: inventory has to be
-  sending the field before checkout can act on it. On the **confirm** path the
-  session is requoted out of `confirming` first, and that is the whole reason this
-  is a release rather than a one-line mapping — the condition is persistent, and
-  `confirming` has no FSM edge to `cancelled`, `lazyExpire` skips it, and
-  `FindActiveByUserID` keeps returning it, so parking there left the shopper unable
-  to confirm, cancel, **or** start a new checkout.
-
-- **`CheckoutAvailabilityUnknownSKU` (critical) + runbook** — a SKU with no balance
-  row in any warehouse. `inventory.v1/CheckAvailability` can now say so explicitly
-  (`unknown_sku_ids`, pkg `v0.35.0`) instead of leaking it out as a `Shortage` at
-  `available_to_promise = 0`, a quantity claim inventory cannot make about a SKU it
-  has never heard of. Checkout fails **closed** on it (503, never *"no longer
-  available"*), so the alert is what turns a silent revenue loss into a page — the
-  RPC succeeds, so nothing at inventory looks wrong. Not a ratio: a healthy majority
-  of baskets would hide the case it exists for.
-
-- **RFC-0021 P4 — order worker build `1-13-0` staged** (order 1.13.0: the saga's
-  product-service stock branch is deleted). Side by side with `1-12-0` per ADR-030
-  and receiving nothing until the activation Job runs. `1-12-0` must stay until its
-  version shows **DRAINED**, and here that is correctness rather than tidiness: it
-  is the last build that can serve a workflow whose participant is `product` or
-  absent, and 1.13.0 refuses those rather than re-routing them — so a pre-P4 saga
-  left with no poller stalls with stock held and payment authorized.
-
-- **RFC-0021 P6 — reconciliation auto-heal enabled**: `RECON_HEAL_ENABLED=true` on
-  the cluster, wired through the checkout ResourceSet as `recon_heal_enabled`
-  (quoted, because the template guard is truthiness-based and a YAML `false` would
-  drop the env rather than disable the feature). Heal converges exactly one drift
-  class — internal `authorized` while the provider says `captured` — by re-driving
-  the idempotent CAS-guarded capture by payment id, never by calling the provider
-  (ADR-012). It is enabled **only now**, and the order is the point: a heal nobody
-  can see is worse than a discrepancy nobody heals, and the pass only became
-  observable in this phase (discrepancy alert, staleness alert, and heal failures
-  as their own series). Last step of RFC-0021 phase 6.
-- **RFC-0021 P6 — payment pinned to 1.5.0**: payment can now say it does **not
-  know** what the provider did instead of guessing. An unknown outcome parks the
-  intent in `processing` with the round-trip recorded in `payment_attempts`, and
-  never triggers the semantic opposite operation — so a capture whose response was
-  lost is no longer reversed against money the provider took. Resolution re-asks
-  the same question under the same key, on the request path and on a bounded
-  one-minute sweep. Reconciliation is bounded to a time window with a
-  completion-gated frontier and runs under a cross-process lease; each refund
-  carries a caller-supplied identity. Migrations 000010–000012 ride the chart's
-  init container. Landed **after** order 1.12.0 was Current on the cluster, since
-  this image is what can produce a `processing` payment. The single-replica note is
-  narrowed: the reconciler is now fenced by the lease, and migration 000007 is the
-  remaining blocker to scaling.
-- **RFC-0021 P6 — order pinned to 1.12.0 + worker build 1-12-0**: cancellation now
-  fails closed when payment does not know what the provider did. A `processing`
-  payment used to fall into the "nothing to move" arm, so the order was settled
-  `cancelled` while the money was unaccounted for; it parks in `manual_review`
-  instead, with a reason that separates an unknown outcome from a decided failure.
-  Each refund also carries its own identity, so an order can owe both a saga
-  compensation and a cancellation remainder. **This pin must land before payment
-  1.5.0** — payment 1.5.0 is what can produce a `processing` payment. The activity
-  signature change rides a new Worker Deployment Version
-  (`order-worker-1-12-0.yaml`, activation CronJob `--build-id 1.12.0`); 1-10-0
-  stays side by side until its version shows DRAINED (ADR-030).
-- **RFC-0021 P6 — reconciliation staleness alert**: `PaymentReconciliationStale`
-  (critical) on `payment_reconciliation_watermark_age_seconds > 1800` for 15m,
-  plus its runbook. It pages even though nothing user-facing breaks when it fires,
-  because while reconciliation is stopped the discrepancy page **cannot fire at
-  all** — a monitor that has stopped monitoring is an incident. The threshold is
-  measured against the mechanism, not guessed: the age has a floor of the
-  5-minute settlement lag and oscillates by the ticker interval on top of it, so
-  healthy values reach ~600s. The alert-catalog gap note for payment reconciliation
-  is now closed.
-- **RFC-0021 P6 design records — ADR-034…037 + docs/api sync**: ADR-034 (record an
-  unknown provider outcome instead of guessing it: `processing` intent state +
-  per-round-trip attempt log, and an UNKNOWN outcome never triggering the semantic
-  opposite operation), ADR-035 (bound a reconciliation pass to a time window asked
-  of both sides, with a completion-gated high-watermark), ADR-036 (guard
-  single-writer background roles with a session-level advisory lease), ADR-037 (let
-  the caller name each refund) — all Accepted/Complete. `docs/api/payments.md`
-  gains an *Unknown provider outcomes* section, the `processing` FSM edges, the
-  `payment_attempts` and `reconciliation_watermark` tables, the scoped refund key,
-  the windowed/leased reconciliation rewrite, backfill examples, and a rewritten
-  known-gaps block; `microservices.md` rollup and the ADR index follow. RFC-0021
-  status → phases 0–3 + 5 + 6 shipped, with the phase-6 Implementation History
-  entry recording the eight critical defects three review rounds found and the
-  lesson: the escape must ship with the trap.
-- **RFC-0021 P6 — payment doubt alerts + runbooks**: payment had **no alert
-  rules at all**; `rfc0021-phase6.yaml` adds six. The design lets payment park an
-  intent in `processing` when a provider gives no answer, which is only safe if
-  the doubt is visible and bounded: `PaymentDoubtStale` (oldest unresolved
-  outcome >1h — both automatic escapes have failed), `PaymentAttemptEvidenceLost`
-  (the attempt log refused a write, so the park was refused and an unconfirmed
-  state stands), `PaymentReconciliationDiscrepancy` (real ledger-vs-provider
-  drift — the gap the catalog itself recorded), plus backlog-growing,
-  sweep-failing and provider-unknown-rate warnings. Six runbooks, alert-catalog
-  §9b, and 8 new rows in the metrics catalog (incl. the `transient` vs `unknown`
-  provider-outcome split). The phase-5 runbooks are indexed at the same time —
-  they shipped as files but never reached the area index.
-- **RFC-0021 P6 — payment pinned to 1.4.0**: brings the refund-honesty fix to the
-  cluster. A refund whose provider outcome was not a success used to be answered
-  as one **and sealed into the idempotency cache as a 201**, so every retry
-  replayed the failed verdict and the money never returned. Payment now
-  distinguishes a decided answer (recorded `failed`, non-retryable
-  `FailedPrecondition` / HTTP 422) from an undecided one (row stays `pending`,
-  retryable `Unavailable` / HTTP 503 asking for a same-key retry), releases the
-  key on a detached context so a timeout cannot lock the caller out, and refuses
-  a `200` that carries no provider refund id. mockpay grew a refund-decline
-  trigger (`…07`).
-- **RFC-0021 P5 docs + ADR-033 — order aggregate as-built**: ADR-033 (order
-  status FSM + CAS command path + customer cancellation; Accepted/Complete);
-  `docs/api/order.md` rewritten to the seven-state FSM, cancel endpoint,
-  expanded `/details` (processing/inventory/degraded), P5 data model, and
-  the legacy-create removal (v1.11.0); saga deep-dive gains the
-  CancellationWorkflow section and drops the stale three-state FSM copy;
-  workflows registry + microservices rollup + inventory/shipping caller
-  tables synced (inventory write path marked live since W7); metrics
-  catalog += 9 phase-5 series and the `totals_source` label removal;
-  RFC-0021 Implementation History records the full P5 ship list.
-- **RFC-0021 P5 — order API pinned to 1.11.0**: brings the generic-write
-  deletion (v1.10.1), the `orders.status` CHECK + seed normalize (v1.10.2)
-  and the legacy REST create removal (v1.11.0) to the cluster. The worker
-  build stays `1-10-0` — no workflow code changed after v1.10.0 (ADR-030:
-  worker builds advance only with workflow-affecting changes).
-- **RFC-0021 P5 — order v1.10.0 pinned + worker build 1-10-0 staged**: order
-  bumped to 1.10.0 (order aggregate: FSM status commands + CAS history, the
-  CancellationWorkflow + cancel API, the processing-stage projection and the
-  expanded `/details`); `order-worker-1-10-0.yaml` lands side-by-side per
-  ADR-030 (activation is the deliberate CronJob step; 1-8-0 is deleted at
-  DRAINED). Phase-5 alerts (`rfc0021-phase5.yaml`: stuck-cancelling,
-  manual-review backlog, cancellation outbox, best-effort tails) + four
-  runbooks incl. the operator resolve procedure (drilled live);
-  local-stack order API gains `INVENTORY_GRPC_ADDR`.
-- **OTel fundamentals docs** under `docs/observability/` — `opentelemetry/fundamentals.md` (API vs SDK, signal selection, OTLP gRPC-vs-HTTP, context propagation & baggage, semconv), `opentelemetry/collector.md` (component model, agent/gateway/sidecar patterns, the deployed pipelines incl. ClickHouse fan-out, processor ordering, `create_schema` startup coupling, troubleshooting runbook), and `metrics/histograms.md` (bucket mechanics, explicit vs **exponential** histograms, delta vs cumulative temporality, cardinality-per-attribute-set). Stack/tracing diagrams and inventories updated to show the live ClickHouse exporter and `tracing-local dependsOn clickhouse-local`; stale "conceptual" collector YAML in `tracing/architecture.md` replaced with the real pipeline table. `rfc-0014-explainer.md` **merged into `fundamentals.md`** (all seven diagrams preserved; the cutover pipeline diagram kept as labelled historical, superseded by `collector.md`) — file removed, every reference updated.
-
-- **ADR-032 proposed — deliver Tempo via tempo-operator `TempoMonolithic`**:
-  decision record (Proposed, adoption not started) to replace the raw Tempo
-  Deployment/ConfigMap with an operator-managed CR, enable the inert
-  metrics-generator, and roll out via a parallel run; no manifests changed.
-- **RFC-0021 P3 docs/api sync (W6)**: the saga deep-dive gains as-built sections
-  for the per-workflow stock participant (resolved from the order's row, never
-  the process flag), the inventory reconciler (once-per-order reporting, the
-  disagreement counter), and Worker Deployment Versioning (one manifest per
-  build, activation lifecycle, verified-live behaviours). `order.md`,
-  `inventory.md` (reconciler shipped — expiry sweeper stays planned) and
-  `workflows.md` updated to the deployed reality; ADR-030 Adoption flipped to
-  **Complete**; RFC-0021's workflow-migration open question marked resolved.
-- **ADR-030 Worker Deployment Versioning wired, inert** (RFC-0021 P3): a second
-  order worker (`order-worker-1-8-0`) polls as deployment `order-fulfillment`
-  build `1.8.0` and receives nothing until an operator sets it Current via the
-  suspended CronJob template — side by side with the unversioned worker, never
-  an in-place flip (which registers with no Current and hangs new workflows
-  silently, verified live). `make validate` now fails on any drift between the
-  worker's image tag, its BUILD_ID env, and the CronJob's `--build-id` /
-  `--deployment-name`; `OrderSagaNotCompleting` (starts>0 `unless` outcomes>0)
-  is the end-to-end backstop with a runbook. Activation, drain, and the
-  retire-at-DRAINED procedure live in the RFC-0021 cutover doc.
-- **RFC-0021 P3 participant-skew signals**: two alerts + runbooks for the one way
-  an order's stock branch can disagree with its own record —
-  `OrderParticipantDisagreement` (a hold exists that the row does not account
-  for) and `OrderStartParticipantUnrecognised` (a start could not use the
-  recorded value and fell back to its flag). Both counted once per order, so
-  any increase is a distinct order and no threshold above zero would be honest.
-  `metrics-catalog.md` gains the two counters (34 -> 36 instruments).
-- **RFC-0021 P3 write-path alerts + runbooks**: nine alerts covering the stock
-  migration's own failure modes — the ones the RED alerts cannot see, because an
-  order and its stock can disagree while every service reports healthy. Commit-lag
-  p99 (mandatory-forward after the pivot), outbox age and terminal-FAILED rows,
-  reconciler backlog, unrepairable breaches, dependency-unreadable, pass
-  truncation, and compensation failure. One runbook per alert.
-  `order_reconciler_backlog` gets a paired **`absent()`** alert because its callback
-  publishes *nothing* rather than `0` when its database read fails — that only works
-  without blanking every other metric because the callback returns nil, and both
-  order processes report it, so a single restart cannot trip the absence alert.
-  Alert catalog gains a **§9 RFC-0021** domain and its count is re-derived from the
-  manifests (184), which also catalogues four alerts that were deployed but never
-  listed: the three earlier RFC-0021 ones and `OtelCollectorDown`. Metrics catalog
-  documents the eight new order series.
-
-- **ADR-031 — fulfillment start outbox** (RFC-0021 P3): the order row and the intent to start its saga now commit in one transaction, because Temporal cannot join it and a crash in between stranded the order `pending` forever. The inline start stays as the fast path; a leased dispatcher in `order-worker` retries what it could not start. Exactly-once is enforced at three layers — `REJECT_DUPLICATE` as the seam **default**, `WorkflowExecutionErrorWhenAlreadyStarted` (without it the SDK swallows the rejection and a refused start looks successful), and describing the existing run before closing a row. Records the accepted trade-offs, including the non-obvious coupling between the dispatcher's attempt cap and the worker's fail-fast Temporal dial: changing one without the other converts a Temporal outage into mass order failure. `docs/api/temporal-order-fulfillment.md` gains a "How the Saga Gets Started" section with the four outbox signals (alert on `oldest_age`, not the count, and with `absent()` handling), and `docs/api/order.md`'s "exactly one durable thing" claim is corrected.
-
-### Fixed
-
-- **inventory-service pinned to `0.2.3`** — the Deployment was in `Init:CrashLoopBackOff` on the cluster (59 restarts): its init container runs `migrate` with only `DB_*` env, the same contract product/order/checkout run under, while `0.1.0` validated the full config before dispatching and panicked on `SERVICE_NAME`. Found by the RFC-0021 P3 cluster audit, fixed in inventory-service#13, released as `v0.2.2` and rolled into `v0.2.3` together with the testcontainers wait-strategy fix and the `x/crypto`/`grpc`/builder CVE bumps.
-- **inventory backfill CronJob image reference** — it pointed at `ghcr.io/duynhlab/inventory-service/inventory:v0.2.1`, which does not exist: the repo publishes `…/inventory-service/inventory-service` tagged without the leading `v` (now `0.2.3`) (GHCR returns 404 for the old path). The CronJob is suspended, so the bad pull would have surfaced the first time it was resumed — inside the write-cutover window, which is the worst possible moment.
-
-### Removed
-
-- **Order worker builds `1-10-0` and `1-12-0`, and the order→product `:9090`
-  NetworkPolicy allow.** Removed on evidence, not tidiness: Current is `1.13.0`, the
-  version search attribute counts **0** workflows pinned to either old build across
-  every status, and the task queue has no Running workflows. Keeping them was not
-  neutral — every build runs the fulfillment start-outbox dispatcher, so a draining
-  build can claim a row and start a saga that Current **refuses**, which was measured
-  during P4-A (`1-12-0` closed the row `DISPATCHED` while `1.13.0` panicked ten times
-  unwatched). `ORDER_START_DISPATCHERS_ENABLED` can silence that for future draining
-  builds but cannot help images that predate the flag, so for these two deletion was
-  the only mitigation. With the saga's product client gone, the netpol allow was the
-  last thing that would let a rolled-back build write a second stock ledger.
-
-- **The last of product's stock, including the schema and the cross-service
-  grant.** The suspended `inventory-backfill` CronJob and the `pg_hba` line
-  `host product inventory` on `product-db` are gone, alongside product migration
-  `000006` (revoke → drop `stock_reservations` → drop `products.stock_quantity`)
-  and inventory's `backfill` subcommand. Retiring the reader before dropping the
-  read is the ordering that matters: the backfill selected exactly that column
-  through exactly that grant. Removing the `pg_hba` line is the outer boundary of
-  the revoke — a `REVOKE` alone still leaves the role able to reach the database.
-  Recovering a missing balance is now inventory-local (seed, or an explicit
-  `RECEIVE` movement); the `CheckoutAvailabilityRefusingEverything` runbook and
-  the alert annotation that both named the backfill Job as the fix now say so,
-  because a runbook that points at a deleted Job costs an on-call the time it
-  takes to discover that.
-
-- **The RFC-0021 read-migration machinery, everywhere it existed.** The
-  `CHECKOUT_AVAILABILITY_*` inputs and their ResourceSet template blocks, the
-  OpenBAO-backed `checkout-availability-canary` ExternalSecret (a Secret injected
-  into a process with no consumer), the two local-stack envs, and
-  `rfc0021-read-migration.yaml` — whose recording rule and
-  `CheckoutInventoryShadowDivergence` alert watched `inventory_shadow_compare_total`,
-  a series checkout 0.5.0 no longer emits. A rule on a dead series does not go quiet
-  loudly, it goes **blind**: no data never fires. The two baseline dashboard panels
-  are labelled **RETIRED — no data is expected** rather than left looking broken.
-
-### Added
-
-- **`checkout-availability.yaml`: signals for the authority phase 4 created.**
-  `CheckoutAvailabilityErrors` (critical) — inventory erroring means shoppers get
-  503s and there is no fallback; it is also the only thing separating "inventory is
-  down" from "inventory is refusing baskets", since `checkout_price_changed_total`
-  lumps `PRICE_CHANGED` with `STOCK_UNAVAILABLE`. `CheckoutAvailabilityRefusingEverything`
-  (warning) guards a **contract gap**: `CheckAvailability` cannot say "no data for
-  this SKU" and `can_fulfill=false` is also the zero value, so a backfill gap reads
-  as a definite customer-facing out-of-stock. Both have runbooks.
+- **checkout-service** (RFC-0015 P1–P5, all in this window): the session FSM
+  with price re-validation against product (P1, ADR-020/021), the idempotent
+  confirm handoff over order's first gRPC server + `AbandonedCheckoutWorkflow`
+  abandonment (P2, ADR-018/019), quoted totals from shipping `GetQuote` + tax
+  rules (P3), promo codes with atomic confirm-time redemption (P4, ADR-022),
+  and the cluster deployment — DB triplet, Kong route, NetworkPolicies,
+  checkout-worker (P5). The SPA moved to the multi-step funnel; RFC-0015 is
+  implemented (its P6 legacy-path removal shipped via RFC-0021 P5).
+- **inventory-service** (RFC-0021 P1): gRPC-only `inventory.v1` — balances with
+  derived ATP, `RESERVED → COMMITTED|RELEASED|EXPIRED` reservation FSM,
+  append-only movement ledger (ADR-027/028). Fulfillment domain ResourceSet,
+  database triplet on product-db, NetworkPolicies, local-stack wiring,
+  recording rules + alerts + dashboard, and `docs/api/inventory.md`.
+- **Order aggregate** (RFC-0021 P5, ADR-033): seven-state FSM with CAS command
+  path and append-only status history, customer cancellation
+  (`CancellationWorkflow` with policy gate, refund-by-state, manual_review
+  parking), processing-stage projection, expanded `/details`; phase-5 alerts +
+  runbooks including the drilled operator resolve procedure.
+- **Payment ambiguity** (RFC-0021 P6, ADR-034…037): payment can say it does not
+  know — `processing` intent state + per-round-trip `payment_attempts`, an
+  UNKNOWN outcome never triggers the semantic opposite; windowed, leased
+  reconciliation with a completion-gated watermark; caller-named refunds;
+  reconciliation auto-heal (one drift class, observable first); six doubt
+  alerts + `PaymentReconciliationStale` + runbooks — payment previously had no
+  alert rules at all.
+- **Workflow-start outbox** (ADR-031): order row + saga-start intent commit in
+  one transaction; leased dispatcher retries what inline start could not;
+  exactly-once enforced at three layers; four outbox signals.
+- **RFC-0021 migration observability**: baseline recording rules + dashboard,
+  write-path alerts (commit lag, outbox age, reconciler backlog + `absent()`
+  pair, compensation failure), participant-skew alerts, availability alerts
+  (`CheckoutAvailabilityErrors`/`RefusingEverything`/`UnknownSKU` — the last
+  because a missing balance row must page, not read as out-of-stock), and the
+  drain-gate query-format trap recorded in `cutover-rollback.md`.
+- **First recorded GameDay run** (`RFC-0021/gameday.md`): five faults on Kind,
+  24/24 orders terminal, no double charge; measured CNPG switchover RTO 11.4 s
+  vs the `< 30 s` SLO; two documented claims falsified and filed as
+  `010.2` evidence `DR-2026-08-B`.
+- **Inventory gRPC SLOs, hand-written**: the chart's HTTP SLIs had no series
+  behind them on a gRPC-only service — replaced with `grpc-availability`
+  (99.9%) and `reserve-latency` (p95 < 250 ms), RFC-0021's own targets, plus a
+  per-service `slo_disabled` opt-out in the fulfillment ResourceSet.
+- **ClickHouse OLAP for OTel logs+traces** (RFC-0019 Phase B, ADR-023):
+  Altinity operator + CHI, collector exporter fan-out, Grafana datasource —
+  cluster and local-stack; the standard dashboard suite (overview / logs /
+  traces with in-dashboard waterfall), the per-service deep-dive board, and
+  the hub's Grafana chapter, all verified panel-by-panel.
+- **platform-db** (RFC-0018): 3-node CNPG cluster with Barman merging the
+  former auth-db/shared-db/temporal-db, `pgdog-platform` pooler (×3, PDB),
+  NetworkPolicy, alert rules, OpenBAO seeds.
+- **Observability docs**: OTel fundamentals + collector + histograms guides,
+  the stack review with per-signal scorecard, PostgreSQL (33) and
+  microservices (19) per-alert runbooks with `runbook_url` wiring, metrics
+  catalogs (built-in CNPG inventory, application instruments), Business KPIs
+  dashboard, DB-client observability row + four app-side DB alerts.
+- **docs/api/pkg.md**: shared-library summary — package table, consumer
+  matrix, adoption table, and the full v0.1.0 → v0.35.0 release ledger.
+- **Proposals**: RFC-0018 (platform-db), RFC-0019 (ClickHouse), RFC-0020
+  (internal TLS, provisional), RFC-0021 (platform overhaul) + research; ADR
+  template v2 with separate Adoption tracking; ADR-032 (TempoMonolithic,
+  Proposed).
+- PR Markdown link validation; GitHub labels workflow; Kong CORS exposes
+  `Retry-After`; Prometheus-type Grafana datasource alias unlocking the
+  Alerting UI; chart-native scrapes for cert-manager and the Kong proxy;
+  `KubeStateMetricsAbsent` fail-closed page.
 
 ### Changed
 
-- **checkout pinned to 0.5.0 — inventory is the only availability authority**
-  (RFC-0021 phase 4). The four `CHECKOUT_AVAILABILITY_*` envs are no longer read,
-  and they stay rendered for exactly one commit: 0.4.x defaults the source to
-  `product`, so removing the inputs while a 0.4.x pod still serves would move the
-  authority back onto product's frozen stock column — the same trap
-  `ORDER_STOCK_PARTICIPANT` set. So the pin lands alone and the inputs follow.
-  0.5.0 also fixes a dead end found in adversarial review: an unsellable line
-  answered 503 "retry with the same key" for a condition that could never change,
-  wedging the session at `confirming` with no FSM edge out.
-
-- **product pinned to 1.8.0 — the frozen stock column leaves the read contract.**
-  `/details` has no `stock` block and product payloads no longer publish
-  `stock_quantity`; availability comes from inventory-service and is the only stock
-  answer. Order mattered: the SPA moved to the `availability` block first
-  (frontend#81), because removing the old fields before that would have blanked the
-  page. `products.stock_quantity` is still SELECTed for
-  `GetProducts.available_qty` (checkout's product-source fallback), so the column
-  cannot be dropped from the schema yet.
-
-- **The product detail page asks inventory for availability** (`PRODUCT_AVAILABILITY_SOURCE=inventory`,
-  RFC-0021 P2-6 machinery turned on in phase 4). Until now the cluster served only
-  `products.stock_quantity`, frozen since the W7 write cutover — a page reporting
-  "In Stock (25)" that could never change. The address is set explicitly because the
-  code default names a Service this cluster does not have and an unreachable
-  inventory soft-fails to `status: unknown`, so a wrong default would degrade
-  quietly. Expand step only: the frozen `stock` block is still on the response
-  because the SPA reads it; the frontend moves next, then `stock` is dropped.
-
-- **product pinned to 1.7.0 — the stock write RPCs are gone** (RFC-0021 phase 4),
-  and the observability that watched them retires in the same PR rather than being
-  left to rot: the `rfc0021:product_stock_reservations:rate5m` recording rule is
-  **deleted** (a recorded series that can only ever be empty looks like a signal),
-  the cluster and local-stack dashboard panels are relabelled **RETIRED — empty is
-  expected, not an outage**, and both metrics-catalog rows are struck through with a
-  pointer to the waiver. `docs/api/` sync stays with the phase-4 close.
-
-- **The phase-4 removal gate is recorded as WAIVED, not quietly skipped.** The
-  RFC's two-week-zero window on `product_stock_surface_calls_total` would have
-  closed 2026-08-14; the owner chose code evidence on 2026-08-05 instead. The
-  waiver matters because the instrument is deleted with the RPCs, so the gate
-  query returns *empty* afterwards and empty reads the same as zero on a
-  dashboard — `cutover-rollback.md` and the product pin now say so explicitly,
-  including that the only remaining detection channel is `Unimplemented` replies
-  logged at error level, after something has already broken.
-
-- **`docs/api/` matches the P4 as-built** now that order 1.13.0 is Current on the
-  cluster (this sync was held back from the code PR on purpose — those files
-  describe deployed reality, and the two-branch saga was still what ran). The saga
-  step table, both saga sequence diagrams, the platform call graph and the order
-  topology diagram lose the product stock edge; the participant section documents
-  the refusal, where it lives and why a workflow panic alone is not enough; and
-  `product.md` stops claiming product owns stock — the column and ledger are marked
-  FROZEN since the W7 write cutover, with the RPCs recorded as registered but
-  caller-less. All 17 changed Mermaid blocks re-rendered.
-
-- **The order reconciler runs on the CURRENT worker build only** — it was `true` on
-  all three side-by-side builds, so three judges shared one scan that claims
-  nothing (no `FOR UPDATE SKIP LOCKED`), which its own docs say must have a single
-  runner. Draining builds now stand down, and `scripts/flux-validate.sh` enforces
-  exactly-one **and** that it is the build the cutover CronJob makes Current — a
-  forgotten flip at an activation is invisible until the judgements disagree.
-  Found by running the P4 rollout on a Kind cluster rather than by reading it.
-
-- **RFC-0021 P4 — order API pinned to 1.13.0** and the `order_stock_participant`
-  input removed, deliberately in the same commit: 1.12.0 defaults that flag to
-  `product`, so dropping the input while the older image was deployed would have
-  silently sent new orders back to the deleted branch. 1.13.0 does not read it —
-  one servable participant means nothing to select — and the now-dead template
-  block goes with it (its hard-won Go-template-delimiter warning was carried over
-  to the surviving `CHECKOUT_AVAILABILITY_SOURCE` block). Verified on the cluster
-  before pinning: `CurrentVersionBuildID = 1.13.0` and an order driven end to end
-  came back `Pinned` to BuildId 1.13.0.
-
-- **RFC-0021 P4 — order runbooks and catalogs match the removed product stock
-  branch** (ahead of the worker build, so the alerts land on correct docs): the
-  participant flag is no longer a mitigation lever — order 1.13.0 refuses an
-  unservable participant instead of falling back to it — and each affected runbook
-  carries an **Applies to** row so it stays usable for a fleet that is still on
-  1.12.x. `FulfillmentStartOutboxFailed` was rewritten: its "burned the attempt cap
-  (~2h)" meaning was already wrong for three codes, its "never charged" claim is
-  false when a run exists, and its preferred mitigation was a raw `UPDATE orders SET
-  status='failed'` that bypasses the P5 aggregate (version + append-only history)
-  and could strand captured money. New code `PARTICIPANT_UNSERVABLE`; the
-  participant metric gains a `result` label so refusals stop counting as starts.
-  local-stack drops `ORDER_STOCK_PARTICIPANT` and `PRODUCT_GRPC_ADDR` from order and
-  its worker, and the worker's `depends_on` now names inventory instead of product.
-
-- **OpenBAO seeding docs match the post-revoke reality**: re-running the
-  bootstrap Job seeds NOTHING on a live cluster (it detects the revoked root
-  and exits — learned at the W8 canary-salt seed), and the rotation runbook's
-  root_token commands could not work (inert copy). New break-glass runbook
-  (generate-root from the recovery key → write → revoke) with the
-  seed-both-places rule and the planned AppRole write-path noted; the Job
-  header and rotation runbook now point at it.
-- **product bumped to 1.6.0 — the phase-4 clock starts at convergence**: the
-  deployment carries product_stock_surface_calls_total{rpc}, the instrument
-  the RFC-0021 contract-removal gate reads (two weeks of zero, measured from
-  deployment). E2E-verified on local-stack before release; catalog 36 -> 37
-  instruments.
-- **MicroserviceDown stops paging on every rollout**: the D-4 heartbeat-absence
-  check now joins `kube_pod_info` (exported_pod/exported_namespace on this
-  setup), so it fires only for a pod that still EXISTS but went silent —
-  replaced pods are normal lifecycle, whole-app outages stay with
-  MicroserviceAllInstancesDown. The join makes kube-state-metrics
-  load-bearing, so `KubeStateMetricsAbsent` (new, critical) pages when the
-  joined series itself disappears — fail-closed-with-a-page, not
-  fail-open-with-noise.
-- **RFC-0021 W8 docs sync + phase-4 gate made measurable**: checkout.md and
-  api.md catch up with the read cutover (split reads — prices from product's
-  BatchGetCurrentPrices, stock from inventory's CheckAvailability; GetProducts
-  stays as the subject-less fallback); the RFC index moves to implementable
-  with phases 0-3 recorded in Implementation History; the phase-4 contract
-  removal gate now names its instrument (product_stock_surface_calls_total),
-  its queries, and the rule that the two-week clock starts at DEPLOYMENT, not
-  merge.
-- **RFC-0021 W8 rung 3 — availability reads fully on inventory (read cutover
-  complete)**: the canary dial opens from 20 to 100 after the canary gate —
-  per-user arms verified exactly against the HMAC (8/8 users, both arms
-  confirming 201), all thirteen write-migration alerts inactive. With W7,
-  inventory-service now owns BOTH the write and the read path for stock;
-  product's stock surface is drain-only pending phase-4 contraction.
-- **RFC-0021 W8 rung 2 — availability reads open to a 20% canary**: the shadow
-  gate passed (30+ minutes of real double-reads, `inventory_shadow_compare_
-  total{result="ok"}=16`, zero mismatches, divergence alert inactive), so
-  `checkout_availability_source` moves to `inventory` with a 20% sticky
-  per-user canary. The HMAC bucket key is seeded into OpenBAO and reaches the
-  pod only through an ExternalSecret + `secretKeyRef` — git cannot compute
-  which arm a user lands on. Everyone outside the bucket stays on product.
-- **checkout bumped to 0.4.0 in the cluster** (RFC-0021 W8): the deployed
-  0.3.1 binary predates the entire read path — shadow reads, inventory-mode
-  split reads, the keyed canary — so the W8 `shadow` flip rendered an env the
-  process silently ignored (no flagx validation, no dial, no metric). Third
-  merged-but-never-released prerequisite this phase has surfaced; the release
-  ladder now moves before the flag ladder.
-- **RFC-0021 W8 rung 1 — checkout availability reads go `shadow`**: checkout
-  keeps serving availability from product, and additionally reads inventory to
-  compare (`inventory_shadow_compare_total` is the divergence measure;
-  `CheckoutInventoryShadowDivergence` silent for 30m gates the canary rung).
-  The checkout ResourceSet gains conditional blocks for the whole read-flip
-  ladder (source, inventory address, canary pct + salt), so every later rung
-  is a one-line input change; the inventory address is explicit because the
-  code default names a Service that does not exist on this cluster. Template
-  re-verified with the flux-operator parser constructor (PARSE OK).
-- **RFC-0021 W7 write cutover — inventory owns new stock writes**
-  (2026-07-30): `order_stock_participant` flipped to `inventory`, inside a
-  drained window with the backfill applied and verified (balance `1|43|0|0`
-  == product stock, `mismatch_count: 0`). New sagas reserve/commit/release in
-  inventory-service; in-flight product-path sagas drain on their own pinned
-  branch. Reads stay on product until W8. Reverting the flag only redirects
-  NEW workflows — never a data rollback. docs/api participant/caller claims
-  flipped to the post-cutover reality in the same change.
-- **product bumped to 1.5.0 in the cluster** (RFC-0021): four merged slices the
-  cluster had not seen — BatchGetCurrentPrices, migration **000005** granting
-  the inventory role read of products (the W7 backfill failed 42501 without
-  it: the grant was merged but never released), availability enrichment, and
-  the catalog list returning stock. The inventory-backfill CronJob template
-  also gains the numeric `runAsUser: 65532` its image needs under
-  `runAsNonRoot` — found the first time the template was actually
-  instantiated, the same defect class the temporal cutover CronJob had.
-- **Observability-contract stale facts** (post-#620 fix-pass): the gRPC
-  access-log level contract now matches pkg v0.31.0 (level follows the status
-  code's class; services keep the old blanket non-OK→error until they bump),
-  the access-log field schema is labelled contract-target vs today's fields,
-  the body-size histogram math follows the deployed 8-boundary View
-  (38 series/combo, ~2,100 worst case, 9 bucket lines), the collector counts
-  are 7 exporters defined / 6 wired fanning out to six backends, hardcoded
-  "ten services" counts are removed, and `service.version` is labelled
-  as-built on the versioned worker only.
-- **`docs/api/` observability contracts** — `observability.md` is the normative application hub (document ownership, layer responsibilities, cross-signal data policy, error ownership, worker/Temporal rules, PR checklist); `api.md § Observability` delegates instead of duplicating the signal matrix. Contract-first pass over the pillar docs, every claim audited against `duynhlab/pkg`, the ten service repos, and the OTel specification (2026-07-29): `logs.md` gains the **OTel LogRecord data model** (11 fields, SeverityNumber ranges, platform mapping) and the semconv access-log schema; `metrics.md` gains bucket semantics and a **temporality** contract (cumulative, D-7) and fixes the byte-bucket View values to the deployed set; `tracing.md` gets full **baggage** semantics (immutability, not-stored, security) and restores the verified Kong `inject: [w3c]` fact; `profiling.md` pins verified `SetupProfiling` behavior and a bounded-stop wiring shape; probe filtering is one signal-by-signal contract matrix. Follow-up pass adds the **instrument selection rule** (all seven instrument kinds, additive×monotonic decision table, sync vs Observable timing, the cumulative-total callback trap), the API-vs-SDK stability contract in the fundamentals doc, and the layer tracing rules: SpanKind↔layer mapping, the enrich-before-create granularity ladder (attributes → events → child span), and no hand-wrapped driver spans in adapters.
-
-- **Unversioned order worker retired** (ADR-030 lifecycle, RFC-0021 P3): the
-  activation drill set Current to `1.8.0` and the drain gate
-  (`TemporalWorkerDeploymentVersion IS NULL`, running) read 0, so
-  `order-worker.yaml` is deleted and the versioned worker takes over the
-  reconciler in the same change — one judge at all times, never zero, never
-  two. No guard edit needed: `flux-validate.sh` treats the unversioned file
-  as optional by design.
-- **order bumped to 1.8.0 in the cluster** (RFC-0021 P3) — API, worker, and the
-  `migrate` init container together. Every saga start now resolves the stock
-  participant from the order's outbox row instead of the process flag (the two
-  inline starts used to re-decide on replay — the one skew that corrupts the
-  reconciler's judgement), and a reservation the row does not account for is
-  logged and counted, feeding the two alerts added below. Migration **000010**
-  rides the image the same way 000008/000009 did and CHECK-constrains the
-  participant column now that it routes stock writes. Verified end-to-end on
-  local-stack and on a fresh Kind bring-up, including a live skew drill that
-  took `OrderParticipantDisagreement` to firing.
-- **order worker calls inventory, and its reconciler is switched on** (RFC-0021 P3) — `INVENTORY_GRPC_ADDR` wired and `ORDER_RECONCILER_ENABLED=true` in the same change, so the loop never runs without an address. It does useful work before any cutover: terminal orders are all product-path, so `GetReservation` answers NOT_FOUND, the pair reads as consistent, and the backlog settles to 0 — proving the loop and its NetworkPolicy path while nothing's stock depends on them. `ORDER_STOCK_PARTICIPANT=product` is explicit so the write cutover is a one-line greppable diff; it reaches the pod through a conditional block in the **domain ResourceSet**, because the `mop` chart has no such value and an RSIP input alone would be silently dropped. ADR-030 Adoption corrected **Complete → Partial**: the index claimed Complete while no Worker Versioning configuration exists anywhere.
-
-- **Temporal chart moved to `controllers/temporal/`, operator retired by rename** — `controllers/` is where chart-installed platform components live (26 HelmReleases: Kong, Valkey, OpenBAO, Vector…); `configs/` holds the CRs and config they consume, so the ingress + PrometheusRule stay in `configs/temporal` under a `temporal-config-local` Kustomization — the `kong-local` → `kong-config-local` shape. `apps-local` still depends on `temporal-local`, which is what its order-worker needs (a serving frontend). Retirement method changed: the four retired artifacts — operator HelmRelease, both operator CRs, operator HelmRepository — are **renamed to `*.yaml.bak` with their contents intact** instead of having every line commented out. A file no kustomization lists is already inert, so blanking it only made it unreadable; the suffix additionally keeps it out of `make validate`, which globs `*.yaml`. Accepted cost: a `.bak` file ships in the OCI artifact as dead weight and is no longer syntax-checked or Renovate-tracked — which is the point for a retired manifest. Added both temporal paths to `scripts/flux-validate.sh`: `controllers/temporal` is excluded from `controllers/kustomization.yaml` so it can have its own Kustomization, so a build of `controllers` never reached it and **nothing had ever validated the chart**. Chart spec byte-identical; ingress and PrometheusRule are pure renames.
-
-- **order bumped to 1.7.0 in the cluster** (RFC-0021 P3) — three merged slices the cluster had not seen: the participant-routed saga (1.5.0), the fulfillment start outbox (1.6.0), and the inventory reconciler (1.7.0). All INERT on merge: the saga reads `ORDER_STOCK_PARTICIPANT`, which defaults to `product`. Migrations **000008 + 000009** ride the same image — the `mop` chart's init container runs `migrate` before the app container, so the schema cannot lag the code that needs it (the outbox insert names `participant`, and an app ahead of its schema fails every CreateOrder with `42703`; measured on a copy of the local-stack database). The worker ships with `ORDER_RECONCILER_ENABLED=false` because the reconciler calls inventory-service on a timer and has no address yet — the kill switch keeps the bump observable on its own rather than firing `OrderReconcilerDependencyUnreadable` about missing configuration. Env wiring, Worker Versioning, and enabling the loop follow separately.
-
-- **ADR template v2 and proposals lifecycle** — [`ADR-0000-template/`](docs/proposals/adr/ADR-0000-template/) gains decision summary, Scope, drivers, decision rules, validation, revisit triggers, and separate **Adoption** tracking; [`adr/README.md`](docs/proposals/adr/README.md) is the unified process hub + index. RFC review spawns ADR(s) at **Proposed** and flips RFC + ADR to **Accepted** before implementation; hub status **`Accepted`** replaces **`implementable`** (legacy index rows unchanged). RFC template adds **Resulting decisions**; runbooks remain topic-dependent after ship.
-- **Karma and the Sloth UI ship at 0 replicas** — both are browse-on-demand tools (Karma reads the VMAlertmanager API, the Sloth UI reads the same VMSingle as Grafana), so neither needs to hold cluster resources idle. No Flux health check references them and the Sloth PodMonitor simply finds no targets while scaled down. Alerting and SLO rule generation are unaffected — only the interactive views are off. Scale to 1 (`kubectl scale deploy/{karma,sloth-ui} -n monitoring --replicas=1`) when triaging; noted in the alerting and SLO docs where the runbooks point at them.
-- **Temporal re-platformed onto the official `temporalio/helm-charts`** (RFC-0021 P3, ADR-030 — supersedes ADR-002's deployment half): the alexandrevilain operator is retired (its matrix caps at server 1.28.x) so the cluster can run server **1.31.2**, the floor for Temporal **Worker Versioning** (≥ 1.29.1), the mechanism the phase-3 stock-write migration uses. Persistence, `numHistoryShards: 512`, the `platform-db-temporal-secret` ESO secret and the `temporal-frontend` Service name all carry over — no service's `TEMPORAL_HOSTPORT` changes. The `mop` namespace (168h) moves to the chart's namespace Job, the UI Service becomes `temporal-web` (ingress updated), `schema.useHelmHooks: false` because Flux does not reconcile Helm hooks, and the operator/CR manifests plus the `cert-manager-local` dependency and CRD-based Flux health checks are gone (Temporal health is now the HelmRelease + frontend Deployment). Operator manifests are commented out in place for rollback — control plane only: once the chart's schema job upgrades the databases past 1.24.2, a real rollback also needs a `platform-db` PITR of `temporal` + `temporal_visibility`. **Applying this to a cluster that is already running the operator?** Delete the `TemporalCluster`/`TemporalNamespace` CRs *while the operator still runs*, or Flux can prune the operator first and leave the CRs hanging on finalizers. The platform's Kind cluster is rebuilt per `make up`, so the normal path is a fresh install with nothing to prune.
-
-### Added
-
-- **RFC-0021 inventory Phase-1 exit docs** — ADR-027 (inventory-service is the sole stock authority, supersedes RFC-0003) and ADR-028 (reservation & balance model: derived ATP, RESERVED→COMMITTED\|RELEASED\|EXPIRED FSM, append-only movement ledger, one-order-one-warehouse), both Accepted; new `docs/api/inventory.md` service contract (v2 template — gRPC-only `inventory.v1`, deployed with no live caller until phases 2–4) added to the hub rollup and service list.
-- **inventory-service observability** (RFC-0021 P1-9) — `inventory:*` recording rules (reservation rate by operation+outcome, check rate by outcome, gRPC p95 + error ratio per method, DB query p95) plus symptom alerts `InventoryReservationInfraErrors` (outcome=error > 0 for 10m) and `InventoryGrpcErrorRatio` (non-OK/all > 5% for 10m), and Grafana dashboard *RFC-0021 — Inventory* (`inventory-overview`); phase-3 write-path signals (oversell gauge, stale-RESERVED reconciler age, commit lag) deferred until their metrics exist.
-- **inventory-service in local-stack** (RFC-0021 P1-8) — `inventory-migrate` + `inventory-seed` (dev-only) + `inventory` service (gRPC :9090, no Kong route, no live caller yet) in `compose.yaml`; `inventory` database in `postgres/init.sql`. Fresh-stack E2E audit: init.sql creates the DB, migrate/seed apply (10 seeded balances + WH-DEFAULT), 21 OTLP series reach VictoriaMetrics, and the baseline saga regression stays 18/0 (adding inventory doesn't disturb the existing flow).
-- **inventory-service GitOps manifests** (RFC-0021 P1-7) — new `fulfillment` domain ResourceSet (`rs-fulfillment` + apps-local health check), `rsip-inventory` (gRPC-only, v0.1.0, PgDog runtime + product-db-rw migrations, reflection off), PgDog `inventory` backend/user entry, and NetworkPolicies (deny-all + pod-scoped `allow-inventory-grpc` from checkout/order; inventory ns allowed into product-db 6432/5432).
-- **inventory database triplet on product-db** (RFC-0021 P1-6) — ExternalSecret + DatabaseRole + Database (`services/inventory.yaml`), consuming-namespace secret copy, `inventory` namespace (tier app), pg_hba allow line ordered before the trailing reject, OpenBAO bootstrap seed (fresh clusters; live cluster needs the day-2 break-glass write per ADR-024 note).
-- **RFC-0021 phase-0 baseline verified** (gate §0.7) — 7 saga scenarios (happy path, magic-amount decline, two-user TOCTOU race on the last unit, duplicate confirm, shipment-failure compensation, worker-outage convergence, capture-fail documented as un-injectable) driven against local-stack with a local-only helper; verified via the canonical tracked gate, the local-stack README Phase A/B/C protocol.
-- **RFC-0021 baseline observability** (CP-0 gate) — `rfc0021:*` recording rules (checkout confirm success/bounce/p95, product ReserveStock outcomes + gRPC RED, saga terminal outcomes + compensation, payment provider p95 + authorization) and Grafana dashboard *RFC-0021 — Overhaul Baseline* (`rfc0021-baseline`); the 7-day pre-refactor window starts at merge. Pending-order age and outbox depth deliberately absent (metrics land with phase 3).
-- **RFC-0021 phase-0 kickoff docs** — `docs/api/product.md` known-gaps revised (stock extraction planned under RFC-0021; TOCTOU stance carried forward; design-record row points RFC-0003 → RFC-0021); `RFC-0021/cutover-rollback.md` added (per-cutover rollback story, RUNBOOK-007 seed).
-- **RFC-0021 promoted to provisional** — `RFC-0021/README.md` added (decision, target architecture, 8-phase rollout with exit gates, cutover/rollback stance); **RFC-0003 flipped to superseded** with a pointer (its stock semantics carry into the inventory reservation FSM); research review gate fully ticked with owner sign-off.
-- **RFC-0021 reserved (researching)** — platform overhaul umbrella: inventory extraction (supersession of RFC-0003 proposed), order aggregate strengthening, payment hardening; `research.md` grounded in a 2026-07-23 code audit of all service repos; backlog RFC-0016 absorbed into phase 6.
-
-### Changed
-
-- **docs/api/microservices.md**: expanded §2 local-stack snapshot (workers, Temporal, mockpay, gRPC `:9090`, Valkey gateway dep); fixed outdated checkout P5 blurb; aligned technique index and §6 gaps with README rollup.
-- **Observability docs standardization**: normative app contracts moved to `docs/api/observability.md`, `logs.md`, `metrics.md`, `tracing.md`, and `profiling.md`; `docs/observability/` keeps platform depth with verbatim dedup replaced by links; removed `logging-standards.md` and `victorialogs.md` (canonical `api/logs.md` and `logging/README.md`); inbound links and `api.md` middleware order (tracing → logging, metrics via otelgin/otelgrpc) updated.
-- **docs/api quick-facts**: hook and Identity tables use three columns (`Attribute | Value | RFC / ADR`) with a **Design record** row (proposal links or `None`).
-- **Platform docs review**: new `docs/platform/README.md` hub; drift fixes in `setup.md` (10 services, checkout-worker, clickhouse-local, secrets vs controllers split), `kong-gateway.md` (checkout route), `application-delivery.md` (RFC-0018 db_host examples); deployed-vs-target callouts in `gitflow.md`/`cicd.md`; `graceful-shutdown`, `mcp-servers`, `sonarcloud` updates.
-- **docs/api/api.md**: Platform API Topology redrawn top-down (layered link order: Internet → SPA → Kong → platform → data).
-
-- **grafana-clickhouse-datasource pinned to 4.20.0** (cluster + local-stack; was unpinned "latest"): OTel schema 1.3.0 + auto-detect; datasources gain `logs`/`traces` `otelEnabled` mapping (query builders, Explore, trace↔log links); local-stack collector bumped `0.140.0` → `0.152.0` to match the cluster's OTel logs schema (contrib ≥ 0.151.0 drops `TimestampTime`).
-- **Grafana folders + team-friendly dashboard text**: ClickHouse dashboards grouped into a `ClickHouse` Grafana folder on both environments (local via `foldersFromFilesStructure` + subdirectories, cluster via CR `folder:`); all visible dashboard text rewritten in plain SRE language (no RFC/phase/internal-library jargon); plugin-bundled reference dashboards documented (manual import, not GitOps, wiped on volume recreate).
-- **Fixed stale span enums in *ClickHouse — OTel logs+traces SQL***: exporter ≥ 0.152.0 writes `StatusCode` `Ok`/`Error`/`Unset` and `SpanKind` `Server`/`Client` — the dashboard's `STATUS_CODE_*` filters silently returned 0 errors; replaced in queries and value mappings (both copies).
-
-- **RFC-0020 promoted to provisional**: research gate passed — owner decisions recorded (all app→DB via pooler, `payment` direct hop transitional; CNPG server cert re-issued from `homelab-ca`; straight to `verify-full`; T3 defined per hop; 90d/30d rotation; `streaming_replica` stays CNPG-managed; umbrella scope Slice 0–6) and `RFC-0020/README.md` added (decision, target architecture, rollout).
-- **RFC-0020 research Context7 audit completed**: PgDog confirmed TLS-capable (client TLS, upstream `verify_full`, experimental mTLS) — pooler tier unblocked, no PgBouncer migration needed; Istio ambient-vs-sidecar and OpenBAO listener-TLS rows resolved; review gate updated.
-
-- **docs/api standardized as the trusted API source**: all 10 service contracts use At a glance (3 columns), grouped code maps, and hub deployment rollup in `docs/api/README.md`; user journeys merged into `api.md`; repo index in `docs/README.md` § Repositories; `AGENTS.md` trusts `docs/api/` for API contracts.
-
-### Added
-
-- **Standard OTel dashboard suite** (`clickhouse-otel-overview` → `clickhouse-logs-explorer` → `clickhouse-traces-explorer`, local-stack + cluster): three-tier triage navigation — Overview (which service is in trouble), Logs Explorer (native logs panel, severity/search/trace-id filters, spam ranking), Trace Explorer (trace-level volume/status, duration heatmap, trace search, **in-dashboard trace waterfall** via format-3 Jaeger aliases + logs-for-this-trace panel); TraceId data links wire logs↔traces across the suite; e2e-verified panel-by-panel on real local-stack traffic. Trace-status semantics: the status filter applies to the trace-level classification (computed over ALL spans of matching traces), never to member spans — no 100%-by-construction stats, no error traces misfiled under Ok; volume-row stats ignore status/trace-id filters by design. C4 e2e check extended to all 5 ClickHouse dashboards.
-- **Grafana dashboard *ClickHouse — Service deep dive*** (`clickhouse-service-deepdive`, local-stack + cluster): per-service drill-down over OTel logs+traces — per-operation RED, HTTP route/gRPC method tables (semconv v1.41 keys), east-west dependency tables via `rpc.method` package matching, slowest/error spans with TraceId→Explore data links, severity-filtered logs, error-traces↔logs JOIN; 20 panels verified panel-by-panel against live data.
-- **Grafana chapter in the ClickHouse hub** ([`docs/observability/clickhouse/README.md#grafana`](docs/observability/clickhouse/README.md#grafana)): datasource OTel mapping, schema versions (1.2.9 vs 1.3.0 `TimestampTime`), Explore + trace↔log linking, dashboard grammar + macros, the standard suite and deep-dive references, plugin-bundled dashboards, query performance rules — consolidated into the hub (no separate `grafana.md`).
-- **GitHub labels** (`.github/labels.yaml` + `sync-labels` workflow): declarative triage and `area/*` labels for homelab domains; `delete-other-labels: false` preserves bot-managed labels.
-- **ClickHouse OLAP for OTel logs+traces** (RFC-0019 Phase B / [ADR-023](docs/proposals/adr/ADR-023-clickhouse-observability-olap/)): Altinity operator `0.27.1` + `ClickHouseInstallation` (1×1, PVC `standard`, TTL 90d) in ns `monitoring`; OTel Collector `clickhouse` exporter fanned out on the traces+logs pipelines (`create_schema`, `sending_queue`+retry); `clickhouse-credentials` `ClusterExternalSecret` (OpenBAO); Grafana `grafana-clickhouse-datasource` + datasource. Metrics stay on VictoriaMetrics; no app code change.
-- **ClickHouse in local-stack**: `clickhouse` compose service + collector exporter + Grafana plugin/datasource; e2e audit check **C6** (SQL count over `otel_traces`/`otel_logs`).
-- **Grafana dashboard** *ClickHouse — OTel logs+traces SQL* (RED/golden-signals, 19 panels): local-stack (file) + cluster (`configMapGenerator` → `GrafanaDashboard`).
-- **Observability stack review** ([`docs/observability/stack-review.md`](docs/observability/stack-review.md)): whole-stack assessment (metrics/logs/traces/profiles + cross-cutting) with a per-signal maturity scorecard and ranked production-readiness gaps.
-- **PostgreSQL alert runbooks** ([`docs/observability/runbooks/postgresql/`](docs/observability/runbooks/postgresql/)): 33 per-alert files (CNPG chart + deep-signal + homelab extras), `_TEMPLATE.md`, and index; `runbook_url` on deep-signal and chart PrometheusRules.
-- **PostgreSQL metrics learning hub** ([`docs/observability/metrics/postgresql/README.md`](docs/observability/metrics/postgresql/README.md)): workflows, signal guides (`signals/`), runbook links on custom-metrics; alert-catalog §4 Runbook column + `CNPGLongRunningTransaction` / `CNPGIdleInTransaction`.
-- **CNPG built-in metrics inventory** ([`docs/observability/metrics/postgresql/builtin-metrics.md`](docs/observability/metrics/postgresql/builtin-metrics.md)): the 13 default queries + `cnpg_collector_*` → metric → consuming-alert map, so operators know which built-in signals exist.
-- **Microservices application alert runbooks** ([`docs/observability/runbooks/microservices/`](docs/observability/runbooks/microservices/)): 19 per-alert files, `_TEMPLATE.md`, index; hub remains [`microservices-alerts.md`](docs/observability/runbooks/microservices-alerts.md); `runbook_url` on all rules in `prometheusrules/microservices/alerts.yaml`.
-- **Application metrics learning hub** ([`docs/observability/metrics/metrics-apps.md`](docs/observability/metrics/metrics-apps.md)): learning path + signal→alert map linking to per-alert runbooks.
-- Postgres **deep-signal alerts** ([`deep-signals-alerts.yaml`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml)): blocked queries, deadlocks, autovacuum-behind, low cache-hit, temp-file spill, checkpoint pressure, XID wraparound (warn/critical), and WAL-archive failing — label-driven by `cnpg_io_cluster`, one file covering `platform-db` + `product-db`.
-- CNPG-native Grafana boards **`pg-query-performance`** (pg_stat_statements deep-dive) and **`pg-maintenance`** (locks, checkpointer, autovacuum, bloat), replacing four No-Data PMM boards; `pgdog` board gains a `pooler` selector.
-- **`platform-db`** CNPG cluster (ns `platform`, HA ×3): merges former `auth-db`,
-  `shared-db`, and `temporal-db` logical databases; Barman backups under
-  `s3://pg-backups-cnpg/platform-db/`.
-- **`pgdog-platform`** PgDog pooler (×3, PDB `minAvailable: 2`) for auth, user,
-  notification, shipping, and review.
-- NetworkPolicy [`platform.yaml`](kubernetes/infra/configs/network-policies/platform.yaml);
-  Prometheus rules [`cnpg-platform-db/`](kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/cnpg-platform-db/).
-- OpenBAO bootstrap seed for `secret/local/databases/platform-db/temporal`.
-- **RFC-0019** ([`docs/proposals/rfc/RFC-0019/`](docs/proposals/rfc/RFC-0019/)): ClickHouse as supplementary OLAP — Phase B OTel logs/traces SQL now **accepted + deployed** (see ClickHouse entries above); Phase A commerce facts remain optional/not deployed.
-- ClickHouse guide ([`docs/observability/clickhouse/README.md`](docs/observability/clickhouse/README.md)): flipped planned→**deployed** — MergeTree, deployed architecture, operations, and a hands-on MergeTree playground.
-
-### Removed
-
-- **PgCat artifacts**: deleted legacy runbooks (`docs/databases/runbooks/legacy/pgcat-*.md`), orphan Flux `HelmRepository` (`helm/pgcat.yaml`), and all active doc/manifest references; pooler docs now cover **PgBouncer + PgDog** only.
-
-### Changed
-
-- **docs (runbooks)**: Retired central `docs/runbooks/troubleshooting/` — backup/restore → `docs/databases/runbooks/`; VictoriaLogs debug → `docs/observability/runbooks/`; new `databases/runbooks/README.md`; updated alert catalog, PrometheusRule `runbook_url`, and cross-links.
-- **AGENTS.md**: Engineering skills workflow ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) platform + [agent-browser](https://github.com/vercel-labs/agent-browser) e2e Phase B); skills not vendored in repo.
-- **AGENTS.md**: Senior Platform Engineer role, platform domain map, and `How to work here`; split architecture into platform vs cross-repo app context with [`SERVICES.md`](SERVICES.md) routing rules.
-- **PostgreSQL custom queries**: removed `pg_stat_checkpointer`, `pg_database_size`, and
-  `pg_connection_limits` from both cluster monitoring ConfigMaps — redundant with CNPG
-  built-in default queries (`pg_stat_checkpointer`, `pg_database`, `pg_settings` +
-  `backends`); docs repointed to the built-in metric names.
-- **infra (grafana)**: Pin `grafana/grafana` **13.0.1 → 13.1.0** (cluster `Grafana` CR + local-stack compose).
-- **Documentation**: Merge `docs/observability/metrics/vmauth.md` into `victoriametrics.md` (VMAuth planned section); trim duplicated VLSingle/logs content from victoriametrics.md; sync VLSingle resources in victorialogs.md; update doc index links.
-- RFC workflow: reserve `RFC-NNNN` with owner OK → `research.md` (real-world problem +
-  plain-language + Context7) → `README.md`; optional domain doc spin-off; templates in
-  [`RFC-0000/`](docs/proposals/rfc/RFC-0000/).
-- [`docs/proposals/rfc/README.md`](docs/proposals/rfc/README.md): registry cleanup —
-  drop Priority column and narrative focus block; merge process sections; backlog RFC-0016
-  row.
-- Removed `TODO.md` references from proposals workflow docs; planning artifacts are
-  RFC/ADR/backlog only.
-- [`docs/proposals/README.md`](docs/proposals/README.md): historical note — RFC-0001–0018
-  predate `research.md`; RFC-0019+ uses research-first workflow.
-- Platform app RSIPs (auth, user, notification, shipping, review) →
-  `pgdog-platform.platform.svc.cluster.local:6432`; Temporal →
-  `platform-db-rw.platform.svc.cluster.local:5432`.
-- Hub docs and infra READMEs updated for **3 CNPG clusters / 2 PgDog poolers**
-  ([RFC-0018](docs/proposals/rfc/RFC-0018/)).
-- **Secrets docs**: merged retired `docs/secrets/secrets-management.md` into
-  [`docs/secrets/README.md`](docs/secrets/README.md) (hub + secret catalog); moved
-  add/rotate procedures to [`docs/secrets/runbooks/`](docs/secrets/runbooks/) (`add-eso-secret.md`,
-  expanded `rotate-static-secret.md`); scrubbed inbound links across the repo.
-
-### Removed
-
-- Retired `pg-exporter-mapping.md` and `pg-exporter-dashboards.md` (Pigsty
-  pg_exporter reference for the removed `supporting-shared-db` pilot — no live
-  infra, external links). Scrubbed their doc-index/tree references.
-- `metrics/postgresql/workflows.md` — the diagnostic decision trees / symptom
-  matrix were not pulling their weight; removed and scrubbed its references
-  (learning path, doc-map, trees). Per-alert diagnosis lives in the runbooks.
-- `metrics/postgresql/monitoring.md` — content was largely duplicative
-  (architecture ↔ victoriametrics.md, coverage ↔ builtin/custom-metrics, inventory
-  ↔ many docs). Consolidated its unique bits (scrape architecture, alert-rule
-  layout, audit-logging pointers) into `metrics/postgresql/README.md` and
-  repointed all inbound links.
-- `auth-db`, `shared-db`, and `temporal-db` cluster manifests; `pgdog-auth` and
-  `pgdog-shared` poolers; `cnpg-auth-db/` and `cnpg-shared-db/` alert rules.
-
-### Fixed
-
-- Broken relative links in docs: `RFC-0018/README.md` (43 links off by one `../`
-  level) and `kong-gateway.md` (ADR-006 folder renamed to `ADR-006-rs256-jwt-kong-edge-auth`).
-- PostgreSQL metrics docs: wrong CNPG field `customQueriesConfigMapList` →
-  `customQueriesConfigMap`; corrected the claim that `product-db-replica` is scraped
-  (it is a DR replica, not scraped); custom-metrics.md query count 12 → 9.
-- `platform-db` low-disk-space alerts queried `namespace="auth"` (stale render) and
-  could never fire; corrected to `namespace="platform"`.
-- `OtelMetricsPipelineExportFailures` never matched a series (dead alert): metric was
-  `otelcol_exporter_send_failed_metric_points_total`, corrected to the no-`_total`
-  name emitted by the collector self-telemetry.
-- `platform-db` metrics lacked the `cnpg_io_cluster` label (its `enablePodMonitor: true`
-  let the operator's label-less PodMonitor shadow the repo one) — deep-signal alert
-  grouping and runbook diagnosis for `platform-db` returned empty; fixed by matching
-  `product-db` (repo `PodMonitor` with `podTargetLabels`).
-- Runbook drift: `MicroserviceApdexCritical` severity (`warning`→`critical`),
-  `GrpcServerHighErrorRate` PromQL label (`rpc_grpc_status_code`→`rpc_response_status_code`),
-  `MicroserviceHighMemoryUsage` stale "checkout uncovered" note, `MicroserviceGoroutineLeak`
-  `rate()`→`deriv()`, physical-replication-lag units (`ms`→`s`), `CNPGCheckpointPressure`
-  psql columns + metric name, `CNPGClusterInstancesOnSameNode` `exported_node`→`node`,
-  `PostgresWALSizeHigh` `value="size"` selector, `CNPGClusterLogicalReplicationLagging`
-  metric name, stale cross-references to non-existent alerts, and de-duplicated runbook bodies.
-- Alert-catalog §1 table rows had a stray empty column (7 cells vs 6-col header).
-
-
-### Added
-
-- **RFC-0018** ([`docs/proposals/rfc/RFC-0018/`](docs/proposals/rfc/RFC-0018/)): propose
-  consolidating `auth-db`, `shared-db`, and `temporal-db` into `platform-db`
-  (3 CNPG clusters total with unchanged `product-db` / `product-db-replica`);
-  includes documentation impact matrix and validation gate.
-
-### Changed
-
-- Bump checkout (API + worker) to 0.3.1: the serve path now keeps a
-  background Temporal redial after startup-dial exhaustion (BUGS-6 — the
-  abandonment workflow could silently never start when a pod raced Temporal
-  at bring-up).
-
-### Fixed
-
-- **Memory alerts were dead fleet-wide**: `MicroserviceHighMemoryUsage` and
-  `KubePodMemoryNearLimit` joined cAdvisor series with kube-state-metrics
-  limits on `namespace/pod/container`, but KSM is scraped without honorLabels
-  so the real identity lives in `exported_*` — the join matched nothing (or
-  collapsed to one bogus series). Limits are now relabeled back before the
-  join (verified live: 28 real ratios). Also added the missing `checkout`
-  namespace to the microservices memory regex and raised
-  `MicroserviceApdexCritical` to `severity: critical` to match its name and
-  pager routing.
-
-### Fixed
-
-- **Alert-ruler audit wave 2 (scrapes/limits)**: scraped the otel-collector's
-  `:8888` self-telemetry and CoreDNS `:9153` (arms `OtelMetricsPipelineExportFailures`,
-  `OtelCollectorDown`, `CoreDNS*`; stops the `CoreDNSDown` false positive);
-  kubelet keep-regex now passes the two gauges `KubeletTooManyPods` needs;
-  disabled the target-less vm-mcp chart scrape and excluded the
-  operator-forced empty `temporal-internal-frontend` pool; raised throttled
-  CPU limits (vector 200m, VM operator 300m, Grafana 300m).
-- **Alert-ruler audit wave 1 (rules/docs)**: retired the structurally
-  false-positive `MicroserviceGCThrash`; fixed never-firing
-  `KongUpstreamTargetUnhealthy` (empty PromQL `and` intersection) and
-  `TemporalPersistenceErrorRateHigh` (nonexistent metric name); excluded
-  `CONNECT` from `KubeAPIServerHighLatency`; scoped the duplicated CNPG
-  fenced/WAL rules per cluster; repaired 4 space-broken runbook anchors, added
-  the 2 missing `*Critical` runbook sections and backup-alert runbook links;
-  added `OtelCollectorDown`; reconciled the alert catalog (164 static alerts,
-  gated + inactive-on-Kind rules now marked).
-
-### Changed
-
-- Bump product to 1.4.1 (removes the hardcoded service-level CORS
-  middleware that 403'd every browser request on the cluster).
-
-### Added
-
-- **Prometheus-type Grafana datasource alias** `VictoriaMetrics (Prometheus)`
-  (same vmsingle URL): unlocks Alerting → data-source-managed rules (Grafana's
-  ruler API rejects the VM plugin type, hiding all vmalert groups) and fixes
-  the three upstream VM dashboards whose `ds` variable only lists
-  prometheus-type datasources ("datasource was not found").
-- **Kong CORS: expose `Retry-After`** in both stacks (local `kong.yml` +
-  cluster KongClusterPlugin): the SPA reads it on 429 to show "wait Ns";
-  without exposure the browser hides it cross-origin (audit finding).
-- **Application metrics catalog** (`docs/observability/metrics/metrics-catalog.md`):
-  lookup tables for every emitted series — the auto-instrumented families
-  (HTTP/gRPC/runtime/DB-client/cache-pool) and all **34 shipped business
-  instruments** per service with exact label values, buckets, and recording
-  semantics. RFC-0017 marked **implemented**, its Implementation History filled
-  in (W0–W4), and its design catalog annotated with the shipped divergences.
-
-### Fixed
-
-- **10 legacy Grafana dashboard sources repaired**: the `GrafanaDashboard` CRs
-  for pg-*, pgdog, cloudnative-pg, replication-lag, redis, kong,
-  kubernetes-overview, and tempo still pointed at flat
-  `dashboard/<name>.json` raw URLs that 404 since the `grafana-dashboards`
-  repo was restructured into subdirectories — those cluster boards had been
-  broken at source. URLs now point at the nested paths (verified 200 + valid
-  JSON for all ten).
-
-### Added
-
-- **Cluster dashboards from the helm-charts chart (RFC-0017 W3b)**: new
-  `grafana-dashboards` HelmRelease (OCI `ghcr.io/duynhlab/helm-charts`,
-  chart ≥0.2.0); the microservices OTel board now sources from the chart's
-  ConfigMap via `configMapRef` (replacing the retired `grafana-dashboards`
-  repo raw URL) and the Business KPIs board joins it. Only these two boards
-  move — legacy boards keep their existing sources.
-
-- **E2E audit Phase C (telemetry sanity)** in `local-stack/README.md`:
-  collector health, business-counter consistency, DB-client p95 sanity,
-  dashboard load, and trace-service checks — all self-tested against the live
-  stack; the audit is now a mandatory agent gate referenced from `AGENTS.md`.
-- **Database-client observability (RFC-0017 W4)**: `Database (client — otelpgx)`
-  row on the local RED dashboard (query p95 by service/op, operation errors,
-  pool in-flight/saturation/contention), 2 Valkey cache-pool panels on the
-  Business board's Product row, 4 app-side DB alerts
-  (`DBClientQueryP95High`, `DBClientErrorRate`, `PgxPoolNearExhaustion`,
-  `PgxPoolAcquireWaitHigh`) with runbook §12, and a DB-client metrics section
-  in `metrics-apps.md` (incl. the `db_client_connections_*` redisotel naming
-  trap).
-
-- **Business KPIs Grafana dashboard (local-stack)**: new
-  `business-otel-local.json` with one collapsible row per domain (Payments,
-  Orders/Saga, Auth, Product, Cart, Shipping, User, Review, Notification,
-  Checkout), built off the RFC-0017 hand-declared business instruments.
-- **OTel instrument-types explainer** in `metrics-apps.md`: a beginner table
-  (Counter/UpDownCounter/Histogram/Gauge), the buckets-only-for-histograms
-  insight, and why a seconds histogram needs explicit bucket boundaries.
-
-### Changed
-
-- **local-stack README refreshed to deployed reality**: checkout worker,
-  VictoriaLogs + Vector (logs pipeline) in the intro/table/diagram, native
-  app-metrics framing (span-metrics demoted to complement), service counts,
-  and `docker compose logs` for the collector.
-- **Microservices (OTel) local dashboard repaired**: dropped scrape-era dead
-  panels (`up`, `process_cpu_seconds_total`, `requests_in_flight`, `go_memstats_*`,
-  cAdvisor/kube panels) and consolidated the runtime rows into one coherent
-  Go-runtime + HTTP-I/O row using the emitted OTel metrics.
-- **Business-metric coverage corrected** in `metrics-apps.md`: all 10 services
-  declare their own business instruments since RFC-0017 (was documented as
-  checkout-only).
-- **Observability documentation refreshed**: diagrams now use the shared
-  semantic palette and explicit current/planned paths; service, worker, SLO,
-  alert, PostgreSQL, and telemetry topology facts match code and manifests.
-
-- **VictoriaMetrics stack refresh**: pin VM Operator chart `0.66.2`
-  (operator `v0.73.1`), which manages VictoriaMetrics `v1.147.0`,
-  VictoriaLogs `v1.51.0`, and matching CRDs; bump VictoriaTraces to
-  `v0.9.4`, Grafana VM/VL datasources to `v0.25.2`/`v0.29.0`, and pin
-  the VM/VL MCP charts to `0.3.0`/`0.1.0`. Cluster defaults and local-stack
-  images now resolve to the same reviewed core product releases.
-- **OpenTelemetry learning area**: the canonical instrumentation guide and
-  beginner RFC-0014 explainer now live together under
-  `docs/observability/opentelemetry/`; existing learning content and diagrams
-  are preserved, with current worker coverage, environment differences, and
-  correlation semantics corrected against code and manifests.
-- **API documentation organized by service**: shared HTTP and gRPC
-  conventions now live in `docs/api/api.md`; each of the ten services has one
-  contract file; Saga-vs-2PC learning moved beside the live Temporal workflow.
-  The three superseded source files were removed after all live repository
-  links were repointed to canonical sections. Platform, service, workflow,
-  and telemetry diagrams now share role-based colors and expose every
-  deployed service and worker.
-- **Observability configs reorganized by pillar**: `configs/monitoring/` →
-  `configs/observability/{metrics,logging,tracing,grafana,sloth}` — VLSingle
-  (logs) and VTSingle (traces) no longer hide inside `victoriametrics/`;
-  the tree now mirrors `controllers/` and `docs/observability/`. Same Flux
-  Kustomization (`monitoring-local`, path updated) and an identical rendered
-  object set (109/109 verified), so the cluster sees no change.
-
-### Added
-
-- **RFC-0015 P5 — checkout on the cluster**: checkout database triplet on
-  product-db (ExternalSecret + DatabaseRole + Database, pg_hba line, PgDog
-  backend, OpenBAO seed, app-ns secret copy); `rsip-checkout` (image 0.2.0,
-  2 replicas, PgDog) + `checkout-worker` HelmRelease (order-worker pattern,
-  `checkout` task queue); cart and order gain `grpc_server: true`
-  (reflection off) so their gRPC Services render; NetworkPolicies — checkout
-  fenced to Kong→8080, cart/order/shipping admit checkout→9090, product
-  gains a pod-scoped `allow-product-grpc` (order + checkout → product.v1,
-  without exposing PgDog's 9090 openmetrics); `checkout` joins the three
-  Kyverno namespace lists; Kong `api-checkout-private` route (edge JWT) and
-  `Idempotency-Key` in the global CORS allowlist.
-
-- **RFC-0015 P4 — promo codes (local-stack)**: checkout gains
-  `POST/DELETE …/sessions/:id/promo` (apply = validated preview, never a
-  counted use) and atomic confirm-time redemption (ADR-022: one tx,
-  serialized per code, `UNIQUE(code, session_id)` anchor before expiry/cap
-  checks — crash re-drives count exactly once; both caps race-tested);
-  exhausted/expired at the gate strips to `shipping_set` and never consumes
-  the Idempotency-Key; discounts re-derive at every totals change. The order
-  handoff now carries fee/tax/discount (pkg v0.22.0) — closing a P3 gap
-  where the saga charged the legacy $5 demo fee instead of the session's
-  quoted fee and tax — and order fingerprints replays on the composed total.
-  SPA gains the promo field + discount line.
-
-- **RFC-0015 P3 — totals + SPA cutover (local-stack)**: shipping gains
-  `shipping.v1/GetQuote` (static method × region rate table — the fee
-  authority); checkout composes `total = subtotal + fee + tax − discount` in
-  minor units from a seeded `tax_rules` table (DEFAULT fallback), invalidates
-  the quote on address change, and recomputes tax on confirm-time requotes;
-  the SPA cuts `/checkout` over to the multi-step session funnel (address →
-  shipping → payment → review, persisted per-session Idempotency-Key,
-  requote re-render) with the legacy one-shot flow kept at `/checkout/legacy`
-  (dual-entry until P6); compose wires `SHIPPING_GRPC_ADDR` into checkout.
-
-- **RFC-0015 P2 — checkout confirm + abandonment (local-stack)**: order gains
-  its first gRPC server (`order.v1/CreateOrder` on `:9090` — idempotent by
-  `(user_id, idempotency_key)` with a replay fingerprint, pending-only saga
-  kickoff gate + `RejectDuplicate` dedup; ADR-018); checkout adds
-  `PUT …/shipping` (fee/tax 0-stub until P3), `PUT …/payment` (`tok_…` only,
-  PAN-like 400 pre-persist), and `POST …/sessions/:id/confirm` (required
-  `Idempotency-Key`, pkg/idempotency Claim→marker→CreateOrder→Finish with
-  session↔claim binding, deadline fencing, PRICE_CHANGED/STOCK_UNAVAILABLE
-  requote that never burns the key); `AbandonedCheckoutWorkflow` +
-  `checkout-worker` (DB-authoritative `ExpireIfDue` + re-arm; ADR-019);
-  confirm/expiry business metrics; local-stack `checkout-worker` service and
-  README audit section A10; ADR-018 + ADR-019.
-
-- **RFC-0015 P1 — checkout service (local-stack)**: checkout-service rebuilt
-  on the platform 3-layer template (old `/api/v1/*` scaffold removed) serving
-  `/checkout/v1/private/sessions` (create/get/address/cancel, FSM, one active
-  session per user, lazy-expiry backstop, anti-IDOR); cart gains a read-only
-  `cart.v1/GetCart` gRPC server (ADR-021) and product a cache-bypassing
-  `GetProducts` batch read (ADR-020) — product is the checkout price
-  authority (`price_changed` flags close the stale-price gap); local-stack
-  wires the `checkout` DB, migrate job, Kong `/checkout/v1/private/` route
-  (edge JWT, no host port) and the README A9 audit; pkg v0.19.0 (cart.v1
-  proto, product GetProducts, checkout httpx codes).
-
-### Changed
-
-- **RFC-0015 aligned with ADR-017**: spawned-ADR numbers shifted to 018–022
-  (ADR-017 was taken by the path decision) and checkout's collection noun
-  `sessions` registered as planned in the naming convention.
-- **API paths → collection-noun rule (ADR-017, naming convention v3.0.0)**: 13
-  routes renamed so the segment after `{audience}` is a service-owned collection
-  noun — auth `/auth/v1/public/auth/*`, shipping `shipments/{track,estimate}` +
-  `shipments/orders/:orderId`, notification `notifications/{email,sms}`, payment
-  `payments/webhooks/mockpay` + `payments/reconciliation/runs`. Expand phase:
-  live-caller routes keep deprecated aliases for one release; frontend,
-  `AUTH_JWKS_URL` defaults, `MOCKPAY_WEBHOOK_URL`, Kong webhook Ingress path and
-  local-stack audit updated in lockstep.
+- **Service releases through the program** (final pins): product **1.11.1** —
+  price-only catalog, stock RPCs/fields/schema removed (migration `000006`,
+  the irreversible step, hardened to refuse the drop while any role still
+  holds SELECT); order **1.13.1** — aggregate + saga on inventory only, the
+  product stock branch deleted; checkout **0.6.1** — inventory as the only
+  availability authority, fail-closed on unknown SKUs, and `503` +
+  `Retry-After: 2` on every session endpoint when its own datastore is
+  unavailable; payment **1.5.1** — ambiguity + refund honesty (a failed
+  provider refund is no longer sealed into the idempotency cache as a 201);
+  inventory **0.4.0**; notification **1.5.1**; auth/user/cart/review/shipping
+  **1.4.1**. The last patch round is the fleet-wide pkg v0.35.0 alignment.
+- **The read/write cutover itself, staged and gated**: W7 write cutover inside
+  a drained window with verified backfill; W8 read ladder shadow → 20% keyed
+  canary → 100%, each rung gated on divergence alerts; every migration flag
+  removed with its migration (the flag-default trap hit three times —
+  `ORDER_STOCK_PARTICIPANT`, `CHECKOUT_AVAILABILITY_SOURCE`,
+  `PRODUCT_AVAILABILITY_SOURCE` — and each removal rode the pin that made the
+  default unreachable); the two-week removal gate recorded as WAIVED for code
+  evidence, not skipped.
+- **Temporal re-platformed** onto the official `temporalio/helm-charts`
+  (server 1.31.2) for Worker Deployment Versioning (ADR-030): workflows run
+  Pinned, one worker manifest per build, activation via a suspended CronJob,
+  drain-then-retire — the order reconciler runs on the Current build only,
+  enforced by `make validate`. The operator retired by `.yaml.bak` rename;
+  chart moved under `controllers/temporal/` and actually validated.
+- **CI supply chain**: every service repo pins the shared reusable workflows
+  to a commit SHA (`gha-workflows` tagged `v1.0.0` so Dependabot can bump) and
+  passes only the secrets each callee declares; fleet Sonar hotspots reduced
+  to one reviewed-safe verdict per repo.
+- **Alert hygiene**: Alertmanager inhibition so checkout's fail-closed 503s
+  page once (budget still burns); `MicroserviceLatencyCritical` demoted
+  (duplicated the Sloth page); `MicroserviceDown` joins `kube_pod_info` so
+  rollouts stop paging; `VMAgentScrapePoolHasNoTargets` root-caused
+  (sloth-ui at 0 replicas) instead of relaxed; availability-alert ratios name
+  their label sets explicitly after review found `unknown_sku` could blind one
+  alert and dilute another; SLO docs corrected to 32 SLOs / 64 alerts across
+  11 services with the mop-chart origin stated.
+- **mockpay pinned 1.5.0** (was 1.0.0): the skew manufactured a permanent
+  reconciliation discrepancy (unbounded `GET /transactions`) and made the
+  phase-6 ambiguity faults uninjectable in the cluster.
+- **checkout-worker realigned to the API image** (0.3.1 → 0.6.1, same-tag
+  rule); order worker builds staged/retired per ADR-030 through 1-13-1.
+- **API paths → v3 collection-noun rule** (ADR-017): 13 routes renamed with
+  one-release deprecated aliases; RFC-0015 spawned-ADR numbers shifted to
+  018–022.
+- **docs/api standardized as the trusted source** (v2 template, three-column
+  quick facts, deployment rollup) and then de-drifted to the post-RFC-0021
+  reality: `GetProducts` no longer described as live, the Checkout→Inventory
+  edge on every call graph, planned→implemented caller matrices, the 0.6.1
+  datastore-unavailable contract, product.md/order.md/saga docs rewritten
+  as-built; observability contracts audited against pkg and the OTel spec.
+- **RFC registry synced to shipped reality**: RFC-0015/0017/0018/0019 →
+  implemented with evidence rows; RFC-0008 index matches its implementable
+  body; RFC-0007 de-staled (drills B/E recorded; stale cluster names fixed);
+  RFC-0001 future work acknowledges what shipped.
+- **local-stack as the explicit pre-release gate**: thin operator README, the
+  A/B/C protocol in `local-stack/docs/e2e-audit.md` with an `ELIGIBLE FOR
+  TAG` decision, 11-service inventory, semver-to-Kind handoff documented.
+- **Docs reorganizations**: observability configs by pillar
+  (`configs/observability/{metrics,logging,tracing,grafana,sloth}`, rendered
+  objects identical), central runbooks redistributed, secrets docs
+  hub + runbooks, platform docs hub + drift pass, VictoriaMetrics stack
+  refresh (operator 0.66.2 / VM v1.147.0), Grafana 13.1.0, ClickHouse
+  datasource pinned 4.20.0 with OTel schema mapping, Karma + Sloth UI at 0
+  replicas by design, AGENTS.md gains the engineering-skills workflow and the
+  Senior Platform Engineer role; domain drift sweeps over the docs index,
+  platform setup/cicd, kong/security, databases inventory, observability OTLP
+  wording and secrets accuracy (deployed `http://` vs planned TLS labelled).
+- **DR docs corrected**: `kubectl cnpg promote` (the plugin has no
+  `switchover` verb), the `-rw` failover sub-step re-measured (12.6 s, not
+  `< 5 s` — the `< 30 s` RTO still holds), OpenBAO break-glass runbook
+  replacing inert root-token copy, reconciliation-discrepancy runbook queries
+  fixed and the window-asymmetry false positive documented.
 
 ### Deprecated
 
-- Pre-v3 API paths (`/auth/v1/public/{login,register,refresh,logout,jwks}`,
-  `/shipping/v1/public/{track,estimate}`, `/payment/v1/public/webhooks/mockpay`,
-  `/payment/v1/internal/reconciliation/runs`) — served as aliases until the
-  ADR-017 contract release removes them.
-
-### Added
-
-- **CloudNativePG `auth-db` + `shared-db` clusters** completing the Zalando→CNPG
-  migration — each with a per-cluster PgDog pooler (`pgdog-auth` / `pgdog-shared`),
-  Barman Cloud backups, and postgres/pooler alert rules.
-- **RFC-0015 — checkout service** (provisional): checkout session state machine
-  with price/stock re-validation against product, durably idempotent confirm
-  handed to order over a new `order.v1/CreateOrder` gRPC (order stays the
-  saga-starter), `AbandonedCheckoutWorkflow` durable-timer expiry, shipping
-  `GetQuote` + tax + promo totals; RFC-0016 named for async payment
-  Signal + order cancellation.
-- **Chart-native metrics scraping for cert-manager and the Kong gateway proxy**:
-  cert-manager now emits its own `ServiceMonitor` via
-  `prometheus.servicemonitor.enabled` (controller/webhook/cainjector on `:9402`);
-  Kong proxy metrics come from the chart's built-in `serviceMonitor` (scrapes the
-  proxy status port `:8100` — `kong_http_requests_total` etc.), replacing a
-  hand-rolled scrape that hit the ingress-controller health port and pinned a
-  false-positive `KongDown` alert. Kyverno already ships a native `serviceMonitor`
-  (VMAgent `selectAllByDefault` picks it up), so no extra CR is needed there.
-
-### Changed
-
-- **Renamed `cnpg-db` → `product-db`** (+ `product-db-replica` DR); all application
-  databases now run on CloudNativePG behind PgDog poolers.
-- **Raised the VictoriaLogs memory limit** to absorb the added CNPG cluster log volume.
-- **Point the 9 services at the released RFC-0014 images** (`image_tag`
-  `1.0.1`→`1.2.0`, payment `1.0.0`→`1.1.0`) so the cluster runs the `obsx` OTLP
-  code (metrics/logs/traces) instead of the pre-RFC-0014 binaries.
+- Pre-v3 API paths (`/auth/v1/public/{login,…}`, shipping/payment equivalents)
+  — served as aliases until the ADR-017 contract release removes them.
 
 ### Removed
 
-- **Zalando Postgres operator** — the operator, the `postgres-operator` namespace,
-  and the Spilo/Patroni runtime.
-- **WAL-G backups** — the `pg-backups-zalando` bucket and the `backup: walg`
-  credential mapping (every cluster now backs up via Barman to `pg-backups-cnpg`).
-- **PgBouncer + pg-exporter Grafana dashboards and recording rules** — no cluster
-  runs PgBouncer anymore.
-- **`postgres-operator-ui` ingress** (`pgui.duynh.me`).
+- **Zalando Postgres operator, WAL-G backups, PgBouncer dashboards, and the
+  `pgui` ingress** — every application database runs on CloudNativePG behind
+  PgDog (`cnpg-db` renamed `product-db`; auth-db/shared-db/temporal-db merged
+  into platform-db and their manifests, poolers and alert-rule dirs deleted).
+- **The last of product's stock**: schema (`stock_reservations`,
+  `products.stock_quantity`), the cross-service grant and its `pg_hba` line,
+  the backfill CronJob and subcommand (reader retired before the read), the
+  stock RPCs and their retired observability (recording rule deleted, panels
+  labelled RETIRED, catalog rows struck through).
+- **The RFC-0021 read-migration machinery**: canary inputs/ExternalSecret,
+  shadow-divergence rules on series checkout no longer emits (a rule on a
+  dead series goes blind, not quiet), baseline panels labelled RETIRED.
+- **Order worker builds 1-10-0 and 1-12-0** on drain evidence (0 pinned
+  workflows), plus the order→product `:9090` NetworkPolicy allow; the
+  unversioned worker retired at DRAINED after the activation drill.
+- PgCat artifacts; retired docs (pg-exporter references, duplicative
+  postgresql metrics pages, `rfc-0014-explainer` merged into fundamentals).
 
 ### Fixed
 
-- **Local-stack Temporal bring-up race self-heals**: `order-worker` gets
-  `restart: on-failure` (mirrors the K8s pod restart) and order-service gained
-  a bounded startup dial retry, so a Temporal that turns healthy moments after
-  the containers start no longer leaves the worker dead and orders stuck
-  `pending` without a saga.
-- **Local-stack Kong routes scoped to audience prefixes**: `shipping` narrowed
-  `/shipping/` → `/shipping/v1/public/` and `notification` `/notification/` →
-  `/notification/v1/private/`, closing anonymous/JWT-holder access to the
-  `internal` HTTP surfaces through the local gateway (mirrors the cluster
-  Ingress trust model).
-- **Local Kind bring-up races (make up)**: Zalando operator now gets
-  `enable_readiness_probe: true` so spilo pods gate on real readiness; the
-  `ensure-databases` Jobs **wait for the owner role** before `CREATE DATABASE`
-  instead of crash-looping; `temporal-operator` runs `replicaCount: 2` so its
-  `failurePolicy: Fail` webhook never drops to zero on a restart; `order-worker`
-  gets a `TemporalNamespace/mop` readiness gate + a higher CPU limit; the
-  VMAlertmanager config no longer ships an unparseable `<SLACK_WEBHOOK_URL>`
-  placeholder.
-- **DB-exporter metrics were NetworkPolicy-blocked**: allow `monitoring` → the
-  pgbouncer-exporter (`:9127`, auth) and the pg_exporter pilot (`:9630`, user)
-  so their series (and the pg recording rules) populate.
-- **RustFS CPU** raised (500m→1500m) — the chronic throttle caused cluster-wide
-  Pyroscope profile-upload 422s and slow backups.
-- **local gateway wording**: microservices.md said the local stack fronts
-  services with nginx — it is Kong 3.9 DB-less (`gateway/kong.yml`, edge
-  JWT parity with the cluster); gateway table row corrected to 8000→8080;
-  local-stack README counts bumped 8 → 9 (services + databases).
-
-- **docs index & proposals navigation**: docs/README gains a Security
-  category, the missing Platform entries (kyverno, graceful-shutdown,
-  gke-dns, mcp-servers, ruleset-automation), ADR-016 (tree + Decisions),
-  databases 012 + the 2 unlinked runbooks, streaming-aggregation in the
-  metrics tree; PgCat runbooks demoted to legacy; RFC index: 0009 focus
-  callout retired, 0010/0014 rows → done/implemented; RFC-0010 Related
-  links ADR-009..012; RFC-0009 trailing tool-artifact tags removed; dead
-  `specs/active` links repointed; caching.md documents the Kong
-  rate-limit consumer on Valkey db 1 (gateway request path).
-- **platform docs setup/cicd drift**: `make up` order corrected (`flux-push`
-  before `flux-up`, quick-start + detailed steps); VictoriaMetrics wording
-  (no Prometheus server); temporal-db in the expected state; caching/mcp
-  Kustomizations added to the dependency graph; cicd.md gains payment +
-  the multi-level image naming + CRITICAL-only scan-gate alignment;
-  graceful-shutdown table gains payment; kyverno chart pin 3.8.1 + current
-  Audit-mode annotation; application-delivery layout gains mockpay +
-  order-worker; `setup-hosts.sh` + docs gain `victoriatraces.duynh.me`.
-- **kong/security docs drift**: `jwt-edge` counted and marked Active
-  (10 KongClusterPlugins, ADR-006 defense-in-depth note); redis
-  rate-limiting marked done in the roadmap; user/review ingress rows
-  split (`-public`/`-private`); stale payment↛JWKS gap removed from
-  network-policies (auth admits all 9 namespaces); policy-catalog image
-  criterion corrected to the multi-level `<repo>/<image>` shape.
-- **databases docs inventory drift**: PgDog scope corrected to the 4 `cnpg-db`
-  databases (payment added everywhere it was omitted; payment app noted as
-  direct-TLS past the pooler); pooler replica/instance counts 1–2 → 3
-  (PgDog + both PgBouncers); auth-db PG17; supporting +review; temporal-db
-  (no backups) added to inventories; extension declarations re-pointed to
-  the RFC-0012 `services/*.yaml` triplets (dead `extensions.yaml` links);
-  CNPG doc links 1.29 → 1.30; exporter versions refreshed in the infra
-  databases READMEs; add-service runbook pg_hba wording → present tense.
-
-- **observability docs OTLP drift**: dropped the fictional spanmetrics
-  connector and retired `ServiceMonitor/microservices-api` references
-  (OTLP push since RFC-0014 P3); RFC-0014 README + explainer corrected to
-  the landed reality (no checkout exemption/fence — ADR-016, now linked;
-  status → implemented); alert layers/counts fixed (node/pod Implemented,
-  PG 34, 149 static); Tempo metrics-generator marked inert
-  (`remote_write: []`); VictoriaLogs wording → VLSingle CRD; runbooks:
-  dual-path logs, `CNPGClusterOffline`, HighRestartRate retired, D-14
-  re-attributions, Sloth burn-rate windows.
-- **secrets docs accuracy**: operational OpenBAO examples corrected to the
-  deployed `http://` endpoint (TLS is RFC-0008, planned) and the target
-  `https`/`caBundle` shape labeled planned; OpenBAO-namespace field replaced by
-  KV path-prefix isolation (OSS has no namespaces); cert-manager chart pin
-  `v1.20.2`; trust-distribution reconcile commands → `cert-manager-local`.
-- **product gRPC in-cluster**: add the missing `grpc_server: true` input on
-  `rsip-product` so the mop chart renders the `product-grpc` headless Service
-  that order-worker's saga stock steps dial; refresh stale manifest comments
-  (temporal PrometheusRule PodMonitor reference, PSS "8 microservices").
-
-### Changed
-
-- **docs/api accuracy sweep + feature matrix**: `microservices.md` rebuilt as a
-  per-service feature matrix (feature → API → technique) with a platform-wide
-  technique index; route inventory gains the cart internal saga-clear route;
-  auth-gRPC remnants removed from the shared API guide; saga docs pick up
-  `SendReceipt`/`SendRefundNotification` and the shipped internal cart-clear;
-  api.md adds auth refresh/JWKS + payment payload sections and fixes the
-  register response envelope; payments.md reaper note updated.
+- **Memory alerts were dead fleet-wide** (KSM `exported_*` join mismatch;
+  verified live with 28 real ratios) and two alert-ruler audit waves: dead
+  metric names, empty PromQL intersections, missing scrapes (collector
+  self-telemetry, CoreDNS), a structurally false-positive GC alert retired,
+  alert catalog reconciled.
+- **inventory-service 0.2.3**: init-container crash-loop on the cluster (59
+  restarts — `migrate` under the fleet env contract), plus the backfill
+  CronJob pointing at a GHCR path that does not exist.
+- **platform-db observability**: metrics lacked `cnpg_io_cluster` (operator
+  PodMonitor shadowing), low-disk alerts queried a stale namespace,
+  `OtelMetricsPipelineExportFailures` matched a nonexistent `_total` name.
+- **Local bring-up races self-heal**: order-worker restart policy + bounded
+  startup dial, readiness-gated ensure-databases, webhook replicas, Kong
+  routes narrowed to audience prefixes, NetworkPolicy-blocked DB exporters.
+- Ten legacy Grafana dashboard sources repaired (404 raw URLs); stale span
+  enums in the ClickHouse SQL board; runbook drift batch (severities, label
+  names, metric names, broken anchors); docs link fixes (RFC-0018 43 links,
+  kong-gateway ADR slug); product 1.4.1 removed the service-level CORS that
+  403'd every browser request.
 
 ## [0.105.0] - 2026-07-10
 

@@ -88,7 +88,7 @@ and `databases-local` / `apps-local` never reconcile:
 | Callee ns | Allowed source | Ports | Why |
 |-----------|----------------|-------|-----|
 | **platform** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
-| **platform** | `auth`, `user`, `notification`, `shipping`, `review` (cross-ns) | `:6432` (PgDog), `:5432` (migrations) | Platform apps share `platform-db` via `pgdog-platform`. |
+| **platform** | `auth`, `user`, `notification`, `shipping`, `review` (cross-ns) | `:5432` (PgBouncer pooler **and** migrations) | Platform apps share `platform-db` via the CNPG PgBouncer `Pooler` `platform-db-pooler-rw` (ADR-026). PgBouncer listens on 5432, so runtime and migration traffic use the same port here — unlike product's PgDog `:6432`. |
 | **platform** | `temporal` (cross-ns) | `:5432` | Temporal server connects **direct** to `platform-db-rw` (no PgDog). |
 | **platform** | intra-namespace | `:5432`, `:6432`, `:8000` | PgDog → Postgres, replica WAL streaming, pooler mesh. |
 | **product** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
@@ -188,4 +188,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-07-17 — RFC-0018: DB-tier allows for ns `platform` (`pgdog-platform` :6432, Temporal direct :5432); auth/user ns Postgres rules removed (apps egress to platform). Earlier: Zalando→CNPG migration; Patroni `:8008` / PgBouncer rows dropped._
+_Last updated: 2026-08-07 — ADR-026: ns `platform` DB-tier allow is `:5432` for both the PgBouncer pooler `platform-db-pooler-rw` and migrations (PgDog `pgdog-platform` :6432 removed); Temporal direct :5432. Earlier: RFC-0018 auth/user ns Postgres rules removed (apps egress to platform). Earlier: Zalando→CNPG migration; Patroni `:8008` / PgBouncer rows dropped._

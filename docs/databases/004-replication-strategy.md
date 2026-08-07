@@ -14,7 +14,7 @@ All clusters run on **CloudNativePG**.
 
 | Cluster | Operator | Namespace | Instances | Sync Mode | Pooler | Services |
 |--------|----------|-----------|-----------|-----------|--------|----------|
-| **platform-db** | CloudNativePG | platform | 3 | Synchronous (`on`, ANY 1) | PgDog (`pgdog-platform`) | auth, user, notification, shipping, review, temporal (+ temporal_visibility) |
+| **platform-db** | CloudNativePG | platform | 3 | Synchronous (`on`, ANY 1) | PgBouncer (`platform-db-pooler-rw`) | auth, user, notification, shipping, review, temporal (+ temporal_visibility) |
 | **product-db** | CloudNativePG | product | 3 | Synchronous (`on`, ANY 1) | PgDog (`pgdog-product`) | product, cart, order, payment |
 | **product-db-replica** | CloudNativePG | product | 1 | DR (restore from object store) | — | DR replica of product-db |
 
@@ -418,7 +418,11 @@ flowchart TB
     PRIMARY -.->|WAL Stream| REP2
 ```
 
-**Your clusters:** product-db and platform-db front CloudNativePG with **PgDog** (`pgdog-product`, `pgdog-platform`).
+**Your clusters:** `product-db` fronts CloudNativePG with **PgDog**
+(`pgdog-product`); `platform-db` fronts it with the CNPG-native **PgBouncer**
+`Pooler` (`platform-db-pooler-rw`, ADR-026). Only the PgDog side does
+replica routing — the PgBouncer pooler is `type: rw`, so every platform query
+reaches the primary.
 
 ### WAL Sender/Receiver Flow
 
@@ -515,7 +519,7 @@ Large hyperscale deployments scale PostgreSQL to hundreds of millions of users w
 | **Replication Type** | Physical (HA) + Logical (CDC) | Physical (DR from object store) | Physical |
 | **Sync Mode** | Synchronous (`on`, ANY 1) | N/A (async catch-up from archive) | Synchronous (`on`, ANY 1) |
 | **Instances** | 3 | 1 | 3 |
-| **Pooler** | PgDog (`pgdog-product`) | — | PgDog (`pgdog-platform`; Temporal direct) |
+| **Pooler** | PgDog (`pgdog-product`) | — | PgBouncer (`platform-db-pooler-rw`; Temporal direct) |
 | **Databases** | product, cart, order, payment | mirror of product-db (DR) | auth, user, notification, shipping, review, temporal, temporal_visibility |
 | **Failover RPO** | **0** (for commits acknowledged per sync policy) | Depends on restore/replay lag | **0** (for commits acknowledged per sync policy) |
 | **Failover RTO** | Seconds (Auto) | Workflow-dependent (DR) | Seconds (Auto) |

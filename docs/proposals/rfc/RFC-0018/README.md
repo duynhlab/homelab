@@ -4,6 +4,13 @@
 |--------|-------|---------|--------------|
 | implemented | infra | 2026-07-17 | 2026-08-07 |
 
+> **Superseded in part:** this RFC shipped `platform-db` behind a PgDog pooler
+> (`pgdog-platform`). [ADR-026](../../adr/ADR-026-platform-db-pgbouncer-pilot/)
+> later replaced that pooler with the CloudNativePG-native `Pooler`
+> **`platform-db-pooler-rw`** (PgBouncer, port 5432). Every `pgdog-platform`
+> reference below is **historical** — the consolidation decision stands, the
+> pooler choice does not.
+
 > **Origin:** the homelab runs **five** CloudNativePG clusters (four operational +
 > one DR) and **three** PgDog poolers. Operational overhead, doc drift
 > (`cnpg-db` / Zalando archaeology), and known gaps — **`shared-db` single-node

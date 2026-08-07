@@ -22,7 +22,7 @@ Three CloudNativePG clusters (two operational + one DR), two PgDog poolers
 
 | Cluster              | Operator      | PostgreSQL | Namespace | HA      | Pooler                                    | Services                             |
 | -------------------- | ------------- | ---------- | --------- | ------- | ----------------------------------------- | ------------------------------------ |
-| platform-db          | CloudNativePG | 18.1       | platform  | 3 nodes (1 primary + 1 sync + 1 async) | PgDog v0.39 (`pgdog-platform`) | Auth, User, Notification, Shipping, Review, Temporal |
+| platform-db          | CloudNativePG | 18.1       | platform  | 3 nodes (1 primary + 1 sync + 1 async) | CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`, ADR-026) | Auth, User, Notification, Shipping, Review, Temporal |
 | product-db              | CloudNativePG | 18.1       | product   | 3 nodes (1 primary + 1 sync + 1 async) | PgDog v0.39 (`pgdog-product`) | Product, Cart, Order, Payment (payment app: direct-TLS) |
 | product-db-replica      | CloudNativePG | 18.1       | product   | 1 node  | —                                         | DR (continuous WAL recovery)         |
 
@@ -32,7 +32,7 @@ Three CloudNativePG clusters (two operational + one DR), two PgDog poolers
 
 | Cluster              | Pooler Endpoint                             | Direct Endpoint                                                              | Notes                                                   |
 | -------------------- | ------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------- |
-| platform-db          | `pgdog-platform.platform.svc:6432`               | RW: `platform-db-rw.platform.svc:5432`, R: `platform-db-r.platform.svc:5432`          | PgDog; DBs: auth, user, notification, shipping, review; Temporal direct to RW |
+| platform-db          | `platform-db-pooler-rw.platform.svc:5432`        | RW: `platform-db-rw.platform.svc:5432`, R: `platform-db-r.platform.svc:5432`          | PgBouncer (ADR-026, port 5432 not 6432); DBs: auth, user, notification, shipping, review; Temporal direct to RW |
 | product-db              | `pgdog-product.product.svc:6432`               | RW: `product-db-rw.product.svc:5432`, R: `product-db-r.product.svc:5432`          | PgDog with R/W splitting; DBs: product, cart, order, payment (payment app: direct-TLS) |
 | product-db-replica      | —                                           | `product-db-replica-rw.product.svc:5432`                                        | DR only; promotable to standalone primary               |
 

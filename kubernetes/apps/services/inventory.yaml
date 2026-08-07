@@ -34,7 +34,8 @@ spec:
     # with only DB_* env (the contract every service here runs under) and 0.1.0
     # validated the full config first, so this Deployment sat in
     # Init:CrashLoopBackOff on the cluster with "SERVICE_NAME is required".
-    image_tag: "0.4.0" # {"$imagepolicy": "flux-system:inventory:tag"}
+    # 0.4.1: 0.4.1: Reserve answers SKU_NOT_FOUND for a SKU with no balance row anywhere, instead of a fabricated INSUFFICIENT_STOCK at ATP 0 (inventory#23).
+    image_tag: "0.4.1" # {"$imagepolicy": "flux-system:inventory:tag"}
     namespace: inventory
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — inventory's data lives on

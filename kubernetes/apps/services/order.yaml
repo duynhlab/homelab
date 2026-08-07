@@ -42,7 +42,8 @@ spec:
     # MUST be activated at the next bring-up: gate on
     # `temporal worker deployment list` showing order-fulfillment, then run
     # the set-current-version CronJob (ADR-030) - pod Ready is NOT the gate.
-    image_tag: "1.13.1" # {"$imagepolicy": "flux-system:order:tag"}
+    # 1.13.2: 1.13.2: G2b fault hook (ORDER_FAULT_COMMIT_PAUSE, GameDay-only, default off) + UNKNOWN_SKU failure reason - a data gap stops hiding inside stockout statistics (order#180).
+    image_tag: "1.13.2" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     platform_backup_label: "cnpg"
     replicaCount: 1

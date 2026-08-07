@@ -160,6 +160,23 @@ spec:
         # oscillates up to roughly the ticker interval plus the lag (~600s) between
         # passes. 1800s is well clear of healthy behaviour and still catches a
         # reconciler that has missed several firings in a row.
+        # FINDING: the provider returned transactions OUTSIDE the window the
+        # pass asked for. The pass excludes them from classification (they
+        # cannot manufacture phantom missing_internal — the first GameDay's
+        # false positive) and refuses to advance the watermark, so the window
+        # will be re-covered; this alert is what makes that refusal visible.
+        - alert: PaymentReconciliationWindowViolation
+          expr: |
+            increase(payment_reconciliation_window_violations_total[1h]) > 0
+          for: 0m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "the payment provider ignored its reconciliation window bounds"
+            description: "{{ $value | humanize }} provider transaction(s) in 1h fell outside the requested [from, through) window. They were excluded and the watermark held (the window will be re-scanned), but a provider that ignores bounds needs investigating before the frontier can be trusted to move. Check payment logs for the excluded ids and compare with the provider's paging behaviour."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationWindowViolation.md"
+
         - alert: PaymentReconciliationStale
           expr: max(payment_reconciliation_watermark_age_seconds) > 1800
           for: 15m

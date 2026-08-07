@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Debt-clearing wave pinned: order `1.13.2` (G2b fault hook
+  `ORDER_FAULT_COMMIT_PAUSE`, GameDay-only + the `UNKNOWN_SKU` failure
+  reason), inventory `0.4.1` (Reserve answers `SKU_NOT_FOUND` for untracked
+  SKUs instead of a fabricated shortage), payment `1.5.2` (reconciliation
+  window verification with held watermark; `stage=park|resolve` on the doubt
+  counter; discrepancy metrics emit `class`), frontend `1.2.1` (one paced,
+  jittered retry on `503` + `Retry-After` — also catches up the never-pinned
+  `1.2.0`). Order worker build `1-13-2` staged, `1-13-1` retired (cluster
+  down, nothing to drain); activation at the next bring-up.
+
+### Added
+
+- `InventoryReserveUnknownSKU` (critical, count-once) — a reservation hit a
+  SKU inventory does not track: a data gap on the money path that checkout's
+  fail-closed layer cannot see mid-flight. `PaymentReconciliationWindowViolation`
+  (warning) — the provider ignored its window bounds; rows excluded, watermark
+  held, re-scan guaranteed. Runbooks for both; the discrepancy runbook and
+  metrics catalog follow the `kind`→`class` rename and the new `stage` label.
+
 ### Added
 
 - `scripts/db-isolation-sweep.sh` — the RFC-0012 P4 role×database isolation

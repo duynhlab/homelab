@@ -305,6 +305,11 @@ What checkout deliberately does NOT do (the boundary):
 
 ## Known gaps
 
+- **Promo lock contention answers `500`, deliberately** (0.6.2): redemptions
+  of one code serialize on a row lock, and a queue longer than 2s surfaces as
+  SQLSTATE `55P03` — contention is a load/design signal that must stay
+  visible, not a retryable outage; classifying it as `503` would let a hot
+  promo code manufacture fake-failover pages.
 - **Error-mapping asymmetry** (accepted): a shipping-service outage during
   `PUT …/shipping` still answers `500`; only session create and confirm map
   *upstream* failures to `503` + `Retry-After`. Checkout's **own datastore**
@@ -370,4 +375,4 @@ Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-serv
 - [cart.md](./cart.md) · [product.md](./product.md) · [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-07 — checkout 0.6.1: datastore-unavailable answers 503 + Retry-After on every session endpoint; GetProducts fallback removed from the contract._
+_Last updated: 2026-08-07 — 0.6.2: promo lock contention stays a visible 500 (55P03); expiry keeps managing sessions across infra blips._

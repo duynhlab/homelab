@@ -8,6 +8,14 @@
 | **Custom queries** | — (built-in `cnpg_pg_stat_archiver_*`) |
 | **Grafana** | CloudNativePG Cluster Overview |
 
+> **The rule now requires no progress, not just a failure.** As of 2026-08-07
+> the expression is
+> `increase(failed_count[30m]) > 0 and increase(archived_count[15m]) == 0`, so
+> the single `.history` archive failure that every planned promotion produces no
+> longer holds this critical alert for 30 minutes: archiving keeps advancing
+> through it (`archive_timeout: 5min` gives ~3 archived WAL per 15m window on
+> both clusters). If this alert fires now, archiving is genuinely stuck.
+
 ## Meaning
 
 `increase(cnpg_pg_stat_archiver_failed_count[30m]) > 0` for **5 minutes** —

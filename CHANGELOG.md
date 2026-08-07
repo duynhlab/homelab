@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The committed PITR restore manifest had never worked.** The first Drill A run
+  (2026-08-07) put `restore-cluster-example.yaml` through a real restore and
+  Postgres refused to start: `FATAL: "min_wal_size" must be at least twice
+  "wal_segment_size"`, cluster `unrecoverable`. WAL segment size is baked into the
+  RESTORED data directory (`product-db` is initdb'd with `walSegmentSize: 64`)
+  while `postgresql.parameters` come from the restore manifest, which carried
+  none — so it took CNPG's default 80MB `min_wal_size` against 64MB segments.
+  The manifest now mirrors the source's WAL sizing, with the reason next to it;
+  restore then completed in 2m12s and PITR stopped exactly at the requested
+  instant (the post-target marker row was correctly absent).
+- **The documented backup command does not work on these clusters.**
+  `kubectl cnpg backup <cluster>` defaults to `barmanObjectStore`, the in-tree
+  method the platform left behind, and fails with `cannot proceed with the backup
+  as the cluster has no backup section`. The restore runbook and the Drill A steps
+  now carry the working form (`--method plugin --plugin-name
+  barman-cloud.cloudnative-pg.io`).
+- `scripts/db-isolation-sweep.sh` parsed kubectl's pod-deletion chatter as a
+  matrix row and reported a false FAIL on its first live run; only `PAIR`-tagged
+  lines are verdicts now (85/85 pairs pass, exit 0).
+
+### Changed
+
+- **`CNPGWALArchiveFailing` requires no progress, not just a failure.** A planned
+  promotion always fails exactly one archive (the new timeline's `.history`
+  file), and `increase(failed_count[30m]) > 0` then held a critical alert for 30
+  minutes on a cluster that was archiving perfectly — measured twice. The rule
+  now adds `and increase(archived_count[15m]) == 0`; `archive_timeout: 5min`
+  advances `archived_count` ~3 times per 15m window on both clusters, so the
+  no-progress clause carries a 3x margin and the post-promotion blip is
+  suppressed. Verified empty against the live series before shipping.
+
 ### Changed
 
 - Debt-clearing wave pinned: order `1.13.2` (G2b fault hook

@@ -124,6 +124,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Fleet pinned to the access-log fix**: auth/user/cart/review/shipping
+  **1.4.2**, product **1.11.2**, order **1.13.3**, notification **1.5.2**,
+  payment **1.5.3**, checkout **0.6.3**, inventory **0.4.2**, plus
+  checkout-worker **0.6.3**. Each tag carries three things at once — the
+  per-module pkg v0.36.1 migration, the dependency/toolchain CVE round, and the
+  telemetry-audit F-1/F-2 fix. Gated on local-stack E2E #2: every Phase A/B/C row
+  passed, probe access-log records went **513 664 → 0**, and native trace ids now
+  land on **51/51** HTTP access records against 9 837/14 292 before.
+  checkout-worker moves in one step because `internal/workflow/` changed by zero
+  lines between the tags, so the workflow definition is byte-identical — the same
+  verification its previous move used. **order-worker stays at 1.13.2**: it is the
+  one worker under ADR-030 side-by-side versioning, where a new build is a new
+  manifest plus an activation step, and this change touches no workflow code.
 - **Audit finding F-1 restated after reading the code.** The measurement stands
   (33 327 of 33 348 correlated log rows lack the native `TraceId`); the diagnosis
   does not. The otelzap bridge is fine — `Core.With` retains a context field and

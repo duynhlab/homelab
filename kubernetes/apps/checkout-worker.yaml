@@ -46,7 +46,13 @@ spec:
       # activate and no side-by-side step. `repo.ExpireDue`, the only activity it
       # runs, is also unchanged.
       repository: ghcr.io/duynhlab/checkout-service/checkout-service
-      tag: "0.6.2"
+      # 0.6.3 verified the same way as the previous move: between v0.6.2 and
+      # v0.6.3 `internal/workflow/` changed by ZERO lines, so the workflow
+      # DEFINITION is byte-identical and an in-flight AbandonedCheckoutWorkflow
+      # replays without a non-determinism error. The delta is middleware/logging
+      # only (telemetry audit F-1/F-2), which the worker uses for its own probe
+      # endpoints.
+      tag: "0.6.3"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

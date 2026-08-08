@@ -11,7 +11,13 @@ spec:
   defaultValues:
     name: review
     # 1.4.1: pkg v0.35.0 wave (2026-08-07): dependency-only patch release, fleet aligned on one shared-library version.
-    image_tag: "1.4.1" # {"$imagepolicy": "flux-system:review:tag"}
+    # 1.4.2: telemetry-audit fix for the HTTP access log (F-1/F-2) on top of the
+    # per-module pkg v0.36.1 migration and the dependency CVE round. The access
+    # log now emits from the trace-carrying logger, skips routine successful
+    # probes while keeping failing ones, logs the span trace id or none rather
+    # than a fabricated one, and treats 4xx as warn. Local-stack E2E #2: probe
+    # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
+    image_tag: "1.4.2" # {"$imagepolicy": "flux-system:review:tag"}
     namespace: review
     grpc_server: true
     replicaCount: 1

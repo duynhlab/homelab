@@ -173,6 +173,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   healthy services, so the module split is runtime-neutral. The same run captured
   the pre-fix F-1/F-2 baseline that E2E #2 has to move — **96.2% of all exported
   log records are successful-probe access logs**.
+- **ADR-038 (Proposed)** — promote the copied gin tracing/logging middleware into
+  a new Layer 1 module `pkg/httpmw`. Audit findings F-1 and F-2 are the same
+  duplication seen twice: eleven near-identical copies, and the skip list the
+  contract claims they share exists in only one of the pair. The ADR records one
+  design constraint that makes or breaks the module — `obsx` is Layer 2 and
+  `pkg`'s own rules forbid importing it, so `httpmw` must build the
+  trace-context field from the OpenTelemetry **API** rather than calling
+  `obsx.TraceContext`. Direction only: the F-1/F-2 fix still lands as eleven
+  in-place patches, so this is not on the critical path.
 - **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
   Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
   stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;

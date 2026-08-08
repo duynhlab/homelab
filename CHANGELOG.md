@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **F-1 corrected a second time, and the severity goes back up.** The first
+  restatement said nine of eleven services already carried trace context on the
+  access log, leaving only `auth` and `inventory` to fix. Measured on local-stack
+  at full sampling, **one** does: `cart`, 9 837 of 9 837 non-probe access logs.
+  Every other service reads 0. The cause is one word — eight services bind
+  `obsx.TraceContext` onto `loggerWithTrace`, hand that logger to their handlers,
+  and then emit the access log from the **base** `logger`, so the context is
+  attached to a logger the access log never uses. `auth` emits from the right
+  logger but never binds the context; `inventory` has no HTTP middleware at all.
+  Zero probe records carry the field, which does confirm the first correction's
+  central point. The fix is now 8 one-word swaps plus one missing call.
 - **The alert guarding the metrics pipeline could not report the first failure.**
   `OtelMetricsPipelineExportFailures` — whose own comment calls the push pipeline
   "a dependency of every alert above" — used
@@ -157,6 +168,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suppressed. Verified empty against the live series before shipping.
 ### Added
 
+- E2E #1 evidence recorded in the telemetry audit: the local-stack release audit
+  run that gates the pkg per-module split. All Phase A/B/C rows pass on 47/47
+  healthy services, so the module split is runtime-neutral. The same run captured
+  the pre-fix F-1/F-2 baseline that E2E #2 has to move — **96.2% of all exported
+  log records are successful-probe access logs**.
 - **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
   Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
   stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;

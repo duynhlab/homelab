@@ -113,6 +113,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Audit finding F-1 restated after reading the code.** The measurement stands
+  (33 327 of 33 348 correlated log rows lack the native `TraceId`); the diagnosis
+  does not. The otelzap bridge is fine — `Core.With` retains a context field and
+  `Write` emits with it — and 9 of 11 services already pass `obsx.TraceContext`.
+  The real defect is narrower: `GetTraceID` **fabricates a random trace id when
+  there is no span**, so probe logs advertise a correlation that cannot exist,
+  and `auth`/`inventory` never pass the context at all. Severity drops from high
+  to medium, and F-2's probe filtering now removes most of the symptom as a side
+  effect.
 - Telemetry audit findings log added at
   [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
   — the `api/observability.md` contract measured against the deployed platform.

@@ -457,7 +457,7 @@ act push -W .github/workflows/build.yml --detect-event
 
 ## Docker Image Naming Convention
 
-Images are **multi-level**: `ghcr.io/duynhlab/<repo>/<image>` — the builder workflow publishes under the repository path (`ghcr.io/${{ github.repository }}/<image>`), and the `mop` chart consumes `<name>-service/<name>-service` (plus the `-init` image). Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image.
+Images are **multi-level**: `ghcr.io/duynhlab/<repo>/<image>` — the builder workflow publishes under the repository path (`ghcr.io/${{ github.repository }}/<image>`), and the `mop` chart consumes `<name>-service/<name>-service`. Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image.
 
 | GitHub Repo | GHCR Image (app) |
 |---|---|
@@ -988,10 +988,10 @@ concurrency:
   (Renovate-managed) and **rebuild on a schedule** so base fixes land automatically — or use
   **Copacetic** to patch OS CVEs in-image. Keep a best-effort `apk --no-cache upgrade` in the
   runtime stage.
-- **Sign** every pushed image with Cosign keyless OIDC — including the **`-init`** image.
+- **Sign** every pushed image with Cosign keyless OIDC.
 - **Naming is multi-level** (platform convention): `ghcr.io/duynhlab/<repo>/<image>` — the `mop`
-  chart renders `<name>-service/<name>` **and** `<name>-service/<name>-init`. Scan **and sign
-  every** pushed image, not just the primary one.
+  chart renders `<name>-service/<name>-service`, and the migration init container reuses that
+  image, so each service publishes exactly one image to scan and sign.
 - **TOCTOU:** bind scan result, signature, and deploy to the **same digest** — a locally-scanned
   artifact (esp. a multi-platform Buildx manifest) may differ from the pushed digest.
 - **Production consumes an immutable `sha256:` digest** (GHCR tags are mutable); `vX.Y.Z`/

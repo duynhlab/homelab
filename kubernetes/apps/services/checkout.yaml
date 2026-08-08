@@ -54,7 +54,13 @@ spec:
     # 0.6.2: promo lock queues answer 55P03 (contention, 500) instead of a
     # fake-failover 503; ExpireDue propagates infra errors on the confirm-
     # binding read so the abandonment activity retries (checkout PR #48).
-    image_tag: "0.6.2" # {"$imagepolicy": "flux-system:checkout:tag"}
+    # 0.6.3: telemetry-audit fix for the HTTP access log (F-1/F-2) on top of the
+    # per-module pkg v0.36.1 migration and the dependency CVE round. The access
+    # log now emits from the trace-carrying logger, skips routine successful
+    # probes while keeping failing ones, logs the span trace id or none rather
+    # than a fabricated one, and treats 4xx as warn. Local-stack E2E #2: probe
+    # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
+    image_tag: "0.6.3" # {"$imagepolicy": "flux-system:checkout:tag"}
     namespace: checkout
     # No platform_backup_label: checkout's data lives on product-db in the
     # product namespace, which is already backed up (same reasoning as

@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Kind E2E (#3) evidence for the pinned fleet: 11/11 services on their pinned
+  tag, 0 probe access records, native trace id on 12/12 HTTP access records.
+
 ### Fixed
+
+- `mockpay` realigned with `payment` 1.5.3, per the rule the manifest already
+  states; verified `internal/mockpay/` changed by zero lines across the range.
 
 - **F-1 corrected a second time, and the severity goes back up.** The first
   restatement said nine of eleven services already carried trace context on the

@@ -1,98 +1,173 @@
 # Shared Go Library (`pkg`)
 
-One module every Go service pins: `github.com/duynhlab/pkg` carries the
-platform's middleware, observability wiring, database helpers, and the
-versioned east-west protobuf contracts — one version bump moves libraries and
-contracts together.
+Thirteen independently tagged Go modules carrying the platform's middleware,
+observability wiring, database helpers, and the versioned east-west protobuf
+contracts. A service pins only the modules it imports, and each moves on its own
+release line.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **Repository** | [`duynhlab/pkg`](https://github.com/duynhlab/pkg) | — |
-| **Module** | `github.com/duynhlab/pkg` — a **single** Go module; `proto/` stubs are part of it, not a nested module | — |
-| **Latest release** | `v0.35.0` (2026-08-06) | — |
+| **Modules** | **13**, one per package — `github.com/duynhlab/pkg/<module>`. There is **no root `go.mod`**, and one must never be re-created | — |
+| **Newest tags** | `v0.36.1` for `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` | — |
+| **Single-module line** | Frozen at `v0.35.0` (2026-08-06). **No plain `v0.36.x` tag exists** | — |
 | **Consumers** | 11 Go services (the frontend SPA does not use it) | — |
-| **Bump mechanics** | Hand-authored PR `Bump pkg to vX.Y.Z` touching only `go.mod` + `go.sum` | — |
-| **Design records** | — | [RFC-0014](../proposals/rfc/RFC-0014/) (obsx) · [RFC-0017](../proposals/rfc/RFC-0017/) (dbx, TraceContext) · [RFC-0021](../proposals/rfc/RFC-0021/) (flagx, inventory/product contracts) |
+| **Bump mechanics** | Per module: `go get github.com/duynhlab/pkg/<module>@vX.Y.Z` | — |
+| **Design records** | — | [RFC-0014](../proposals/rfc/RFC-0014/) (obsx) · [RFC-0017](../proposals/rfc/RFC-0017/) (dbx, TraceContext) · [RFC-0021](../proposals/rfc/RFC-0021/) (flagx, inventory/product contracts) · [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) (layering, proposed `httpmw`) |
 
 ## Overview
 
-`pkg` exists so ten services do not each carry their own copy of JWT
+`pkg` exists so eleven services do not each carry their own copy of JWT
 verification, OTel wiring, gRPC hardening, or idempotency semantics. Two rules
 shape it:
 
 1. **Contracts live here, generated stubs are committed.** A service imports
-   `proto/<svc>/v1` at the module version it pins — no protoc at build time,
-   and a contract change is visible as an ordinary version bump.
-2. **One version, whole module.** Because protos and libraries share the
-   module, "which contract does order speak?" has the same answer as "which
-   pkg does order pin?" — see the adoption table below.
+   `proto/<svc>/v1` at the version it pins — no protoc at build time, and a
+   contract change is visible as an ordinary version bump.
+2. **One module per package, one tag per module.** A service pins only what it
+   imports, so a change to `temporalx` cannot force a release on the six services
+   that never touch Temporal.
+
+### Why the split, concretely
+
+The security round released as `v0.36.1` bumped gRPC and `golang.org/x`. Under
+the old single module, that would have moved every consumer of every package.
+Per module, it touched **nine**: `flagx`, `logger/zapx` and `logger/clog` carry
+no such dependency, so they legitimately stayed at `v0.36.0`. Different newest
+tags across modules is the normal state, not drift.
+
+### Layering
+
+Modules sit in strict layers, and **a module may only import a lower layer**.
+Same-layer imports are forbidden even when they would not create a cycle, because
+they create hidden tag-ordering constraints.
+
+```mermaid
+flowchart TD
+  L2["<b>Layer 2 — terminal</b><br/>obsx · dbx · migratex · temporalx<br/><i>no module may import these</i>"]
+  L1["<b>Layer 1 — building blocks</b><br/>httpx · grpcx · authmw · idempotency"]
+  L0["<b>Layer 0 — foundation</b><br/>proto · logger/zapx · logger/zerolog · logger/clog · flagx<br/><i>zero internal dependencies</i>"]
+  L2 -->|may import| L1
+  L1 -->|may import| L0
+  L2 -->|may import| L0
+
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  class L2 platform;
+  class L1 service;
+  class L0 data;
+```
+
+Enforcement is `depguard` in the repo's `.golangci.yml`, which also confines the
+OTel **SDK** to `obsx`. Today no module imports another at all — the layers state
+what is *allowed*, so the constraint is cheap to keep and expensive to recover
+once broken.
+
+The rule that bites: **`obsx` is Layer 2, so no shared module can call it.** A
+shared HTTP middleware that wants trace context must build the field from the
+OpenTelemetry **API**, which Layer 1 may import. [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/)
+works that through for the proposed `httpmw`, and `grpcx` is already living the
+consequence — see the finding in
+[audit-2026-08-07](../observability/audit-2026-08-07.md).
 
 Authoritative per-package detail lives in the repo's own
-[`README`](https://github.com/duynhlab/pkg#packages) and `AGENTS.md`; this
-page is the platform-side summary and the bump ledger.
+[`README`](https://github.com/duynhlab/pkg#packages) and `AGENTS.md`; this page is
+the platform-side summary and the release ledger.
 
 ## Packages
 
-| Package | Purpose |
-|---------|---------|
-| `authmw` | Fail-closed Gin middleware verifying RS256 JWT bearer tokens locally against a cached JWKS (issuer/audience pinned). JWT-only since RFC-0009 P5. |
-| `dbx` | pgx pools pre-wired with OTel (otelpgx tracing + pool-stat metrics), transaction-pooler-safe defaults, password-file credential hot-reload. |
-| `flagx` | Startup-validated env flags for migration modes (RFC-0021): enum flags + bounded percent flag; values safe as metric labels. |
-| `grpcx` | East-west gRPC server/client helpers: OTel, panic recovery, health, reflection, keepalive, round-robin over headless Services, machine-readable error reasons, access-log interceptor (level follows the status class). |
-| `httpx` | Shared HTTP envelope: additive error shape (`error` + stable `code`) and list pagination. |
-| `idempotency` | Postgres-backed idempotency store, Stripe-style: claim → first response replays verbatim → mismatch is a conflict; in-flight locks with stale-lock takeover. Caller owns the table. |
-| `logger/zapx` · `logger/zerolog` · `logger/clog` | Structured logger adapters with trace-ID injection. |
-| `migratex` | Embedded golang-migrate runner (`Run(fsys, dir, dsn)`) — always against the DIRECT DB host, never a transaction pooler (DDL is unsafe through PgBouncer/PgDog). |
-| `obsx` | The single OTel SDK wiring point (RFC-0014 P0): traces/metrics/logs over OTLP, one `Shutdown`, zap tee, `TraceContext`, Pyroscope profiling. |
-| `temporalx` | Temporal client/worker bootstrap mirroring grpcx/obsx: OTel tracing interceptor, SDK RED metrics, Worker Deployment Versioning options. |
-| `proto/<svc>/v1` | Versioned contracts + committed stubs for `cart`, `inventory`, `notification`, `order`, `payment`, `product`, `review`, `shipping`. |
+| Module | Layer | Purpose |
+|---------|:---:|---------|
+| `authmw` | 1 | Fail-closed Gin middleware verifying RS256 JWT bearer tokens locally against a cached JWKS (issuer/audience pinned). JWT-only since RFC-0009 P5. |
+| `dbx` | 2 | pgx pools pre-wired with OTel (otelpgx tracing + pool-stat metrics), transaction-pooler-safe defaults, password-file credential hot-reload. |
+| `flagx` | 0 | Startup-validated env flags for migration modes (RFC-0021): enum flags + bounded percent flag; values safe as metric labels. |
+| `grpcx` | 1 | East-west gRPC server/client helpers: OTel, panic recovery, health, reflection, keepalive, round-robin over headless Services, machine-readable error reasons, access-log interceptor (level follows the status class). |
+| `httpx` | 1 | Shared HTTP envelope: additive error shape (`error` + stable `code`) and list pagination. |
+| `idempotency` | 1 | Postgres-backed idempotency store, Stripe-style: claim → first response replays verbatim → mismatch is a conflict; in-flight locks with stale-lock takeover. Caller owns the table. |
+| `logger/zapx` · `logger/zerolog` · `logger/clog` | 0 | Structured logger adapters with trace-ID injection. **Only `zapx` has consumers** — never add the other two to a service. |
+| `migratex` | 2 | Embedded golang-migrate runner (`Run(fsys, dir, dsn)`) — always against the DIRECT DB host, never a transaction pooler (DDL is unsafe through PgBouncer/PgDog). |
+| `obsx` | 2 | The single OTel SDK wiring point (RFC-0014 P0): traces/metrics/logs over OTLP, one `Shutdown`, zap tee, `TraceContext`, Pyroscope profiling. |
+| `temporalx` | 2 | Temporal client/worker bootstrap mirroring grpcx/obsx: OTel tracing interceptor, SDK RED metrics, Worker Deployment Versioning options. |
+| `proto/<svc>/v1` | 0 | Versioned contracts + committed stubs for `cart`, `inventory`, `notification`, `order`, `payment`, `product`, `review`, `shipping`. |
 
 ## Consumer matrix
 
-Which subpackages each service imports (as of `v0.35.0`):
+Which modules each service imports — derived from imports, which is also what
+each `go.mod` requires (verified: no service requires a module it does not
+import, or imports one it does not require).
 
-| Service | authmw | dbx | flagx | grpcx | httpx | idempotency | migratex | obsx | temporalx | proto |
-|---------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|-------|
-| auth | — | ✓ | — | — | ✓ | — | ✓ | ✓ | — | — |
-| user | ✓ | ✓ | — | — | ✓ | — | ✓ | ✓ | — | — |
-| product | — | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | — | inventory, product, review |
-| cart | ✓ | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | — | cart |
-| order | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | inventory, notification, order, payment, shipping |
-| review | ✓ | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | — | review |
-| shipping | — | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | — | shipping |
-| notification | ✓ | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | — | notification |
-| payment | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | payment |
-| checkout | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | cart, inventory, order, product, shipping |
-| inventory | — | ✓ | — | ✓ | — | — | ✓ | ✓ | — | inventory |
+| Service | n | authmw | dbx | flagx | grpcx | httpx | idempotency | logger/zapx | migratex | obsx | temporalx | proto |
+|---------|:-:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|-------|
+| auth | 5 | — | ✓ | — | — | ✓ | — | ✓ | ✓ | ✓ | — | — |
+| user | 6 | ✓ | ✓ | — | — | ✓ | — | ✓ | ✓ | ✓ | — | — |
+| inventory | 6 | — | ✓ | — | ✓ | — | — | ✓ | ✓ | ✓ | — | inventory |
+| product | 7 | — | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | ✓ | — | inventory, product, review |
+| shipping | 7 | — | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | ✓ | — | shipping |
+| cart | 8 | ✓ | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | ✓ | — | cart |
+| review | 8 | ✓ | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | ✓ | — | review |
+| notification | 8 | ✓ | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | ✓ | — | notification |
+| payment | 9 | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | payment |
+| order | 10 | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | inventory, notification, order, payment, shipping |
+| checkout | 10 | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | cart, inventory, order, product, shipping |
 
-Every service uses a `logger/*` adapter; the column is omitted for width.
+`inventory` is the only service with **no `httpx`** — a useful counter-example to
+the assumption that every service shares one floor.
 
 ## Adoption
 
-| Service | pkg version |
-|---------|-------------|
-| auth, user, product, cart, order, review, shipping, notification, payment, checkout, inventory | `v0.35.0` (2026-08-07 wave) |
+All eleven services are migrated off the frozen root module. `inventory` was last
+(2026-08-08), which is also why it is absent from the migration runbook in the pkg
+repo.
 
-The platform-wide bump wave of 2026-08-07 brought every service to the same
-version; before it the fleet ranged from `v0.24.0` to `v0.35.0`.
+| Modules | Pinned at |
+|---------|-----------|
+| `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` | `v0.36.1` |
+| `flagx logger/zapx` | `v0.36.0` |
+
+A service's own `go.mod` is the authority for which versions it pins; this table
+records the fleet-wide state, not a per-service guarantee.
 
 ## Operations
 
-- **Bumping:** branch `chore/bump-pkg-vX.Y.Z`, `go get
-  github.com/duynhlab/pkg@vX.Y.Z && go mod tidy`, build + tests, PR titled
-  `Bump pkg to vX.Y.Z` (go.mod + go.sum only). Bumps are hand-authored —
-  no bot rule covers this module.
-- **Releasing pkg:** tag on `main` after merge; consumers pick the tag up on
-  their next bump PR. A contract change (proto) and its first consumer land as
-  separate PRs — pkg first, tagged, then the consumer bumps.
-- **Contract compatibility:** removals are staged like RFC-0021 P4 did —
-  callers migrate off first (evidence, not assumption), then the RPC leaves
-  the contract in a minor release (`v0.33.0`/`v0.34.0`).
+- **Bumping:** `go get github.com/duynhlab/pkg/<module>@vX.Y.Z && go mod tidy`,
+  build + tests, PR touching `go.mod` + `go.sum` only. Dependabot groups all
+  `github.com/duynhlab/pkg/*` into one PR per service, so a fleet round is eleven
+  PRs, not eleven times thirteen.
+- **A stale root require must be deleted, never version-edited.** Editing
+  `require github.com/duynhlab/pkg v0.35.0` to a `v0.36.x` points at a tag that
+  does not exist; mixing the root require with a per-module one fails immediately
+  with `ambiguous import`.
+- **Releasing:** `make release-<module> VER=x.y.z` — **no `v` prefix** in `VER`;
+  it tags `<module>/vx.y.z`. Nested modules encode `/` as `:`, so `logger/zapx` is
+  `make release-logger:zapx`. The target refuses a dirty tree or a HEAD that is
+  not an ancestor of `origin/main`.
+- **A pushed tag is immutable.** The module proxy caches it, so a mistake is
+  superseded by a new patch, never corrected in place.
+- **Order matters when modules depend on each other:** tag the dependency first,
+  then the dependents. No module imports another today, so this is currently
+  theoretical — it stops being theoretical the first time it is not.
+- **Contract compatibility:** removals are staged like RFC-0021 P4 did — callers
+  migrate off first (evidence, not assumption), then the RPC leaves the contract
+  in a minor release.
 
 ## Release history
 
-Every release since the module began — the bump ledger. Note: `v0.12.1` was
-never published (the sequence jumps `v0.12.0` → `v0.12.2`).
+Two sequences, not one. The single-module line ended when the repository split;
+per-module numbering continues from it, which is why the first per-module tag is
+`v0.36.0` rather than `v0.1.0`.
+
+### Per-module tags
+
+| Tag line | Modules | Date | What it carried |
+|-----|---------|------|-----------------|
+| `v0.36.1` | `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` | 2026-08-08 | gRPC and `golang.org/x` security bumps; test-coverage gaps closed. The four modules without those dependencies stayed at `v0.36.0`. |
+| `v0.36.0` | all 13 | 2026-08-07 | The split itself: one module per package, Go 1.26, per-module release tooling. `grpcx` inlined its trace-id helper to drop the `obsx` call the new layering forbids. |
+
+### Single-module line (`github.com/duynhlab/pkg`, frozen at `v0.35.0`)
+
+Every release of the original module. Note: `v0.12.1` was never published (the
+sequence jumps `v0.12.0` → `v0.12.2`).
 
 | Tag | Date | What it carried |
 |-----|------|-----------------|
@@ -142,9 +217,10 @@ never published (the sequence jumps `v0.12.0` → `v0.12.2`).
 
 ## References
 
-- [`duynhlab/pkg`](https://github.com/duynhlab/pkg) — README (packages) + `AGENTS.md`
+- [`duynhlab/pkg`](https://github.com/duynhlab/pkg) — README (packages), `AGENTS.md` (layering), `docs/MIGRATION.md` (per-service runbook)
+- [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) — why a shared middleware module must build trace context from the OTel API, not `obsx`
 - [api.md § gRPC Runtime Model](./api.md#grpc-runtime-model) — how services use grpcx at runtime
 - [observability.md](./observability.md) — the obsx contract every service follows
 - Per-service contracts: [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-07 — created with the v0.35.0 fleet-wide bump wave._
+_Last updated: 2026-08-09 — rewritten for the per-module split: 13 independently tagged modules, the import layering, and a release ledger split into the per-module and single-module lines._

@@ -635,8 +635,10 @@ A service starts its gRPC server whenever it implements one. There is no
 | Package name | `<service>.v1` | Mirrors HTTP major version |
 | Compatibility check | Buf lint and breaking checks | Breaking changes require a new version |
 
-Keeping protos in the shared package avoids copying request structs across ten
-repositories while retaining one release point for consumers.
+Keeping protos in a shared module avoids copying request structs across eleven
+repositories. Since the per-module split, `proto` releases on its own tag line,
+so a contract change moves only the services that speak that contract — see
+[pkg.md](./pkg.md).
 
 ### Kubernetes HTTP/2 load balancing
 

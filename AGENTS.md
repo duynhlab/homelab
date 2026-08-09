@@ -236,7 +236,8 @@ make flux-sync    # force reconciliation
   YAML, never duplicate it in Terraform. See [`terraform/README.md`](terraform/README.md).
 
 - **e2e:** `cd local-stack && docker compose up -d --build` → SPA at `:3001`, API gateway at `:8080`. Demo login `alice` / `password123` (by **username**).
-  **Mandatory before tagging** any change touching a service repo, `pkg`, Kong/gateway
+  **Mandatory before tagging** any change touching a service repo, **any `pkg` module**,
+  Kong/gateway
   config, `compose.yaml`, or the SPA: run the **full E2E release audit** (API contract + real
   browser + telemetry sanity) in [`local-stack/docs/e2e-audit.md`](local-stack/docs/e2e-audit.md).
   All A/B/C rows must pass; paste the evidence table into the PR or release record.
@@ -271,6 +272,7 @@ homelab, **`docs/api/` wins** (file a drift fix in homelab or the service repo).
 | Deployment rollup + status vocabulary + CI column | [`README.md` § Service contracts](docs/api/README.md#service-contracts) |
 | Feature ownership + known gaps | [`microservices.md`](docs/api/microservices.md) |
 | Temporal workflows + saga deep dive | [`workflows.md`](docs/api/workflows.md), [`temporal-order-fulfillment.md`](docs/api/temporal-order-fulfillment.md) |
+| Which `pkg` modules exist, how they are tagged, the import layering | [`pkg.md`](docs/api/pkg.md) — **which versions a service pins is its own `go.mod`**, never a doc |
 | Full ownership map | [`README.md` § Document Ownership](docs/api/README.md#document-ownership) |
 
 **Not in `docs/api/`:** repo URLs, GHCR images, CI badges →

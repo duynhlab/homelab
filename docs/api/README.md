@@ -20,6 +20,7 @@ flowchart TD
     Hub --> Contracts["11 service contract files"]
     Hub --> Workflows["workflows.md<br/>Temporal workflow registry"]
     Hub --> Saga["Temporal fulfillment<br/>Saga + 2PC + operations"]
+    Hub --> Pkg["pkg.md<br/>shared Go modules + layering"]
     Shared --> Journeys["api.md § End-to-end user journeys"]
     Contracts --> Basic["Auth · User · Product · Inventory · Cart<br/>Order · Review · Notification · Shipping"]
     Contracts --> Deep["Checkout · Payment<br/>state-machine deep dives"]
@@ -30,13 +31,14 @@ flowchart TD
     Template["_template-service.md<br/>authoring template"] -.->|"shapes"| Contracts
     Saga --> Order["order.md"]
     Saga --> Payment["payments.md"]
+    Pkg -.->|"contracts ship as the proto module"| Contracts
 
     classDef hub fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef guide fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef contract fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef workflow fill:#f59e0b,color:#451a03,stroke:#b45309;
     class Hub hub;
-    class Shared,Catalog,Rollup,Journeys,Template guide;
+    class Shared,Catalog,Rollup,Journeys,Template,Pkg guide;
     class Contracts,Basic,Deep,Order,Payment contract;
     class Saga,Workflows workflow;
 ```
@@ -91,6 +93,8 @@ doc has no owning RFC or ADR. Legacy v1 contracts may still say **Design record*
 | Platform deployment rollup and status vocabulary | This page § [Service contracts](#service-contracts) |
 | Cross-service feature ownership | [microservices.md](./microservices.md) |
 | Saga, 2PC theory, Temporal workflow, compensation, and operations | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| Which `pkg` modules exist, how they are tagged, the import layering | [pkg.md](./pkg.md) |
+| Which `pkg` modules a service imports and at which version | That service's own `go.mod` — never a document |
 | Design rationale and alternatives | RFC or ADR |
 | Deployed gateway, network, database, or observability backends/ops | The matching platform area under `docs/observability/` |
 | Repository URLs, images, and CI badges | [docs/README.md § Repositories](../README.md#repositories) |

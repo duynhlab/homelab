@@ -5,7 +5,7 @@ Cross-cutting instrumentation contract for every Go service and worker in the pl
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **Wiring** | One call: `obsx.SetupObservability(ctx, obsx.ConfigFromEnv())` in `main()` | — |
-| **Semconv** | **v1.41.0**, pinned in `pkg/obsx` — bumps only via deliberate pkg release | — |
+| **Semconv** | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate `obsx` release | — |
 | **Middleware** | **Tracing → logging** (two middleware); RED metrics via `otelgin` inside tracing | — |
 | **Export** | OTLP/HTTP `:4318` → OpenTelemetry Collector | — |
 | **Platform topology** | [OpenTelemetry (platform)](../observability/opentelemetry/README.md) · [Observability hub](../observability/README.md) | — |
@@ -113,7 +113,7 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
    ```
 
 2. **`client_golang` is retired.** No `prometheus.*`/`promauto` in app code — metrics use the OTel Meter API with semconv names. The `/metrics` scrape endpoint was removed at RFC-0014 P3.
-3. **Semconv v1.41 is pinned** in `pkg/obsx`; SDK/contrib/semconv triple bumps only as a deliberate pkg release.
+3. **Semconv v1.41 is pinned** in `pkg/obsx`; SDK/contrib/semconv triple bumps only as a deliberate `obsx` release ([pkg.md](./pkg.md)).
 4. **Never set `OTEL_SEMCONV_STABILITY_OPT_IN`.** Any value containing `rpc` silently renames metrics and breaks consumers.
 5. **The Views are law.** HTTP duration uses the platform 13-bucket set `{0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 2, 5, 10}`; body-size histograms use byte buckets; `rpc.client.call.duration` drops `server.address`/`server.port`. Changing buckets is an RFC-level decision.
 6. **Rollout flags ON fleet-wide.** `OTEL_METRICS_ENABLED` / `OTEL_LOGS_ENABLED` are enabled fleet-wide (P3/P4 cutovers). They remain per-service kill switches.

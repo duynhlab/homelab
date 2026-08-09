@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- RFC-0022 (Keycloak as the platform identity provider; retire auth-service):
+  research with fleet-wide as-built audit + Context7 log, provisional RFC, and
+  index/backlog updates.
 - `docs/api` governance: the contract/service-README/service-AGENTS ownership
   boundary, a four-class mismatch procedure whose "implementation violates the
   contract" class blocks the release tag, and an author checklist in

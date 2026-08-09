@@ -122,6 +122,7 @@ for its own sake.
 | [RFC-0019](RFC-0019/) | ClickHouse for OTel logs/traces SQL (+ optional commerce analytics) | platform-wide | done | implemented (Phase B) — OLAP for OTel logs+traces deployed in local-stack + cluster (#560, [ADR-023](../adr/ADR-023-clickhouse-observability-olap/)); Phase A commerce facts stays out of scope |
 | [RFC-0020](RFC-0020/) | Internal TLS everywhere on the `homelab-ca` root (DB, pooler, gRPC, OpenBAO) | platform-wide | P1 | provisional |
 | [RFC-0021](RFC-0021/) | Platform overhaul: inventory extraction, order aggregate, payment hardening (supersedes [RFC-0003](RFC-0003/)) | platform-wide | done | **implemented (P0–P7 landed)** — inventory is the sole stock authority; product's stock RPCs, read fields and schema are removed; the order aggregate ([ADR-033](../adr/ADR-033-order-status-cancellation/)) and payment ambiguity ([ADR-034](../adr/ADR-034-provider-outcome-ambiguity/)…[ADR-037](../adr/ADR-037-per-request-refund-identity/)) shipped; migration flags gone and the first [GameDay run](RFC-0021/gameday.md) recorded (5 faults, 2 claims falsified). Deferred items are listed in the RFC's Implementation History, not dropped |
+| [RFC-0022](RFC-0022/) | Adopt Keycloak as the platform identity provider; retire auth-service (supersedes the custom-issuer portions of [RFC-0009](RFC-0009/)) | platform-wide | P1 | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -133,8 +134,8 @@ when someone starts research (owner OK → `research.md` → index `researching`
 | **RFC-0016** — async payment confirmation via Temporal *(reserved; absorbed into [RFC-0021](RFC-0021/) phase 6 — number retired, do not backfill)* | platform-wide | [RFC-0015](RFC-0015/) |
 | **Atlantis** PR-driven Terraform | infra | [`terraform/`](../../../terraform/) |
 | **Alert delivery** (Slack via OpenBAO + PagerDuty) | infra | `docs/observability/alerting/` |
-| **Authorization (RBAC/ABAC)** — claim population + enforcement | platform-wide | [RFC-0009](RFC-0009/) O1 |
-| **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain | infra | [RFC-0009](RFC-0009/) O4/O6 |
+| **Authorization (RBAC/ABAC)** — claim population + enforcement; claim population moves to Keycloak roles under [RFC-0022](RFC-0022/), enforcement design remains here | platform-wide | [RFC-0009](RFC-0009/) O1 |
+| **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain; the issuer-domain question is reshaped by the Keycloak realm issuer in [RFC-0022](RFC-0022/) | infra | [RFC-0009](RFC-0009/) O4/O6 |
 | **Chaos / GameDay program** | infra | [`docs/databases/010-drp.md`](../../databases/010-drp.md), DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api.md#versioning-and-compatibility` |
 | **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
@@ -147,4 +148,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-07 — RFC-0007 implemented (program + Drill A evidence); see its Implementation History for what deliberately did not run._
+_Last updated: 2026-08-09 — RFC-0022 opened (Keycloak as platform IdP; research + provisional RFC)._

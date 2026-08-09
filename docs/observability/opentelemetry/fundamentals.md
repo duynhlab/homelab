@@ -79,8 +79,8 @@ The instrumentation libraries split into two deliberately separate layers:
 The API is the contract; the SDK is one implementation of it — so **swapping
 or upgrading the SDK touches only setup code, never instrumentation**. That
 asymmetry (stable API, fast-moving SDK) is why `pkg/obsx` pins the
-SDK/contrib/semconv triple and bumps it as a deliberate pkg release: one place
-absorbs SDK churn for the whole fleet.
+SDK/contrib/semconv triple and bumps it as a deliberate `obsx` release: one
+module absorbs SDK churn for the whole fleet.
 
 The SDK plugs in by **registering a provider per signal** — `TracerProvider`,
 `MeterProvider`, `LoggerProvider` — at process start. Until a provider is
@@ -506,7 +506,7 @@ Semconv is the shared vocabulary: `http.request.method`, `http.route`,
 `db.system`, `service.name` mean the same thing from every language and
 library. That's what makes one Grafana dashboard work for every service,
 and why the platform pins **semconv v1.41** in `pkg/obsx` and treats
-SDK/semconv bumps as a deliberate pkg release —
+SDK/semconv bumps as a deliberate `obsx` release —
 never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 ([`docs/api/observability.md`](../../api/observability.md#platform-instrumentation-policy-rfc-0014--normative)).
 

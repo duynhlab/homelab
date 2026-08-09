@@ -11,7 +11,7 @@ how this platform uses it today (Collector topology, sampling, operations).
 | Item | Value |
 |------|-------|
 | SDK | OpenTelemetry Go **v1.44.0**, wired by **`pkg/obsx` `SetupObservability`** (one call in `main()`) |
-| Semconv | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate pkg release |
+| Semconv | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate `obsx` release |
 | Collector | `otel-collector` (contrib distribution, `monitoring` namespace) |
 | Signals | Traces ✅ (10 services, 2 workers, and Kong) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4; Kong runtime logs via OTLP ✅) |
 | Protocol | Services and workers use OTLP/HTTP protobuf on `:4318`; the cluster Collector also accepts OTLP/gRPC on `:4317` |

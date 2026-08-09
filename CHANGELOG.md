@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `docs/api/pkg.md` rewritten for the per-module `pkg`: 13 independently tagged
+  modules, the import layering, per-module bump/release mechanics, and a release
+  ledger split into the per-module and single-module lines.
+- The same single-module claim corrected in `api.md`, `observability.md`,
+  `opentelemetry/{README,fundamentals}.md` and the `AGENTS.md` E2E gate; `pkg`
+  added to both ownership tables and the docs/api map.
 - `mockpay` realigned with `payment` 1.5.3, per the rule the manifest already
   states; verified `internal/mockpay/` changed by zero lines across the range.
 

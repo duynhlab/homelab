@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/api` governance: the contract/service-README/service-AGENTS ownership
+  boundary, a four-class mismatch procedure whose "implementation violates the
+  contract" class blocks the release tag, and an author checklist in
+  `_template-service.md`.
 - Kind E2E (#3) evidence for the pinned fleet: 11/11 services on their pinned
   tag, 0 probe access records, native trace id on 12/12 HTTP access records.
 

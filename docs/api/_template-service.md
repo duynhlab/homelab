@@ -21,9 +21,17 @@ Depth guide:
 - Complex workflow/payment/inventory details may move to a linked deep dive.
 Do not omit contract semantics merely to meet a line-count target.
 
-This document is an as-built, verified contract reference. HTTP routers,
-request/response types, protobufs, tests, Kong configuration, and runtime
-configuration remain the executable sources.
+This document is NORMATIVE. It is what agents and service authors implement
+against. HTTP routers, request/response types, protobufs, tests, Kong
+configuration, manifests, and local-stack are VERIFICATION EVIDENCE: they are
+how a claim here is proved true, not a competing source to prefer when it is
+more convenient.
+
+A mismatch between this document and the evidence is therefore never resolved by
+picking whichever side is easier to change. Classify it first — see
+README.md § Resolving a mismatch — and note that one class, an implementation
+that violates the intended contract, BLOCKS the release tag until it is
+reconciled or explicitly accepted.
 
 Versioning policy: do not duplicate — link api.md § versioning-and-compatibility.
 CI badges live in hub rollup + docs/README.md § Repositories, not here.
@@ -185,8 +193,19 @@ Part 8 — Full canonical paths (/{service}/v1/{audience}/...).
 Minimum route table (see checkout.md):
 | Method | Path | Purpose | Errors worth knowing |
 
-Document at least one validation failure, one auth failure, and one
-retry/idempotency path per non-trivial surface.
+Cover, for every non-trivial surface:
+- Request and response semantics — which fields are required, what they mean,
+  units (money is always minor units), and what the caller gets back.
+- Validation: at least one concrete failure and the code it returns.
+- Authentication AND authorization: who may call it, and the rule applied —
+  these are different questions and the second is the one usually missing.
+- Owner scoping: when a route reads or writes data belonging to a principal,
+  state how ownership is enforced. An unscoped route is an IDOR, so say the
+  rule explicitly rather than leaving it implied.
+- Idempotency / retry behavior: what a repeated call does.
+- Error outcomes are part of the contract. A documented code is stable — callers
+  branch on it, so changing one is a breaking change, not a detail.
+
 Link api.md for envelope, audiences, pagination, idempotency headers.
 If no gRPC server, list outbound gRPC callees in a table here or under gRPC API.
 -->
@@ -202,8 +221,14 @@ Platform conventions apply: [api.md](./api.md#error-envelope) · [audiences](./a
 Part 9 — RPC table with Saga column: — | step | compensation.
 If no gRPC server: one line "None — HTTP only." plus outbound callee table if any.
 
+Name the proto source for every RPC — the module and path the stubs come from
+(pkg/proto/<svc>/v1) — so a reader can diff the contract against the generated code.
+
 Distinguish gRPC transport errors from business outcomes in the response body
 (e.g. payment decline returns status failed, not a gRPC error — see payments.md).
+
+State idempotency per RPC: what a redelivery does. Saga steps are retried by the
+workflow, so an RPC that is not safe to repeat is a defect, not a caveat.
 -->
 
 | RPC | Request → Response | Saga | Notes |
@@ -236,6 +261,15 @@ Write "None." if empty.
 <!--
 Part 13 — env vars, probes, key metrics, curl/grpcurl examples via Kong.
 Include trace/correlation env when instrumented (RFC-0017 / observability.md).
+
+Restricted to what is DEPLOYED. An env var the manifests do not set, or a probe
+the chart does not configure, does not belong here — this section is read during
+an incident, and a value that is merely intended is worse than an absent one.
+
+Add failure behavior: what this service does when a dependency it needs is
+unavailable. Fail-closed or fail-open, what the caller sees, and whether the
+effect is retried, queued, or lost. This is the question asked at 3am and it is
+the one most often missing.
 -->
 
 ## Code map
@@ -268,5 +302,27 @@ Learning exemplar for participant + money FSM: payments.md
 - [workflows.md](./workflows.md)
 - <!-- RFC/ADR links -->
 - <!-- [checkout.md](./checkout.md) — authoring exemplar -->
+
+<!--
+Author checklist — delete this block before committing the filled document.
+
+Each line names the evidence that proves a claim. Tick it because you opened the
+file, not because the statement sounds right. Anything you could not verify is
+marked `Planned` or listed under Known gaps; it is never left as an unqualified
+present-tense sentence.
+
+- [ ] Routes match the router — internal/web/v1/
+- [ ] Payload fields and units match the DTOs — request/response types
+- [ ] RPCs and messages match the protobufs — pkg/proto/<svc>/v1
+- [ ] Documented failures are covered by tests, so the codes are real
+- [ ] The service and its wiring exist in local-stack/compose.yaml
+- [ ] Edge exposure matches the Kong routes actually configured
+- [ ] Deployment claims match kubernetes/apps/ — image, probes, env
+- [ ] Call-graph edges owned by api.md are not redrawn here, only linked
+- [ ] Deployment status uses the hub vocabulary, and Planned is used for
+      anything not running
+- [ ] Every link resolves, and each service contract is linked directly
+- [ ] `_Last updated` says what changed, not only when
+-->
 
 _Last updated: YYYY-MM-DD_

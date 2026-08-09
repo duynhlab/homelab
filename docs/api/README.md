@@ -73,6 +73,46 @@ Three layers — not three copies of the same fact:
    **Drift is forbidden** on deployed behaviour (paths, status badges, ownership) — not on
    teaching diagrams that answer different questions.
 
+### Where a fact belongs: here, the service README, or the service AGENTS.md
+
+Three documents describe every service, and they answer different questions. A
+fact written in the wrong one is a fact that will drift, because only one of the
+three is read when the behaviour changes.
+
+| Document | Answers | Must not contain |
+|----------|---------|------------------|
+| **`docs/api/{service}.md`** (here) | What the service promises: routes, RPCs, payloads, errors, ownership, deployment status | Repo build commands, directory tours, decision essays |
+| Service **`README.md`** | How a human starts and verifies it locally, and where the contract lives | A second endpoint table, payload or error inventory, env-var catalogue, call graph, or deployment claim |
+| Service **`AGENTS.md`** | How to implement in that repo: workflow, verification commands, architecture boundaries, service-specific invariants | Any API inventory — routes, RPCs, payloads, or the cross-service call graph |
+
+The rule that makes this stick: **a service repo links the canonical contract,
+it never reproduces it.** When the two disagree, `docs/api/` wins and the service
+doc is corrected — not the other way round.
+
+Invariants are the deliberate exception. Money units, idempotency keys,
+anti-IDOR scoping, fail-closed behaviour, FSM ownership, pooler-safe database
+settings, shutdown order — these belong in the service `AGENTS.md` because they
+are rules an implementer can violate at the keyboard, and they stay there even
+though the contract also implies them.
+
+### Resolving a mismatch
+
+When this documentation and the evidence disagree, classify before editing.
+Choosing whichever side is cheaper to change is how a contract quietly becomes a
+description of whatever the code happens to do.
+
+| Class | Signal | Resolution |
+|-------|--------|------------|
+| **Stale service doc** | The service `README`/`AGENTS` contradicts the canonical contract | Correct the service doc; do not copy canonical tables into the repo |
+| **Canonical doc missed a shipped change** | Code, tests, local-stack and manifests agree with each other, and this page is behind | Update the owning `{service}.md` with that evidence; touch rollups or the call graph only if their owned facts changed |
+| **Implementation violates the contract** | The behaviour is not what the contract intends, and the contract is right | **Blocks the release tag.** Record it, open a separate implementation task — never rewrite the contract to legitimise the defect |
+| **Designed but not deployed** | Manifests and local-stack do not run it yet | Tag it `Planned`; never present it as current |
+
+The third class is the one worth being strict about. It is also the one that
+looks most like a documentation bug, because the fastest way to make the
+mismatch disappear is to edit this page — which converts a known defect into an
+accepted behaviour without anyone deciding to accept it.
+
 Every quick-facts table under a `docs/api/` title — and each service contract's
 **Identity** table — uses three columns: **Attribute | Value | RFC / ADR**.
 Normative design links belong on the **Design records** row; use `None` when the
@@ -112,6 +152,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | **Technical debt** | Shipped but planned removal |
 | **No caller** | Route/RPC wired, no live consumer — keep documented |
 | **Planned** | Designed, not deployed |
+| **None** | The surface does not exist for this service — e.g. no gRPC client, no worker. Distinct from **No caller**, which means it exists and nothing calls it |
 
 ### Platform rollup
 
@@ -187,8 +228,11 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | At a glance or code map format | v2 template: `Dimension \| Value \| Status` rows include **Deployment**, **Runtime modes**, **HTTP server**, **Edge exposure**, **gRPC server/clients**, **Worker**, **Temporal**, **Async/events**, **Technical debt** — see [_template-service.md](./_template-service.md) |
 | New service contract file | Start from [_template-service.md](./_template-service.md) v2 — At a glance + Identity + 15-part outline |
 | New file | Link it here and from [docs/README.md](../README.md) |
+| A service `README.md` or `AGENTS.md` disagrees with a contract | Correct the service doc — see [Where a fact belongs](#where-a-fact-belongs-here-the-service-readme-or-the-service-agentsmd) |
 
 Every substantive claim must match the service code, local-stack wiring, and
-GitOps manifests. Mark designed but undeployed behavior as **planned**.
+GitOps manifests — that evidence is how a claim is verified, not a competing
+source to prefer. Mark designed but undeployed behavior as **planned**, and when
+the two disagree, classify it first: [Resolving a mismatch](#resolving-a-mismatch).
 
-_Last updated: 2026-08-07 — deployment rollup drops the two legacy rows removed by RFC-0021 P5; checkout is fully shipped._
+_Last updated: 2026-08-09 — adds the contract/README/AGENTS ownership boundary, the mismatch classification with its release-blocking class, the `None` status badge, and pkg to the ownership table and map._

@@ -244,15 +244,17 @@ variables so dev passwords stay out of the file:
   ],
   "roles": { "realm": [ { "name": "customer" }, { "name": "backoffice_admin" } ] },
   "users": [
-    { "username": "alice", "email": "alice@example.com", "enabled": true,
+    { "id": "10000000-0000-4000-8000-000000000001",
+      "username": "alice", "email": "alice@example.com", "enabled": true,
       "credentials": [ { "type": "password", "value": "${ALICE_DEV_PASSWORD}" } ],
       "realmRoles": ["customer"] }
   ]
 }
 ```
 
-The imported users get server-generated UUID subjects; the seed pipeline must expose
-those subjects to the domain-service seeds (an open question below).
+Imported users keep an explicitly declared `id` (Keycloak only generates one when it
+is absent — verified at source), so fixed UUIDs in the import file give the
+domain-service seeds stable subjects to reference (Open questions #10).
 
 ---
 
@@ -268,7 +270,7 @@ assumptions into audited facts.
 |--------|---------------------------|----------------------|
 | Issuer | Custom `auth-service` 1.4.2, HTTP-only, ns `auth`, domain `identity` ([`kubernetes/apps/services/auth.yaml`](../../../../kubernetes/apps/services/auth.yaml)) | Keycloak realm `duynhlab` (planned) |
 | Endpoints | `/auth/v1/public/auth/{login,register,refresh,logout,jwks}` + deprecated flat aliases ([`docs/api/auth.md`](../../../api/auth.md)) | Standard OIDC endpoints under `/realms/duynhlab/protocol/openid-connect/` |
-| Access token | RS256, 1 h, claims above; `kid` = hash of public key | RS256 realm key; default 5 min lifespan — TTL decision needed |
+| Access token | RS256, 1 h, claims above; `kid` = hash of public key | RS256 realm key; default 5 min lifespan — decided: **15 min** (see Open questions #1) |
 | Refresh token | Opaque 32-byte, SHA-256-hashed at rest, **family rotation with reuse detection**: replay ⇒ whole family deleted (`auth-service/internal/logic/v1/service.go:283-433`) | JWT refresh token tied to the SSO session. **`revokeRefreshToken` defaults to `false`** — rotation/reuse-revocation must be switched on (`Revoke Refresh Token` + `refreshTokenMaxReuse: 0`) to keep today's guarantee |
 | Session model | None beyond the refresh family (stateless by design, RFC-0009 Phase 5 dropped `sessions`) | Server-side SSO session (idle 30 min / max 10 h defaults) — a new stateful concept to configure deliberately |
 | Signing key custody | OpenBAO `secret/local/auth/jwt-signing`, ESO fan-out to auth (`JWT_PRIVATE_KEY_PEM`) and Kong (consumer credential) ([`kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml`](../../../../kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml)) | Realm-managed key providers; rotation = add higher-priority key, old stays passive; JWKS serves all enabled keys |
@@ -302,11 +304,11 @@ an opaque UUID string, while today's identity is the integer `auth.users.id`:
 
 | Aspect | Platform today (deployed) | Keycloak (candidate) |
 |--------|---------------------------|----------------------|
-| Demo identities | `auth-service seed`: alice…eve = ids 1–5, `password123`, prod-guarded; domain seeds reference those integer ids | realm-import users with server-generated UUID subjects; domain seeds need those subjects exported deterministically (open question) |
+| Demo identities | `auth-service seed`: alice…eve = ids 1–5, `password123`, prod-guarded; domain seeds reference those integer ids | realm-import users with **fixed declared UUIDs** (import preserves an explicit `id` — verified); domain seeds reference the same constants |
 | Frontend auth | Custom: `POST …/login`, tokens in `localStorage`, silent 401-refresh with in-tab shared promise + cross-tab `navigator.locks` — built specifically around family reuse detection (`frontend/src/api/client.ts`) | standard OIDC client (e.g. `keycloak-js`, PKCE S256 default since KC 24) replaces the entire custom token layer; `getStoredUser()` already coerces `id` to string |
 | Profile ownership | `user-service` owns name/phone/address; username/email come from **verified JWT claims**, not DB joins ([`docs/api/user.md`](../../../api/user.md)) | unchanged — this boundary was designed for exactly this swap |
 | Registration → profile | `POST /user/v1/internal/users` is documented as "called by auth-service" but is **orphaned** — auth-service makes zero outbound calls; private profile reads tolerate a missing row and `PUT` upserts | the tolerant-read + upsert behavior already makes Keycloak self-registration work with no provisioning hook; the orphaned route should be retired or repurposed |
-| Auth DB | Database `auth` on CNPG `platform-db`; **its role/secret double as the cluster's `bootstrap.initdb` credentials** ([`…/databases/clusters/platform-db/services/auth.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml)) | retiring `auth` is **not** a plain DB drop — the platform-db bootstrap contract must move to another owner first; Keycloak brings its own database (placement is an open question) |
+| Auth DB | Database `auth` on CNPG `platform-db`; **its role/secret double as the cluster's `bootstrap.initdb` credentials** ([`…/databases/clusters/platform-db/services/auth.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml)) | retiring `auth` is **not** a plain DB drop — the bootstrap contract moves to a neutral `platform_owner` role first (Open questions #5); Keycloak's own database lands on `platform-db`, connected direct, not via the transaction-mode pooler (#8) |
 
 ---
 
@@ -369,30 +371,26 @@ formally it stays **undecided until the RFC review**, but no audited fact contra
 
 ## Open questions
 
-Owner input needed before/at the RFC gate (carried from the draft, plus new ones
-surfaced by this audit):
+All items below now carry **owner-approved directions** (2026-08-09), researched
+against Keycloak/Kong documentation and common enterprise practice. They stay listed
+so the RFC review can still overturn any of them; implementation may refine exact
+values, not the direction, without coming back here.
 
-- [ ] Pin the Keycloak version/image (current line 26.x; exact digest at implementation).
-- [ ] Environment hostnames + exact redirect/logout URIs per environment.
-- [ ] Platform `aud` value and audience-mapper shape; confirm `pkg/authmw` (jwt/v5)
-      accepts array `aud` — spike, not assumption.
-- [ ] Role-claim normalization: read `realm_access.roles` directly or flatten via a
-      protocol mapper into a custom flat claim authmw already understands?
-- [ ] Token/session TTLs: today 1 h access / 30 d refresh vs Keycloak defaults
-      5 min access / 30 min idle / 10 h max — deliberate choice needed.
-- [ ] Refresh semantics: enable `Revoke Refresh Token` (+ `refreshTokenMaxReuse: 0`)
-      to keep today's reuse-revocation guarantee? (Default is **off**.)
-- [ ] Kong rotation runbook: single credential per `iss` at the edge — accept a
-      short edge-rejection window on rotation, or pre-stage via declarative config?
-- [ ] Keycloak DB placement: dedicated CNPG database on `platform-db` vs own cluster;
-      local-stack: same Postgres container vs dedicated one.
-- [ ] Who inherits the `platform-db` `bootstrap.initdb` contract when the `auth`
-      role/database retire?
-- [ ] Deterministic seed subjects: fix UUIDs in the realm import vs export-after-import
-      step feeding domain seeds.
-- [ ] Self-registration enabled at first Customer SPA release, or demo users only?
-- [ ] Forgot-password / email verification in scope for the first release?
-- [ ] Retire or repurpose the orphaned `POST /user/v1/internal/users` route.
+| # | Question | Approved direction |
+|---|----------|--------------------|
+| 1 | Token/session TTLs | Access token **15 min** (both clients — short-lived access is current BCP; silent OIDC refresh removes the UX cost that justified today's 1 h). `customer-spa`: SSO idle 14 d / max 30 d with Remember Me (consumer-commerce norm, matches today's 30 d refresh). `admin-portal`: client-session idle 30 min / max 10 h (stricter backoffice posture, standard internal-tool policy). |
+| 2 | Refresh semantics | Enable `revokeRefreshToken: true` + `refreshTokenMaxReuse: 0` — keeps today's reuse ⇒ revoke guarantee; rotation for public clients is the OAuth 2.1 / IETF browser-app BCP direction. |
+| 3 | Audience | Keep `duynhlab-platform`, added via a shared client scope `platform-api` carrying an `oidc-audience-mapper`, assigned to both clients. **No authmw change needed for array `aud`** — jwt/v5 `verifyAudience` is a containment check (verified at source, v5.3.1). Trim unused built-in scopes for lean tokens. |
+| 4 | Role claim shape | authmw reads Keycloak's standard `realm_access.roles` directly via a configurable claim path (default `realm_access.roles`) — the pattern every mainstream integration uses; no custom flattening mapper to maintain in the realm. |
+| 5 | `bootstrap.initdb` handover | Re-point to a neutral `platform_owner` role + secret owned by the databases layer, coupled to no service. Bootstrap never re-runs on a live cluster, so this is exercised only by a DR rebuild — validate with a Kind rebuild and update the RFC-0007 DR runbook. |
+| 6 | Keycloak version | Pin `quay.io/keycloak/keycloak` 26.5.x by digest at implementation; upgrade per minor with the upstream guide (the community distribution has no LTS). |
+| 7 | Hostnames / URIs | Prod: `https://id.duynh.me` (`--hostname`, strict, `--hostname-backchannel-dynamic true`); local-stack: `http://localhost:8081`. Redirect/post-logout URIs exact in prod; `http://localhost:3001/*` allowed in dev only. |
+| 8 | Keycloak DB placement | Database `keycloak` + role on CNPG `platform-db` (declarative CRs, RFC-0012 pattern), connected **direct to `platform-db-rw`** — Keycloak's Agroal pool relies on long-lived connections and server-side prepared statements, which a transaction-mode pooler (PgDog) breaks. Local-stack: `keycloak` database in the shared Postgres container. |
+| 9 | Kong rotation runbook | Keep the edge check (ADR-006). Two-step rotation: add the new realm key at higher priority (old stays enabled for verification) → update Kong's declarative credential in the same change. Old tokens may fail at the edge for ≤ one access-token lifetime (15 min); the SPA's OIDC client absorbs it with a silent refresh. |
+| 10 | Deterministic seed subjects | Declare **fixed UUIDs** in the realm import — Keycloak preserves an explicitly set user `id` on import (verified at source); domain seeds reference the same constants. No export-after-import step. |
+| 11 | Self-registration | Off in the first release (deterministic demo users only); enable together with the email stack. |
+| 12 | Forgot-password / email verification | Out of scope for the first release (no SMTP in homelab). Planned follow-up: Mailpit (local) + real SMTP, then registration + verification + reset land together. |
+| 13 | `POST /user/v1/internal/users` | Retire the route. The claim-fallback read + upsert behavior **is** JIT provisioning — the standard pattern with an external IdP; no event listener/webhook. |
 
 ---
 
@@ -426,10 +424,10 @@ doing — and then migrating anyway.
 
 **Is the Kong edge check still worth it if it can't do JWKS?**
 
-That question is deliberately left to the RFC's alternatives. Today the edge check
-is cheap defense-in-depth (ADR-006). With realm-managed rotation it acquires a
-manual step; the RFC weighs "keep static key + runbook" vs "drop the edge JWT check
-and rely on service verification + rate limiting."
+Yes — decided to keep it (ADR-006 defense-in-depth). With realm-managed rotation it
+acquires one declarative step: update Kong's credential in the same change that adds
+the new realm key. With 15-minute access tokens the worst case is a short
+edge-rejection window that the SPA absorbs with a silent refresh.
 
 ---
 
@@ -458,6 +456,9 @@ and rely on service verification + rate limiting."
 | Public client + PKCE: `publicClient: true`, `standardFlowEnabled: true`, `directAccessGrantsEnabled: false`, `attributes["pkce.code.challenge.method"]="S256"`; keycloak-js defaults S256 since KC 24 | Context7 `/keycloak/keycloak` — client representation + JS adapter | confirmed |
 | Kong OSS `jwt` plugin: credential looked up by `key_claim_name` (`iss`), static `rsa_public_key`, no JWKS discovery | Context7 `/kong/developer.konghq.com` — jwt plugin | confirmed |
 | Kong `openid-connect` plugin is Enterprise-tier | Kong plugin page (`tier: enterprise`), fetched 2026-08-09 | confirmed |
+| jwt/v5 `WithAudience` handles array `aud` (containment check → no authmw change) | golang-jwt/jwt v5.3.1 `validator.go` `verifyAudience` — source read | confirmed |
+| Realm import preserves an explicitly declared user `id` (fixed-UUID seeds viable) | Context7 `/keycloak/keycloak` — `UsersPartialImport.create` | confirmed |
+| Keycloak needs long-lived DB connections + server-side prepared statements → connect direct, not via a transaction-mode pooler | Context7 `/keycloak/keycloak` — HA database-connections guide | confirmed |
 
 ---
 

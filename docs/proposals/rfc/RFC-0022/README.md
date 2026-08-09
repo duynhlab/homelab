@@ -266,11 +266,16 @@ Keycloak is a platform component, not a Go domain service:
 
 ```text
 identity namespace / compose group
-├── keycloak                (pinned version, never :latest)
-├── keycloak database       (placement: open question — CNPG on platform-db vs dedicated)
-├── realm import bootstrap  (deterministic duynhlab-realm.json)
+├── keycloak                (quay.io/keycloak/keycloak 26.5.x, pinned by digest)
+├── keycloak database       (database `keycloak` + role on CNPG platform-db, declarative CRs)
+├── realm import bootstrap  (deterministic duynhlab-realm.json, fixed demo-user UUIDs)
 └── identity secrets        (OpenBAO + ESO, like every platform secret)
 ```
+
+Keycloak connects **direct to `platform-db-rw`**, not through the PgDog pooler — its
+Agroal pool relies on long-lived connections and server-side prepared statements,
+which a transaction-mode pooler breaks. Local-stack adds a `keycloak` database to the
+shared Postgres container.
 
 It must satisfy the same admission bar as everything else (Kyverno: pinned image,
 resource requests/limits, probes, PSS) and slots into the Flux chain where the
@@ -282,8 +287,11 @@ As-built, the `auth` role and `platform-db-secret` **double as the CNPG
 `bootstrap.initdb` credentials** for the whole `platform-db` cluster
 ([`kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml)).
 Before the `auth` database and role retire, the bootstrap contract must move to a new
-owner (a dedicated bootstrap role or another service's role) — a required, explicit
-step in the implementation plan.
+owner — a required, explicit step in the implementation plan. **Decision:** re-point
+`bootstrap.initdb` to a neutral `platform_owner` role + secret owned by the databases
+layer, coupled to no service. Bootstrap never re-runs on a live cluster, so the change
+is exercised only by a disaster-recovery rebuild — validate with a Kind rebuild and
+update the RFC-0007 DR runbook.
 
 ### Hostnames and issuer discipline
 
@@ -295,7 +303,10 @@ api.<domain>      Kong/APIs         admin.<domain>  Backoffice portal (future)
 The issuer inside tokens must equal the URL clients and verifiers use. Keycloak's
 hostname options (`--hostname <public-url>`, strict in production,
 `--hostname-backchannel-dynamic true` for internal callers) prevent the classic
-internal-vs-external issuer mismatch. Local-stack may use localhost ports.
+internal-vs-external issuer mismatch. Production issuer:
+`https://id.duynh.me/realms/duynhlab`; local-stack runs Keycloak on
+`http://localhost:8081` with the matching issuer. Redirect and post-logout URIs are
+exact in production; `http://localhost:3001/*` is allowed in development only.
 
 ### Client security
 
@@ -303,7 +314,9 @@ Public clients only; Authorization Code + PKCE S256 required; Direct Access Gran
 disabled; exact redirect/post-logout URIs and web origins per environment; no
 client secrets in browser code; tokens managed by the OIDC client integration (the
 frontend's custom `localStorage` + silent-refresh + cross-tab-lock layer is deleted,
-not ported).
+not ported). Self-registration stays **off** in the first release (deterministic demo
+users only); forgot-password and email verification are a planned follow-up gated on
+an email stack (Mailpit locally, real SMTP later) and land together with registration.
 
 ### Token lifetimes and refresh semantics (explicit, not inherited)
 
@@ -312,9 +325,9 @@ deliberately rather than accepted silently:
 
 | Setting | Today | Keycloak default | Decision |
 |---------|-------|------------------|----------|
-| Access-token TTL | 1 h | 5 min | tune at implementation (open question) |
-| Refresh reuse | reuse ⇒ whole family revoked | **rotation/reuse-revocation off** | enable `Revoke Refresh Token` (+ max reuse 0) to keep the guarantee |
-| Session bounds | none (stateless refresh family) | SSO idle 30 min / max 10 h | choose deliberately with the SPA UX |
+| Access-token TTL | 1 h | 5 min | **15 min**, both clients (silent OIDC refresh removes the UX cost that justified 1 h) |
+| Refresh reuse | reuse ⇒ whole family revoked | **rotation/reuse-revocation off** | enable `Revoke Refresh Token` + `refreshTokenMaxReuse: 0` — keeps the guarantee; OAuth 2.1 direction for public clients |
+| Session bounds | none (stateless refresh family) | SSO idle 30 min / max 10 h | `customer-spa`: SSO idle **14 d** / max **30 d** with Remember Me (matches today's 30 d refresh); `admin-portal`: client-session idle **30 min** / max **10 h** (stricter backoffice posture) |
 
 ### Kong and service verification
 
@@ -322,9 +335,12 @@ The RFC-0009 defense-in-depth shape is unchanged: Kong = coarse edge rejection
 (signature + time claims), services = authoritative verifier and authorizer. The Kong
 OSS `jwt` plugin keeps a **static** realm public key (it cannot fetch JWKS, and the
 `openid-connect` plugin is Enterprise-only). Because the edge credential is looked up
-by `iss`, only one key per issuer is active at the edge at a time — realm key rotation
-therefore keeps a manual/declarative edge step, documented in the rotation runbook.
-Services refresh the realm JWKS automatically via `pkg/authmw`.
+by `iss`, only one key per issuer is active at the edge at a time. **Rotation runbook
+(decided):** add the new realm key at higher priority (the old key stays enabled for
+verification) and update Kong's declarative credential in the same change; old tokens
+may be rejected at the edge for at most one access-token lifetime (15 min), which the
+SPA's OIDC client absorbs with a silent refresh. Services refresh the realm JWKS
+automatically via `pkg/authmw`.
 
 `pkg/authmw` evolves from auth-service-defaults to a generic OIDC verifier
 configuration:
@@ -337,9 +353,13 @@ OIDC_REQUIRED_ALGORITHM         RS256 initially
 OIDC_JWKS_CACHE_TTL             bounded cache + single-flight unknown-kid refresh
 ```
 
-plus role normalization (nested Keycloak claims → stable `[]string`) and a non-empty
-`sub` requirement. Behavior stays: fail closed, sanitized errors, never introspect
-per request.
+plus role normalization and a non-empty `sub` requirement. Roles are read from
+Keycloak's standard `realm_access.roles` claim via a configurable claim path — no
+custom flattening mapper to maintain in the realm. Array `aud` needs no code change:
+jwt/v5's audience check is a containment test (verified at source, v5.3.1); the
+platform audience `duynhlab-platform` is added by an `oidc-audience-mapper` on a
+shared `platform-api` client scope assigned to both clients. Behavior stays: fail
+closed, sanitized errors, never introspect per request.
 
 ### Failure behavior
 
@@ -362,6 +382,7 @@ custom login/register/refresh/logout endpoints and the /auth/v1/public prefix
 custom RS256 signer + refresh-token family logic + custom JWKS endpoint
 JWT_PRIVATE_KEY_PEM and the auth-jwt-signing / auth-issuer-jwt ExternalSecrets
 frontend custom token storage + silent-refresh + cross-tab lock layer
+the orphaned POST /user/v1/internal/users provisioning route (JIT upsert stays)
 docs/api/auth.md as a live contract (archived, not deleted from history)
 ```
 
@@ -373,7 +394,8 @@ routed, seeded, or documented as live.
 This is a coordinated breaking change, not a zero-downtime migration. Acceptance
 starts from a clean rebuild (`docker compose down -v && build && up`, or the Make
 equivalents), which must: start databases and Keycloak → import the realm (clients,
-roles, deterministic demo users) → initialize service schemas with string `user_id`
+roles, demo users with **fixed declared UUID subjects** — the import preserves an
+explicit `id`) → initialize service schemas with string `user_id`
 columns → seed domain data using the Keycloak subjects → start Kong and services →
 pass authentication and ownership smoke tests. There is no dual issuer, dual column,
 backfill job, or compatibility fallback.
@@ -482,6 +504,13 @@ every domain schema and outlives the choice of IdP.
 - 2026-08-09 — Research ([./research.md](./research.md)) and provisional RFC created
   from the owner's draft, corrected against a fleet-wide as-built audit (freshly
   pulled service repos + manifests) and a Context7 documentation audit.
+- 2026-08-09 — All 13 open questions resolved with owner-approved directions
+  ([research → Open questions](./research.md#open-questions)): 15-min access tokens
+  with per-client session bounds, refresh rotation/reuse-revocation on, `platform-api`
+  audience scope, `realm_access.roles` read directly, `platform_owner` bootstrap
+  handover, Keycloak DB direct on `platform-db`, two-step Kong rotation runbook,
+  fixed-UUID demo subjects, registration/email flows deferred to the email stack,
+  JIT profile provisioning kept and the orphaned internal route retired.
 
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)

@@ -124,6 +124,7 @@ for its own sake.
 | [RFC-0021](RFC-0021/) | Platform overhaul: inventory extraction, order aggregate, payment hardening (supersedes [RFC-0003](RFC-0003/)) | platform-wide | done | **implemented (P0–P7 landed)** — inventory is the sole stock authority; product's stock RPCs, read fields and schema are removed; the order aggregate ([ADR-033](../adr/ADR-033-order-status-cancellation/)) and payment ambiguity ([ADR-034](../adr/ADR-034-provider-outcome-ambiguity/)…[ADR-037](../adr/ADR-037-per-request-refund-identity/)) shipped; migration flags gone and the first [GameDay run](RFC-0021/gameday.md) recorded (5 faults, 2 claims falsified). Deferred items are listed in the RFC's Implementation History, not dropped |
 | [RFC-0022](RFC-0022/) | Adopt Keycloak as the platform identity provider; retire auth-service (supersedes the custom-issuer portions of [RFC-0009](RFC-0009/)) | platform-wide | P1 | provisional |
 | [RFC-0023](RFC-0023/) | Basic Backoffice portal (React + TanStack) and the first `protected` business APIs (depends on [RFC-0022](RFC-0022/)) | platform-wide | P2 | provisional |
+| [RFC-0024](RFC-0024/) | Migrate the platform edge from Kong OSS to Envoy Gateway (base: [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -137,7 +138,7 @@ when someone starts research (owner OK → `research.md` → index `researching`
 | **Alert delivery** (Slack via OpenBAO + PagerDuty) | infra | `docs/observability/alerting/` |
 | **Authorization (RBAC/ABAC)** — claim population + enforcement; claim population moves to Keycloak roles under [RFC-0022](RFC-0022/); the first enforcement (role gate + `protected` routes) ships with [RFC-0023](RFC-0023/); fine-grained roles remain here | platform-wide | [RFC-0009](RFC-0009/) O1 |
 | **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain; the issuer-domain question is reshaped by the Keycloak realm issuer in [RFC-0022](RFC-0022/) | infra | [RFC-0009](RFC-0009/) O4/O6 |
-| **Gateway strategy post-Kong-OSS** — Envoy Gateway / APISIX evaluation; Kong OSS is a frozen 3.9 maintenance line and the exit trigger (3.9 stops receiving patches, or an unpatched critical CVE) is recorded in [RFC-0022 research](RFC-0022/research.md#gateway-distribution-risk-kong-oss--added-2026-08-10) | infra | RFC-0022 § Gateway distribution risk |
+| ~~**Gateway strategy post-Kong-OSS**~~ — **promoted to [RFC-0024](RFC-0024/)** (owner activated the exit trigger proactively, 2026-08-10) | infra | RFC-0022 § Gateway distribution risk |
 | **Chaos / GameDay program** | infra | [`docs/databases/010-drp.md`](../../databases/010-drp.md), DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api.md#versioning-and-compatibility` |
 | **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
@@ -150,4 +151,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-10 — RFC-0023 opened; gateway-strategy backlog row added (Kong OSS 3.9 freeze, see RFC-0022 research)._
+_Last updated: 2026-08-10 — RFC-0024 opened (edge migrates to Envoy Gateway; gateway-strategy backlog row promoted)._

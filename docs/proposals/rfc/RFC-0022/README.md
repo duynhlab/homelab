@@ -344,12 +344,13 @@ automatically via `pkg/authmw`.
 
 **Distribution note (2026-08-10):** Kong OSS itself became a frozen 3.9 maintenance
 line in 2025 (no OSS 3.10+ exists; the unlicensed Enterprise image is unusable for
-this platform's KIC DB-less flow). The 3.9 LTS line still receives patches and
-prebuilt images (`kong:3.9.3`, 2026-08), so this design holds unchanged; the risk,
-pinned-version direction, watch, and exit trigger are recorded in
-[research → Gateway distribution risk](./research.md#gateway-distribution-risk-kong-oss--added-2026-08-10),
-and a gateway-strategy backlog RFC (Envoy Gateway / APISIX) covers the eventual exit —
-any JWKS-capable edge dissolves the rotation runbook's manual step.
+this platform's KIC DB-less flow). **Later the same day the owner activated the exit
+trigger proactively: the platform edge migrates to Envoy Gateway per
+[RFC-0024](../RFC-0024/README.md).** Consequence for this section: the static realm
+public key at the edge and the two-step rotation runbook described above are **not
+built** — the RFC-0024 edge verifies via SecurityPolicy `remoteJWKS` (automatic key
+refresh), so only the realm-side key procedure remains. The Kong-specific analysis is
+kept above as the decision record.
 
 `pkg/authmw` evolves from auth-service-defaults to a generic OIDC verifier
 configuration:
@@ -518,6 +519,11 @@ every domain schema and outlives the choice of IdP.
   strategy backlog row; Enterprise license evaluated and rejected — see
   [research → Gateway distribution risk](./research.md#gateway-distribution-risk-kong-oss--added-2026-08-10)).
   Backoffice references updated to [RFC-0023](../RFC-0023/), which now exists.
+- 2026-08-10 — **Exit trigger activated by the owner**: the edge migrates to Envoy
+  Gateway per [RFC-0024](../RFC-0024/README.md). This RFC implements against that
+  edge — the static-key ExternalSecret and the Kong rotation runbook step (Open
+  questions #9) are superseded before ever being built; the token design is
+  unchanged.
 - 2026-08-09 — All 13 open questions resolved with owner-approved directions
   ([research → Open questions](./research.md#open-questions)): 15-min access tokens
   with per-client session bounds, refresh rotation/reuse-revocation on, `platform-api`
@@ -536,6 +542,7 @@ When Status → implemented, confirm:
 ## Related
 
 - [./research.md](./research.md) — plain-language research and Context7 audit trail
+- [RFC-0024 — Migrate the platform edge from Kong OSS to Envoy Gateway](../RFC-0024/README.md) — the edge this RFC implements against (supersedes the Kong static-key/rotation portions here)
 - [RFC-0023 — Basic Backoffice portal + first protected APIs](../RFC-0023/README.md) — hard-depends on this RFC's `admin-portal` client and `backoffice_admin` role
 - [RFC-0009 — Production-grade API gateway: signed JWT + Kong edge auth](../RFC-0009/README.md) — superseded in part by this RFC
 - [ADR-006 — RS256 JWT + Kong edge auth](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — preserved

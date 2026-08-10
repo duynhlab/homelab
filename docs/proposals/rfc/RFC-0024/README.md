@@ -1,0 +1,361 @@
+# RFC-0024 Migrate the platform edge from Kong OSS to Envoy Gateway
+
+| Status | Scope | Research | Created | Last updated |
+|--------|-------|----------|---------|--------------|
+| provisional | platform-wide | [./research.md](./research.md) — gate pending owner sign-off | 2026-08-10 | 2026-08-10 |
+
+> **Every decision is a tradeoff.** This RFC replaces a mature, working edge (Kong OSS
+> 3.9, DB-less, deeply wired into routing, rate limiting, TLS, and the fleet's
+> telemetry) with Envoy Gateway. We take on a real migration (~150 files reference
+> Kong; 32 alert/recording expressions die with the `kong_*` metrics) and a quarterly
+> upgrade duty, in exchange for a CNCF-governed edge with live patch streams, standard
+> Gateway API config, and free JWKS/OIDC/claim-authorization — the exact features the
+> Keycloak adoption ([RFC-0022](../RFC-0022/README.md)) otherwise has to design
+> around. Costs are itemized in **Design Details → Drawbacks**.
+
+## Prerequisites
+
+- [research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
+- Context7 audit complete (see research [audit log](./research.md#context7-audit-log))
+- Owner approved **ready for RFC** (direction chosen by owner 2026-08-10 — this RFC
+  formalizes an activated exit trigger, see
+  [RFC-0022 → Gateway distribution risk](../RFC-0022/research.md#gateway-distribution-risk-kong-oss--added-2026-08-10))
+- **Base: [RFC-0022](../RFC-0022/README.md)** — the Keycloak realm, issuer, claim
+  contract, and TTLs are inputs to this RFC; RFC-0024 changes the *edge vehicle*, not
+  the token design. **Ordering: this RFC's edge lands before/with RFC-0022's
+  implementation**, so the Keycloak edge integration is built once (remoteJWKS), never
+  on the Kong static key.
+- Interacts with [RFC-0023](../RFC-0023/README.md): the `protected` route class gains
+  an edge role gate (JWT claim authorization) as a second defense-in-depth layer.
+- Mechanism deep-dive, criteria matrix, and blast-radius inventory live in
+  [./research.md](./research.md) — this file decides.
+- When Status → **`Accepted`**: expected ADRs in [Resulting decisions](#resulting-decisions);
+  `docs/api/` impact is limited to `api.md` edge-exposure prose (routes/payloads
+  unchanged); platform docs gain `docs/platform/envoy-gateway.md` and
+  `docs/platform/kong-gateway.md` is **archived read-only**.
+
+## Summary
+
+Replace Kong OSS with **Envoy Gateway** (EG) as the platform's only edge: standard
+Gateway API routing (Gateway + HTTPRoutes for all 31 ingress surfaces), SecurityPolicy
+for edge security (Keycloak `remoteJWKS` verification with automatic key refresh, JWT
+claim authorization on `protected` routes, CIDR fencing for admin UIs, CORS),
+BackendTrafficPolicy for resilience and **local-first rate limiting** (no RLS/Redis at
+the edge), and EnvoyProxy telemetry (OTel tracing with the fleet's ParentBased
+sampling model, JSON access logs with CEL probe filtering, Prometheus + control-plane
+metrics). The cutover is **greenfield** — no parallel-run: Kind environments rebuild
+constantly and the production cluster contains no Kong.
+
+Kong is then **decommissioned completely**: HelmRelease, all 10 KongClusterPlugins,
+the consumer and its static-key ExternalSecret, 32 Kong-metric alert/recording
+expressions, the Kong dashboard, the OTTL deprecation filter, the Kyverno
+`NET_BIND_SERVICE` exception, and the local-stack `kong.yml`. **Kong documentation is
+kept and archived read-only** (banner, no rewrite) as platform history.
+
+Motivation, the full criteria comparison (EG 14 / tie 4 / Kong 1 across 24 criteria),
+the observability and rate-limiting deep-dives, and the ~150-file blast-radius
+inventory are in [./research.md](./research.md).
+
+## Motivation
+
+Kong Inc. froze the OSS line in 2025: no 3.10+ exists in any form, the unlicensed
+Enterprise image is unusable for this platform's GitOps flow (read-only Admin API),
+and the 3.9 maintenance line has no published end date. RFC-0022 recorded the risk,
+pinned `kong:3.9.3`, and defined an exit trigger; after a verified comparison the
+owner activated that trigger **proactively** — moving before RFC-0022/0023 implement
+means the Keycloak edge is built once on the surviving gateway, and the two artifacts
+that exist only because of Kong's static-key limitation (the `auth-issuer-jwt` ESO
+fan-out and the manual edge rotation step) are never built at all.
+
+### Goals
+
+- One edge, standard config: Gateway API resources for every route the platform
+  exposes today (API, monitoring, infra, MCP, frontend, temporal-ui).
+- Keycloak verified at the edge via `remoteJWKS` — zero provisioned key material,
+  rotation-transparent; services stay the authoritative verifier (ADR-006's split
+  survives, re-homed by ADR-045).
+- `protected` routes ([RFC-0023](../RFC-0023/README.md)) gain an edge role gate
+  (`realm_access.roles` ∋ `backoffice_admin`).
+- Local-first rate limiting with no new stateful components; admin-UI CIDR fence and
+  CORS re-expressed as SecurityPolicy.
+- Edge telemetry parity or better: ParentBased sampling at 0.1 (model unchanged —
+  research-verified), standard JSON access logs with probe filtering at source
+  (audit F-2), `envoy_*` metrics + first-party dashboards, control-plane metrics.
+- Complete Kong decommission (configs + monitoring); docs archived read-only.
+- local-stack keeps a one-command bring-up: EG standalone mode, with the
+  owner-approved fallback of moving the E2E release-audit gate to Kind.
+
+### Non-Goals
+
+- Changing any service API, route path, host name, or the audience vocabulary —
+  `/{service}/v1/{audience}/…` and `gateway.duynh.me`/`local.duynh.me` survive as-is.
+- Changing RFC-0022's token design (realm, claims, TTLs, authmw) — inputs, not
+  subjects.
+- OIDC-at-edge for the SPAs (keycloak-js stays per RFC-0022/0023; EG's OIDC filter is
+  recorded capability, not adopted).
+- Global rate limiting / RLS in the MVP (explicit escape hatch with a trigger).
+- Service mesh, east-west mTLS ([RFC-0020](../RFC-0020/)/[RFC-0006](../RFC-0006/)
+  territory), ext_authz/OPA adoption.
+- Rewriting archived Kong docs or CHANGELOG history.
+
+## Proposal
+
+### Before → after
+
+| Concern | Before (Kong OSS 3.9, deployed) | After (Envoy Gateway) |
+|---------|--------------------------------|------------------------|
+| Routing | 31 Ingresses, `ingressClassName: kong`, `konghq.com/*` annotations | Gateway (per host class) + ~31 HTTPRoutes, standard Gateway API |
+| Edge JWT (RFC-0022) | `jwt-edge` plugin + `KongConsumer auth-issuer` + static realm key via ESO | SecurityPolicy `jwt.providers[].remoteJWKS` → realm JWKS; **no secret, no rotation step** |
+| Protected routes (RFC-0023) | signature+exp only | + JWT claim authz: `backoffice_admin` in `realm_access.roles` (edge 403), service still authoritative |
+| Admin-UI fence | `ip-restriction-internal` + `rate-limiting-admin` | SecurityPolicy `clientCIDRs` + BTP local rate limit |
+| CORS | `cors-policy` (twin cluster/local configs) | SecurityPolicy `cors` (same YAML both environments) |
+| Rate limiting | `rate-limiting` redis policy → Valkey db 1, per-client-IP, fail-open | **BTP local** token bucket per route (numbers halved for 2 replicas); X-RateLimit draft-03 headers; global+RLS = documented escape hatch |
+| Request size | `request-size-limiting-api` 10 MB | BTP `requestBuffer: 10Mi` (413) |
+| Security headers / request ID | `response-transformer` + `correlation-id` plugins | HTTPRoute `ResponseHeaderModifier` + Envoy native `x-request-id` |
+| Resilience | 5× KongUpstreamPolicy + 25 Service annotations | BTP retries/timeouts/active+passive health checks |
+| TLS | wildcard cert mounted via `secretVolumes`/`ssl_cert` | Gateway `certificateRefs` (same cert-manager Certificate) |
+| Edge tracing | OTel plugin, 0.1 sampling, W3C inject | EnvoyProxy OTel tracing, `samplingRate: 0.1`, **ParentBased default** (model identical), `customTags` |
+| Access logs | bespoke `kong_json` (11 fields), unfilterable | Envoy default JSON (richer) + **CEL filter drops probe logs at source** |
+| Metrics | `kong_*` + `job="kong"` relabel, out-of-tree dashboard | `envoy_*` + control-plane metrics + 4 first-party dashboards |
+| Local gateway | `kong:3.9` + 283-line `kong.yml` dialect | EG **standalone** container reading the same Gateway API YAML (spike; fallback: E2E gate → Kind) |
+| Distribution | frozen line, unannounced EOL | quarterly minors, live patch streams, CNCF governance |
+
+### Resource mapping (implementation checklist)
+
+| Kong resource (today) | Envoy Gateway target |
+|-----------------------|----------------------|
+| `KongClusterPlugin jwt-edge` + `KongConsumer` + `ExternalSecret auth-issuer-jwt` | SecurityPolicy `jwt` (remoteJWKS) on private/protected HTTPRoutes — **secret deleted** |
+| `cors-policy` (global) | SecurityPolicy `cors` on the API Gateway |
+| `ip-restriction-internal` | SecurityPolicy `authorization.clientCIDRs` on admin/monitoring/MCP routes |
+| `rate-limiting-api` / `rate-limiting-admin` | BTP `rateLimit.local` (halved numbers; per-route buckets — semantics change recorded in research) |
+| `request-size-limiting-api` | BTP `requestBuffer` |
+| `correlation-id` | Envoy native `x-request-id` (present in default access log) |
+| `security-headers` (response-transformer) | HTTPRoute `ResponseHeaderModifier` filter |
+| `prometheus-metrics` | EnvoyProxy metrics (Prometheus endpoint) + ServiceMonitor |
+| `opentelemetry-tracing` | EnvoyProxy `telemetry.tracing` (OTLP gRPC 4317, samplingRate 0.1, customTags) + access-log OTel sink where useful |
+| 5× `KongUpstreamPolicy` + `konghq.com/{connect,read,write}-timeout/retries` Service annotations | BTP `retry`/timeouts/`healthCheck` per domain ResourceSet template |
+| 31 Ingresses (incl. `configs/temporal/ingress.yaml`) | Gateway + HTTPRoutes, grouped: `gateway.duynh.me` (API), `local.duynh.me` (SPA), admin hosts |
+| `helmrelease.yaml` (chart kong 3.2.0) + HelmRepository | `gateway-crds-helm` (Gateway API standard channel) + `gateway-helm` (OCI) HelmReleases; Flux edges `cert-manager → gateway-api-crds → envoy-gateway → envoy-gateway-config` |
+| 11 NetworkPolicies (`metadata.name: kong`) | re-pointed at the EG namespace — swept with a checklist (silent-blackhole risk) |
+| Kyverno `PolicyException kong-openbao` (NET_BIND_SERVICE) | expected **droppable** for EG (verify at implementation) |
+| `local-stack/gateway/kong.yml` + `gateway` compose service | EG standalone container + Gateway API resource files (spike outcome decides; fallback approved) |
+
+### Keycloak integration (the RFC-0022 join point)
+
+The realm issuer and JWKS URI from RFC-0022 plug directly into SecurityPolicy;
+an in-cluster Keycloak with the platform CA uses the `Backend` + `BackendTLSPolicy`
+pattern (documented in the KubeCon notes in this folder). RFC-0022's rollout step 5
+("re-point Kong's edge credential at the realm public key") is **replaced** by "attach
+the SecurityPolicy JWT provider"; its rotation runbook keeps only the realm-side key
+procedure. `pkg/authmw` and all service-side behavior are untouched.
+
+## Architecture & Diagrams
+
+### Target edge topology (planned)
+
+```mermaid
+flowchart TB
+    Client["Browsers / SPAs"] --> GW["Envoy Gateway<br/>Gateway: gateway.duynh.me + local.duynh.me<br/>TLS: certificateRefs (wildcard cert)"]
+
+    subgraph Policies["Attached policies (planned)"]
+        SP1["SecurityPolicy: Keycloak remoteJWKS<br/>private + protected routes"]
+        SP2["SecurityPolicy: claim authz backoffice_admin<br/>protected routes (RFC-0023)"]
+        SP3["SecurityPolicy: clientCIDRs + CORS<br/>admin UIs / API"]
+        BTP["BackendTrafficPolicy: local rate limit,<br/>retries, health checks, requestBuffer"]
+        EP["EnvoyProxy: OTel tracing 0.1 ParentBased,<br/>JSON access log + CEL probe filter, metrics"]
+    end
+
+    Policies -.-> GW
+    KC["Keycloak realm duynhlab<br/>(RFC-0022)"] -.->|"JWKS auto-refresh"| GW
+    GW --> Routes["~31 HTTPRoutes<br/>API · monitoring · infra · MCP · frontend · temporal-ui"]
+    Routes --> Svcs["Owning services<br/>pkg/authmw authoritative (ADR-006 split kept)"]
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class GW edge;
+    class Svcs service;
+    class KC platform;
+    class SP1,SP2,SP3,BTP,EP,Routes planned;
+```
+
+### Cutover phases (greenfield — dependency order, not a project plan)
+
+```mermaid
+flowchart LR
+    P0["P0 PoC Kind:<br/>CRDs + EG + 1 public route<br/>+ Keycloak JWT spike"] --> P1["P1 Edge core:<br/>Gateway + all HTTPRoutes<br/>+ SecurityPolicies + BTP"]
+    P1 --> P2["P2 Telemetry cutover:<br/>envoy_* rules + dashboards<br/>+ Vector schema + sampling"]
+    P2 --> P3["P3 Kong decommission:<br/>configs, monitoring, secrets,<br/>NetworkPolicies, exceptions"]
+    P3 --> P4["P4 local-stack:<br/>standalone spike →<br/>adopt or E2E gate → Kind"]
+    P4 --> P5["P5 Docs:<br/>envoy-gateway.md new,<br/>kong-gateway.md archived"]
+
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class P0,P1,P2,P3,P4,P5 planned;
+```
+
+Each phase is one PR train; P2 ships **with** P1's cutover per area so no route runs
+without its alerts (the platform's operability-is-part-of-the-change rule).
+
+## Design Details
+
+### Rate limiting — local-first (decided)
+
+Local token buckets per route replace the Valkey-backed per-client counters. The
+semantic change is stated plainly: no per-IP fairness (local mode has no `Distinct`
+matching), and per-instance buckets mean the effective ceiling ≈ configured × replica
+count — so configured numbers are halved for `replicaCount: 2`. For this platform's
+traffic (a handful of clients behind one NAT) per-IP fairness was decorative; the edge
+loses its last Redis dependency and the RLS component is never deployed. **Escape
+hatch:** adopt global rate limiting (EnvoyGateway `rateLimit.backend: Redis` → Valkey
+db 1 + RLS) if a demonstrated multi-client fairness need appears; the trigger is a
+real abuse incident from distinct sources, not speculation. `X-RateLimit` draft-03
+headers replace Kong's `RateLimit-*` in the CORS expose list; the E2E audit's request
+pacing re-derives from the new numbers.
+
+### Observability cutover
+
+The 13 alerts + 19 recording rules on `kong_*` are rewritten on `envoy_*` equivalents
+in the same PR train as the route cutover, using EG's four first-party Grafana
+dashboards as the reference for expression shapes; the alert catalog §2 is rewritten.
+Vector's `kong_json` parsing maps once onto the Envoy default JSON schema (richer:
+`response_flags`, `upstream_cluster`, `route_name`); a CEL `matches` filter drops
+successful probe access logs at source (closing audit F-2's biggest volume). Tracing:
+`samplingRate: 0.1` cluster / 1.0 local with the confirmed ParentBased default — the
+fleet's sampling model is unchanged (F-7); span semconv modernizes (F-8);
+trace queries pinned to `service.name="kong"` update with the cutover. The
+`filter/kong_redis_deprecation` OTTL processor is deleted.
+
+### local-stack and the E2E gate (decided fallback)
+
+Spike EG **standalone mode** as the compose gateway: one container
+(`envoyproxy/gateway:<pin>`, file provider + host infrastructure) reading the same
+Gateway API YAML as the cluster — killing today's second config dialect. Spike
+exit criteria: all local routes + JWT verification + local rate limit + JSON access
+logs function under compose with healthchecks the `depends_on` graph can consume.
+**If the spike fails** (feature gaps in standalone mode): per owner decision, the
+**E2E release-audit gate moves to Kind** (`local-stack/docs/e2e-audit.md` re-scoped;
+compose keeps services + a minimal pass-through for developer convenience). Either
+way `kong:3.9`, `kong.yml`, and the `kong health` healthcheck are removed.
+
+### Kong decommission and docs archive (decided)
+
+Deleted outright: `controllers/kong/` HelmRelease + HelmRepository, all
+`configs/kong/` CRs, the consumer's ExternalSecret, the 32 metric expressions +
+`prometheusrules/kong/`, the Kong Grafana dashboard CR, the OTTL Kong filter, the
+Kyverno exception, `local-stack/gateway/kong.yml`, and the `job="kong"` relabel.
+Re-pointed: 11 NetworkPolicies, `flux-ui.sh` port-forward, MCP RBAC namespace list,
+CORS origins (unchanged values, new home). **Archived read-only, never rewritten:**
+`docs/platform/kong-gateway.md` (banner: *"Archived (RFC-0024) — describes the
+retired Kong OSS edge, kept as history"*), ADR-003/ADR-006 (superseded-by links),
+RFC-0009 (one more superseded-in-part note), CHANGELOG history (append-only as
+always).
+
+### Drawbacks (the cost side, stated plainly)
+
+- A real migration across ~150 files with one L-sized risk area (observability
+  rewiring) — sequenced, but not small.
+- Quarterly upgrade duty (~2 lines/year) replaces "pin and forget" (owner: accepted).
+- Per-client rate-limit fairness is lost in local mode (documented escape hatch).
+- Standalone mode is young; the local-stack story may end up split (compose for
+  services, Kind for the E2E gate) — accepted in advance.
+- Team knowledge resets: Kong plugin intuition → Gateway API + Envoy semantics
+  (response_flags literacy, xDS debugging).
+
+## Security considerations
+
+- The ADR-006 defense-in-depth split is preserved and strengthened: edge does
+  signature/iss/aud/exp via live JWKS (better than signature+exp today) plus role
+  claims on `protected`; services remain authoritative (`pkg/authmw` untouched).
+- Static key material leaves the edge entirely — one fewer secret, one fewer ESO
+  path, no Kong-shaped credential Secret.
+- Admin-UI exposure keeps the CIDR fence semantics (same ranges), now with
+  `defaultAction: Deny` explicitness.
+- Kyverno/PSS: EG workloads meet the standard admission bar; the Kong
+  `NET_BIND_SERVICE` PolicyException is expected to drop (verify, then delete +
+  update the exceptions catalog).
+- NetworkPolicy re-pointing is the highest-silence risk (traffic blackholes) — the
+  11-file sweep is a named implementation checklist item with a Kind verification.
+- Local rate limiting cannot fail open or closed (in-process) — removes the
+  fail-open Redis dependency the edge has today.
+
+## Observability & SLO impact
+
+Covered in Design Details → Observability cutover: 32 expressions rewritten, alert
+catalog §2 replaced, dashboards swapped to first-party + control-plane metrics added,
+Vector schema re-mapped once, F-2/F-7/F-8 all improved or preserved. During each
+cutover PR train the affected area's alerts land in the same PR — no route runs
+unwatched. Post-migration signals to keep: edge 4xx/5xx and latency percentiles
+(envoy histograms), per-route 429 counts, JWKS fetch failures (new — worth an alert),
+control-plane reconcile errors.
+
+## Rollout & rollback
+
+Greenfield cutover in five PR trains (diagram above): P0 PoC (Kind: CRDs + EG + one
+public route + Keycloak JWT spike) → P1 edge core (Gateway, all HTTPRoutes,
+SecurityPolicies, BTP — Kong deleted from the cluster chain in the same train) → P2
+telemetry (same-PR-per-area with P1 slices) → P3 decommission sweep (secrets,
+NetworkPolicies, exceptions, scripts) → P4 local-stack (spike outcome or E2E-gate
+move) → P5 docs. **Rollback** is source-level per train: revert the PR train and
+rebuild (`make up` / compose rebuild) — the same greenfield property that makes the
+cutover cheap makes reverts cheap; no dual-gateway state ever exists.
+
+## Testing / verification
+
+- **PoC/spike gates (P0/P4):** Keycloak JWT verify + claim authz demonstrated on
+  Kind; standalone spike against explicit exit criteria.
+- **Route parity:** scripted diff of every host/path/audience pair before/after
+  (31 ingress surfaces incl. temporal-ui); 404/401/403 behavior per audience class
+  re-asserted; the local bare-prefix trap class of bug checked by test, not eyeball.
+- **Auth:** valid/invalid/expired Keycloak tokens at edge + service (both layers);
+  `protected` role gate 403s without `backoffice_admin`; realm key rotation with no
+  edge action.
+- **Rate limit:** halved numbers verified per instance; 429 + X-RateLimit headers;
+  E2E pacing re-derived.
+- **Telemetry:** every rewritten alert fired synthetically or by injection where the
+  platform already has drills; trace continuity SPA→edge→service (ParentBased);
+  access-log pipeline end-to-end into VictoriaLogs/ClickHouse; probe-filter CEL
+  proven by volume delta.
+- **NetworkPolicy sweep:** scripted connectivity matrix from the EG namespace
+  (reuse the `db-isolation-sweep` pattern).
+- **E2E:** full local-stack release audit (or its Kind successor per P4) — all
+  A/B/C rows pass before any tag.
+
+## Resulting decisions
+
+| Decision | ADR | Status |
+|----------|-----|--------|
+| Envoy Gateway is the platform edge; Gateway API is the routing config model (supersedes ADR-006's Kong binding — the edge-coarse/service-authoritative split survives) | ADR-045 | Proposed |
+| Edge rate limiting is local-first (no RLS/Redis); global is an escape hatch behind a recorded trigger | ADR-046 | Proposed |
+| The E2E release-audit gate moves to Kind if compose cannot carry the edge (standalone spike fails) | ADR-047 | Proposed |
+
+Numbers count past RFC-0023's 042–044 per owner convention.
+
+## Implementation History
+
+- 2026-08-10 — Research + provisional RFC created. Direction pre-decided by owner
+  (activating the RFC-0022 gateway-risk exit trigger proactively): Envoy Gateway,
+  greenfield cutover, local-first rate limiting, standards-first access-log schema,
+  full Kong config/monitoring decommission with docs archived read-only, E2E-gate
+  fallback to Kind. KubeCon SecurityPolicy notes committed alongside as reference
+  material; the Vietnamese review report stays untracked (`*.vi.md` gitignored).
+
+When Status → implemented, confirm:
+- [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
+- [ ] `docs/api/api.md` edge-exposure prose updated; `docs/platform/envoy-gateway.md`
+      created; `docs/platform/kong-gateway.md` archived banner in place
+- [ ] Runbooks: edge runbook replaced; alert catalog §2 rewritten; rotation runbook
+      edge step deleted from `docs/secrets/openbao.md`
+- [ ] RFC-0022/0023 cross-references updated to the as-built edge
+
+## Related
+
+- [./research.md](./research.md) — problem framing, criteria matrix, deep-dives, blast radius, Context7 audit
+- [`kubecon-eu25-securitypolicy-notes.md`](./kubecon-eu25-securitypolicy-notes.md) — SecurityPolicy + Keycloak BackendTLSPolicy pattern
+- [RFC-0022 — Keycloak as platform IdP](../RFC-0022/README.md) — base; its edge artifacts simplify under this RFC
+- [RFC-0023 — Backoffice + protected APIs](../RFC-0023/README.md) — `protected` routes gain the edge role gate
+- [RFC-0009](../RFC-0009/README.md) / [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — the Kong edge design being superseded in its vehicle, preserved in its principle
+- [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — to be archived read-only
+
+---
+_Last updated: 2026-08-10_

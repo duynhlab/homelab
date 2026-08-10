@@ -57,7 +57,7 @@ platform should keep maintaining. The full problem framing and the audited as-bu
 inventory are in [./research.md](./research.md#problem-statement).
 
 The timing is deliberately opportunistic: no stable customer frontend contract must be
-preserved, the Backoffice portal does not exist yet, no production identities need
+preserved, the Backoffice portal ([RFC-0023](../RFC-0023/)) is not built yet, no production identities need
 migration, and local-stack already rebuilds and seeds the complete environment.
 
 ### Goals
@@ -65,7 +65,7 @@ migration, and local-stack already rebuilds and seeds the complete environment.
 - Make Keycloak the only platform issuer for human access tokens.
 - Remove `auth-service`, its `auth` database, and its Kong routes completely.
 - Use standard OIDC browser redirects; no password ever reaches an application API.
-- Support a future Customer SPA and a separate Backoffice portal as distinct public
+- Support a future Customer SPA and a separate Backoffice portal ([RFC-0023](../RFC-0023/)) as distinct public
   clients in one realm.
 - Keep local, offline token verification in Kong and in the Go services.
 - Keep services authoritative for issuer, audience, expiry, subject, role, ownership,
@@ -78,7 +78,7 @@ migration, and local-stack already rebuilds and seeds the complete environment.
 
 ### Non-Goals
 
-- Backoffice pages, navigation, business APIs, or operator workflows (separate RFC).
+- Backoffice pages, navigation, business APIs, or operator workflows ([RFC-0023](../RFC-0023/)).
 - An `admin-service`, identity facade, or BFF in front of Keycloak.
 - OAuth Client Credentials for normal internal gRPC calls.
 - East-west mTLS or a service mesh ([RFC-0020](../RFC-0020/) / [RFC-0006](../RFC-0006/) territory).
@@ -117,7 +117,7 @@ migration, and local-stack already rebuilds and seeds the complete environment.
 | Kong | Routing, rate limiting, coarse token rejection at the edge | Final identity/ownership/business authorization |
 | Go services | Full token validation, owner scoping, role gates, domain invariants | Passwords, login screens, refresh-token storage, signing keys |
 | `user-service` | Name, phone, address, application profile fields | Passwords, username uniqueness, sessions, token issuance |
-| Backoffice RFC (future) | Protected business workflows and UI | Keycloak realm administration |
+| Backoffice ([RFC-0023](../RFC-0023/)) | Protected business workflows and UI | Keycloak realm administration |
 
 ### Realm, clients, and roles
 
@@ -129,7 +129,7 @@ Issuer: https://<identity-host>/realms/duynhlab   (immutable per environment)
 | Client | Type | Flow | Purpose |
 |--------|------|------|---------|
 | `customer-spa` | Public OIDC client | Authorization Code + PKCE S256 | Customer browser application |
-| `admin-portal` | Public OIDC client | Authorization Code + PKCE S256 | Future Backoffice browser application |
+| `admin-portal` | Public OIDC client | Authorization Code + PKCE S256 | Backoffice browser application ([RFC-0023](../RFC-0023/)) |
 
 Browser clients have no secret; Direct Access Grants (password grant) is disabled;
 redirect URIs and web origins are exact per environment — wildcards are forbidden in
@@ -138,9 +138,9 @@ production.
 | Role | Meaning |
 |------|---------|
 | `customer` | May access private customer APIs; still subject to owner scoping by `sub` |
-| `backoffice_admin` | May access `protected` business APIs defined by the Backoffice RFC |
+| `backoffice_admin` | May access `protected` business APIs defined by [RFC-0023](../RFC-0023/) |
 
-The role model intentionally starts minimal; the Backoffice RFC may later split
+The role model intentionally starts minimal; [RFC-0023](../RFC-0023/) may later split
 `backoffice_admin`. `protected` is the existing-but-unused route class in
 [`docs/api/api.md`](../../../api/api.md) — this RFC gives it its first real user.
 
@@ -211,7 +211,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     Customer["Customer"] --> CustomerSPA["Customer SPA"]
-    Admin["Backoffice admin"] --> AdminPortal["Admin Portal<br/>(planned, Backoffice RFC)"]
+    Admin["Backoffice admin"] --> AdminPortal["Admin Portal<br/>(planned, RFC-0023)"]
 
     CustomerSPA -->|"OIDC Authorization Code + PKCE"| Keycloak["Keycloak<br/>realm duynhlab"]
     AdminPortal -->|"OIDC Authorization Code + PKCE"| Keycloak
@@ -341,6 +341,15 @@ verification) and update Kong's declarative credential in the same change; old t
 may be rejected at the edge for at most one access-token lifetime (15 min), which the
 SPA's OIDC client absorbs with a silent refresh. Services refresh the realm JWKS
 automatically via `pkg/authmw`.
+
+**Distribution note (2026-08-10):** Kong OSS itself became a frozen 3.9 maintenance
+line in 2025 (no OSS 3.10+ exists; the unlicensed Enterprise image is unusable for
+this platform's KIC DB-less flow). The 3.9 LTS line still receives patches and
+prebuilt images (`kong:3.9.3`, 2026-08), so this design holds unchanged; the risk,
+pinned-version direction, watch, and exit trigger are recorded in
+[research → Gateway distribution risk](./research.md#gateway-distribution-risk-kong-oss--added-2026-08-10),
+and a gateway-strategy backlog RFC (Envoy Gateway / APISIX) covers the eventual exit —
+any JWKS-capable edge dissolves the rotation runbook's manual step.
 
 `pkg/authmw` evolves from auth-service-defaults to a generic OIDC verifier
 configuration:
@@ -504,6 +513,11 @@ every domain schema and outlives the choice of IdP.
 - 2026-08-09 — Research ([./research.md](./research.md)) and provisional RFC created
   from the owner's draft, corrected against a fleet-wide as-built audit (freshly
   pulled service repos + manifests) and a Context7 documentation audit.
+- 2026-08-10 — Kong OSS distribution risk recorded (OSS frozen at the 3.9 LTS line;
+  direction: pin `kong:3.9.3`, release-radar watch, explicit exit trigger, gateway-
+  strategy backlog row; Enterprise license evaluated and rejected — see
+  [research → Gateway distribution risk](./research.md#gateway-distribution-risk-kong-oss--added-2026-08-10)).
+  Backoffice references updated to [RFC-0023](../RFC-0023/), which now exists.
 - 2026-08-09 — All 13 open questions resolved with owner-approved directions
   ([research → Open questions](./research.md#open-questions)): 15-min access tokens
   with per-client session bounds, refresh rotation/reuse-revocation on, `platform-api`
@@ -522,6 +536,7 @@ When Status → implemented, confirm:
 ## Related
 
 - [./research.md](./research.md) — plain-language research and Context7 audit trail
+- [RFC-0023 — Basic Backoffice portal + first protected APIs](../RFC-0023/README.md) — hard-depends on this RFC's `admin-portal` client and `backoffice_admin` role
 - [RFC-0009 — Production-grade API gateway: signed JWT + Kong edge auth](../RFC-0009/README.md) — superseded in part by this RFC
 - [ADR-006 — RS256 JWT + Kong edge auth](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — preserved
 - [RFC-0020 — Internal TLS everywhere](../RFC-0020/) — owns east-west transport trust
@@ -530,4 +545,4 @@ When Status → implemented, confirm:
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) · [`docs/secrets/openbao.md`](../../../secrets/openbao.md)
 
 ---
-_Last updated: 2026-08-09_
+_Last updated: 2026-08-10_

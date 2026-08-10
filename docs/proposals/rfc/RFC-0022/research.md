@@ -6,7 +6,7 @@
 | **Status** | researching |
 | **Scope** | platform-wide |
 | **Created** | 2026-08-09 |
-| **Last updated** | 2026-08-09 |
+| **Last updated** | 2026-08-10 |
 
 > **Plain-language research.** This file is the audit trail for replacing the custom
 > `auth-service` (built and hardened by [RFC-0009](../RFC-0009/README.md)) with
@@ -52,8 +52,8 @@
 | | |
 |---|---|
 | **Situation** | RFC-0009 shipped a production-grade token architecture — but it made this project the **operator of its own identity provider**: credential storage, bcrypt policy, refresh-token family rotation and reuse detection, RS256 key custody and rotation, JWKS publication, and (future) MFA, account recovery, and role administration are all custom Go code we maintain. |
-| **Who feels it** | Platform (key rotation is a manual OpenBAO + Kong + restart procedure); security (every auth bug is ours); product (the RBAC/ABAC backlog row and the future Backoffice portal both stall on identity features `auth-service` does not have). |
-| **Why now** | The timing window is uniquely cheap: no stable frontend contract to preserve, no Backoffice portal yet, no production identities to migrate, and local-stack already rebuilds the whole environment from zero. Every quarter of delay adds more schemas, seeds, and tests keyed to the custom issuer. |
+| **Who feels it** | Platform (key rotation is a manual OpenBAO + Kong + restart procedure); security (every auth bug is ours); product (the RBAC/ABAC backlog row and the Backoffice portal — now designed as [RFC-0023](../RFC-0023/) — both stall on identity features `auth-service` does not have). |
+| **Why now** | The timing window is uniquely cheap: no stable frontend contract to preserve, the Backoffice portal ([RFC-0023](../RFC-0023/)) is not built yet, no production identities to migrate, and local-stack already rebuilds the whole environment from zero. Every quarter of delay adds more schemas, seeds, and tests keyed to the custom issuer. |
 | **If we do nothing** | The RBAC row ([RFC-0009 O1](../RFC-0009/README.md)) forces us to design a custom role model; MFA/account-recovery/social login each become bespoke security-critical projects; the `roles: []` placeholder stays dead weight in every token; key rotation stays a three-system manual drill ([`docs/secrets/openbao.md` § JWT signing key](../../../secrets/openbao.md#jwt-signing-key-auth--kong)). |
 
 > **In plain terms:** we built a small bank vault to learn how vaults work — now we
@@ -63,9 +63,9 @@
 
 **Example triggers:**
 
-- **Design review:** the Backoffice portal needs an `admin` login with roles. Today
-  that means designing claim population, admin credential storage, and an admin UI
-  from scratch inside `auth-service`.
+- **Design review:** the Backoffice portal ([RFC-0023](../RFC-0023/)) needs an `admin`
+  login with roles. Without this RFC that means designing claim population, admin
+  credential storage, and an admin UI from scratch inside `auth-service`.
 - **Toil / ops:** rotating the signing key touches OpenBAO, two ExternalSecrets, a
   Kong consumer credential, and an auth-service restart — and the edge half is easy
   to forget because services auto-refresh JWKS but Kong does not.
@@ -282,8 +282,40 @@ assumptions into audited facts.
 |--------|---------------------------|----------------------|
 | Service middleware | [`pkg/authmw`](https://github.com/duynhlab/pkg) v0.36.1 in 7 services — **already issuer-neutral**: `NewVerifier(jwksURL, issuer, audience)`, keyfunc/v3 cached JWKS, RS256 pinned, validates `iss`/`aud`/`exp`, puts `user_id`(=`sub`)/`username`/`email` in context | Same package, retargeted by env (`AUTH_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`). Gaps: `aud` may arrive as an **array** (jwt/v5 `WithAudience` handles arrays — verify in a spike); `preferred_username` vs today's `username` claim; **roles are nested**, and authmw reads no roles at all today |
 | Roles | `roles: []` hardcoded in the signer, never read by any consumer — there is **no authorization model to port**; Keycloak roles are net-new capability | `realm_access.roles` / `resource_access.<client>.roles`; needs a normalization decision in authmw (flatten to `[]string`) |
-| Edge | Kong OSS `jwt` plugin `jwt-edge`: `key_claim_name: iss`, `claims_to_verify: [exp]`, static `rsa_public_key` on `KongConsumer auth-issuer` ([`kubernetes/infra/configs/kong/plugins.yaml`](../../../../kubernetes/infra/configs/kong/plugins.yaml), mirrored in [`local-stack/gateway/kong.yml`](../../../../local-stack/gateway/kong.yml)) | Same plugin, key material becomes the realm public key. Kong OSS `jwt` does **no JWKS discovery**, and the `openid-connect` plugin is **Enterprise-tier only** (verified 2026-08-09) — so the edge keeps a static-copy constraint; because the credential is looked up by `iss`, only **one key per issuer** can be active at the edge at a time, which shapes the rotation runbook |
-| Route classes | `public`/`private`/`protected`/`internal` ([`docs/api/api.md`](../../../api/api.md)); `protected` is defined but **unused** — reserved for exactly the role-gated routes this work enables | unchanged vocabulary; `backoffice_admin` becomes the first real `protected` gate |
+| Edge | Kong OSS `jwt` plugin `jwt-edge`: `key_claim_name: iss`, `claims_to_verify: [exp]`, static `rsa_public_key` on `KongConsumer auth-issuer` ([`kubernetes/infra/configs/kong/plugins.yaml`](../../../../kubernetes/infra/configs/kong/plugins.yaml), mirrored in [`local-stack/gateway/kong.yml`](../../../../local-stack/gateway/kong.yml)) | Same plugin, key material becomes the realm public key. Kong OSS `jwt` does **no JWKS discovery**, and the `openid-connect` plugin is **Enterprise-tier only** (verified 2026-08-09) — so the edge keeps a static-copy constraint; because the credential is looked up by `iss`, only **one key per issuer** can be active at the edge at a time, which shapes the rotation runbook. **Note (2026-08-10): Kong OSS itself is now a frozen 3.9 maintenance line — see [Gateway distribution risk](#gateway-distribution-risk-kong-oss--added-2026-08-10)** |
+| Route classes | `public`/`private`/`protected`/`internal` ([`docs/api/api.md`](../../../api/api.md)); `protected` is defined but **unused** — reserved for exactly the role-gated routes this work enables | unchanged vocabulary; `backoffice_admin` becomes the first real `protected` gate — the routes themselves are designed in [RFC-0023](../RFC-0023/) |
+
+### Gateway distribution risk (Kong OSS) — added 2026-08-10
+
+The edge design above assumes Kong OSS. In 2025 Kong changed how the OSS edition is
+distributed, and the facts were re-verified directly on 2026-08-10:
+
+| Fact | Evidence |
+|------|----------|
+| **No Kong OSS 3.10+ exists** — no source tags, no images, no packages | `git ls-remote` on Kong/kong shows the newest OSS tags are 3.9.x; [discussion #14405](https://github.com/Kong/kong/discussions/14405) |
+| **"Free mode" is gone**: `kong/kong-gateway:3.10+` without a license behaves as an **expired Enterprise license**, and the current changelog makes the Admin API **read-only** without a license | [discussion #14628](https://github.com/Kong/kong/discussions/14628); [Kong Gateway changelog](https://developer.konghq.com/gateway/changelog/) — fatal for this platform's KIC **DB-less** flow, which pushes declarative config through the Admin API |
+| **The 3.9 LTS line is still alive**: patches and prebuilt images continue | Docker Hub API: `kong:3.9.2` pushed 2026-06, **`kong:3.9.3` pushed 2026-08-04** — this corrects vendor-blog claims that 3.9.x gets "no more security updates" |
+| **The real risk is the unannounced EOL** of the 3.9 maintenance line, not a missing patch today | no published end-of-support date for OSS 3.9 |
+
+Platform exposure: local-stack floats `kong:3.9` (unpinned patch) and the cluster runs
+chart 3.2.0 → OSS 3.9.
+
+**Direction (owner-approved 2026-08-10, Open questions #14):** the Keycloak edge design
+in this research is **unchanged** — the OSS `jwt` plugin with a provisioned realm
+public key remains correct on 3.9. Follow-ups (separate manifest PR, not this docs
+change): pin `kong:3.9.3` in local-stack and the chart values; add Kong to the
+`release-radar` watch list; record the **exit trigger** — *the 3.9 line stops
+receiving patches, or a critical CVE lands unpatched* — which activates a
+gateway-strategy RFC (backlog row added). A Kong Enterprise license was evaluated and
+rejected: for this design it buys only edge JWKS automation (the `openid-connect`
+plugin), at enterprise pricing, while the role gate stays in-service regardless.
+
+> **In plain terms:** our gateway brand stopped selling the free model we use; the
+> spare-parts supply for our current one continues, but nobody says for how long. We
+> keep driving it, pin the exact part number, subscribe to the recall bulletin, and
+> keep a shortlist of replacement models (Envoy Gateway, APISIX — both verify Keycloak
+> tokens against live JWKS for free, which would also dissolve this design's one
+> manual rotation step). Nothing in the Keycloak decision locks us to Kong.
 
 ### Identity data — the real blast radius
 
@@ -391,6 +423,7 @@ values, not the direction, without coming back here.
 | 11 | Self-registration | Off in the first release (deterministic demo users only); enable together with the email stack. |
 | 12 | Forgot-password / email verification | Out of scope for the first release (no SMTP in homelab). Planned follow-up: Mailpit (local) + real SMTP, then registration + verification + reset land together. |
 | 13 | `POST /user/v1/internal/users` | Retire the route. The claim-fallback read + upsert behavior **is** JIT provisioning — the standard pattern with an external IdP; no event listener/webhook. |
+| 14 | Gateway distribution risk (added 2026-08-10) | Kong OSS is a frozen 3.9 maintenance line (no 3.10+ exists; unlicensed `kong-gateway` is unusable for KIC DB-less — see [Gateway distribution risk](#gateway-distribution-risk-kong-oss--added-2026-08-10)). **Owner-approved direction:** stay on 3.9 LTS with the design unchanged; pin `kong:3.9.3` (follow-up manifest PR); watch via release-radar; exit trigger = 3.9 stops receiving patches or an unpatched critical CVE → activate the gateway-strategy backlog RFC (Envoy Gateway / APISIX — free JWKS support dissolves the manual edge-rotation step). Kong Enterprise rejected: buys only edge JWKS automation at enterprise pricing while the role gate stays in-service. |
 
 ---
 
@@ -418,16 +451,20 @@ is on the path only for login, token refresh, and unknown-`kid` JWKS refreshes.
 
 **Why not wait until the Backoffice portal forces the issue?**
 
-The Backoffice needs roles and an admin login on day one. Building those into
-`auth-service` first means doing the custom-IdP work this research argues to stop
-doing — and then migrating anyway.
+The Backoffice ([RFC-0023](../RFC-0023/), which hard-depends on this RFC) needs roles
+and an admin login on day one. Building those into `auth-service` first means doing
+the custom-IdP work this research argues to stop doing — and then migrating anyway.
 
 **Is the Kong edge check still worth it if it can't do JWKS?**
 
 Yes — decided to keep it (ADR-006 defense-in-depth). With realm-managed rotation it
 acquires one declarative step: update Kong's credential in the same change that adds
 the new realm key. With 15-minute access tokens the worst case is a short
-edge-rejection window that the SPA absorbs with a silent refresh.
+edge-rejection window that the SPA absorbs with a silent refresh. Separately, Kong
+OSS itself became a frozen maintenance line in 2025 — see
+[Gateway distribution risk](#gateway-distribution-risk-kong-oss--added-2026-08-10);
+the design holds on 3.9 LTS, and any future JWKS-capable edge removes this step
+entirely.
 
 ---
 
@@ -439,6 +476,9 @@ edge-rejection window that the SPA absorbs with a silent refresh.
 - Keycloak hostname configuration — https://www.keycloak.org/server/hostname
 - Kong `jwt` plugin — https://developer.konghq.com/plugins/jwt/
 - Kong `openid-connect` plugin (Enterprise tier) — https://developer.konghq.com/plugins/openid-connect/
+- Kong Gateway changelog — https://developer.konghq.com/gateway/changelog/
+- Kong OSS 3.10 image discussion — https://github.com/Kong/kong/discussions/14405
+- Kong Enterprise-without-license discussion — https://github.com/Kong/kong/discussions/14628
 
 ---
 
@@ -459,6 +499,9 @@ edge-rejection window that the SPA absorbs with a silent refresh.
 | jwt/v5 `WithAudience` handles array `aud` (containment check → no authmw change) | golang-jwt/jwt v5.3.1 `validator.go` `verifyAudience` — source read | confirmed |
 | Realm import preserves an explicitly declared user `id` (fixed-UUID seeds viable) | Context7 `/keycloak/keycloak` — `UsersPartialImport.create` | confirmed |
 | Keycloak needs long-lived DB connections + server-side prepared statements → connect direct, not via a transaction-mode pooler | Context7 `/keycloak/keycloak` — HA database-connections guide | confirmed |
+| No Kong OSS 3.10+ exists (no source tags beyond 3.9.x) | `git ls-remote --tags` on Kong/kong, 2026-08-10 | confirmed |
+| Kong OSS 3.9 LTS still ships prebuilt images (`kong:3.9.2` 2026-06, `kong:3.9.3` 2026-08-04) | Docker Hub API (`library/kong` tags), 2026-08-10 | confirmed — **corrected** the vendor-blog claim that 3.9.x gets no security updates |
+| Unlicensed `kong-gateway:3.10+` = expired-license behavior; current changelog: Admin API **read-only** without a license (breaks KIC DB-less config push) | Kong discussion #14628 + Kong Gateway changelog, 2026-08-10 | confirmed |
 
 ---
 
@@ -477,4 +520,4 @@ edge-rejection window that the SPA absorbs with a silent refresh.
 
 ---
 
-_Last verified: 2026-08-09 (Context7 + manifest + service-repo cross-check on freshly pulled `main` branches)._
+_Last verified: 2026-08-10 (Context7 + manifest + service-repo cross-check; Kong OSS distribution facts re-verified against Docker Hub, git tags, and Kong discussions)._

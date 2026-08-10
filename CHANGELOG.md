@@ -83,6 +83,13 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- ADR-039 (run Temporal on Postgres in local-stack for versioning parity):
+  proposes replacing the in-memory `temporalio/temporal` dev-server with the
+  official five-container topology (schema setup, server, namespace/search-
+  attribute bootstrap, long-running admin-tools CLI target, UI) on the shared
+  `postgres` container, so the three RFC-0021 Worker Deployment Versioning
+  traps and the `kubectl exec deploy/temporal-admintools` workflow are
+  reproducible on the dev loop instead of only on Kind.
 - RFC-0024 (replatform edge and identity — Envoy Gateway + Keycloak in one
   greenfield cutover; RFC-0022's implementation is absorbed as program phases,
   its design record stands): research

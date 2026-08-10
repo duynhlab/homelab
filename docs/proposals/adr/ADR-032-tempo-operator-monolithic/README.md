@@ -52,6 +52,30 @@ Several pressures make the delivery mechanism worth revisiting:
 - **Learning value.** The platform already delivers Temporal, VictoriaMetrics,
   VictoriaLogs, CNPG, and Grafana through operators; Tempo is the remaining
   hand-rolled observability backend.
+- **Tempo 3.0 is a rearchitecture, not a bump.** Upstream Tempo 3.0 (released
+  2026) removes the `ingester` and `compactor` modules and the `v2` block
+  encoding, replaces them with live-store, block-builder, and a backend
+  scheduler/worker pair, and refuses to start when the legacy sections are
+  present. The current raw ConfigMap (`configmap.yaml:21,62`) uses both.
+  Renovate PR #694 (`grafana/tempo` v2.10.5 → v3.0.2) surfaces this: bumping
+  the tag alone crashloops the pod. tempo-operator v0.21.0 still pins Tempo
+  2.10.5, so adopting the operator today lands the platform on the last
+  pre-Rhythm version behind a controller that will carry the 3.x migration
+  when the next operator release ships it. Choosing the operator now closes
+  the operability gap without buying into the Rhythm migration on the same
+  day.
+- **Kafka is a Tempo 3.x microservices concern, not an operator concern.**
+  The Rhythm write path in Tempo 3.x **microservices mode** places a Kafka
+  cluster between the distributor and the block-builder/live-store/
+  metrics-generator consumers as a durable buffer (see the reference diagram
+  below Decision view). Kafka is **not** required for `TempoMonolithic` at
+  any version: monolithic mode runs distributor, live-store, block-builder,
+  metrics-generator, backend scheduler, and backend worker in-process and
+  needs no message bus. Tempo 2.10.5 (the version this ADR lands on today)
+  predates Rhythm entirely and has no Kafka path at all. Adopting the
+  operator therefore does **not** pull Kafka into the platform, and a future
+  upgrade to Tempo 3.x stays Kafka-free as long as the CR remains
+  `TempoMonolithic`.
 
 ## Scope
 
@@ -175,12 +199,61 @@ flowchart LR
     class Bucket2 planned;
 ```
 
+### Reference — Tempo 3.x microservices mode (not deployed)
+
+The diagram below is a reference sketch of upstream Tempo 3.x running in
+**microservices mode** (the "Rhythm" architecture), included here to make the
+Kafka boundary explicit. The homelab does **not** deploy this shape: this ADR
+lands on `TempoMonolithic` at Tempo 2.10.5 today, and any future move to
+Tempo 3.x is expected to stay on `TempoMonolithic` (monolithic mode runs every
+component in-process and does not require Kafka). Kafka only enters the
+picture if a follow-up ADR chooses `TempoStack` on Tempo 3.x, which the Kind
+1-pod footprint and single-tenant scope explicitly reject.
+
+```mermaid
+flowchart TD
+    Producers["OTel Collector / SDKs<br/>OTLP producers"] --> Distributor["Distributor"]
+    Distributor --> Kafka(["Kafka<br/>durable buffer<br/>(reference, not deployed)"])
+    Kafka -.->|"async"| LiveA["Live store<br/>zone a"]
+    Kafka -.->|"async"| LiveB["Live store<br/>zone b"]
+    Kafka -.->|"async"| BlockBuilder["Block builder"]
+    Kafka -.->|"async"| MetricsGen["Metrics generator"]
+    MetricsGen -.->|"remote_write"| MetricsBackend["Metrics backend<br/>(e.g. VictoriaMetrics)"]
+    BlockBuilder --> Storage[("Storage<br/>object store + cache")]
+    Scheduler["Backend scheduler"] --> Worker["Backend worker"]
+    Worker <--> Storage
+    LiveA --> Querier["Querier"]
+    LiveB --> Querier
+    Storage --> Querier
+    Querier --> QF["Query frontend"]
+    QF --> Grafana["Grafana"]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+
+    class Producers,Grafana external;
+    class Distributor,QF,Querier service;
+    class BlockBuilder,MetricsGen,LiveA,LiveB,Scheduler,Worker worker;
+    class Kafka platform;
+    class Storage,MetricsBackend data;
+    class Kafka planned;
+```
+
+Read this as a **reference** for what Kafka would replace on the write path
+(the current in-process ingester queue), not as a target. Solid arrows are
+the synchronous ingest and query paths; dotted arrows are the asynchronous
+Kafka consumers that microservices mode requires.
+
 ## Alternatives considered
 
 | Option | Benefits | Costs / risks | Result |
 |--------|----------|---------------|--------|
 | **A — TempoMonolithic via tempo-operator** | Keeps the 1-pod footprint; managed upgrades; operator-generated ServiceMonitor/PrometheusRules; embedded Jaeger UI; native S3 secret handling (drops the `expand-env` splice) | New controller + webhook to run; `v1alpha1` API; retention and metrics-generator only reachable via `extraConfig`; service DNS name changes | **Selected** |
-| **B — TempoStack via tempo-operator** | First-class CRD fields for retention/limits/metrics-generator; `resources.total` auto-split; multitenancy, OIDC/RBAC gateway, inter-component mTLS | Microservices mode: ~5–7 pods (distributor, ingester + PVC, querier, query-frontend, compactor, optional gateway) — a large jump from one 256Mi pod on Kind, buying features this single-tenant, no-in-cluster-auth platform does not use | Rejected |
+| **B — TempoStack via tempo-operator** | First-class CRD fields for retention/limits/metrics-generator; `resources.total` auto-split; multitenancy, OIDC/RBAC gateway, inter-component mTLS | Microservices mode: ~5–7 pods (distributor, ingester + PVC, querier, query-frontend, compactor, optional gateway) on Tempo 2.x, and Tempo 3.x microservices adds Kafka as a durable buffer between distributor and consumers — a large jump from one 256Mi pod on Kind, buying features this single-tenant, no-in-cluster-auth platform does not use | Rejected |
 | **C — Keep the raw Deployment** | Zero new moving parts; Renovate keeps bumping the image directly | Hand-maintained config/monitoring surface persists; metrics-generator still needs manual wiring; no operator learning | Rejected |
 | **D — `grafana/tempo` Helm chart** | Less YAML than raw manifests; familiar HelmRelease flow | No managed upgrades or CRD semantics; swaps one templating layer for another without the learning value that motivates the change | Rejected |
 
@@ -273,6 +346,16 @@ ahead of implementation.
 Re-open this decision when one or more of the following become true:
 
 - tempo-operator stops releasing, or `TempoMonolithic` is deprecated upstream.
+- **tempo-operator ships a release that manages Tempo 3.x** (Rhythm
+  architecture). At that point a follow-up ADR decides whether to upgrade the
+  `TempoMonolithic` CR, whether to run Tempo 3.x in monolithic in-process mode
+  (no Kafka, fits the Kind 1-pod footprint) or microservices mode with Kafka
+  (see the reference diagram under Decision view), and how to migrate the
+  ConfigMap sections this ADR still writes in 2.x form (`ingester`,
+  `compactor`, `metrics_generator.storage.remote_write`,
+  `compaction.compaction.*` flag names). Until then, PRs that bump
+  `grafana/tempo` to `>= 3.0.0` are rejected. Adopting Kafka is not on the
+  table while the CR remains `TempoMonolithic`.
 - The platform gains a real multitenancy, in-cluster auth, or scale
   requirement that maps to TempoStack's feature set.
 - VictoriaTraces reaches ~1.0/GA and the pre-announced consolidation ADR
@@ -287,6 +370,9 @@ requires a new ADR that supersedes this one.
 
 - [tempo-operator v0.21.0 release](https://github.com/grafana/tempo-operator/releases/tag/v0.21.0)
 - [TempoMonolithic documentation](https://github.com/grafana/tempo-operator/blob/main/docs/tempomonolithic.md)
+- [Tempo 3.0 release notes](https://grafana.com/docs/tempo/latest/release-notes/v3-0/) — ingester/compactor removal, Rhythm architecture, config migration
+- [Migrate from Tempo 2.x to 3.0](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/migrate-to-3/)
+- [Tempo architecture](https://grafana.com/docs/tempo/latest/introduction/architecture/) — monolithic vs microservices, Kafka boundary in Rhythm write path
 - [Tracing hub](../../../observability/tracing/README.md)
 - [Trace backends comparison](../../../observability/tracing/backends-comparison.md) — reserves backend consolidation for a future ADR
 - [Observability stack review](../../../observability/stack-review.md)
@@ -298,6 +384,7 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-07-30 | Proposed / Not started | Initial draft |
+| 2026-08-10 | Proposed / Not started | Note Tempo 3.0 rearchitecture (ingester/compactor removed) as context and revisit trigger; keep 2.10.5 as landing pad through the operator. Make the Kafka boundary explicit: `TempoMonolithic` needs no Kafka at any version, Rhythm microservices does — add a reference diagram of Tempo 3.x microservices under Decision view. Renovate PR #694 (`v3.0.2` bump) rejected on this basis. |
 
 ---
-_Last updated: 2026-07-30_
+_Last updated: 2026-08-10_

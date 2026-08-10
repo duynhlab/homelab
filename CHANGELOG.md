@@ -83,6 +83,13 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- ADR-032 amended (Tempo delivery via tempo-operator `TempoMonolithic`): note
+  Tempo 3.0's rearchitecture (ingester and compactor modules removed, Project
+  Rhythm becomes the default write path) as context and as an explicit revisit
+  trigger; the operator still pins Tempo 2.10.5, so 2.10.5 stays the landing
+  pad. Renovate PR #694 (`grafana/tempo` v2.10.5 → v3.0.2) is rejected on this
+  basis and PRs that push Tempo `>= 3.0.0` are gated on a follow-up ADR after
+  tempo-operator ships 3.x support.
 - RFC-0024 (replatform edge and identity — Envoy Gateway + Keycloak in one
   greenfield cutover; RFC-0022's implementation is absorbed as program phases,
   its design record stands): research

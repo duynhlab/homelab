@@ -137,6 +137,7 @@ when someone starts research (owner OK → `research.md` → index `researching`
 | **Alert delivery** (Slack via OpenBAO + PagerDuty) | infra | `docs/observability/alerting/` |
 | **Authorization (RBAC/ABAC)** — claim population + enforcement; claim population moves to Keycloak roles under [RFC-0022](RFC-0022/); the first enforcement (role gate + `protected` routes) ships with [RFC-0023](RFC-0023/); fine-grained roles remain here | platform-wide | [RFC-0009](RFC-0009/) O1 |
 | **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain; the issuer-domain question is reshaped by the Keycloak realm issuer in [RFC-0022](RFC-0022/) | infra | [RFC-0009](RFC-0009/) O4/O6 |
+| **Gateway strategy post-Kong-OSS** — Envoy Gateway / APISIX evaluation; Kong OSS is a frozen 3.9 maintenance line and the exit trigger (3.9 stops receiving patches, or an unpatched critical CVE) is recorded in [RFC-0022 research](RFC-0022/research.md#gateway-distribution-risk-kong-oss--added-2026-08-10) | infra | RFC-0022 § Gateway distribution risk |
 | **Chaos / GameDay program** | infra | [`docs/databases/010-drp.md`](../../databases/010-drp.md), DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api.md#versioning-and-compatibility` |
 | **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
@@ -149,4 +150,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-10 — RFC-0023 opened (Backoffice portal + first protected APIs; research + provisional RFC)._
+_Last updated: 2026-08-10 — RFC-0023 opened; gateway-strategy backlog row added (Kong OSS 3.9 freeze, see RFC-0022 research)._

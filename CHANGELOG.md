@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Kind E2E (#3) evidence for the pinned fleet: 11/11 services on their pinned
   tag, 0 probe access records, native trace id on 12/12 HTTP access records.
 
+### Changed
+
+- RFC-0022 amended: the Kong OSS distribution risk is recorded (OSS frozen at
+  the 3.9 LTS line; direction: pin `kong:3.9.3`, release-radar watch, explicit
+  exit trigger, gateway-strategy backlog row) and Backoffice references now
+  point at RFC-0023.
+
 ### Fixed
 
 - `docs/api/pkg.md` rewritten for the per-module `pkg`: 13 independently tagged

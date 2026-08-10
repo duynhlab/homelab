@@ -91,9 +91,7 @@ Skeleton (copy what you need):
   cutover, Keycloak via remoteJWKS, local-first rate limiting, full Kong
   config/monitoring decommission with docs archived read-only), RFC-0022
   amendments (exit trigger activated; Kong rotation runbook superseded before
-  being built), and the KubeCon SecurityPolicy notes committed as reference
-  material (the Vietnamese review report stays untracked — `*.vi.md` is
-  gitignored).
+  being built).
 - RFC-0023 (basic Backoffice portal + first `protected` business APIs): research
   with fleet-wide endpoint-gap audit + Context7 log, provisional RFC, and index
   updates.

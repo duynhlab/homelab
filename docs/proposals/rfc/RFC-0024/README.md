@@ -158,7 +158,7 @@ fan-out and the manual edge rotation step) are never built at all.
 
 The realm issuer and JWKS URI from RFC-0022 plug directly into SecurityPolicy;
 an in-cluster Keycloak with the platform CA uses the `Backend` + `BackendTLSPolicy`
-pattern (documented in the KubeCon notes in this folder). RFC-0022's rollout step 5
+pattern (per the official Backend/BackendTLSPolicy docs). RFC-0022's rollout step 5
 ("re-point Kong's edge credential at the realm public key") is **replaced** by "attach
 the SecurityPolicy JWT provider"; its rotation runbook keeps only the realm-side key
 procedure. `pkg/authmw` and all service-side behavior are untouched.
@@ -382,8 +382,8 @@ together with this RFC's review.
   (activating the RFC-0022 gateway-risk exit trigger proactively): Envoy Gateway,
   greenfield cutover, local-first rate limiting, standards-first access-log schema,
   full Kong config/monitoring decommission with docs archived read-only, E2E-gate
-  fallback to Kind. KubeCon SecurityPolicy notes committed alongside as reference
-  material; the Vietnamese review report stays untracked (`*.vi.md` gitignored).
+  fallback to Kind. The owner's working reading material stays outside git by
+  design.
 - 2026-08-10 — **Scope expanded by owner decision: RFC-0022 is absorbed for
   execution.** Keycloak deployment and auth-service retirement run as phases P1/P3/P5
   of this program (RFC-0022 stays the identity design record); the edge never trusts
@@ -400,7 +400,6 @@ When Status → implemented, confirm:
 ## Related
 
 - [./research.md](./research.md) — problem framing, criteria matrix, deep-dives, blast radius, Context7 audit
-- [`kubecon-eu25-securitypolicy-notes.md`](./kubecon-eu25-securitypolicy-notes.md) — SecurityPolicy + Keycloak BackendTLSPolicy pattern
 - [RFC-0022 — Keycloak as platform IdP](../RFC-0022/README.md) — the identity **design record**, absorbed here for execution (owner decision 2026-08-10)
 - [RFC-0023 — Backoffice + protected APIs](../RFC-0023/README.md) — receives its identity prerequisites from this program; `protected` routes gain the edge role gate
 - [RFC-0009](../RFC-0009/README.md) / [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — the Kong edge design being superseded in its vehicle, preserved in its principle

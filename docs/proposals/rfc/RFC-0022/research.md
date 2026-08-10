@@ -310,6 +310,16 @@ gateway-strategy RFC (backlog row added). A Kong Enterprise license was evaluate
 rejected: for this design it buys only edge JWKS automation (the `openid-connect`
 plugin), at enterprise pricing, while the role gate stays in-service regardless.
 
+> **Update (2026-08-10, later the same day): the exit trigger was activated
+> proactively by the owner** after a verified Envoy Gateway comparison — see
+> **[RFC-0024](../RFC-0024/README.md)**. Consequence: the Keycloak token design is
+> untouched, the two Kong-specific edge artifacts (`ExternalSecret auth-issuer-jwt`
+> static key and the two-step rotation runbook, Open questions #9) are **not built**,
+> and — by a further owner decision the same day — **this RFC's entire implementation
+> is absorbed into RFC-0024's combined greenfield program** (Keycloak + new edge +
+> auth-service retirement in one cutover). This file stays the identity design
+> record.
+
 > **In plain terms:** our gateway brand stopped selling the free model we use; the
 > spare-parts supply for our current one continues, but nobody says for how long. We
 > keep driving it, pin the exact part number, subscribe to the recall bulletin, and
@@ -418,12 +428,12 @@ values, not the direction, without coming back here.
 | 6 | Keycloak version | Pin `quay.io/keycloak/keycloak` 26.5.x by digest at implementation; upgrade per minor with the upstream guide (the community distribution has no LTS). |
 | 7 | Hostnames / URIs | Prod: `https://id.duynh.me` (`--hostname`, strict, `--hostname-backchannel-dynamic true`); local-stack: `http://localhost:8081`. Redirect/post-logout URIs exact in prod; `http://localhost:3001/*` allowed in dev only. |
 | 8 | Keycloak DB placement | Database `keycloak` + role on CNPG `platform-db` (declarative CRs, RFC-0012 pattern), connected **direct to `platform-db-rw`** — Keycloak's Agroal pool relies on long-lived connections and server-side prepared statements, which a transaction-mode pooler (PgDog) breaks. Local-stack: `keycloak` database in the shared Postgres container. |
-| 9 | Kong rotation runbook | Keep the edge check (ADR-006). Two-step rotation: add the new realm key at higher priority (old stays enabled for verification) → update Kong's declarative credential in the same change. Old tokens may fail at the edge for ≤ one access-token lifetime (15 min); the SPA's OIDC client absorbs it with a silent refresh. |
+| 9 | Kong rotation runbook | ~~Two-step rotation: add the new realm key at higher priority → update Kong's declarative credential in the same change~~ **Superseded 2026-08-10 by [RFC-0024](../RFC-0024/README.md)**: the edge moves to Envoy Gateway with `remoteJWKS` auto-refresh — no edge rotation step exists; only the realm-side key procedure remains. The edge check itself is kept (ADR-006 principle, re-homed by ADR-045). |
 | 10 | Deterministic seed subjects | Declare **fixed UUIDs** in the realm import — Keycloak preserves an explicitly set user `id` on import (verified at source); domain seeds reference the same constants. No export-after-import step. |
 | 11 | Self-registration | Off in the first release (deterministic demo users only); enable together with the email stack. |
 | 12 | Forgot-password / email verification | Out of scope for the first release (no SMTP in homelab). Planned follow-up: Mailpit (local) + real SMTP, then registration + verification + reset land together. |
 | 13 | `POST /user/v1/internal/users` | Retire the route. The claim-fallback read + upsert behavior **is** JIT provisioning — the standard pattern with an external IdP; no event listener/webhook. |
-| 14 | Gateway distribution risk (added 2026-08-10) | Kong OSS is a frozen 3.9 maintenance line (no 3.10+ exists; unlicensed `kong-gateway` is unusable for KIC DB-less — see [Gateway distribution risk](#gateway-distribution-risk-kong-oss--added-2026-08-10)). **Owner-approved direction:** stay on 3.9 LTS with the design unchanged; pin `kong:3.9.3` (follow-up manifest PR); watch via release-radar; exit trigger = 3.9 stops receiving patches or an unpatched critical CVE → activate the gateway-strategy backlog RFC (Envoy Gateway / APISIX — free JWKS support dissolves the manual edge-rotation step). Kong Enterprise rejected: buys only edge JWKS automation at enterprise pricing while the role gate stays in-service. |
+| 14 | Gateway distribution risk (added 2026-08-10) | Kong OSS is a frozen 3.9 maintenance line (no 3.10+ exists; unlicensed `kong-gateway` is unusable for KIC DB-less — see [Gateway distribution risk](#gateway-distribution-risk-kong-oss--added-2026-08-10)). **Resolution (2026-08-10): the owner activated the exit trigger proactively — the edge migrates to Envoy Gateway per [RFC-0024](../RFC-0024/README.md)** (greenfield cutover; this RFC implements against that edge). Kong Enterprise stays rejected. |
 
 ---
 

@@ -82,6 +82,17 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- RFC-0024 (replatform edge and identity — Envoy Gateway + Keycloak in one
+  greenfield cutover; RFC-0022's implementation is absorbed as program phases,
+  its design record stands): research
+  distilled from the verified comparison report (criteria matrix, observability
+  and rate-limit deep-dives, ~150-file blast radius), provisional RFC (greenfield
+  cutover, Keycloak via remoteJWKS, local-first rate limiting, full Kong
+  config/monitoring decommission with docs archived read-only), RFC-0022
+  amendments (exit trigger activated; Kong rotation runbook superseded before
+  being built), and the KubeCon SecurityPolicy notes committed as reference
+  material (the Vietnamese review report stays untracked — `*.vi.md` is
+  gitignored).
 - RFC-0023 (basic Backoffice portal + first `protected` business APIs): research
   with fleet-wide endpoint-gap audit + Context7 log, provisional RFC, and index
   updates.

@@ -17,10 +17,11 @@
 - [research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
 - Context7 audit complete (see research [audit log](./research.md#context7-audit-log))
 - Owner approved **ready for RFC**
-- **Hard dependency: [RFC-0022](../RFC-0022/README.md)** — the `admin-portal` OIDC
-  client, the `backoffice_admin` realm role, role claims in tokens
-  (`realm_access.roles`), and `pkg/authmw` role normalization are RFC-0022
-  deliverables; this RFC's implementation cannot start before they land
+- **Hard dependency: the [RFC-0022](../RFC-0022/README.md) identity design record,
+  delivered by [RFC-0024](../RFC-0024/README.md)'s program** — the `admin-portal`
+  OIDC client, the `backoffice_admin` realm role, role claims in tokens
+  (`realm_access.roles`), and `pkg/authmw` role normalization; this RFC's
+  implementation cannot start before RFC-0024's identity phases land
 - Mechanism deep-dive and the as-built gap audit live in [./research.md](./research.md)
 - When Status → **`Accepted`**: expected ADRs listed in
   [Resulting decisions](#resulting-decisions); expected [`docs/api/`](../../../api/README.md)

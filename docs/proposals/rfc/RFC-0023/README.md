@@ -43,7 +43,9 @@ commands to their first caller) plus **all** read-only views: cross-customer ord
 payments (including attempts and reconciliation discrepancies), shipments, customer
 profiles, and the dashboard. **Slice B (this RFC, shipped second)** — product/catalog
 writes: create, edit, publish/archive on a net-new lifecycle, and categories. No
-`admin-service`, no admin database, no BFF, no SSR. Refunds, forced order or shipment
+admin **backend** service, no admin database, no BFF, no SSR — the `admin-service`
+repository (owner-chosen name) contains only the static Admin Portal SPA, not a Go
+service. Refunds, forced order or shipment
 transitions, payment-state mutation, and bulk actions are explicitly deferred; the
 order `manual_review` resolution — today a raw-SQL runbook — is named the flagship
 follow-up command once the protected conventions exist.
@@ -98,7 +100,9 @@ letting `internal` routes drift into accidental admin endpoints.
 ### Non-Goals
 
 - Replacing Keycloak Admin Console; identity lifecycle stays there.
-- An `admin-service`, shared admin database, or BFF in the first release.
+- An admin **backend** service, shared admin database, or BFF in the first release
+  (note: `admin-service` is the SPA repository's name, not a Go service — no domain
+  logic or database lives there).
 - Next.js, React Server Components, TanStack Start, SSR, SEO, or edge deployment.
 - Calling `/internal/` routes from a browser; direct DB or ClickHouse access from the
   frontend (no analytics client in the browser).
@@ -289,7 +293,9 @@ reads only and own no business data.
 
 ### Frontend architecture
 
-Repository `frontend-admin` (name final at implementation), mirroring the customer
+Repository **`admin-service`** (owner-chosen, 2026-08-10 — the name denotes the Admin
+Portal SPA; despite the `-service` suffix it is a static frontend, not a Go domain
+service), mirroring the customer
 SPA's proven build/serve/test patterns:
 
 ```text
@@ -560,7 +566,8 @@ schema exists anywhere.
   only; form error mapping; unsaved-change guard; keyboard/focus; axe checks; no tokens
   in logs/reports.
 - **Clean rebuild**: one command brings up Keycloak, services, Kong, seeds, and both
-  SPAs; the admin demo account works end-to-end; no `admin-service` exists; full
+  SPAs; the admin demo account works end-to-end; no admin **backend**/BFF or admin
+  database exists (the `admin-service` repo ships static assets only); full
   [local-stack E2E release audit](../../../../local-stack/docs/e2e-audit.md) gates the
   tags.
 
@@ -590,6 +597,10 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   keycloak-js and zod confirmed after researched comparisons vs `oidc-client-ts` and
   valibot; detailed product lifecycle/categories/audit proposal added; the
   `product-design` skill named the portal's UI design authority.
+- 2026-08-10 — Final open items closed: `manual_review` resolve stays a **Future**
+  command outside the MVP slices (own safety review); the SPA repository is named
+  **`admin-service`** (a static frontend despite the suffix — no admin backend, BFF,
+  or database exists; RFC wording adjusted to keep the non-goal unambiguous).
 
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)

@@ -81,7 +81,7 @@ services:
   # `server start-dev` bundles frontend (:7233) + Web UI (:8233) in one container
   # and auto-registers the `mop` namespace. In-memory persistence (ephemeral).
   temporal:
-    image: temporalio/temporal:1.7.2
+    image: temporalio/temporal:1.8.2
     command: ["server", "start-dev", "--ip", "0.0.0.0", "--namespace", "mop", "--log-level", "warn"]
     ports:
       - "7233:7233" # frontend gRPC

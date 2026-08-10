@@ -36,15 +36,17 @@ make the `protected` route audience real: new role-gated `/{service}/v1/protecte
 APIs on the owning services, exposed through Kong, verified in-service by `pkg/authmw`
 plus a net-new role gate requiring `backoffice_admin`.
 
-The first version is deliberately narrow. Writes: **product/catalog management**
-(create, edit, publish/archive on a net-new lifecycle; categories) and **inventory
-receipt/adjustment** (wiring inventory's already-built, idempotent, actor-aware stock
-commands to their first caller). Reads: cross-customer operational views over orders,
-payments (including attempts and reconciliation discrepancies), shipments, and customer
-profiles. No `admin-service`, no admin database, no BFF, no SSR. Refunds, forced order
-or shipment transitions, payment-state mutation, and bulk actions are explicitly
-deferred; the order `manual_review` resolution — today a raw-SQL runbook — is named the
-flagship follow-up command once the protected conventions exist.
+The first version is deliberately narrow, and its writes ship in two slices ordered by
+what already exists (owner direction, 2026-08-10): **Slice A (MVP core)** — inventory
+receipt/adjustment (wiring inventory's already-built, idempotent, actor-aware stock
+commands to their first caller) plus **all** read-only views: cross-customer orders,
+payments (including attempts and reconciliation discrepancies), shipments, customer
+profiles, and the dashboard. **Slice B (this RFC, shipped second)** — product/catalog
+writes: create, edit, publish/archive on a net-new lifecycle, and categories. No
+`admin-service`, no admin database, no BFF, no SSR. Refunds, forced order or shipment
+transitions, payment-state mutation, and bulk actions are explicitly deferred; the
+order `manual_review` resolution — today a raw-SQL runbook — is named the flagship
+follow-up command once the protected conventions exist.
 
 Authentication is the Keycloak `admin-portal` public client (Authorization Code + PKCE
 S256) with the `backoffice_admin` role from RFC-0022. Every protected write requires
@@ -185,11 +187,11 @@ Adjustments, Movements, Reservations) · Orders · Payments · Shipments · Cust
 |------|---------------|------------|---------------|
 | Login/logout | Keycloak redirect/session | identity only | RFC-0022 client |
 | Dashboard | Attention cards, partial-data tolerant | read-only | only cards with owning endpoints (low/out-of-stock, `manual_review`/`cancelling` backlogs, payment UNKNOWN attempts + recon discrepancies, recent orders) |
-| Products | List, create, edit, publish, archive | read/write | lifecycle (`DRAFT/ACTIVE/ARCHIVED`) is **net-new** — status column + transition commands + `ACTIVE` filter on public reads |
-| Categories | List, create, edit | read/write | table exists; endpoints net-new |
-| Variants/SKUs | — | — | **out of MVP** (no model exists) |
+| Products | List, create, edit, publish, archive | read/write — **slice B** | lifecycle (`DRAFT/ACTIVE/ARCHIVED`) is **net-new** — see § Product lifecycle |
+| Categories | List, create, edit (no delete) | read/write — **slice B** | table exists; endpoints net-new |
+| Variants/SKUs | — | — | **out of scope** (no model exists) |
 | Inventory balances | Filter by SKU/warehouse; low/out-of-stock views | read-only | shows all four numbers: on_hand, reserved, safety_stock, derived ATP |
-| Inventory receipts / adjustments | Receive stock; adjust with mandatory reason | write | wires the existing idempotent `StockCommand`s (`command_id`, actor from token) |
+| Inventory receipts / adjustments | Receive stock; adjust with mandatory reason | write — **slice A** | wires the existing idempotent `StockCommand`s (`command_id`, actor from token) |
 | Movements / Reservations | Append-only history; reservation inspection | read-only | tables exist; readers net-new |
 | Orders | Cross-customer list + case detail | read-only | unscoped repo path net-new; `manual_review` resolve = flagship Future command |
 | Payments | Cross-customer list, detail incl. attempts + ledger summary + recon discrepancies | read-only | unscoped `Get(id, 0)` path already exists; attempts/ledger/recon readers net-new |
@@ -238,7 +240,7 @@ audit explorer is future work.
 
 ```mermaid
 flowchart TB
-    Operator["Backoffice operator"] --> Portal["Admin Portal<br/>React 19 + Vite + TanStack<br/>admin.duynh.me / :3003 local"]
+    Operator["Backoffice operator"] --> Portal["Admin Portal<br/>React 19 + Vite + TanStack<br/>admin.duynh.me / :3009 local"]
     Portal -->|"Authorization Code + PKCE S256"| Keycloak["Keycloak realm duynhlab<br/>admin-portal client"]
     Portal -->|"Bearer admin token"| Kong["Kong gateway<br/>jwt-edge + rate-limiting-admin<br/>on /protected/ routes"]
 
@@ -317,9 +319,21 @@ tests/                 Playwright (+ axe), same e2e conventions as the customer 
 - **API client**: targets Kong only; attaches the active access token, request-ID and
   idempotency headers; parses the shared error envelope; carries both idempotency
   styles (header vs body `command_id`); never logs tokens or sensitive bodies.
-- **Auth**: keycloak-js, PKCE S256, in-memory tokens (an explicit improvement over the
-  customer SPA's documented localStorage trade-off); no client secret; no custom
-  refresh code.
+- **Auth**: **keycloak-js** — chosen over the standards-portable `oidc-client-ts`
+  (+`react-oidc-context`) after comparison: keycloak-js holds tokens **in memory** by
+  default and speaks Keycloak's session features natively, while `oidc-client-ts`
+  defaults its user store to `sessionStorage` (web storage) and only matches the
+  in-memory posture with extra configuration; the platform is committed to Keycloak
+  (RFC-0022), so vendor alignment costs nothing. PKCE S256, no client secret, no
+  custom refresh code (`updateToken` + login fallback); an explicit improvement over
+  the customer SPA's documented localStorage trade-off. `oidc-client-ts` is the named
+  swap if multi-IdP portability ever matters.
+- **UI design authority**: the owner's **`product-design` skill** — a design contract
+  (semantic tokens in OKLCH, restrained neutral palette, shadcn primitives kept
+  pristine with call-site customization, centralized DataTable/skeleton/empty/error
+  patterns, dense operational typography, no decorative AI styling) whose preferred
+  stack is exactly this RFC's (TanStack Router/Query/Table, Tailwind v4, shadcn/ui).
+  Implementation sessions load the skill when building or reviewing portal UI.
 
 ### Backend deltas (the bigger half — audited in research)
 
@@ -330,10 +344,11 @@ tests/                 Playwright (+ axe), same e2e conventions as the customer 
 3. **inventory**: first HTTP web layer (handlers + error translation + routes) wiring
    the existing `StockCommander`; first Kong route ever for inventory (cluster Ingress
    + local-stack service/upstream) + NetworkPolicy amendment.
-4. **product**: `status` lifecycle column + transition commands + `ACTIVE` filter on
-   public reads; category endpoints; update path (repository methods exist, logic and
-   handlers are new); `product_status_history` audit table; protected lists use
-   standard `page`/`page_size` (public `limit` divergence stays documented).
+4. **product** (slice B — see § Product lifecycle, categories, and audit below):
+   `status` lifecycle column + transition commands + `ACTIVE` filter on public reads;
+   category endpoints; update path (repository methods exist, logic and handlers are
+   new); `admin_action_audit` table; protected lists use standard `page`/`page_size`
+   (public `limit` divergence stays documented).
 5. **order/payment/shipping/user**: unscoped, role-gated list/read paths (order needs a
    new repo method — owner scope is baked into SQL today; payment reuses its unscoped
    `Get`); payment attempts/ledger-summary/reconciliation readers; shipping list; user
@@ -346,11 +361,66 @@ tests/                 Playwright (+ axe), same e2e conventions as the customer 
 7. **CORS + client config**: add the admin origin to both twinned Kong CORS configs in
    the same PR and to the `admin-portal` client's redirect URIs/origins.
 
+### Product lifecycle, categories, and audit (slice B — detailed proposal)
+
+**Lifecycle.** Net-new column on `products`:
+
+```sql
+ALTER TABLE products
+  ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'
+  CHECK (status IN ('DRAFT','ACTIVE','ARCHIVED'));
+ALTER TABLE products ADD COLUMN version BIGINT NOT NULL DEFAULT 1;
+CREATE INDEX idx_products_status ON products (status);
+```
+
+- `DEFAULT 'ACTIVE'` makes the migration **backfill-free**: every existing/seeded row
+  stays publicly visible. Products created via the protected route default to `DRAFT`.
+- Three transition **commands** (no generic status setter — order-service discipline):
+  `publish` (DRAFT→ACTIVE), `archive` (DRAFT|ACTIVE→ARCHIVED), `restore`
+  (ARCHIVED→ACTIVE). Invalid edges → 409 `INVALID_TRANSITION`.
+- Edits use optimistic concurrency: the update carries the expected `version`; a
+  mismatch returns the conflict for the operator to reconcile.
+- Public catalog reads (`ListProducts`, `GetProduct`, `/details`) filter
+  `status = 'ACTIVE'`. **gRPC price reads stay status-blind** (`BatchGetCurrentPrices`
+  keeps resolving ARCHIVED products) so an existing cart holding a just-archived
+  product still prices correctly — checkout's price re-validation remains the guard;
+  the product page 404s. This asymmetry is deliberate and documented in
+  `docs/api/product.md` when implemented.
+
+**Categories.** MVP endpoints: `GET /categories` (paginated), `POST /categories`,
+`PUT /categories/:id`. **No delete**: `products.category_id` references categories
+`ON DELETE SET NULL`, and silently uncategorizing products is a decision that deserves
+its own review; archiving-a-category is future work. No hierarchy (the table is flat).
+
+**Audit.** One table in product's schema covering products and categories, modeled on
+order's proven same-transaction `order_status_history` append:
+
+```sql
+CREATE TABLE admin_action_audit (
+  id             BIGSERIAL PRIMARY KEY,
+  target_type    VARCHAR(16)  NOT NULL CHECK (target_type IN ('product','category')),
+  target_id      INTEGER      NOT NULL,
+  action         VARCHAR(32)  NOT NULL,  -- CREATE / UPDATE / PUBLISH / ARCHIVE / RESTORE
+  actor_sub      VARCHAR(255) NOT NULL,  -- verified token subject
+  reason         VARCHAR(64),
+  changed_fields JSONB,                  -- before/after for UPDATE
+  version_before BIGINT,
+  version_after  BIGINT,
+  request_id     VARCHAR(64),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_admin_audit_target ON admin_action_audit (target_type, target_id, created_at DESC);
+```
+
+The audit row commits **in the same transaction** as the write; a failed audit insert
+fails the command (matching the draft SLO: no successful protected write without its
+audit record). Inventory needs none of this — its movement ledger already is the audit.
+
 ### Local-stack and seed
 
 ```text
-Development:  Vite dev server on :3003        (3002 is Grafana; 3001 is the customer SPA)
-Container:    static build → nginx :80, published 3003:80
+Development:  Vite dev server on :3009        (3002 is Grafana; 3001 is the customer SPA)
+Container:    static build → nginx :80, published 3009:80
 Cluster:      ResourceSet mirroring frontend-rs.yaml — including the mop-chart
               `service.http.port: 80` gotcha (top-level port keys are silently ignored)
 Host:         admin.duynh.me (covered by the existing *.duynh.me wildcard cert)
@@ -444,14 +514,17 @@ record**; one failed dashboard card never blanks the others.
 3. Local-stack Kong audience split (closes the bare-prefix trap) + CORS/redirect-URI
    updates for the admin origin.
 4. SPA foundation: Vite/TanStack/shadcn shell, keycloak-js login, `_authenticated`
-   guard, DataTable/Form conventions.
-5. Product: lifecycle + protected catalog commands + audit table → catalog pages.
-6. Inventory: HTTP layer + first Kong exposure + protected reads/commands → stock pages.
-7. Read-only Order/Payment/Shipping/Customer pages (+ their net-new unscoped reads).
-8. Dashboard, seeds, audit verification, accessibility pass, E2E, documentation
+   guard, DataTable/Form conventions (UI per the `product-design` skill).
+5. **Slice A** — Inventory: HTTP layer + first Kong exposure + protected
+   reads/commands → stock pages; read-only Order/Payment/Shipping/Customer pages
+   (+ their net-new unscoped reads); dashboard.
+6. **Slice B** — Product: lifecycle + protected catalog commands + categories +
+   `admin_action_audit` → catalog pages.
+7. Seeds, audit verification, accessibility pass, E2E, documentation
    (docs/api contracts + `docs/frontend/admin-portal/`).
 
-Steps 5–8 are independently shippable slices behind the same conventions.
+Slice A alone is a complete, useful Backoffice (it retires both live operator pains'
+read paths and the inventory manual fix); slice B follows behind the same conventions.
 
 ### Rollback
 
@@ -495,9 +568,9 @@ schema exists anywhere.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | ADR-042 *(number pending owner confirmation; RFC-0022 holds 039–041)* | Proposed |
-| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | ADR-043 *(pending)* | Proposed |
-| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui | ADR-044 *(pending)* | Proposed |
+| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | ADR-042 *(owner-approved 2026-08-10; counts up past RFC-0022's 039–041)* | Proposed |
+| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | ADR-043 | Proposed |
+| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui — owner-selected | ADR-044 | Proposed |
 
 The MVP write-scope cut (product/inventory only) stays an RFC scope decision, not an ADR.
 
@@ -505,12 +578,18 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
 
 - 2026-08-10 — Research ([./research.md](./research.md)) and provisional RFC created
   from the owner's draft, corrected against a fleet-wide as-built audit (freshly pulled
-  service repos + manifests) and a Context7 audit. Notable corrections: local dev port
-  :3003 (draft's :3002 is Grafana), product lifecycle/categories labeled net-new,
-  inventory identified as the largest infra delta (first HTTP surface + first Kong
-  route), shipping transitions blocked on a nonexistent FSM, customer search limited by
-  the absence of email/username columns, the local bare-prefix JWT trap, and the order
-  `manual_review` runbook named as the flagship future command.
+  service repos + manifests) and a Context7 audit. Notable corrections: product
+  lifecycle/categories labeled net-new, inventory identified as the largest infra delta
+  (first HTTP surface + first Kong route), shipping transitions blocked on a
+  nonexistent FSM, customer search limited by the absence of email/username columns,
+  the local bare-prefix JWT trap, and the order `manual_review` runbook named as the
+  flagship future command.
+- 2026-08-10 — Owner decisions recorded: TanStack stack selected (ADR-044); MVP writes
+  sliced inventory-first (slice A) with product/catalog writes as slice B; local port
+  **:3009**; ADR numbers 042–044 confirmed; priority P2 sequenced after RFC-0022;
+  keycloak-js and zod confirmed after researched comparisons vs `oidc-client-ts` and
+  valibot; detailed product lifecycle/categories/audit proposal added; the
+  `product-design` skill named the portal's UI design authority.
 
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)

@@ -330,7 +330,7 @@ verifier wiring.
 | Inventory reachability | no Kong route, no Ingress, NetworkPolicy allows only in-cluster gRPC callers | first-ever inventory Ingress + local Kong service/upstream + NetworkPolicy amendment |
 | SPA deployment | `frontend-rs.yaml` ResourceSet, mop chart, **`service.http.port: 80` gotcha** (old top-level port keys silently ignored → chart default 8080 breaks nginx SPA) | second ResourceSet mirrors it, gotcha and all |
 | SPA host | `local.duynh.me` via `ingress-frontend.yaml`; wildcard `*.duynh.me` cert | `admin.duynh.me` — covered by the existing wildcard cert |
-| **Local dev port** | `:3001` SPA, **`:3002` Grafana**, `:8081` reserved by RFC-0022 for Keycloak | draft's `:3002` collides — use **`:3003`** |
+| **Local dev port** | `:3001` SPA, **`:3002` Grafana**, `:8081` reserved by RFC-0022 for Keycloak | draft's `:3002` collides — owner picked **`:3009`** |
 | `protected` in older docs | RFC-0010 once read `protected` as a *signed-webhook* class | superseded by RFC-0022's role-gate reading — reconcile explicitly in api.md |
 
 ---
@@ -342,7 +342,7 @@ All **planned** — no manifests exist yet.
 ```mermaid
 flowchart LR
     subgraph LS["local-stack (planned)"]
-        Admin["admin-portal container<br/>:3003 → :80"] -.-> KongL["Kong :8080<br/>+ protected routes<br/>+ CORS :3003"]
+        Admin["admin-portal container<br/>:3009 → :80"] -.-> KongL["Kong :8080<br/>+ protected routes<br/>+ CORS :3009"]
         KC["Keycloak :8081<br/>admin-portal client"] -.-> Admin
     end
     subgraph K8S["cluster (planned)"]
@@ -380,9 +380,12 @@ RFC creates it.
 | **Admin BFF first** | One endpoint for the UI; simple dashboards | Another service/deployment/failure mode before any screen exists; MVP screens are single-domain; revisit trigger stays documented |
 | **Expose `/internal/` to the browser** | Less backend work | Internal routes lack browser auth, roles, audit, stable schemas; violates the api.md fence rule |
 
-The primary direction (separate TanStack SPA, direct-to-owning-services, no BFF) is the
-draft's; formally it stays **undecided until the RFC review**. The stack question is the
-one alternative with a real counter-case — the tradeoff is recorded honestly above.
+**Owner decision (2026-08-10): the TanStack stack is selected.** The
+"reuse customer stack" tradeoff above stays recorded as the road not taken; the RFC
+review ratifies rather than reopens it. Two supporting facts: shadcn's official
+data-table pattern is built on TanStack Table, and the owner's `product-design` skill
+(the portal's UI design authority — see the RFC) names this exact stack (TanStack
+Router/Query/Table, Tailwind v4, shadcn/ui) as its preferred foundation.
 
 ---
 
@@ -394,15 +397,15 @@ are marked ★.
 
 | # | Question | Proposed direction |
 |---|----------|--------------------|
-| 1 | RFC / ADR numbers | RFC-0023; ADRs **ADR-042..044** — RFC-0022 reserved 039–041 which don't exist as folders yet ★ (flag: if 0022's ADRs shift, renumber before creating folders) |
-| 2 | Admin portal hostname + local port | `admin.duynh.me` (wildcard cert covers it); local dev/container **:3003** — draft's :3002 is Grafana ★ |
+| 1 | RFC / ADR numbers | RFC-0023; ADRs **ADR-042..044** — **owner-approved 2026-08-10** (numbers keep counting up past RFC-0022's reserved 039–041) |
+| 2 | Admin portal hostname + local port | `admin.duynh.me` (wildcard cert covers it); local dev/container **:3009** (owner pick, 2026-08-10) — draft's :3002 is Grafana ★ |
 | 3 | Package versions | Pin in `package.json`/lockfile at implementation; the RFC pins responsibilities, not versions (per draft) |
-| 4 | OIDC adapter + token storage | **keycloak-js**: PKCE S256 default since KC 24, tokens held in memory on the instance, `updateToken(minValidity)` refresh, no custom refresh code. No tokens in `localStorage` (improves on the customer SPA's known XSS trade-off) |
-| 5 | Form validation library | **zod** — already the platform's validation language (customer SPA, zod 4) and a Standard Schema: TanStack Form consumes it **directly, no adapter** (verified) |
-| 6 | Product lifecycle vocabulary | `DRAFT / ACTIVE / ARCHIVED` as a **net-new** `status` column + CHECK; public reads gain `WHERE status = 'ACTIVE'`; publish/archive are explicit transition commands, not a generic status setter (order-service discipline copied) |
+| 4 | OIDC adapter + token storage | **keycloak-js** (comparison researched, see below): PKCE S256 default since KC 24, tokens held **in memory** on the instance, `updateToken(minValidity)` refresh, Keycloak-native session/SSO features, zero custom refresh code. The standards-portable alternative, `oidc-client-ts` (+`react-oidc-context` hooks), defaults its `userStore` to **`sessionStorage`** — tokens in web storage unless overridden to its `InMemoryWebStorage`, at which point its UX equals keycloak-js with more configuration. Since RFC-0022 commits the platform to Keycloak, the vendor adapter wins on posture (in-memory by default — stricter than the customer SPA's localStorage) and simplicity; `oidc-client-ts` stays the named swap if multi-IdP portability ever matters |
+| 5 | Form validation library | **zod** (comparison researched): zod 4 is already the platform's validation language (customer SPA), and it is a Standard Schema — TanStack Form consumes it **directly, no adapter** (verified). **valibot** is the bundle-size alternative (~1.4 kB vs ~17.7 kB for the same login schema; Zod Mini ~6.9 kB) — a real ~90% saving that does not matter for an internal admin portal, and not worth a second validation language across the two SPAs. Recorded as the swap if bundle size ever becomes a constraint |
+| 6 | Product lifecycle vocabulary | `DRAFT / ACTIVE / ARCHIVED` as a net-new `status` column — detailed proposal in the RFC (§ Product lifecycle): `DEFAULT 'ACTIVE'` so existing rows need no backfill; protected creates default `DRAFT`; three transition commands (`publish` DRAFT→ACTIVE, `archive` DRAFT/ACTIVE→ARCHIVED, `restore` ARCHIVED→ACTIVE) — no generic status setter (order-service discipline); public catalog reads filter `ACTIVE`; **gRPC price reads stay status-blind** so existing carts holding a just-archived product still resolve (checkout's price re-validation is the guard); `version` column for optimistic concurrency on edits |
 | 7 | Inventory protected schemas | Derive 1:1 from the existing `StockCommand` domain type (`command_id`, `sku_id`, `warehouse_id`, delta, `reason`; `actor` from token) — the commands are already built and idempotent |
-| 8 | Categories and variants in slice 1? | **Categories yes** (table exists; CRUD is cheap); **variants no** — no model exists; defer to a Product refactor RFC (draft's "Required after Product refactor" made explicit) |
-| 9 | Product audit model | Copy the order pattern: a `product_status_history`/revision table appended in the same TX as the write (order_status_history is the proven shape) |
+| 8 | Categories and variants in slice 1? | **Categories yes** — table exists; MVP endpoints are `GET/POST /categories` + `PUT /categories/:id` only (**no delete**: products reference categories `ON DELETE SET NULL` and deletion semantics deserve their own decision); no hierarchy. **Variants no** — no model exists; defer to a Product refactor RFC |
+| 9 | Product audit model | One `admin_action_audit` table in product's schema covering products **and** categories (`target_type` + `target_id`, `action`, `actor_sub`, `reason`, `changed_fields JSONB`, `version_before/after`, `request_id`, `created_at`) — same-transaction append, modeled on order's proven `order_status_history`; detailed sketch in the RFC |
 | 10 | Dashboard cards | Only cards whose endpoints exist in the MVP: low/out-of-stock count (inventory balances), `manual_review` + `cancelling` backlog (gauges already exported), payment UNKNOWN-attempts + recon discrepancies (new reads), recent orders. No card without an owning endpoint |
 | 11 | Customer fields safe for operators | `user_id`, first/last name, phone — **email/username cannot be searched: the columns don't exist in user-service** (identity claims live in Keycloak); Keycloak Admin Console stays the identity lookup ★ |
 | 12 | Pagination/filter/sort defaults | Platform standard `page`/`page_size` (20/100 cap) + allowlisted sort fields per list; protected product routes use the standard and do **not** inherit the public `limit` divergence |
@@ -412,6 +415,7 @@ are marked ★.
 | 16★ | Shipping status views | Read-only list/detail shows the **as-built** vocabulary (`pending`/`cancelled` from code; seed-only values labelled); transitions stay Future, gated on a shipping-FSM effort — the draft's transition endpoint cannot exist before an FSM does |
 | 17★ | Order `manual_review` resolve | Named the **flagship Future command**: everything exists server-side (`ResolveManualReview`, actor discipline, history) except the surface; MVP ships the read/case view, the command follows under the protected conventions |
 | 18★ | api.md protected conventions | This RFC amends `docs/api/api.md` with the protected ruleset (role, actor_sub, audit, idempotency, pagination) and reconciles RFC-0010's old webhook-class reading |
+| 19★ | MVP write-scope slicing | **Owner direction (2026-08-10): keep it simple — inventory first.** Slice A (MVP core) = inventory writes (receive/adjust — the commands already exist) + **all** read-only views + dashboard: the thinnest useful Backoffice, fixing the live operator pains with near-zero domain modelling. Slice B (still in this RFC's scope, shipped second) = product catalog writes (lifecycle + categories + audit — the net-new modelling). The draft's "product and inventory writes together" ordering is replaced by this sequencing |
 
 ---
 
@@ -475,6 +479,8 @@ that require `backoffice_admin` and log the actor.
 | shadcn/ui's official Data Table doc is built on TanStack Table (`columnHelper`, `DataTable`, `DataTablePagination`) | Context7 `/shadcn-ui/ui` | confirmed |
 | keycloak-js: PKCE S256 **default since Keycloak 24**; tokens held on the instance (in-memory); `updateToken(minValidity)` + login() fallback is the refresh pattern | Context7 `/keycloak/keycloak` (JS adapter + release notes) | confirmed |
 | shadcn/ui on React 19 + Tailwind v4 works in this platform | as-built evidence: `frontend/package.json` + `components.json` (style `base-nova`, 19 primitives) | confirmed |
+| oidc-client-ts defaults `userStore` to `sessionStorage` (web storage); in-memory requires opting into `InMemoryWebStorage`; silent renew via `automaticSilentRenew` | Context7 `/authts/oidc-client-ts` (UserManagerSettings source) | confirmed — informs the keycloak-js recommendation |
+| valibot vs zod bundle: ~1.4 kB vs ~17.7 kB (Zod Mini ~6.9 kB) for the same login schema; both are Standard Schemas | Context7 valibot comparison guide | confirmed — zod kept for platform consistency |
 
 ---
 

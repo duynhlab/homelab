@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 # What's next?
 
 <!-- ============================================================================
-CHANGELOG format — Kong-gateway-changelog style (developer.konghq.com/gateway/changelog),
-adapted to this platform. This comment is the authoring template; it never renders.
+CHANGELOG format — release entries grouped Category → Component (a structure we
+liked in other projects' changelogs, adapted to this platform). This comment is
+the authoring template; it never renders.
 
 Shape (inside [Unreleased] and every release cut from it):
 
@@ -18,7 +19,7 @@ Shape (inside [Unreleased] and every release cut from it):
   - One bullet per change. Lead with the outcome; name the alert/RFC/service/file
     that anchors it; keep the "why" to one clause. Link PRs/RFCs/ADRs when useful.
 
-Categories (fixed order, omit empty — Kong vocabulary):
+Categories (fixed order, omit empty):
   Breaking Change   removals, contract/behavior breaks, migrations required
   Feature           new capability, new doc/RFC/ADR/runbook/alert, recorded evidence
   Bugfix            anything corrected: code, manifests, alerts, docs, runbooks, claims
@@ -28,14 +29,14 @@ Categories (fixed order, omit empty — Kong vocabulary):
 
 Components (pick the closest; add a new one only when none fits):
   GitOps            Flux, clusters/, apps/, ResourceSets, bootstrap, storage jobs
-  Gateway           Kong, ingress, CORS, edge plugins
+  Gateway           edge gateway, ingress/routes, CORS, edge policies
   Observability     alerts, dashboards, runbooks, OTel, collectors, ClickHouse, audits
   Databases         CNPG, poolers, Barman/DR, isolation, drills
   Secrets           OpenBAO, ESO
   Security          Kyverno, NetworkPolicy, PSS
   Services          service/worker manifests, fleet pins, mockpay
   Temporal          Temporal server/config, worker versioning
-  Local-stack       compose, seeds, local Kong, E2E harness
+  Local-stack       compose, seeds, local gateway, E2E harness
   Docs              docs/ content that is not a proposal (api contracts, guides, catalogs)
   Proposals         RFC/ADR lifecycle: opened, amended, status flips, index/backlog
   CI                workflows, release tooling

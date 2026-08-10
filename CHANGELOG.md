@@ -7,48 +7,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # What's next?
 
+<!-- ============================================================================
+CHANGELOG format — Kong-gateway-changelog style (developer.konghq.com/gateway/changelog),
+adapted to this platform. This comment is the authoring template; it never renders.
+
+Shape (inside [Unreleased] and every release cut from it):
+
+  ### <Category>        h3 — one per category present, in this fixed order
+  #### <Component>      h4 — one per component touched, omit empty ones
+  - One bullet per change. Lead with the outcome; name the alert/RFC/service/file
+    that anchors it; keep the "why" to one clause. Link PRs/RFCs/ADRs when useful.
+
+Categories (fixed order, omit empty — Kong vocabulary):
+  Breaking Change   removals, contract/behavior breaks, migrations required
+  Feature           new capability, new doc/RFC/ADR/runbook/alert, recorded evidence
+  Bugfix            anything corrected: code, manifests, alerts, docs, runbooks, claims
+  Performance       latency/resource improvements
+  Dependency        version pins & bumps: images, charts, service fleet pins, pkg modules
+  Deprecation       marked-for-removal notices
+
+Components (pick the closest; add a new one only when none fits):
+  GitOps            Flux, clusters/, apps/, ResourceSets, bootstrap, storage jobs
+  Gateway           Kong, ingress, CORS, edge plugins
+  Observability     alerts, dashboards, runbooks, OTel, collectors, ClickHouse, audits
+  Databases         CNPG, poolers, Barman/DR, isolation, drills
+  Secrets           OpenBAO, ESO
+  Security          Kyverno, NetworkPolicy, PSS
+  Services          service/worker manifests, fleet pins, mockpay
+  Temporal          Temporal server/config, worker versioning
+  Local-stack       compose, seeds, local Kong, E2E harness
+  Docs              docs/ content that is not a proposal (api contracts, guides, catalogs)
+  Proposals         RFC/ADR lifecycle: opened, amended, status flips, index/backlog
+  CI                workflows, release tooling
+
+Rules:
+  - New entries go to the TOP of the matching category+component in [Unreleased];
+    create missing category/component headings in the fixed order above.
+  - Released sections ([X.Y.Z]) are APPEND-ONLY — never rewrite history (older
+    releases keep whatever format they shipped with).
+  - Cutting a release: rename [Unreleased] → [X.Y.Z] - YYYY-MM-DD (condensing
+    entries is fine), then re-create an empty [Unreleased] directly below this
+    comment.
+
+Skeleton (copy what you need):
+
+### Breaking Change
+#### <Component>
+- ...
+
+### Feature
+#### <Component>
+- ...
+
+### Bugfix
+#### <Component>
+- ...
+
+### Performance
+#### <Component>
+- ...
+
+### Dependency
+#### <Component>
+- ...
+
+### Deprecation
+#### <Component>
+- ...
+============================================================================= -->
+
 ## [Unreleased]
 
-### Added
+### Feature
 
-- `docs/api/temporal.md` (renamed from `temporal-order-fulfillment.md`): Part 2 is
-  now one section per workflow — `AbandonedCheckoutWorkflow` documented for the
-  first time, `CancellationWorkflow` given its first diagram, and a "which
-  workflow, when" overview. Four new Mermaid diagrams; all 18 rendered and
-  inspected.
+#### Proposals
+
 - RFC-0023 (basic Backoffice portal + first `protected` business APIs): research
   with fleet-wide endpoint-gap audit + Context7 log, provisional RFC, and index
   updates.
 - RFC-0022 (Keycloak as the platform identity provider; retire auth-service):
   research with fleet-wide as-built audit + Context7 log, provisional RFC, and
   index/backlog updates.
+- **ADR-038 (Proposed)** — promote the copied gin tracing/logging middleware into
+  a new Layer 1 module `pkg/httpmw`. Audit findings F-1 and F-2 are the same
+  duplication seen twice: eleven near-identical copies, and the skip list the
+  contract claims they share exists in only one of the pair. The ADR records one
+  design constraint that makes or breaks the module — `obsx` is Layer 2 and
+  `pkg`'s own rules forbid importing it, so `httpmw` must build the
+  trace-context field from the OpenTelemetry **API** rather than calling
+  `obsx.TraceContext`. Direction only: the F-1/F-2 fix still lands as eleven
+  in-place patches, so this is not on the critical path.
+
+#### Observability
+
+- Telemetry audit findings log added at
+  [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
+  — the `api/observability.md` contract measured against the deployed platform.
+  Six findings, four falsified suspicions (one of them my own bad test), and an
+  explicit compliant list so the next audit can diff instead of re-deriving.
+- E2E #1 evidence recorded in the telemetry audit: the local-stack release audit
+  run that gates the pkg per-module split. All Phase A/B/C rows pass on 47/47
+  healthy services, so the module split is runtime-neutral. The same run captured
+  the pre-fix F-1/F-2 baseline that E2E #2 has to move — **96.2% of all exported
+  log records are successful-probe access logs**.
+- `InventoryReserveUnknownSKU` (critical, count-once) — a reservation hit a
+  SKU inventory does not track: a data gap on the money path that checkout's
+  fail-closed layer cannot see mid-flight. `PaymentReconciliationWindowViolation`
+  (warning) — the provider ignored its window bounds; rows excluded, watermark
+  held, re-scan guaranteed. Runbooks for both; the discrepancy runbook and
+  metrics catalog follow the `kind`→`class` rename and the new `stage` label.
+
+#### Databases
+
+- **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
+  Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
+  stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;
+  the two DR drills that only make sense on durable hardware (C promotion, D
+  platform-db restore) are deferred to RFC-0011 with the reason recorded.
+- `scripts/db-isolation-sweep.sh` — the RFC-0012 P4 role×database isolation
+  matrix as the scripted psql sweep ADR-015 promised: credential-free (a
+  forbidden pair rejects at pg_hba BEFORE auth; an allowed pair probed with a
+  wrong password fails AT auth — the error message is the verdict), covering
+  product-db (6 allow / 30 reject) and platform-db (8 allow / 41 reject),
+  exit-code gated for Drill Day.
+
+#### Docs
+
+- `docs/api/temporal.md` (renamed from `temporal-order-fulfillment.md`): Part 2 is
+  now one section per workflow — `AbandonedCheckoutWorkflow` documented for the
+  first time, `CancellationWorkflow` given its first diagram, and a "which
+  workflow, when" overview. Four new Mermaid diagrams; all 18 rendered and
+  inspected.
 - `docs/api` governance: the contract/service-README/service-AGENTS ownership
   boundary, a four-class mismatch procedure whose "implementation violates the
   contract" class blocks the release tag, and an author checklist in
   `_template-service.md`.
+
+#### Services
+
 - Kind E2E (#3) evidence for the pinned fleet: 11/11 services on their pinned
   tag, 0 probe access records, native trace id on 12/12 HTTP access records.
 
-### Changed
+### Bugfix
 
-- RFC-0022 amended: the Kong OSS distribution risk is recorded (OSS frozen at
-  the 3.9 LTS line; direction: pin `kong:3.9.3`, release-radar watch, explicit
-  exit trigger, gateway-strategy backlog row) and Backoffice references now
-  point at RFC-0023.
-
-### Fixed
-- Temporal docs drift: the worker build id disagreed three ways (`1-13-0` /
-  `1.13.1` / the manifest's `1.13.2`), `workflows.md` linked a manifest that does
-  not exist and offered a removed RPC as a current activity example, and the
-  Grafana Temporal dashboard was marked Planned although it ships.
-- `docs/api/pkg.md` rewritten for the per-module `pkg`: 13 independently tagged
-  modules, the import layering, per-module bump/release mechanics, and a release
-  ledger split into the per-module and single-module lines.
-- The same single-module claim corrected in `api.md`, `observability.md`,
-  `opentelemetry/{README,fundamentals}.md` and the `AGENTS.md` E2E gate; `pkg`
-  added to both ownership tables and the docs/api map.
-- `mockpay` realigned with `payment` 1.5.3, per the rule the manifest already
-  states; verified `internal/mockpay/` changed by zero lines across the range.
+#### Observability
 
 - **F-1 corrected a second time, and the severity goes back up.** The first
   restatement said nine of eleven services already carried trace context on the
@@ -61,6 +163,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   logger but never binds the context; `inventory` has no HTTP middleware at all.
   Zero probe records carry the field, which does confirm the first correction's
   central point. The fix is now 8 one-word swaps plus one missing call.
+- **Audit finding F-1 restated after reading the code.** The measurement stands
+  (33 327 of 33 348 correlated log rows lack the native `TraceId`); the diagnosis
+  does not. The otelzap bridge is fine — `Core.With` retains a context field and
+  `Write` emits with it — and 9 of 11 services already pass `obsx.TraceContext`.
+  The real defect is narrower: `GetTraceID` **fabricates a random trace id when
+  there is no span**, so probe logs advertise a correlation that cannot exist,
+  and `auth`/`inventory` never pass the context at all. Severity drops from high
+  to medium, and F-2's probe filtering now removes most of the symptom as a side
+  effect.
 - **The alert guarding the metrics pipeline could not report the first failure.**
   `OtelMetricsPipelineExportFailures` — whose own comment calls the push pipeline
   "a dependency of every alert above" — used
@@ -71,31 +182,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have surfaced only as every dashboard quietly going stale. Now
   `sum(increase(...[15m])) > 0` with `for: 0m`, the fifth rule of this class
   corrected.
-- **Kong's redis-shorthand deprecation notice was the entirety of its stored WARN
-  volume** — 3840 of 3840 records in the 90-day ClickHouse store, with no real
-  Kong warning present. The platform config is already the non-deprecated nested
-  `redis:` form in both the cluster plugins and local-stack; Kong 3.9.3
-  materialises the whole deprecated shorthand set from those values at
-  declarative-config load and warns on each (`redis_ssl` and `redis_ssl_verify`
-  warn just as often and appear nowhere in this repo). Dropped at the collector
-  with the reasoning recorded, so the notice stops buying retention cost and real
-  Kong warnings become visible again; it disappears on its own at the Kong 4.0
-  bump.
-- **The RustFS bucket gate reported success without creating anything.** On a
-  fresh `make up` (2026-08-07) Tempo crash-looped on
-  `The specified bucket does not exist` even though
-  `Job/rustfs-setup-buckets-init` was `Complete` and had logged all three
-  buckets created. The wait loop tested `mc alias set` — which can succeed
-  against an endpoint whose disk is not open yet — and, worse, **fell through
-  after ten failed attempts and created buckets anyway with no non-zero exit**.
-  RustFS opened `/data` 70s later and found it empty. Flux's `wait: true` read
-  the Complete Job as a satisfied dependency and released `tracing-local` and
-  `profiling-local` onto buckets that were never written; `pg-backups-cnpg` was
-  missing too, so Barman archiving would have failed next. The gate now waits on
-  `mc ls` (serving, not merely reachable) for up to 5 minutes, stats every
-  bucket after creating it, and **exits non-zero** on either failure so the
-  retry actually happens. Same fix in the `*/30` CronJob, which carried an
-  identical copy.
 - **Four count-once alerts could not fire on the event they exist for.** Proven
   on a live cluster: after exactly one unknown-SKU checkout, the raw counter read
   `1`, `increase(...[10m])` read `1`, and `rate(...[5m])` read **`0`** — the
@@ -128,19 +214,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   claimed 37 instruments across 10 services against 63 across 11 — it was
   missing the `inventory` section entirely, so neither of inventory's business
   metrics was documented anywhere, and four per-service counts were stale.
+- **Kong's redis-shorthand deprecation notice was the entirety of its stored WARN
+  volume** — 3840 of 3840 records in the 90-day ClickHouse store, with no real
+  Kong warning present. The platform config is already the non-deprecated nested
+  `redis:` form in both the cluster plugins and local-stack; Kong 3.9.3
+  materialises the whole deprecated shorthand set from those values at
+  declarative-config load and warns on each (`redis_ssl` and `redis_ssl_verify`
+  warn just as often and appear nowhere in this repo). Dropped at the collector
+  with the reasoning recorded, so the notice stops buying retention cost and real
+  Kong warnings become visible again; it disappears on its own at the Kong 4.0
+  bump.
+- **`CNPGWALArchiveFailing` verified by injection, and its runbook corrected.**
+  Scaling the RustFS object store to zero for 19 minutes drove the alert through
+  pending → firing → resolved exactly as the 2026-08-07 hardening intended, with
+  the idle-cluster arm holding (the second cluster paged only because it really
+  had 36 failures on an in-flight segment). Measured outage-to-page latency is
+  **18 minutes**, so the runbook now says plainly that this alert confirms stuck
+  archiving rather than warning early, and tells the responder to check `pg_wal`
+  space first. Its `Meaning` section still quoted the old single-arm expression
+  and now describes both arms. Also recorded: Tempo and Pyroscope survived the
+  same outage without a restart — a crash-looping Tempo means a *missing bucket*,
+  not an unreachable store, so its health is not a proxy for the object store's.
+- **`CNPGWALArchiveFailing` requires no progress, not just a failure.** A planned
+  promotion always fails exactly one archive (the new timeline's `.history`
+  file), and `increase(failed_count[30m]) > 0` then held a critical alert for 30
+  minutes on a cluster that was archiving perfectly — measured twice. The rule
+  now adds `and increase(archived_count[15m]) == 0`; `archive_timeout: 5min`
+  advances `archived_count` ~3 times per 15m window on both clusters, so the
+  no-progress clause carries a 3x margin and the post-promotion blip is
+  suppressed. Verified empty against the live series before shipping.
+- `CheckoutAvailabilityErrors` runbook now warns that reproducing the alert needs
+  sustained traffic: the `[10m]` ratio window and `for: 10m` debounce are the same
+  length, so a burst expires exactly as the debounce matures (measured both ways).
 
-- **ADR-026 shipped without its paper trail.** The CNPG PgBouncer `Pooler`
-  `platform-db-pooler-rw` has fronted `platform-db` since the pilot rolled out —
-  no `pgdog-platform` HelmRelease exists in the tree — but the ADR was still
-  `Proposed` / `Not started` and **17 files still described PgDog on that
-  cluster**, including the wrong port (6432 vs PgBouncer's 5432). The worst of
-  them was the rotation runbook, which told an operator to
-  `flux reconcile` and `rollout restart` a Deployment that does not exist:
-  `platform-db` needs **no** pooler step at all, because CNPG configures
-  `auth_query` and PgBouncer reads `pg_shadow` live. ADR-026 flipped to
-  Accepted / Complete with its adoption evidence, docs swept, and the pooler
-  runbook now carries a PgBouncer section covering what differs. RFC-0018's
-  `pgdog-platform` references are marked historical rather than rewritten.
+#### Databases
+
 - **The committed PITR restore manifest had never worked.** The first Drill A run
   (2026-08-07) put `restore-cluster-example.yaml` through a real restore and
   Postgres refused to start: `FATAL: "min_wal_size" must be at least twice
@@ -161,93 +269,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matrix row and reported a false FAIL on its first live run; only `PAIR`-tagged
   lines are verdicts now (85/85 pairs pass, exit 0).
 
-### Changed
+#### Proposals
 
-- **Fleet pinned to the access-log fix**: auth/user/cart/review/shipping
-  **1.4.2**, product **1.11.2**, order **1.13.3**, notification **1.5.2**,
-  payment **1.5.3**, checkout **0.6.3**, inventory **0.4.2**, plus
-  checkout-worker **0.6.3**. Each tag carries three things at once — the
-  per-module pkg v0.36.1 migration, the dependency/toolchain CVE round, and the
-  telemetry-audit F-1/F-2 fix. Gated on local-stack E2E #2: every Phase A/B/C row
-  passed, probe access-log records went **513 664 → 0**, and native trace ids now
-  land on **51/51** HTTP access records against 9 837/14 292 before.
-  checkout-worker moves in one step because `internal/workflow/` changed by zero
-  lines between the tags, so the workflow definition is byte-identical — the same
-  verification its previous move used. **order-worker stays at 1.13.2**: it is the
-  one worker under ADR-030 side-by-side versioning, where a new build is a new
-  manifest plus an activation step, and this change touches no workflow code.
-- **Audit finding F-1 restated after reading the code.** The measurement stands
-  (33 327 of 33 348 correlated log rows lack the native `TraceId`); the diagnosis
-  does not. The otelzap bridge is fine — `Core.With` retains a context field and
-  `Write` emits with it — and 9 of 11 services already pass `obsx.TraceContext`.
-  The real defect is narrower: `GetTraceID` **fabricates a random trace id when
-  there is no span**, so probe logs advertise a correlation that cannot exist,
-  and `auth`/`inventory` never pass the context at all. Severity drops from high
-  to medium, and F-2's probe filtering now removes most of the symptom as a side
-  effect.
-- Telemetry audit findings log added at
-  [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
-  — the `api/observability.md` contract measured against the deployed platform.
-  Six findings, four falsified suspicions (one of them my own bad test), and an
-  explicit compliant list so the next audit can diff instead of re-deriving.
-- **`CNPGWALArchiveFailing` verified by injection, and its runbook corrected.**
-  Scaling the RustFS object store to zero for 19 minutes drove the alert through
-  pending → firing → resolved exactly as the 2026-08-07 hardening intended, with
-  the idle-cluster arm holding (the second cluster paged only because it really
-  had 36 failures on an in-flight segment). Measured outage-to-page latency is
-  **18 minutes**, so the runbook now says plainly that this alert confirms stuck
-  archiving rather than warning early, and tells the responder to check `pg_wal`
-  space first. Its `Meaning` section still quoted the old single-arm expression
-  and now describes both arms. Also recorded: Tempo and Pyroscope survived the
-  same outage without a restart — a crash-looping Tempo means a *missing bucket*,
-  not an unreachable store, so its health is not a proxy for the object store's.
-- `docs/api/` synced to what the RFC-0021 follow-up releases actually do:
-  inventory's reservation path surfaces `SKU_NOT_FOUND` (0.4.1) rather than a
-  generic `NOT_FOUND`, order's bounded failure reasons include `UNKNOWN_SKU`
-  (1.13.2), and payment verifies the provider's transaction window instead of
-  trusting it (1.5.2).
-- Stale in-manifest references corrected: the checkout-worker note named the
-  retired `order-worker-1-13-1.yaml`, and the `auth`/`user` NetworkPolicy
-  headers still credited the removed `pgdog-platform` pooler.
-
-- **`CNPGWALArchiveFailing` requires no progress, not just a failure.** A planned
-  promotion always fails exactly one archive (the new timeline's `.history`
-  file), and `increase(failed_count[30m]) > 0` then held a critical alert for 30
-  minutes on a cluster that was archiving perfectly — measured twice. The rule
-  now adds `and increase(archived_count[15m]) == 0`; `archive_timeout: 5min`
-  advances `archived_count` ~3 times per 15m window on both clusters, so the
-  no-progress clause carries a 3x margin and the post-promotion blip is
-  suppressed. Verified empty against the live series before shipping.
-### Added
-
-- E2E #1 evidence recorded in the telemetry audit: the local-stack release audit
-  run that gates the pkg per-module split. All Phase A/B/C rows pass on 47/47
-  healthy services, so the module split is runtime-neutral. The same run captured
-  the pre-fix F-1/F-2 baseline that E2E #2 has to move — **96.2% of all exported
-  log records are successful-probe access logs**.
-- **ADR-038 (Proposed)** — promote the copied gin tracing/logging middleware into
-  a new Layer 1 module `pkg/httpmw`. Audit findings F-1 and F-2 are the same
-  duplication seen twice: eleven near-identical copies, and the skip list the
-  contract claims they share exists in only one of the pair. The ADR records one
-  design constraint that makes or breaks the module — `obsx` is Layer 2 and
-  `pkg`'s own rules forbid importing it, so `httpmw` must build the
-  trace-context field from the OpenTelemetry **API** rather than calling
-  `obsx.TraceContext`. Direction only: the F-1/F-2 fix still lands as eleven
-  in-place patches, so this is not on the critical path.
-- **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
-  Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
-  stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;
-  the two DR drills that only make sense on durable hardware (C promotion, D
-  platform-db restore) are deferred to RFC-0011 with the reason recorded.
-
-### Changed
-
+- **ADR-026 shipped without its paper trail.** The CNPG PgBouncer `Pooler`
+  `platform-db-pooler-rw` has fronted `platform-db` since the pilot rolled out —
+  no `pgdog-platform` HelmRelease exists in the tree — but the ADR was still
+  `Proposed` / `Not started` and **17 files still described PgDog on that
+  cluster**, including the wrong port (6432 vs PgBouncer's 5432). The worst of
+  them was the rotation runbook, which told an operator to
+  `flux reconcile` and `rollout restart` a Deployment that does not exist:
+  `platform-db` needs **no** pooler step at all, because CNPG configures
+  `auth_query` and PgBouncer reads `pg_shadow` live. ADR-026 flipped to
+  Accepted / Complete with its adoption evidence, docs swept, and the pooler
+  runbook now carries a PgBouncer section covering what differs. RFC-0018's
+  `pgdog-platform` references are marked historical rather than rewritten.
 - **RFC-0007 → `implemented`**: the program is written down and Drill A has
   evidence. Both qualifications are stated rather than glossed — the recurring
   cadence cannot meaningfully run on an ephemeral Kind cluster and activates with
   durable hardware, and the RustFS retention hold is *inapplicable* here (the
   bucket is rebuilt with the cluster; no in-tree prefix survives) rather than
   "lifted".
+- RFC-0007 gains its actual deliverable on paper: a Program section (cadence,
+  named-per-run roles, evidence home, the stale-row liveness rule), and Drill D
+  is re-pointed at reality — the quarterly `platform-db` restore-test that
+  `010.2` already defined, replacing the obsolete Zalando WAL-G row and its
+  three stale references (scenario map, RFC-0005 tie, a broken anchor).
 - **RFC-0012**: P3 rebuild parity and P4 isolation matrix (85/85 pairs) both
   **PASS**; P2 rotation is **blocked, not skipped** — the documented OpenBAO
   break-glass ceremony returns `403` on a cluster with a revoked root, so there
@@ -265,12 +311,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two orders); the reconciler verifies its window. Gameday follow-ups (b) and (c)
   closed too — the one-minute doubt sweep is tested, and the provider-unknown
   counter's park/resolve ambiguity is fixed.
-- `CheckoutAvailabilityErrors` runbook now warns that reproducing the alert needs
-  sustained traffic: the `[10m]` ratio window and `for: 10m` debounce are the same
-  length, so a burst expires exactly as the debounce matures (measured both ways).
+
+#### Docs
+
+- Temporal docs drift: the worker build id disagreed three ways (`1-13-0` /
+  `1.13.1` / the manifest's `1.13.2`), `workflows.md` linked a manifest that does
+  not exist and offered a removed RPC as a current activity example, and the
+  Grafana Temporal dashboard was marked Planned although it ships.
+- `docs/api/pkg.md` rewritten for the per-module `pkg`: 13 independently tagged
+  modules, the import layering, per-module bump/release mechanics, and a release
+  ledger split into the per-module and single-module lines.
+- The same single-module claim corrected in `api.md`, `observability.md`,
+  `opentelemetry/{README,fundamentals}.md` and the `AGENTS.md` E2E gate; `pkg`
+  added to both ownership tables and the docs/api map.
+- `docs/api/` synced to what the RFC-0021 follow-up releases actually do:
+  inventory's reservation path surfaces `SKU_NOT_FOUND` (0.4.1) rather than a
+  generic `NOT_FOUND`, order's bounded failure reasons include `UNKNOWN_SKU`
+  (1.13.2), and payment verifies the provider's transaction window instead of
+  trusting it (1.5.2).
+
+#### GitOps
+
+- **The RustFS bucket gate reported success without creating anything.** On a
+  fresh `make up` (2026-08-07) Tempo crash-looped on
+  `The specified bucket does not exist` even though
+  `Job/rustfs-setup-buckets-init` was `Complete` and had logged all three
+  buckets created. The wait loop tested `mc alias set` — which can succeed
+  against an endpoint whose disk is not open yet — and, worse, **fell through
+  after ten failed attempts and created buckets anyway with no non-zero exit**.
+  RustFS opened `/data` 70s later and found it empty. Flux's `wait: true` read
+  the Complete Job as a satisfied dependency and released `tracing-local` and
+  `profiling-local` onto buckets that were never written; `pg-backups-cnpg` was
+  missing too, so Barman archiving would have failed next. The gate now waits on
+  `mc ls` (serving, not merely reachable) for up to 5 minutes, stats every
+  bucket after creating it, and **exits non-zero** on either failure so the
+  retry actually happens. Same fix in the `*/30` CronJob, which carried an
+  identical copy.
+- Stale in-manifest references corrected: the checkout-worker note named the
+  retired `order-worker-1-13-1.yaml`, and the `auth`/`user` NetworkPolicy
+  headers still credited the removed `pgdog-platform` pooler.
 - `mockpay.yaml` records that its pin tracks payment by hand only — currently two
   patches behind, no functional skew, but the F1 finding was exactly a skew here.
 
+#### Services
+
+- `mockpay` realigned with `payment` 1.5.3, per the rule the manifest already
+  states; verified `internal/mockpay/` changed by zero lines across the range.
+
+### Dependency
+
+#### Services
+
+- **Fleet pinned to the access-log fix**: auth/user/cart/review/shipping
+  **1.4.2**, product **1.11.2**, order **1.13.3**, notification **1.5.2**,
+  payment **1.5.3**, checkout **0.6.3**, inventory **0.4.2**, plus
+  checkout-worker **0.6.3**. Each tag carries three things at once — the
+  per-module pkg v0.36.1 migration, the dependency/toolchain CVE round, and the
+  telemetry-audit F-1/F-2 fix. Gated on local-stack E2E #2: every Phase A/B/C row
+  passed, probe access-log records went **513 664 → 0**, and native trace ids now
+  land on **51/51** HTTP access records against 9 837/14 292 before.
+  checkout-worker moves in one step because `internal/workflow/` changed by zero
+  lines between the tags, so the workflow definition is byte-identical — the same
+  verification its previous move used. **order-worker stays at 1.13.2**: it is the
+  one worker under ADR-030 side-by-side versioning, where a new build is a new
+  manifest plus an activation step, and this change touches no workflow code.
 - Debt-clearing wave pinned: order `1.13.2` (G2b fault hook
   `ORDER_FAULT_COMMIT_PAUSE`, GameDay-only + the `UNKNOWN_SKU` failure
   reason), inventory `0.4.1` (Reserve answers `SKU_NOT_FOUND` for untracked
@@ -280,35 +384,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   jittered retry on `503` + `Retry-After` — also catches up the never-pinned
   `1.2.0`). Order worker build `1-13-2` staged, `1-13-1` retired (cluster
   down, nothing to drain); activation at the next bring-up.
-
-### Added
-
-- `InventoryReserveUnknownSKU` (critical, count-once) — a reservation hit a
-  SKU inventory does not track: a data gap on the money path that checkout's
-  fail-closed layer cannot see mid-flight. `PaymentReconciliationWindowViolation`
-  (warning) — the provider ignored its window bounds; rows excluded, watermark
-  held, re-scan guaranteed. Runbooks for both; the discrepancy runbook and
-  metrics catalog follow the `kind`→`class` rename and the new `stage` label.
-
-### Added
-
-- `scripts/db-isolation-sweep.sh` — the RFC-0012 P4 role×database isolation
-  matrix as the scripted psql sweep ADR-015 promised: credential-free (a
-  forbidden pair rejects at pg_hba BEFORE auth; an allowed pair probed with a
-  wrong password fails AT auth — the error message is the verdict), covering
-  product-db (6 allow / 30 reject) and platform-db (8 allow / 41 reject),
-  exit-code gated for Drill Day.
-
-### Changed
-
-- RFC-0007 gains its actual deliverable on paper: a Program section (cadence,
-  named-per-run roles, evidence home, the stale-row liveness rule), and Drill D
-  is re-pointed at reality — the quarterly `platform-db` restore-test that
-  `010.2` already defined, replacing the obsolete Zalando WAL-G row and its
-  three stale references (scenario map, RFC-0005 tie, a broken anchor).
-
-### Changed
-
 - checkout pinned to `0.6.2` (worker follows, same-tag rule): promo lock
   queues answer SQLSTATE `55P03` (contention, a visible 500) instead of dying
   at the query deadline and reading as a fake failover 503; `ExpireDue`

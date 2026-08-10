@@ -589,7 +589,7 @@ lands the order in `confirmed` or `failed`.
 ### 4. Order fulfillment saga
 
 Owner: [order.md](./order.md); step order and compensations:
-[temporal-order-fulfillment.md](./temporal-order-fulfillment.md).
+[temporal.md](./temporal.md).
 
 ```mermaid
 sequenceDiagram
@@ -808,7 +808,7 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 
 - [API documentation index](./README.md)
 - [Microservice map](./microservices.md)
-- [Temporal order fulfillment](./temporal-order-fulfillment.md)
+- [Temporal order fulfillment](./temporal.md)
 - [Kong gateway](../platform/kong-gateway.md)
 - [Application observability](./observability.md) · [Application metrics](./metrics.md) · [Application logging](./logs.md) · [Application tracing](./tracing.md) · [Application profiling](./profiling.md)
 - [Metrics (platform ops)](../observability/metrics/metrics-apps.md)

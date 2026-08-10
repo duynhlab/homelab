@@ -8,7 +8,7 @@
 > verified. It exists as the worked example for the [RFC process](../README.md) and as
 > the single home for Temporal's remaining roadmap (see [Future work](#future-work)).
 > The operational reference — endpoints, deploy/run, ops — stays in
-> [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md);
+> [`docs/api/temporal.md`](../../../api/temporal.md);
 > this RFC owns the *why*, the *design rationale*, and the *roadmap*.
 
 > **Deployment superseded (2026-07-28).** The infrastructure topology and version
@@ -18,7 +18,7 @@
 > `temporalio/helm-charts` release (server 1.31.2) — see
 > [ADR-030](../../adr/ADR-030-temporal-workflow-versioning/) for the re-platform
 > and the Worker Versioning requirement that forced it, and
-> [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md)
+> [`docs/api/temporal.md`](../../../api/temporal.md)
 > for the current topology. The Temporal *adoption* decision (ADR-001) and this
 > RFC's design rationale stand; only the deployment mechanism changed. The
 > "upgrade 1.24.2 → 1.27.x" roadmap item in Future work is obsolete.
@@ -204,7 +204,7 @@ flowchart LR
 
 ## Future work
 
-Owned here (replaces the roadmap previously inline in `temporal-order-fulfillment.md` §9):
+Owned here (replaces the roadmap previously inline in `temporal.md` §9):
 
 - ✅ **Server bump** — shipped past the 1.27.x target: server 1.31.2 via the official chart (ADR-030 re-platform superseding ADR-002).
 - ✅ **Cache-bust on reserve** — `ReserveStock`/`ReleaseStock` invalidate the affected `product:{id}` Valkey keys (product-service; detail-only, list cache left to TTL).
@@ -224,7 +224,7 @@ Owned here (replaces the roadmap previously inline in `temporal-order-fulfillmen
 ## Related
 
 - ADRs: [ADR-001 Adopt Temporal](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002 Deploy via the operator](../../adr/ADR-002-deploy-temporal-via-operator/).
-- Operational reference: [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md).
+- Operational reference: [`docs/api/temporal.md`](../../../api/temporal.md).
 - East-west transport: [shared API guide](../../../api/api.md#grpc-runtime-model).
 
 ---

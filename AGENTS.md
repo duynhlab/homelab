@@ -271,7 +271,7 @@ homelab, **`docs/api/` wins** (file a drift fix in homelab or the service repo).
 | Per-service routes, RPCs, payloads, deployment | [`{service}.md`](docs/api/README.md#service-contracts) |
 | Deployment rollup + status vocabulary + CI column | [`README.md` § Service contracts](docs/api/README.md#service-contracts) |
 | Feature ownership + known gaps | [`microservices.md`](docs/api/microservices.md) |
-| Temporal workflows + saga deep dive | [`workflows.md`](docs/api/workflows.md), [`temporal-order-fulfillment.md`](docs/api/temporal-order-fulfillment.md) |
+| Temporal workflows + saga deep dive | [`workflows.md`](docs/api/workflows.md), [`temporal.md`](docs/api/temporal.md) |
 | Which `pkg` modules exist, how they are tagged, the import layering | [`pkg.md`](docs/api/pkg.md) — **which versions a service pins is its own `go.mod`**, never a doc |
 | Full ownership map | [`README.md` § Document Ownership](docs/api/README.md#document-ownership) |
 

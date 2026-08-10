@@ -312,7 +312,7 @@ focused PRs without waiting for the research gate.
 
 - [RFC-0003](../RFC-0003/README.md) — decision being superseded; its Alternatives table defines options (a)/(b)/(c) reused above.
 - [RFC-0001](../RFC-0001/) (saga), [RFC-0010](../RFC-0010/) + ADR-007..012 (payment), [RFC-0015](../RFC-0015/) + ADR-018/019/020 (checkout), [RFC-0020](../RFC-0020/) (internal TLS — a phase 7 dependency for east-west mTLS).
-- [`docs/api/product.md`](../../../api/product.md), [`order.md`](../../../api/order.md), [`payments.md`](../../../api/payments.md), [`checkout.md`](../../../api/checkout.md), [`temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md) — as-built contracts the audit cross-checked.
+- [`docs/api/product.md`](../../../api/product.md), [`order.md`](../../../api/order.md), [`payments.md`](../../../api/payments.md), [`checkout.md`](../../../api/checkout.md), [`temporal.md`](../../../api/temporal.md) — as-built contracts the audit cross-checked.
 - Temporal docs — *Versioning (Go SDK)* and *Worker Versioning* (worker deployments): patching via `workflow.GetVersion` vs deployment-version pinning.
 - Buf docs — *Breaking rules* (`FIELD_NO_DELETE`/`RPC_NO_DELETE` guidance: deprecate instead of delete) and `buf source edit deprecate`.
 

@@ -33,7 +33,7 @@ availability, but it *asks inventory* for it.
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | None. Historically `ReserveStock` + `ReleaseStock`; the saga now reserves at inventory-service |
 | **Idempotency** | `reservation_id` = order id (historical) |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -175,7 +175,7 @@ Canonical contract: `pkg/proto/product/v1/product.proto`. Server on `:9090`
 `ReserveStock`, `ReleaseStock`, and `GetProducts` are **gone** from the contract
 (pkg v0.33.0 / v0.34.0, product 1.7.0 / 1.8.0) — not deprecated, removed. The
 saga's stock steps are `inventory.v1` RPCs
-([temporal-order-fulfillment.md](./temporal-order-fulfillment.md)).
+([temporal.md](./temporal.md)).
 
 Product is also a gRPC client:
 
@@ -238,7 +238,7 @@ deadline on top of the `pkg/grpcx` default, and an inventory failure resolves to
 |-----------|------|-----------|---------|
 | Inbound | Browser SPA via Kong | HTTP | Catalog browsing, product page |
 | Inbound | checkout | gRPC `BatchGetCurrentPrices` | **Price** re-validation at session create + confirm; availability comes from inventory ([checkout.md](./checkout.md)) |
-| ~~Inbound~~ | ~~order-worker~~ | ~~gRPC `ReserveStock` / `ReleaseStock`~~ | **Gone.** RFC-0021 P4 deleted the saga branch *and* the RPCs; order no longer dials product at all, and the NetworkPolicy allow **was withdrawn** on 2026-08-06 once the pre-P4 worker builds were shown to hold no pinned histories ([temporal-order-fulfillment.md](./temporal-order-fulfillment.md)) |
+| ~~Inbound~~ | ~~order-worker~~ | ~~gRPC `ReserveStock` / `ReleaseStock`~~ | **Gone.** RFC-0021 P4 deleted the saga branch *and* the RPCs; order no longer dials product at all, and the NetworkPolicy allow **was withdrawn** on 2026-08-06 once the pre-P4 worker builds were shown to hold no pinned histories ([temporal.md](./temporal.md)) |
 | Outbound | inventory | gRPC `BatchGetAvailability` | `/details` availability enrichment; soft-fail to `status: unknown` ([inventory.md](./inventory.md)) |
 | Outbound | review | gRPC `GetProductReviews` | Product-details enrichment ([review.md](./review.md)) |
 | Outbound | product DB via PgDog | Postgres | All persistence |
@@ -317,7 +317,7 @@ Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-servic
 - [api.md](./api.md) — shared HTTP/gRPC rules, error envelope, pagination, gRPC runtime model
 - [workflows.md](./workflows.md) — Temporal workflow registry
 - [Service contracts](./README.md#service-contracts)
-- [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga deep dive
+- [temporal.md](./temporal.md) — saga deep dive
 - [checkout.md](./checkout.md) · [review.md](./review.md) — dependency contracts
 - [Application caching](./caching.md) — cache-aside pattern theory
 - [Caching (platform)](../caching/README.md) — Valkey deployment and ops

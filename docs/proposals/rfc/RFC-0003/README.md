@@ -226,7 +226,7 @@ no data migration and no behavioral change to roll back.
 
 - [RFC-0001 Temporal for durable cross-service orchestration](../RFC-0001/) — the saga that
   consumes `ReserveStock`/`ReleaseStock`; owns the *cache-bust on reserve* future-work item.
-- [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md) —
+- [`docs/api/temporal.md`](../../../api/temporal.md) —
   operational reference for the saga and the reservation ledger.
 - RFC-0004 (caching) — *forward reference*: when product Cache-Aside / cache-bust gets its
   own RFC, the `available`-staleness hook is documented there.

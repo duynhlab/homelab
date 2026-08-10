@@ -7,7 +7,7 @@ Start here to learn the platform's shared API rules and then drill into one serv
 | **Status** | Living documentation checked against all 11 service repositories | — |
 | **Canonical shared guide** | [api.md](./api.md) | — |
 | **Service map** | [microservices.md](./microservices.md) | — |
-| **Workflow guide** | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | — |
+| **Workflow guide** | [temporal.md](./temporal.md) | — |
 | **Design record** | — | None |
 
 ## Documentation Map
@@ -19,7 +19,7 @@ flowchart TD
     Hub --> Catalog["microservices.md<br/>ownership + feature matrix"]
     Hub --> Contracts["11 service contract files"]
     Hub --> Workflows["workflows.md<br/>Temporal workflow registry"]
-    Hub --> Saga["Temporal fulfillment<br/>Saga + 2PC + operations"]
+    Hub --> Saga["temporal.md<br/>3 workflows + saga theory"]
     Hub --> Pkg["pkg.md<br/>shared Go modules + layering"]
     Shared --> Journeys["api.md § End-to-end user journeys"]
     Contracts --> Basic["Auth · User · Product · Inventory · Cart<br/>Order · Review · Notification · Shipping"]
@@ -55,7 +55,7 @@ shown in [api.md](./api.md#current-east-west-call-graph).
 | 3 | [microservices.md](./microservices.md) | Which service owns each feature and how services call one another |
 | 4 | One service file below | Exact HTTP routes, gRPC methods, payload examples, and service rules |
 | 5 | [workflows.md](./workflows.md) | Which Temporal workflows exist, who orchestrates them, and who participates |
-| 6 | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | Why Saga is used instead of 2PC and how the live workflow compensates |
+| 6 | [temporal.md](./temporal.md) | What each of the three workflows does, why Saga instead of 2PC, and how compensation works |
 | 7 | [payments.md](./payments.md) or [checkout.md](./checkout.md) | Deeper state-machine, idempotency, and operational examples |
 | 8 | [_template-service.md](./_template-service.md) then diff against [checkout.md](./checkout.md) | Authoring shape for new or migrated service contracts (v2) |
 
@@ -132,7 +132,7 @@ doc has no owning RFC or ADR. Legacy v1 contracts may still say **Design record*
 | One service's routes, RPCs, payloads, and business constraints | That service's file (At a glance **Deployment** row for local/cluster) |
 | Platform deployment rollup and status vocabulary | This page § [Service contracts](#service-contracts) |
 | Cross-service feature ownership | [microservices.md](./microservices.md) |
-| Saga, 2PC theory, Temporal workflow, compensation, and operations | [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| Saga, 2PC theory, Temporal workflow, compensation, and operations | [temporal.md](./temporal.md) |
 | Which `pkg` modules exist, how they are tagged, the import layering | [pkg.md](./pkg.md) |
 | Which `pkg` modules a service imports and at which version | That service's own `go.mod` — never a document |
 | Design rationale and alternatives | RFC or ADR |
@@ -195,7 +195,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 |----------|--------|----------------|
 | [api.md](./api.md) | HTTP and gRPC architecture, call graph, user journeys, HTTP/2 load balancing, security, observability | Implemented |
 | [microservices.md](./microservices.md) | Service feature matrix, ownership, dependencies, and known gaps | Living reference |
-| [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
+| [temporal.md](./temporal.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
 | [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | Implemented — P1-P5 shipped; the legacy order path was removed in RFC-0021 P5 |
 | [payments.md](./payments.md) | Money state machine, idempotency, ledger, provider, and reconciliation | Implemented |
 
@@ -223,7 +223,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | Deployment or CI status changes | Update this rollup + the service At a glance table |
 | East-west call graph or edge exposure changes | Update [api.md](./api.md) |
 | Cross-service feature ownership changes | Update [microservices.md](./microservices.md) and the relevant service files |
-| Saga step or compensation changes | Update [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| Saga step or compensation changes | Update [temporal.md](./temporal.md) |
 | RFC `implemented` or ADR `Accepted` (API-touching) | Sync per [Document Ownership](#document-ownership); set **Design records** links; same PR or immediate follow-up — see [proposals lifecycle](../proposals/README.md) |
 | At a glance or code map format | v2 template: `Dimension \| Value \| Status` rows include **Deployment**, **Runtime modes**, **HTTP server**, **Edge exposure**, **gRPC server/clients**, **Worker**, **Temporal**, **Async/events**, **Technical debt** — see [_template-service.md](./_template-service.md) |
 | New service contract file | Start from [_template-service.md](./_template-service.md) v2 — At a glance + Identity + 15-part outline |

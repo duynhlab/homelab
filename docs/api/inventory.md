@@ -272,7 +272,7 @@ platform-wide call graph is in
   caller — and reports holds whose order does not account for them. An expiry
   *sweeper* that transitions rows to `EXPIRED` remains **Planned**; the
   reconciler is precisely why a stranded hold is bounded without one. See
-  [temporal-order-fulfillment.md § The Inventory Reconciler](./temporal-order-fulfillment.md#the-inventory-reconciler).
+  [temporal.md § The Inventory Reconciler](./temporal.md#the-inventory-reconciler).
 - **One-order-one-warehouse.** Multi-warehouse split fulfillment and backorder
   (ATP-from-incoming) are non-goals; the contract reserves `warehouse_id` and a
   `destination_region` hint (accepted but unused in v1) so they land later without

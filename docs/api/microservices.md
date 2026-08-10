@@ -179,7 +179,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Cart CRUD** | `GET/POST/DELETE /cart/v1/private/cart`, `GET /cart/v1/private/cart/count`, `PATCH/DELETE /cart/v1/private/cart/items/:itemId` | fail-closed JWT (`user_id` from token, never body — ownership-scoped queries); UPSERT `ON CONFLICT (user_id, product_id)`; server-side subtotal math (empty cart = 0 shipping) | auth JWKS | Implemented | — |
-| **Saga cart-clear** | `DELETE /cart/v1/internal/cart/:userId` | tokenless in-cluster endpoint, NetworkPolicy-fenced; called best-effort by the saga's `ClearCart` step | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
+| **Saga cart-clear** | `DELETE /cart/v1/internal/cart/:userId` | tokenless in-cluster endpoint, NetworkPolicy-fenced; called best-effort by the saga's `ClearCart` step | caller: order-worker | Implemented | [temporal saga](temporal.md) |
 | **gRPC read surface** | `cart.v1/GetCart` (`:9090`) | read-only snapshot for checkout (RFC-0015); prices → int64 minor units at this boundary; writes deliberately stay REST (ADR-021) | caller: checkout | Implemented (local-stack + cluster) | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) |
 
 ### order — orders & checkout fulfillment
@@ -192,10 +192,10 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Order reads** | `GET /order/v1/private/orders`, `GET /order/v1/private/orders/:id` | ownership-scoped queries (`WHERE id AND user_id` — anti-IDOR) | auth JWKS | Implemented | — |
-| **Checkout → durable fulfillment** | internal gRPC `order.v1/CreateOrder` (the only create path — the legacy REST create was removed in RFC-0021 P5) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve inventory → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart → commit inventory → complete; compensations run in reverse (void pre-capture / refund post-pivot); exhaustion parks in `manual_review`; server-side order-math validation; atomic order+items insert; saga start via transactional outbox (ADR-031) | Temporal; inventory, shipping, payment, notification (gRPC); cart (REST) | Implemented | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
+| **Checkout → durable fulfillment** | internal gRPC `order.v1/CreateOrder` (the only create path — the legacy REST create was removed in RFC-0021 P5) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve inventory → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart → commit inventory → complete; compensations run in reverse (void pre-capture / refund post-pivot); exhaustion parks in `manual_review`; server-side order-math validation; atomic order+items insert; saga start via transactional outbox (ADR-031) | Temporal; inventory, shipping, payment, notification (gRPC); cart (REST) | Implemented | [Temporal Saga and 2PC](temporal.md) |
 | **Customer cancellation** | `POST /order/v1/private/orders/:id/cancel` (202/200 replay/409) | `CancellationWorkflow` (`order-cancellation-<id>-v<epoch>`): policy gate (shipment not dispatched) → cancel shipment → void/refund remainder by current payment state → release RESERVED stock (COMMITTED = accepted shrinkage) → `cancelled`; exhaustion parks in `manual_review` | Temporal; shipping, payment, inventory (gRPC) | Implemented (RFC-0021 P5) | [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | **Order-details aggregation** | `GET /order/v1/private/orders/:id/details` | gRPC fan-out with soft-fail enrichment: `GetShipmentByOrder` and `GetPayment` — the `shipment`/`payment` blocks are omitted (`omitempty`) when absent or unavailable | shipping, payment | Implemented | [API call graph](api.md#current-east-west-call-graph) |
-| **Saga worker** | — (Temporal task queue `order-fulfillment`) | `worker` subcommand of the same image; registers workflow + activities; fail-fast if Temporal is unreachable | Temporal | Implemented | [temporal saga](temporal-order-fulfillment.md) |
+| **Saga worker** | — (Temporal task queue `order-fulfillment`) | `worker` subcommand of the same image; registers workflow + activities; fail-fast if Temporal is unreachable | Temporal | Implemented | [temporal saga](temporal.md) |
 
 ### review — product reviews
 
@@ -217,7 +217,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 |---|---|---|---|---|---|
 | **Tracking** | `GET /shipping/v1/public/shipments/track` | lookup by `tracking_number` (legacy `trackingId` fallback); NULL-safe carrier scan | — | Implemented | — |
 | **Estimate** | `GET /shipping/v1/public/shipments/estimate` | weight validation rejects `≤0`/`NaN`/`±Inf` → 400 | — | Implemented | — |
-| **Shipment lifecycle** (saga steps) | internal gRPC `ShippingService.CreateShipment` / `CancelShipment` | idempotent by `order_id` | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
+| **Shipment lifecycle** (saga steps) | internal gRPC `ShippingService.CreateShipment` / `CancelShipment` | idempotent by `order_id` | caller: order-worker | Implemented | [temporal saga](temporal.md) |
 | **Shipment read for order details** | internal gRPC `GetShipmentByOrder` (HTTP twin: `GET /shipping/v1/internal/shipments/orders/:orderId`) | missing shipment → empty response (caller soft-fails to `null`) | caller: order | Implemented (HTTP twin: **No caller**) | [API call graph](api.md#current-east-west-call-graph) |
 
 ### notification — user notifications
@@ -230,7 +230,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Notification inbox** | `GET /notification/v1/private/notifications`, `GET /notification/v1/private/notifications/count`, `GET/PATCH /notification/v1/private/notifications/:id`, `PATCH /notification/v1/private/notifications/read-all` | JWT; owner-scoped reads/mutations (`(id, user_id)` — anti-IDOR); paginated list | auth JWKS | Implemented | — |
-| **Order emails** (saga side-effects) | internal gRPC `NotificationService.SendEmail` | called best-effort by the saga (order-created, receipt, refund notice) on a detached context | caller: order-worker | Implemented | [temporal saga](temporal-order-fulfillment.md) |
+| **Order emails** (saga side-effects) | internal gRPC `NotificationService.SendEmail` | called best-effort by the saga (order-created, receipt, refund notice) on a detached context | caller: order-worker | Implemented | [temporal saga](temporal.md) |
 | **Internal notify twins + SMS** | `POST /notification/v1/internal/notifications/email`, `POST /notification/v1/internal/notifications/sms`; gRPC `SendSMS` | HTTP twins of the gRPC path; SMS path fully unused | — | **No caller** | [notification.md](notification.md) |
 
 ### payment — payments, outbox & reconciliation
@@ -269,7 +269,7 @@ is never browser-facing.**
 |---|---|---|---|
 | **RS256 JWT + JWKS** | Stateless identity — no per-request auth hop | Mint: auth. Verify locally via `pkg/authmw`: user, cart, order, review, notification, payment, checkout | RFC-0009, [API auth model](api.md#authentication) |
 | **Rotating refresh tokens** | Long-lived sessions without long-lived access tokens; reuse detection | auth (sha256 at rest, family revoke) | — |
-| **Temporal saga** | All-or-nothing multi-service checkout with compensations | order (+ `order-worker`); participants: inventory, shipping, payment, notification, cart | [Temporal Saga and 2PC](temporal-order-fulfillment.md) |
+| **Temporal saga** | All-or-nothing multi-service checkout with compensations | order (+ `order-worker`); participants: inventory, shipping, payment, notification, cart | [Temporal Saga and 2PC](temporal.md) |
 | **Temporal abandonment timer** | Durable session expiry without polling the DB | checkout (+ `checkout-worker`); DB-authoritative `expires_at` (ADR-019) | [workflows.md](workflows.md#abandoned-checkout) |
 | **Cache-aside (Valkey)** | Read-heavy hot paths | product (SETNX stampede lock, TTL jitter, SCAN invalidation) | [caching](./caching.md) |
 | **Transactional outbox** | Reliable side-effects with the DB write (no dual-write gap) | payment (single-writer relay) | ADR-007 |

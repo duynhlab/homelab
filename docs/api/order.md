@@ -25,11 +25,11 @@ only writer of orders and the only place the fulfillment saga starts.
 |-------|-------|
 | **Role** | Orchestrator — owns the workflow, the worker, and every activity |
 | **Workflow** | `OrderFulfillmentWorkflow` + `CancellationWorkflow` (`internal/saga/`) |
-| **Worker** | `order-worker-1-13-0` (Current) — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned`. Earlier builds keep polling until their pinned histories drain |
+| **Worker** | `order-worker-1-13-2` (Current) — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned`. Earlier builds keep polling until their pinned histories drain |
 | **Task queue** | `order-fulfillment` (Temporal namespace `mop`) |
 | **Workflow ID** | `order-fulfillment-<orderID>`; cancellation episodes use `order-cancellation-<orderID>-v<epoch>` (epoch = observed `orders.version`, so a legally repeated episode gets a fresh id) |
 | **Start semantics** | Detached-context start after the order row commits (see [Saga handoff](#the-saga-handoff-start-after-commit)) |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -45,7 +45,7 @@ ships without charging. Order solves this by splitting the problem in two:
    Temporal cannot join it, so a crash between the commit and the workflow start
    would otherwise strand the order `pending` forever
    ([ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/), and
-   [temporal-order-fulfillment.md](./temporal-order-fulfillment.md#how-the-saga-gets-started)
+   [temporal.md](./temporal.md#how-the-saga-gets-started)
    for the mechanism).
 2. **A durable saga for everything else.** Fulfillment runs as a Temporal
    workflow on the `order-worker`, with per-step compensation, so partial
@@ -265,7 +265,7 @@ discipline in the [OrderManualReviewBacklog runbook](../observability/runbooks/m
 
 Step order, retry policy, the pivot rationale, and the cancellation
 workflow's disposition rules live in
-[temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — not
+[temporal.md](./temporal.md) — not
 duplicated here.
 
 ### CreateOrder idempotency
@@ -367,7 +367,7 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 
 - [api.md](./api.md) — shared HTTP/gRPC rules, error envelope, pagination
 - [workflows.md](./workflows.md) — workflow registry · [Service contracts](./README.md#service-contracts)
-- [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga theory + as-built + runbook
+- [temporal.md](./temporal.md) — saga theory + as-built + runbook
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 

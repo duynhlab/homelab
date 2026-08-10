@@ -362,7 +362,7 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 | [`docs/platform/application-delivery.md`](../../../platform/application-delivery.md) | Domain → DB map |
 | [`docs/api/microservices.md`](../../../api/microservices.md) | Per-service DB endpoints |
 | [`docs/api/api.md`](../../../api/api.md) | Topology diagram |
-| [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md) | Persistence host |
+| [`docs/api/temporal.md`](../../../api/temporal.md) | Persistence host |
 | [`docs/security/network-policies.md`](../../../security/network-policies.md) | `:6432` → ns `platform` |
 | [`docs/secrets/openbao.md`](../../../secrets/openbao.md) | Path diagram |
 | [`docs/secrets/README.md`](../../../secrets/README.md#kubernetes-secret-catalog) | Secret names |

@@ -105,7 +105,7 @@ inside `fulfillment.Start`, the single place a saga is created, so a future star
 inherits it. The column stays `CHECK`-constrained to the enum.
 
 ## References
-- [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md)
+- [`docs/api/temporal.md`](../../../api/temporal.md)
 - [RFC-0021 cutover rollback](../../../proposals/rfc/RFC-0021/cutover-rollback.md)
 - [`OrderStartParticipantUnrecognised`](OrderStartParticipantUnrecognised.md)
 

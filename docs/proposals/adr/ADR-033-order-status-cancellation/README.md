@@ -185,7 +185,7 @@ Re-open this decision when one or more of the following become true:
 
 - [RFC-0021](../../rfc/RFC-0021/) — platform overhaul umbrella (Phase 5)
 - [Order contract](../../../api/order.md)
-- [Temporal order fulfillment](../../../api/temporal-order-fulfillment.md)
+- [Temporal order fulfillment](../../../api/temporal.md)
 - [Workflows registry](../../../api/workflows.md)
 - [ADR-030](../ADR-030-temporal-workflow-versioning/) — worker versioning the cutover rides on
 - [ADR-031](../ADR-031-fulfillment-start-outbox/) — the outbox pattern the cancellation start mirrors

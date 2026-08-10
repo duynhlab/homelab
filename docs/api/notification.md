@@ -30,7 +30,7 @@ triggered it.
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `SendNotification`, `SendReceipt` — both call `SendEmail`; post-pivot, best-effort, **no compensation** |
 | **Idempotency** | None — a retried activity inserts a fresh inbox row (accepted duplicate; see [Known gaps](#known-gaps)) |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -289,7 +289,7 @@ Paths in [`duynhlab/notification-service`](https://github.com/duynhlab/notificat
 
 - [api.md](./api.md) — shared auth, error envelope, pagination, gRPC runtime model
 - [workflows.md](./workflows.md) — workflow registry
-- [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga theory + as-built steps
+- [temporal.md](./temporal.md) — saga theory + as-built steps
 - [order.md](./order.md) — the orchestrator's contract
 - [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix

@@ -53,7 +53,7 @@ compensations.
 The checkout flow `cart → order → shipping` confirms orders without ever
 collecting money — the saga is `ReserveStock → CreateShipment →
 ConfirmOrder (pivot) → SendNotification → ClearCart`
-([temporal-order-fulfillment.md](../../../api/temporal-order-fulfillment.md)).
+([temporal.md](../../../api/temporal.md)).
 That is the platform's biggest functional gap, and closing it unlocks the
 lessons none of the existing 8 services can teach:
 
@@ -607,7 +607,7 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
   model payment inherits; ESO secret pattern reused for the webhook HMAC)
 - [shared API guide](../../../api/api.md#http-url-model) ·
   [gRPC runtime model](../../../api/api.md#grpc-runtime-model) ·
-  [temporal-order-fulfillment.md](../../../api/temporal-order-fulfillment.md)
+  [temporal.md](../../../api/temporal.md)
 - ADRs to spawn (agreed policy: **each ADR is written when its phase lands**,
   created as `Accepted` — the decision is made by then; ADRs stay short and
   link back here for the full design):

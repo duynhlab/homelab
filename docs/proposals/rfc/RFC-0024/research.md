@@ -19,12 +19,9 @@
 > docs/Context7 or maintainer statements; every Kong fact against this repo's audited
 > as-built state.
 >
-> **Companion material:**
-> [`kubecon-eu25-securitypolicy-notes.md`](./kubecon-eu25-securitypolicy-notes.md) —
-> KubeCon EU25 talk notes on SecurityPolicy (incl. the Keycloak
-> Backend/BackendTLSPolicy pattern). The owner's Vietnamese review report
-> (`report-envoy-vs-kong.vi.md`) stays **untracked by design** (`*.vi.md` is
-> gitignored) — this research is its English distillation of record.
+> This research is the committed record of the comparison; the owner's working
+> reading material stays outside git by design. Every claim below carries its own
+> official source (see References and the Context7 audit log).
 
 ---
 
@@ -126,7 +123,7 @@ mode** (file provider + host infrastructure) for running outside Kubernetes.
 | **BackendTrafficPolicy** | Retries, timeouts, active+passive health checks, **rate limiting (local/global)**, request buffer limit (replaces 5× KongUpstreamPolicy + 25 Service annotations + `rate-limiting-*` + `request-size-limiting-api`). |
 | **ClientTrafficPolicy** | Downstream connection behavior, buffer limits, header options. |
 | **EnvoyProxy** | Data-plane telemetry and infra: Prometheus/OTel metrics, access-log formats/sinks/CEL filters, OTel tracing (`samplingRate`, `customTags`), replicas/resources (replaces the Kong HelmRelease telemetry env block + `opentelemetry-tracing` + `prometheus-metrics` plugins). |
-| **Backend + BackendTLSPolicy** | Non-Service backends and upstream TLS/CA config — the documented pattern for pointing `remoteJWKS`/OIDC at an in-cluster Keycloak with a private CA (see the KubeCon notes). |
+| **Backend + BackendTLSPolicy** | Non-Service backends and upstream TLS/CA config — the documented pattern for pointing `remoteJWKS`/OIDC at an in-cluster Keycloak with a private CA (official docs). |
 | **Envoy RLS** (optional) | The global rate-limit service (Redis-backed) — only deployed if global rate limiting is adopted; **not in the MVP** (see rate-limit deep-dive). |
 
 ---
@@ -452,7 +449,6 @@ EG runs in its first-class environment.
 - Envoy Gateway: [docs](https://gateway.envoyproxy.io/docs/) · [SecurityPolicy concepts](https://gateway.envoyproxy.io/latest/concepts/gateway_api_extensions/security-policy/) · [security tasks](https://gateway.envoyproxy.io/docs/tasks/security/) · [observability tasks](https://gateway.envoyproxy.io/docs/tasks/observability/) · [rate limiting concepts](https://gateway.envoyproxy.io/docs/concepts/rate-limiting) · [standalone mode](https://gateway.envoyproxy.io/docs/tasks/operations/standalone-deployment-mode) · [release matrix](https://gateway.envoyproxy.io/news/releases/matrix/) · [Helm install](https://gateway.envoyproxy.io/docs/install/install-helm)
 - Sampling: [discussion #8436](https://github.com/envoyproxy/gateway/discussions/8436) · [issue #8476 / PR #8529](https://github.com/envoyproxy/gateway/issues/8476) · [Envoy OTel samplers](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/trace/opentelemetry/samplers)
 - Kong OSS status: [discussion #14405](https://github.com/Kong/kong/discussions/14405) · [#14628](https://github.com/Kong/kong/discussions/14628) · [Kong Gateway changelog](https://developer.konghq.com/gateway/changelog/)
-- In-folder: [`kubecon-eu25-securitypolicy-notes.md`](./kubecon-eu25-securitypolicy-notes.md) · owner's review report `report-envoy-vs-kong.vi.md` (untracked, `*.vi.md` gitignored)
 
 ---
 

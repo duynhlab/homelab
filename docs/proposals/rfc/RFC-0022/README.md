@@ -4,6 +4,13 @@
 |--------|-------|----------|---------|--------------|
 | provisional | platform-wide | [./research.md](./research.md) — gate pending owner sign-off | 2026-08-09 | 2026-08-09 |
 
+> **⚠ Implementation absorbed into [RFC-0024](../RFC-0024/README.md)** (owner
+> decision 2026-08-10): this RFC remains the platform's **identity design record** —
+> realm, clients, claims, TTLs, string-`user_id` migration, bootstrap handover,
+> auth-service retirement — but it does **not** run as a standalone implementation.
+> Its rollout executes as phases P1/P3/P5 of RFC-0024's combined greenfield cutover,
+> where the new edge trusts the Keycloak realm from first deployment.
+
 > **Every decision is a tradeoff.** This RFC removes a custom authentication service
 > and delegates credential, session, token, role, and signing-key management to
 > Keycloak. We give up direct ownership of the authentication implementation and add
@@ -520,10 +527,14 @@ every domain schema and outlives the choice of IdP.
   [research → Gateway distribution risk](./research.md#gateway-distribution-risk-kong-oss--added-2026-08-10)).
   Backoffice references updated to [RFC-0023](../RFC-0023/), which now exists.
 - 2026-08-10 — **Exit trigger activated by the owner**: the edge migrates to Envoy
-  Gateway per [RFC-0024](../RFC-0024/README.md). This RFC implements against that
-  edge — the static-key ExternalSecret and the Kong rotation runbook step (Open
-  questions #9) are superseded before ever being built; the token design is
-  unchanged.
+  Gateway per [RFC-0024](../RFC-0024/README.md). The static-key ExternalSecret and
+  the Kong rotation runbook step (Open questions #9) are superseded before ever
+  being built; the token design is unchanged.
+- 2026-08-10 — **Implementation absorbed into RFC-0024** (owner decision): no
+  standalone RFC-0022 rollout — Keycloak deployment, the fleet identity cutover, and
+  auth-service retirement run as RFC-0024 phases P1/P3/P5. This document stays the
+  identity design record; its proposed ADRs (039–041) flip Accepted with RFC-0024's
+  review.
 - 2026-08-09 — All 13 open questions resolved with owner-approved directions
   ([research → Open questions](./research.md#open-questions)): 15-min access tokens
   with per-client session bounds, refresh rotation/reuse-revocation on, `platform-api`
@@ -542,7 +553,7 @@ When Status → implemented, confirm:
 ## Related
 
 - [./research.md](./research.md) — plain-language research and Context7 audit trail
-- [RFC-0024 — Migrate the platform edge from Kong OSS to Envoy Gateway](../RFC-0024/README.md) — the edge this RFC implements against (supersedes the Kong static-key/rotation portions here)
+- [RFC-0024 — Replatform edge and identity](../RFC-0024/README.md) — **executes this design record** (absorbed 2026-08-10); supersedes the Kong static-key/rotation portions here
 - [RFC-0023 — Basic Backoffice portal + first protected APIs](../RFC-0023/README.md) — hard-depends on this RFC's `admin-portal` client and `backoffice_admin` role
 - [RFC-0009 — Production-grade API gateway: signed JWT + Kong edge auth](../RFC-0009/README.md) — superseded in part by this RFC
 - [ADR-006 — RS256 JWT + Kong edge auth](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — preserved

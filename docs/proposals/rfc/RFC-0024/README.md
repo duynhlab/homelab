@@ -1,17 +1,19 @@
-# RFC-0024 Migrate the platform edge from Kong OSS to Envoy Gateway
+# RFC-0024 Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
 | provisional | platform-wide | [./research.md](./research.md) — gate pending owner sign-off | 2026-08-10 | 2026-08-10 |
 
 > **Every decision is a tradeoff.** This RFC replaces a mature, working edge (Kong OSS
-> 3.9, DB-less, deeply wired into routing, rate limiting, TLS, and the fleet's
-> telemetry) with Envoy Gateway. We take on a real migration (~150 files reference
-> Kong; 32 alert/recording expressions die with the `kong_*` metrics) and a quarterly
-> upgrade duty, in exchange for a CNCF-governed edge with live patch streams, standard
-> Gateway API config, and free JWKS/OIDC/claim-authorization — the exact features the
-> Keycloak adoption ([RFC-0022](../RFC-0022/README.md)) otherwise has to design
-> around. Costs are itemized in **Design Details → Drawbacks**.
+> 3.9) with Envoy Gateway **and, in the same greenfield program, executes the Keycloak
+> adoption designed by [RFC-0022](../RFC-0022/README.md)** — retiring `auth-service`
+> and its database (owner decision 2026-08-10: RFC-0022 does not run as a separate
+> implementation). We take on one large coordinated rebuild (~150 Kong-touching files;
+> 32 alert/recording expressions die with the `kong_*` metrics; the RFC-0022 fleet-wide
+> string-`user_id` migration rides the same rebuild) and a quarterly upgrade duty, in
+> exchange for a CNCF-governed edge whose free JWKS/OIDC/claim-authorization means the
+> Keycloak integration is built exactly once — the edge never trusts `auth-service`
+> at all. Costs are itemized in **Design Details → Drawbacks**.
 
 ## Prerequisites
 
@@ -20,13 +22,16 @@
 - Owner approved **ready for RFC** (direction chosen by owner 2026-08-10 — this RFC
   formalizes an activated exit trigger, see
   [RFC-0022 → Gateway distribution risk](../RFC-0022/research.md#gateway-distribution-risk-kong-oss--added-2026-08-10))
-- **Base: [RFC-0022](../RFC-0022/README.md)** — the Keycloak realm, issuer, claim
-  contract, and TTLs are inputs to this RFC; RFC-0024 changes the *edge vehicle*, not
-  the token design. **Ordering: this RFC's edge lands before/with RFC-0022's
-  implementation**, so the Keycloak edge integration is built once (remoteJWKS), never
-  on the Kong static key.
-- Interacts with [RFC-0023](../RFC-0023/README.md): the `protected` route class gains
-  an edge role gate (JWT claim authorization) as a second defense-in-depth layer.
+- **[RFC-0022](../RFC-0022/README.md) is the identity design record and is absorbed
+  here for execution** (owner decision 2026-08-10): its realm/clients/claims/TTLs,
+  string-`user_id` blast radius, `bootstrap.initdb` handover, and auth-service
+  retirement plan are **inputs executed as phases of this RFC** — no standalone
+  RFC-0022 implementation exists. Design questions stay answered there; this RFC
+  answers only "how it ships".
+- [RFC-0023](../RFC-0023/README.md) receives its identity prerequisites (client,
+  role, claims, authmw normalization) from this RFC's program; its `protected` route
+  class additionally gains an edge role gate (JWT claim authorization) as a second
+  defense-in-depth layer.
 - Mechanism deep-dive, criteria matrix, and blast-radius inventory live in
   [./research.md](./research.md) — this file decides.
 - When Status → **`Accepted`**: expected ADRs in [Resulting decisions](#resulting-decisions);
@@ -45,6 +50,13 @@ the edge), and EnvoyProxy telemetry (OTel tracing with the fleet's ParentBased
 sampling model, JSON access logs with CEL probe filtering, Prometheus + control-plane
 metrics). The cutover is **greenfield** — no parallel-run: Kind environments rebuild
 constantly and the production cluster contains no Kong.
+
+The same program **deploys Keycloak and retires `auth-service`** exactly as RFC-0022
+designed it (realm `duynhlab`, two PKCE clients, `customer`/`backoffice_admin` roles,
+`sub` as string `user_id` fleet-wide, JIT profile provisioning, `platform_owner`
+bootstrap handover) — the edge trusts the Keycloak realm from its first deployment via
+`remoteJWKS`, so the Kong-era static-key ExternalSecret, the edge rotation runbook,
+and any auth-service↔EG wiring are never built.
 
 Kong is then **decommissioned completely**: HelmRelease, all 10 KongClusterPlugins,
 the consumer and its static-key ExternalSecret, 32 Kong-metric alert/recording
@@ -71,6 +83,8 @@ fan-out and the manual edge rotation step) are never built at all.
 
 - One edge, standard config: Gateway API resources for every route the platform
   exposes today (API, monitoring, infra, MCP, frontend, temporal-ui).
+- Keycloak deployed and `auth-service` (+ its database) retired **in this program**,
+  per the RFC-0022 design record — one identity, one edge, one rebuild.
 - Keycloak verified at the edge via `remoteJWKS` — zero provisioned key material,
   rotation-transparent; services stay the authoritative verifier (ADR-006's split
   survives, re-homed by ADR-045).
@@ -89,8 +103,8 @@ fan-out and the manual edge rotation step) are never built at all.
 
 - Changing any service API, route path, host name, or the audience vocabulary —
   `/{service}/v1/{audience}/…` and `gateway.duynh.me`/`local.duynh.me` survive as-is.
-- Changing RFC-0022's token design (realm, claims, TTLs, authmw) — inputs, not
-  subjects.
+- Re-deciding RFC-0022's identity design (realm, claims, TTLs, authmw, user_id
+  migration shape) — that design record stands; this RFC only executes it.
 - OIDC-at-edge for the SPAs (keycloak-js stays per RFC-0022/0023; EG's OIDC filter is
   recorded capability, not adopted).
 - Global rate limiting / RLS in the MVP (explicit escape hatch with a trigger).
@@ -184,18 +198,20 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    P0["P0 PoC Kind:<br/>CRDs + EG + 1 public route<br/>+ Keycloak JWT spike"] --> P1["P1 Edge core:<br/>Gateway + all HTTPRoutes<br/>+ SecurityPolicies + BTP"]
-    P1 --> P2["P2 Telemetry cutover:<br/>envoy_* rules + dashboards<br/>+ Vector schema + sampling"]
-    P2 --> P3["P3 Kong decommission:<br/>configs, monitoring, secrets,<br/>NetworkPolicies, exceptions"]
-    P3 --> P4["P4 local-stack:<br/>standalone spike →<br/>adopt or E2E gate → Kind"]
-    P4 --> P5["P5 Docs:<br/>envoy-gateway.md new,<br/>kong-gateway.md archived"]
+    P0["P0 PoC Kind:<br/>CRDs + EG + scratch Keycloak<br/>remoteJWKS + claim-authz spike"] --> P1["P1 Identity foundation:<br/>Keycloak deploy + realm import<br/>+ platform-db + bootstrap handover"]
+    P1 --> P2["P2 Edge core:<br/>Gateway + HTTPRoutes + policies<br/>trusting the realm from day one"]
+    P2 --> P3["P3 Fleet identity cutover:<br/>authmw retarget + string user_id<br/>+ keycloak-js + seeds"]
+    P3 --> P4["P4 Telemetry cutover:<br/>envoy_* rules + dashboards<br/>+ Vector schema + sampling"]
+    P4 --> P5["P5 Decommission:<br/>Kong (configs+monitoring)<br/>+ auth-service (+auth DB)"]
+    P5 --> P6["P6 local-stack + docs:<br/>standalone spike or E2E→Kind;<br/>envoy-gateway.md, archives"]
 
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
-    class P0,P1,P2,P3,P4,P5 planned;
+    class P0,P1,P2,P3,P4,P5,P6 planned;
 ```
 
-Each phase is one PR train; P2 ships **with** P1's cutover per area so no route runs
-without its alerts (the platform's operability-is-part-of-the-change rule).
+Each phase is one PR train; P1/P3 execute the RFC-0022 design record (its rollout
+steps map 1:1 onto these phases); P4 ships **with** the P2/P3 cutovers per area so no
+route runs without its alerts (the operability-is-part-of-the-change rule).
 
 ## Design Details
 
@@ -238,18 +254,36 @@ logs function under compose with healthchecks the `depends_on` graph can consume
 compose keeps services + a minimal pass-through for developer convenience). Either
 way `kong:3.9`, `kong.yml`, and the `kong health` healthcheck are removed.
 
-### Kong decommission and docs archive (decided)
+### Identity cutover — executing the RFC-0022 design record (P1/P3)
+
+Nothing is re-designed here: Keycloak deployment (realm import with fixed demo UUIDs,
+database on `platform-db` connected direct, `platform_owner` bootstrap handover,
+Kyverno-conformant workload), the `pkg/authmw` retarget (issuer/JWKS env swap,
+`realm_access.roles` normalization), the fleet-wide string-`user_id` migration
+(5 INTEGER columns, 2 numeric protos, `pkg/idempotency`, 9 strconv sites, Temporal
+inputs — greenfield rebuild sidesteps in-flight history), the frontend `keycloak-js`
+swap, and JIT profile provisioning all follow
+[RFC-0022](../RFC-0022/README.md)/[its research](../RFC-0022/research.md) verbatim.
+What changes versus RFC-0022's original rollout: its step 5 ("re-point Kong's edge
+credential") **does not exist** — the P2 edge trusts the realm from first deployment —
+and its removal list gains nothing new; `auth-service` and its database retire in P5
+alongside Kong.
+
+### Kong + auth-service decommission and docs archive (decided)
 
 Deleted outright: `controllers/kong/` HelmRelease + HelmRepository, all
 `configs/kong/` CRs, the consumer's ExternalSecret, the 32 metric expressions +
 `prometheusrules/kong/`, the Kong Grafana dashboard CR, the OTTL Kong filter, the
-Kyverno exception, `local-stack/gateway/kong.yml`, and the `job="kong"` relabel.
+Kyverno exception, `local-stack/gateway/kong.yml`, and the `job="kong"` relabel —
+**plus the entire auth-service surface per RFC-0022's removal list** (deployment,
+compose service, routes, seeds, NetworkPolicy, `auth` database + role after the
+bootstrap handover, `JWT_PRIVATE_KEY_PEM` ESO paths).
 Re-pointed: 11 NetworkPolicies, `flux-ui.sh` port-forward, MCP RBAC namespace list,
 CORS origins (unchanged values, new home). **Archived read-only, never rewritten:**
 `docs/platform/kong-gateway.md` (banner: *"Archived (RFC-0024) — describes the
-retired Kong OSS edge, kept as history"*), ADR-003/ADR-006 (superseded-by links),
-RFC-0009 (one more superseded-in-part note), CHANGELOG history (append-only as
-always).
+retired Kong OSS edge, kept as history"*), `docs/api/auth.md` (archived per
+RFC-0022), ADR-003/ADR-006 (superseded-by links), RFC-0009 (one more
+superseded-in-part note), CHANGELOG history (append-only as always).
 
 ### Drawbacks (the cost side, stated plainly)
 
@@ -291,18 +325,22 @@ control-plane reconcile errors.
 
 ## Rollout & rollback
 
-Greenfield cutover in five PR trains (diagram above): P0 PoC (Kind: CRDs + EG + one
-public route + Keycloak JWT spike) → P1 edge core (Gateway, all HTTPRoutes,
-SecurityPolicies, BTP — Kong deleted from the cluster chain in the same train) → P2
-telemetry (same-PR-per-area with P1 slices) → P3 decommission sweep (secrets,
-NetworkPolicies, exceptions, scripts) → P4 local-stack (spike outcome or E2E-gate
-move) → P5 docs. **Rollback** is source-level per train: revert the PR train and
-rebuild (`make up` / compose rebuild) — the same greenfield property that makes the
-cutover cheap makes reverts cheap; no dual-gateway state ever exists.
+Greenfield cutover in seven PR trains (diagram above): P0 PoC (Kind: CRDs + EG +
+scratch Keycloak + remoteJWKS/claim-authz spike) → P1 identity foundation (Keycloak
+per the RFC-0022 design: realm import, platform-db, bootstrap handover) → P2 edge
+core (Gateway, all HTTPRoutes, SecurityPolicies trusting the realm, BTP — Kong
+deleted from the cluster chain in the same train) → P3 fleet identity cutover
+(authmw retarget, string user_id, keycloak-js, seeds) → P4 telemetry
+(same-PR-per-area with P2/P3 slices) → P5 decommission sweep (Kong + auth-service:
+secrets, NetworkPolicies, exceptions, scripts, auth DB after handover) → P6
+local-stack + docs (spike outcome or E2E-gate move; envoy-gateway.md; archives).
+**Rollback** is source-level per train: revert the PR train and rebuild (`make up` /
+compose rebuild) — the same greenfield property that makes the cutover cheap makes
+reverts cheap; no dual-gateway or dual-issuer state ever exists.
 
 ## Testing / verification
 
-- **PoC/spike gates (P0/P4):** Keycloak JWT verify + claim authz demonstrated on
+- **PoC/spike gates (P0/P6):** Keycloak JWT verify + claim authz demonstrated on
   Kind; standalone spike against explicit exit criteria.
 - **Route parity:** scripted diff of every host/path/audience pair before/after
   (31 ingress surfaces incl. temporal-ui); 404/401/403 behavior per audience class
@@ -318,7 +356,11 @@ cutover cheap makes reverts cheap; no dual-gateway state ever exists.
   proven by volume delta.
 - **NetworkPolicy sweep:** scripted connectivity matrix from the EG namespace
   (reuse the `db-isolation-sweep` pattern).
-- **E2E:** full local-stack release audit (or its Kind successor per P4) — all
+- **Identity (RFC-0022's test plan executes here):** realm import determinism on
+  clean rebuild; refresh rotation/reuse-revocation; ownership scoping with string
+  subjects end-to-end (HTTP → gRPC → DB → Temporal); JIT profile fallback/upsert;
+  auth-service absent from build/route/deploy/health/docs.
+- **E2E:** full local-stack release audit (or its Kind successor per P6) — all
   A/B/C rows pass before any tag.
 
 ## Resulting decisions
@@ -329,7 +371,10 @@ cutover cheap makes reverts cheap; no dual-gateway state ever exists.
 | Edge rate limiting is local-first (no RLS/Redis); global is an escape hatch behind a recorded trigger | ADR-046 | Proposed |
 | The E2E release-audit gate moves to Kind if compose cannot carry the edge (standalone spike fails) | ADR-047 | Proposed |
 
-Numbers count past RFC-0023's 042–044 per owner convention.
+Numbers count past RFC-0023's 042–044 per owner convention. RFC-0022's proposed
+identity ADRs (039–041: adopt Keycloak; `sub` as user_id; OIDC-for-browsers /
+workload-trust-east-west) remain owned by that design record and flip to Accepted
+together with this RFC's review.
 
 ## Implementation History
 
@@ -339,6 +384,10 @@ Numbers count past RFC-0023's 042–044 per owner convention.
   full Kong config/monitoring decommission with docs archived read-only, E2E-gate
   fallback to Kind. KubeCon SecurityPolicy notes committed alongside as reference
   material; the Vietnamese review report stays untracked (`*.vi.md` gitignored).
+- 2026-08-10 — **Scope expanded by owner decision: RFC-0022 is absorbed for
+  execution.** Keycloak deployment and auth-service retirement run as phases P1/P3/P5
+  of this program (RFC-0022 stays the identity design record); the edge never trusts
+  auth-service — it is born trusting the Keycloak realm.
 
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
@@ -352,8 +401,8 @@ When Status → implemented, confirm:
 
 - [./research.md](./research.md) — problem framing, criteria matrix, deep-dives, blast radius, Context7 audit
 - [`kubecon-eu25-securitypolicy-notes.md`](./kubecon-eu25-securitypolicy-notes.md) — SecurityPolicy + Keycloak BackendTLSPolicy pattern
-- [RFC-0022 — Keycloak as platform IdP](../RFC-0022/README.md) — base; its edge artifacts simplify under this RFC
-- [RFC-0023 — Backoffice + protected APIs](../RFC-0023/README.md) — `protected` routes gain the edge role gate
+- [RFC-0022 — Keycloak as platform IdP](../RFC-0022/README.md) — the identity **design record**, absorbed here for execution (owner decision 2026-08-10)
+- [RFC-0023 — Backoffice + protected APIs](../RFC-0023/README.md) — receives its identity prerequisites from this program; `protected` routes gain the edge role gate
 - [RFC-0009](../RFC-0009/README.md) / [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — the Kong edge design being superseded in its vehicle, preserved in its principle
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — to be archived read-only
 

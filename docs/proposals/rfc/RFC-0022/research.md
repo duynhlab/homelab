@@ -312,12 +312,13 @@ plugin), at enterprise pricing, while the role gate stays in-service regardless.
 
 > **Update (2026-08-10, later the same day): the exit trigger was activated
 > proactively by the owner** after a verified Envoy Gateway comparison — see
-> **[RFC-0024](../RFC-0024/README.md)** (migrate the edge to Envoy Gateway,
-> greenfield). Consequence for this RFC: the Keycloak token design is untouched, but
-> the two Kong-specific edge artifacts (`ExternalSecret auth-issuer-jwt` static key
-> and the two-step rotation runbook, Open questions #9) are **not built** — the edge
-> verifies via SecurityPolicy `remoteJWKS` from the start. RFC-0022 implements
-> against the RFC-0024 edge.
+> **[RFC-0024](../RFC-0024/README.md)**. Consequence: the Keycloak token design is
+> untouched, the two Kong-specific edge artifacts (`ExternalSecret auth-issuer-jwt`
+> static key and the two-step rotation runbook, Open questions #9) are **not built**,
+> and — by a further owner decision the same day — **this RFC's entire implementation
+> is absorbed into RFC-0024's combined greenfield program** (Keycloak + new edge +
+> auth-service retirement in one cutover). This file stays the identity design
+> record.
 
 > **In plain terms:** our gateway brand stopped selling the free model we use; the
 > spare-parts supply for our current one continues, but nobody says for how long. We

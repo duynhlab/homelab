@@ -82,7 +82,9 @@ Skeleton (copy what you need):
 
 #### Proposals
 
-- RFC-0024 (migrate the platform edge from Kong OSS to Envoy Gateway): research
+- RFC-0024 (replatform edge and identity — Envoy Gateway + Keycloak in one
+  greenfield cutover; RFC-0022's implementation is absorbed as program phases,
+  its design record stands): research
   distilled from the verified comparison report (criteria matrix, observability
   and rate-limit deep-dives, ~150-file blast radius), provisional RFC (greenfield
   cutover, Keycloak via remoteJWKS, local-first rate limiting, full Kong

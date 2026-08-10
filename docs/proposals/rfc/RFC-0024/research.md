@@ -9,9 +9,10 @@
 | **Last updated** | 2026-08-10 |
 
 > **Plain-language research.** This file is the audit trail for replacing Kong OSS with
-> **Envoy Gateway** (EG) as the platform's edge — routing, edge auth for the Keycloak
-> tokens designed in [RFC-0022](../RFC-0022/README.md), rate limiting, and edge
-> telemetry. It exists because the exit trigger recorded in
+> **Envoy Gateway** (EG) as the platform's edge — and, per the owner's 2026-08-10
+> decision, for executing the **Keycloak adoption + auth-service retirement** designed
+> by [RFC-0022](../RFC-0022/README.md) **inside the same greenfield program** (RFC-0022
+> stays the identity design record; it does not run as a separate implementation). It exists because the exit trigger recorded in
 > [RFC-0022 → Gateway distribution risk](../RFC-0022/research.md#gateway-distribution-risk-kong-oss--added-2026-08-10)
 > was **activated proactively by the owner on 2026-08-10** after reviewing the
 > comparison report. Every Envoy Gateway fact below is verified against official
@@ -392,14 +393,14 @@ gate can still overturn any of them.
 
 | # | Question | Direction |
 |---|----------|-----------|
-| 1 | Migration style | **Greenfield cutover, owner-approved** — no parallel-run: Kind rebuilds constantly, prod is Kong-free; one PR train replaces the edge and its observability per area |
+| 1 | Migration style | **Greenfield cutover, owner-approved** — no parallel-run: Kind rebuilds constantly, prod is Kong-free; one PR train per phase. **Combined program (owner, 2026-08-10): the RFC-0022 identity work executes here** — Keycloak foundation and fleet identity cutover are phases of this RFC, and `auth-service` retires alongside Kong |
 | 2 | EG release line | Pin the newest supported minor at implementation (≥ v1.8.3, or the line carrying PR #8529's sampler config); accept quarterly upgrade duty (**owner: not a concern**); Renovate watches the chart pins |
 | 3 | Rate limiting | **Local-only (owner-approved)** — no RLS/Redis at the edge; halve configured numbers for `replicaCount: 2`; X-RateLimit draft-03 headers; **global escape-hatch trigger**: a demonstrated multi-client fairness need (per-IP abuse from distinct sources) |
 | 4 | local-stack gateway | Spike EG **standalone mode** (file provider — same Gateway API YAML as the cluster). **Owner-approved fallback: move the E2E release-audit gate to Kind** and let compose keep a thinner gateway story (`local-stack/docs/e2e-audit.md` scope updated at implementation) |
 | 5 | Access-log schema | Adopt Envoy default JSON (richer, standard) — **owner: change freely, standards-first**; Vector/CH mappings updated once; add a CEL `matches` filter to drop probe access logs at source (F-2) |
 | 6 | Kong decommission scope | **Delete all Kong configs and monitoring** (helmrelease, plugins, consumer, ESO secret, 32 rule expressions, dashboard CR, OTTL filter, Kyverno exception, HelmRepository, local `kong.yml`); NetworkPolicies re-pointed. **Docs are kept, marked Archived/read-only** — `docs/platform/kong-gateway.md` gets an archive banner, not a rewrite |
 | 7 | ADR numbering | ADR-045 (EG as platform edge — supersedes ADR-006's Kong binding, keeps the defense-in-depth split), ADR-046 (local-first edge rate limiting), ADR-047 (E2E gate placement when compose can't carry the edge) — counting up past RFC-0023's 042–044 |
-| 8 | Keycloak integration point | RFC-0022 implements **against EG from the start** (remoteJWKS; no static-key ESO, no Kong rotation runbook) — the reason this RFC lands before RFC-0022 implementation begins |
+| 8 | Keycloak integration point | **RFC-0022 absorbed for execution (owner, 2026-08-10)**: the edge is born trusting the Keycloak realm via remoteJWKS — no static-key ESO, no Kong rotation runbook, and no auth-service↔EG wiring ever exists; auth-service + `auth` DB retire in this program's decommission phase |
 | 9 | Sampling | Copy the model: EG `samplingRate` 0.1 cluster / 1.0 local, ParentBased default confirmed; adopt `sampler` enum config when the carrying release ships |
 | 10 | Edge spans/semconv | Accept the newer semconv (F-8 fix); trace-dashboard queries referencing `service.name="kong"` update to the EG service identity in the same PR as the tracing cutover |
 
@@ -407,13 +408,16 @@ gate can still overturn any of them.
 
 ## FAQ
 
-**Does this reopen RFC-0022?**
+**What happens to RFC-0022?**
 
-No — it *simplifies* it. RFC-0022's token design (realm, claims, TTLs, authmw) is
-gateway-agnostic and unchanged; the only parts that die are the two artifacts that
-existed solely because of Kong OSS's static-key limitation (the `auth-issuer-jwt`
-ExternalSecret and the edge rotation runbook step). RFC-0022's research already
-recorded this: *"nothing in the Keycloak decision locks us to Kong."*
+It becomes the identity **design record** and stops being a separate implementation:
+the owner decided (2026-08-10) to execute Keycloak adoption + auth-service retirement
+inside this RFC's greenfield program. Its design (realm, claims, TTLs, authmw,
+string-`user_id` migration, bootstrap handover) is followed verbatim; the two
+artifacts that existed solely because of Kong's static-key limitation (the
+`auth-issuer-jwt` ExternalSecret and the edge rotation runbook step) are never built,
+and the edge never trusts `auth-service` at all. RFC-0022's research already recorded
+the enabling fact: *"nothing in the Keycloak decision locks us to Kong."*
 
 **Why greenfield instead of a parallel migration?**
 

@@ -15,7 +15,7 @@ fulfillment work, move the money only immediately before the confirm pivot.
 
 The order-fulfillment saga was `ReserveStock → CreateShipment → ConfirmOrder
 (pivot)`, compensating in reverse on failure (see
-[temporal-order-fulfillment.md](../../../api/temporal-order-fulfillment.md)).
+[temporal.md](../../../api/temporal.md)).
 Adding payment raises one real question: **when does money move relative to the
 fulfillment work?**
 

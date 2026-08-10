@@ -557,7 +557,7 @@ count and retention hit zero.
 - As-built contracts this RFC rewrote: [inventory.md](../../../api/inventory.md) ·
   [product.md](../../../api/product.md) · [order.md](../../../api/order.md) ·
   [checkout.md](../../../api/checkout.md) · [payments.md](../../../api/payments.md) ·
-  [temporal-order-fulfillment.md](../../../api/temporal-order-fulfillment.md)
+  [temporal.md](../../../api/temporal.md)
 - ADRs spawned: ADR-027…033 (inventory authority, reservation model, flag helper,
   workflow versioning, start outbox, order status model) and ADR-034…037
   (provider-outcome ambiguity, windowed reconciliation, single-writer lease,

@@ -27,7 +27,7 @@ Shipping turns "an order that must move" into a tracked shipment — and turns "
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `CreateShipment`, `CancelShipment` (compensation — also the `CancellationWorkflow`'s unwind step, and `GetShipmentByOrder` gates the cancel policy, RFC-0021 P5) |
 | **Idempotency** | order id — `UNIQUE (order_id)` + `ON CONFLICT` makes replays return the existing shipment |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -282,7 +282,7 @@ Paths in [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-serv
 
 - [api.md](./api.md) — shared HTTP/gRPC rules (auth, error envelope, runtime model)
 - [workflows.md](./workflows.md) — Temporal workflow registry
-- [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga deep dive
+- [temporal.md](./temporal.md) — saga deep dive
 - [checkout.md](./checkout.md) · [order.md](./order.md) — quote and enrichment callers
 - [Service contracts](./README.md#service-contracts)
 

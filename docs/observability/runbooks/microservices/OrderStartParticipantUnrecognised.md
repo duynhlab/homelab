@@ -93,7 +93,7 @@ so a new start path inherits the refusal instead of having to remember it.
 ## References
 - [`FulfillmentStartOutboxFailed`](FulfillmentStartOutboxFailed.md) — the paging signal and the remedy
 - [`OrderParticipantDisagreement`](OrderParticipantDisagreement.md)
-- [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md)
+- [`docs/api/temporal.md`](../../../api/temporal.md)
 - [RFC-0021 cutover rollback](../../../proposals/rfc/RFC-0021/cutover-rollback.md)
 
 ---

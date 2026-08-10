@@ -22,7 +22,7 @@ docs/
 │   ├── shipping.md               # Tracking, quotes, shipment gRPC contract
 │   ├── checkout.md               # P1-P5 checkout subsystem; P6 planned
 │   ├── payments.md               # Payment contract, ledger, reconciliation
-│   └── temporal-order-fulfillment.md # Saga vs 2PC + live Temporal workflow and ops
+│   └── temporal.md # 3 Temporal workflows as built + saga vs 2PC + ops
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
@@ -283,7 +283,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Inventory](./api/inventory.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), and [Payment](./api/payments.md)
 
-5. **[Temporal order-fulfillment Saga](./api/temporal-order-fulfillment.md)** - Saga vs 2PC theory, live workflow steps and compensations, infrastructure, and operations
+5. **[Temporal workflows](./api/temporal.md)** - all three workflows as built, saga vs 2PC theory, infrastructure, and operations
 
 6. **[RFCs — research then decide](./proposals/rfc/)** — owner approves next `RFC-NNNN` → `research.md` (plain-language + Context7) → `README.md` → optional `docs/<area>/` spin-off
 
@@ -381,7 +381,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Microservices catalog](./api/microservices.md) - Feature ownership, techniques, dependencies, and known gaps
 - [Service contracts](./api/README.md#service-contracts) - Platform deployment rollup and one file per Go service
 - [Workflow registry](./api/workflows.md) - Temporal workflows: owners, workers, task queues, and participants
-- [Temporal Order-Fulfillment Saga](./api/temporal-order-fulfillment.md) - Saga-vs-2PC learning, live compensations, Temporal infrastructure, and operations
+- [Temporal Workflows](./api/temporal.md) - the three workflows as built, saga-vs-2PC learning, Temporal infrastructure, and operations
 - [Checkout](./api/checkout.md) - Session orchestration, fully shipped (local-stack + cluster); the legacy order path was removed in RFC-0021 P5
 - [Payments](./api/payments.md) - Payment API, state machine, ledger, provider, and reconciliation
 - [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Implemented (all six phases); supersedes ADR-003 via ADR-006

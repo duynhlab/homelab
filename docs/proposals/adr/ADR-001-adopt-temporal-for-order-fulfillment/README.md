@@ -29,7 +29,7 @@ Adopt **[Temporal](https://temporal.io/)** (Go SDK) as the workflow engine and i
 fulfillment as a Temporal **saga**: a durable `OrderFulfillmentWorkflow` started after the order
 commits, with one activity per step, per-activity `RetryPolicy`, and compensations run in reverse on
 failure. The HTTP request stays async (`201 pending`); the workflow drives the order to
-`confirmed`/`failed`. See the [implementation guide](../../../api/temporal-order-fulfillment.md).
+`confirmed`/`failed`. See the [implementation guide](../../../api/temporal.md).
 
 ## Alternatives considered
 
@@ -74,7 +74,7 @@ failure. The HTTP request stays async (`201 pending`); the workflow drives the o
   `CreateShipment`/`CancelShipment`.
 - Checkout becomes **async** (`201 pending`); the SPA polls for the terminal status.
 - When to reach for Temporal again (and when not) is documented in the
-  [guide — When to Use Temporal](../../../api/temporal-order-fulfillment.md#when-to-use-temporal) — it is for
+  [guide — When to Use Temporal](../../../api/temporal.md#when-to-use-temporal) — it is for
   durable multi-step orchestration, not for ordinary request/response.
 
 ---

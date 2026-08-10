@@ -1,15 +1,17 @@
-# Temporal Order-Fulfillment Saga
+# Temporal Workflows
 
-Temporal makes the platform's multi-service order transaction durable, retryable, observable, and compensatable.
+Three Temporal workflows make the platform's cross-service transactions durable,
+retryable, observable and compensatable — and one of them exists purely to notice
+when a shopper stopped.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
-| **Status** | Implemented — verified end-to-end in local-stack; Temporal and the order worker are deployed in the cluster | — |
-| **Scope** | Saga and 2PC learning guide plus the live order-fulfillment workflow | — |
-| **Workflow owner** | Order service and the `order-worker` process | — |
-| **Task queue** | `order-fulfillment` | — |
-| **Order result** | `pending` becomes `confirmed` or `failed` | — |
-| **Registry** | [workflows.md](./workflows.md#order-fulfillment) — all platform workflows in one table | — |
+| **Status** | Implemented — all three verified end-to-end in local-stack; Temporal and both workers are deployed in the cluster | — |
+| **Scope** | Saga and 2PC concepts, then each of the three workflows as built, then the machinery they share | — |
+| **Workflows** | `OrderFulfillmentWorkflow` · `CancellationWorkflow` (order-service) · `AbandonedCheckoutWorkflow` (checkout-service) | — |
+| **Task queues** | `order-fulfillment` (both order workflows) · `checkout` | — |
+| **Namespace** | `mop` | — |
+| **Registry** | [workflows.md](./workflows.md) — the one-line index of every workflow | — |
 | **Design record** | — | [RFC-0021](../proposals/rfc/RFC-0021/) (stock participant, worker versioning, start outbox) · [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) |
 
 ## Overview
@@ -18,8 +20,12 @@ One order touches independent order, product, shipping, and payment databases,
 plus an external payment provider. A normal database transaction cannot cover
 all of them. The platform therefore uses an orchestrated Saga: each service
 commits locally, Temporal records durable progress, and failures before the
-pivot trigger compensating actions in reverse. This is the deep dive for
-`OrderFulfillmentWorkflow`; the platform-wide workflow index lives in
+pivot trigger compensating actions in reverse.
+
+That saga is the biggest of the three workflows here, but not the only one. This
+page is the deep dive for all three: the order fulfilment saga, the cancellation
+unwind that gives back what it took, and the checkout timer that expires an
+abandoned session. The one-line index of them lives in
 [workflows.md](./workflows.md).
 
 | Before Temporal | With the current Saga |
@@ -52,26 +58,29 @@ flowchart LR
 
 ## Contents
 
-- [Part 1 — Learn](#part-1--learn)
-  - [Why Temporal?](#why-temporal)
-  - [When to Use Temporal](#when-to-use-temporal)
-  - [The Distributed Transaction Problem](#the-distributed-transaction-problem)
-  - [How Two-Phase Commit Works](#how-two-phase-commit-works)
-  - [Why 2PC Does Not Fit This Platform](#why-2pc-does-not-fit-this-platform)
-  - [The Saga Pattern](#the-saga-pattern)
-  - [Saga Properties: Compensation, Idempotency, and Pivot](#saga-properties-compensation-idempotency-and-pivot)
-  - [2PC vs Saga Tradeoffs](#2pc-vs-saga-tradeoffs)
-  - [When 2PC Is the Better Choice](#when-2pc-is-the-better-choice)
-- [Part 2 — As-built](#part-2--as-built)
-  - [Current Order-Fulfillment Saga](#current-order-fulfillment-saga) — [Workflow at a Glance](#workflow-at-a-glance) · [Retry and Timeout Policy](#retry-and-timeout-policy)
-  - [How the Saga Gets Started](#how-the-saga-gets-started)
-  - [Contracts and the Checkout Flow](#contracts-and-the-checkout-flow)
-  - [Temporal Infrastructure](#temporal-infrastructure)
-  - [As-Built Notes and Roadmap](#as-built-notes-and-roadmap)
-- [Part 3 — Operations](#part-3--operations)
-  - [Deploy and Run It](#deploy-and-run-it)
-  - [Operations and Observability](#operations-and-observability)
-- [References](#references)
+**[Part 1 — Learn](#part-1--learn)** — why an order needs a saga at all: the
+distributed-transaction problem, how 2PC works and why it does not fit here, and
+the saga properties this platform leans on. Read once; it does not change.
+
+**[Part 2 — As-built](#part-2--as-built)** — the three workflows that actually
+run, one section each, then the machinery they share.
+
+| Workflow | Owner | What it is for |
+|----------|-------|----------------|
+| [`OrderFulfillmentWorkflow`](#orderfulfillmentworkflow) | order | Turn a committed order into money taken, stock committed and a shipment created — or undo all of it |
+| [`CancellationWorkflow`](#cancellationworkflow) | order | Give back what a cancelled order took, and never settle silently when it cannot |
+| [`AbandonedCheckoutWorkflow`](#abandonedcheckoutworkflow) | checkout | Expire a checkout session that the shopper walked away from |
+
+Shared machinery: [how the saga gets started](#how-the-saga-gets-started) ·
+[the stock participant](#the-stock-participant-rfc-0021-p3-narrowed-by-p4) ·
+[the inventory reconciler](#the-inventory-reconciler) ·
+[contracts](#contracts-and-the-checkout-flow) ·
+[infrastructure](#temporal-infrastructure) ·
+[worker versioning](#worker-deployment-versioning-as-built) ·
+[notes and roadmap](#as-built-notes-and-roadmap)
+
+**[Part 3 — Operations](#part-3--operations)** — running the workers, and where
+the alerts and runbooks live.
 
 ## Part 1 — Learn
 
@@ -327,12 +336,74 @@ cross-service business action on this platform.
 
 ## Part 2 — As-built
 
-What actually runs: the `OrderFulfillmentWorkflow` steps and compensations, the
-east-west contracts behind them, and the Temporal deployment itself.
+Three workflows run on this platform. Two belong to order-service and share a
+task queue; one belongs to checkout-service and shares nothing. Each gets its own
+section below with the same shape — what it is for, what starts it, what it
+guarantees, what it does step by step, and how it ends — followed by the
+machinery they have in common.
 
-### Current Order-Fulfillment Saga
+### The three workflows
 
-#### Workflow at a Glance
+| | `OrderFulfillmentWorkflow` | `CancellationWorkflow` | `AbandonedCheckoutWorkflow` |
+|---|---|---|---|
+| **Owner** | order-service | order-service | checkout-service |
+| **Task queue** | `order-fulfillment` | `order-fulfillment` (same worker) | `checkout` |
+| **Started by** | the order row committing | a cancel request being accepted | every session mutation, via Signal-With-Start |
+| **Workflow ID** | `order-fulfillment-<orderID>` | `order-cancellation-<orderID>-v<epoch>` | `checkout-abandon-<sessionID>` |
+| **Shape** | ten forward steps around a pivot, compensating in reverse | a one-shot unwind that only moves forward | a timer and two signals in a loop |
+| **Talks to** | payment, inventory, shipping, notification, cart | payment, inventory, shipping, notification | nothing — one table in its own database |
+| **Ends as** | `confirmed` · `failed` · `compensated` · `manual_review` | `cancelled` · `manual_review` | `expired` · `gone` · finalized |
+| **Versioned** | **Pinned** (ADR-030) | **Pinned** (ADR-030) | **not versioned** |
+
+The asymmetry in that last row is deliberate and worth understanding before
+reading further. The two order workflows hold money and stock while they run, so
+they are pinned to the worker build that started them: a rolling replacement would
+hand a half-finished saga to code that may disagree about what it already did.
+The checkout timer holds nothing — its only authority is a timestamp in a database
+row — so it runs unversioned and a rolling deploy is safe.
+
+```mermaid
+flowchart LR
+    Shopper["shopper"] -->|"creates or edits a session"| CO["checkout-service"]
+    CO -.->|"Signal-With-Start on every mutation"| ACW["AbandonedCheckoutWorkflow<br/>queue: checkout"]
+    CO -->|"confirm → CreateOrder"| ORD["order-service"]
+    ORD -->|"after the order row commits"| OFW["OrderFulfillmentWorkflow<br/>queue: order-fulfillment"]
+    Shopper -->|"asks to cancel an order"| ORD
+    ORD -->|"one run per cancel episode"| CW["CancellationWorkflow<br/>queue: order-fulfillment"]
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class CO,ORD service;
+    class ACW,OFW,CW worker;
+    class Shopper external;
+```
+
+The dotted edge is the only one that is not a direct call: the session workflow is
+signalled, and started if it is not already running, by the same request that
+mutated the session.
+
+### OrderFulfillmentWorkflow
+
+**What it is for.** An order row exists and the shopper has been told "we are
+processing it". This workflow is what makes that true: it takes the money, holds
+the stock, creates the shipment, and confirms the order — or, if any of that
+fails before the point of no return, undoes everything it did and leaves the
+order `failed` with no money moved.
+
+**What starts it.** The order row committing. The start is deliberately *not*
+inside that transaction — Temporal cannot join a PostgreSQL transaction — so the
+commit also writes an outbox row and a dispatcher guarantees the workflow
+eventually starts even if the process dies in between. See
+[how the saga gets started](#how-the-saga-gets-started).
+
+**What it guarantees.** Exactly one saga per order, enforced by the workflow ID.
+Before the pivot, either everything succeeds or every completed step is
+compensated. After the pivot, nothing is rolled back — the order is confirmed and
+the remaining steps are best-effort. When a compensation itself cannot converge,
+the order parks in `manual_review` rather than being reported as cleanly failed.
+
+#### Steps and compensation
 
 | # | Forward step | Service | Compensation if a later pre-pivot step fails |
 |---|--------------|---------|-----------------------------------------------|
@@ -344,7 +415,14 @@ east-west contracts behind them, and the Temporal deployment itself.
 | 5 | `SendNotification` | Notification | None; post-pivot best-effort |
 | 6 | `SendReceipt` | Notification | None; post-pivot best-effort |
 | 7 | `ClearCart` | Cart | None; post-pivot best-effort REST exception |
-| 8 | `Complete` | Order | None; best-effort `confirmed → completed` ladder write (RFC-0021 P5) — failure is counted, never compensated |
+| 8 | `CommitInventory` | Inventory | None; **mandatory forward** — a confirmed order retries it until it converges, and a reservation left uncommitted is the reconciler's job |
+| 9 | `Complete` | Order | None; best-effort `confirmed → completed` ladder write (RFC-0021 P5) — failure is counted, never compensated |
+
+`CommitInventory` runs *after* the customer-visible tail, and the order matters.
+Putting it first would mean that during an inventory degradation the shopper gets
+no confirmation email and keeps a full cart, re-checks out, and receives a second
+order id that workflow-ID deduplication cannot catch — charged twice for one
+purchase.
 
 Stage boundaries also write the `order_processing_projection` row
 (best-effort, ~7 s budget) so `/details` can render progress; a lost write
@@ -353,49 +431,6 @@ self-heals at the next boundary.
 The actual execution order is important: authorize early, capture late, then
 confirm the order. This fails a declined payment before reserving inventory and
 keeps captured money as close as possible to the pivot.
-
-#### The stock participant (RFC-0021 P3, narrowed by P4)
-
-Stock lives at inventory-service, and only there. P3 routed the stock steps
-through a per-workflow participant so the write could move without a flag day;
-**P4 (order 1.13.0) removed the product-service branch it moved away from**:
-
-| Participant | Forward | Compensation | Post-pivot |
-|---|---|---|---|
-| `inventory` | `ReserveInventory` | `ReleaseInventory` | `CommitInventory`, **mandatory forward** — a confirmed order retries it to completion |
-| `product`, or absent (every order created before P3) | — | — | **REFUSED.** Not re-routed |
-
-The refusal is the load-bearing part. Re-routing a product order to inventory
-would release stock inventory never reserved and orphan the real hold at
-product-service — the invisible-hold split the pinning exists to prevent. So the
-token keeps its historical meaning and simply cannot be served: no saga is
-created, and the order's outbox row goes terminal with `PARTICIPANT_UNSERVABLE`
-(runbook `FulfillmentStartOutboxFailed`).
-
-Where that refusal lives matters, and a workflow panic alone is **not** enough:
-it fails the workflow TASK, so the gRPC call still answers success, the
-dispatcher sees a RUNNING execution and closes its outbox row, and the
-reconciler only scans terminal orders. So `fulfillment.Start` refuses (the one
-place a saga is created), the gRPC replay answers the existing order without a
-kickoff, and the dispatcher asks Temporal before condemning a row — a live saga
-is honoured, a confirmed absence goes terminal. The workflow guard is the last
-backstop, for a history force-migrated by hand.
-
-Which value gets stamped is resolved from the **order's own record**, never from
-the process answering (order-service #155): `CreateOrder` writes the participant
-into the order's outbox row in the same transaction, and every start path
-resolves through one shared `fulfillment.ParticipantFor`. The column is
-CHECK-constrained (migration `000010`). Every resolution is counted:
-`order_fulfillment_start_participant_total{participant, source, result}` —
-`source` distinguishes `recorded` / `absent` / `unrecognised`, `result`
-distinguishes `started` / `refused`, and `unrecognised` is alerted on
-(`OrderStartParticipantUnrecognised`).
-
-**Rollout requirement, not a property of the code:** the removal ships as a new
-Worker Deployment Version, so pinned versioning must be ON and the previous
-build must keep polling until pre-P4 sagas drain. A pinned saga left with no
-poller stalls with its stock held and its payment authorized.
-
 
 The order-fulfillment saga (`order-service/internal/saga/workflow.go`), driven by a
 Temporal worker — payment is an unconditional part of every run
@@ -457,6 +492,35 @@ sequenceDiagram
 Read it top-to-bottom: three steps succeeded, the fourth failed, and each success
 got a matching undo in the opposite order. Because capture never completed, **no
 money moved** — the workflow explicitly voids the hold, so this is a *void* situation, not a refund.
+
+#### Retry and timeout policy
+
+Four policies, not one. Which activity gets which is the difference between a
+saga that gives up safely and one that leaves money in limbo.
+
+| Policy | Applies to | Settings | Why these numbers |
+|--------|-----------|----------|-------------------|
+| Forward | every pre-pivot step and the best-effort tail | `StartToClose` 30s · 1s initial, ×2, max 30s · **5 attempts** | Business rejections come back as non-retryable application errors, so a declined card or a genuine shortage fails immediately rather than burning five attempts |
+| Commit | `CommitInventory` only | `StartToClose` 30s · **`ScheduleToClose` 30 min** · **unlimited attempts** · max interval 1 min | Past the pivot the reservation *must* converge, so attempts are unbounded. The **elapsed** bound is the load-bearing half: a panicking inventory handler surfaces as a retryable `Internal`, so without it a deterministic bug would retry forever, the workflow would park permanently, and the breach metric and log would never be reached |
+| Compensation | `VoidPayment`, `RefundPayment`, `ReleaseInventory`, `CancelShipment`, `FailOrder`, `MarkManualReview` | `StartToClose` 30s · max interval 1 min · **10 attempts** | A forward step that gives up merely fails the saga; a compensation that gives up leaves money held or stock reserved with nothing left to drive it |
+| Projection | `RecordProcessingStage` | `StartToClose` **3s** · max interval 2s · **2 attempts** (~7s worst case) | The tightest budget in the saga, because it runs synchronously *ahead of* money-bearing compensations — a slow projection must never delay a refund |
+
+Transport retries and Temporal activity retries do not replace idempotency.
+Every activity may have committed even when its response was lost.
+
+The workflow's terminal writes map onto the order FSM
+([order.md § Order status FSM](./order.md#order-status-fsm) owns the full
+seven-state diagram): pre-pivot exhaustion with **all** compensations
+converged → `failed`; any compensation exhaustion → `manual_review`
+(`COMPENSATION_INCOMPLETE`) — the alert-backed parked state; a successful
+fulfillment tail records `confirmed → completed` best-effort. If even the
+manual-review park cannot land, the workflow fails and the order stays
+`pending`, deliberately keeping the starts-without-outcomes alert firing.
+
+> **Canonical owner:** payment behaviour — the money FSM, the idempotency claim
+> lifecycle, the provider contract and reconciliation — is owned by
+> [payments.md](./payments.md). It is repeated here because the compensation logic
+> above is unreadable without it. If the two ever disagree, payments.md wins.
 
 **Payment state machine** — why "undo" means different things at different points.
 The stored payment status decides whether a compensation is a void or a refund:
@@ -581,31 +645,179 @@ How to read it against the theory above:
    These are how a saga stays trustworthy without a coordinator guaranteeing
    atomicity.
 
+### CancellationWorkflow
 
-#### Retry and Timeout Policy
+**What it is for.** An order that already took money, stock and a shipment is
+being cancelled. This workflow gives each of those back — and when it cannot, it
+says so loudly instead of marking the order cancelled anyway.
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| Activity timeout | `StartToCloseTimeout: 30s` | Bound one execution attempt |
-| Initial retry interval | `1s` | Recover quickly from short transient failures |
-| Backoff coefficient | `2.0` | Reduce pressure on an unhealthy dependency |
-| Maximum interval | `30s` | Cap the delay between attempts |
-| Maximum attempts | `5` | Prevent endless activity retry loops |
-| Business rejection | Non-retryable Temporal application error | Compensate immediately for conditions such as insufficient stock |
+**What starts it.** An accepted cancel request. The API flips the order to
+`cancelling` under a compare-and-swap and writes a row to the cancellation
+outbox in the same transaction; a dispatcher starts one workflow run per episode.
 
-Transport retries and Temporal activity retries do not replace idempotency.
-Every activity may have committed even when its response was lost.
+**What it guarantees.** The run always *completes* — the order's state carries
+the outcome, not the workflow's. Money is returned according to what the payment
+service actually says it did, never according to what this workflow assumed.
+Stock is released only when a reservation is genuinely still held. Anything that
+does not converge parks the order in `manual_review` with a reason code chosen to
+answer the operator's first question, and nothing is ever settled silently.
 
-The workflow's terminal writes map onto the order FSM
-([order.md § Order status FSM](./order.md#order-status-fsm) owns the full
-seven-state diagram): pre-pivot exhaustion with **all** compensations
-converged → `failed`; any compensation exhaustion → `manual_review`
-(`COMPENSATION_INCOMPLETE`) — the alert-backed parked state; a successful
-fulfillment tail records `confirmed → completed` best-effort. If even the
-manual-review park cannot land, the workflow fails and the order stays
-`pending`, deliberately keeping the starts-without-outcomes alert firing.
+It is a separate workflow type rather than a signal into the fulfilment saga
+because by the time a shopper may cancel, that saga is long finished.
 
-### How the Saga Gets Started
+```mermaid
+sequenceDiagram
+    autonumber
+    participant W as CancellationWorkflow
+    participant S as shipping
+    participant P as payment
+    participant I as inventory
+    participant O as order DB
+    W->>W: CheckCancellationPolicy
+    Note over W: if the shipment already left:<br/>park SHIPMENT_DISPATCHED and stop
+    W->>S: CancelShipment
+    W->>P: GetPaymentState
+    alt authorized
+        W->>P: VoidPayment
+    else captured
+        W->>P: RefundPayment(remaining)
+    else processing
+        Note over W: park PAYMENT_OUTCOME_UNKNOWN<br/>never guess an outcome
+    end
+    W->>I: GetReservationState
+    alt still reserved
+        W->>I: ReleaseInventory(ORDER_CANCELLED)
+    else already committed
+        Note over W: RESTOCK_SKIPPED — inventory.v1 has no Return RPC
+    end
+    W->>O: CompleteCancellation(epoch)
+```
+
+Every step reads the true state before acting, which is why there are three
+`Get…` calls in that sequence. The workflow never trusts the amount it was
+started with, and it never releases stock it cannot prove is held.
+
+Customer cancellation is a **separate workflow type** on the same task queue
+(`CancellationWorkflow`, id `order-cancellation-<orderID>-v<epoch>`,
+`REJECT_DUPLICATE`, Pinned per ADR-030) — not a signal into the fulfillment
+saga. A completed saga cannot be signalled, and the accepted
+`completed → cancelling` edge means cancellation must outlive fulfillment
+history anyway ([ADR-033](../proposals/adr/ADR-033-order-status-cancellation/)).
+
+The cancel API CASes the order to `cancelling` **and** arms a
+`cancellation_requests` outbox row in one transaction (the lean sibling of
+the ADR-031 outbox — no payment token, no row-age money hazard), then tries
+an inline start; the worker-side dispatcher sweeps whatever the inline path
+missed. The epoch — the `orders.version` observed at request time — namespaces
+both the workflow id and the episode's command ids, so a legally repeated
+episode (`manual_review → confirmed → cancel again`) re-arms the same row.
+
+Every step reads **current server-side state** rather than trusting inputs:
+
+| Step | Reads | Action |
+|------|-------|--------|
+| `CheckCancellationPolicy` | shipment | Pass when the shipment is pending, cancelled, or absent; a dispatched shipment parks the episode |
+| `CancelShipment` | — | Reused saga compensation (idempotent) |
+| Payment unwind | current payment state | Void an authorization; refund the **remainder** (`amount − refunded`) of a capture |
+| Inventory disposition | current reservation | `RESERVED` → `Release(ORDER_CANCELLED)`; `COMMITTED` → `RESTOCK_SKIPPED` (accepted shrinkage — inventory.v1 has no Return RPC); race → re-read |
+| `CompleteCancellation` | — | CAS `cancelling → cancelled` |
+
+The workflow **always completes**; the order state carries the outcome. Any
+step exhausting its compensation-grade retry budget parks the order in
+`manual_review` instead of failing the workflow. Backstops:
+`OrderStuckCancelling` (critical) and `OrderCancellationOutboxStalled`
+([runbooks](../observability/runbooks/microservices/OrderStuckCancelling.md)).
+
+### AbandonedCheckoutWorkflow
+
+**What it is for.** A checkout session is a thirty-minute quote. This workflow is
+the thing that notices when a shopper walked away and marks the session expired,
+so an abandoned basket does not sit forever holding a promo redemption and a
+price snapshot.
+
+**What starts it.** Every successful session mutation, through **Signal-With-Start**
+— one call that signals the workflow if it is running and starts it if it is not.
+There is no separate "start the timer" step to forget, and no reuse policy is
+needed: the workflow ID is the session ID.
+
+**What it guarantees.** The database is the only clock. The workflow's timer is a
+wake-up call, never a verdict: when it fires, an activity re-reads
+`checkout_sessions.expires_at` and expires the row *only* if the deadline has
+genuinely passed and the session is still in a state that can expire. Losing a
+signal can therefore **delay** an expiry, never cause a wrong one. If Temporal is
+unreachable entirely, session mutations still succeed — the signal is logged and
+dropped — and correctness falls back to the lazy check every read and write
+already performs.
+
+That last property is why this workflow is not versioned. It holds no money and
+no stock, its single write is conditional and idempotent, and its authority lives
+in a database column rather than in workflow history.
+
+```mermaid
+flowchart TD
+    Start(["Signal-With-Start<br/>on session create"]) --> Arm["arm timer<br/>TTL = 30 min"]
+    Arm --> Sel{"select<br/>signals registered<br/>before the timer"}
+    Sel -->|"signal: activity"| Reset{"resets ≥ 500?"}
+    Reset -->|"no · re-arm to TTL"| Arm
+    Reset -->|"yes"| CAN["drain, then<br/>Continue-As-New"]
+    CAN --> Arm
+    Sel -->|"timer fired"| Act["ExpireIfDue<br/>re-reads checkout_sessions"]
+    Act -->|"not_due"| ReArm["re-arm to the row's<br/>remaining time"]
+    ReArm --> Sel
+    Sel -->|"signal: finalize"| Done(["drain and return<br/>session confirmed or cancelled"])
+    Act -->|"expired · gone"| Done
+
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    class Arm,Sel,Reset,CAN,ReArm worker;
+    class Act data;
+```
+
+Three details in that loop are load-bearing:
+
+- **The signals are registered on the selector before the timer.** After a worker
+  outage there can be buffered signals *and* an already-elapsed timer. Adding the
+  signals first means user activity wins the tie, so a session someone is still
+  editing is not expired by a timer that fired while nobody was listening.
+- **Signals are drained on every return path**, and the drain result is checked
+  *before* Continue-As-New. A buffered `finalize` arriving as the run rolls over
+  must not be dropped, or the workflow would keep watching a session that is
+  already finished.
+- **The TTL is fixed for the life of a run**, for determinism. Changing the
+  configured session lifetime does not reach sessions already being watched;
+  those follow the deadline stored on their row, which is the only clock anyway.
+
+The activity's retry policy has **no attempt limit** — a database outage should
+delay an expiry, not abandon the watch — which is safe precisely because the lazy
+check is doing the real work meanwhile.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Watching: session created
+    Watching --> Watching: activity
+    Watching --> Checking: timer fires
+    Watching --> Finalized: finalize
+    Checking --> Watching: not_due
+    Checking --> Expired: expired
+    Checking --> Gone: gone
+    Expired --> [*]
+    Gone --> [*]
+    Finalized --> [*]
+```
+
+`gone` is the interesting outcome: the session is out of this workflow's
+jurisdiction — already terminal, or parked mid-confirm where an idempotency claim
+owns it. The watch simply ends. If such a session later returns to an expirable
+state, the next mutation's Signal-With-Start begins watching it again.
+
+The full session contract — the funnel states, the routes, and what expiry means
+to a caller — is owned by [checkout.md](./checkout.md).
+
+### Shared mechanics
+
+The two order workflows share a worker, a task queue, and the machinery below.
+
+#### How the Saga Gets Started
 
 Temporal cannot join the PostgreSQL transaction, so committing the order and
 starting its workflow can never be atomic with each other. Until RFC-0021 P3 the
@@ -674,40 +886,49 @@ handling: a database failure blanks all three together, so a naive threshold wou
 *resolve* during the incident. Full rationale and the accepted trade-offs are in
 [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/).
 
-### The Cancellation Workflow (RFC-0021 P5)
+#### The stock participant (RFC-0021 P3, narrowed by P4)
 
-Customer cancellation is a **separate workflow type** on the same task queue
-(`CancellationWorkflow`, id `order-cancellation-<orderID>-v<epoch>`,
-`REJECT_DUPLICATE`, Pinned per ADR-030) — not a signal into the fulfillment
-saga. A completed saga cannot be signalled, and the accepted
-`completed → cancelling` edge means cancellation must outlive fulfillment
-history anyway ([ADR-033](../proposals/adr/ADR-033-order-status-cancellation/)).
+Stock lives at inventory-service, and only there. P3 routed the stock steps
+through a per-workflow participant so the write could move without a flag day;
+**P4 (order 1.13.0) removed the product-service branch it moved away from**:
 
-The cancel API CASes the order to `cancelling` **and** arms a
-`cancellation_requests` outbox row in one transaction (the lean sibling of
-the ADR-031 outbox — no payment token, no row-age money hazard), then tries
-an inline start; the worker-side dispatcher sweeps whatever the inline path
-missed. The epoch — the `orders.version` observed at request time — namespaces
-both the workflow id and the episode's command ids, so a legally repeated
-episode (`manual_review → confirmed → cancel again`) re-arms the same row.
+| Participant | Forward | Compensation | Post-pivot |
+|---|---|---|---|
+| `inventory` | `ReserveInventory` | `ReleaseInventory` | `CommitInventory`, **mandatory forward** — a confirmed order retries it to completion |
+| `product`, or absent (every order created before P3) | — | — | **REFUSED.** Not re-routed |
 
-Every step reads **current server-side state** rather than trusting inputs:
+The refusal is the load-bearing part. Re-routing a product order to inventory
+would release stock inventory never reserved and orphan the real hold at
+product-service — the invisible-hold split the pinning exists to prevent. So the
+token keeps its historical meaning and simply cannot be served: no saga is
+created, and the order's outbox row goes terminal with `PARTICIPANT_UNSERVABLE`
+(runbook `FulfillmentStartOutboxFailed`).
 
-| Step | Reads | Action |
-|------|-------|--------|
-| `CheckCancellationPolicy` | shipment | Pass when the shipment is pending, cancelled, or absent; a dispatched shipment parks the episode |
-| `CancelShipment` | — | Reused saga compensation (idempotent) |
-| Payment unwind | current payment state | Void an authorization; refund the **remainder** (`amount − refunded`) of a capture |
-| Inventory disposition | current reservation | `RESERVED` → `Release(ORDER_CANCELLED)`; `COMMITTED` → `RESTOCK_SKIPPED` (accepted shrinkage — inventory.v1 has no Return RPC); race → re-read |
-| `CompleteCancellation` | — | CAS `cancelling → cancelled` |
+Where that refusal lives matters, and a workflow panic alone is **not** enough:
+it fails the workflow TASK, so the gRPC call still answers success, the
+dispatcher sees a RUNNING execution and closes its outbox row, and the
+reconciler only scans terminal orders. So `fulfillment.Start` refuses (the one
+place a saga is created), the gRPC replay answers the existing order without a
+kickoff, and the dispatcher asks Temporal before condemning a row — a live saga
+is honoured, a confirmed absence goes terminal. The workflow guard is the last
+backstop, for a history force-migrated by hand.
 
-The workflow **always completes**; the order state carries the outcome. Any
-step exhausting its compensation-grade retry budget parks the order in
-`manual_review` instead of failing the workflow. Backstops:
-`OrderStuckCancelling` (critical) and `OrderCancellationOutboxStalled`
-([runbooks](../observability/runbooks/microservices/OrderStuckCancelling.md)).
+Which value gets stamped is resolved from the **order's own record**, never from
+the process answering (order-service #155): `CreateOrder` writes the participant
+into the order's outbox row in the same transaction, and every start path
+resolves through one shared `fulfillment.ParticipantFor`. The column is
+CHECK-constrained (migration `000010`). Every resolution is counted:
+`order_fulfillment_start_participant_total{participant, source, result}` —
+`source` distinguishes `recorded` / `absent` / `unrecognised`, `result`
+distinguishes `started` / `refused`, and `unrecognised` is alerted on
+(`OrderStartParticipantUnrecognised`).
 
-### The Inventory Reconciler
+**Rollout requirement, not a property of the code:** the removal ships as a new
+Worker Deployment Version, so pinned versioning must be ON and the previous
+build must keep polling until pre-P4 sagas drain. A pinned saga left with no
+poller stalls with its stock held and its payment authorized.
+
+#### The Inventory Reconciler
 
 The outbox above covers a saga that never **started**; the reconciler covers a
 saga that started and left its **stock** disagreeing with its outcome — a
@@ -741,7 +962,7 @@ suspect — not for dependency outages, which it defers on by itself.
 | `order_reconciler_participant_disagreements_total{row_participant}` | Should read flat zero; any increase is a distinct order |
 | `order_reconciler_passes_truncated_total` | The 200-row batch cap was hit; the backlog is a floor, not a count |
 
-### Contracts and the Checkout Flow
+#### Contracts and the Checkout Flow
 
 East-west contracts in [`duynhlab/pkg`](https://github.com/duynhlab/pkg) (`pkg/proto`, `buf`;
 introduced in `v0.7.0`), all **idempotent** so activity retries are safe:
@@ -808,7 +1029,7 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
 Worker Deployment Versions, one worker manifest per build.
 
-- The worker registers as deployment **`order-fulfillment`** build **`1.13.1`** (one manifest per pinned build; the number tracks the order release)
+- The worker registers as deployment **`order-fulfillment`** build **`1.13.2`** (one manifest per pinned build; the number tracks the order release)
   (`TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, read by
   `pkg/temporalx`; both-or-neither, half-set refuses to start). The workflow
   registers **`VersioningBehaviorPinned`** — a saga holding money and stock is
@@ -831,7 +1052,7 @@ Worker Deployment Versions, one worker manifest per build.
 
 Deliberate deviations from the original design:
 
-- **Pivot = ConfirmOrder** (step 4 in [Workflow at a Glance](#workflow-at-a-glance)); post-pivot steps are best-effort.
+- **Pivot = ConfirmOrder** (step 4 in [Steps and compensation](#steps-and-compensation)); post-pivot steps are best-effort.
 - **Workflow start is centralized in `internal/fulfillment`** (RFC-0015 P2, ADR-018): both the web
   handler and the gRPC `CreateOrder` server delegate to the same starter, so the logic layer stays
   Temporal-free. If Temporal is unavailable the order is still created (`pending`) and the start is
@@ -846,8 +1067,9 @@ Deliberate deviations from the original design:
   (product migration `000006`) with the RPCs that wrote it.
 
 **Roadmap:** tracked as **Future work in [RFC-0001](../proposals/rfc/RFC-0001/)** —
-Grafana dashboard (**Planned**) and the platform-db DR replica cluster
-(**Planned**) remain; the server bump shipped past the 1.27.x target (1.31.2,
+the platform-db DR replica cluster (**Planned**) remains — the Grafana
+dashboard shipped (`temporal-workflows`, in the observability dashboards
+kustomization); the server bump shipped past the 1.27.x target (1.31.2,
 ADR-030 re-platform) and the first GameDay drill ran 2026-08-06
 ([RFC-0021 gameday](../proposals/rfc/RFC-0021/gameday.md), G2).
 Already shipped from that list: cache-bust on reserve (product's
@@ -868,7 +1090,7 @@ How to deploy the worker, run the saga locally, and watch it in production.
   still needs liveness and readiness probes). Worker metrics export over OTLP.
 - **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
   ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
-  `order-worker-1-13-0` HelmRelease (`kubernetes/apps/order-worker-1-13-0.yaml`, namespace `order` —
+  `order-worker-1-13-2` HelmRelease (`kubernetes/apps/order-worker-1-13-2.yaml`, namespace `order` —
   one file per Worker Deployment Version; a retired file is deleted once its build is
   Current-superseded with nothing pinned to it, as 1-8-0 was, see
   [Worker Deployment Versioning](#worker-deployment-versioning-as-built)) carrying the
@@ -902,7 +1124,6 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - **Failure handling** — insufficient stock fails fast (non-retryable) and compensates; transient
   downstream errors retry per policy; a stuck workflow is visible (and terminable) in the UI.
 
-
 ## References
 
 - [workflows.md](./workflows.md) — platform workflow registry
@@ -917,4 +1138,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-08-07 — worker build id tracks the current pin; roadmap reflects the shipped server bump and the recorded GameDay drill._
+_Last updated: 2026-08-10 — renamed from temporal-order-fulfillment.md and rebuilt around all three workflows: CancellationWorkflow gains a diagram, AbandonedCheckoutWorkflow is documented for the first time, the retry table covers all four policies including CommitInventory, and the worker build id is corrected to 1.13.2._

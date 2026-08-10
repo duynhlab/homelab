@@ -27,7 +27,7 @@ Cart turns browsing intent into a per-user, mutable basket — and hands checkou
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `ClearCart` activity → `DELETE /cart/v1/internal/cart/:userId` after fulfillment — best-effort, no compensation |
 | **Idempotency** | Delete-all-rows for one `user_id` — naturally idempotent; a replayed clear is a no-op |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
 
 Cart is the only saga participant reached over REST instead of gRPC — a
 documented exception: the internal route lets the worker clear a cart **without
@@ -303,6 +303,6 @@ Paths in [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service). Tr
 - [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) — cart gRPC read surface
 - [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) — checkout re-validation policy
 - [checkout.md](./checkout.md) · [product.md](./product.md) · [order.md](./order.md) — neighbor contracts
-- [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga deep dive
+- [temporal.md](./temporal.md) — saga deep dive
 
 _Last updated: 2026-08-07 — the legacy order→cart pricing gap closed with RFC-0021 P5; RFC-0015 implemented._

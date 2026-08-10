@@ -94,7 +94,7 @@ gaps that are already acknowledged in our docs:
   outbox/publish point later).
 - **No second saga.** The "parent CheckoutWorkflow" from early sketches already
   exists as `OrderFulfillmentWorkflow`
-  ([`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md));
+  ([`docs/api/temporal.md`](../../../api/temporal.md));
   this RFC does not wrap, replace, or re-parent it.
 - **No asynchronous payment confirmation via Signal, and no
   post-confirmation order cancellation.** Both touch the shipped
@@ -716,7 +716,7 @@ Phased P1→P6 as above. Blast-radius notes:
 - Docs to update on implementation: [`docs/api/api.md`](../../../api/api.md),
   [`docs/api/microservices.md`](../../../api/microservices.md),
   [`docs/api/checkout.md`](../../../api/checkout.md),
-  [`docs/api/temporal-order-fulfillment.md`](../../../api/temporal-order-fulfillment.md),
+  [`docs/api/temporal.md`](../../../api/temporal.md),
   [`docs/README.md` § Repositories](../../../README.md#repositories).
 
 ---

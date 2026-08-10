@@ -29,7 +29,7 @@ reconciliation loop that proves the books match the provider.
 | **Workflow** | `OrderFulfillmentWorkflow` (owned by order) |
 | **This service's steps** | `Authorize`, `Capture` (steps); `Void`, `Refund` (compensations) |
 | **Idempotency** | Order-keyed: `order:<id>` (Authorize), `refund:order:<id>` (Refund); Capture/Void replay by state |
-| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) |
+| **Deep dive** | [workflows.md](./workflows.md#order-fulfillment) · [temporal.md](./temporal.md) |
 
 ## Why it exists
 
@@ -494,7 +494,7 @@ Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-servic
 ## References
 
 - [api.md](./api.md) — shared HTTP/gRPC conventions (auth, error envelope, pagination, gRPC runtime)
-- [order.md](./order.md) · [temporal-order-fulfillment.md](./temporal-order-fulfillment.md) — saga handoff and compensation
+- [order.md](./order.md) · [temporal.md](./temporal.md) — saga handoff and compensation
 - [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 

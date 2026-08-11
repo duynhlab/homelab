@@ -106,6 +106,18 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- ADR-039 (run local-stack Temporal as `temporalio/server` on Postgres with
+  admin-tools): proposes replacing the single dev-server container with the
+  official multi-container topology, reusing the existing `postgres` service for
+  persistence, so state survives a server restart and a Worker Deployment
+  Version drain can be rehearsed across one locally instead of only on Kind.
+  Argued on durability and storage-engine parity after measurement refuted two
+  of the draft's claims: the versioning search attributes are built-in system
+  attributes needing no registration, and the versioning APIs are not gated
+  behind dynamic config — both worked on the dev-server. Records the newly
+  tested alternative of persisting the dev-server's SQLite to a volume and why
+  the storage engine decides against it. Docs-only; the compose rewrite lands
+  in a follow-up.
 - ADR-040 (deliver Tempo through the `grafana-community/tempo` Helm chart):
   proposes a chart-based replacement for the hand-written Tempo Deployment
   and ConfigMap, delivered as a Flux `HelmRelease` that matches every other

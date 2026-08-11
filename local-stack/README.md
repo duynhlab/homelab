@@ -114,7 +114,7 @@ flowchart LR
     KONG --> SVC["11 Go services<br/>including inventory"]
     SVC -->|"payment provider HTTP"| MP["mockpay<br/>provider stub"]
     MP -->|"signed webhook"| KONG
-    SVC --> PG[("PostgreSQL<br/>11 databases")]
+    SVC --> PG[("PostgreSQL<br/>13 databases")]
     SVC -->|"product cache"| VALKEY[("Valkey")]
     KONG -->|"rate limit"| VALKEY
     SVC -->|"order + checkout"| TMP["Temporal :7233<br/>order + checkout workers"]

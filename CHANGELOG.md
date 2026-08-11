@@ -83,6 +83,11 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- ADR-039 (run local-stack Temporal as `temporalio/server` on Postgres with
+  admin-tools): proposes replacing the single dev-server container with the
+  official multi-container topology, reusing the existing `postgres` service for
+  persistence, so a Worker Deployment Version cutover can be rehearsed locally
+  instead of only on Kind. Docs-only; the compose rewrite lands in a follow-up.
 - ADR-040 (deliver Tempo through the `grafana-community/tempo` Helm chart):
   proposes a chart-based replacement for the hand-written Tempo Deployment
   and ConfigMap, delivered as a Flux `HelmRelease` that matches every other

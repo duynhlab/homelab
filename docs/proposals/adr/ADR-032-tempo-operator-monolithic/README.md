@@ -248,6 +248,83 @@ Read this as a **reference** for what Kafka would replace on the write path
 the synchronous ingest and query paths; dotted arrows are the asynchronous
 Kafka consumers that microservices mode requires.
 
+### Delivery mechanism
+
+The decision above chooses **tempo-operator as the reconciler**, but the
+operator itself is not shipped as a Helm chart. Every other operator in the
+homelab today (cnpg, kyverno, cert-manager, jaegertracing, sloth, openbao,
+altinity clickhouse-operator, temporal, grafana, pgdog) arrives through
+`HelmRelease` + `HelmRepository`. The homelab has no in-tree precedent for
+raw manifest bundles or remote kustomize URLs.
+
+Upstream state today:
+
+- `grafana/tempo-operator` releases publish a single asset:
+  `tempo-operator.yaml` (raw manifest bundle). No `.tgz`, no chart.
+- `grafana/helm-charts` (official Grafana chart repo) contains `tempo`,
+  `tempo-distributed`, and `tempo-vulture` — **no `tempo-operator`**.
+- No community Helm chart for the operator has meaningful traction.
+
+Delivery options for the operator (independent of the operator-vs-chart
+decision):
+
+| Delivery option | Fits homelab pattern? | Diff visibility per bump | Offline / air-gap | Renovate ergonomics |
+|-----------------|-----------------------|--------------------------|-------------------|---------------------|
+| **HelmRelease + HelmRepository** — the pattern every other operator uses | Ideal — **but no chart exists** for tempo-operator | Chart version + rendered diff | Depends on chart pull | First-class |
+| **Vendored bundle** — `curl` `tempo-operator.yaml@vX.Y.Z` into the repo, patch through kustomize | Off-pattern (no in-tree precedent) | Full diff in the bump PR | Yes | Custom regex manager |
+| **Remote kustomize URL** — `resources: [https://github.com/grafana/tempo-operator/releases/download/vX.Y.Z/tempo-operator.yaml]` | Off-pattern | URL string only | No (Flux/kustomize fetches at reconcile) | Custom regex manager |
+
+**Chart route as a full alternative to the operator.**
+`grafana-community/helm-charts` (Apache-2.0, community-maintained by third
+parties, not Grafana Labs upstream) ships two Tempo charts that this ADR
+must weigh honestly, because they let us adopt the `HelmRelease` pattern
+without the operator:
+
+| Chart | Mode | appVersion (2026-08) | What it gives us |
+|-------|------|----------------------|------------------|
+| `grafana-community/tempo` | Single-binary (monolithic) | `2.10.7` | Deployment/StatefulSet + ConfigMap + Service + ServiceMonitor; `tempo.metricsGenerator.storage.remote_write` is a first-class values field |
+| `grafana-community/tempo-distributed` | Microservices | `3.0.2` | Distributed Tempo 3.x today (~5–7 pods; Kafka once Rhythm defaults land) |
+
+Adopting the community `tempo` chart instead of the operator (recorded as
+Alternative D) is technically viable and would deliver most of the
+metrics-generator win driving this ADR. It is rejected because it does not
+satisfy the four ADR drivers together:
+
+- **Driver 1 (operability):** the chart still hand-rolls Tempo's config
+  through values; a chart bump is still four coordinated changes across
+  ConfigMap-like values, ServiceMonitor knobs, alert values, and the
+  Deployment section, just written in Helm shape. It does not consolidate
+  operational surface the way a CR does.
+- **Driver 3 (learning value):** swapping one templating layer for another
+  is an explicit non-goal of the RFC that spawned this ADR.
+- **Community maintenance:** `grafana-community/helm-charts` is not owned by
+  Grafana Labs; maintainers are individual contributors. It is a fine
+  fallback but not the same trust surface as the operator.
+
+**Selected delivery mechanism for tempo-operator: vendored bundle.**
+`curl tempo-operator.yaml@v0.21.0` into
+`kubernetes/infra/controllers/tracing/tempo-operator/` and pin the tag in a
+header comment. Rationale:
+
+- Homelab has no HelmRelease option; the choice is between vendored and a
+  remote URL fetch.
+- Vendored gives full YAML diff on every Renovate bump, so review can catch
+  RBAC widening or webhook changes before merge.
+- Kyverno posture (resources, probes, PSS baseline) is greppable in-tree.
+- Reconciles do not depend on Flux pulling a URL at runtime.
+
+The header comment must state that this is a deliberate off-pattern: no
+Helm chart exists upstream, no other operator ships this way here, and
+Renovate uses a custom `github-releases` datasource pointed at
+`grafana/tempo-operator` to bump the bundle.
+
+**Fallback trigger.** If upstream ships an official Helm chart for
+tempo-operator (either under `grafana/helm-charts` or as a first-party
+release), or a community chart reaches the trust threshold used for
+`altinity/clickhouse-operator` (in-tree today), migrate the operator
+delivery to `HelmRelease` in a follow-up PR — this does not require a new
+ADR because the operational shape (CR + reconciler) does not change.
+
 ## Alternatives considered
 
 | Option | Benefits | Costs / risks | Result |
@@ -255,7 +332,8 @@ Kafka consumers that microservices mode requires.
 | **A — TempoMonolithic via tempo-operator** | Keeps the 1-pod footprint; managed upgrades; operator-generated ServiceMonitor/PrometheusRules; embedded Jaeger UI; native S3 secret handling (drops the `expand-env` splice) | New controller + webhook to run; `v1alpha1` API; retention and metrics-generator only reachable via `extraConfig`; service DNS name changes | **Selected** |
 | **B — TempoStack via tempo-operator** | First-class CRD fields for retention/limits/metrics-generator; `resources.total` auto-split; multitenancy, OIDC/RBAC gateway, inter-component mTLS | Microservices mode: ~5–7 pods (distributor, ingester + PVC, querier, query-frontend, compactor, optional gateway) on Tempo 2.x, and Tempo 3.x microservices adds Kafka as a durable buffer between distributor and consumers — a large jump from one 256Mi pod on Kind, buying features this single-tenant, no-in-cluster-auth platform does not use | Rejected |
 | **C — Keep the raw Deployment** | Zero new moving parts; Renovate keeps bumping the image directly | Hand-maintained config/monitoring surface persists; metrics-generator still needs manual wiring; no operator learning | Rejected |
-| **D — `grafana/tempo` Helm chart** | Less YAML than raw manifests; familiar HelmRelease flow | No managed upgrades or CRD semantics; swaps one templating layer for another without the learning value that motivates the change | Rejected |
+| **D — `grafana-community/tempo` Helm chart (single-binary)** | Familiar `HelmRelease` + `HelmRepository` flow already used for cnpg, kyverno, clickhouse-operator, grafana; `metrics_generator.remote_write` is a first-class values field; no `v1alpha1` CRD to track; no new controller to run | Community-maintained (`grafana-community/helm-charts`, not `grafana/helm-charts` upstream); still hand-rolls config/ServiceMonitor/alerts — the four hand-kept files problem does not go away; provides no CRD semantics; keeps the `-config.expand-env` splice unless we wire values differently; no learning value for operator adoption | Rejected — kept as the fallback shape if driver 3 gets deprioritized (see [Delivery mechanism](#delivery-mechanism)) |
+| **E — `grafana-community/tempo-distributed` Helm chart (microservices)** | Distributed Tempo 3.x is available today (chart appVersion 3.0.2) without waiting for tempo-operator to ship 3.x | ~5–7 component pods just like TempoStack; Tempo 3.x microservices pulls in Kafka; buys the same features single-tenant Kind does not use; still hand-rolls the surrounding observability wiring | Rejected on the same footprint grounds as B |
 
 ### Why the selected option won
 
@@ -373,6 +451,8 @@ requires a new ADR that supersedes this one.
 - [Tempo 3.0 release notes](https://grafana.com/docs/tempo/latest/release-notes/v3-0/) — ingester/compactor removal, Rhythm architecture, config migration
 - [Migrate from Tempo 2.x to 3.0](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/migrate-to-3/)
 - [Tempo architecture](https://grafana.com/docs/tempo/latest/introduction/architecture/) — monolithic vs microservices, Kafka boundary in Rhythm write path
+- [`grafana-community/helm-charts` — `tempo` chart](https://github.com/grafana-community/helm-charts/tree/main/charts/tempo) — single-binary Helm chart, appVersion 2.10.x (community-maintained)
+- [`grafana-community/helm-charts` — `tempo-distributed` chart](https://github.com/grafana-community/helm-charts/tree/main/charts/tempo-distributed) — microservices Helm chart, appVersion 3.0.x (community-maintained)
 - [Tracing hub](../../../observability/tracing/README.md)
 - [Trace backends comparison](../../../observability/tracing/backends-comparison.md) — reserves backend consolidation for a future ADR
 - [Observability stack review](../../../observability/stack-review.md)
@@ -385,6 +465,7 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-07-30 | Proposed / Not started | Initial draft |
 | 2026-08-10 | Proposed / Not started | Note Tempo 3.0 rearchitecture (ingester/compactor removed) as context and revisit trigger; keep 2.10.5 as landing pad through the operator. Make the Kafka boundary explicit: `TempoMonolithic` needs no Kafka at any version, Rhythm microservices does — add a reference diagram of Tempo 3.x microservices under Decision view. Renovate PR #694 (`v3.0.2` bump) rejected on this basis. |
+| 2026-08-10 | Proposed / Not started | Add **Delivery mechanism** subsection under Decision: upstream `grafana/tempo-operator` ships no Helm chart, only a raw `tempo-operator.yaml` bundle. Homelab has no in-tree precedent for either vendored bundles or remote kustomize URLs, but every existing operator uses `HelmRelease`. Record the trade-off and select the vendored bundle for diff visibility and offline safety, with a fallback to `HelmRelease` if upstream ships a chart. Refresh Alternative D (`grafana-community/tempo` single-binary chart) with a concrete rejection and add Alternative E (`grafana-community/tempo-distributed`). |
 
 ---
 _Last updated: 2026-08-10_

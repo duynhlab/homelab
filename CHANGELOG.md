@@ -83,6 +83,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- ADR-032 amended (Tempo delivery via tempo-operator `TempoMonolithic`): add
+  a **Delivery mechanism** subsection under Decision. Upstream tempo-operator
+  ships no Helm chart, only a raw `tempo-operator.yaml` bundle, so the homelab
+  cannot follow the `HelmRelease` pattern every other operator here uses.
+  Record the trade-off between a vendored bundle and a remote kustomize URL,
+  select the vendored bundle for diff visibility and offline safety, and
+  document the fallback to `HelmRelease` if a first-party chart appears.
+  Refresh Alternative D (`grafana-community/tempo` single-binary chart) with
+  a concrete rejection and add Alternative E (`grafana-community/tempo-distributed`).
 - ADR-032 amended (Tempo delivery via tempo-operator `TempoMonolithic`): note
   Tempo 3.0's rearchitecture (ingester and compactor modules removed, Project
   Rhythm becomes the default write path) as context and as an explicit revisit

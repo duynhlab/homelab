@@ -81,6 +81,10 @@ Skeleton (copy what you need):
 
 ### Feature
 
+- local-stack E2E audit gains **A12** (cancellation unwind) and **A13** (the
+  abandonment timer), the two Temporal workflows it never exercised, and C4 now
+  checks the `temporal-worker-local` dashboard that already ships.
+
 #### Proposals
 
 - ADR-040 (deliver Tempo through the `grafana-community/tempo` Helm chart):

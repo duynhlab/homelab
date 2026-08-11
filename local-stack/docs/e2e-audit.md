@@ -250,7 +250,9 @@ audit_curl -s $BASE/order/v1/private/orders/$OID -H "Authorization: Bearer $AT0"
 # One redemption exactly, order_id backfilled:
 docker compose exec -T postgres psql -U postgres -d checkout -t -c \
   "SELECT code, order_id IS NOT NULL AS used FROM promo_redemptions ORDER BY id DESC LIMIT 1" </dev/null
-docker compose exec -T temporal temporal workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" </dev/null 2>/dev/null | head -3
+# The CLI lives in temporal-admintools: the `temporalio/server` image ships only
+# the server binary, so `exec -T temporal temporal ...` fails with "not found".
+docker compose exec -T temporal-admintools temporal workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" </dev/null 2>/dev/null | head -3
 
 # Abandonment (ADR-019): the DB deadline is the authority; the workflow timer
 # makes expiry proactive. Shorten the DB deadline and verify the outcome.

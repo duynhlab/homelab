@@ -1,8 +1,9 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
-# Brings up: Postgres (11 DBs) + Valkey cache + per-service golang-migrate migrations
-# + 11 Go services + a Temporal dev server + the order-fulfillment worker + a
-# Kong DB-less gateway (mirrors the in-cluster Kong) + the React frontend.
+# Brings up: Postgres (13 DBs) + Valkey cache + per-service golang-migrate migrations
+# + 11 Go services + Temporal (server 1.31.2 on Postgres, as in the cluster) + the
+# order-fulfillment worker + a Kong DB-less gateway (mirrors the in-cluster Kong)
+# + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be
 # checked out next to homelab/. Run from this directory:
@@ -77,20 +78,140 @@ services:
       timeout: 3s
       retries: 10
 
-  # ---- Temporal dev server (in-memory; drives the order-fulfillment saga) ----
-  # `server start-dev` bundles frontend (:7233) + Web UI (:8233) in one container
-  # and auto-registers the `mop` namespace. In-memory persistence (ephemeral).
+  # ---- Temporal (drives the order-fulfillment saga) ----
+  # Server and storage engine match the cluster: server 1.31.2 (chart 1.6.0's
+  # appVersion) on Postgres through the `postgres12` plugin, databases `temporal`
+  # and `temporal_visibility`. That is what makes Temporal testable end to end
+  # here — workflow history, timers and Worker Deployment Versioning state all
+  # survive `docker compose restart temporal`. The previous `start-dev` server
+  # kept everything in memory, so a restart took the namespace from 9 live
+  # executions to 0 and no drain rehearsal could span one.
+  #
+  # Five containers replace the single dev-server, in this order:
+  #   temporal-schema (run-once) -> temporal -> temporal-bootstrap (run-once)
+  # plus temporal-admintools and temporal-ui. Services depend on the bootstrap,
+  # not the server, because the `mop` namespace does not exist until it runs.
+  #
+  # `temporalio/server` carries no client binary — only `temporal-server` and
+  # busybox — so every `temporal ...` command runs in temporal-admintools:
+  #   docker compose exec -T temporal-admintools temporal workflow list --namespace mop
+  #
+  # `docker compose down` still wipes this: `postgres` has no data volume, by
+  # design. Use `restart` to exercise durability.
+  temporal-schema:
+    image: temporalio/admin-tools:1.31.2
+    # A healthy postgres can still refuse the first connection during bring-up;
+    # retry rather than failing every Temporal-dependent service behind it.
+    restart: on-failure:5
+    environment:
+      SQL_PASSWORD: postgres # temporal-sql-tool reads the password from here, not a flag
+    # The two databases are created by postgres/init.sql, mirroring the cluster
+    # where CNPG postInitSQL owns creation and Temporal runs with
+    # `createDatabase: false`. Re-running is safe: setup-schema skips a database
+    # whose version already exceeds the initial one, and update-schema then finds
+    # no pending updates.
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        for db in temporal temporal_visibility; do
+          [ "$$db" = temporal ] && dir=temporal || dir=visibility
+          temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u postgres --db "$$db" \
+            setup-schema -v 0.0
+          temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u postgres --db "$$db" \
+            update-schema -d "/etc/temporal/schema/postgresql/v12/$$dir/versioned"
+        done
+    depends_on:
+      postgres: { condition: service_healthy }
+
   temporal:
-    image: temporalio/temporal:1.7.2
-    command: ["server", "start-dev", "--ip", "0.0.0.0", "--namespace", "mop", "--log-level", "warn"]
+    image: temporalio/server:1.31.2
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PWD: postgres
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+      # Cluster runs 512 (helmrelease.yaml). 4 is a deliberate local divergence:
+      # shard count partitions throughput, not behaviour, and local-stack does no
+      # load testing. Immutable once the databases are initialised.
+      NUM_HISTORY_SHARDS: "4"
+      LOG_LEVEL: warn # Vector tails this container; info-level server logs swamp VictoriaLogs
+      TEMPORAL_LOG_FORMAT: zapjson # structured, so VictoriaLogs parses fields instead of raw text
+      # The entrypoint derives TEMPORAL_BROADCAST_ADDRESS from the hostname when
+      # this is a wildcard, so ring membership still works and the healthcheck
+      # below can use localhost.
+      BIND_ON_IP: 0.0.0.0
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+    # Required, not optional: the server refuses to start when
+    # DYNAMIC_CONFIG_FILE_PATH does not resolve, and the image ships no such file.
+    volumes:
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig:ro
     ports:
       - "7233:7233" # frontend gRPC
-      - "8233:8233" # Web UI (http://localhost:8233)
+    # `nc` because this image carries no CLI — only `temporal-server` and busybox.
+    # It is also namespace-independent, which matters: a `--namespace mop` probe
+    # would deadlock, since `mop` is created by temporal-bootstrap, which in turn
+    # waits on this healthcheck.
     healthcheck:
-      test: ["CMD", "temporal", "workflow", "list", "--address", "localhost:7233", "--namespace", "mop"]
+      test: ["CMD", "nc", "-z", "localhost", "7233"]
       interval: 5s
       timeout: 5s
       retries: 30
+    depends_on:
+      postgres: { condition: service_healthy }
+      temporal-schema: { condition: service_completed_successfully }
+
+  # Registers `mop` with the cluster's retention (168h). Gate Temporal-dependent
+  # services on this completing, not on the server being healthy.
+  temporal-bootstrap:
+    image: temporalio/admin-tools:1.31.2
+    restart: on-failure:5 # the frontend can accept a TCP probe just before it serves the API
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        if temporal operator namespace describe --namespace mop >/dev/null 2>&1; then
+          echo "namespace mop already registered"
+        else
+          temporal operator namespace create --namespace mop --retention 168h \
+            --description "duynhlab platform workflows (order-fulfillment saga)"
+        fi
+    depends_on:
+      temporal: { condition: service_healthy }
+
+  # The CLI target. `temporalio/server` ships only the server binary and busybox,
+  # so every `temporal ...` invocation — the e2e runbook's workflow queries, the
+  # versioning drill, ad-hoc debugging — runs here:
+  #   docker compose exec -T temporal-admintools temporal workflow list --namespace mop
+  # This mirrors `kubectl exec deploy/temporal-admintools` on the cluster, and the
+  # tag tracks the cluster's admin-tools pin so the client is never older than the
+  # server it talks to.
+  temporal-admintools:
+    image: temporalio/admin-tools:1.31.2 # default entrypoint sleeps; nothing to run
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      # `mop` is the only namespace here, so default to it. Without this the CLI
+      # silently queries `default` and returns an empty list rather than an error
+      # — an easy way to mis-read a green run as a failure.
+      TEMPORAL_NAMESPACE: mop
+    depends_on:
+      temporal: { condition: service_healthy }
+
+  temporal-ui:
+    image: temporalio/ui:2.53.1
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8233:8080" # keeps the documented http://localhost:8233
+    depends_on:
+      temporal: { condition: service_healthy }
 
   # ---- Observability: traces → VictoriaTraces; span-derived RED metrics → VictoriaMetrics ----
   # Services emit OTLP-HTTP to the collector (:4318). The collector (a) re-exports traces to
@@ -564,7 +685,7 @@ services:
       product: { condition: service_healthy }
       order: { condition: service_healthy }
       shipping: { condition: service_healthy }
-      temporal: { condition: service_healthy }
+      temporal-bootstrap: { condition: service_completed_successfully }
 
   # ---- Checkout Temporal worker (AbandonedCheckoutWorkflow, ADR-019) ----
   checkout-worker:
@@ -585,7 +706,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       checkout-migrate: { condition: service_completed_successfully }
-      temporal: { condition: service_healthy }
+      temporal-bootstrap: { condition: service_completed_successfully }
 
   # ---- Mock payment provider (a second deployment of the payment binary via
   # the `mockpay` subcommand — the real network hop behind payment's provider
@@ -656,7 +777,7 @@ services:
       auth: { condition: service_healthy }
       cart: { condition: service_healthy }
       shipping: { condition: service_healthy }
-      temporal: { condition: service_healthy }
+      temporal-bootstrap: { condition: service_completed_successfully }
 
   # ---- Order fulfillment worker (Temporal: runs the saga's activities) ----
   order-worker:
@@ -689,7 +810,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
-      temporal: { condition: service_healthy }
+      temporal-bootstrap: { condition: service_completed_successfully }
       inventory: { condition: service_healthy }
       shipping: { condition: service_healthy }
       notification: { condition: service_healthy }

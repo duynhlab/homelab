@@ -1,0 +1,20 @@
+# Dynamic config for the local Temporal server.
+#
+# This file exists mainly because it must: `temporal-server` resolves
+# DYNAMIC_CONFIG_FILE_PATH (default `config/dynamicconfig/docker.yaml`) and
+# refuses to start when the path is missing, and the `temporalio/server` image
+# ships no such file. Upstream's own compose sample mounts a directory here for
+# the same reason.
+#
+# It is NOT how Worker Deployment Versioning is enabled: those APIs are on by
+# default in server 1.31 and were exercised end-to-end here with no dynamic
+# config at all. The cluster runs with no dynamic config, so keep this file as
+# close to empty as possible — every key added here is local-only behaviour that
+# the cluster does not have.
+#
+# Search attributes are cached and refreshed periodically; reading them straight
+# after a workflow starts (the versioning drill does exactly that) otherwise
+# races the cache. Dev-only, as upstream marks it.
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}

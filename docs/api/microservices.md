@@ -89,7 +89,7 @@ flowchart LR
 | order-worker | `:8080` health | client only | `order` | — | Temporal; inventory/shipping/notification/payment (gRPC), cart (REST clear) |
 | checkout-worker | `:8080` health | — | `checkout` | — | Temporal (`AbandonedCheckoutWorkflow`; DB-only activities) |
 | mockpay | `:8080` | — | — | — | called by payment; webhooks → gateway → payment public route |
-| temporal | — (`7233` gRPC, `8233` UI) | — | — (in-memory dev) | — | callers: order, checkout, both workers |
+| temporal | — (`7233` gRPC, `8233` UI) | — | `temporal`, `temporal_visibility` | — | callers: order, checkout, both workers; CLI via `temporal-admintools` |
 | gateway (Kong 3.9) | `8000` → host `8080` | — | — | Valkey (rate-limit) | ten HTTP services + cache; inventory remains east-west only; callers: frontend, browser, mockpay webhooks |
 | frontend | `80` → host `3001` | — | — | — | gateway only |
 

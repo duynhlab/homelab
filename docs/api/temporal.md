@@ -1103,9 +1103,19 @@ How to deploy the worker, run the saga locally, and watch it in production.
   `apps-local` `dependsOn` `temporal-local` so it deploys after the cluster is
   Ready. (Earlier drafts used a `worker.enabled` chart toggle; the chart was reworked to the
   separate-release model.)
-- **Locally.** `local-stack/compose.yaml` runs a `temporalio/temporal` dev server (frontend `:7233`,
-  Web UI `:8233`) + an `order-worker` container; `docker compose up -d --build` then a checkout
-  exercises the live saga.
+- **Locally.** `local-stack/compose.yaml` runs `temporalio/server` **1.31.2** — the same server
+  version the cluster chart deploys — with all four roles in one container, backed by the shared
+  PostgreSQL through the `postgres12` plugin (databases `temporal` and `temporal_visibility`).
+  A run-once `temporal-schema` container applies the schema, a run-once `temporal-bootstrap`
+  registers `mop` with the cluster's `168h` retention, `temporal-admintools` is the CLI target,
+  and `temporal-ui` serves `:8233`. `docker compose up -d --build` then a checkout exercises the
+  live saga.
+
+  Because state lives in PostgreSQL, workflow history, timers, and Worker Deployment Versioning
+  state survive `docker compose restart temporal` — so a drain rehearsal can span a restart
+  locally. Two deliberate divergences from the cluster: `numHistoryShards` is **4** against 512
+  (shard count partitions throughput, not behaviour), and `docker compose down` still wipes
+  everything, because the `postgres` service holds no data volume.
 
 ### Operations and Observability
 

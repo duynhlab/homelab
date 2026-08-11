@@ -106,6 +106,14 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- ADR-039 **Accepted**, Adoption **Complete**: local-stack Temporal runs
+  `temporalio/server` on the shared PostgreSQL. All eight implementation
+  obligations verified on `main`, and a History section records that the
+  Context, Decision, Alternatives and Consequences were rewritten *before*
+  acceptance — measurement had refuted two of the draft's claims, so the
+  decision now rests on restart-spanning durability and storage-engine parity
+  rather than on API capability. `docs/api/temporal.md` gains ADR-039 in its
+  Design record, per the docs/api sync gate for Adoption `Complete`.
 - ADR-039 (run local-stack Temporal as `temporalio/server` on Postgres with
   admin-tools): proposes replacing the single dev-server container with the
   official multi-container topology, reusing the existing `postgres` service for

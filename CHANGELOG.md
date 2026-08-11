@@ -224,6 +224,39 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Docs
+
+- `docs/api/` and `local-stack/` corrected against deployed reality. The
+  release-gate fixes matter most: the abandonment-timer row told operators to
+  arm it before Phase A, where `$TCLI` and `audit_curl` were still undefined, so
+  it could not run where it said to; the README demanded that *every* row pass
+  while the audit marks the versioning drill conditional with `N/A`; and C2's
+  "three ends of the saga agree" compared per-process counters that A14 and A15
+  themselves reset. Also corrected: four wrong statements about system
+  boundaries — the `/internal/` audience is sealed by the route path, not
+  NetworkPolicy; product is no longer a saga participant; the legacy
+  `POST /order/v1/private/orders` create and the legacy order→cart pricing hop
+  do not exist; and the product CORS "known defect" was never in the code.
+  Smaller factual repairs across twelve `docs/api/` files: HTTP log levels are
+  500→error / 400–499→warn on `pkg/grpcx v0.36.1`, probe filtering is
+  as-built, the business catalog holds 63 instruments, checkout's
+  `availability.check` was missing from the only table that documents it,
+  inventory's fence admits three namespaces, `product-db` holds six databases,
+  and auth's pooler is PgBouncer. `local-stack/README.md`'s topology diagram now
+  matches `kong.yml` and `vector.yaml` — Kong fronts ten services, Vector tails
+  only what it does not exclude, and VictoriaLogs has no Grafana datasource.
+
+#### Gateway
+
+- local-stack Kong routes are audience-scoped, matching the cluster Ingress.
+  Bare `/product/`, `/cart/` and `/order/` prefixes routed the `/internal/`
+  audience too: `POST /product/v1/internal/products` answered with **no JWT**,
+  because that route carried no `jwt` plugin, and
+  `DELETE /cart/v1/internal/cart/:userId` answered for any shopper's token —
+  the path names the target user, so one shopper could clear another's cart.
+  Audit row **A8** now probes both, so the gate can no longer pass while the
+  audience leaks.
+
 #### Observability
 
 - **F-1 corrected a second time, and the severity goes back up.** The first

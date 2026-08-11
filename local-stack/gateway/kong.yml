@@ -56,7 +56,10 @@ services:
     read_timeout: 15000
     write_timeout: 15000
     retries: 2
-    routes: [{ name: product, paths: ["/product/"], strip_path: false }]
+    # Audience-scoped, matching the cluster Ingress. A bare "/product/" prefix
+    # also routed POST /product/v1/internal/products — reachable with no JWT,
+    # since this route carries no jwt plugin.
+    routes: [{ name: product, paths: ["/product/v1/public/"], strip_path: false }]
   - name: cart
     host: cart.upstream
     port: 8080
@@ -66,7 +69,10 @@ services:
     write_timeout: 15000
     retries: 2
     routes:
-      - { name: cart, paths: ["/cart/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
+      # Audience-scoped, matching the cluster Ingress. A bare "/cart/" prefix also
+      # routed /cart/v1/internal/cart/:userId, which takes the user id from the
+      # path — so any shopper's token could clear another shopper's cart.
+      - { name: cart, paths: ["/cart/v1/private/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
   - name: payment
     host: payment.upstream
     port: 8080
@@ -104,7 +110,7 @@ services:
     write_timeout: 15000
     retries: 2
     routes:
-      - { name: order, paths: ["/order/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
+      - { name: order, paths: ["/order/v1/private/"], strip_path: false, plugins: [{ name: jwt, config: *jwtcfg }] }
   - name: review
     host: review.upstream
     port: 8080

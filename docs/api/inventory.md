@@ -104,8 +104,9 @@ commits here, checkout reads availability here, and product's `/details` asks he
 the page's availability. Nothing dials inventory's HTTP surface — `:8080` carries
 `/health` and `/ready` only, which is also why its SLO must be built on the gRPC RED
 metrics rather than the HTTP ones; all
-consumers use gRPC on `:9090`, fenced by NetworkPolicy from the `checkout` and
-`order` namespaces.
+consumers use gRPC on `:9090`, fenced by NetworkPolicy from the `checkout`,
+`order`, and `product` namespaces — product reads availability for the
+`GetProductDetails` enrichment, live since RFC-0021 phase 4.
 
 ## Data model
 
@@ -344,4 +345,4 @@ Transport peers call `logic/v1`; logic calls `core` only
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
 
-_Last updated: 2026-08-07 — cutover language retired: every caller is Implemented (checkout CheckAvailability, product BatchGetAvailability, saga Reserve/Release/Commit); pre-cutover worker builds drained and retired._
+_Last updated: 2026-08-11 — the gRPC fence admits three namespaces — product reads availability for `GetProductDetails`._

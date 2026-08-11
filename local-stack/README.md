@@ -9,7 +9,7 @@ an immutable release tag and promoting its image to Kind.
 | **Runtime** | Docker Compose; no Kubernetes cluster required |
 | **Purpose** | Full application-path, browser, and telemetry verification before a service or frontend tag |
 | **Source under test** | Current checkouts of the sibling service, `pkg`, and frontend repositories |
-| **Required gate** | Every Phase A, B, and C row in the [E2E audit](docs/e2e-audit.md) passes |
+| **Required gate** | Every required Phase A, B, and C row in the [E2E audit](docs/e2e-audit.md) passes; a row marked conditional there is `N/A` when its trigger is absent |
 | **Successful outcome** | Evidence recorded and the tested commit set is eligible for tagging |
 | **Next environment** | Local Kind, reconciled by Flux after the released image is pinned in homelab |
 
@@ -84,23 +84,32 @@ docker compose ps
 ```
 
 The first build compiles the complete application fleet and can take several
-minutes. Do not start the audit until required services report `running` or
-`healthy` and every migration/seed job has exited successfully.
+minutes. Do not start the audit until every container that declares a healthcheck
+reports `healthy`, and every run-once container has exited `0`. The run-once set
+is wider than the migrate and seed jobs: `temporal-schema` and
+`temporal-bootstrap` also exit `0` and gate the services behind them. Most
+observability containers declare no healthcheck at all and only ever show `Up`,
+so `running` alone is not evidence of readiness for those.
 
 | Component | URL | Notes |
 |-----------|-----|-------|
 | Frontend SPA | http://localhost:3001 | Demo login `alice` / `password123`, by username |
 | Kong API gateway | http://localhost:8080 | Pass-through edge for the application services |
 | Temporal Web UI | http://localhost:8233 | Order and checkout workflows |
-| Grafana | http://localhost:3002 | RED, business, Temporal, ClickHouse, and Explore views |
+| Grafana | http://localhost:3002 | RED, business, Temporal, and ClickHouse dashboards; Explore over VictoriaMetrics, VictoriaTraces, ClickHouse, and Pyroscope |
 | VictoriaTraces | http://localhost:10428 | Trace storage, Jaeger query API, and vmui |
 | VictoriaMetrics | http://localhost:8428 | OTLP/remote-write metrics and PromQL |
-| VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL |
-| ClickHouse | http://localhost:8123 | SQL over `otel.otel_logs` and `otel.otel_traces` |
+| VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL, through its own vmui — there is no Grafana datasource for it |
+| ClickHouse | http://localhost:8123 | SQL over `otel.otel_logs` and `otel.otel_traces`; credentials `default` / `otel` |
 | Pyroscope | http://localhost:4040 | Continuous profiling |
 
 PostgreSQL, Valkey, services, workers, and mockpay are internal-only. Reach the
 application through Kong unless an audit step explicitly probes a container.
+
+Three more ports are published but are not part of the audit surface: Temporal's
+frontend gRPC on `7233`, the collector's OTLP-HTTP receiver on `4318` (handy for
+a host-side `telemetrygen` smoke test), and ClickHouse's native protocol on
+`9000`.
 
 ## Architecture
 
@@ -111,24 +120,26 @@ controls.
 ```mermaid
 flowchart LR
     SPA["React SPA<br/>:3001"] --> KONG["Kong DB-less<br/>:8080"]
-    KONG --> SVC["11 Go services<br/>including inventory"]
+    KONG --> SVC["10 HTTP services"]
+    SVC -->|"gRPC, no Kong route"| INV["inventory<br/>gRPC only"]
     SVC -->|"payment provider HTTP"| MP["mockpay<br/>provider stub"]
     MP -->|"signed webhook"| KONG
     SVC --> PG[("PostgreSQL<br/>13 databases")]
     SVC -->|"product cache"| VALKEY[("Valkey")]
     KONG -->|"rate limit"| VALKEY
-    SVC -->|"order + checkout"| TMP["Temporal :7233<br/>order + checkout workers"]
+    SVC -->|"order + checkout"| TMP["Temporal server :7233<br/>+ UI :8233"]
+    TMP -->|"durable state"| PG
+    TMP --> OW["order-worker<br/>checkout-worker"]
     SVC -->|"OTLP/HTTP<br/>traces · metrics · logs"| COL["OTel Collector<br/>:4318"]
     MP -->|"OTLP/HTTP"| COL
-    SVC -->|"container stdout"| VEC["Vector"]
+    TAILED["containers Vector still tails:<br/>infra + inventory, checkout,<br/>checkout-worker, mockpay"] -->|"container stdout"| VEC["Vector"]
     COL --> VT["VictoriaTraces<br/>:10428"]
     COL -->|"native + span metrics"| VM["VictoriaMetrics<br/>:8428"]
-    COL -->|"logs"| VL["VictoriaLogs<br/>:9428"]
+    COL -->|"logs"| VL["VictoriaLogs :9428<br/>queried via its own vmui,<br/>no Grafana datasource"]
     COL -->|"logs + traces SQL"| CH[("ClickHouse<br/>:8123")]
     VEC -->|"jsonline ingest"| VL
     VT --> GRAF["Grafana<br/>:3002"]
     VM --> GRAF
-    VL --> GRAF
     CH --> GRAF
     SVC -->|"pprof"| PYRO["Pyroscope<br/>:4040"]
     PYRO --> GRAF
@@ -149,9 +160,9 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
     class SPA,KONG,LEdge edge;
-    class SVC,LService service;
-    class TMP,LWorker worker;
-    class COL,VEC,VT,VM,VL,GRAF,PYRO,LPlatform platform;
+    class SVC,INV,LService service;
+    class TMP,OW,LWorker worker;
+    class COL,VEC,TAILED,VT,VM,VL,GRAF,PYRO,LPlatform platform;
     class PG,VALKEY,CH,LData data;
     class MP,LExternal external;
 ```
@@ -169,14 +180,20 @@ Kong/gateway configuration, or `compose.yaml`.
 The audit always includes:
 
 1. **Phase A — API contract:** authentication, edge enforcement, public/private
-   routes, the 11-service path, checkout, saga, idempotency, and abandonment.
+   routes, the 11-service path, checkout, saga, idempotency, abandonment,
+   cancellation unwind, and Temporal durability across a server restart. Every
+   `temporal ...` command in the audit runs inside `temporal-admintools`, because
+   the `temporalio/server` image ships no client binary.
 2. **Phase B — real browser:** UI login, single-flight silent refresh, and
    server-side logout.
 3. **Phase C — telemetry:** collector health, business counters, DB metrics,
    dashboards, traces, and ClickHouse ingestion.
 
-Every row must pass. Record the evidence table and tested commit SHAs before
-declaring the candidate eligible for a tag. There are no partial-pass releases.
+Every required row must pass. One row is conditional — the Worker Deployment
+Versioning drill, which applies when a change touches versioning, the saga's
+activity set, or the rollout runbook — and is recorded `N/A` when its trigger is
+absent. Record the evidence table and tested commit SHAs before declaring the
+candidate eligible for a tag. A failed row is never a partial pass.
 
 ## Promote a passing candidate to Kind
 
@@ -268,5 +285,9 @@ Passing one environment never implies that the other environment passes.
 - [Observability](../docs/observability/README.md)
 - [agent-browser CLI](https://github.com/vercel-labs/agent-browser)
 
-_Last updated: 2026-08-07 — pre-release full A/B/C gate, 11-service inventory,
-and explicit semver-to-Kind handoff._
+_Last updated: 2026-08-11 — corrects the topology against `compose.yaml` and
+`gateway/kong.yml`: Kong fronts ten HTTP services with inventory east-west only,
+Temporal is a five-container set holding durable state in PostgreSQL, Vector
+tails only the containers it does not exclude, and VictoriaLogs has no Grafana
+datasource. Also records the conditional audit row, the three published ports
+outside the audit surface, and what readiness actually means here._

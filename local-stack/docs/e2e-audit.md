@@ -45,11 +45,17 @@ for release; every Phase A, B, and C row must pass before a tag is created.
 The stack builds directly from these sibling worktrees. Uncommitted files are
 part of the build but cannot be represented by a release tag; the final audit
 therefore requires clean candidate worktrees. Pace bulk API requests at least
-0.25 seconds apart because the local Kong rate limit is 5 requests per second.
+0.25 seconds apart because the local Kong rate limit is 5 requests per second — and
+note it also enforces 100 per minute and 2500 per hour, so re-running a whole
+phase inside the same minute can trip a limit that waiting a few seconds will not
+clear.
 
 ## Phase A — API contract (curl, ~1 min)
 
 ```bash
+# ---- Preamble. Run this first, in the shell you will use for every row —
+#      including A13, which is armed before A1. Skipping it leaves $TCLI and
+#      audit_curl unset and the arming snippet fails with "command not found".
 BASE=http://localhost:8080
 
 # Keep the executable block below Kong's 5 req/s global limit.
@@ -57,6 +63,11 @@ audit_curl() {
   curl "$@"
   sleep 0.3
 }
+
+# Every `temporal ...` call in this audit runs in temporal-admintools: the
+# `temporalio/server` image ships only the server binary, so
+# `exec -T temporal temporal ...` fails with "not found".
+TCLI="docker compose exec -T temporal-admintools temporal"
 
 # A1. Login returns the JWT pair — and NO opaque `token` field
 R=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
@@ -125,6 +136,16 @@ docker compose exec -T notification wget -q -O /dev/null -S \
 docker compose exec -T shipping wget -q -O /dev/null -S \
   http://localhost:8080/shipping/v1/internal/orders/1 </dev/null 2>&1 | head -1
 # want: HTTP/1.1 404 (now /shipping/v1/internal/shipments/orders/:orderId)
+
+#     Then the other half of A8: an `/internal/` path that DOES exist must still
+#     be unreachable *through Kong*. Probe the two services whose routes were
+#     once declared on a bare prefix — product's create needs no JWT at all, and
+#     cart's takes the user id from the path, so a wide prefix there lets any
+#     shopper's token clear another shopper's cart.
+audit_curl -s -o /dev/null -w "A8 product internal: %{http_code} (want 404 — not routed at the edge)\n" \
+  -X POST $BASE/product/v1/internal/products -H 'Content-Type: application/json' -d '{}'
+audit_curl -s -o /dev/null -w "A8 cart internal:    %{http_code} (want 404 — not routed at the edge)\n" \
+  -X DELETE $BASE/cart/v1/internal/cart/1 -H "Authorization: Bearer $AT"
 
 # A9. Checkout sessions (RFC-0015 P1) — lifecycle through Kong edge-JWT.
 #     Cart must have at least one item (add via the SPA or cart API first).
@@ -250,10 +271,6 @@ audit_curl -s $BASE/order/v1/private/orders/$OID -H "Authorization: Bearer $AT0"
 # One redemption exactly, order_id backfilled:
 docker compose exec -T postgres psql -U postgres -d checkout -t -c \
   "SELECT code, order_id IS NOT NULL AS used FROM promo_redemptions ORDER BY id DESC LIMIT 1" </dev/null
-# Every `temporal ...` call in this audit runs in temporal-admintools: the
-# `temporalio/server` image ships only the server binary, so
-# `exec -T temporal temporal ...` fails with "not found".
-TCLI="docker compose exec -T temporal-admintools temporal"
 $TCLI workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" </dev/null 2>/dev/null | head -3
 
 # Abandonment (ADR-019): the DB deadline is the authority; the workflow timer
@@ -307,8 +324,9 @@ docker compose exec -T postgres psql -U postgres -d order -t -c \
 # A13. The abandonment timer actually fires (ADR-019). A10 above only ever
 #      produces expired(lazy) — it moves the DB deadline, not the armed timer — so
 #      without this row the third workflow has no evidence it works at all.
-#      ARM THIS FIRST, before Phase A, and read it at the end: the timer runs for
-#      the session's full TTL while the rest of the audit proceeds.
+#      ARM THIS FIRST — after the preamble above, before A1 — and read it at the
+#      end: the timer runs for the session's full TTL while the rest of the audit
+#      proceeds, so arming it early costs no extra wall-clock.
 #      It needs its OWN user. One active session per user is a partial unique
 #      index, so A9/A10 would adopt this session and every mutation re-arms it.
 TU="audittimer$(date +%s)"
@@ -475,7 +493,16 @@ docker compose logs --since 10m otel-collector 2>&1 \
   | xargs -I{} sh -c '[ {} -eq 0 ] && echo "C1 OK collector clean" || echo "C1 FAIL: {} error lines"'
 
 # C2. Business counters move with the flow (run a checkout first, wait 45s):
-#     the three ends of the saga must agree — confirmed = saga = authorized.
+#     the three ends of the saga should agree — confirmed = saga = authorized.
+#
+#     These are per-process counters, so equality only holds while no process has
+#     restarted. A14 restarts `temporal` and A15 restarts `order-worker`, which
+#     resets the saga counter to 0 — after either row, `order_saga_outcome_total`
+#     counts only the sagas driven SINCE that restart and will read lower than
+#     checkout's and payment's. That is arithmetic, not a failure. Either run C2
+#     before A14/A15, or settle it with the durable evidence: every
+#     `OrderFulfillmentWorkflow` execution `Completed` and every confirmed order
+#     reaching `completed`.
 for m in checkout_sessions_confirmed_total 'order_saga_outcome_total{outcome="confirmed"}' \
          'payment_authorization_total{result="authorized"}'; do
   curl -s "$VM/api/v1/query" --data-urlencode "query=sum($m)" \
@@ -492,7 +519,7 @@ curl -s "$VM/api/v1/query" --data-urlencode \
     print('C3 DB p95:', 'OK %.2fms' % (v*1000) if v and v < 0.5 else f'FAIL {v} (collapsed buckets? old pkg?)')"
 
 # C4. Main + ClickHouse-suite dashboards load with no datasource/parse errors
-for d in microservices-otel-local business-otel-local temporal-worker-local \
+for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer; do
   curl -s -o /dev/null -w "C4 $d: %{http_code} (want 200)\n" \
@@ -533,7 +560,7 @@ done
 | A5 | Logout | 200, idempotent; refresh afterwards 401 |
 | A6 | Removed surfaces | `/auth/v1/private/*` 404; no `sessions` table |
 | A7 | v3 paths (ADR-017) | new `shipments/*` + `auth/*` paths 200; deprecated aliases still 200 (expand phase) |
-| A8 | Renamed internal paths | old `notify/*` + `internal/orders/*` 404 in-container (no aliases) |
+| A8 | Internal audience sealed | renamed `notify/*` + `internal/orders/*` 404 in-container (no aliases); and the two `/internal/` paths that DO exist — product create, cart clear — 404 **through Kong**, so no audience leaks at the edge |
 | A9 | Checkout sessions (RFC-0015) | lifecycle 201→200→200→200 through edge-JWT; no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
 | A10 | Confirm + abandonment (RFC-0015 P2–P4) | fee/tax/promo composition asserted; `Idempotency-Key` required; replay = same order; order reaches `confirmed` or `completed`; order total == session total; lazy-410 past `expires_at` |
 | A11 | Full-fleet fan-out | product details returns product, live inventory availability, reviews, and review summary |
@@ -544,8 +571,9 @@ done
 | B1 | UI login | JWT + refresh in localStorage |
 | B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
 | B3 | UI logout | `POST /public/auth/logout` 200; storage cleared; redirect to `/login` |
+| B4 | Browser cleanup | the agent-browser session is closed, so a later run starts from a clean profile |
 | C1 | Collector | 0 export failures / error lines |
-| C2 | Business counters | confirmed = saga = authorized, incremented by the driven flow (after ~45s) |
+| C2 | Business counters | confirmed = saga = authorized for flows driven since the last process restart (after ~45s). A14/A15 reset the saga counter; then the durable evidence settles it — every `OrderFulfillmentWorkflow` `Completed`, every confirmed order `completed` |
 | C3 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
 | C4 | Dashboards | every listed dashboard loads via `/api/dashboards/uid/…` with 200 |
 | C5 | Traces | all 11 application service names are present in the Jaeger services list |
@@ -603,6 +631,4 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-08-11 — adds A12 (cancellation unwind) and A13 (abandonment
-timer), the two workflows this audit never exercised, plus the Temporal dashboard
-in C4._
+_Last updated: 2026-08-11 — the preamble now defines `$TCLI` and `audit_curl` above A13's arming step, which previously ran before either existed; A8 also probes the two `/internal/` paths that do exist, after local-stack Kong was scoped to audience prefixes; adds A14 (durability across a server restart) and A15 (the conditional versioning drill), the real Kong rate limits, a B4 criterion, and `red-spanmetrics` in C4._

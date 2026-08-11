@@ -14,7 +14,7 @@ availability, but it *asks inventory* for it.
 | **gRPC server** | `BatchGetCurrentPrices` · `:9090` — the only RPC. `GetProducts`, `ReserveStock`, `ReleaseStock` were **removed** in RFC-0021 P4 | Implemented |
 | **gRPC client** | review (`ReviewService/GetProductReviews`), inventory (`InventoryService/BatchGetAvailability`) | Implemented |
 | **Worker** | None | None |
-| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
+| **Temporal** | None — former participant; the saga's stock steps moved to inventory · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | None |
 | **Technical debt** | None | None |
 
 | Attribute | Value | RFC / ADR |
@@ -110,11 +110,12 @@ Money units differ by transport on purpose:
 | `GET` | `/product/v1/public/products/:id/details` | Public | Aggregate product + inventory-sourced availability + reviews + summary + related products |
 | `POST` | `/product/v1/internal/products` | Internal | Create a product (admin/seed) — **never exposed at either edge**; NetworkPolicy is the fence |
 
-Edge routing divergence (known, documented in
-[api.md § Edge exposure](./api.md#edge-exposure)): the
-cluster ingress exposes exactly `/product/v1/public/`, while local-stack Kong
-routes the bare prefix `/product/`. Service paths are identical — Variant A
-pass-through, `strip_path: false`.
+Both edges expose exactly `/product/v1/public/`, so the internal create has no
+route to match in either environment — see
+[api.md § Edge exposure](./api.md#edge-exposure). Until 2026-08-11 local-stack
+routed the bare prefix `/product/`, which made that create reachable with no JWT
+at all. Service paths are identical — Variant A pass-through,
+`strip_path: false`.
 
 ### Product shape
 
@@ -323,4 +324,4 @@ Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-servic
 - [Caching (platform)](../caching/README.md) — Valkey deployment and ops
 - [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics
 
-_Last updated: 2026-08-05_
+_Last updated: 2026-08-11 — product is no longer a saga participant, and both edges expose only `/product/v1/public/`._

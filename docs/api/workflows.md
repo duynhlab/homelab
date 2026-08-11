@@ -67,7 +67,8 @@ product-participant history rather than re-routing it. Checkout is deliberately
 | Service | Temporal role |
 |---------|---------------|
 | auth, user, review | **None** |
-| product, shipping, payment, notification | **Participant (gRPC)** — order saga |
+| shipping, payment, notification, inventory | **Participant (gRPC)** — order saga |
+| product | **None** — former participant; `ReserveStock`/`ReleaseStock` left the contract in pkg v0.33.0 / product 1.7.0. It serves `BatchGetCurrentPrices` to checkout, which is not a saga step |
 | cart | **Participant (REST)** — ClearCart activity |
 | order | **Orchestrator** — `OrderFulfillmentWorkflow` + `CancellationWorkflow` |
 | checkout | **Orchestrator** — `AbandonedCheckoutWorkflow` |
@@ -106,4 +107,4 @@ resolves it.
 - [temporal.md](./temporal.md) — the three workflows as built, plus saga theory and operations
 - [Service contracts](README.md#service-contracts) — platform deployment rollup
 
-_Last updated: 2026-08-10 — registry gains a Purpose column and a short what-it-is-for note per workflow; worker build corrected to 1-13-2 and the dead manifest link fixed._
+_Last updated: 2026-08-11 — the saga role table moves product to None and names inventory as the stock participant._

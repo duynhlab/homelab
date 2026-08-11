@@ -979,9 +979,10 @@ with `order_id`; the SPA shows "Processing…" and polls
 `GET /order/v1/private/orders/:id` for `confirmed`/`failed`. The HTTP request
 does **not** block on the saga — activity retries can take seconds–minutes,
 blocking would couple user latency to downstream health, and an API-pod restart
-would lose the response while the durable workflow keeps running. The legacy
-`POST /order/v1/private/orders` path still starts the same workflow (**Technical
-debt**, P6 removal — [order.md](./order.md)). *(Future nicety: Temporal
+would lose the response while the durable workflow keeps running. The gRPC
+`CreateOrder` is the only starter — the legacy `POST /order/v1/private/orders`
+create was removed in RFC-0021 P5, and `order-service` now registers only the
+four read/cancel routes ([order.md](./order.md)). *(Future nicety: Temporal
 **Update-With-Start** could return an early "stock reserved" ack in the initial
 call.)*
 
@@ -1148,4 +1149,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-08-10 — renamed from temporal-order-fulfillment.md and rebuilt around all three workflows: CancellationWorkflow gains a diagram, AbandonedCheckoutWorkflow is documented for the first time, the retry table covers all four policies including CommitInventory, and the worker build id is corrected to 1.13.2._
+_Last updated: 2026-08-11 — the legacy REST create is gone — `CreateOrder` over gRPC is the only starter._

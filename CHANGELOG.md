@@ -83,6 +83,19 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- ADR-040 (deliver Tempo through the `grafana-community/tempo` Helm chart):
+  proposes a chart-based replacement for the hand-written Tempo Deployment
+  and ConfigMap, delivered as a Flux `HelmRelease` that matches every other
+  Helm-delivered component in this repo. Enables the metrics-generator
+  through first-class values so Grafana's serviceMap and tracesToMetrics
+  finally have data. Supersedes ADR-032 (see below); the Tempo 3.x upgrade
+  path stays a values change on the same chart family.
+- ADR-032 withdrawn (Tempo delivery via tempo-operator `TempoMonolithic`):
+  superseded by ADR-040. Follow-up research confirmed upstream tempo-operator
+  ships no Helm chart, only a raw `tempo-operator.yaml` bundle; adopting the
+  operator would require a vendored raw bundle or a remote kustomize URL,
+  both off-pattern for this repo, introduced for a single controller. The
+  ADR is preserved as design context.
 - ADR-032 amended (Tempo delivery via tempo-operator `TempoMonolithic`): add
   a **Delivery mechanism** subsection under Decision. Upstream tempo-operator
   ships no Helm chart, only a raw `tempo-operator.yaml` bundle, so the homelab

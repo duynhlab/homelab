@@ -1,5 +1,15 @@
 # ADR-032: Deliver Tempo through the tempo-operator TempoMonolithic CR
 
+> **Withdrawn 2026-08-10** in favour of
+> [ADR-040](../ADR-040-tempo-community-helm-chart/), which delivers Tempo
+> through the `grafana-community/tempo` Helm chart instead. Reason: upstream
+> `grafana/tempo-operator` ships no Helm chart, only a raw
+> `tempo-operator.yaml` bundle, and every other operator/chart-delivered
+> component in this repository uses `HelmRelease`. Adopting the operator
+> would require a vendored raw bundle or a remote kustomize URL — both
+> off-pattern for this repo, introduced for a single controller. See ADR-040
+> for the replacement decision.
+
 > **Decision summary:** We will replace the hand-written Tempo Deployment,
 > ConfigMap, and Service with a `TempoMonolithic` custom resource managed by
 > the grafana/tempo-operator, and enable the metrics-generator during the
@@ -9,7 +19,7 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
+| **Status** | Withdrawn |
 | **Decision date** | — |
 | **Owners** | `duynh` |
 | **Deciders** | `duynh` |
@@ -18,8 +28,8 @@
 | **Related RFC** | — |
 | **Related research** | — |
 | **Supersedes** | — |
-| **Superseded by** | — |
-| **Implementation tracking** | — (obligations below; not started) |
+| **Superseded by** | [ADR-040](../ADR-040-tempo-community-helm-chart/) |
+| **Implementation tracking** | — (never started; withdrawn before adoption) |
 | **Adoption** | Not started |
 
 ## Context
@@ -466,6 +476,7 @@ requires a new ADR that supersedes this one.
 | 2026-07-30 | Proposed / Not started | Initial draft |
 | 2026-08-10 | Proposed / Not started | Note Tempo 3.0 rearchitecture (ingester/compactor removed) as context and revisit trigger; keep 2.10.5 as landing pad through the operator. Make the Kafka boundary explicit: `TempoMonolithic` needs no Kafka at any version, Rhythm microservices does — add a reference diagram of Tempo 3.x microservices under Decision view. Renovate PR #694 (`v3.0.2` bump) rejected on this basis. |
 | 2026-08-10 | Proposed / Not started | Add **Delivery mechanism** subsection under Decision: upstream `grafana/tempo-operator` ships no Helm chart, only a raw `tempo-operator.yaml` bundle. Homelab has no in-tree precedent for either vendored bundles or remote kustomize URLs, but every existing operator uses `HelmRelease`. Record the trade-off and select the vendored bundle for diff visibility and offline safety, with a fallback to `HelmRelease` if upstream ships a chart. Refresh Alternative D (`grafana-community/tempo` single-binary chart) with a concrete rejection and add Alternative E (`grafana-community/tempo-distributed`). |
+| 2026-08-10 | Withdrawn / Not started | Withdrawn in favour of [ADR-040](../ADR-040-tempo-community-helm-chart/): the vendored-bundle delivery this ADR selected is off-pattern for a repo where every other operator/chart-delivered component ships via `HelmRelease`. ADR-040 reframes the same problem (raw Tempo → managed Tempo with metrics-generator) as a chart adoption instead of an operator adoption, using `grafana-community/tempo`. This ADR is preserved as design context; it never reached implementation. |
 
 ---
 _Last updated: 2026-08-10_

@@ -452,12 +452,21 @@ services moved to local JWT verification.
 
 - No `/internal/` audience is exposed at either edge — verified in
   [kong.yml](../../local-stack/gateway/kong.yml) and
-  [ingress-api.yaml](../../kubernetes/infra/configs/kong/ingress-api.yaml). NetworkPolicy is
-  the fence.
-- Known local divergence: local-stack Kong routes product and order on bare
-  prefixes (`/product/`, `/order/`) while the cluster ingress splits
-  `/product/v1/public/` and `/order/v1/private/`. Service paths are identical
-  (Variant A pass-through, `strip_path: false` everywhere).
+  [ingress-api.yaml](../../kubernetes/infra/configs/kong/ingress-api.yaml).
+- **The route path is what enforces this, not NetworkPolicy.** Every route in
+  both environments is declared on an audience-scoped prefix
+  (`/product/v1/public/`, `/cart/v1/private/`, `/order/v1/private/`, …), so an
+  `/internal/` path simply has no route to match. NetworkPolicy is the second
+  fence, and in local-stack there is no NetworkPolicy at all — a bare
+  service-wide prefix there would expose the internal audience outright.
+- That is not hypothetical: until 2026-08-11 local-stack routed product, cart and
+  order on bare prefixes. `POST /product/v1/internal/products` answered with **no
+  JWT** (its route carried no `jwt` plugin), and `DELETE
+  /cart/v1/internal/cart/:userId` answered for any shopper's token — the path
+  carries the target user id, so one shopper could clear another's cart. The
+  routes are now audience-scoped and the audit's **A8** row probes both.
+- Service paths are identical in both environments (Variant A pass-through,
+  `strip_path: false` everywhere).
 
 ## End-to-end user journeys {#end-to-end-user-journeys}
 
@@ -709,8 +718,10 @@ Signal-specific authoring rules:
 [tracing](./tracing.md) · [profiling](./profiling.md).
 
 Health, readiness, and reflection probes are excluded from spans and RED
-metrics on both transports, and from gRPC access logs; HTTP access logs do not
-filter probes yet. Signal-by-signal matrix:
+metrics on both transports, and from both gRPC and HTTP access logs — the HTTP
+filter shipped fleet-wide in the x.2/x.3 wave, which took one service's probe
+access logs from 513664 lines to 0. A *failing* probe is still logged.
+Signal-by-signal matrix:
 [observability.md § Health filtering](./observability.md#health-readiness-and-reflection-filtering).
 
 ## Security
@@ -816,4 +827,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-07 — call graph and journeys reflect the post-RFC-0021 contract: checkout split-reads product (prices) + inventory (availability), GetProducts and the drained pre-cutover saga edges removed._
+_Last updated: 2026-08-11 — the edge-exposure section now names the route path — not NetworkPolicy — as what seals the `/internal/` audience, and records the local-stack exposure closed on this date; HTTP probe filtering is as-built._

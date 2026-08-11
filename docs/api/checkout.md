@@ -298,7 +298,9 @@ What checkout deliberately does NOT do (the boundary):
   order-service's idempotent `CreateOrder` gRPC method. Order-service keeps
   the "insert pending + StartWorkflow in one place" invariant (ADR-018).
 - **No stock reservation** — availability is *checked* only; reserving stays
-  with the saga's `ReserveStock` (RFC-0003). The TOCTOU window between check
+  with the saga's `ReserveInventory` activity against `inventory.v1/Reserve` — the
+  product `ReserveStock`/`ReleaseStock` RPCs left the contract in pkg v0.33.0. The
+  TOCTOU window between check
   and reserve is a named, accepted tradeoff in the RFC.
 - **No card data** — `PUT …/payment` (P2) accepts only `tok_…` references;
   the stored token is `json:"-"` and never serialized outward.
@@ -343,8 +345,8 @@ What checkout deliberately does NOT do (the boundary):
   remember: a sustained majority of `expired{reason="lazy"}` means the worker
   is down or wedged.
 - **Cluster (P5):** RSIP under the existing `checkout` domain ResourceSet,
-  CNPG triplet, NetworkPolicies (Kong→8080; cart, product, order, and shipping each admit
-  checkout→9090 — the full dial set of the confirm path). The netpol is a **release gate**: RFC-0015's east-west gRPC
+  CNPG triplet, NetworkPolicies (Kong→8080; cart, product, inventory, order, and shipping
+  each admit checkout→9090 — the full dial set of the confirm path). The netpol is a **release gate**: RFC-0015's east-west gRPC
   surface is unauthenticated by design and the fence is the policy.
 
 ## Code map
@@ -364,7 +366,7 @@ Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-serv
 | | `internal/workflow/abandon.go`, `lazy.go`, `notifier.go` | Abandonment workflow + activities |
 | | `internal/clients/clients.go` | gRPC clients |
 | | `db/migrations/sql/` | Migrations (schema + seeds) |
-| | `pkg/proto/{cart,product,shipping,order}/v1/*.proto` | Protos consumed |
+| | `pkg/proto/{cart,inventory,order,product,shipping}/v1/*.proto` | Protos consumed |
 
 ## References
 
@@ -375,4 +377,4 @@ Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-serv
 - [cart.md](./cart.md) · [product.md](./product.md) · [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-07 — 0.6.2: promo lock contention stays a visible 500 (55P03); expiry keeps managing sessions across infra blips._
+_Last updated: 2026-08-11 — the saga reserves through `inventory.v1/Reserve`, the confirm dial set is five services including inventory, and the proto code map lists inventory._

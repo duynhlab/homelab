@@ -231,7 +231,8 @@ must stay true, or the cache goes stale:
    (and `InvalidateProductList`), or the detail cache serves stale data for up to
    `CACHE_TTL_PRODUCT_DETAIL` (10m).
 2. **No other service writes product rows the cache reflects.** The `product-db` cluster is shared
-   by product/cart/order; if another service mutates product data directly (e.g. decrements
+   by product, cart, order, payment, checkout and inventory; if another service
+   mutates product data directly (e.g. decrements
    stock), product-service has **no invalidation hook** and serves stale detail data bounded by
    the 10m TTL. Today stock is not written this way; if it ever is, route the mutation through
    product-service or publish an invalidation event. This is a deliberate, documented boundary.
@@ -327,4 +328,4 @@ Server-side Valkey metrics and hit-rate queries: [Caching (platform) § Observab
 - [Redis Go Client](https://github.com/redis/go-redis)
 - [Cache-Aside Pattern](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Strategies.html)
 
-_Last updated: 2026-07-22 — canonical app caching contract; moved from docs/caching/caching.md._
+_Last updated: 2026-08-11 — `product-db` holds six databases, not three — the stale-cache blast radius is wider than stated._

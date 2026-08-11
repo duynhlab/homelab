@@ -10,7 +10,7 @@ Cart turns browsing intent into a per-user, mutable basket — and hands checkou
 | **gRPC client** | None | None |
 | **Worker** | None | None |
 | **Temporal** | Participant (REST) · `ClearCart` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
-| **Technical debt** | Legacy order→cart REST pricing hop · P6 removal · [Known gaps](#known-gaps) | Technical debt |
+| **Technical debt** | None · [Known gaps](#known-gaps) | None |
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
@@ -60,7 +60,6 @@ flowchart LR
     SPA["Browser SPA"] --> Kong["Kong (edge JWT)"]
     Kong -->|"/cart/v1/private/… HTTP CRUD"| Cart["cart-service"]
     CK["checkout"] -->|"gRPC GetCart :9090 (read-only, ADR-021)"| Cart
-    ORD["order (legacy create)"] -.->|"REST GET /cart/v1/private/cart — debt, P6"| Cart
     W["order-worker"] -.->|"REST DELETE /cart/v1/internal/… — documented exception"| Cart
     Cart --> PGD["PgDog pooler"] --> DB[("cart DB on product-db")]
 
@@ -69,7 +68,7 @@ flowchart LR
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SPA,Kong edge;
-    class Cart,CK,ORD service;
+    class Cart,CK service;
     class W worker;
     class PGD,DB data;
 ```
@@ -115,10 +114,10 @@ or query.
 | `GET` | `/cart/v1/private/cart/count` | Private | Item count for the SPA badge |
 | `PATCH` | `/cart/v1/private/cart/items/:itemId` | Private | Set one item's quantity |
 | `DELETE` | `/cart/v1/private/cart/items/:itemId` | Private | Remove one item |
-| `DELETE` | `/cart/v1/internal/cart/:userId` | Internal | Post-saga clear — tokenless, NetworkPolicy-fenced, **not exposed at the cluster edge** (local-stack's wide prefix does route it, behind edge JWT — see below) |
+| `DELETE` | `/cart/v1/internal/cart/:userId` | Internal | Post-saga clear — tokenless, called by order-worker over the service network. **Not routed at either edge**: both Kong route sets are audience-scoped to `/cart/v1/private/`. The path carries the target user id, so edge exposure here would be an IDOR — which it was in local-stack until 2026-08-11 |
 
-Local-stack Kong routes the whole service on the wide `/cart/` prefix (JWT
-plugin attached); the cluster ingress exposes only `/cart/v1/private/`.
+Both Kong route sets expose only `/cart/v1/private/`; local-stack no longer
+routes the whole service on a wide `/cart/` prefix.
 Service paths are identical in both (Variant A pass-through,
 `strip_path: false`) — see [api.md § Edge exposure](./api.md#edge-exposure).
 
@@ -239,7 +238,6 @@ deadlines, health): [api.md § gRPC Runtime Model](./api.md#grpc-runtime-model).
 |--------|-----------|--------------|
 | Browser SPA (via Kong) | HTTP private | Full cart CRUD + badge count |
 | checkout | gRPC `GetCart` | Read-only snapshot at `POST /checkout/v1/private/checkout/sessions` |
-| order (legacy create path) | REST `GET /cart/v1/private/cart` | Pricing read inside legacy `POST /order/v1/private/orders` — **Technical debt, P6** |
 | order-worker (`ClearCart` activity) | REST `DELETE /cart/v1/internal/cart/:userId` | Best-effort basket clear after fulfillment |
 
 Cart itself calls no other service — no gRPC client, no outbound REST. Its
@@ -274,7 +272,7 @@ only dependency is its database. Platform call graph:
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8080/auth/v1/public/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}' | jq -r .token)
+  -d '{"username":"alice","password":"password123"}' | jq -r .access_token)
 curl -s http://localhost:8080/cart/v1/private/cart \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
@@ -305,4 +303,4 @@ Paths in [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service). Tr
 - [checkout.md](./checkout.md) · [product.md](./product.md) · [order.md](./order.md) — neighbor contracts
 - [temporal.md](./temporal.md) — saga deep dive
 
-_Last updated: 2026-08-07 — the legacy order→cart pricing gap closed with RFC-0021 P5; RFC-0015 implemented._
+_Last updated: 2026-08-11 — the internal clear is routed at neither edge (local-stack's wide `/cart/` prefix is gone); drops the legacy order→cart pricing hop, which no code has; smoke test reads `.access_token`._

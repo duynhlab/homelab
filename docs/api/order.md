@@ -8,7 +8,7 @@ only writer of orders and the only place the fulfillment saga starts.
 | **Deployment** | local-stack + cluster | Implemented |
 | **HTTP** | private · `:8080` · Kong `/order/v1/private/` (local-stack: bare `/order/` prefix) · edge JWT | Partial |
 | **gRPC server** | `OrderService/CreateOrder` · `:9090` | Implemented |
-| **gRPC client** | shipping (`GetShipmentByOrder`), payment (`GetPayment`) — enrichment reads | Implemented |
+| **gRPC client** | shipping (`GetShipmentByOrder`), payment (`GetPayment`), inventory (`GetReservation`) — enrichment reads | Implemented |
 | **Worker** | `order-worker` · queue `order-fulfillment` | Implemented |
 | **Temporal** | Orchestrator · `OrderFulfillmentWorkflow` + `CancellationWorkflow` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
 
@@ -371,4 +371,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 
-_Last updated: 2026-08-01 — RFC-0021 P5 as-built: seven-state FSM, cancel API, expanded `/details`, legacy REST create removed (v1.11.0)._
+_Last updated: 2026-08-11 — the gRPC client row includes inventory `GetReservation`._

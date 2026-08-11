@@ -6,7 +6,7 @@ RED, gRPC, runtime, database client, and business metric authoring contract for 
 |-----------|-------|-----------|
 | **Export** | OTLP push via `obsx.SetupObservability` — no app `/metrics` scrape | — |
 | **Core histogram** | `http_server_request_duration_seconds` — single source of RED | — |
-| **Business catalog** | [metrics-catalog.md](../observability/metrics/metrics-catalog.md) — all 34 shipped instruments | — |
+| **Business catalog** | [metrics-catalog.md](../observability/metrics/metrics-catalog.md) — all 63 shipped instruments | — |
 | **Platform ops** | [Application metrics (platform view)](../observability/metrics/metrics-apps.md) — alerts, dashboards, troubleshooting | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
 | **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [RFC-0017](../proposals/rfc/RFC-0017/) · [RFC-0013](../proposals/rfc/RFC-0013/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) |
@@ -494,6 +494,7 @@ and is what the [Business KPIs dashboard](../observability/metrics/metrics-apps.
 | checkout | `checkout_price_changed_total` | `checkout.price.changed` | Counter | — | Confirms bounced with `PRICE_CHANGED`/`STOCK_UNAVAILABLE` (session requoted) |
 | checkout | `checkout_promo_redeemed_total` | `checkout.promo.redeemed` | Counter | — | Promo redemptions counted at confirm (P4) |
 | checkout | `checkout_promo_rejected_total` | `checkout.promo.rejected` | Counter | `reason` = `expired`\|`exhausted` | Promo rejections at the authoritative confirm gate |
+| checkout | `checkout_availability_check_total` | `checkout.availability.check` | Counter | `result` = `ok`\|`shortage`\|`unknown_sku`\|`error` | Inventory availability checks by outcome — the only signal that separates "inventory is down" (`error`, fail-closed 503) from "inventory refused the basket" (`shortage`) |
 | checkout | `checkout_confirm_duration_seconds` | `checkout.confirm.duration` | Histogram (`s`) | — | End-to-end confirm handler duration |
 
 Label and cardinality rules: [§ App-side cardinality control](#app-side-cardinality-control)
@@ -577,5 +578,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-29 — canonical app metrics authoring contract; checkout example table verified against `checkout-service/internal/logic/v1/metrics.go`._
+_Last updated: 2026-08-11 — the business catalog holds 63 instruments, and checkout's table gains `checkout.availability.check` — the signal that separates an inventory outage from a refused basket._
 

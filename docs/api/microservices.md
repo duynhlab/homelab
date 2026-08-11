@@ -116,7 +116,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 ### auth — identity
 
 > Owns `users` (credentials) and refresh-token families; DB `auth` on `platform-db`
-> (CloudNativePG, via PgDog `platform-db-pooler-rw`). Public-only HTTP — no JWT middleware, no gRPC
+> (CloudNativePG, via the PgBouncer `Pooler` `platform-db-pooler-rw` — ADR-026 pilot;
+> only `product-db` still uses PgDog). Public-only HTTP — no JWT middleware, no gRPC
 > server (HTTP-only since RFC-0009 Phase 5; services verify JWTs locally).
 
 | Feature | API | Technique | Depends on | Status | Ref |
@@ -150,9 +151,6 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | ~~**Stock reservation**~~ (saga step) | ~~internal gRPC `ProductService.ReserveStock` / `ReleaseStock`~~ | **Removed**, not merely uncalled: the RPCs left the contract in pkg v0.33.0 / product 1.7.0 and the schema went with migration `000006` (1.10.0). The two-week-zero gate on `product_stock_surface_calls_total` was **waived** in favour of code evidence, and the instrument was deleted with the surface — so an empty panel is expected, not a measurement | ~~caller: order-worker~~ | Removed | [inventory](./inventory.md) |
 | **Checkout batch read** | internal gRPC `ProductService.BatchGetCurrentPrices` | cache-bypassing **price-only** batch (product = checkout price authority; availability comes from inventory); int64 minor units; unknown ids omitted | caller: checkout | Implemented (RFC-0021 P4) | [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) |
 | **Product create** | `POST /product/v1/internal/products` | admin/seed path | — | Implemented | — |
-
-> **Known defect:** the service still emits its own CORS headers on top of the
-> gateway's (duplicate `Access-Control-Allow-Origin`) — see §6.
 
 ### checkout — session orchestrator (RFC-0015 P1-P5)
 
@@ -312,7 +310,6 @@ templates.
 | Committed-stock restock on cancellation (`RESTOCK_SKIPPED`) | order / inventory | **Accepted shrinkage** — inventory.v1 has no `Return` RPC; revisit trigger in [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | ~~Legacy order→cart REST pricing on direct create~~ | order | **Gone** — it died with the legacy REST create (RFC-0021 P5); checkout/product own price authority |
 | gRPC mTLS east-west | platform | **Planned** (RFC-0020); NetworkPolicy remains the fence until then |
-| Duplicate CORS headers (service emits CORS + gateway) | product | Worked around at gateway; service-side removal still recommended (middleware present in code) |
 | Internal `POST /users` has no in-cluster caller | user | Wired to real persistence; auth registers into its own DB |
 | Internal HTTP notify twins + gRPC `SendSMS` unused | notification | No caller (saga emails go via gRPC `SendEmail`) |
 | Internal HTTP `GET /shipping/v1/internal/shipments/orders/:orderId` redundant | shipping | No caller — order reads shipment over gRPC |
@@ -323,4 +320,4 @@ templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-08-07 — checkout batch read is BatchGetCurrentPrices (price-only); the removed server-side pricing row and the 000006 version typo corrected._
+_Last updated: 2026-08-11 — auth's pooler is PgBouncer (ADR-026), and the product CORS "known defect" is removed: the service has no CORS middleware._

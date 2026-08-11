@@ -261,17 +261,17 @@ they are logging a separate domain event.
 > [data policy](./observability.md#cross-signal-data-and-privacy-policy) — is
 > the LOG-1 refactor.
 
-Level policy: HTTP logs `error` for status ≥ 400, else `info`. gRPC follows
+Level policy: HTTP logs `error` for status ≥ 500, `warn` for 400–499, else
+`info` — a rejected request is not a broken service. gRPC follows
 the **status-code class** (pkg ≥ v0.31.0, verbatim from go-grpc-middleware's
 `DefaultServerCodeToLevel`): caller-attributable outcomes at `info`
 (`OK`, `NotFound`, `Canceled`, `AlreadyExists`, `InvalidArgument`,
 `Unauthenticated`), degraded-but-explicable at `warn` (`DeadlineExceeded`,
 `PermissionDenied`, `ResourceExhausted`, `FailedPrecondition`, `Aborted`,
 `OutOfRange`, `Unavailable`), faults at `error` (`Unknown`, `Unimplemented`,
-`Internal`, `DataLoss`; unknown codes default to `error`). Services emit the
-old blanket non-OK→`error` behaviour until they bump `pkg` — the fleet is on
-≤ v0.30.0 today. HTTP messages are `HTTP request`, gRPC messages are
-`gRPC request`.
+`Internal`, `DataLoss`; unknown codes default to `error`). This is as-built:
+every service pins `pkg/grpcx v0.36.1`. HTTP messages are `HTTP request`, gRPC
+messages are `gRPC request`.
 
 **Probe filtering (contract):** no routine successful health/readiness probe
 access logs on either transport; keep failed probes and readiness state
@@ -363,4 +363,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-29 — canonical app logging contract; adds the OTel LogRecord data model and the semconv access-log schema._
+_Last updated: 2026-08-11 — HTTP level policy is 500→error / 400–499→warn, and the status-class gRPC mapping is as-built on `pkg/grpcx v0.36.1`._

@@ -15,8 +15,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-11 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Temporal topology in `local-stack/` — how the dev compose stack runs the workflow engine. Cluster delivery is unaffected. |
@@ -26,8 +26,8 @@
 | **Related ADR** | [ADR-030](../ADR-030-temporal-workflow-versioning/) (Worker Versioning + official chart on the cluster), [ADR-001](../ADR-001-adopt-temporal-for-order-fulfillment/) (Temporal adoption, background) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | homelab#746 — implements the topology, gates it with audit rows A14/A15, and corrects the docs |
-| **Adoption** | Not started |
+| **Implementation tracking** | homelab#746 (merged) — implements the topology, gates it with audit rows A14/A15, and corrects the docs |
+| **Adoption** | Complete |
 
 ## Context
 
@@ -334,3 +334,11 @@ The ADR PR is docs-only. Implementation lands in a follow-up PR against
    Without A14 the property this ADR exists to provide has nothing watching it.
 8. Flip **Adoption** to `Complete` in this ADR when the implementation PR
    merges.
+
+## History
+
+| Date | Change |
+|------|--------|
+| 2026-08-11 | Proposed. |
+| 2026-08-11 | Context, Decision, Alternatives and Consequences rewritten before acceptance, after measurement on local-stack refuted two of the draft's claims: the versioning search attributes are built-in system attributes needing no registration, and the versioning APIs are not gated behind dynamic config. Re-argued on restart-spanning durability and storage-engine parity. Added alternative E (persist the dev-server's SQLite to a volume) and rejected it on storage engine. Stated `numHistoryShards: 4` and retention `168h`, which the draft left implicit. |
+| 2026-08-11 | Accepted, and **Adoption → Complete** with homelab#746. All eight implementation obligations verified on `main`: five-container topology with no `temporalio/temporal:1.7.2` left, both databases in `init.sql`, dynamic config mounted, commands inline with no `scripts/` directory, four `depends_on` gates on `temporal-bootstrap`, the three docs updated, and the audit's CLI calls moved to `temporal-admintools` with rows A14/A15 added. Evidence: PostgreSQL 18.4 accepts the `postgres12` schema (1.19 main / 1.14 visibility, idempotent on re-run); seven bring-up cycles green; full A/B/C audit A 16/16, B 3/3, C 6/6; and a versioning drain spanning `docker compose restart temporal`, with the current version, a `draining` predecessor, and a pinned in-flight execution all surviving. |

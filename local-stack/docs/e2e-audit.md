@@ -278,6 +278,56 @@ audit_curl -s "$BASE/product/v1/public/products/1/details" | python3 -c "import 
   print('A11 details:', 'OK full fan-out response' if ok else 'FAIL incomplete inventory/review enrichment'); \
   raise SystemExit(0 if ok else 1)"
 
+# A12. Cancellation unwind (ADR-033). Nothing else in this audit touches
+#      CancellationWorkflow. Reuses $OID from A10, which is `completed` by now and
+#      still cancellable because its shipment was never dispatched. The episode
+#      always COMPLETES; the ORDER's state carries the outcome.
+audit_curl -s -o /dev/null -w "A12 cancel:   %{http_code} (want 202 — episode opened)\n" \
+  -X POST "$BASE/order/v1/private/orders/$OID/cancel" -H "Authorization: Bearer $AT"
+audit_curl -s -o /dev/null -w "A12 replay:   %{http_code} (want 200 — idempotent)\n" \
+  -X POST "$BASE/order/v1/private/orders/$OID/cancel" -H "Authorization: Bearer $AT"
+for _ in 1 2 3 4 5 6; do
+  sleep 4
+  CST=$(audit_curl -s "$BASE/order/v1/private/orders/$OID" -H "Authorization: Bearer $AT" | \
+    python3 -c "import json,sys;print(json.load(sys.stdin)['status'])")
+  [ "$CST" = cancelled ] && break
+done
+echo "A12 status:   $CST (want cancelled; manual_review = a compensation did not converge)"
+# The workflow id carries the epoch — the orders.version the server read when it
+# accepted the cancel — so a second episode cannot replay the first one's outcome:
+docker compose exec -T temporal temporal workflow list --namespace mop \
+  -q "WorkflowType = 'CancellationWorkflow'" </dev/null 2>/dev/null | head -3
+docker compose exec -T postgres psql -U postgres -d order -t -c \
+  "SELECT order_id, status, epoch FROM cancellation_requests ORDER BY order_id DESC LIMIT 1" </dev/null
+
+# A13. The abandonment timer actually fires (ADR-019). A10 above only ever
+#      produces expired(lazy) — it moves the DB deadline, not the armed timer — so
+#      without this row the third workflow has no evidence it works at all.
+#      ARM THIS FIRST, before Phase A, and read it at the end: the timer runs for
+#      the session's full TTL while the rest of the audit proceeds.
+#      It needs its OWN user. One active session per user is a partial unique
+#      index, so A9/A10 would adopt this session and every mutation re-arms it.
+TU="audittimer$(date +%s)"
+audit_curl -s -o /dev/null -X POST $BASE/auth/v1/public/auth/register -H 'Content-Type: application/json' \
+  -d "{\"username\":\"$TU\",\"email\":\"$TU@example.com\",\"password\":\"password123\"}"
+TAT=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
+  -d "{\"username\":\"$TU\",\"password\":\"password123\"}" | \
+  python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $TAT" \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
+TSID=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $TAT" | \
+  python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+docker compose exec -T temporal temporal workflow list --namespace mop \
+  -q "WorkflowId = 'checkout-abandon-$TSID'" </dev/null 2>/dev/null | head -3   # want Running
+# ...then DO NOT TOUCH that session. After its TTL has elapsed:
+audit_curl -s -o /dev/null -w "A13 timer-410: %{http_code} (want 410)\n" \
+  "$BASE/checkout/v1/private/checkout/sessions/$TSID" -H "Authorization: Bearer $TAT"
+docker compose exec -T postgres psql -U postgres -d checkout -t -c \
+  "SELECT status, expired_reason FROM checkout_sessions WHERE id = '$TSID'" </dev/null
+# want: expired | timer. `lazy` here means a read beat the timer — that is
+# INCONCLUSIVE, not a pass, because it only proves the backstop. Retry.
+
 ```
 
 > Rapid-fire auth calls can trip Kong's rate limit (429). That is the gateway
@@ -285,10 +335,15 @@ audit_curl -s "$BASE/product/v1/public/products/1/details" | python3 -c "import 
 >
 > A10 abandonment timing: the workflow timer arms for the session's FULL TTL
 > (default 30m) at creation; shortening `expires_at` in SQL afterwards only
-> moves the LAZY deadline. To watch the timer itself fire quickly, run the
-> stack with `SESSION_TTL_SECONDS=15` on `checkout` + `checkout-worker`
-> instead, then create a session and leave it untouched — it flips to
-> `expired(timer)` in ~15s while the SPA shows 410 on reload.
+> moves the LAZY deadline. That is why A10 proves the backstop and **A13**
+> proves the timer. For A13, either arm the session before Phase A and read it
+> at the end — the TTL elapses while the rest of the audit runs — or bring the
+> stack up with `SESSION_TTL_SECONDS=15` on `checkout` **and** `checkout-worker`
+> for a ~15s cycle.
+>
+> A13 needs its own user. One active session per user is enforced by a partial
+> unique index, so running A9/A10 as the same user makes them adopt the watched
+> session, and every mutation re-arms its timer.
 
 ## Phase B — real browser (agent-browser, ~2 min)
 
@@ -377,7 +432,7 @@ curl -s "$VM/api/v1/query" --data-urlencode \
     print('C3 DB p95:', 'OK %.2fms' % (v*1000) if v and v < 0.5 else f'FAIL {v} (collapsed buckets? old pkg?)')"
 
 # C4. Main + ClickHouse-suite dashboards load with no datasource/parse errors
-for d in microservices-otel-local business-otel-local \
+for d in microservices-otel-local business-otel-local temporal-worker-local \
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer; do
   curl -s -o /dev/null -w "C4 $d: %{http_code} (want 200)\n" \
@@ -422,6 +477,8 @@ done
 | A9 | Checkout sessions (RFC-0015) | lifecycle 201→200→200→200 through edge-JWT; no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
 | A10 | Confirm + abandonment (RFC-0015 P2–P4) | fee/tax/promo composition asserted; `Idempotency-Key` required; replay = same order; order reaches `confirmed` or `completed`; order total == session total; lazy-410 past `expires_at` |
 | A11 | Full-fleet fan-out | product details returns product, live inventory availability, reviews, and review summary |
+| A12 | Cancellation unwind (ADR-033) | cancel 202 then replay 200; order reaches `cancelled`; `CancellationWorkflow` execution `Completed`; outbox row `DISPATCHED` with an epoch matching the workflow id's `-v<n>` suffix |
+| A13 | Abandonment timer (ADR-019) | on a **dedicated user**, an untouched session past its TTL reads 410 and the row is `expired \| timer`. `lazy` is inconclusive, not a pass — it proves only the backstop |
 | B1 | UI login | JWT + refresh in localStorage |
 | B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
 | B3 | UI logout | `POST /public/auth/logout` 200; storage cleared; redirect to `/login` |
@@ -452,7 +509,7 @@ value. Preserve the candidate SHA list with the audit result.
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A11 API contract | PASS / FAIL | |
+| A | A1–A13 API contract | PASS / FAIL | |
 | B | B1–B3 real browser | PASS / FAIL | |
 | C | C1–C6 telemetry | PASS / FAIL | |
 
@@ -483,5 +540,6 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-08-07 — mandatory full A/B/C release gate, A11 full-fleet
-fan-out, explicit evidence and tag eligibility decision._
+_Last updated: 2026-08-11 — adds A12 (cancellation unwind) and A13 (abandonment
+timer), the two workflows this audit never exercised, plus the Temporal dashboard
+in C4._

@@ -12,3 +12,9 @@ CREATE DATABASE notification;
 CREATE DATABASE payment;
 CREATE DATABASE checkout;
 CREATE DATABASE inventory;
+-- Temporal's own stores. Created here rather than by `temporal-sql-tool create`
+-- so the topology mirrors the cluster, where CNPG postInitSQL owns creation and
+-- Temporal runs with `createDatabase: false`. The tables inside them are managed
+-- by the `temporal-schema` container.
+CREATE DATABASE temporal;
+CREATE DATABASE temporal_visibility;

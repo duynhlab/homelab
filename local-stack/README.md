@@ -114,7 +114,7 @@ flowchart LR
     KONG --> SVC["11 Go services<br/>including inventory"]
     SVC -->|"payment provider HTTP"| MP["mockpay<br/>provider stub"]
     MP -->|"signed webhook"| KONG
-    SVC --> PG[("PostgreSQL<br/>11 databases")]
+    SVC --> PG[("PostgreSQL<br/>13 databases")]
     SVC -->|"product cache"| VALKEY[("Valkey")]
     KONG -->|"rate limit"| VALKEY
     SVC -->|"order + checkout"| TMP["Temporal :7233<br/>order + checkout workers"]
@@ -249,7 +249,8 @@ ambiguous.
 |---------|-------------|------------|
 | Runtime | Docker Compose | Kubernetes + Flux Operator |
 | Application image | Built from sibling source checkout | Released semver image pinned in manifests |
-| Database | One PostgreSQL container, 11 databases | CloudNativePG clusters and poolers |
+| Database | One PostgreSQL container, 13 databases | CloudNativePG clusters and poolers |
+| Temporal | `temporalio/server` on that PostgreSQL, all roles in one container, `numHistoryShards: 4` | Official Helm chart, four role Deployments, `numHistoryShards: 512` |
 | Secrets | Inline development values | OpenBAO + External Secrets Operator |
 | Network controls | Single Compose network | NetworkPolicy + Kong ingress boundaries |
 | Admission | None | Kyverno and PSS policies |

@@ -38,9 +38,11 @@ see [`local-stack/README.md`](../../local-stack/README.md) for host ports and
 audit gates.
 
 Postgres, Valkey, Temporal, app services, workers, mockpay, gateway, and
-frontend are health-gated. Most observability containers start on
-`service_started`; **ClickHouse** is health-gated and blocks the collector and
-Grafana until ready.
+frontend are health-gated. Temporal's consumers gate one step later, on
+`temporal-bootstrap` completing rather than on the server being healthy, because
+the `mop` namespace does not exist until that run-once container registers it.
+Most observability containers start on `service_started`; **ClickHouse** is
+health-gated and blocks the collector and Grafana until ready.
 
 ```mermaid
 flowchart LR
@@ -48,7 +50,7 @@ flowchart LR
     Kong --> SVC["10 HTTP services"]
     MP["mockpay"] -->|"provider HTTP"| PAY["payment"]
     MP -->|"webhook"| Kong
-    SVC --> PG[("Postgres<br/>11 DBs")]
+    SVC --> PG[("Postgres<br/>13 DBs")]
     SVC -->|"gRPC inventory calls"| INV["inventory<br/>gRPC only"]
     INV --> PG
     SVC --> VALKEY[("Valkey")]
@@ -89,14 +91,15 @@ flowchart LR
 | order-worker | `:8080` health | client only | `order` | — | Temporal; inventory/shipping/notification/payment (gRPC), cart (REST clear) |
 | checkout-worker | `:8080` health | — | `checkout` | — | Temporal (`AbandonedCheckoutWorkflow`; DB-only activities) |
 | mockpay | `:8080` | — | — | — | called by payment; webhooks → gateway → payment public route |
-| temporal | — (`7233` gRPC, `8233` UI) | — | — (in-memory dev) | — | callers: order, checkout, both workers |
+| temporal | — (`7233` gRPC, `8233` UI) | — | `temporal`, `temporal_visibility` | — | callers: order, checkout, both workers; CLI via `temporal-admintools` |
 | gateway (Kong 3.9) | `8000` → host `8080` | — | — | Valkey (rate-limit) | ten HTTP services + cache; inventory remains east-west only; callers: frontend, browser, mockpay webhooks |
 | frontend | `80` → host `3001` | — | — | — | gateway only |
 
 > **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`platform-db-pooler-rw.platform.svc.cluster.local:5432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);
 > `product-db` (CloudNativePG behind the **pgdog-product** pooler — `product`/`cart`/`order`/`checkout`/`payment`
 > databases; payment connects **direct over TLS, bypassing PgDog**).
-> Locally these collapse into one Postgres with 11 service databases. See [`../databases/`](../databases/).
+> Locally these collapse into one Postgres holding the 11 service databases
+> plus Temporal's `temporal` and `temporal_visibility`. See [`../databases/`](../databases/).
 > **Logging is unified** — all 11 services log via the shared `pkg/logger` zap wrapper
 > (`zapx`), teed into the OTLP pipeline (RFC-0014 P4).
 

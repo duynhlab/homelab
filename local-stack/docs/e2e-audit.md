@@ -250,7 +250,11 @@ audit_curl -s $BASE/order/v1/private/orders/$OID -H "Authorization: Bearer $AT0"
 # One redemption exactly, order_id backfilled:
 docker compose exec -T postgres psql -U postgres -d checkout -t -c \
   "SELECT code, order_id IS NOT NULL AS used FROM promo_redemptions ORDER BY id DESC LIMIT 1" </dev/null
-docker compose exec -T temporal temporal workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" </dev/null 2>/dev/null | head -3
+# Every `temporal ...` call in this audit runs in temporal-admintools: the
+# `temporalio/server` image ships only the server binary, so
+# `exec -T temporal temporal ...` fails with "not found".
+TCLI="docker compose exec -T temporal-admintools temporal"
+$TCLI workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" </dev/null 2>/dev/null | head -3
 
 # Abandonment (ADR-019): the DB deadline is the authority; the workflow timer
 # makes expiry proactive. Shorten the DB deadline and verify the outcome.
@@ -295,7 +299,7 @@ done
 echo "A12 status:   $CST (want cancelled; manual_review = a compensation did not converge)"
 # The workflow id carries the epoch — the orders.version the server read when it
 # accepted the cancel — so a second episode cannot replay the first one's outcome:
-docker compose exec -T temporal temporal workflow list --namespace mop \
+$TCLI workflow list --namespace mop \
   -q "WorkflowType = 'CancellationWorkflow'" </dev/null 2>/dev/null | head -3
 docker compose exec -T postgres psql -U postgres -d order -t -c \
   "SELECT order_id, status, epoch FROM cancellation_requests ORDER BY order_id DESC LIMIT 1" </dev/null
@@ -318,7 +322,7 @@ audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization:
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
 TSID=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $TAT" | \
   python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-docker compose exec -T temporal temporal workflow list --namespace mop \
+$TCLI workflow list --namespace mop \
   -q "WorkflowId = 'checkout-abandon-$TSID'" </dev/null 2>/dev/null | head -3   # want Running
 # ...then DO NOT TOUCH that session. After its TTL has elapsed:
 audit_curl -s -o /dev/null -w "A13 timer-410: %{http_code} (want 410)\n" \
@@ -328,6 +332,62 @@ docker compose exec -T postgres psql -U postgres -d checkout -t -c \
 # want: expired | timer. `lazy` here means a read beat the timer — that is
 # INCONCLUSIVE, not a pass, because it only proves the backstop. Retry.
 
+
+# A14. Durability — Temporal state survives a server restart. This is the whole
+#      reason local Temporal runs on PostgreSQL instead of an in-memory dev
+#      server: before the move, a restart took the namespace from nine live
+#      executions to zero.
+BEFORE=$($TCLI workflow list --namespace mop </dev/null 2>/dev/null | tail -n +2 | grep -c .)
+docker compose restart temporal >/dev/null
+until docker compose ps temporal --format '{{.Status}}' | grep -c healthy | grep -qx 1; do sleep 5; done
+AFTER=$($TCLI workflow list --namespace mop </dev/null 2>/dev/null | tail -n +2 | grep -c .)
+echo "A14 executions: before=$BEFORE after=$AFTER (want equal and non-zero)"
+$TCLI workflow show --workflow-id "order-fulfillment-$OID" --namespace mop </dev/null 2>/dev/null | head -3
+# want: the same execution still listed, its history still readable
+
+# A15. Worker Deployment Versioning drill (ADR-030). CONDITIONAL: run it when a
+#      change touches worker versioning, the saga's activity set, or the rollout
+#      runbook. It is the only rehearsal of a pinned drain outside the cluster.
+#
+#      Keep the pause UNDER the saga's 30s StartToCloseTimeout
+#      (order-service/internal/saga/workflow.go). A longer pause makes every
+#      attempt time out and retry forever — MaximumAttempts is 0 — so the drill
+#      never converges and strands an in-flight workflow.
+docker compose stop order-worker
+docker compose run -d --no-deps --name ow-v1 \
+  -e TEMPORAL_WORKER_DEPLOYMENT_NAME=order-fulfillment -e TEMPORAL_WORKER_BUILD_ID=v1 \
+  -e ORDER_FAULT_COMMIT_PAUSE=20s order-worker worker
+sleep 12
+$TCLI worker deployment list --namespace mop            # want: order-fulfillment, version v1
+$TCLI worker deployment set-current-version \
+  --deployment-name order-fulfillment --build-id v1 --namespace mop --yes
+# Drive one checkout through A10's funnel to get a fresh $OID, then:
+$TCLI workflow describe --workflow-id "order-fulfillment-$OID" --namespace mop \
+  | grep -A3 'Versioning Info'                          # want: Behavior Pinned, BuildId v1
+
+docker compose run -d --no-deps --name ow-v2 \
+  -e TEMPORAL_WORKER_DEPLOYMENT_NAME=order-fulfillment -e TEMPORAL_WORKER_BUILD_ID=v2 \
+  order-worker worker
+sleep 10
+$TCLI worker deployment set-current-version \
+  --deployment-name order-fulfillment --build-id v2 --namespace mop --yes
+$TCLI worker deployment describe --name order-fulfillment --namespace mop
+# want: current version v2, and v1 DrainageStatus `draining` while it still holds
+# a pinned execution. The `draining` -> `drained` flip lags the workflow
+# finishing by ~2 minutes, so never gate a rollout step on an instantaneous read.
+# Restarting `temporal` here is safe and worth doing once: the deployment state
+# and the pinned execution both survive it.
+
+# TEARDOWN IS MANDATORY, and this order matters. Removing a version's workers
+# while workflows are still pinned to it strands them; and reverting the worker
+# env while CurrentVersion still points at a build with no pollers leaves NEW
+# workflows Running forever, with ApproximateBacklogCount 0 on the unversioned
+# queue and nothing logged as an error.
+$TCLI worker deployment set-current-version \
+  --deployment-name order-fulfillment --unversioned --namespace mop --yes
+docker rm -f ow-v1 ow-v2
+docker compose start order-worker
+$TCLI workflow list --namespace mop | awk 'NR>1 && $1=="Running"'   # want: no output
 ```
 
 > Rapid-fire auth calls can trip Kong's rate limit (429). That is the gateway
@@ -479,6 +539,8 @@ done
 | A11 | Full-fleet fan-out | product details returns product, live inventory availability, reviews, and review summary |
 | A12 | Cancellation unwind (ADR-033) | cancel 202 then replay 200; order reaches `cancelled`; `CancellationWorkflow` execution `Completed`; outbox row `DISPATCHED` with an epoch matching the workflow id's `-v<n>` suffix |
 | A13 | Abandonment timer (ADR-019) | on a **dedicated user**, an untouched session past its TTL reads 410 and the row is `expired \| timer`. `lazy` is inconclusive, not a pass — it proves only the backstop |
+| A14 | Temporal durability | execution count is unchanged and non-zero across `restart temporal`; the driven workflow's history is still readable |
+| A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` workflow behind |
 | B1 | UI login | JWT + refresh in localStorage |
 | B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
 | B3 | UI logout | `POST /public/auth/logout` 200; storage cleared; redirect to `/login` |
@@ -509,7 +571,8 @@ value. Preserve the candidate SHA list with the audit result.
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A13 API contract | PASS / FAIL | |
+| A | A1–A14 API contract | PASS / FAIL | |
+| A | A15 versioning drill | PASS / FAIL / N/A | |
 | B | B1–B3 real browser | PASS / FAIL | |
 | C | C1–C6 telemetry | PASS / FAIL | |
 

@@ -81,6 +81,25 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Local-stack
+
+- Temporal now runs `temporalio/server` 1.31.2 on the shared PostgreSQL —
+  the same server version the cluster chart deploys, through the same
+  `postgres12` plugin and the same `temporal` / `temporal_visibility`
+  database split — instead of a `start-dev` server holding state in memory.
+  Workflow history, timers, and Worker Deployment Versioning state now
+  survive `docker compose restart temporal`, so a versioning drain
+  rehearsal can span a restart locally; previously a restart took the
+  namespace from nine live executions to zero. Four containers replace the
+  single dev-server: `temporal-schema` (run-once schema apply),
+  `temporal` (all roles), `temporal-bootstrap` (run-once, registers `mop`
+  with the cluster's `168h` retention), and `temporal-ui` on the unchanged
+  `:8233`. `temporal-admintools` joins them as the CLI target, because the
+  `temporalio/server` image ships no client binary — every
+  `docker compose exec ... temporal ...` call now goes through it.
+  `numHistoryShards` is deliberately 4 against the cluster's 512: shard
+  count partitions throughput, not behaviour. Worker addresses
+  (`temporal:7233`) and the UI port are unchanged, so no service moves.
 - local-stack E2E audit gains **A12** (cancellation unwind) and **A13** (the
   abandonment timer), the two Temporal workflows it never exercised, and C4 now
   checks the `temporal-worker-local` dashboard that already ships.

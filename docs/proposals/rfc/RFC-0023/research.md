@@ -397,7 +397,7 @@ are marked ★.
 
 | # | Question | Proposed direction |
 |---|----------|--------------------|
-| 1 | RFC / ADR numbers | RFC-0023; ADRs **ADR-042..044** — **owner-approved 2026-08-10** (numbers keep counting up past RFC-0022's reserved 039–041) |
+| 1 | RFC / ADR numbers | RFC-0023; ADRs **ADR-047..049** — *renumbered 2026-08-11* (originally 042..044; ADR-039/040 were consumed by unrelated decisions, so RFC-0022's identity ADRs took 041–043 and RFC-0024's edge ADRs took 044–046 at acceptance) |
 | 2 | Admin portal hostname + local port | `admin.duynh.me` (wildcard cert covers it); local dev/container **:3009** (owner pick, 2026-08-10) — draft's :3002 is Grafana ★ |
 | 3 | Package versions | Pin in `package.json`/lockfile at implementation; the RFC pins responsibilities, not versions (per draft) |
 | 4 | OIDC adapter + token storage | **keycloak-js** (comparison researched, see below): PKCE S256 default since KC 24, tokens held **in memory** on the instance, `updateToken(minValidity)` refresh, Keycloak-native session/SSO features, zero custom refresh code. The standards-portable alternative, `oidc-client-ts` (+`react-oidc-context` hooks), defaults its `userStore` to **`sessionStorage`** — tokens in web storage unless overridden to its `InMemoryWebStorage`, at which point its UX equals keycloak-js with more configuration. Since RFC-0022 commits the platform to Keycloak, the vendor adapter wins on posture (in-memory by default — stricter than the customer SPA's localStorage) and simplicity; `oidc-client-ts` stays the named swap if multi-IdP portability ever matters |

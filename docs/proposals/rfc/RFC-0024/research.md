@@ -288,7 +288,7 @@ maintainer-statement depth:
 | Sampler options | One number | [Issue #8476](https://github.com/envoyproxy/gateway/issues/8476) **closed via PR #8529**: `telemetry.tracing.sampler` enum (AlwaysOn/AlwaysOff/ParentBased/TraceIdRatioBased) — verify the carrying release at adoption (> v1.8.3). Envoy layer additionally ships AlwaysOn/**CEL**/Dynatrace/ParentBased/TraceIdRatioBased samplers (WIP-marked) |
 | Propagation | extract `[w3c, b3, jaeger, ot]`, inject `[w3c]` | W3C `traceparent` native; legacy B3/jaeger extraction not exposed — **non-issue for this fleet (everything is W3C)**, recorded for completeness |
 | Semconv | Pre-1.21 on Kong spans (audit **F-8**), frozen forever with 3.9 | Actively maintained tracer — F-8 resolves by migration |
-| Metrics | `kong_*` via prometheus plugin; **13 alerts + 19 recording rules keyed `job="kong"`** | `envoy_*` Prometheus pull (or OTel push); `ProxyMetrics` toggles; **control-plane metrics** (new capability); RateLimit observability page; **4 first-party Grafana dashboards** ship in `gateway-addons-helm` (today's Kong dashboard JSON lives in an out-of-tree repo) |
+| Metrics | `kong_*` via prometheus plugin; **13 alerts + 20 recording rules keyed `job="kong"`** | `envoy_*` Prometheus pull (or OTel push); `ProxyMetrics` toggles; **control-plane metrics** (new capability); RateLimit observability page; **4 first-party Grafana dashboards** ship in `gateway-addons-helm` (today's Kong dashboard JSON lives in an out-of-tree repo) |
 | Access logs | Bespoke `kong_json` (11 nginx-var fields; no route/service name — version-gated); no filtering (audit **F-2**: 96.2 % of exported log records were successful probe access logs) | Default JSON is richer (`response_flags`, `response_code_details`, `upstream_cluster`, `route_name`…); Text/JSON custom formats; **CEL `matches` filter at source** (solves F-2 where it starts); sinks: File / **OpenTelemetry** / ALS |
 | Migration cost | — | The **32 rule expressions must be rewritten on `envoy_*`** and the Vector/VictoriaLogs/ClickHouse pipeline re-mapped to the Envoy JSON schema (owner: schema change accepted — standard formats preferred); the `filter/kong_redis_deprecation` OTTL processor becomes dead code and is deleted |
 
@@ -327,7 +327,7 @@ numbers.
 | Policies | 10 KongClusterPlugin → SecurityPolicy/BTP/CTP/EnvoyProxy/route filters; 5 KongUpstreamPolicy + 25 `konghq.com/*` Service annotations → BTP | M |
 | Secrets | `ExternalSecret auth-issuer-jwt` (KIC-shaped) **deleted**; OpenBAO JWT fan-out halves | S ✅ |
 | NetworkPolicies | **11 files** keyed `kubernetes.io/metadata.name: kong` re-pointed — silent-blackhole risk if missed | S ⚠️ |
-| Observability | 13 alerts + 19 recording rules on `kong_*` rewritten; dashboards (out-of-tree JSON) → EG first-party set; Vector `kong_json` → Envoy JSON; OTTL kong filter deleted; sampling number copied | **L** (riskiest) |
+| Observability | 13 alerts + 20 recording rules on `kong_*` rewritten; dashboards (out-of-tree JSON) → EG first-party set; Vector `kong_json` → Envoy JSON; OTTL kong filter deleted; sampling number copied | **L** (riskiest) |
 | local-stack | `gateway` service (`kong:3.9`, 283-line `kong.yml`, 11 `service_healthy` deps, frontend gate) → EG standalone spike; **fallback (owner-approved): move the E2E release-audit gate to Kind** | M/L |
 | Docs | `docs/platform/kong-gateway.md` (1 121 L) + ~80 referencing docs; ADR-003/ADR-006 need a superseding ADR; **owner direction: Kong docs stay, marked Archived/read-only** | L (spreadable) |
 | Scripts/e2e | `flux-ui.sh` port-forward target; e2e pacing + edge-behavior assertions re-baselined | S |
@@ -396,7 +396,7 @@ gate can still overturn any of them.
 | 4 | local-stack gateway | Spike EG **standalone mode** (file provider — same Gateway API YAML as the cluster). **Owner-approved fallback: move the E2E release-audit gate to Kind** and let compose keep a thinner gateway story (`local-stack/docs/e2e-audit.md` scope updated at implementation) |
 | 5 | Access-log schema | Adopt Envoy default JSON (richer, standard) — **owner: change freely, standards-first**; Vector/CH mappings updated once; add a CEL `matches` filter to drop probe access logs at source (F-2) |
 | 6 | Kong decommission scope | **Delete all Kong configs and monitoring** (helmrelease, plugins, consumer, ESO secret, 32 rule expressions, dashboard CR, OTTL filter, Kyverno exception, HelmRepository, local `kong.yml`); NetworkPolicies re-pointed. **Docs are kept, marked Archived/read-only** — `docs/platform/kong-gateway.md` gets an archive banner, not a rewrite |
-| 7 | ADR numbering | ADR-045 (EG as platform edge — supersedes ADR-006's Kong binding, keeps the defense-in-depth split), ADR-046 (local-first edge rate limiting), ADR-047 (E2E gate placement when compose can't carry the edge) — counting up past RFC-0023's 042–044 |
+| 7 | ADR numbering | ~~ADR-045/046/047 counting past RFC-0023's 042–044~~ **Renumbered at acceptance (2026-08-11)**: ADR-039/040 were consumed by unrelated decisions, so the edge ADRs landed as ADR-044 (EG as platform edge — supersedes ADR-006's Kong binding, keeps the defense-in-depth split), ADR-045 (local-first edge rate limiting), ADR-046 (E2E gate placement when compose can't carry the edge); identity ADRs (RFC-0022) took 041–043; RFC-0023's future ADRs shift to 047–049 |
 | 8 | Keycloak integration point | **RFC-0022 absorbed for execution (owner, 2026-08-10)**: the edge is born trusting the Keycloak realm via remoteJWKS — no static-key ESO, no Kong rotation runbook, and no auth-service↔EG wiring ever exists; auth-service + `auth` DB retire in this program's decommission phase |
 | 9 | Sampling | Copy the model: EG `samplingRate` 0.1 cluster / 1.0 local, ParentBased default confirmed; adopt `sampler` enum config when the carrying release ships |
 | 10 | Edge spans/semconv | Accept the newer semconv (F-8 fix); trace-dashboard queries referencing `service.name="kong"` update to the EG service identity in the same PR as the tracing cutover |
@@ -433,7 +433,7 @@ decorative. The global RLS path is documented with an explicit activation trigge
 
 Kept. The owner's direction is archive-not-delete for documentation: the Kong platform
 doc gets an "Archived (RFC-0024)" banner and stays read-only history; ADR-003/ADR-006
-get superseded-by links from ADR-045; RFC-0009 gains one more superseded-in-part note.
+get superseded-by links from ADR-044; RFC-0009 gains one more superseded-in-part note.
 Configs and monitoring, by contrast, are deleted outright.
 
 **Is the Envoy Gateway of today mature enough for the one thing Kong does well here (compose)?**
@@ -477,17 +477,17 @@ EG runs in its first-class environment.
 
 ## Research review gate
 
-- [ ] Answers a **real-world problem** you'd recognize at work (on-call, design review,
+- [x] Answers a **real-world problem** you'd recognize at work (on-call, design review,
       incident, scale, compliance) — not generic vendor marketing
-- [ ] **Problem statement** names situation, who feels it, and cost of doing nothing
-- [ ] At least **two alternatives** documented with tradeoffs
-- [ ] **Platform as-built** section filled from manifests/docs (not boilerplate)
-- [ ] Primary use-case direction stated (may remain "undecided")
-- [ ] **Context7 audit** complete; footer date updated
-- [ ] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
-- [ ] No Kubernetes manifest changes smuggled into this research file
-- [ ] Owner sign-off: **ready for RFC**
+- [x] **Problem statement** names situation, who feels it, and cost of doing nothing
+- [x] At least **two alternatives** documented with tradeoffs
+- [x] **Platform as-built** section filled from manifests/docs (not boilerplate)
+- [x] Primary use-case direction stated (may remain "undecided")
+- [x] **Context7 audit** complete; footer date updated
+- [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
+- [x] No Kubernetes manifest changes smuggled into this research file
+- [x] Owner sign-off: **ready for RFC** — 2026-08-11, with the RFC-0024 acceptance
 
 ---
 
-_Last verified: 2026-08-10 (Context7 + official Envoy Gateway docs + GitHub threads + Docker Hub/git tags; Kong as-built from the 2026-08-10 repo inventory)._
+_Last verified: 2026-08-11 (Context7 + official Envoy Gateway docs + GitHub threads + Docker Hub/git tags; Kong as-built from the 2026-08-10 repo inventory, rule count corrected against `prometheusrules/kong/` on 2026-08-11)._

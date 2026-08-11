@@ -106,6 +106,22 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- RFC-0024 (Envoy Gateway + Keycloak, one greenfield cutover) and RFC-0022
+  (Keycloak as platform IdP; design record) both flip to **Accepted**; the
+  program's six ADRs are created at Accepted — identity ADR-041 (adopt
+  Keycloak, retire auth-service), ADR-042 (OIDC `sub` as string `user_id`
+  fleet-wide), ADR-043 (OIDC for browsers; east-west stays workload-trust)
+  and edge ADR-044 (Envoy Gateway on the Gateway API; supersedes ADR-006's
+  Kong vehicle, keeps the defense-in-depth split), ADR-045 (local-first edge
+  rate limiting; global RLS is a triggered escape hatch), ADR-046 (E2E gate
+  moves to Kind if the compose standalone spike fails). Numbering shifted
+  from the RFCs' reserved 039–041/045–047 because ADR-039/040 were consumed
+  by unrelated decisions; RFC-0023's future ADRs move to 047–049. ADR-003/
+  ADR-006 gain superseded-by banners and RFC-0009 a superseded-in-part note.
+  Two as-built corrections recorded: the `kong_*` rule set is 13 alerts +
+  **20** recording rules, and `platform-db`'s `bootstrap.initdb` already
+  rests on `user`/`platform-db-user-secret`, so no `platform_owner` handover
+  role is needed.
 - ADR-039 **Accepted**, Adoption **Complete**: local-stack Temporal runs
   `temporalio/server` on the shared PostgreSQL. All eight implementation
   obligations verified on `main`, and a History section records that the

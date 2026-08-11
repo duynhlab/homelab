@@ -9,6 +9,9 @@
 > adopts signed RS256 JWTs + Kong edge auth as defense-in-depth. Services still
 > validate (ADR-003's other half stands); ADR-006 *adds* an edge check and reverses the
 > "no Kong `jwt` plugin" stance. Body kept unchanged below for history.
+> *(2026-08-11: the Kong framing itself is retired by
+> [ADR-044](../ADR-044-envoy-gateway-platform-edge/) — the edge check moves to Envoy
+> Gateway `remoteJWKS`; the services-stay-authoritative half of this ADR still stands.)*
 
 ## Context
 

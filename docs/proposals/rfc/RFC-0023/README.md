@@ -576,9 +576,9 @@ schema exists anywhere.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | ADR-042 *(owner-approved 2026-08-10; counts up past RFC-0022's 039–041)* | Proposed |
-| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | ADR-043 | Proposed |
-| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui — owner-selected | ADR-044 | Proposed |
+| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | ADR-047 *(renumbered 2026-08-11: the identity ADRs took 041–043 and RFC-0024's edge ADRs took 044–046 at acceptance)* | Proposed |
+| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | ADR-048 | Proposed |
+| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui — owner-selected | ADR-049 | Proposed |
 
 The MVP write-scope cut (product/inventory only) stays an RFC scope decision, not an ADR.
 
@@ -592,7 +592,7 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   nonexistent FSM, customer search limited by the absence of email/username columns,
   the local bare-prefix JWT trap, and the order `manual_review` runbook named as the
   flagship future command.
-- 2026-08-10 — Owner decisions recorded: TanStack stack selected (ADR-044); MVP writes
+- 2026-08-10 — Owner decisions recorded: TanStack stack selected (ADR-049, renumbered from 044); MVP writes
   sliced inventory-first (slice A) with product/catalog writes as slice B; local port
   **:3009**; ADR numbers 042–044 confirmed; priority P2 sequenced after RFC-0022;
   keycloak-js and zod confirmed after researched comparisons vs `oidc-client-ts` and

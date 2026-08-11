@@ -43,6 +43,14 @@ spec:
           endpoint: tempo.monitoring.svc.cluster.local:4317
           tls:
             insecure: true
+        otlp/tempo-chart:
+          # ADR-040 phase 1 parallel-run: 5th trace sink alongside the raw
+          # Tempo Deployment. Cutover deletes `otlp/tempo` above and this
+          # exporter's release is renamed to `tempo` so the DNS goes back
+          # to `tempo.monitoring.svc`.
+          endpoint: tempo-chart.monitoring.svc.cluster.local:4317
+          tls:
+            insecure: true
         otlphttp/victoriatraces:
           # VictoriaTraces OTLP-HTTP ingest (single port :10428). gRPC :4317 is
           # TLS-by-default, so use HTTP. Pilot: 3rd backend alongside Tempo + Jaeger.
@@ -158,6 +166,7 @@ spec:
           traces:
             exporters:
             - otlp/tempo
+            - otlp/tempo-chart
             - otlp/jaeger
             - otlphttp/victoriatraces
             - clickhouse

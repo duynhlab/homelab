@@ -4,5 +4,6 @@ kind: Kustomization
 # Tracing stack: Tempo (storage) + Jaeger (UI) + OTel Collector (pipeline)
 resources:
   - tempo/
+  - tempo-chart/
   - jaeger/jaeger.yaml
   - otel-collector/otel-collector.yaml

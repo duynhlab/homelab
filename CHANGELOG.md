@@ -83,13 +83,35 @@ Skeleton (copy what you need):
 
 #### Proposals
 
-- ADR-039 (run Temporal on Postgres in local-stack for versioning parity):
-  proposes replacing the in-memory `temporalio/temporal` dev-server with the
-  official five-container topology (schema setup, server, namespace/search-
-  attribute bootstrap, long-running admin-tools CLI target, UI) on the shared
-  `postgres` container, so the three RFC-0021 Worker Deployment Versioning
-  traps and the `kubectl exec deploy/temporal-admintools` workflow are
-  reproducible on the dev loop instead of only on Kind.
+- ADR-040 (deliver Tempo through the `grafana-community/tempo` Helm chart):
+  proposes a chart-based replacement for the hand-written Tempo Deployment
+  and ConfigMap, delivered as a Flux `HelmRelease` that matches every other
+  Helm-delivered component in this repo. Enables the metrics-generator
+  through first-class values so Grafana's serviceMap and tracesToMetrics
+  finally have data. Supersedes ADR-032 (see below); the Tempo 3.x upgrade
+  path stays a values change on the same chart family.
+- ADR-032 withdrawn (Tempo delivery via tempo-operator `TempoMonolithic`):
+  superseded by ADR-040. Follow-up research confirmed upstream tempo-operator
+  ships no Helm chart, only a raw `tempo-operator.yaml` bundle; adopting the
+  operator would require a vendored raw bundle or a remote kustomize URL,
+  both off-pattern for this repo, introduced for a single controller. The
+  ADR is preserved as design context.
+- ADR-032 amended (Tempo delivery via tempo-operator `TempoMonolithic`): add
+  a **Delivery mechanism** subsection under Decision. Upstream tempo-operator
+  ships no Helm chart, only a raw `tempo-operator.yaml` bundle, so the homelab
+  cannot follow the `HelmRelease` pattern every other operator here uses.
+  Record the trade-off between a vendored bundle and a remote kustomize URL,
+  select the vendored bundle for diff visibility and offline safety, and
+  document the fallback to `HelmRelease` if a first-party chart appears.
+  Refresh Alternative D (`grafana-community/tempo` single-binary chart) with
+  a concrete rejection and add Alternative E (`grafana-community/tempo-distributed`).
+- ADR-032 amended (Tempo delivery via tempo-operator `TempoMonolithic`): note
+  Tempo 3.0's rearchitecture (ingester and compactor modules removed, Project
+  Rhythm becomes the default write path) as context and as an explicit revisit
+  trigger; the operator still pins Tempo 2.10.5, so 2.10.5 stays the landing
+  pad. Renovate PR #694 (`grafana/tempo` v2.10.5 → v3.0.2) is rejected on this
+  basis and PRs that push Tempo `>= 3.0.0` are gated on a follow-up ADR after
+  tempo-operator ships 3.x support.
 - RFC-0024 (replatform edge and identity — Envoy Gateway + Keycloak in one
   greenfield cutover; RFC-0022's implementation is absorbed as program phases,
   its design record stands): research

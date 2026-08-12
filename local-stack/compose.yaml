@@ -1,7 +1,8 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
-# Brings up: Postgres (13 DBs) + Valkey cache + per-service golang-migrate migrations
-# + 11 Go services + Temporal (server 1.31.2 on Postgres, as in the cluster) + the
+# Brings up: Postgres (14 DBs) + Valkey cache + per-service golang-migrate migrations
+# + 11 Go services + Temporal (server 1.31.2 on Postgres, as in the cluster)
+# + Keycloak (realm `duynhlab`, RFC-0024 P3 identity cutover) + the
 # order-fulfillment worker + a Kong DB-less gateway (mirrors the in-cluster Kong)
 # + the React frontend.
 #
@@ -17,9 +18,12 @@
 #
 # Tracing fans into VictoriaTraces (via an OTel Collector) — audit it in Grafana
 # at http://localhost:3002 (Explore → VictoriaTraces). Profiling is enabled — each
-# service pushes pprof to the local Pyroscope (:4040, Grafana → Explore → Pyroscope);
-# auth uses the real JWT login flow — RS256 access token + rotating refresh
-# token, edge-verified by Kong's jwt plugin (demo login: alice / password123).
+# service pushes pprof to the local Pyroscope (:4040, Grafana → Explore → Pyroscope).
+# Identity (RFC-0024 P3): the SPA logs in against Keycloak (http://localhost:8081,
+# realm `duynhlab`, keycloak-js PKCE) and services verify realm tokens via OIDC_*
+# (pkg v0.37.0 authmw). auth-service still runs and mints its own JWT_* tokens,
+# but nothing verifies against it any more — it retires in P5.
+# Demo login: alice / password123 (by username).
 
 x-svc-env: &svc-env
   ENV: development
@@ -43,10 +47,16 @@ x-svc-env: &svc-env
   DB_USER: postgres
   DB_PASSWORD: postgres
   DB_SSLMODE: disable
-  # Local JWKS for service-side JWT verification (authmw.MiddlewareJWT). Issuer and
-  # audience use the auth-service defaults (https://gateway.duynh.me /
-  # duynhlab-platform), so only the URL needs overriding from the cluster default.
-  AUTH_JWKS_URL: http://auth:8080/auth/v1/public/auth/jwks
+  # RFC-0024 P3: services verify Keycloak realm tokens (pkg v0.37.0 authmw).
+  # Split-horizon issuer: the browser reaches Keycloak at the published
+  # http://localhost:8081, and start-dev (no --hostname) derives `iss` from the
+  # request host — so tokens carry iss=http://localhost:8081/realms/duynhlab and
+  # services must expect exactly that string. Their JWKS fetch, however, runs
+  # inside the compose network where localhost:8081 is not Keycloak, hence the
+  # explicit keycloak:8080 override (empty OIDC_JWKS_URL would derive it from
+  # the issuer). OIDC_AUDIENCE rides the service default (duynhlab-platform).
+  OIDC_ISSUER: http://localhost:8081/realms/duynhlab
+  OIDC_JWKS_URL: http://keycloak:8080/realms/duynhlab/protocol/openid-connect/certs
 
 x-svc-healthcheck: &svc-healthcheck
   test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
@@ -77,6 +87,46 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # ---- Keycloak (RFC-0024 P3: the platform IdP, realm `duynhlab`) ----
+  # Same image pin as the cluster Deployment; `start-dev` instead of `start`
+  # is the deliberate compose divergence (HTTP, no --hostname: the issuer is
+  # derived from the request host — see the OIDC_ISSUER note in x-svc-env).
+  # ./keycloak/duynhlab-realm.json is a verbatim copy of the cluster ConfigMap's
+  # realm JSON (fixed demo-user UUIDs a11ce000-…{1..5}, clients customer-spa /
+  # admin-portal, audience duynhlab-platform); its redirect URIs already point
+  # at the localhost dev origins. --import-realm only imports when the realm
+  # does not exist yet — `docker compose down -v` re-converges to this state.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.7@sha256:45ae20191531eb608ddb0b775d012b40d3e4f942697f3214694887dd7c108d13
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+      # Dev-only bootstrap admin (cluster: keycloak-bootstrap-admin via ESO).
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true" # health lives on the management port :9000
+      KC_HTTP_PORT: "8080"
+    volumes:
+      - ./keycloak/duynhlab-realm.json:/opt/keycloak/data/import/duynhlab-realm.json:ro
+    ports:
+      - "8081:8080" # browser-facing origin http://localhost:8081 (SPA login + iss)
+    # The image ships no curl/wget; probe /health/ready on the management port
+    # with bash's /dev/tcp (the documented Keycloak container healthcheck).
+    # YAML double-quote escaping: \\r\\n below reaches the shell as literal
+    # \r\n, which `echo -e` then expands into the HTTP line breaks.
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s # JVM start + first-boot realm import is slow
+    depends_on:
+      postgres: { condition: service_healthy }
 
   # ---- Temporal (drives the order-fulfillment saga) ----
   # Server and storage engine match the cluster: server 1.31.2 (chart 1.6.0's
@@ -501,7 +551,10 @@ services:
       # Edge JWT (RFC-0009 Phase 4): stable DEV-ONLY RS256 signing key so the
       # gateway's jwt consumer credential (kong.yml holds the matching public
       # half) stays valid across restarts. In the cluster this key comes from
-      # OpenBAO via ESO. iss/aud match the Kong jwt_secret key and authmw.
+      # OpenBAO via ESO. iss/aud match the Kong jwt_secret key.
+      # RFC-0024 P3: auth still mints these tokens, but its consumers no longer
+      # verify against them — services trust the Keycloak realm (OIDC_* in
+      # x-svc-env). JWT_* stays only until auth-service retires in P5.
       JWT_ISSUER: https://gateway.duynh.me
       JWT_AUDIENCE: duynhlab-platform
       JWT_PRIVATE_KEY_PEM: |
@@ -551,7 +604,10 @@ services:
       postgres: { condition: service_healthy }
       user-migrate: { condition: service_completed_successfully }
       user-seed: { condition: service_completed_successfully }
+      # RFC-0024 P3: Keycloak is the token verifier (JWKS); the auth dependency
+      # coexists until P5 retires auth-service.
       auth: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
 
   shipping:
     build: { context: ../../shipping-service }
@@ -577,6 +633,7 @@ services:
       review-migrate: { condition: service_completed_successfully }
       review-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
 
   notification:
     build: { context: ../../notification-service }
@@ -591,6 +648,7 @@ services:
       notification-migrate: { condition: service_completed_successfully }
       notification-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
 
   product:
     build: { context: ../../product-service }
@@ -632,6 +690,7 @@ services:
       cart-migrate: { condition: service_completed_successfully }
       cart-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
 
   # ---- Inventory (RFC-0021): sole stock authority. gRPC-only (:9090,
   # inventory.v1) — no Kong route. Three live callers since phase 4: the order
@@ -681,6 +740,7 @@ services:
       postgres: { condition: service_healthy }
       checkout-migrate: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
       cart: { condition: service_healthy }
       product: { condition: service_healthy }
       order: { condition: service_healthy }
@@ -707,6 +767,7 @@ services:
       postgres: { condition: service_healthy }
       checkout-migrate: { condition: service_completed_successfully }
       temporal-bootstrap: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy } # RFC-0024 P3: same OIDC_* env as the API service
 
   # ---- Mock payment provider (a second deployment of the payment binary via
   # the `mockpay` subcommand — the real network hop behind payment's provider
@@ -742,6 +803,7 @@ services:
       postgres: { condition: service_healthy }
       payment-migrate: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
       mockpay: { condition: service_healthy }
 
   order:
@@ -775,6 +837,7 @@ services:
       order-migrate: { condition: service_completed_successfully }
       order-seed: { condition: service_completed_successfully }
       auth: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
       cart: { condition: service_healthy }
       shipping: { condition: service_healthy }
       temporal-bootstrap: { condition: service_completed_successfully }
@@ -811,6 +874,7 @@ services:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
       temporal-bootstrap: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy } # RFC-0024 P3: same OIDC_* env as the API service
       inventory: { condition: service_healthy }
       shipping: { condition: service_healthy }
       notification: { condition: service_healthy }
@@ -877,6 +941,12 @@ services:
       context: ../../frontend
       args:
         API_BASE_URL: http://localhost:8080
+        # RFC-0024 P3 (frontend#90): keycloak-js login — the Dockerfile turns
+        # these ARGs into VITE_* at build time. Browser-facing origin, so
+        # localhost:8081 (not the in-network keycloak:8080).
+        KEYCLOAK_URL: http://localhost:8081
+        KEYCLOAK_REALM: duynhlab
+        KEYCLOAK_CLIENT_ID: customer-spa
     ports:
       - "3001:80"
     healthcheck:

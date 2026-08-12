@@ -459,6 +459,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 - [Kong API Gateway](./platform/kong-gateway.md) - API-gateway concept + tradeoffs; DB-less Kong (plugins, routing, rate-limiting, TLS)
 - [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
+- [Identity Cutover Runbook](./platform/identity-cutover-runbook.md) - RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm)
 - [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 11 services)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
 - [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics/Logs, Flux, Grafana)

@@ -227,6 +227,19 @@ spec:
           - name: PAYMENT_GRPC_ADDR
             value: << inputs.payment_grpc_addr >>
           <<- end >>
+          <<- if (index inputs "authmw") >>
+          # RFC-0024 P3 (identity cutover; RFC-0022 design record): authmw
+          # (pkg v0.37.0) verifies Keycloak realm tokens. The compiled defaults
+          # already point at the realm — set both explicitly at cutover so the
+          # trusted issuer is auditable in the manifest. JWKS is fetched
+          # in-cluster over plain HTTP (TLS terminates at the edge, which is
+          # for browsers; empty OIDC_JWKS_URL would derive <issuer>/protocol/
+          # openid-connect/certs and hairpin through the public host).
+          - name: OIDC_ISSUER
+            value: "https://id.duynh.me/realms/duynhlab"
+          - name: OIDC_JWKS_URL
+            value: "http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs"
+          <<- end >>
         resources:
           requests:
             memory: "32Mi"

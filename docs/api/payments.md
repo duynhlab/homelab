@@ -128,7 +128,7 @@ removed.
 
 | RPC | Request → Response | Saga | Notes |
 |-----|--------------------|------|-------|
-| `Authorize` | `order_id, user_id, amount_minor, currency, payment_method` → `Payment` | step | Place (or replay) the hold; idempotent by key `order:<id>`; manual capture mode |
+| `Authorize` | `order_id, user_id, amount_minor, currency, payment_method` → `Payment` | step | Place (or replay) the hold; idempotent by key `order:<id>`; manual capture mode. `user_id` is `string` since RFC-0024 P3 (was `int64`) — the Keycloak `sub` ([ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)) |
 | `Capture` | `order_id` → `Payment` | step | Capture the hold after earlier saga steps succeed; already-captured replays unchanged |
 | `Void` | `order_id` → `Payment` | compensation | Release an uncaptured hold |
 | `Refund` | `order_id, amount_minor, reason, refund_request_id` → `Refund` | compensation | Return captured funds; idempotent by key `refund:order:<id>:<refund_request_id>`. The **caller** names the refund, because only the caller knows whether two refunds are the same intent — order sends `compensation` and `cancellation`. An empty id keeps the historical `refund:order:<id>` key ([ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/)) |
@@ -418,8 +418,9 @@ older charge read as missing on our side.
 
 ## Operations
 
-- **Key env:** `DB_*` (`DB_SSLMODE=require` on cluster), `AUTH_JWKS_URL`,
-  `JWT_ISSUER`/`JWT_AUDIENCE`, `GRPC_PORT`, `MOCKPAY_URL`, `MOCKPAY_WEBHOOK_SECRET`,
+- **Key env:** `DB_*` (`DB_SSLMODE=require` on cluster), `OIDC_ISSUER`,
+  `OIDC_AUDIENCE`, `OIDC_JWKS_URL` (pkg v0.37.0 — empty derives
+  `<issuer>/protocol/openid-connect/certs`), `GRPC_PORT`, `MOCKPAY_URL`, `MOCKPAY_WEBHOOK_SECRET`,
   `MOCKPAY_WEBHOOK_URL`, `AUTH_HOLD_TTL`, `IDEMPOTENCY_KEY_TTL`,
   `IDEMPOTENCY_LOCK_TAKEOVER`, `RECON_HEAL_ENABLED`.
 - **Reconciliation API** (internal audience — never routed through the
@@ -498,4 +499,4 @@ Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-servic
 - [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 
-_Last updated: 2026-08-04_
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: proto `user_id` is `string` (was `int64`), `OIDC_*` verification env._

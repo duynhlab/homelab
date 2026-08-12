@@ -76,7 +76,7 @@ One table; migrations are embedded and applied by the `migrate` subcommand
 |--------|------|-----------|
 | `id` | `SERIAL` | primary key |
 | `product_id` | `INTEGER NOT NULL` | references product catalog by id — cross-service, **no FK** |
-| `user_id` | `INTEGER NOT NULL` | references auth users by id — cross-service, **no FK** |
+| `user_id` | `VARCHAR(255) NOT NULL` | the Keycloak `sub` (string UUID, [ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)) — identity lives in the IdP, **no FK** |
 | `rating` | `INTEGER` | `CHECK (rating >= 1 AND rating <= 5)` |
 | `title` | `VARCHAR(255)` | optional |
 | `comment` | `TEXT` | required by the API contract (DB allows NULL) |
@@ -114,7 +114,7 @@ invalid values fall back to defaults).
     {
       "id": "12",
       "product_id": "1",
-      "user_id": "7",
+      "user_id": "a11ce000-0000-4000-8000-000000000002",
       "rating": 5,
       "title": "Solid keyboard",
       "comment": "Good switches and build quality.",
@@ -152,7 +152,7 @@ invalid values fall back to defaults).
 
 | HTTP | Code | Trigger |
 |------|------|---------|
-| `400` | `VALIDATION_ERROR` | Missing `product_id` query param; invalid JSON body; rating outside 1–5; non-numeric `product_id`/`user_id` |
+| `400` | `VALIDATION_ERROR` | Missing `product_id` query param; invalid JSON body; rating outside 1–5; non-numeric `product_id` (`user_id` is a string subject since RFC-0024 P3 — no numeric check) |
 | `401` | `UNAUTHORIZED` | Missing/invalid JWT — rejected at the Kong edge or by in-service `pkg/authmw` |
 | `409` | `CONFLICT` | The user already reviewed this product |
 | `500` | `INTERNAL_ERROR` | Database or unexpected failure, no leaked internals |
@@ -214,10 +214,13 @@ A client cannot review on behalf of another user.
 ### One logic layer, two transports
 
 `ListReviews` serves both `GET /review/v1/public/reviews` and
-`GetProductReviews` — same validation (`strconv.Atoi` on ids → invalid-input
-sentinel), same repository, same ordering (`created_at DESC`). Transport
-adapters only translate errors: sentinel → HTTP status on one side, sentinel
-→ gRPC status code on the other.
+`GetProductReviews` — same validation (`strconv.Atoi` on `product_id` →
+invalid-input sentinel), same repository, same ordering (`created_at DESC`).
+Transport adapters only translate errors: sentinel → HTTP status on one side,
+sentinel → gRPC status code on the other. The P3 string-`user_id` cutover
+removed the subject's `strconv.Atoi` entirely — including the repository-level
+conversion whose error was silently swallowed (`review_repo.go:82` pre-P3),
+so a non-numeric subject can no longer degrade a query quietly.
 
 ## Callers & dependencies
 
@@ -226,7 +229,7 @@ adapters only translate errors: sentinel → HTTP status on one side, sentinel
 | Inbound | Browser SPA via Kong | HTTP `:8080` | Public list; private create behind edge JWT |
 | Inbound | product-service | gRPC `:9090` | `GetProductReviews` for details aggregation; 3s deadline, soft-fail to `[]` |
 | Outbound | `review` DB on `platform-db` | PostgreSQL | Via `platform-db-pooler-rw.platform:5432` |
-| Outbound | auth JWKS | HTTP | `AUTH_JWKS_URL` — local RS256 verification (`pkg/authmw`); no runtime call to auth per request |
+| Outbound | Keycloak realm JWKS | HTTP | `OIDC_ISSUER`/`OIDC_JWKS_URL` — local RS256 verification (`pkg/authmw` v0.37.0); no runtime IdP call per request |
 
 NetworkPolicy (`kubernetes/infra/configs/network-policies/review.yaml`):
 default deny-all ingress; only the `kong` and `product` namespaces are
@@ -246,8 +249,9 @@ are reserved for that future surface).
   (readiness; flips false during graceful shutdown, then drains
   `READINESS_DRAIN_DELAY` seconds before the listener stops). gRPC `:9090`
   serves the standard health service via `pkg/grpcx`.
-- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*`, `AUTH_JWKS_URL`,
-  `JWT_ISSUER`, `JWT_AUDIENCE`, `LOG_LEVEL`, `TRACING_ENABLED`,
+- **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*`, `OIDC_ISSUER`,
+  `OIDC_AUDIENCE`, `OIDC_JWKS_URL` (pkg v0.37.0 — empty derives
+  `<issuer>/protocol/openid-connect/certs`), `LOG_LEVEL`, `TRACING_ENABLED`,
   `OTEL_COLLECTOR_ENDPOINT`, `SHUTDOWN_TIMEOUT`.
 - **Lifecycle subcommands:** `migrate` (schema, every environment) and
   `seed` (demo data, dev-only — hard-refused in production).
@@ -304,4 +308,4 @@ Paths in [`duynhlab/review-service`](https://github.com/duynhlab/review-service)
 - [product.md](./product.md) — the details aggregation that calls `GetProductReviews`
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (Keycloak `sub`), `OIDC_*` verification env, subject `strconv` (and its swallowed error) removed._

@@ -79,7 +79,39 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Breaking Change
+
+#### Services
+
+- Fleet identity cutover to the Keycloak realm (RFC-0024 P3, executing the
+  RFC-0022 design record / ADR-041/042, coordinated pkg `v0.37.0`): every
+  authmw consumer (user, cart, review, notification, payment, order,
+  checkout + both workers) now verifies `OIDC_ISSUER` /
+  `OIDC_AUDIENCE` / `OIDC_JWKS_URL` — the old `AUTH_JWKS_URL`/`JWT_ISSUER`/
+  `JWT_AUDIENCE` names are gone — and `user_id` is the token `sub` (string
+  UUID) end to end: 5 `INTEGER` columns, the notification/payment protos,
+  `pkg/idempotency`, and the Temporal workflow inputs. Requires the
+  greenfield DB reset in
+  [`docs/platform/identity-cutover-runbook.md`](docs/platform/identity-cutover-runbook.md);
+  the domain ResourceSets inject the explicit `OIDC_*` pair behind the new
+  `authmw` RSIP input. auth-service keeps running (nothing verifies its
+  tokens) until the P5 decommission.
+
 ### Feature
+
+#### Local-stack
+
+- Keycloak joins compose (RFC-0024 P3): the cluster-pinned
+  `keycloak:26.5.7` image in `start-dev --import-realm` mode on Postgres
+  (`keycloak` database in `init.sql`), importing a verbatim copy of the
+  cluster realm at `local-stack/keycloak/duynhlab-realm.json`, published at
+  the browser origin `http://localhost:8081`. Split-horizon issuer wired in
+  `x-svc-env` (`iss` = `http://localhost:8081/realms/duynhlab`, JWKS fetched
+  in-network at `keycloak:8080`), the seven authmw consumers + both workers
+  gate on its bash `/dev/tcp` health probe, and the frontend build gains the
+  `KEYCLOAK_URL`/`KEYCLOAK_REALM`/`KEYCLOAK_CLIENT_ID` args (frontend#90).
+  Known gap until P6: the local Kong edge JWT still matches the retired auth
+  issuer's static key and cannot verify realm tokens.
 
 #### Gateway
 

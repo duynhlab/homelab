@@ -77,17 +77,18 @@ flowchart LR
 
 | Component | HTTP | gRPC | Database (local) | Cache | Runtime deps / callers |
 |-----------|------|------|------------------|-------|------------------------|
-| auth | `:8080` | — | `auth` | — | none outbound (JWKS validated *by* everyone) |
-| user | `:8080` | — | `user` | — | auth (JWKS); caller: Kong |
+| keycloak | `:8080` (host `:8081`) | — | `keycloak` | — | the platform IdP (RFC-0024 P3): SPA login (PKCE), realm JWKS verified by every authmw consumer |
+| auth | `:8080` | — | `auth` | — | none outbound; **nothing verifies its tokens since P3** (retires in P5) |
+| user | `:8080` | — | `user` | — | Keycloak (JWKS); caller: Kong |
 | product | `:8080` | `:9090` server | `product` | Valkey | review + inventory (gRPC); callers: Kong, checkout |
 | inventory | health only | `:9090` server | `inventory` | — | callers: product details, checkout, order API, order-worker |
-| cart | `:8080` | `:9090` server | `cart` | — | auth (JWKS); callers: Kong, checkout (`GetCart`), order/order-worker (REST) |
-| order | `:8080` | `:9090` server | `order` | — | auth (JWKS), Temporal, shipping/payment/inventory (gRPC), cart (REST); callers: Kong, checkout (`CreateOrder`) |
-| review | `:8080` | `:9090` server | `review` | — | auth (JWKS); callers: Kong, product (gRPC) |
+| cart | `:8080` | `:9090` server | `cart` | — | Keycloak (JWKS); callers: Kong, checkout (`GetCart`), order/order-worker (REST) |
+| order | `:8080` | `:9090` server | `order` | — | Keycloak (JWKS), Temporal, shipping/payment/inventory (gRPC), cart (REST); callers: Kong, checkout (`CreateOrder`) |
+| review | `:8080` | `:9090` server | `review` | — | Keycloak (JWKS); callers: Kong, product (gRPC) |
 | shipping | `:8080` | `:9090` server | `shipping` | — | none outbound; callers: Kong, checkout, order, order-worker |
-| notification | `:8080` | `:9090` server | `notification` | — | auth (JWKS); callers: Kong, order-worker (`SendEmail`) |
-| payment | `:8080` | `:9090` server | `payment` | — | auth (JWKS), mockpay (HTTP); callers: Kong, order (GetPayment), order-worker (saga money) |
-| checkout | `:8080` internal-only | client only | `checkout` | — | auth (JWKS), cart/product/inventory/shipping/order (gRPC), Temporal; caller: Kong only |
+| notification | `:8080` | `:9090` server | `notification` | — | Keycloak (JWKS); callers: Kong, order-worker (`SendEmail`) |
+| payment | `:8080` | `:9090` server | `payment` | — | Keycloak (JWKS), mockpay (HTTP); callers: Kong, order (GetPayment), order-worker (saga money) |
+| checkout | `:8080` internal-only | client only | `checkout` | — | Keycloak (JWKS), cart/product/inventory/shipping/order (gRPC), Temporal; caller: Kong only |
 | order-worker | `:8080` health | client only | `order` | — | Temporal; inventory/shipping/notification/payment (gRPC), cart (REST clear) |
 | checkout-worker | `:8080` health | — | `checkout` | — | Temporal (`AbandonedCheckoutWorkflow`; DB-only activities) |
 | mockpay | `:8080` | — | — | — | called by payment; webhooks → gateway → payment public route |
@@ -135,8 +136,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Public profile view** | `GET /user/v1/public/users/:id` | minimal projection (`id` + `name`, no PII) from real persistence | — | Implemented | — |
-| **Own profile read/update** | `GET/PUT /user/v1/private/users/profile` | JWT-subject scoping (ownership-scoped queries); partial update preserves unset fields (COALESCE) | auth JWKS | Implemented | — |
-| **Internal profile create** | `POST /user/v1/internal/users` | requires an authoritative `user_id` from the caller (never synthesized) | — | **No caller** (auth registers into its own DB and does not call this) | [user.md](user.md) |
+| **Own profile read/update** | `GET/PUT /user/v1/private/users/profile` | JWT-subject scoping (ownership-scoped queries); partial update preserves unset fields (COALESCE) | Keycloak JWKS | Implemented | — |
+| **JIT profile provisioning** | (behavior of the private profile routes) | claim-fallback read + first-`PUT` upsert creates the row for the token's `sub` — the internal create route (`POST /user/v1/internal/users`) was removed in RFC-0024 P3 | Keycloak JWKS | Implemented (P3) | [user.md](user.md) |
 
 ### product — catalog (+ cache)
 
@@ -163,7 +164,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Session lifecycle** | `POST /checkout/v1/private/checkout/sessions`, `GET/DELETE /checkout/v1/private/checkout/sessions/:id`, `PUT /checkout/v1/private/checkout/sessions/:id/address` (process-named `checkout` segment — see checkout.md) | explicit FSM, one active session per user, ownership-scoped queries (anti-IDOR), DB-authoritative TTL | auth JWKS, cart, product | Implemented (P1) | [checkout](checkout.md) |
+| **Session lifecycle** | `POST /checkout/v1/private/checkout/sessions`, `GET/DELETE /checkout/v1/private/checkout/sessions/:id`, `PUT /checkout/v1/private/checkout/sessions/:id/address` (process-named `checkout` segment — see checkout.md) | explicit FSM, one active session per user, ownership-scoped queries (anti-IDOR), DB-authoritative TTL | Keycloak JWKS, cart, product | Implemented (P1) | [checkout](checkout.md) |
 | **Price re-validation** | session create and confirm | cart owns quantities; product `BatchGetCurrentPrices` owns current price, inventory `CheckAvailability` owns availability (fail-closed); changed lines are explicit | cart, product | Implemented (P1-P2) | ADR-020/021 |
 | **Shipping and totals** | `PUT /checkout/v1/private/checkout/sessions/:id/shipping` | shipping `GetQuote`; SQL recomputes subtotal + fee + tax - discount in minor units | shipping | Implemented (P3) | [checkout](checkout.md#totals-p3-implemented--one-composition-rule-owned-by-sql) |
 | **Payment selection** | `PUT /checkout/v1/private/checkout/sessions/:id/payment` | opaque `tok_` reference only; PAN-like input rejected before persistence | — | Implemented (P2) | [checkout](checkout.md) |
@@ -179,7 +180,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Cart CRUD** | `GET/POST/DELETE /cart/v1/private/cart`, `GET /cart/v1/private/cart/count`, `PATCH/DELETE /cart/v1/private/cart/items/:itemId` | fail-closed JWT (`user_id` from token, never body — ownership-scoped queries); UPSERT `ON CONFLICT (user_id, product_id)`; server-side subtotal math (empty cart = 0 shipping) | auth JWKS | Implemented | — |
+| **Cart CRUD** | `GET/POST/DELETE /cart/v1/private/cart`, `GET /cart/v1/private/cart/count`, `PATCH/DELETE /cart/v1/private/cart/items/:itemId` | fail-closed JWT (`user_id` from token, never body — ownership-scoped queries); UPSERT `ON CONFLICT (user_id, product_id)`; server-side subtotal math (empty cart = 0 shipping) | Keycloak JWKS | Implemented | — |
 | **Saga cart-clear** | `DELETE /cart/v1/internal/cart/:userId` | tokenless in-cluster endpoint, NetworkPolicy-fenced; called best-effort by the saga's `ClearCart` step | caller: order-worker | Implemented | [temporal saga](temporal.md) |
 | **gRPC read surface** | `cart.v1/GetCart` (`:9090`) | read-only snapshot for checkout (RFC-0015); prices → int64 minor units at this boundary; writes deliberately stay REST (ADR-021) | caller: checkout | Implemented (local-stack + cluster) | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) |
 
@@ -192,7 +193,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Order reads** | `GET /order/v1/private/orders`, `GET /order/v1/private/orders/:id` | ownership-scoped queries (`WHERE id AND user_id` — anti-IDOR) | auth JWKS | Implemented | — |
+| **Order reads** | `GET /order/v1/private/orders`, `GET /order/v1/private/orders/:id` | ownership-scoped queries (`WHERE id AND user_id` — anti-IDOR) | Keycloak JWKS | Implemented | — |
 | **Checkout → durable fulfillment** | internal gRPC `order.v1/CreateOrder` (the only create path — the legacy REST create was removed in RFC-0021 P5) | **Temporal saga** `OrderFulfillmentWorkflow` (workflow id `order-fulfillment-<orderID>`): authorize payment → reserve inventory → create shipment → capture → **confirm (pivot)** → notify + receipt → clear cart → commit inventory → complete; compensations run in reverse (void pre-capture / refund post-pivot); exhaustion parks in `manual_review`; server-side order-math validation; atomic order+items insert; saga start via transactional outbox (ADR-031) | Temporal; inventory, shipping, payment, notification (gRPC); cart (REST) | Implemented | [Temporal Saga and 2PC](temporal.md) |
 | **Customer cancellation** | `POST /order/v1/private/orders/:id/cancel` (202/200 replay/409) | `CancellationWorkflow` (`order-cancellation-<id>-v<epoch>`): policy gate (shipment not dispatched) → cancel shipment → void/refund remainder by current payment state → release RESERVED stock (COMMITTED = accepted shrinkage) → `cancelled`; exhaustion parks in `manual_review` | Temporal; shipping, payment, inventory (gRPC) | Implemented (RFC-0021 P5) | [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | **Order-details aggregation** | `GET /order/v1/private/orders/:id/details` | gRPC fan-out with soft-fail enrichment: `GetShipmentByOrder` and `GetPayment` — the `shipment`/`payment` blocks are omitted (`omitempty`) when absent or unavailable | shipping, payment | Implemented | [API call graph](api.md#current-east-west-call-graph) |
@@ -206,7 +207,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Review list** | `GET /review/v1/public/reviews?product_id=…` | required `product_id` (missing → 400); paginated | — | Implemented | — |
-| **Review create** | `POST /review/v1/private/reviews` | JWT (`user_id` from token — no impersonation); `UNIQUE (product_id, user_id)` + SQLSTATE `23505` → `409` (race-safe duplicate handling) | auth JWKS | Implemented | — |
+| **Review create** | `POST /review/v1/private/reviews` | JWT (`user_id` from token — no impersonation); `UNIQUE (product_id, user_id)` + SQLSTATE `23505` → `409` (race-safe duplicate handling) | Keycloak JWKS | Implemented | — |
 | **Review feed for product details** | internal gRPC `ReviewService.GetProductReviews` | thin adapter over the same logic layer as the HTTP list | caller: product | Implemented | [API call graph](api.md#current-east-west-call-graph) |
 
 ### shipping — tracking, estimates & shipment lifecycle
@@ -230,7 +231,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
-| **Notification inbox** | `GET /notification/v1/private/notifications`, `GET /notification/v1/private/notifications/count`, `GET/PATCH /notification/v1/private/notifications/:id`, `PATCH /notification/v1/private/notifications/read-all` | JWT; owner-scoped reads/mutations (`(id, user_id)` — anti-IDOR); paginated list | auth JWKS | Implemented | — |
+| **Notification inbox** | `GET /notification/v1/private/notifications`, `GET /notification/v1/private/notifications/count`, `GET/PATCH /notification/v1/private/notifications/:id`, `PATCH /notification/v1/private/notifications/read-all` | JWT; owner-scoped reads/mutations (`(id, user_id)` — anti-IDOR); paginated list | Keycloak JWKS | Implemented | — |
 | **Order emails** (saga side-effects) | internal gRPC `NotificationService.SendEmail` | called best-effort by the saga (order-created, receipt, refund notice) on a detached context | caller: order-worker | Implemented | [temporal saga](temporal.md) |
 | **Internal notify twins + SMS** | `POST /notification/v1/internal/notifications/email`, `POST /notification/v1/internal/notifications/sms`; gRPC `SendSMS` | HTTP twins of the gRPC path; SMS path fully unused | — | **No caller** | [notification.md](notification.md) |
 
@@ -246,8 +247,8 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | Feature | API | Technique | Depends on | Status | Ref |
 |---|---|---|---|---|---|
 | **Saga money steps** | internal gRPC `PaymentService.Authorize` / `Capture` / `Void` / `Refund` | recovery-point idempotency (keys `order:<id>`, `refund:order:<id>:<refund_request_id>`; checkpointed provider calls survive crash takeover); a decline is a business response, not a gRPC error; the **caller names each refund** so an order can owe more than one | mockpay; caller: order-worker | Implemented | [RFC-0010](../proposals/rfc/RFC-0010/), ADR-009/010, [ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/) |
-| **Payment reads (browser)** | `GET /payment/v1/private/payments`, `GET /payment/v1/private/payments/:id` | JWT; owner-scoped | auth JWKS | Implemented | [payments.md](payments.md) |
-| **Payment create (browser)** | `POST /payment/v1/private/payments` | requires `Idempotency-Key`; token-only `payment_method` (`tok_…`, PAN-like digit runs rejected); shared validators across HTTP and gRPC | auth JWKS | Implemented | [payments.md](payments.md) |
+| **Payment reads (browser)** | `GET /payment/v1/private/payments`, `GET /payment/v1/private/payments/:id` | JWT; owner-scoped | Keycloak JWKS | Implemented | [payments.md](payments.md) |
+| **Payment create (browser)** | `POST /payment/v1/private/payments` | requires `Idempotency-Key`; token-only `payment_method` (`tok_…`, PAN-like digit runs rejected); shared validators across HTTP and gRPC | Keycloak JWKS | Implemented | [payments.md](payments.md) |
 | **Payment enrichment for order details** | internal gRPC `GetPayment` (by order id) | read snapshot; caller soft-fails | caller: order | Implemented | [payments.md](payments.md) |
 | **Provider webhook** | `POST /payment/v1/public/payments/webhooks/mockpay` | **webhook HMAC**: `Mockpay-Signature: t=…,v1=…` — HMAC-SHA256 over the raw body, constant-time compare, ±5 min replay window, fail-closed on empty secret, 1 MiB body cap | mockpay | Implemented | RFC-0010 |
 | **Outbox relay** | — (background loop) | **transactional outbox** — events enqueued in the same tx as the money movement, drained by a 10 s single-writer relay (at-least-once) | Postgres | Implemented | ADR-007 |
@@ -268,8 +269,8 @@ is never browser-facing.**
 
 | Technique | What it solves | Where used | Deep-dive |
 |---|---|---|---|
-| **RS256 JWT + JWKS** | Stateless identity — no per-request auth hop | Mint: auth. Verify locally via `pkg/authmw`: user, cart, order, review, notification, payment, checkout | RFC-0009, [API auth model](api.md#authentication) |
-| **Rotating refresh tokens** | Long-lived sessions without long-lived access tokens; reuse detection | auth (sha256 at rest, family revoke) | — |
+| **RS256 JWT + JWKS** | Stateless identity — no per-request auth hop | Mint: Keycloak realm `duynhlab` (RFC-0024 P3, ADR-041; `user_id` = `sub` string UUID). Verify locally via `pkg/authmw` v0.37.0: user, cart, order, review, notification, payment, checkout | RFC-0009, [API auth model](api.md#authentication) |
+| **Rotating refresh tokens** | Long-lived sessions without long-lived access tokens; reuse detection | Keycloak realm (`revokeRefreshToken` + `maxReuse 0`); auth's own implementation is unused since P3 | — |
 | **Temporal saga** | All-or-nothing multi-service checkout with compensations | order (+ `order-worker`); participants: inventory, shipping, payment, notification, cart | [Temporal Saga and 2PC](temporal.md) |
 | **Temporal abandonment timer** | Durable session expiry without polling the DB | checkout (+ `checkout-worker`); DB-authoritative `expires_at` (ADR-019) | [workflows.md](workflows.md#abandoned-checkout) |
 | **Cache-aside (Valkey)** | Read-heavy hot paths | product (SETNX stampede lock, TTL jitter, SCAN invalidation) | [caching](./caching.md) |
@@ -320,4 +321,4 @@ templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-08-11 — auth's pooler is PgBouncer (ADR-026), and the product CORS "known defect" is removed: the service has no CORS middleware._
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: Keycloak mints and every authmw consumer verifies realm tokens (string `sub` as `user_id`); user's internal create is replaced by JIT provisioning; auth's tokens are unconsumed pending P5._

@@ -8,6 +8,14 @@ spec:
     - name: frontend
       replicaCount: 1
   resources:
+    # RFC-0024 P3 build-arg contract (frontend#90): the SPA logs in with
+    # keycloak-js, and the Keycloak origin/realm/client are baked in at image
+    # build time (Dockerfile ARGs KEYCLOAK_URL / KEYCLOAK_REALM /
+    # KEYCLOAK_CLIENT_ID → VITE_*). The cluster image pinned below MUST be
+    # built with KEYCLOAK_URL=https://id.duynh.me, KEYCLOAK_REALM=duynhlab,
+    # KEYCLOAK_CLIENT_ID=customer-spa — homelab does not build this image and
+    # the mop chart passes no build args, so there is nothing to set here;
+    # this comment records the CI contract the tag must satisfy.
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
       metadata:

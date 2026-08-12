@@ -85,7 +85,7 @@ One table — `cart_items` (`db/migrations/sql/000001_init_schema.up.sql`):
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | `SERIAL PK` | Item id surfaced as `:itemId` in the API |
-| `user_id` | `INTEGER NOT NULL` | Cross-service reference to auth's user id — **no FK** (separate DBs) |
+| `user_id` | `VARCHAR(255) NOT NULL` | The Keycloak `sub` (string UUID, [ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)) — identity lives in the IdP, **no FK** |
 | `product_id` | `INTEGER NOT NULL` | Cross-service reference to product — no FK |
 | `product_name` | `VARCHAR(255) NOT NULL` | Display snapshot at add time |
 | `product_price` | `DECIMAL(10,2) NOT NULL` | **Add-time price snapshot** — display only, never the charge price |
@@ -140,7 +140,7 @@ guarantees the pooler routes the statement to the primary.
 
 ```json
 {
-  "user_id": "1",
+  "user_id": "a11ce000-0000-4000-8000-000000000001",
   "items": [
     {
       "id": "10",
@@ -260,19 +260,21 @@ only dependency is its database. Platform call graph:
 - **Probes:** `/health` and `/ready` on `:8080` (readiness drains
   `READINESS_DRAIN_DELAY` seconds on shutdown).
 - **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*` (+ `DB_POOL_MODE`,
-  `DB_POOLER_TYPE` for PgDog), `AUTH_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`,
+  `DB_POOLER_TYPE` for PgDog), `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`
+  (pkg v0.37.0 — empty derives `<issuer>/protocol/openid-connect/certs`),
   `OTEL_COLLECTOR_ENDPOINT`, `PYROSCOPE_ENDPOINT`.
 - **Business metrics** (OTLP, RFC-0017 W2):
   `cart_items_added_total{result}` (quantity-rejection KPI),
   `cart_cleared_total{source}` (`user_rest` vs `internal_saga` — a vanished
   `internal_saga` share means the saga clear is broken),
   `cart_snapshot_requests_total{result}` (gRPC reads: ok/empty/invalid/error).
-- **Smoke via Kong** (local-stack, after login):
+- **Smoke via the local gateway** (local-stack, after login):
 
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/v1/public/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}' | jq -r .access_token)
+# RFC-0024 P3: tokens are minted by the Keycloak realm (PKCE via the SPA —
+# log in at http://localhost:3001 as alice / password123 and copy the access
+# token from the browser session); auth-service tokens are no longer accepted.
+TOKEN=... # Keycloak realm access token (aud duynhlab-platform)
 curl -s http://localhost:8080/cart/v1/private/cart \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
@@ -303,4 +305,4 @@ Paths in [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service). Tr
 - [checkout.md](./checkout.md) · [product.md](./product.md) · [order.md](./order.md) — neighbor contracts
 - [temporal.md](./temporal.md) — saga deep dive
 
-_Last updated: 2026-08-11 — the internal clear is routed at neither edge (local-stack's wide `/cart/` prefix is gone); drops the legacy order→cart pricing hop, which no code has; smoke test reads `.access_token`._
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: `user_id` is the Keycloak `sub` (string UUID), verification env is `OIDC_*` (pkg v0.37.0), smoke tokens come from the realm._

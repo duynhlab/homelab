@@ -1,0 +1,160 @@
+{
+  "realm": "duynhlab",
+  "enabled": true,
+  "registrationAllowed": false,
+  "rememberMe": true,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1209600,
+  "ssoSessionMaxLifespan": 2592000,
+  "ssoSessionIdleTimeoutRememberMe": 1209600,
+  "ssoSessionMaxLifespanRememberMe": 2592000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "roles": {
+    "realm": [
+      {
+        "name": "customer",
+        "description": "May access private customer APIs; owner-scoped by sub"
+      },
+      {
+        "name": "backoffice_admin",
+        "description": "May access protected business APIs (RFC-0023)"
+      }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "platform-api",
+      "description": "Adds the duynhlab-platform audience to access tokens",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "duynhlab-platform-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "duynhlab-platform",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "customer-spa",
+      "name": "Customer SPA",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "redirectUris": ["http://localhost:3001/*", "http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3001", "http://localhost:3000"],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "basic",
+        "email",
+        "platform-api"
+      ]
+    },
+    {
+      "clientId": "admin-portal",
+      "name": "Backoffice Admin Portal (RFC-0023)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "client.session.idle.timeout": "1800",
+        "client.session.max.lifespan": "36000"
+      },
+      "redirectUris": ["http://localhost:3002/*"],
+      "webOrigins": ["http://localhost:3002"],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "basic",
+        "email",
+        "platform-api"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "a11ce000-0000-4000-8000-000000000001",
+      "username": "alice",
+      "email": "alice@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {"type": "password", "value": "password123", "temporary": false}
+      ],
+      "realmRoles": ["customer", "backoffice_admin"]
+    },
+    {
+      "id": "a11ce000-0000-4000-8000-000000000002",
+      "username": "bob",
+      "email": "bob@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {"type": "password", "value": "password123", "temporary": false}
+      ],
+      "realmRoles": ["customer"]
+    },
+    {
+      "id": "a11ce000-0000-4000-8000-000000000003",
+      "username": "carol",
+      "email": "carol@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {"type": "password", "value": "password123", "temporary": false}
+      ],
+      "realmRoles": ["customer"]
+    },
+    {
+      "id": "a11ce000-0000-4000-8000-000000000004",
+      "username": "david",
+      "email": "david@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {"type": "password", "value": "password123", "temporary": false}
+      ],
+      "realmRoles": ["customer"]
+    },
+    {
+      "id": "a11ce000-0000-4000-8000-000000000005",
+      "username": "eve",
+      "email": "eve@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {"type": "password", "value": "password123", "temporary": false}
+      ],
+      "realmRoles": ["customer"]
+    }
+  ]
+}

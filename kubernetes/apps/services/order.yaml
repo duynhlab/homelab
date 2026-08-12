@@ -51,6 +51,9 @@ spec:
     # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
     image_tag: "1.13.3" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
+    # RFC-0024 P3: authmw consumer — the domain template injects the explicit
+    # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
+    authmw: true
     platform_backup_label: "cnpg"
     replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"

@@ -123,9 +123,14 @@ CHECK, so a new reason needs no migration — the domain set is the authority.
 | `order_processing_projection` | `order_id` PK, `stage` (12-stage `CHECK`), `last_successful_step`, `last_error_code` | UX-only projection; best-effort writes, never a correctness gate |
 | `cancellation_requests` | `order_id` PK, `status`, `epoch`, attempt/lease columns | The cancellation start outbox (lean sibling of ADR-031 — no payment token); re-armed per episode by epoch |
 
-`user_id` and `product_id` are cross-service references without FKs (each
-service owns its own DB). `product_name` is denormalized on purpose: an order
-must render historically even after the catalog changes.
+`user_id` is the Keycloak `sub` — a string UUID since the RFC-0024 P3 cutover
+([ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)); it and `product_id`
+are cross-service references without FKs (each service owns its own DB, and
+identity lives in the IdP). The Temporal workflow inputs
+(`OrderFulfillmentInput`/`NotifyInput`/`CancellationInput`) carry the same
+string `UserID`; the pre-P3 `strconv.Atoi` on the subject is gone. `product_name`
+is denormalized on purpose: an order must render historically even after the
+catalog changes.
 
 ## HTTP API
 
@@ -149,7 +154,7 @@ was removed in RFC-0021 P5 (order-service v1.11.0).
 ```json
 {
   "id": "42",
-  "user_id": "1",
+  "user_id": "a11ce000-0000-4000-8000-000000000001",
   "status": "pending",
   "items": [
     {
@@ -333,7 +338,7 @@ Both transports delegate the kickoff to one package
 | HTTP probes | `/health`, `/ready` on `:8080` |
 | gRPC server | `:9090` — cluster `dns:///order.order.svc.cluster.local:9090`; local-stack `order:9090` |
 | Worker | `<binary> worker` — Temporal queue `order-fulfillment`, namespace `mop` |
-| Key env | `DB_*`, `AUTH_JWKS_URL`, `SHIPPING_GRPC_ADDR`, `PAYMENT_GRPC_ADDR`, `INVENTORY_GRPC_ADDR`, `NOTIFICATION_GRPC_ADDR`, `CART_SERVICE_URL`, `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, `TASK_QUEUE`, `GRPC_PORT`, `ORDER_RECONCILER_ENABLED`, `ORDER_START_DISPATCHERS_ENABLED` |
+| Key env | `DB_*`, `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL` (pkg v0.37.0), `SHIPPING_GRPC_ADDR`, `PAYMENT_GRPC_ADDR`, `INVENTORY_GRPC_ADDR`, `NOTIFICATION_GRPC_ADDR`, `CART_SERVICE_URL`, `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, `TASK_QUEUE`, `GRPC_PORT`, `ORDER_RECONCILER_ENABLED`, `ORDER_START_DISPATCHERS_ENABLED` |
 | Business metrics | `order.saga.outcome.total` (confirmed / failed / manual_review / compensated), `order.saga.compensation.total` (per step × result), `order.payment.activity.total`, `order.stock_reservation.total`, `order.value.minor` (label-free since v1.11.0), `order.cancellations.total{result}`, `order_cancellation_outcomes_total{outcome}`, backlog gauges `order_cancelling_backlog` / `order_manual_review_backlog` |
 | Signals to watch | Rising `compensation.total{step="void_payment",result="error"}` or `{step="refund_payment"}` failures mean money may be held or unreturned — reconcile against payment's ledger ([payments.md](./payments.md)) |
 | Telemetry | HTTP/gRPC RED over OTLP, workflow traces, structured logs with shared trace IDs (obsx, RFC-0014) |
@@ -371,4 +376,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 
-_Last updated: 2026-08-11 — the gRPC client row includes inventory `GetReservation`._
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (Keycloak `sub`) in rows and workflow inputs; `OIDC_*` verification env._

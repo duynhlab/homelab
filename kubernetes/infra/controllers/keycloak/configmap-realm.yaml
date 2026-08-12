@@ -1,0 +1,194 @@
+# Keycloak realm import — the deterministic `duynhlab` realm (RFC-0022, executed
+# as RFC-0024 P1). Mounted at /opt/keycloak/data/import; `start --import-realm`
+# imports it only when the realm does not exist yet, so a clean rebuild always
+# converges to this exact state (changes to an already-imported realm need a
+# DB wipe or manual admin action — greenfield rebuild contract, RFC-0022).
+#
+# Encodes the owner-approved decisions verbatim (RFC-0022 Open questions #1-#4,
+# #10):
+#   * accessTokenLifespan 900 (15 min, both clients)
+#   * customer posture: SSO idle 14 d / max 30 d with Remember Me
+#   * refresh rotation/reuse-revocation ON (revokeRefreshToken + maxReuse 0)
+#   * audience `duynhlab-platform` via client scope `platform-api`
+#     (oidc-audience-mapper, access token only)
+#   * admin-portal: client-session idle 30 min / max 10 h as client attribute
+#     overrides (stricter backoffice posture); its redirect/origin
+#     http://localhost:3002 is a DEV PLACEHOLDER for the RFC-0023 Backoffice
+#     portal (JSON cannot carry comments — this note is authoritative)
+#   * registration OFF — deterministic demo users only
+#
+# Demo-user UUID scheme (fixed subjects, RFC-0022 OQ#10 — seeds and services
+# reference these as string user_id): a11ce000-0000-4000-8000-00000000000N
+# where N = 1 alice, 2 bob, 3 carol, 4 david, 5 eve. alice additionally holds
+# backoffice_admin as the RFC-0023 test operator. password123 is the local
+# demo password (dev-only realm-import placeholder, never a committed prod value).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  namespace: identity
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity
+data:
+  duynhlab-realm.json: |
+    {
+      "realm": "duynhlab",
+      "enabled": true,
+      "registrationAllowed": false,
+      "rememberMe": true,
+      "accessTokenLifespan": 900,
+      "ssoSessionIdleTimeout": 1209600,
+      "ssoSessionMaxLifespan": 2592000,
+      "ssoSessionIdleTimeoutRememberMe": 1209600,
+      "ssoSessionMaxLifespanRememberMe": 2592000,
+      "revokeRefreshToken": true,
+      "refreshTokenMaxReuse": 0,
+      "roles": {
+        "realm": [
+          {
+            "name": "customer",
+            "description": "May access private customer APIs; owner-scoped by sub"
+          },
+          {
+            "name": "backoffice_admin",
+            "description": "May access protected business APIs (RFC-0023)"
+          }
+        ]
+      },
+      "clientScopes": [
+        {
+          "name": "platform-api",
+          "description": "Adds the duynhlab-platform audience to access tokens",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "false",
+            "display.on.consent.screen": "false"
+          },
+          "protocolMappers": [
+            {
+              "name": "duynhlab-platform-audience",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "consentRequired": false,
+              "config": {
+                "included.custom.audience": "duynhlab-platform",
+                "access.token.claim": "true",
+                "id.token.claim": "false"
+              }
+            }
+          ]
+        }
+      ],
+      "clients": [
+        {
+          "clientId": "customer-spa",
+          "name": "Customer SPA",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "attributes": {
+            "pkce.code.challenge.method": "S256"
+          },
+          "redirectUris": ["http://localhost:3001/*"],
+          "webOrigins": ["http://localhost:3001"],
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "profile",
+            "roles",
+            "basic",
+            "email",
+            "platform-api"
+          ]
+        },
+        {
+          "clientId": "admin-portal",
+          "name": "Backoffice Admin Portal (RFC-0023)",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "attributes": {
+            "pkce.code.challenge.method": "S256",
+            "client.session.idle.timeout": "1800",
+            "client.session.max.lifespan": "36000"
+          },
+          "redirectUris": ["http://localhost:3002/*"],
+          "webOrigins": ["http://localhost:3002"],
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "profile",
+            "roles",
+            "basic",
+            "email",
+            "platform-api"
+          ]
+        }
+      ],
+      "users": [
+        {
+          "id": "a11ce000-0000-4000-8000-000000000001",
+          "username": "alice",
+          "email": "alice@example.com",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {"type": "password", "value": "password123", "temporary": false}
+          ],
+          "realmRoles": ["customer", "backoffice_admin"]
+        },
+        {
+          "id": "a11ce000-0000-4000-8000-000000000002",
+          "username": "bob",
+          "email": "bob@example.com",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {"type": "password", "value": "password123", "temporary": false}
+          ],
+          "realmRoles": ["customer"]
+        },
+        {
+          "id": "a11ce000-0000-4000-8000-000000000003",
+          "username": "carol",
+          "email": "carol@example.com",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {"type": "password", "value": "password123", "temporary": false}
+          ],
+          "realmRoles": ["customer"]
+        },
+        {
+          "id": "a11ce000-0000-4000-8000-000000000004",
+          "username": "david",
+          "email": "david@example.com",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {"type": "password", "value": "password123", "temporary": false}
+          ],
+          "realmRoles": ["customer"]
+        },
+        {
+          "id": "a11ce000-0000-4000-8000-000000000005",
+          "username": "eve",
+          "email": "eve@example.com",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {"type": "password", "value": "password123", "temporary": false}
+          ],
+          "realmRoles": ["customer"]
+        }
+      ]
+    }

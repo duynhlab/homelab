@@ -17,5 +17,9 @@ resources:
   # it can dependsOn platform-db + the ServiceMonitor CRD, and apps-local can
   # dependsOn a Ready server.
   # - temporal/
+  # keycloak/ — excluded like temporal/ above: its own Kustomization (keycloak-local)
+  # so it can dependsOn databases-local (keycloak DB on platform-db) + secrets-local
+  # (ESO bootstrap-admin Secret). Namespace `identity` stays here (namespaces.yaml).
+  # - keycloak/
   # kong/ — moved to its own Kustomization (kong-local) so it can dependsOn cert-manager-local
   - kyverno/

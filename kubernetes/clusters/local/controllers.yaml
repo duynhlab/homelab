@@ -96,6 +96,10 @@ spec:
     - apiVersion: v1
       kind: Namespace
       name: kong
+    # Identity namespace (Keycloak workload deployed by keycloak-local).
+    - apiVersion: v1
+      kind: Namespace
+      name: identity
     # Kyverno admission policy engine
     - apiVersion: v1
       kind: Namespace

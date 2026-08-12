@@ -81,6 +81,34 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Security
+
+- Keycloak identity foundation lands (RFC-0024 P1, executing the RFC-0022
+  design record / ADR-041): `quay.io/keycloak/keycloak:26.5.7` (digest-pinned)
+  runs as a raw Deployment in the new `identity` namespace, importing a
+  deterministic `duynhlab-realm.json` on every start — realm `duynhlab`,
+  public PKCE-S256 clients `customer-spa`/`admin-portal` (Direct Access
+  Grants off), realm roles `customer`/`backoffice_admin`, 15-min access
+  tokens, refresh reuse-revocation, `duynhlab-platform` audience via the
+  shared `platform-api` scope, and demo users alice…eve with fixed UUID
+  subjects (alice doubles as the `backoffice_admin` test operator). Database
+  `keycloak` joins `platform-db` as a declarative triplet connected **direct
+  to `platform-db-rw`** (Keycloak's Agroal pool breaks through a
+  transaction-mode pooler), with OpenBAO-seeded credentials, a `pg_hba`
+  entry, NetworkPolicy allows on both sides, a management-port
+  ServiceMonitor, and `KeycloakDown`/`KeycloakRestartLoop` alerts. The Flux
+  chain gains `keycloak-local` (depends on controllers + databases + secrets
+  + monitoring). No edge route yet — `id.duynh.me` arrives with the P2
+  Envoy Gateway train.
+
+#### CI
+
+- `make validate` now validates community CRDs against the datree
+  CRDs-catalog schemas (ExternalSecret, CNPG `DatabaseRole`/`Database`,
+  ServiceMonitor/PrometheusRule, and the Gateway API CRs the next train
+  adds) instead of waving them through with `-ignore-missing-schemas`, and
+  explicitly validates the chain-excluded `controllers/keycloak` overlay.
+
 #### Local-stack
 
 - Temporal now runs `temporalio/server` 1.31.2 on the shared PostgreSQL —
@@ -231,6 +259,14 @@ Skeleton (copy what you need):
   tag, 0 probe access records, native trace id on 12/12 HTTP access records.
 
 ### Bugfix
+
+#### Observability
+
+- `VLSingle`/`VTSingle` dropped the inert `removePvcAfterDelete: true` —
+  the field exists only on `VMSingle`; the operator's v1 specs never defined
+  it and the API server was pruning it silently, so the data PVCs were never
+  going to be garbage-collected on delete. Surfaced by the new CRDs-catalog
+  schema validation in `make validate`.
 
 #### Docs
 

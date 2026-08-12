@@ -1,0 +1,24 @@
+# ServiceMonitor for Keycloak (RFC-0022 / RFC-0024 P1).
+# Keycloak exposes /metrics on the MANAGEMENT interface (:9000, KC_METRICS_ENABLED),
+# not the application port — scrape targets the `management` Service port.
+# Key metrics:
+#   - keycloak_* login/token event counters (login success/failure rate)
+#   - http_server_requests_seconds* on the token endpoint (latency/errors)
+#   - vendor_* / jvm_* datasource pool + JVM saturation
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: keycloak
+  namespace: monitoring
+spec:
+  endpoints:
+    - interval: 30s
+      path: /metrics
+      port: management
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - identity
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak

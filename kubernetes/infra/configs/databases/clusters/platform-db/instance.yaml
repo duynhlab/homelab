@@ -1,7 +1,8 @@
 # platform-db — consolidated CNPG cluster (RFC-0018).
 # Merges auth-db + shared-db + temporal-db persistence.
 # App databases: auth, user, notification, shipping, review (RFC-0012 triplets);
-# temporal + temporal_visibility (Temporal server, direct :5432).
+# temporal + temporal_visibility (Temporal server, direct :5432);
+# keycloak (identity provider, direct :5432 — RFC-0022 / RFC-0024 P1).
 # HA: 3 instances (1 primary, 1 sync replica, 1 async replica).
 # DR: WAL archived to RustFS (no separate platform-db-replica in this RFC).
 apiVersion: postgresql.cnpg.io/v1
@@ -38,6 +39,10 @@ spec:
       - host review       review       all scram-sha-256
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
+      # Keycloak connects direct to :5432 like temporal — its Agroal pool needs
+      # long-lived connections + server-side prepared statements, which the
+      # transaction pooler breaks (RFC-0022 OQ#8 / ADR-041).
+      - host keycloak            keycloak all scram-sha-256
       # RFC-0008 / ADR-025 pilot: OpenBAO's rotation admin connects to the
       # notification DB to ALTER notification's password (static-role rotation).
       - host notification        vault_rotator all scram-sha-256

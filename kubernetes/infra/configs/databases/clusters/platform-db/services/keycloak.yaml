@@ -1,0 +1,99 @@
+# keycloak — identity provider persistence role (RFC-0022, executed as RFC-0024 P1).
+#
+# Keycloak connects DIRECT to platform-db-rw:5432, never through the transaction
+# pooler: Keycloak's Agroal pool relies on long-lived connections and server-side
+# prepared statements, which transaction-mode pooling breaks (RFC-0022 Open
+# question #8 / ADR-041). Same direct-connection posture as temporal above it in
+# the pg_hba list.
+#
+# Unlike temporal, nothing here is pre-created by postInitSQL: the DatabaseRole
+# CR creates the role and the Database CR creates the database (same pattern as
+# shipping/review — postInitSQL is only for roles that must exist before the
+# operator runs, e.g. the vault_rotator GRANT target).
+#
+# ExternalSecret for platform-db keycloak database credentials — platform namespace.
+# OpenBAO path: secret/data/local/databases/platform-db/keycloak
+#
+# Rendered as kubernetes.io/basic-auth: this secret doubles as the
+# passwordSecret for the DatabaseRole below, and CNPG requires basic-auth
+# there. Secret `type` is immutable — migrating a live cluster requires
+# deleting the old Secret so ESO recreates it
+# (see docs/databases/runbooks/rotate-cnpg-service-password.md).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-keycloak-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-keycloak-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-keycloak-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-keycloak-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/platform-db/keycloak
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/platform-db/keycloak
+        property: password
+---
+# Written out IN FULL — adoption resets omitted attributes.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: platform-db-role-keycloak
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  name: keycloak
+  comment: "Keycloak identity provider persistence role (RFC-0022 / RFC-0024 P1)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: platform-db-keycloak-secret
+  databaseRoleReclaimPolicy: retain
+---
+# keycloak Database extensions.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: keycloak-database
+  namespace: platform
+spec:
+  name: keycloak
+  owner: keycloak
+  cluster:
+    name: platform-db
+  extensions:
+    - name: pgaudit
+    - name: pg_stat_statements
+  databaseReclaimPolicy: retain

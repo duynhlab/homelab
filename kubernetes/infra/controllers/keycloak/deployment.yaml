@@ -1,0 +1,133 @@
+# Keycloak identity provider (RFC-0022, executed as RFC-0024 P1).
+#
+# Persistence: DIRECT to platform-db-rw:5432, never through the transaction
+# pooler — Keycloak's Agroal pool needs long-lived connections + server-side
+# prepared statements, which transaction pooling breaks (RFC-0022 OQ#8 /
+# ADR-041). Credentials come from the identity-ns copy of
+# platform-db-keycloak-secret (ESO).
+#
+# Realm: `start --import-realm` imports the mounted duynhlab-realm.json on the
+# first start against an empty realm set (RFC-0022 greenfield rebuild contract);
+# subsequent starts skip existing realms.
+#
+# TLS terminates at the edge in P2 (Envoy Gateway, RFC-0024) — inside the
+# cluster Keycloak serves plain HTTP :8080 (app) and :9000 (management:
+# health + metrics). KC_HOSTNAME pins the public issuer
+# (https://id.duynh.me/realms/duynhlab); KC_HOSTNAME_BACKCHANNEL_DYNAMIC lets
+# in-cluster callers use the internal Service URL without breaking the issuer.
+#
+# replicas: 1 — no HA topology in the first implementation (RFC-0022 Non-Goals).
+# PSS: full restricted-grade securityContext even though the identity namespace
+# is baseline-only — cheap and future-proof.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: identity
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak
+        app.kubernetes.io/component: identity
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.5.7@sha256:45ae20191531eb608ddb0b775d012b40d3e4f942697f3214694887dd7c108d13
+          args: ["start", "--import-realm"]
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://platform-db-rw.platform.svc.cluster.local:5432/keycloak
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: platform-db-keycloak-secret
+                  key: username
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-db-keycloak-secret
+                  key: password
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-admin
+                  key: username
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-admin
+                  key: password
+            - name: KC_HOSTNAME
+              value: https://id.duynh.me
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: management
+              containerPort: 9000
+              protocol: TCP
+          # Keycloak start + first-boot realm import is slow (JVM + build +
+          # import + DB migration): the startupProbe gives it up to 5 min
+          # before liveness takes over.
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: realm-import
+          configMap:
+            name: keycloak-realm

@@ -86,7 +86,10 @@ via `pkg/grpcx` — see [api.md § gRPC Runtime Model](./api.md#grpc-runtime-mod
 Tables: `checkout_sessions`, `checkout_session_items`, `idempotency_keys`
 (P2), `tax_rules` (P3), `promo_codes` + `promo_redemptions` (P4). All money is
 int64 minor units internally (`*_minor` cent columns); dollars only on the
-browser wire.
+browser wire. `user_id` columns (sessions and `idempotency_keys`) hold the
+Keycloak `sub` — a string UUID since the RFC-0024 P3 cutover
+([ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/); `idempotency_keys.user_id`
+was `BIGINT`).
 
 A session is an **auditable quote**:
 
@@ -333,7 +336,7 @@ What checkout deliberately does NOT do (the boundary):
   sections **A9-A10** in
   [`local-stack/docs/e2e-audit.md`](../../local-stack/docs/e2e-audit.md)
   (session lifecycle, price-change detection, confirm + abandonment).
-- **Key env:** `DB_*`, `AUTH_JWKS_URL`, `CART_GRPC_ADDR`,
+- **Key env:** `DB_*`, `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL` (pkg v0.37.0), `CART_GRPC_ADDR`,
   `PRODUCT_GRPC_ADDR`, `INVENTORY_GRPC_ADDR`, `SHIPPING_GRPC_ADDR`, `ORDER_GRPC_ADDR`,
   `TEMPORAL_HOSTPORT`, `TEMPORAL_NAMESPACE`, and `SESSION_TTL_SECONDS`
   (1800).
@@ -377,4 +380,4 @@ Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-serv
 - [cart.md](./cart.md) · [product.md](./product.md) · [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-11 — the saga reserves through `inventory.v1/Reserve`, the confirm dial set is five services including inventory, and the proto code map lists inventory._
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (Keycloak `sub`) in sessions and the idempotency ledger, `OIDC_*` verification env._

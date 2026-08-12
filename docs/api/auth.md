@@ -2,6 +2,8 @@
 
 Auth turns credentials into short-lived RS256 access tokens and rotating refresh-token families.
 
+> **RFC-0024 P3:** consumers no longer verify against this service — the fleet trusts the Keycloak realm (`OIDC_*`, [api.md § Authentication](./api.md#authentication)); auth still runs and mints tokens nothing consumes, and is decommissioned (with this doc archived) in P5.
+
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
@@ -292,4 +294,4 @@ Paths in [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service). Tr
 - [RFC-0009: RS256 JWT and edge authentication](../proposals/rfc/RFC-0009/)
 - [ADR-006: Kong edge JWT](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) · [ADR-017: collection-noun migration](../proposals/adr/ADR-017-api-path-collection-noun/)
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-12 — header note only: consumers verify the Keycloak realm as of RFC-0024 P3; full archive lands with P5._

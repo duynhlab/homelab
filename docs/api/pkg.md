@@ -9,7 +9,7 @@ release line.
 |-----------|-------|-----------|
 | **Repository** | [`duynhlab/pkg`](https://github.com/duynhlab/pkg) | — |
 | **Modules** | **13**, one per package — `github.com/duynhlab/pkg/<module>`. There is **no root `go.mod`**, and one must never be re-created | — |
-| **Newest tags** | `v0.36.1` for `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` | — |
+| **Newest tags** | `v0.37.0` for `authmw idempotency proto` (RFC-0024 P3 identity cutover) · `v0.36.1` for `dbx grpcx httpx migratex obsx temporalx` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` | — |
 | **Single-module line** | Frozen at `v0.35.0` (2026-08-06). **No plain `v0.36.x` tag exists** | — |
 | **Consumers** | 11 Go services (the frontend SPA does not use it) | — |
 | **Bump mechanics** | Per module: `go get github.com/duynhlab/pkg/<module>@vX.Y.Z` | — |
@@ -79,17 +79,17 @@ the platform-side summary and the release ledger.
 
 | Module | Layer | Purpose |
 |---------|:---:|---------|
-| `authmw` | 1 | Fail-closed Gin middleware verifying RS256 JWT bearer tokens locally against a cached JWKS (issuer/audience pinned). JWT-only since RFC-0009 P5. |
+| `authmw` | 1 | Fail-closed Gin middleware verifying RS256 JWT bearer tokens locally against a cached JWKS (issuer/audience pinned). JWT-only since RFC-0009 P5. **v0.37.0 (RFC-0024 P3):** verifies the Keycloak realm via an explicit `Config` — `OIDC_ISSUER` (default `https://id.duynh.me/realms/duynhlab`), `OIDC_AUDIENCE` (default `duynhlab-platform`), optional `OIDC_JWKS_URL` (empty derives `<issuer>/protocol/openid-connect/certs`); normalizes `realm_access.roles`; `user_id` is the `sub` string. The pre-P3 `AUTH_JWKS_URL`/`JWT_ISSUER`/`JWT_AUDIENCE` env names are gone. |
 | `dbx` | 2 | pgx pools pre-wired with OTel (otelpgx tracing + pool-stat metrics), transaction-pooler-safe defaults, password-file credential hot-reload. |
 | `flagx` | 0 | Startup-validated env flags for migration modes (RFC-0021): enum flags + bounded percent flag; values safe as metric labels. |
 | `grpcx` | 1 | East-west gRPC server/client helpers: OTel, panic recovery, health, reflection, keepalive, round-robin over headless Services, machine-readable error reasons, access-log interceptor (level follows the status class). |
 | `httpx` | 1 | Shared HTTP envelope: additive error shape (`error` + stable `code`) and list pagination. |
-| `idempotency` | 1 | Postgres-backed idempotency store, Stripe-style: claim → first response replays verbatim → mismatch is a conflict; in-flight locks with stale-lock takeover. Caller owns the table. |
+| `idempotency` | 1 | Postgres-backed idempotency store, Stripe-style: claim → first response replays verbatim → mismatch is a conflict; in-flight locks with stale-lock takeover. Caller owns the table. **v0.37.0:** `UserID` is `string` (Keycloak `sub`, ADR-042 — was `int64`). |
 | `logger/zapx` · `logger/zerolog` · `logger/clog` | 0 | Structured logger adapters with trace-ID injection. **Only `zapx` has consumers** — never add the other two to a service. |
 | `migratex` | 2 | Embedded golang-migrate runner (`Run(fsys, dir, dsn)`) — always against the DIRECT DB host, never a transaction pooler (DDL is unsafe through PgBouncer/PgDog). |
 | `obsx` | 2 | The single OTel SDK wiring point (RFC-0014 P0): traces/metrics/logs over OTLP, one `Shutdown`, zap tee, `TraceContext`, Pyroscope profiling. |
 | `temporalx` | 2 | Temporal client/worker bootstrap mirroring grpcx/obsx: OTel tracing interceptor, SDK RED metrics, Worker Deployment Versioning options. |
-| `proto/<svc>/v1` | 0 | Versioned contracts + committed stubs for `cart`, `inventory`, `notification`, `order`, `payment`, `product`, `review`, `shipping`. |
+| `proto/<svc>/v1` | 0 | Versioned contracts + committed stubs for `cart`, `inventory`, `notification`, `order`, `payment`, `product`, `review`, `shipping`. **v0.37.0:** `user_id` is `string` everywhere — notification (was `int32`) and payment (was `int64`) joined the already-string contracts (ADR-042). |
 
 ## Consumer matrix
 
@@ -122,7 +122,8 @@ repo.
 
 | Modules | Pinned at |
 |---------|-----------|
-| `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` | `v0.36.1` |
+| `authmw idempotency proto` | `v0.37.0` |
+| `dbx grpcx httpx migratex obsx temporalx` | `v0.36.1` |
 | `flagx logger/zapx` | `v0.36.0` |
 
 A service's own `go.mod` is the authority for which versions it pins; this table
@@ -161,6 +162,7 @@ per-module numbering continues from it, which is why the first per-module tag is
 
 | Tag line | Modules | Date | What it carried |
 |-----|---------|------|-----------------|
+| `v0.37.0` | `authmw idempotency proto` | 2026-08-11 | RFC-0024 P3 identity cutover (ADR-041/042): authmw verifies the Keycloak realm via `Config` + `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL` (old `AUTH_JWKS_URL`/`JWT_*` names removed) and normalizes `realm_access.roles`; idempotency `UserID` → `string`; notification/payment protos `user_id` → `string`. |
 | `v0.36.1` | `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` | 2026-08-08 | gRPC and `golang.org/x` security bumps; test-coverage gaps closed. The four modules without those dependencies stayed at `v0.36.0`. |
 | `v0.36.0` | all 13 | 2026-08-07 | The split itself: one module per package, Go 1.26, per-module release tooling. `grpcx` inlined its trace-id helper to drop the `obsx` call the new layering forbids. |
 
@@ -223,4 +225,4 @@ sequence jumps `v0.12.0` → `v0.12.2`).
 - [observability.md](./observability.md) — the obsx contract every service follows
 - Per-service contracts: [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-09 — rewritten for the per-module split: 13 independently tagged modules, the import layering, and a release ledger split into the per-module and single-module lines._
+_Last updated: 2026-08-12 — v0.37.0 identity-cutover wave (RFC-0024 P3): authmw OIDC `Config`, idempotency string `UserID`, string `user_id` protos._

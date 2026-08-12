@@ -19,6 +19,9 @@ spec:
     # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
     image_tag: "1.4.2" # {"$imagepolicy": "flux-system:review:tag"}
     namespace: review
+    # RFC-0024 P3: authmw consumer — the domain template injects the explicit
+    # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
+    authmw: true
     grpc_server: true
     replicaCount: 1
     db_host: "platform-db-pooler-rw.platform.svc.cluster.local"

@@ -83,6 +83,7 @@ specific Kustomization or run `make sync`.
 | [`setup.md`](setup.md) | First bring-up, Makefile commands, hosts, seed data, full Flux graph, project tree |
 | [`application-delivery.md`](application-delivery.md) | Add a service, ResourceSet contract, image pins, domain labels |
 | [`kong-gateway.md`](kong-gateway.md) | Routing, TLS, plugins, rate limits, ingress runbooks |
+| [`identity-cutover-runbook.md`](identity-cutover-runbook.md) | RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm) |
 | [`graceful-shutdown.md`](graceful-shutdown.md) | Go shutdown pattern, probe tuning per HTTP service |
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |
 | [`gitflow.md`](gitflow.md) | Branching and release policy (**target** — prod cluster TBD) |

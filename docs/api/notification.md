@@ -83,7 +83,7 @@ One table, owner-scoped by `user_id`:
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | `SERIAL PRIMARY KEY` | Returned as a string on the wire |
-| `user_id` | `INTEGER NOT NULL` | References `auth.users.id` logically — **no FK** (separate databases) |
+| `user_id` | `VARCHAR(255) NOT NULL` | The Keycloak `sub` (string UUID, [ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)) — identity lives in the IdP, **no FK** |
 | `title` | `VARCHAR(255) NOT NULL` | Email subject / `"SMS"` |
 | `message` | `TEXT` | Email body / SMS text |
 | `type` | `VARCHAR(50)` | `email` or `sms` from the send path; seed also uses domain types (`order_placed`, …) |
@@ -165,8 +165,8 @@ user id in the query, so foreign ids behave exactly like missing ids.
 
 | RPC | Request → Response | Saga | Notes |
 |-----|--------------------|------|-------|
-| `SendEmail` | `{user_id, to, subject, body}` → `{notification}` | step (post-pivot, best-effort — **no compensation**) | Live caller: order-worker (`SendNotification` + `SendReceipt` activities) |
-| `SendSMS` | `{user_id, to, message}` → `{notification}` | — | **No caller** — wired end-to-end, kept documented |
+| `SendEmail` | `{user_id, to, subject, body}` → `{notification}` | step (post-pivot, best-effort — **no compensation**) | Live caller: order-worker (`SendNotification` + `SendReceipt` activities). `user_id` is `string` since RFC-0024 P3 (was `int32`) |
+| `SendSMS` | `{user_id, to, message}` → `{notification}` | — | **No caller** — wired end-to-end, kept documented. `user_id` is `string` since RFC-0024 P3 |
 
 Validation lives in the **logic layer** so both transports share it: email
 recipients must parse as an address (`InvalidArgument` otherwise), SMS
@@ -250,7 +250,8 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
   [Service contracts](./README.md#service-contracts)).
 - **Key env:** `PORT` (8080), `GRPC_PORT` (9090), `DB_*` (`DB_PASSWORD_FILE`
   supported — this service is the platform's dynamic-DB-credentials pilot,
-  ADR-025 pattern A), `AUTH_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`,
+  ADR-025 pattern A), `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`
+  (pkg v0.37.0 — empty derives `<issuer>/protocol/openid-connect/certs`),
   `OTEL_COLLECTOR_ENDPOINT`, `PYROSCOPE_ENDPOINT`.
 - **Observability:** obsx OTLP (RFC-0014) — traces, RED metrics, teed logs,
   plus the business metrics above. On-call signal: a rising
@@ -258,12 +259,13 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
   path (future provider) is degrading, not the inbox.
 - **Local-stack:** `notification` + `notification-migrate` + `notification-seed`
   (compose); Kong route `/notification/v1/private/` with the jwt plugin.
-- **Smoke test via Kong:**
+- **Smoke test via the local gateway:**
 
   ```bash
-  TOKEN=$(curl -s -X POST http://localhost:8080/auth/v1/public/auth/login \
-    -H 'Content-Type: application/json' \
-    -d '{"username":"alice","password":"password123"}' | jq -r .access_token)
+  # RFC-0024 P3: tokens are minted by the Keycloak realm (PKCE via the SPA —
+  # log in at http://localhost:3001 as alice / password123 and copy the access
+  # token from the browser session); auth-service tokens are no longer accepted.
+  TOKEN=... # Keycloak realm access token (aud duynhlab-platform)
   curl -s http://localhost:8080/notification/v1/private/notifications/count \
     -H "Authorization: Bearer $TOKEN"
   ```
@@ -294,4 +296,4 @@ Paths in [`duynhlab/notification-service`](https://github.com/duynhlab/notificat
 - [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (column and proto, was `int32`), `OIDC_*` verification env, realm-minted smoke tokens._

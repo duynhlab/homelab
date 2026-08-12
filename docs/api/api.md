@@ -272,15 +272,24 @@ those exceptions into ordinary CRUD services.
 
 ### Authentication
 
+**Token issuer (RFC-0024 P3):** the verification contract fleet-wide is the
+Keycloak realm — `iss https://id.duynh.me/realms/duynhlab` (local-stack:
+`http://localhost:8081/realms/duynhlab`), audience `duynhlab-platform`
+(vocabulary unchanged), `user_id` = the token `sub` (string UUID,
+[ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)). auth-service still
+runs and mints its own tokens until the P5 decommission, but **no service or
+edge verifies against it any more**.
+
 Private routes use the same layered model:
 
 ```mermaid
 sequenceDiagram
     participant B as Browser
-    participant K as Kong
+    participant K as Edge gateway
     participant S as Service
-    participant A as Auth JWKS
+    participant A as Keycloak realm JWKS
     B->>K: Request with RS256 JWT
+    K->>A: remoteJWKS auto-refresh (cluster edge)
     K->>K: Coarse edge JWT check
     K->>S: Forward request
     S->>A: Fetch or refresh cached JWKS when needed
@@ -290,9 +299,9 @@ sequenceDiagram
 
 | Rule | Meaning |
 |------|---------|
-| Identity source | Read `user_id` from verified JWT claims, never from a private request body |
-| Authoritative check | Each service verifies the token locally with `pkg/authmw` |
-| Gateway check | Kong rejects obviously bad or expired private-route tokens first |
+| Identity source | Read `user_id` from verified JWT claims (`sub`, string UUID), never from a private request body |
+| Authoritative check | Each service verifies the token locally with `pkg/authmw` (v0.37.0: `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL`) |
+| Gateway check | The cluster edge (Envoy Gateway SecurityPolicy, merged P2) verifies signature/iss/aud/exp against the realm's `remoteJWKS` — no provisioned key material. **Known P3 gap:** local-stack's Kong gateway still matches tokens by `iss` against the retired auth issuer's static key and cannot fetch the realm JWKS (Kong OSS jwt plugin limitation), so its edge JWT check does not accept realm tokens — resolved by the P6 local-gateway replacement |
 | Auth gRPC | Removed; services do not call auth `GetMe` |
 | Failure mode | Missing, invalid, or unverifiable credentials fail closed |
 
@@ -484,7 +493,11 @@ confirmed order drives the saga in flow 4.
 
 ### 1. Register / login → JWT
 
-Owner: [auth.md](./auth.md).
+Owner: [auth.md](./auth.md). **Historical since RFC-0024 P3:** the SPA now
+logs in against the Keycloak realm (`keycloak-js` PKCE,
+[ADR-043](../proposals/adr/ADR-043-oidc-browser-workload-trust/)) and services
+verify realm tokens only — the flow below still runs on the not-yet-retired
+auth-service, but nothing consumes its tokens; it is decommissioned in P5.
 
 ```mermaid
 sequenceDiagram
@@ -827,4 +840,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-11 — the edge-exposure section now names the route path — not NetworkPolicy — as what seals the `/internal/` audience, and records the local-stack exposure closed on this date; HTTP probe filtering is as-built._
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: §Authentication verifies against the Keycloak realm (`OIDC_*`, string `sub` as `user_id`, edge `remoteJWKS` per merged P2); journey 1 marked historical; the local-stack Kong edge-JWT gap is recorded._

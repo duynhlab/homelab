@@ -32,7 +32,6 @@ resources:
   - helm/external-secrets.yaml
   - helm/openbao.yaml
   - helm/jetstack.yaml
-  - helm/kong.yaml
   - helm/kyverno.yaml
   # temporal-operator source retired with the operator; kept as
   # helm/temporal-operator.yaml.bak (ADR-030).

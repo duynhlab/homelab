@@ -1,5 +1,5 @@
 # Require liveness + readiness probes on app containers.
-# Sloth SLO accuracy depends on Kong only routing to ready Pods.
+# Sloth SLO accuracy depends on the edge gateway only routing to ready Pods.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -11,7 +11,7 @@ metadata:
     policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
       Application containers must declare both livenessProbe and readinessProbe.
-      Missing readinessProbe causes Kong to route to unready Pods, generating
+      Missing readinessProbe causes the edge gateway to route to unready Pods, generating
       false-positive SLI errors in Sloth burn-rate alerts.
 spec:
   validationFailureAction: Audit

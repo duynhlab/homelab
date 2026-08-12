@@ -35,12 +35,11 @@ spec:
       envoyService:
         # NodePort for the Kind extraPortMappings — no LoadBalancer here.
         type: NodePort
-        # Pin the nodePorts the Kind config forwards (same 30080/30443 the
-        # Kong proxy Service claims today). NOTE: while Kong is still
-        # deployed (until cutover PR 2.3) this Service cannot bind these
-        # nodePorts — the API server rejects the duplicate allocation and
-        # envoy-gateway-config-local stays not-ready. That is expected for
-        # this additive train; 2.3 frees the ports.
+        # Pin the nodePorts the Kind config forwards (30080/30443). Kong was
+        # decommissioned in the P2.3 cutover PR, so this Service is the sole
+        # owner of these nodePorts — the coexistence conflict that kept
+        # envoy-gateway-config-local not-ready during the additive train is
+        # resolved.
         # Strategic merge key for Service.spec.ports is `port`; the live
         # merge behavior of this patch gets verified on the P0/Kind spike.
         patch:

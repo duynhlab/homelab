@@ -2,6 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - clusterissuers.yaml
-  - certificates-microservices.yaml
+  # certificates-microservices.yaml (Certificate kong-proxy-tls) retired with the
+  # Kong cutover (RFC-0024 P2.3) — the edge cert is platform-edge-tls, owned by
+  # configs/envoy-gateway/certificate.yaml.
   - ca-source
   - bundles.yaml

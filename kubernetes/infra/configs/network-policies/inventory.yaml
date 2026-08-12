@@ -1,7 +1,7 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ — these rules are
 # LIVE. Any ingress not explicitly allowed below is dropped.
 #
-# Inventory is gRPC-only (RFC-0021): no Kong route reaches it, so there is no
+# Inventory is gRPC-only (RFC-0021): no edge route reaches it, so there is no
 # edge :8080 allow — kubelet health probes are host-level and bypass
 # NetworkPolicy (same stance as checkout). Only the gRPC callers get in.
 ---

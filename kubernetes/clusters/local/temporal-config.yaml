@@ -21,7 +21,7 @@ spec:
   wait: true
 
   dependsOn:
-    # The chart first — the ingress names the temporal-web Service it creates, and
-    # alerts on a server that does not exist yet are noise. Same edge
-    # kong-config-local has on kong-local.
+    # The chart first — alerts on a server that does not exist yet are noise.
+    # Same edge envoy-gateway-config-local has on envoy-gateway-local. (The
+    # temporal-ui route now lives in configs/envoy-gateway/routes/temporal.yaml.)
     - name: temporal-local

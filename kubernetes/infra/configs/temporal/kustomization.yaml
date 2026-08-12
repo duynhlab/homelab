@@ -4,5 +4,4 @@ kind: Kustomization
 # Config half of Temporal — the chart is controllers/temporal.
 # The `.bak` files are the retired operator's CRs, kept readable and unapplied.
 resources:
-  - ingress.yaml
   - prometheusrule.yaml

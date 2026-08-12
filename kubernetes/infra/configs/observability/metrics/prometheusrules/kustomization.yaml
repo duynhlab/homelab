@@ -5,7 +5,7 @@ resources:
   - kubernetes/
   - microservices/
   - postgres/
-  - kong/
+  - envoy-gateway/
   - keycloak/
   - victoriametrics/
   - observability/

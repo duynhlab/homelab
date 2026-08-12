@@ -1,5 +1,42 @@
 # Kong API Gateway
 
+> **Archived (RFC-0024, 2026-08-12).** This documents the retired Kong OSS
+> edge, kept as history — the live edge is Envoy Gateway
+> (`docs/platform/envoy-gateway.md`, arriving with P6; until then see
+> [`kubernetes/infra/configs/envoy-gateway/`](../../kubernetes/infra/configs/envoy-gateway/)).
+> The body below is **not** updated — it describes the platform as it was
+> while Kong served the edge.
+
+## Why we left (known problems)
+
+Recorded so the migration's reasons survive the migration
+([RFC-0024](../proposals/rfc/RFC-0024/README.md) has the full analysis):
+
+- **Frozen distribution.** The Kong OSS line stopped at 3.9 with an
+  unannounced EOL — no minor releases, no patch stream to track.
+- **Unlicensed-Enterprise trap.** Running the Enterprise image without a
+  license turns the Admin API read-only, which breaks DB-less declarative
+  config push — the exact mechanism this deployment depended on.
+- **No JWKS support at the edge.** The OSS `jwt` plugin cannot fetch a JWKS:
+  edge verification required a provisioned static-key credential
+  (ExternalSecret + KongConsumer) and a manual two-step key-rotation runbook.
+  Envoy Gateway's `remoteJWKS` deleted both.
+- **The `job=kong` relabel trap.** The chart's ServiceMonitor derived `job`
+  from the Service name unless explicitly relabeled — a drift that silently
+  emptied `up{job="kong"}` and killed every Kong alert and recording rule
+  without a single error.
+- **Unfilterable access logs.** The nginx access log could not be filtered at
+  source: 96.2% of stored edge log volume was successful probe traffic
+  (observability audit F-2). Envoy's CEL access-log filter drops it at source.
+- **Frozen tracer.** Kong 3.9's OTel tracer predates the 1.21 semconv
+  (audit F-8) — edge spans carried outdated attribute names forever.
+- **Two bespoke dialects.** The `kong_json` nginx log format was a
+  platform-specific schema every consumer had to know, and local-stack carried
+  a second, 283-line `kong.yml` config dialect that duplicated the cluster's
+  CRs and drifted independently.
+
+---
+
 Kong Ingress Controller (KIC) runs in **DB-less mode** — all configuration is declarative via Kubernetes CRDs and Ingress resources, reconciled by Flux.
 
 ---

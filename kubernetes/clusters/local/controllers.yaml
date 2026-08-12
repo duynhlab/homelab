@@ -90,12 +90,6 @@ spec:
       kind: HelmRelease
       name: trust-manager
       namespace: cert-manager
-    # Kong API Gateway — moved to kong-local Kustomization (after cert-manager-local
-    # so the kong-proxy-tls Secret exists before the Kong pod tries to mount it).
-    # Kong namespace stays here (created by namespaces.yaml).
-    - apiVersion: v1
-      kind: Namespace
-      name: kong
     # Envoy Gateway namespace (workloads deployed by gateway-api-crds-local +
     # envoy-gateway-local — RFC-0024 P2).
     - apiVersion: v1

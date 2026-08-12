@@ -31,8 +31,8 @@ spec:
     # LOCAL-ONLY: issue platform-edge-tls from the self-signed `homelab-ca`
     # instead of `letsencrypt-prod`. Kind has no real duynh.me DNS zone /
     # Cloudflare token, so LE DNS-01 can't complete. Prod keeps
-    # letsencrypt-prod. Mirrors the kong-proxy-tls patch in
-    # cert-manager-config.yaml (debugs.md Bug 9).
+    # letsencrypt-prod. (Same shape the retired kong-proxy-tls patch had in
+    # cert-manager-config.yaml — debugs.md Bug 9.)
     - target:
         kind: Certificate
         name: platform-edge-tls

@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - vector-hostpath.yaml
   - postgres-operators.yaml
-  - kong-openbao.yaml
+  - openbao.yaml

@@ -13,7 +13,7 @@ resources:
   - secrets/
   - cert-manager/
   - clickhouse-operator/ # Altinity ClickHouse operator (CHI CRDs + controller); CHI CR applied by clickhouse-local
-  # temporal/ — excluded like kong/ below: its own Kustomization (temporal-local) so
+  # temporal/ — excluded: its own Kustomization (temporal-local) so
   # it can dependsOn platform-db + the ServiceMonitor CRD, and apps-local can
   # dependsOn a Ready server.
   # - temporal/
@@ -21,12 +21,11 @@ resources:
   # so it can dependsOn databases-local (keycloak DB on platform-db) + secrets-local
   # (ESO bootstrap-admin Secret). Namespace `identity` stays here (namespaces.yaml).
   # - keycloak/
-  # kong/ — moved to its own Kustomization (kong-local) so it can dependsOn cert-manager-local
-  # gateway-api-crds/ — excluded like kong/ above: its own Kustomization
+  # gateway-api-crds/ — excluded like temporal/ above: its own Kustomization
   # (gateway-api-crds-local) so envoy-gateway-local can dependsOn applied CRDs
   # (RFC-0024 P2).
   # - gateway-api-crds/
-  # envoy-gateway/ — excluded like kong/ above: its own Kustomization
+  # envoy-gateway/ — excluded like temporal/ above: its own Kustomization
   # (envoy-gateway-local) so it can dependsOn gateway-api-crds-local +
   # cert-manager-local (RFC-0024 P2).
   # - envoy-gateway/

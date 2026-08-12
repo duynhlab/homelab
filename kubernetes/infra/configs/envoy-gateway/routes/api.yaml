@@ -1,0 +1,522 @@
+# API routes on the public gateway (gateway.duynh.me) — 1:1 translation of
+# configs/kong/ingress-api.yaml (13 Ingresses -> 13 HTTPRoutes).
+#
+# URL shape: /{service}/v1/{audience}/{resource...} — Variant A
+# (docs/api/api.md#http-url-model). Pure pass-through, no rewrite (Kong
+# `strip-path: false` == Gateway API default). Only `public` and `private`
+# audiences are exposed; `internal` routes stay in-cluster only.
+#
+# Each HTTPRoute lives in its backend's namespace and attaches to the shared
+# `platform` Gateway (https listener; the http listener only serves the 301
+# redirect — Kong's `protocols: https` + redirect annotations).
+#
+# PathPrefix values drop Kong's trailing slash: Gateway API PathPrefix is
+# SEGMENT-based, so `/user/v1/private` matches `/user/v1/private` and
+# `/user/v1/private/...` but never `/user/v1/privatefoo` — same match set as
+# Kong's Ingress Prefix `/user/v1/private/`.
+#
+# EDGE AUTH (ADR-006 principle, re-homed by ADR-045): routes that carried the
+# `jwt-edge` plugin get a SecurityPolicy with a Keycloak remoteJWKS provider —
+# see policies/security-jwt.yaml. Services STILL validate JWTs (pkg/authmw,
+# authoritative) — defense-in-depth.
+#
+# security-headers: every route carries a ResponseHeaderModifier filter
+# translating the GLOBAL Kong `security-headers` response-transformer plugin
+# (plugins.yaml). Semantic note: Kong's `add` set a header only if the
+# upstream did not send it; Gateway API `set` always wins — the edge value is
+# now guaranteed (upstream can no longer weaken these headers).
+#
+# Rate/size limits + resilience: policies/btp-api.yaml (translates
+# rate-limiting-api, request-size-limiting-api, and the resilience-default
+# KongUpstreamPolicy + konghq.com Service annotations).
+
+---
+# Auth Service — public (login, register, refresh, logout, jwks): anonymous.
+# KEPT during P2/P3/P4: auth-service still serves login until the P3 identity
+# cutover; this route is removed in P5 with the auth-service decommission.
+# Translates Ingress api-auth-public.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-auth-public
+  namespace: auth
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /auth/v1/public
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: auth
+          port: 8080
+---
+# User Service — public GET /users/:id: anonymous. Translates api-user-public.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-user-public
+  namespace: user
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /user/v1/public
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: user
+          port: 8080
+---
+# User Service — private /users/profile: edge JWT (policies/security-jwt.yaml).
+# Translates api-user-private (had jwt-edge).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-user-private
+  namespace: user
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /user/v1/private
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: user
+          port: 8080
+---
+# Product Service — public catalog: anonymous. Translates api-product.
+# (POST /product/v1/internal/products is NOT exposed here.)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-product
+  namespace: product
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /product/v1/public
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: product
+          port: 8080
+---
+# Cart Service — private only: edge JWT. Translates api-cart (had jwt-edge).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-cart
+  namespace: cart
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /cart/v1/private
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: cart
+          port: 8080
+---
+# Order Service — private only: edge JWT. Translates api-order (had jwt-edge).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-order
+  namespace: order
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /order/v1/private
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: order
+          port: 8080
+---
+# Review Service — public list: anonymous. Translates api-review-public.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-review-public
+  namespace: review
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /review/v1/public
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: review
+          port: 8080
+---
+# Review Service — private submit: edge JWT. Translates api-review-private
+# (had jwt-edge).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-review-private
+  namespace: review
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /review/v1/private
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: review
+          port: 8080
+---
+# Notification Service — private only: edge JWT. Translates api-notification
+# (had jwt-edge). /notification/v1/internal/* is NOT exposed here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-notification
+  namespace: notification
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /notification/v1/private
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: notification
+          port: 8080
+---
+# Shipping Service — public track + estimate only: anonymous. Translates
+# api-shipping. /shipping/v1/internal/* is NOT exposed (order-service only,
+# via in-cluster DNS).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-shipping
+  namespace: shipping
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /shipping/v1/public
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: shipping
+          port: 8080
+---
+# Payment Service — private payments API: edge JWT (the service re-validates,
+# authoritative). Translates api-payment-private (had jwt-edge).
+# /payment/v1/internal/* (refunds, reconciliation) stays in-cluster only.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-payment-private
+  namespace: payment
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /payment/v1/private
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: payment
+          port: 8080
+---
+# Payment webhooks — public, anonymous: the HMAC signature over the raw body
+# is the credential (mockpay signs, payment verifies). Rate/size limits still
+# apply (btp-api.yaml). Translates api-payment-webhooks — both paths in one
+# route, matching the Kong Ingress's two path entries.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-payment-webhooks
+  namespace: payment
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /payment/v1/public/payments/webhooks
+        # Deprecated pre-v3 path — kept during the v3 rollout so in-flight
+        # mockpay retries keep landing. Remove at contract (ADR-017).
+        - path:
+            type: PathPrefix
+            value: /payment/v1/public/webhooks
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: payment
+          port: 8080
+---
+# Checkout Service — private checkout API: edge JWT (the service re-validates,
+# authoritative). Confirm carries the Idempotency-Key header — allowed through
+# the CORS SecurityPolicy (policies/security-cors.yaml). Translates
+# api-checkout-private (had jwt-edge).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-checkout-private
+  namespace: checkout
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /checkout/v1/private
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: checkout
+          port: 8080

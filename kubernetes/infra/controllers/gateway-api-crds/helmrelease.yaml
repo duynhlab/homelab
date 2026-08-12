@@ -1,0 +1,38 @@
+# Gateway API + Envoy Gateway CRDs (RFC-0024 P2, ADR-045).
+# Chart: envoyproxy/gateway-crds-helm — CRD-only chart, rendered as regular
+# manifests (no controller). It ships BOTH CRD sets and this release enables
+# both:
+#   - Gateway API standard channel (GatewayClass, Gateway, HTTPRoute, ...)
+#   - Envoy Gateway extension CRDs (EnvoyProxy, SecurityPolicy,
+#     BackendTrafficPolicy, ClientTrafficPolicy, Backend, ...)
+# The envoy-gateway controller chart installs with crds: Skip so this release
+# is the single owner of CRD lifecycle (upstream recommends separating CRDs
+# from the controller chart; see install-helm docs).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gateway-api-crds
+  namespace: envoy-gateway
+spec:
+  interval: 10m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: envoy-gateway-crds-oci
+    namespace: flux-system
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    crds:
+      gatewayAPI:
+        enabled: true
+        # Standard channel only — no experimental Gateway API kinds
+        # (TCPRoute/UDPRoute/TLSRoute) are used by this platform.
+        channel: standard
+      envoyGateway:
+        enabled: true

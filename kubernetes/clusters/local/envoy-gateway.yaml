@@ -1,0 +1,32 @@
+# Envoy Gateway control plane (RFC-0024 P2) — mirrors kong-local's shape.
+# Depends on gateway-api-crds-local (the controller crashes without the
+# Gateway API + EG CRDs, installed with crds: Skip here) and on
+# cert-manager-local so the platform-edge-tls Certificate CR
+# (configs/envoy-gateway/certificate.yaml) has an issuer available by the
+# time envoy-gateway-config-local reconciles the Gateway.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: envoy-gateway-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 10m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./controllers/envoy-gateway
+  prune: false
+  wait: true
+  dependsOn:
+    - name: gateway-api-crds-local
+    - name: cert-manager-local
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: envoy-gateway
+      namespace: envoy-gateway

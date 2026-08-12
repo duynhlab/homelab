@@ -81,6 +81,31 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Gateway
+
+- Envoy Gateway v1.8.3 (digest-pinned chart + CRDs chart) lands as the
+  RFC-0024 P2 **additive** edge (ADR-044): namespace `envoy-gateway`, Flux
+  chain `gateway-api-crds-local → envoy-gateway-local →
+  envoy-gateway-config-local`, GatewayClass `platform`, one wildcard
+  `*.duynh.me` HTTPS listener on a new `platform-edge-tls` Certificate
+  (local `homelab-ca` patch preserved) with canonical :80→:443 301
+  redirect, and **32 HTTPRoutes** translating every Kong Ingress 1:1
+  (13 API incl. both payment webhook paths, 10 monitoring, 3 infra,
+  3 MCP, frontend, temporal-ui) plus the new `id.duynh.me` Keycloak
+  route. Policy parity: SecurityPolicy JWT via `remoteJWKS` against the
+  realm (no static key, no rotation step) on the seven jwt-edge routes,
+  Gateway-level CORS (expose list moves to `X-RateLimit-*` draft-03),
+  `clientCIDRs` fence on admin/monitoring/MCP routes, and per-route
+  BackendTrafficPolicies carrying local rate limits (halved for 2
+  replicas: 2/s + 50/min + 1250/h API, 600/min + 15000/h admin),
+  `requestBuffer: 10Mi`, and the `resilience-default` retry/timeout/
+  health-check semantics. EnvoyProxy pins NodePorts 30080/30443,
+  ParentBased OTel tracing at 10% (100% local), JSON access logs with a
+  CEL probe filter, and Prometheus metrics with a hand-rolled
+  control-plane ServiceMonitor. **Coexistence caveat:** the Envoy
+  Service cannot bind 30080/30443 while Kong holds them — the config
+  Kustomization stays not-ready until the P2.3 cutover frees the ports.
+
 #### Security
 
 - Keycloak identity foundation lands (RFC-0024 P1, executing the RFC-0022

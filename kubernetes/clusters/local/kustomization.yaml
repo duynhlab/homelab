@@ -10,6 +10,9 @@ resources:
   - cnpg-barman-plugin.yaml # Barman Cloud Plugin + ObjectStore CRD before CNPG clusters
   - kong.yaml               # Kong HelmRelease (depends on cert-manager-local for kong-proxy-tls Secret)
   - kong-config.yaml         # Kong Ingress routes + plugins (depends on kong + cert-manager)
+  - gateway-api-crds.yaml    # Gateway API + Envoy Gateway CRDs (RFC-0024 P2)
+  - envoy-gateway.yaml       # Envoy Gateway control plane (depends on gateway-api-crds + cert-manager)
+  - envoy-gateway-config.yaml # Gateway/HTTPRoutes/policies (depends on envoy-gateway + cert-manager + keycloak)
   - secrets.yaml         # Vault + ESO (Must be before databases)
   - caching.yaml         # Valkey (depends on monitoring-local for ServiceMonitor CRD)
   - storage.yaml         # RustFS (depends on secrets-local for ESO-managed credentials)

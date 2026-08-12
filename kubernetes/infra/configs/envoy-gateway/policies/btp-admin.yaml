@@ -1,0 +1,146 @@
+# Admin-surface BackendTrafficPolicies — translate the Kong
+# `rate-limiting-admin` KongClusterPlugin (1200/min, 30000/h, shared Valkey
+# counter for 2 replicas) into rateLimit.local with the numbers HALVED for
+# replicaCount 2 (per-instance buckets, ADR-046): 600/Minute, 15000/Hour.
+# More generous than the API limit because dashboards (e.g. Grafana) fan out
+# many asset/API requests per view.
+#
+# Targets exactly the routes that carried the plugin: the monitoring UIs,
+# both MCP servers in monitoring, flux-ui + flux-mcp, rustfs-console,
+# openbao-ui. One BTP per namespace (targetRefs are same-namespace only).
+# No requestBuffer / resilience block: Kong applied neither
+# request-size-limiting nor a KongUpstreamPolicy to these surfaces.
+# temporal-ui had no Kong rate limit — parity kept (no BTP).
+
+---
+# monitoring: 10 admin UIs + 2 MCP servers
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-admin
+  namespace: monitoring
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: grafana
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoriametrics
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: vmalert
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: karma
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: jaeger
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoriatraces
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: tempo
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: pyroscope
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victorialogs
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: sloth-ui
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoria-metrics-mcp
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoria-logs-mcp
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 600
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 15000
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+---
+# flux-system: Flux Web UI + Flux Operator MCP
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-admin
+  namespace: flux-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: flux-ui
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: flux-operator-mcp
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 600
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 15000
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+---
+# rustfs: RustFS console
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-admin
+  namespace: rustfs
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: rustfs-console
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 600
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 15000
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+---
+# openbao: OpenBAO UI
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-admin
+  namespace: openbao
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openbao-ui
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 600
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 15000
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03

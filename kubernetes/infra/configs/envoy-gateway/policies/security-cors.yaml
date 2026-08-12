@@ -1,0 +1,53 @@
+# CORS — translates the GLOBAL Kong `cors-policy` KongClusterPlugin
+# (configs/kong/plugins.yaml). Kong applied it to every route, so the EG
+# equivalent targets the whole `platform` Gateway; route-level
+# SecurityPolicies (security-jwt.yaml, security-admin-cidr.yaml) declare
+# `mergeType: StrategicMerge` so this gateway-level baseline still applies to
+# their routes instead of being overridden.
+#
+# Values mirror the Kong plugin 1:1 EXCEPT the exposed rate-limit headers:
+# Envoy's local rate limiter emits X-RateLimit-* (IETF draft-03, enabled
+# per-rule in policies/btp-*.yaml), not Kong's RateLimit-* — the expose list
+# swaps accordingly (RFC-0024 Design Details -> Rate limiting).
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: cors-policy
+  namespace: envoy-gateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: platform
+  cors:
+    allowOrigins:
+      - "https://local.duynh.me"
+      - "https://duynh.me"
+      - "http://localhost:3001"
+      - "http://localhost:8000"
+    allowMethods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    allowHeaders:
+      - Content-Type
+      - Authorization
+      - X-Request-ID
+      # Checkout confirm (RFC-0015): the SPA sends its idempotency key on the
+      # confirm POST — without this the preflight rejects it and the POST is
+      # never sent (twin of the local-stack entry).
+      - Idempotency-Key
+    exposeHeaders:
+      - X-Request-ID
+      - X-RateLimit-Limit
+      - X-RateLimit-Remaining
+      - X-RateLimit-Reset
+      # Retry-After: the SPA reads it on 429 to show "wait Ns" — not a
+      # CORS-safelisted response header, so it must be exposed explicitly.
+      - Retry-After
+    allowCredentials: true
+    maxAge: 1h

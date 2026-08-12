@@ -1,0 +1,33 @@
+# ServiceMonitor for the Envoy Gateway CONTROL PLANE (RFC-0024 P2).
+# The gateway-helm chart has no ServiceMonitor toggle, so this is hand-rolled
+# (translates Kong's chart-native serviceMonitor block, which scraped the
+# proxy status port + KIC cmetrics with a job=kong relabel).
+# The controller exposes Prometheus metrics on the `metrics` port (:19001) of
+# the chart's `envoy-gateway` Service:
+#   - watch/reconcile + xDS translation errors (control-plane health)
+#   - status-update and provider queue depths
+# DATA-PLANE (envoy_*) metrics are a P4 concern: the EnvoyProxy CR enables the
+# Prometheus endpoint (telemetry.metrics), and the envoy_* scrape + rules +
+# dashboards land with the telemetry-cutover train, not here.
+# job label forced to `envoy-gateway-controller` so future alert/recording
+# rules get a stable selector (same trick as Kong's job=kong relabel).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: envoy-gateway-controller
+  namespace: monitoring
+spec:
+  endpoints:
+    - interval: 30s
+      path: /metrics
+      port: metrics
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: envoy-gateway-controller
+  namespaceSelector:
+    matchNames:
+      - envoy-gateway
+  selector:
+    matchLabels:
+      control-plane: envoy-gateway

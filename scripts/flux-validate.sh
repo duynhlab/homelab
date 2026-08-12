@@ -54,6 +54,11 @@ kustomize_overlays=(
   "kubernetes/infra/configs/secrets"
   "kubernetes/infra/configs/kyverno"
   "kubernetes/infra/configs/network-policies"
+  # Envoy Gateway train (RFC-0024 P2): each excluded from controllers/
+  # kustomization.yaml (own Flux Kustomizations) — validate them explicitly.
+  "kubernetes/infra/controllers/gateway-api-crds"
+  "kubernetes/infra/controllers/envoy-gateway"
+  "kubernetes/infra/configs/envoy-gateway"
 )
 
 check_prerequisites() {

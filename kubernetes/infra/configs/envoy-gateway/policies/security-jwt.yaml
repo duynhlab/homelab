@@ -1,0 +1,162 @@
+# Edge JWT — translates the Kong `jwt-edge` KongClusterPlugin + KongConsumer
+# auth-issuer + its static-key ExternalSecret (configs/kong/plugins.yaml,
+# consumer.yaml) into SecurityPolicy remoteJWKS verification against the
+# Keycloak realm (RFC-0024 / ADR-045; RFC-0022 is the identity design record).
+# Zero provisioned key material: Envoy fetches and refreshes the realm JWKS
+# itself, so key rotation needs no edge action.
+#
+# Targets EXACTLY the routes that carried `jwt-edge` (the seven /private/
+# API surfaces): user-private, cart, order, review-private, notification,
+# payment-private, checkout. One SecurityPolicy per namespace because
+# targetRefs only resolve same-namespace objects.
+#
+# `mergeType: StrategicMerge` keeps the gateway-level CORS baseline
+# (policies/security-cors.yaml) applied to these routes — without it a
+# route-level SecurityPolicy would override the gateway policy entirely.
+#
+# remoteJWKS over PLAIN HTTP (deviation from the RFC's Backend +
+# BackendTLSPolicy sketch): Keycloak serves plain HTTP in-cluster
+# (KC_HTTP_ENABLED=true, controllers/keycloak/service.yaml), so the JWKS URI
+# points at the Service directly and no Backend/BackendTLSPolicy is needed.
+# Revisit when internal TLS lands (RFC-0020/RFC-0006 territory).
+#
+# Preflight parity: Kong set run_on_preflight:false; Envoy's CORS filter
+# answers OPTIONS preflights before JWT auth runs, preserving the behavior.
+#
+# Services STILL verify tokens (pkg/authmw, fail-closed, authoritative) —
+# the edge is the coarse filter (ADR-006 principle, vehicle superseded).
+
+---
+# user — api-user-private (Kong Ingress api-user-private had jwt-edge)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: user
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-user-private
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# cart — api-cart (Kong Ingress api-cart had jwt-edge)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: cart
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-cart
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# order — api-order (Kong Ingress api-order had jwt-edge)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: order
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-order
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# review — api-review-private only (api-review-public stays anonymous)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: review
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-review-private
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# notification — api-notification (Kong Ingress api-notification had jwt-edge)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: notification
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-notification
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# payment — api-payment-private only (api-payment-webhooks stays anonymous:
+# the HMAC signature over the raw body is the credential)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: payment
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-payment-private
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# checkout — api-checkout-private (Kong Ingress api-checkout-private had jwt-edge)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: checkout
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-checkout-private
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs

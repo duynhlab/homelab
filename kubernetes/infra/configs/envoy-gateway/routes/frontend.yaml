@@ -1,0 +1,41 @@
+# Frontend SPA — https://local.duynh.me. Translates
+# configs/kong/ingress-frontend.yaml (Ingress frontend): all non-API traffic
+# to the frontend Nginx container (static files + SPA fallback). No
+# rate-limit / CIDR policies — the Kong Ingress carried none (only the global
+# plugins, translated as the CORS SecurityPolicy on the Gateway + the
+# security-headers filter here).
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: frontend
+  namespace: frontend
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - local.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: frontend
+          port: 80

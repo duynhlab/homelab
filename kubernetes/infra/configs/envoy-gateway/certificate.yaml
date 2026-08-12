@@ -1,0 +1,36 @@
+# TLS certificate for the Envoy Gateway edge — single wildcard cert for
+# *.duynh.me, referenced by the Gateway's https listener certificateRefs
+# (same namespace, so no ReferenceGrant needed).
+#
+# Deliberately a NEW Certificate, not a move of kong-proxy-tls: Kong keeps its
+# own cert until the cutover PR (2.3) deletes it — the two coexist during this
+# additive train. Spec is otherwise identical to
+# configs/cert-manager/certificates-microservices.yaml.
+#
+# Issued by Let's Encrypt (DNS-01 via Cloudflare) on prod. The LOCAL cluster
+# overlay patches issuerRef -> the self-signed `homelab-ca` (Kind has no real
+# duynh.me DNS zone / Cloudflare token) — see
+# clusters/local/envoy-gateway-config.yaml.
+# Do NOT add a redundant explicit SAN already covered by the wildcard (e.g.
+# local.duynh.me): ACME RFC 8555 §7.1.3 -> CA rejects it (LE 400 "malformed").
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-edge-tls
+  namespace: envoy-gateway
+spec:
+  secretName: platform-edge-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  commonName: duynh.me
+  dnsNames:
+    - duynh.me
+    - "*.duynh.me"

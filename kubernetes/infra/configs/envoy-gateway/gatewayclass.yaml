@@ -1,0 +1,16 @@
+# GatewayClass for the platform edge (RFC-0024 P2, ADR-045).
+# One class, one Gateway: the EnvoyProxy CR referenced here shapes the
+# data-plane fleet (replicas, resources, PDB, NodePorts, telemetry) — the
+# Gateway API equivalent of Kong's HelmRelease proxy values.
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: platform
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: platform
+    namespace: envoy-gateway

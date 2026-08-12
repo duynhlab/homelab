@@ -460,7 +460,7 @@ services moved to local JWT verification.
 ## Edge exposure {#edge-exposure}
 
 - No `/internal/` audience is exposed at either edge — verified in
-  [kong.yml](../../local-stack/gateway/kong.yml) and
+  [local-stack routes.yaml](../../local-stack/gateway/eg/routes.yaml) and
   [ingress-api.yaml](../../kubernetes/infra/configs/kong/ingress-api.yaml).
 - **The route path is what enforces this, not NetworkPolicy.** Every route in
   both environments is declared on an audience-scoped prefix

@@ -101,6 +101,36 @@ Skeleton (copy what you need):
   probes the cluster). The `kong-openbao` PolicyException narrows to
   `openbao` (EG binds non-privileged ports; no `NET_BIND_SERVICE` waiver
   needed).
+#### Local-stack
+
+- The compose edge is **Envoy Gateway in standalone mode** (RFC-0024 P3,
+  ADR-046 arm A): `envoyproxy/gateway:v1.8.3` running
+  `server --config-path /config/standalone.yaml` over the same Gateway API
+  resources the cluster reconciles, in `local-stack/gateway/eg/`: GatewayClass +
+  one plain-HTTP Gateway on 8000 (published as 8080), 12 audience-scoped
+  HTTPRoutes, a JWT SecurityPolicy verifying the realm via `remoteJWKS`, a
+  Gateway-level CORS policy, and one BackendTrafficPolicy (50/s single-window
+  local rate limit, `requestBuffer: 10Mi`). Backends are `Backend` resources with
+  `fqdn` endpoints because Compose has no Services — the single documented
+  divergence. This is what lets the release gate run the real translation layer
+  before Kind, so a routing or policy mistake is found on a laptop. Consequences
+  to plan for: the distroless image can run **no compose healthcheck**, so
+  `frontend` waits on `service_started` and readiness is checked from the host;
+  the gateway depends on `keycloak` and not on `cache`; and a cold start
+  self-signs xDS material and downloads the Envoy binary into the new
+  `envoy-gateway-data` volume, so the first boot after `down -v` needs outbound
+  internet.
+- Audit tokens come from the realm, not auth-service
+  (`local-stack/scripts/keycloak-token.sh`): a headless Authorization Code +
+  PKCE flow, because the realm's clients have Direct Access Grants disabled and
+  `grant_type=password` cannot mint a token. The E2E gate is retargeted
+  accordingly — A1 asserts the realm `iss` and alice's **string** `sub`
+  (ADR-042), A2/A3 assert the Envoy edge (401 `Jwt is missing`), A4/A5 move to
+  the realm's token and end-session endpoints (400/204, not 401/200), A8 restates
+  its 404 as "no HTTPRoute matches", A13 uses the seeded user `bob` instead of
+  registering one, and a new **A16** proves the string subject reaches
+  `cart.cart_items.user_id`. Request pacing is gone — the local edge allows 50
+  requests per second, so a 429 during the audit is a finding, not a pacing error.
 
 #### Services
 
@@ -131,8 +161,8 @@ Skeleton (copy what you need):
   in-network at `keycloak:8080`), the seven authmw consumers + both workers
   gate on its bash `/dev/tcp` health probe, and the frontend build gains the
   `KEYCLOAK_URL`/`KEYCLOAK_REALM`/`KEYCLOAK_CLIENT_ID` args (frontend#90).
-  Known gap until P6: the local Kong edge JWT still matches the retired auth
-  issuer's static key and cannot verify realm tokens.
+  The edge-side gap this opened — Kong could not verify realm tokens — is closed
+  by the Envoy Gateway standalone entry under Breaking Change.
 
 #### Gateway
 

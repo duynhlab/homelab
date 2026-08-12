@@ -1,7 +1,6 @@
 -- Creates one database per backend service. All owned by the default
 -- `postgres` superuser; each service connects with DB_USER=postgres locally.
 -- `user` and `order` are reserved words, hence the quoting.
-CREATE DATABASE auth;
 CREATE DATABASE "user";
 CREATE DATABASE product;
 CREATE DATABASE cart;

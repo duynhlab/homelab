@@ -7,6 +7,13 @@
 receivers:
   otlp:
     protocols:
+      # gRPC is here for the edge, not the services: Envoy Gateway's tracing
+      # provider speaks OTLP gRPC only. The cluster collector has always
+      # listened on both ports; local was HTTP-only because every Go service
+      # uses otlptracehttp, and adding this is what keeps the edge a span
+      # producer after the Kong → Envoy Gateway move.
+      grpc:
+        endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
 

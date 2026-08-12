@@ -5,7 +5,7 @@ Distributed tracing contract for every Go service and worker in the platform ser
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **SDK** | `obsx.SetupObservability()` — one call in `main()` | — |
-| **Propagation** | W3C Trace Context (`traceparent`); Kong forces injection at the edge (`inject: [w3c]`) | — |
+| **Propagation** | W3C Trace Context (`traceparent`), native at the edge and in every service | — |
 | **Sampling** | `ParentBased(TraceIDRatioBased)` — root decides, downstream honours | — |
 | **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — Tempo, Jaeger, VictoriaTraces | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
@@ -44,7 +44,7 @@ Full env table: [Application observability § Environment variables](./observabi
 
 Configured inside `obsx.SetupObservability` as `ParentBased(TraceIDRatioBased(rate))`:
 
-- **Production (cluster):** ~10% head sampling at Kong and services — statistically valid, ~90% storage savings.
+- **Production (cluster):** ~10% head sampling at the edge and in services — statistically valid, ~90% storage savings.
 - **Local-stack:** `OTEL_SAMPLE_RATE=1.0` for complete demo traces.
 - **No ENV auto-mapping** — set `OTEL_SAMPLE_RATE` explicitly per environment.
 
@@ -77,11 +77,15 @@ by `pkg/grpcx`.
 
 ### Propagation
 
-Services accept and propagate W3C Trace Context (`traceparent`). At the edge,
-Kong's opentelemetry plugin **forces** a W3C `traceparent` onto every upstream
-request (`propagation.inject: [w3c]`), so browser-originated requests without a
-trace header still join the edge trace — verified in
-`kubernetes/infra/configs/kong/plugins.yaml`. gRPC metadata carries the same
+Services accept and propagate W3C Trace Context (`traceparent`). The edge speaks
+W3C natively: Envoy starts a span for every request it accepts and sends
+`traceparent` upstream, so a browser request that carries no trace header still
+arrives at the service already joined to the edge trace. The edge is therefore
+the root sampling authority — its `samplingRate` decides, and because Envoy's
+sampler is ParentBased, an inbound sampled decision is always honoured.
+Configured in the `EnvoyProxy` resource (`telemetry.tracing`) in
+`kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml` for the cluster and
+`local-stack/gateway/eg/envoyproxy.yaml` locally. gRPC metadata carries the same
 context via `pkg/grpcx`.
 
 ### Baggage

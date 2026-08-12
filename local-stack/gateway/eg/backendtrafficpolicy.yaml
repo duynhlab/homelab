@@ -1,0 +1,109 @@
+# BackendTrafficPolicy — local rate limit + request body size cap.
+#
+# What this exposes: the two edge protections worth exercising locally, applied
+# to all 13 routes by one policy. In the cluster this is eleven near-identical
+# files (one per namespace, because targetRefs are namespace-scoped); here every
+# route lives in one namespace, so one policy is the honest shape. Two policies
+# would not compose anyway — Envoy Gateway resolves same-kind policy conflicts
+# on a route by "oldest wins", it does not merge them.
+#
+# ---- Rate limit: 50/s, deliberately generous ---------------------------------
+# The cluster is 2/s + 50/min + 1250/h per replica (5/s + 100/min + 2500/h
+# effective across two replicas, translating Kong's shared-Valkey counter). The
+# local numbers are NOT that, on purpose:
+#
+#  * There is no replica division. One Envoy process, one in-process token
+#    bucket, so a configured number is the real ceiling — copying the cluster's
+#    halved per-replica figures would make the local edge twice as strict as
+#    production.
+#  * Kong's 5/s cost the audit a `sleep 0.3` after every single curl and still
+#    tripped 429s, which the runbook had to document as "the gateway working,
+#    not a bug". That is pure friction: a release gate that throttles its own
+#    evidence collection produces flaky rows, not security signal.
+#  * 50/s at one request per shell round-trip is unreachable by a human or by
+#    the audit, so the filter is still WIRED and still emits X-RateLimit-*
+#    headers (that is what local should prove), without ever firing by accident.
+#
+# The MINUTE window is 3000, i.e. exactly the same 50/s sustained — it exists
+# only so a bug that spins the SPA in a retry loop still gets stopped.
+#
+# NO HOUR window, unlike the cluster: an hour bucket cannot be waited out inside
+# an audit run. Kong's 2500/h was the one limit the runbook admitted "waiting a
+# few seconds will not clear", which turns a re-run into a blocked release for
+# reasons that have nothing to do with the candidate.
+#
+# ---- requestBuffer -----------------------------------------------------------
+# 10Mi == Kong's request-size-limiting 10 MB == the cluster's requestBuffer.
+# Over the limit answers 413. Same number in all three places, deliberately:
+# it is a contract the SPA and the services are written against.
+#
+# ---- What is NOT here --------------------------------------------------------
+# retry / timeout / healthCheck. The cluster BTP carries them because it
+# translates Kong's KongUpstreamPolicy (retries 2, connect 3s, read/write 15s,
+# active /health probes, passive ejection). Locally: Envoy's default route
+# timeout is already 15s, Compose healthchecks already gate the services behind
+# `depends_on`, there is one replica per backend so there is nothing to eject,
+# and outlier detection on a single host only ever removes the only upstream —
+# turning a transient 5xx into a hard outage mid-audit. Documented divergence.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-auth-public
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-user-public
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-user-private
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-product
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-cart
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-order
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-review-public
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-review-private
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-shipping
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-notification
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-payment-private
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-payment-webhooks
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-checkout-private
+  rateLimit:
+    type: Local
+    local:
+      # Exactly ONE rule, and that is a hard constraint, not a preference:
+      # Envoy's local rate limiter rejects a policy with more than one rule
+      # unless every rule carries `clientSelectors`, and a rejected policy
+      # makes Envoy Gateway attach a 500 direct response to every route the
+      # policy targets — the whole edge, not just the limiter. Multi-window
+      # limiting (per-second AND per-minute AND per-hour) belongs to a
+      # counter-based limiter; here one window is the design.
+      rules:
+        - limit:
+            requests: 50
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi

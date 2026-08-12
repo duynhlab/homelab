@@ -1,0 +1,69 @@
+# Envoy Gateway STANDALONE control-plane config (ADR-046 spike).
+#
+# What this exposes: nothing by itself. It tells the `envoy-gateway` binary to
+# read Gateway API + Envoy Gateway resources from FILES instead of a Kubernetes
+# API server, and to run the Envoy data plane as a CHILD PROCESS of this same
+# container instead of a Deployment. Everything the local edge actually serves
+# is in the sibling files listed under `provider.custom.resource.file.paths`.
+#
+# Why standalone: the release gate (docs/e2e-audit.md) runs on Compose BEFORE
+# Kind, so the compose edge must speak the same dialect as the cluster edge
+# (kubernetes/infra/configs/envoy-gateway/). Standalone mode is the only way to
+# run the real Envoy Gateway translation layer without a cluster.
+#
+# Upstream marks standalone mode EXPERIMENTAL. It is fit for a local release
+# gate; it is not a production deployment mode.
+#
+# Two non-obvious things about this file:
+#
+#  1. `paths` lists the resource files ONE BY ONE instead of the directory.
+#     The file provider ignores subdirectories but parses every non-hidden file
+#     in a watched directory as Gateway API YAML — and THIS file is `kind:
+#     EnvoyGateway`, which is not a Gateway API kind, so watching /config would
+#     fail the initial load. Adding a resource file means adding it here.
+#
+#  2. configHome/dataHome/stateHome/runtimeDir all point at /var/lib/eg, which
+#     the upstream image creates world-writable for exactly this purpose. They
+#     must be writable because the control plane (a) self-signs the xDS TLS
+#     material used to talk to its own Envoy child process, and (b) downloads
+#     the Envoy BINARY there (see the compose comment on the gateway service).
+#     /config is mounted read-only, so none of them may live under it.
+#     All four are set explicitly rather than left to the XDG defaults under
+#     $HOME, because the image runs as uid 65532 and its home directory is not
+#     a dependency worth having.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyGateway
+gateway:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+provider:
+  type: Custom
+  custom:
+    resource:
+      type: File
+      file:
+        paths:
+          # envoyproxy.yaml first: the GatewayClass below references it, and
+          # the telemetry it carries is what keeps the edge emitting spans and
+          # a parseable access log.
+          - /config/envoyproxy.yaml
+          - /config/gatewayclass.yaml
+          - /config/gateway.yaml
+          - /config/backends.yaml
+          - /config/routes.yaml
+          - /config/securitypolicy.yaml
+          - /config/backendtrafficpolicy.yaml
+    infrastructure:
+      type: Host
+      host:
+        configHome: /var/lib/eg
+        dataHome: /var/lib/eg
+        stateHome: /var/lib/eg/state
+        runtimeDir: /var/lib/eg/run
+logging:
+  level:
+    default: debug
+# Required: with no Kubernetes Services in Compose, HTTPRoute backendRefs point
+# at `Backend` resources (backends.yaml), which are an extension API and stay
+# unimplemented unless this is on.
+extensionApis:
+  enableBackend: true

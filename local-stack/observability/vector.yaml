@@ -1,11 +1,16 @@
 # Vector for the local stack — mirrors the in-cluster DaemonSet pipeline
 # (kubernetes_logs -> transforms -> VictoriaLogs) using the docker_logs source.
 # Tails every compose container's stdout/stderr, lifts the service name and
-# parses JSON log lines (the Go services + Kong's kong_json access log), then
-# ships to VictoriaLogs' jsonline ingest — the same sink the cluster uses.
-# Runs ALONGSIDE Kong's OTel runtime logs — complementary paths into one
-# VictoriaLogs instance (Vector rows carry `container_name`; OTel rows carry
-# `service.name`/`service.instance.id` resource attributes).
+# parses JSON log lines, then ships to VictoriaLogs' jsonline ingest — the same
+# sink the cluster uses.
+#
+# This is the only path for anything without an OTel SDK: the edge's JSON access
+# log (its fields — `response_flags`, `upstream_cluster`, `route_name` — become
+# queryable because the parse merges them into the event), the databases, and
+# the infrastructure containers. It runs alongside the services' own OTLP log
+# export into the same VictoriaLogs instance; the two are told apart by their
+# stream fields (Vector rows carry `service`/`container_name`, OTLP rows carry
+# the `service.name` resource attribute).
 
 sources:
   docker:
@@ -35,7 +40,7 @@ transforms:
       # Service name from the compose service label; fall back to container name.
       .service = .label."com.docker.compose.service"
       if .service == null { .service = .container_name }
-      # Parse JSON log lines (Go services' zerolog/zap + Kong's kong_json access
+      # Parse JSON log lines (Go services' zerolog/zap + the edge's JSON access
       # log); keep plain-text lines (e.g. gin's [GIN] lines) as raw messages.
       parsed, err = parse_json(string!(.message))
       if err == null {

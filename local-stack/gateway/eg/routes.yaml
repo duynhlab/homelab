@@ -1,0 +1,278 @@
+# HTTPRoutes — the entire local edge surface: 13 routes over 10 backends.
+#
+# What this exposes: /{service}/v1/{public|private}/... pass-through, no
+# rewrite (Gateway API's default, == Kong's `strip_path: false`). Route names
+# match the cluster's HTTPRoutes (kubernetes/infra/configs/envoy-gateway/
+# routes/api.yaml) so `%ROUTE_NAME%` in an access log means the same thing in
+# both environments.
+#
+# EVERY route is AUDIENCE-SCOPED. This is the whole point of the file, not a
+# style choice: `internal` is a real audience served by these same containers
+# (POST /product/v1/internal/products creates catalog rows with no auth of its
+# own; DELETE /cart/v1/internal/cart/{userId} takes the victim's id from the
+# PATH). A bare `/product/` or `/cart/` prefix therefore publishes them. Audit
+# row A8 exists because that once happened. Never add a route whose PathPrefix
+# stops before the audience segment.
+#
+# PathPrefix has no trailing slash because Gateway API matches by SEGMENT:
+# `/user/v1/private` matches `/user/v1/private` and `/user/v1/private/...` but
+# never `/user/v1/privatefoo`. Same match set as Kong's `/user/v1/private/`,
+# plus the bare segment itself.
+#
+# Which routes carry edge JWT is declared once, in securitypolicy.yaml — the
+# seven `private` routes. Everything else is anonymous by design:
+#   auth public      login/register/refresh/logout/jwks (P3: still auth-service)
+#   user public      GET /users/{id}
+#   product public   catalog reads
+#   review public    review lists
+#   shipping public  track + estimate
+#   payment public   provider webhooks — the HMAC over the raw body is the
+#                    credential; an edge JWT would break mockpay.
+#
+# No ResponseHeaderModifier security-header filters here, unlike the cluster
+# routes: those translate a Kong global plugin, HSTS is meaningless on plain
+# HTTP, and nothing in the audit asserts them. Documented divergence, not an
+# oversight.
+# There is deliberately NO /auth/v1/ route. Identity is the realm's job: the SPA
+# obtains tokens from Keycloak directly (Authorization Code + PKCE against
+# http://localhost:8081) and the edge verifies them against the realm's JWKS, so
+# the edge never fronts an authentication service. Any /auth/v1/… request
+# therefore 404s here because no route matches — which is what the audit asserts.
+# user — public reads.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-user-public
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /user/v1/public
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: user
+---
+# user — private profile. Edge JWT.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-user-private
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /user/v1/private
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: user
+---
+# product — public catalog. NOT /product/v1/internal/products (A8).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-product
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /product/v1/public
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: product
+---
+# cart — private only. Edge JWT. NOT /cart/v1/internal/cart/{userId} (A8).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-cart
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /cart/v1/private
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: cart
+---
+# order — private only. Edge JWT.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-order
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /order/v1/private
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: order
+---
+# review — public lists.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-review-public
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /review/v1/public
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: review
+---
+# review — private submit. Edge JWT.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-review-private
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /review/v1/private
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: review
+---
+# shipping — public track + estimate only. Internal shipment writes
+# (/shipping/v1/internal/...) stay east-west, order-service only.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-shipping
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /shipping/v1/public
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: shipping
+---
+# notification — private only. Edge JWT. /notification/v1/internal/* stays
+# east-west (the order saga calls it over gRPC anyway).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-notification
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /notification/v1/private
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: notification
+---
+# payment — private payments API. Edge JWT. /payment/v1/internal/ (refunds,
+# reconciliation) is not routed.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-payment-private
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /payment/v1/private
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: payment
+---
+# payment — provider webhooks, anonymous. Two paths in one route, as Kong had:
+# the second is the deprecated pre-v3 alias kept so in-flight mockpay retries
+# keep landing (remove at contract, ADR-017). `mockpay` posts to the first one
+# at http://gateway:8000/payment/v1/public/payments/webhooks/mockpay.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-payment-webhooks
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /payment/v1/public/payments/webhooks
+        - path:
+            type: PathPrefix
+            value: /payment/v1/public/webhooks
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: payment
+---
+# checkout — private only. Edge JWT. Confirm sends Idempotency-Key, which the
+# CORS policy must allow (securitypolicy.yaml) or the browser preflight kills
+# the POST before it is sent.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-checkout-private
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /checkout/v1/private
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: checkout

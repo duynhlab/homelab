@@ -1,0 +1,96 @@
+# EnvoyProxy `platform-edge` — the local edge's telemetry contract.
+#
+# What this exposes: nothing routable. It shapes the Envoy the standalone
+# controller starts, and it exists for one reason: **the edge must keep
+# producing telemetry across the Kong → Envoy Gateway move.** Kong's
+# opentelemetry plugin made the compose edge a span producer and its kong_json
+# format made the access log parseable by Vector; losing either would be a
+# silent observability regression that no audit row would notice until a trace
+# turned up with its first hop missing.
+#
+# Deliberately absent versus the cluster CR
+# (kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml): everything about
+# Kubernetes shape — replicas, PodDisruptionBudget, resources, the NodePort
+# Service patch. Standalone runs one Envoy child process in this container, so
+# those fields have nothing to act on. The telemetry block below is the half
+# that must match, and the field names are kept identical to the cluster's so
+# a reader diffing the two environments sees only the intended differences.
+#
+# FIRST-RUN CHECKS (cannot be desk-verified — standalone mode is young):
+#   1. That the Host infrastructure provider honors `telemetry` at all. The
+#      bootstrap generator is shared with the Kubernetes provider, so it should,
+#      but if edge spans are absent after a run, check this before anything else.
+#   2. That `backendRefs` resolves a `Backend` (not just a Kubernetes Service)
+#      for the tracing provider. `extensionApis.enableBackend: true` is set in
+#      standalone.yaml, and backends.yaml declares `otel-collector`.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: platform-edge
+spec:
+  telemetry:
+    # Prometheus endpoint on the proxy. Nothing scrapes it locally (the compose
+    # stack has no VMAgent), so this records intent and keeps the two
+    # environments' CRs comparable.
+    metrics:
+      prometheus: {}
+
+    accessLog:
+      settings:
+        # Same JSON field set as the cluster, so one Vector parse contract
+        # covers both environments. Locally Vector reads this off container
+        # stdout through the docker_logs source.
+        - format:
+            type: JSON
+            json:
+              time: "%START_TIME%"
+              client: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+              method: "%REQ(:METHOD)%"
+              uri: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              status: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes: "%BYTES_SENT%"
+              duration: "%DURATION%"
+              upstream_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+              upstream: "%UPSTREAM_HOST%"
+              upstream_cluster: "%UPSTREAM_CLUSTER%"
+              route_name: "%ROUTE_NAME%"
+              host: "%REQ(:AUTHORITY)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              user_agent: "%REQ(USER-AGENT)%"
+          # No CEL probe filter locally, on purpose: the cluster drops
+          # successful probe access logs because 96.2% of exported log volume
+          # was probe noise (observability audit F-2). Locally that volume is
+          # irrelevant and seeing every request — probes included — is what
+          # makes a failed audit row diagnosable.
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+
+    tracing:
+      # PERCENT (0-100). 100 locally, matching what Kong did here
+      # (KONG_TRACING_SAMPLING_RATE 1.0) and what the local cluster overlay
+      # patches the cluster CR to. Envoy's default sampler is ParentBased, so
+      # an inbound sampled traceparent is honored either way.
+      samplingRate: 100
+      provider:
+        type: OpenTelemetry
+        # OTLP gRPC :4317. The compose collector previously exposed only
+        # :4318 (HTTP) because every Go service uses otlptracehttp; EG's
+        # tracing provider speaks gRPC only, so the collector config gained a
+        # gRPC receiver alongside the HTTP one — the same pair the cluster
+        # collector already listens on.
+        backendRefs:
+          - group: gateway.envoyproxy.io
+            kind: Backend
+            name: otel-collector
+            port: 4317
+      customTags:
+        # The cluster tags pod identity from the downward API. There are no
+        # pods here, so record the environment instead — enough to tell a local
+        # edge span from a cluster one when both land in the same explorer.
+        deployment.environment.name:
+          type: Literal
+          literal:
+            value: local

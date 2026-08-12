@@ -6,34 +6,96 @@ for release; every Phase A, B, and C row must pass before a tag is created.
 
 | Attribute | Value |
 |-----------|-------|
-| **Applies to** | Service, `pkg`, frontend, Kong/gateway, and Compose changes |
-| **Execution** | Full audit every time; phases are not selectively skipped |
+| **Applies to** | Service, `pkg`, frontend, gateway/edge, identity (realm), and Compose changes |
+| **Execution** | Full audit every time, on a stack recreated from scratch; phases are not selectively skipped |
 | **Evidence** | Candidate commit SHAs plus the completed pass/fail table |
 | **Pass decision** | `ELIGIBLE FOR TAG` only when every required row passes |
-| **Failure decision** | `BLOCKED`; fix, rebuild, reset ambiguous state, and rerun the full audit |
+| **Failure decision** | `BLOCKED`; fix, recreate the stack, and rerun the full audit |
 
 ## Preconditions
 
 1. Check out every candidate repository at the commit intended for the tag.
-2. Start the stack from `homelab/local-stack` with
-   `docker compose up -d --build`.
-3. Confirm Compose renders and the runtime is ready:
+
+2. **Recreate the stack from scratch. Every run — this is not conditional.**
+
+   ```bash
+   docker compose down -v          # drops volumes: databases, telemetry stores, edge state
+   docker compose up -d --build
+   ```
+
+   Cumulative telemetry is what makes this mandatory rather than advisory. Half
+   of Phase C reads counters, span tables, and log streams that never reset on
+   their own, so a re-used stack cannot tell "this candidate produced it" from
+   "the previous run left it behind". `docker compose ps --all` proving a clean
+   boot is also the only cheap way to catch a migrate or seed job that would
+   have failed on an empty database.
+
+   Two cold-start costs are specific to `down -v` and are expected, not faults:
+
+   - **The Envoy binary is re-downloaded.** The control plane obtains the data
+     plane at runtime through func-e into the `envoy-gateway-data` volume, which
+     `down -v` deletes. The first `up` therefore needs **outbound internet** and
+     the edge answers nothing until the download finishes.
+   - **`gateway-certgen` must exit 0 before the gateway starts.** It self-signs
+     the xDS material the control plane uses to reach its own Envoy child
+     process, into the same deleted volume. `docker compose ps --all` must show
+     it `Exited (0)`; a non-zero exit means the gateway is not merely slow, it
+     will never serve.
+
+3. **Run every shell block in `bash`.** Two zsh behaviours break this runbook,
+   and zsh is the macOS default:
+
+   - `USERNAME` is a **special parameter** in zsh, so `USERNAME=alice $KCT`
+     silently mints a token for the *host* account. Every row that depends on
+     being alice, bob, or carol then fails for a reason that looks like an
+     identity bug.
+   - zsh does **not word-split unquoted parameters**, so the runbook's
+     multi-word command handles — `$TCLI` and `$S` — are passed as ONE argument.
+     `agent-browser $S batch …` answers `Unknown command: --session audit`, and
+     `$TCLI workflow list … | grep -q …` reports a false FAIL against a Temporal
+     namespace that is perfectly healthy.
+
+   `bash` has neither behaviour. Start a `bash` shell before Phase A and stay in
+   it for all three phases.
+
+4. Confirm Compose renders and the runtime is ready:
 
    ```bash
    docker compose config --quiet
    docker compose ps --all
    ```
 
-4. Verify all long-running application dependencies are running or healthy.
+5. Verify all long-running application dependencies are running or healthy.
    Every migrate and seed job must have exited successfully. Investigate any
    `unhealthy`, restarting, or non-zero exited container before continuing.
-5. Install and load the browser automation guidance before Phase B:
+   **The `gateway` container is the one exception**: the Envoy Gateway image is
+   distroless, so it can declare no healthcheck and only ever reports `Up`.
+   Prove the edge is serving before starting Phase A — this is the readiness
+   gate the missing healthcheck cannot provide:
+
+   ```bash
+   curl -sf -o /dev/null -w 'edge: %{http_code}\n' \
+     http://localhost:8080/product/v1/public/products   # want 200
+   curl -sf http://localhost:8099/readyz                # control plane loaded the config
+   ```
+
+   One more edge check belongs here, because it is cheap and it invalidates the
+   whole of Phase C when it fails: the control plane must have **attached the
+   EnvoyProxy CR**. Without it the edge still answers 200 on every route while
+   emitting no spans at all, so Phase A and Phase B pass and only Phase C
+   notices:
+
+   ```bash
+   docker compose logs gateway 2>&1 | grep -c 'failed to find envoyproxy'   # want 0
+   ```
+
+6. Install and load the browser automation guidance before Phase B:
 
    ```bash
    agent-browser skills get core
    ```
 
-6. Record the candidate commit set:
+7. Record the candidate commit set:
 
    ```bash
    for repo in ../../*-service ../../frontend ../../pkg; do
@@ -44,24 +106,76 @@ for release; every Phase A, B, and C row must pass before a tag is created.
 
 The stack builds directly from these sibling worktrees. Uncommitted files are
 part of the build but cannot be represented by a release tag; the final audit
-therefore requires clean candidate worktrees. Pace bulk API requests at least
-0.25 seconds apart because the local Kong rate limit is 5 requests per second — and
-note it also enforces 100 per minute and 2500 per hour, so re-running a whole
-phase inside the same minute can trip a limit that waiting a few seconds will not
-clear.
+therefore requires clean candidate worktrees.
 
-## Phase A — API contract (curl, ~1 min)
+**Container runtime.** `docker compose` is the documented command and every row
+of this runbook works under podman's compose provider too — with **one** exception
+that must be handled at bring-up, or two Phase C rows (**C13**, **C14**) come back
+empty while the whole stack looks healthy.
+
+`vector` reads the runtime's API socket. Inside a podman machine
+`/var/run/docker.sock` is a **symlink** to `/run/user/<uid>/podman/podman.sock`,
+and a bind-mounted symlink resolves in the CONTAINER's mount namespace where the
+target does not exist — so Vector exits 78 with `Source "docker": Socket not
+found: /var/run/docker.sock`. `local-stack/compose.podman.yaml` fixes it, and all
+three of its parts are load-bearing: the **resolved** socket path, `userns_mode:
+keep-id` (container root is a subuid, not the socket's `core` owner), and
+`security_opt: [label=disable]` (the socket carries an SELinux label that denies
+the mount even to its owner). Under podman the bring-up in step 2 becomes:
+
+```bash
+export PODMAN_SOCKET="$(podman machine ssh readlink -f /var/run/docker.sock | tr -d '\r')"
+export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')"
+docker compose -f compose.yaml -f compose.podman.yaml down -v
+docker compose -f compose.yaml -f compose.podman.yaml up -d --build
+```
+
+Only `up` needs the second file — it is what creates the container — and on Docker
+the overlay is not needed at all. Confirm before Phase A either way:
+
+```bash
+docker compose ps vector                       # want: Up, not Exited
+docker compose logs vector 2>&1 | tail -3      # want: "Started watching for container logs"
+```
+
+A `vector` that exited means the overlay was **omitted**, not that the container
+needs another restart: a plain `up` re-reads `compose.yaml` and remounts the same
+broken symlink. Do not start Phase C with `vector` down.
+
+**Request pacing is not required.** The local edge allows 50 requests per second
+with a 3000-per-minute ceiling and no hourly window
+(`gateway/eg/backendtrafficpolicy.yaml`) — a limit no shell-driven row can reach
+by hand, and one that cannot leak across runs because Envoy's local rate limiter
+is an in-process token bucket with no shared datastore. A 429 during this audit
+is therefore a real finding: either the policy was tightened or something is
+looping. Investigate it, do not wait it out.
+
+**Tokens come from the realm.** Direct Access Grants are disabled on the realm's
+clients, so no `grant_type=password` shortcut exists. Every token below is minted
+by `scripts/keycloak-token.sh`, a headless Authorization Code + PKCE flow
+(read its header before changing anything about identity).
+
+## Phase A — API contract (curl, ~10 min hands-on)
+
+Timing is dominated by waits, not by typing: A10 sleeps 13s, A12 polls up to 24s,
+A14 restarts `temporal` and waits for it to report healthy, and the conditional
+A15 adds roughly 5 minutes of drill. **A13 is the outlier** — it is gated on the
+checkout session TTL (30 minutes by default), which is exactly why it is armed
+before A1 and read at the end instead of being run in place.
 
 ```bash
 # ---- Preamble. Run this first, in the shell you will use for every row —
-#      including A13, which is armed before A1. Skipping it leaves $TCLI and
-#      audit_curl unset and the arming snippet fails with "command not found".
+#      including A13, which is armed before A1. Skipping it leaves $TCLI, $KCT
+#      and audit_curl unset and the arming snippet fails with "command not found".
 BASE=http://localhost:8080
+KC=http://localhost:8081/realms/duynhlab
+KCT=./scripts/keycloak-token.sh        # run this block from homelab/local-stack
 
-# Keep the executable block below Kong's 5 req/s global limit.
+# One indirection for every call, kept so pacing could be reinstated in ONE place
+# if the edge policy ever tightens. It does not sleep: the local edge allows
+# 50 req/s (see Preconditions).
 audit_curl() {
   curl "$@"
-  sleep 0.3
 }
 
 # Every `temporal ...` call in this audit runs in temporal-admintools: the
@@ -69,63 +183,135 @@ audit_curl() {
 # `exec -T temporal temporal ...` fails with "not found".
 TCLI="docker compose exec -T temporal-admintools temporal"
 
-# A1. Login returns the JWT pair — and NO opaque `token` field
-R=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}')
-echo "$R" | python3 -c "import json,sys; d=json.load(sys.stdin); \
-  assert 'token' not in d, 'opaque token leaked'; \
-  assert d['access_token'].count('.')==2 and d['refresh_token'] and d['expires_in']; \
-  print('A1 OK', sorted(d.keys()))"
+# A1. Token acquisition through the realm (RFC-0024 P3). Headless
+#     Authorization Code + PKCE — there is no password grant, because the realm's
+#     clients have Direct Access Grants disabled, exactly as in the cluster.
+#     The assertions are the identity cutover's evidence: the token is issued by
+#     the realm, and `sub` is alice's FIXED UUID — as a JSON STRING, which is the
+#     ADR-042 string-subject contract the whole fleet now stores.
+R=$(USERNAME=alice KC_OUTPUT=json $KCT)
+echo "$R" | python3 -c "
+import base64, json, sys
+d = json.load(sys.stdin)
+at = d['access_token']
+assert at.count('.') == 2 and d['refresh_token'] and d['expires_in'], sorted(d)
+p = at.split('.')[1]
+c = json.loads(base64.urlsafe_b64decode(p + '=' * (-len(p) % 4)))
+assert c['iss'] == 'http://localhost:8081/realms/duynhlab', c['iss']
+assert isinstance(c['sub'], str), type(c['sub'])
+assert c['sub'] == 'a11ce000-0000-4000-8000-000000000001', c['sub']
+assert 'duynhlab-platform' in (c['aud'] if isinstance(c['aud'], list) else [c['aud']]), c['aud']
+print('A1 OK iss=%s sub=%s (str) aud=%s' % (c['iss'], c['sub'], c['aud']))
+"
 AT=$(echo "$R" | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
 RT=$(echo "$R" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
 
-# A2. Private routes 200 through Kong edge-jwt with a valid JWT
+# A2. Private routes 200 through the Envoy edge with a realm token. What this
+#     proves is the whole edge auth path in one line: the jwt_authn filter
+#     fetched the realm's JWKS at boot, validated this token against it, and
+#     forwarded the request to an audience-scoped route.
 for p in user/v1/private/users/profile cart/v1/private/cart order/v1/private/orders \
          notification/v1/private/notifications; do
   [ "$(audit_curl -s -o /dev/null -w '%{http_code}' $BASE/$p -H "Authorization: Bearer $AT")" = 200 ] \
     && echo "A2 OK /$p" || echo "A2 FAIL /$p"
 done
 
-# A3. Bad / missing token → 401 at the Kong edge (WWW-Authenticate header)
+# A3. Bad / missing token → 401 AT THE EDGE, before the request reaches a
+#     service. The jwt_authn filter answers `content-type: text/plain` with a
+#     short reason string in the body, and it DOES set `www-authenticate`:
+#       no token      -> Bearer realm="<the requested URL>"
+#       broken token  -> the same, plus error="invalid_token"
+#     The realm value is the request URL, not an identity-provider URL — Envoy
+#     echoes what was asked for. All three facts are asserted; none is optional.
 audit_curl -s -o /dev/null -w "A3 bad-token: %{http_code} (want 401)\n" \
   $BASE/cart/v1/private/cart -H "Authorization: Bearer x.y.z"
-audit_curl -s -o /dev/null -w "A3 no-token:  %{http_code} (want 401)\n" $BASE/cart/v1/private/cart
+audit_curl -s -w "\nA3 no-token:  %{http_code} (want 401, body 'Jwt is missing')\n" \
+  $BASE/cart/v1/private/cart
+audit_curl -s -o /dev/null -D - $BASE/cart/v1/private/cart | grep -i '^www-authenticate' \
+  | grep -q 'Bearer realm="http://localhost:8080/cart/v1/private/cart"' \
+  && echo "A3 challenge:  OK www-authenticate echoes the requested URL" \
+  || echo "A3 challenge:  FAIL missing/changed www-authenticate"
+audit_curl -s -o /dev/null -D - $BASE/cart/v1/private/cart \
+  -H "Authorization: Bearer x.y.z" | grep -i '^www-authenticate' \
+  | grep -q 'error="invalid_token"' \
+  && echo "A3 invalid:    OK error=\"invalid_token\" added when a token is present" \
+  || echo "A3 invalid:    FAIL no error=\"invalid_token\" on an unverifiable token"
 
-# A4. Refresh rotates; replaying the OLD token → 401 AND revokes the family
-R2=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' \
-  -d "{\"refresh_token\":\"$RT\"}")
+# A4. Refresh rotation and reuse detection, asserted against the realm's token
+#     endpoint — the realm owns this behaviour. `duynhlab` sets
+#     revokeRefreshToken=true + refreshTokenMaxReuse=0, so a replay is not merely
+#     refused: it kills the SESSION, and the rotated token that was still valid a
+#     moment ago dies with it. 400 invalid_grant (not 401) is the OAuth2 token
+#     endpoint's error contract, not an edge rejection.
+R2=$(audit_curl -s -X POST $KC/protocol/openid-connect/token \
+  -d grant_type=refresh_token -d client_id=customer-spa --data-urlencode "refresh_token=$RT")
 RT2=$(echo "$R2" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
-audit_curl -s -o /dev/null -w "A4 replay-old:      %{http_code} (want 401)\n" \
-  -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT\"}"
-audit_curl -s -o /dev/null -w "A4 family-revoked:  %{http_code} (want 401)\n" \
-  -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT2\"}"
+[ "$RT2" != "$RT" ] && echo "A4 rotated:         OK new refresh token" || echo "A4 rotated:         FAIL not rotated"
+# Replaying the consumed token: 400 + "Maximum allowed refresh token reuse exceeded".
+audit_curl -s -o /tmp/a4-replay -w "A4 replay-old:      %{http_code} (want 400)\n" \
+  -X POST $KC/protocol/openid-connect/token \
+  -d grant_type=refresh_token -d client_id=customer-spa --data-urlencode "refresh_token=$RT"
+grep -q 'Maximum allowed refresh token reuse exceeded' /tmp/a4-replay \
+  && echo "A4 replay reason:   OK reuse detected" \
+  || echo "A4 replay reason:   FAIL unexpected body: $(cat /tmp/a4-replay)"
+# CONFIRMED BEHAVIOUR: the replay above revokes the whole family, so RT2 — the
+# rotated token that worked seconds ago — is now dead too, with a DIFFERENT
+# reason: "Session doesn't have required client". Both sub-rows are required.
+audit_curl -s -X POST $KC/protocol/openid-connect/token \
+  -d grant_type=refresh_token -d client_id=customer-spa --data-urlencode "refresh_token=$RT2" \
+  -o /tmp/a4-family -w "A4 family-revoked:  %{http_code} (want 400 — the replay killed the session)\n"
+grep -q 'invalid_grant' /tmp/a4-family \
+  && echo "A4 family reason:   OK $(cat /tmp/a4-family)" \
+  || echo "A4 family-revoked:  FAIL the rotated token survived the replay"
 
-# A5. Logout revokes; idempotent; subsequent refresh dies
-R3=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}')
+# A5. Logout revokes the realm session; a later refresh dies. Keycloak's
+#     end-session endpoint answers 204 (no body) for a public client posting its
+#     refresh token, and is idempotent.
+R3=$(USERNAME=alice KC_OUTPUT=json $KCT)
 RT3=$(echo "$R3" | python3 -c "import json,sys;print(json.load(sys.stdin)['refresh_token'])")
-audit_curl -s -o /dev/null -w "A5 logout:          %{http_code} (want 200)\n" \
-  -X POST $BASE/auth/v1/public/auth/logout -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
-audit_curl -s -o /dev/null -w "A5 refresh-after:   %{http_code} (want 401)\n" \
-  -X POST $BASE/auth/v1/public/auth/refresh -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$RT3\"}"
+audit_curl -s -o /dev/null -w "A5 logout:          %{http_code} (want 204)\n" \
+  -X POST $KC/protocol/openid-connect/logout \
+  -d client_id=customer-spa --data-urlencode "refresh_token=$RT3"
+# CONFIRMED BEHAVIOUR: the replayed logout is 204, not 400 — the endpoint is
+# genuinely idempotent for an already-revoked token, so assert 204 both times.
+audit_curl -s -o /dev/null -w "A5 logout-replay:   %{http_code} (want 204 — idempotent)\n" \
+  -X POST $KC/protocol/openid-connect/logout \
+  -d client_id=customer-spa --data-urlencode "refresh_token=$RT3"
+# ...and the refresh afterwards dies with 400 "Session not active" — a different
+# reason from A4's reuse detection, because here the session was ended, not reused.
+audit_curl -s -o /tmp/a5-refresh -w "A5 refresh-after:   %{http_code} (want 400)\n" \
+  -X POST $KC/protocol/openid-connect/token \
+  -d grant_type=refresh_token -d client_id=customer-spa --data-urlencode "refresh_token=$RT3"
+grep -q 'Session not active' /tmp/a5-refresh \
+  && echo "A5 refresh reason:  OK session ended" \
+  || echo "A5 refresh reason:  FAIL unexpected body: $(cat /tmp/a5-refresh)"
 
-# A6. Removed surfaces stay removed
-audit_curl -s -o /dev/null -w "A6 /private/me:     %{http_code} (want 404 — route gone at Kong)\n" \
+# A6. Removed surfaces stay removed. auth-service is GONE from local-stack — no
+#     container, no Backend, no HTTPRoute, no database — so this row no longer
+#     inspects a table inside the `auth` database; it asserts the DATABASE itself
+#     is absent (it is dropped from postgres/init.sql). The retired token layer's
+#     cluster surface (apps/services/auth.yaml, the auth DB triplet, the ESO
+#     secrets) retires in RFC-0024 P5, which needs Kind; locally the end state is
+#     already what this gate runs against.
+audit_curl -s -o /dev/null -w "A6 /private/me:     %{http_code} (want 404 — no route matches at the edge)\n" \
   $BASE/auth/v1/private/me -H "Authorization: Bearer $AT"
-docker compose exec -T postgres psql -U postgres -d auth -c '\dt' </dev/null | grep -q sessions \
-  && echo "A6 FAIL: sessions table exists" || echo "A6 OK: no sessions table"
+docker compose exec -T postgres psql -U postgres -lqt </dev/null \
+  | cut -d'|' -f1 | tr -d ' ' | grep -qx auth \
+  && echo "A6 FAIL: the auth database still exists" \
+  || echo "A6 OK: no auth database"
 
 # A7. v3 collection-noun paths (ADR-017): new canonical 200 + deprecated
-#     aliases still answering during the expand phase (removed at contract)
+#     aliases still answering during the expand phase (removed at contract).
+#     Shipping only. The `POST /auth/v1/public/login` alias that used to be
+#     checked here is not "deprecated but serving" — it certified the retired
+#     token layer, and with auth-service gone from local-stack there is no
+#     backend and no route behind it. Nothing to expand-phase.
 audit_curl -s -o /dev/null -w "A7 shipments/track:     %{http_code} (want 200)\n" \
   "$BASE/shipping/v1/public/shipments/track?tracking_number=1Z999AA10123456784"
 audit_curl -s -o /dev/null -w "A7 shipments/estimate:  %{http_code} (want 200)\n" \
   "$BASE/shipping/v1/public/shipments/estimate?origin=HN&destination=SG&weight=1"
 audit_curl -s -o /dev/null -w "A7 alias track:         %{http_code} (want 200 — deprecated)\n" \
   "$BASE/shipping/v1/public/track?tracking_number=1Z999AA10123456784"
-audit_curl -s -o /dev/null -w "A7 alias login:         %{http_code} (want 200 — deprecated)\n" \
-  -X POST $BASE/auth/v1/public/login -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}'
 
 # A8. Renamed zero-caller internal paths are gone (no aliases kept):
 #     these are cluster-internal, so probe the service containers directly.
@@ -138,25 +324,34 @@ docker compose exec -T shipping wget -q -O /dev/null -S \
 # want: HTTP/1.1 404 (now /shipping/v1/internal/shipments/orders/:orderId)
 
 #     Then the other half of A8: an `/internal/` path that DOES exist must still
-#     be unreachable *through Kong*. Probe the two services whose routes were
+#     be unreachable *through the edge*. Probe the two services whose routes were
 #     once declared on a bare prefix — product's create needs no JWT at all, and
 #     cart's takes the user id from the path, so a wide prefix there lets any
-#     shopper's token clear another shopper's cart.
-audit_curl -s -o /dev/null -w "A8 product internal: %{http_code} (want 404 — not routed at the edge)\n" \
+#     shopper's token clear another shopper's cart. The 404 comes from "no
+#     HTTPRoute matches this path" — every route in gateway/eg/routes.yaml is
+#     audience-scoped — which is why the response is a 404 and not a 401.
+audit_curl -s -o /dev/null -w "A8 product internal: %{http_code} (want 404 — no route matches)\n" \
   -X POST $BASE/product/v1/internal/products -H 'Content-Type: application/json' -d '{}'
-audit_curl -s -o /dev/null -w "A8 cart internal:    %{http_code} (want 404 — not routed at the edge)\n" \
+audit_curl -s -o /dev/null -w "A8 cart internal:    %{http_code} (want 404 — no route matches)\n" \
   -X DELETE $BASE/cart/v1/internal/cart/1 -H "Authorization: Bearer $AT"
 
-# A9. Checkout sessions (RFC-0015 P1) — lifecycle through Kong edge-JWT.
+# A9. Checkout sessions (RFC-0015 P1) — lifecycle through the edge JWT filter.
 #     Cart must have at least one item (add via the SPA or cart API first).
-AT9=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+AT9=$(USERNAME=alice $KCT)
 audit_curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT9" \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null
-S9=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9")
+# The create is the row's FIRST status assertion, not just a way to get an id:
+# the documented lifecycle is 201 -> 200 -> 200 -> 200 and 201 is the only code
+# in it that is unique to creation, so an idempotent-adopt regression (200 on a
+# fresh session) has to be caught here or not at all.
+S9_RAW=$(audit_curl -s -w '\n%{http_code}' -X POST $BASE/checkout/v1/private/checkout/sessions \
+  -H "Authorization: Bearer $AT9")
+S9_CODE=${S9_RAW##*$'\n'}
+S9=${S9_RAW%$'\n'*}
+[ "$S9_CODE" = 201 ] && echo "A9 create:   201 OK" || echo "A9 create:   FAIL HTTP $S9_CODE (want 201) — $S9"
 SID=$(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-echo "A9 create:   session $SID ($(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])"))"
+echo "A9 session:  $SID ($(echo "$S9" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])"))"
 audit_curl -s -o /dev/null -w "A9 re-create: %{http_code} (want 200 — idempotent, same session)\n" \
   -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT9"
 audit_curl -s -o /dev/null -w "A9 get:       %{http_code} (want 200)\n" \
@@ -193,8 +388,7 @@ audit_curl -s -o /dev/null -w "A9 price-session cleanup: %{http_code} (want 200)
 # A10. Confirm handoff + abandonment (RFC-0015 P2). Full lifecycle: fresh
 #      session → address → shipping → payment → confirm (Idempotency-Key
 #      REQUIRED) → order created + fulfillment saga → replay = same order.
-AT0=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+AT0=$(USERNAME=alice $KCT)
 audit_curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT0" \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null
@@ -275,8 +469,7 @@ $TCLI workflow list --namespace mop -q "WorkflowId = 'order-fulfillment-$OID'" <
 
 # Abandonment (ADR-019): the DB deadline is the authority; the workflow timer
 # makes expiry proactive. Shorten the DB deadline and verify the outcome.
-AT1=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}' | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+AT1=$(USERNAME=alice $KCT)
 audit_curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT1" -H 'Content-Type: application/json' \
   -d '{"product_id":"2","product_name":"USB Hub","product_price":79.99,"quantity":1}' -o /dev/null
 SID2=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT1" | \
@@ -292,7 +485,7 @@ docker compose exec -T postgres psql -U postgres -d checkout -t -c \
 # want: expired | lazy (the read got there first) or timer (the worker did)
 
 # A11. Exercise the product-details fan-out so the full audit covers product,
-#      inventory, and review before trace coverage is evaluated in C5.
+#      inventory, and review before trace coverage is evaluated in C4/C6.
 audit_curl -s "$BASE/product/v1/public/products/1/details" | python3 -c "import json,sys; d=json.load(sys.stdin); \
   p=d.get('product') or {}; a=d.get('availability') or {}; reviews=d.get('reviews'); summary=d.get('reviews_summary') or {}; \
   ok=p.get('id')=='1' and a.get('available_to_promise') is not None and isinstance(reviews,list) and len(reviews)>0 and summary.get('total')==len(reviews); \
@@ -314,12 +507,21 @@ for _ in 1 2 3 4 5 6; do
   [ "$CST" = cancelled ] && break
 done
 echo "A12 status:   $CST (want cancelled; manual_review = a compensation did not converge)"
-# The workflow id carries the epoch — the orders.version the server read when it
-# accepted the cancel — so a second episode cannot replay the first one's outcome:
+# The dispatch row and the workflow id must AGREE. `cancellation_requests` is the
+# outbox: one row per order, status PENDING|DISPATCHED|FAILED, plus the `epoch` —
+# the orders.version the server read when it accepted the cancel. The workflow id
+# is `order-cancellation-<orderId>-v<epoch>`, so a second episode cannot replay
+# the first one's outcome. This used to print both and leave the comparison to the
+# reader; the comparison is the assertion, so it is made here.
+A12ROW=$(docker compose exec -T postgres psql -U postgres -d order -t -A -F, -c \
+  "SELECT status, epoch FROM cancellation_requests WHERE order_id = $OID" </dev/null | tr -d '[:space:]')
+echo "A12 outbox:   $A12ROW (want DISPATCHED,<epoch>)"
+case "$A12ROW" in DISPATCHED,*) ;; *) echo "A12 outbox:   FAIL not DISPATCHED" ;; esac
 $TCLI workflow list --namespace mop \
-  -q "WorkflowType = 'CancellationWorkflow'" </dev/null 2>/dev/null | head -3
-docker compose exec -T postgres psql -U postgres -d order -t -c \
-  "SELECT order_id, status, epoch FROM cancellation_requests ORDER BY order_id DESC LIMIT 1" </dev/null
+  -q "WorkflowType = 'CancellationWorkflow'" </dev/null 2>/dev/null \
+  | grep -q "order-cancellation-$OID-v${A12ROW##*,}" \
+  && echo "A12 epoch:    OK workflow id order-cancellation-$OID-v${A12ROW##*,} matches the outbox epoch" \
+  || echo "A12 epoch:    FAIL no CancellationWorkflow id carries the outbox epoch"
 
 # A13. The abandonment timer actually fires (ADR-019). A10 above only ever
 #      produces expired(lazy) — it moves the DB deadline, not the armed timer — so
@@ -329,12 +531,17 @@ docker compose exec -T postgres psql -U postgres -d order -t -c \
 #      proceeds, so arming it early costs no extra wall-clock.
 #      It needs its OWN user. One active session per user is a partial unique
 #      index, so A9/A10 would adopt this session and every mutation re-arms it.
-TU="audittimer$(date +%s)"
-audit_curl -s -o /dev/null -X POST $BASE/auth/v1/public/auth/register -H 'Content-Type: application/json' \
-  -d "{\"username\":\"$TU\",\"email\":\"$TU@example.com\",\"password\":\"password123\"}"
-TAT=$(audit_curl -s -X POST $BASE/auth/v1/public/auth/login -H 'Content-Type: application/json' \
-  -d "{\"username\":\"$TU\",\"password\":\"password123\"}" | \
-  python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+#      That user is `bob`, a seeded realm user — self-registration is gone with
+#      the identity cutover (the realm sets registrationAllowed=false and only an
+#      admin API call could create a user), and every other Phase A row is alice.
+#      Because the user is now a FIXED one, clear any session an earlier run left
+#      active first — otherwise the POST below adopts it and this row silently
+#      watches the previous run's timer.
+TAT=$(USERNAME=bob $KCT)
+OLD=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $TAT" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+[ -n "$OLD" ] && audit_curl -s -o /dev/null -X DELETE \
+  $BASE/checkout/v1/private/checkout/sessions/$OLD -H "Authorization: Bearer $TAT"
 audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $TAT" \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
@@ -362,6 +569,26 @@ AFTER=$($TCLI workflow list --namespace mop </dev/null 2>/dev/null | tail -n +2 
 echo "A14 executions: before=$BEFORE after=$AFTER (want equal and non-zero)"
 $TCLI workflow show --workflow-id "order-fulfillment-$OID" --namespace mop </dev/null 2>/dev/null | head -3
 # want: the same execution still listed, its history still readable
+
+# A16. STRING SUBJECTS REACH THE DATABASE (ADR-042). Numbered last but placed
+#      here, ahead of the CONDITIONAL A15, so a required row never sits behind an
+#      optional one. A1 proves the realm mints a
+#      string `sub`; this proves the whole chain honours it — edge JWT filter,
+#      pkg/authmw, handler, and the column type. A numeric-id regression anywhere
+#      would show up here as an integer-looking user_id or a 500, not as a
+#      token-shaped failure. Self-contained: it mints its own token, writes a cart
+#      row, and reads that row back out of PostgreSQL.
+AT16=$(USERNAME=carol $KCT)
+audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT16" \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
+docker compose exec -T postgres psql -U postgres -d cart -t -A -c \
+  "SELECT DISTINCT user_id FROM cart_items WHERE user_id = 'a11ce000-0000-4000-8000-000000000003'" </dev/null \
+  | grep -qx 'a11ce000-0000-4000-8000-000000000003' \
+  && echo "A16 OK cart.user_id is carol's realm UUID (string subject persisted)" \
+  || { echo "A16 FAIL — no row keyed by the realm sub; dump what did land:"; \
+       docker compose exec -T postgres psql -U postgres -d cart -c \
+         "SELECT user_id, product_id FROM cart_items ORDER BY id DESC LIMIT 5" </dev/null; }
 
 # A15. Worker Deployment Versioning drill (ADR-030). CONDITIONAL: run it when a
 #      change touches worker versioning, the saga's activity set, or the rollout
@@ -408,8 +635,14 @@ docker compose start order-worker
 $TCLI workflow list --namespace mop | awk 'NR>1 && $1=="Running"'   # want: no output
 ```
 
-> Rapid-fire auth calls can trip Kong's rate limit (429). That is the gateway
-> working, not a bug — wait a few seconds and retry the step.
+> A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
+> row cannot reach the limit, so a 429 means either the policy was tightened or
+> something is looping. Investigate before re-running.
+>
+> The access token minted in A1 stays usable for the whole phase even though A4
+> revokes its refresh-token family: a JWT is not checked against realm session
+> state, and the realm's `accessTokenLifespan` is 900s. If Phase A stretches past
+> ~15 minutes before A12, mint a fresh token rather than debugging a 401.
 >
 > A10 abandonment timing: the workflow timer arms for the session's FULL TTL
 > (default 30m) at creation; shortening `expires_at` in SQL afterwards only
@@ -421,70 +654,231 @@ $TCLI workflow list --namespace mop | awk 'NR>1 && $1=="Running"'   # want: no o
 >
 > A13 needs its own user. One active session per user is enforced by a partial
 > unique index, so running A9/A10 as the same user makes them adopt the watched
-> session, and every mutation re-arms its timer.
+> session, and every mutation re-arms its timer. Since the cutover that user is
+> the seeded realm user `bob` instead of a freshly registered one, which is why
+> A13 now clears bob's leftover session before arming.
 
-## Phase B — real browser (agent-browser, ~2 min)
+## Phase B — real browser (agent-browser, ~5 min)
+
+What Phase B proves that Phase A cannot: the SPA holds **no token of its own**.
+keycloak-js owns the token lifecycle in adapter memory, the browser never sees an
+in-app credential form, and every transition — sign-in, refresh, sign-out — is a
+realm endpoint the browser reaches directly, not a service route behind the edge.
+Storage-shaped regressions (a token cached "for convenience") and refresh
+regressions are invisible to curl and can only be caught here.
 
 `--args "--no-sandbox"` is required on Linux hosts with user-namespace
 restrictions (only needed on the first command of a session).
 
+Refs like `@e5` are **not stable** — they are assigned per snapshot and change on
+every navigation. Every block below re-snapshots before it clicks; do not carry a
+ref across a page load.
+
 ```bash
-S="--session audit"
+S="--session audit"      # bash only — see Preconditions
 
-# B1. Login through the UI, then verify what landed in localStorage
-agent-browser $S --args "--no-sandbox" batch "open http://localhost:3001/login" "wait 1500" "snapshot -i"
-# read the refs from the snapshot (username @eX, password @eY, Login button @eZ), then:
-agent-browser $S batch "fill @e8 alice" "fill @e9 password123" "click @e10" "wait 2000"
-agent-browser $S eval --stdin <<'EVALEOF'
-JSON.stringify({
-  access_is_jwt: (localStorage.getItem('authToken')||'').split('.').length === 3,
-  refresh_present: !!localStorage.getItem('authRefreshToken'),
-  user: JSON.parse(localStorage.getItem('authUser')||'null')?.username
-})
-EVALEOF
-# want: {"access_is_jwt":true,"refresh_present":true,"user":"alice"}
+# B1. LOGIN THROUGH THE REALM. The SPA has no password field: LoginPage renders
+#     one button that calls keycloak.login({redirectUri}), which is a FULL-PAGE
+#     redirect to the realm. The credentials are typed on Keycloak's own page at
+#     localhost:8081, so the assertion is partly about the ORIGIN CHANGING.
+agent-browser $S --args "--no-sandbox" batch \
+  "open http://localhost:3001" "wait 2500" "snapshot -i"
+# Compose gives `frontend` only `service_started` on the gateway, so on a freshly
+# recreated stack the SPA can load a few seconds before the edge accepts
+# requests. A first paint with failed API calls is a RETRY, not a failure:
+# reload and re-snapshot. Then click the nav "Login" link, using the ref THAT
+# snapshot gave it (it was @e5 on the run this was written from — read your own):
+agent-browser $S batch "click @e5" "wait 1500" "get url" "snapshot -i"
+# want url http://localhost:3001/login and a single "Sign in with Keycloak" button.
+# Take its ref from the snapshot just printed — it is a different element that
+# also happened to be @e5 here, which is exactly why refs must be re-read:
+agent-browser $S batch "click @e5" "wait 3000" "get url" "snapshot -i"
+# ASSERTION 1 — the origin changed. `get url` must now be
+#   http://localhost:8081/realms/duynhlab/protocol/openid-connect/auth?...
+#   ...response_type=code&code_challenge_method=S256...
+# and the snapshot must show Keycloak's own form: "Username or email",
+# "Password", "Sign In". A password field served from :3001 is a FAILED row.
+agent-browser $S batch "fill @e2 alice" "fill @e4 password123" "click @e3" \
+  "wait 3000" "get url"
+# want: back on http://localhost:3001/ (the realm redirect_uri is the SPA root)
+agent-browser $S snapshot -i | grep -E 'Logout|Orders|Profile'
+# ASSERTION 2 — signed-in state: the nav carries Cart/Checkout/Orders/
+# Notifications/Profile/Logout instead of a Login link.
 
-# B2. SILENT REFRESH under fault injection — corrupt the JWT signature, then
-#     load a private page. The interceptor must refresh + retry, not bounce to /login.
+# ASSERTION 3 — NO TOKEN IN WEB STORAGE. Enumerate BOTH storages and assert that
+# nothing in either one is JWT-shaped. On this build both are entirely empty
+# after login; the assertion is written against the values, not against known key
+# names, because the point is that no key holds a token whatever it is called.
+agent-browser $S storage local get
+agent-browser $S storage session get
 agent-browser $S eval --stdin <<'EVALEOF'
-(() => { const p = localStorage.getItem('authToken').split('.');
-  p[2] = p[2].slice(0,-5) + 'AAAAA'; localStorage.setItem('authToken', p.join('.'));
-  return 'token corrupted'; })()
+(() => {
+  const jwtish = v => typeof v === 'string' && v.split('.').length === 3
+    && /^[A-Za-z0-9_-]{16,}$/.test(v.split('.')[0]);
+  const scan = s => Object.keys(s).filter(k => jwtish(s.getItem(k)));
+  return JSON.stringify({
+    local_keys: Object.keys(localStorage),
+    session_keys: Object.keys(sessionStorage),
+    local_jwtish: scan(localStorage),
+    session_jwtish: scan(sessionStorage)
+  });
+})()
 EVALEOF
-agent-browser $S batch "open http://localhost:3001/orders" "wait 3000"
-agent-browser $S eval --stdin <<'EVALEOF'
-JSON.stringify({
-  token_recovered: !(localStorage.getItem('authToken')||'').endsWith('AAAAA'),
-  bounced_to_login: window.location.pathname.includes('login')
-})
-EVALEOF
-# want: {"token_recovered":true,"bounced_to_login":false}
-agent-browser $S network requests --type xhr,fetch | grep -E "refresh|401|200" | tail -8
-# want this exact shape (single-flight: N concurrent 401s -> ONE refresh -> retries 200):
-#   GET  .../private/...              401
-#   GET  .../private/...              401
-#   POST /auth/v1/public/auth/refresh      200      <-- exactly one
-#   GET  .../private/...              200
-#   GET  .../private/...              200
+# want: local_jwtish [] and session_jwtish [] — a non-empty list is a FAILED row.
+# Transient kc-callback-* entries in sessionStorage would hold OIDC state (state,
+# nonce, PKCE verifier), never a token, and keycloak-js removes them after the
+# redirect is parsed; they are not JWT-shaped and so cannot pass this filter.
 
-# B3. Logout via the UI revokes server-side and clears the client
-agent-browser $S snapshot -i          # find the Logout button ref
-agent-browser $S batch "click @e13" "wait 2000"
-agent-browser $S eval 'JSON.stringify({cleared: !localStorage.getItem("authToken") && !localStorage.getItem("authRefreshToken"), path: location.pathname})'
-agent-browser $S network requests --method POST | grep logout   # want: .../public/auth/logout ... 200
+# ASSERTION 4 — the token actually in use is the realm's. The access token lives
+# in adapter memory, so it is read from the code-exchange RESPONSE captured in
+# the network log instead of from storage.
+RID=$(agent-browser $S network requests --type fetch --json | python3 -c "
+import json,sys
+rs = json.load(sys.stdin)['data']['requests']
+tok = [r for r in rs if r['method']=='POST' and r['url'].endswith('/protocol/openid-connect/token')]
+print(tok[-1]['requestId'] if tok else '')")
+agent-browser $S network request "$RID" --json | python3 -c "
+import base64, json, sys, urllib.parse
+d = json.load(sys.stdin)['data']
+grant = dict(urllib.parse.parse_qsl(d['postData'])).get('grant_type')
+body = json.loads(d['responseBody'])
+p = body['access_token'].split('.')[1]
+c = json.loads(base64.urlsafe_b64decode(p + '=' * (-len(p) % 4)))
+assert grant == 'authorization_code', grant
+assert c['iss'] == 'http://localhost:8081/realms/duynhlab', c['iss']
+assert isinstance(c['sub'], str) and len(c['sub']) == 36, (type(c['sub']), c['sub'])
+assert 'refresh_token' in body, sorted(body)
+print('B1 OK grant=%s iss=%s sub=%s (str uuid); refresh_token stayed in the response body' \
+      % (grant, c['iss'], c['sub']))"
+
+# B2. ADAPTER REFRESH. src/api/client.js calls updateToken(30) BEFORE every
+#     request, so the refresh is pre-emptive: there is no 401-then-retry shape to
+#     observe any more. To see a refresh inside a bounded window, make the access
+#     token short-lived for the duration of this row via a CLIENT-LEVEL override
+#     (the realm default is 900s), then restore it. The alternative is waiting
+#     ~14.5 minutes.
+KCA=http://localhost:8081
+ADM=$(curl -s -X POST $KCA/realms/master/protocol/openid-connect/token \
+  -d client_id=admin-cli -d username=admin -d password=admin -d grant_type=password \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+CID=$(curl -s -H "Authorization: Bearer $ADM" \
+  "$KCA/admin/realms/duynhlab/clients?clientId=customer-spa" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)[0]['id'])")
+curl -s -o /dev/null -w "B2 lifespan 60s: %{http_code} (want 204)\n" -X PUT \
+  -H "Authorization: Bearer $ADM" -H 'Content-Type: application/json' \
+  "$KCA/admin/realms/duynhlab/clients/$CID" -d '{"attributes":{"access.token.lifespan":"60"}}'
+# Reload so the SSO session mints a 60s token (init runs check-sso, no re-login),
+# clear the log, then let the token become due before touching a private page.
+agent-browser $S batch "reload" "wait 3000" "get url"
+agent-browser $S network requests --clear
+sleep 35
+agent-browser $S batch "open http://localhost:3001/orders" "wait 4000" "get url"
+# want: still http://localhost:3001/orders — NOT /login
+# The request list does not carry post bodies, so the grant type comes from the
+# per-request detail. Classify every token POST in the window:
+for id in $(agent-browser $S network requests --type fetch --json | python3 -c "
+import json,sys
+rs = json.load(sys.stdin)['data']['requests']
+print(' '.join(r['requestId'] for r in rs
+                if r['method']=='POST' and r['url'].endswith('/openid-connect/token')))"); do
+  agent-browser $S network request "$id" --json | python3 -c "
+import json,sys,urllib.parse
+d = json.load(sys.stdin)['data']
+print('B2 grant:', dict(urllib.parse.parse_qsl(d['postData'])).get('grant_type'))"
+done | sort | uniq -c
+agent-browser $S network requests --type xhr --json | python3 -c "
+import json,sys,collections
+rs = json.load(sys.stdin)['data']['requests']
+api = collections.Counter(r.get('status') for r in rs if ':8080/' in r['url'])
+print('B2 api statuses:', dict(api))
+raise SystemExit(0 if api and set(api) <= {200} else 1)"
+# want: exactly `1 B2 grant: authorization_code` + `1 B2 grant: refresh_token`,
+# and api statuses {200: N}.
+#   - EXACTLY ONE refresh_token grant: keycloak-js single-flights concurrent
+#     updateToken callers, so the page's parallel private calls share one refresh.
+#   - the ONE authorization_code grant is the full page load's check-sso exchange
+#     and is expected — count grants, not token POSTs.
+#   - a SECOND refresh_token grant means the window was left open long enough for
+#     the polling widgets to age the 60s token out again; clear and redo the row.
+# RESTORE THE LIFESPAN. Do not leave the override on the client — it survives
+# nothing (down -v drops it) but it will skew B3 and any later manual poking.
+curl -s -o /dev/null -w "B2 lifespan restored: %{http_code} (want 204)\n" -X PUT \
+  -H "Authorization: Bearer $ADM" -H 'Content-Type: application/json' \
+  "$KCA/admin/realms/duynhlab/clients/$CID" -d '{"attributes":{"access.token.lifespan":""}}'
+
+# B3. LOGOUT VIA THE REALM'S END-SESSION ENDPOINT. keycloak.logout() is a GET
+#     redirect to the realm, not a POST to any service — no service participates
+#     in sign-out at all, which is the thing to verify.
+agent-browser $S network requests --clear
+agent-browser $S snapshot -i | grep -i 'button "Logout"'   # take the fresh ref
+agent-browser $S batch "click @e14" "wait 3500" "get url"
+# want: back on http://localhost:3001/
+agent-browser $S network requests | grep 'openid-connect/logout'
+# want ONE line: GET http://localhost:8081/realms/duynhlab/protocol/openid-connect/logout
+#   ?client_id=customer-spa&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3001
+#   &id_token_hint=... (Document)
+agent-browser $S network requests --method POST | grep -Ei 'logout|:8080/' \
+  && echo "B3 FAIL: sign-out touched a service" \
+  || echo "B3 OK: no POST to any service during logout"
+agent-browser $S snapshot -i | grep -E 'Login|Logout'
+# want a "Login" link and NO "Logout" button
+agent-browser $S batch "open http://localhost:3001/orders" "wait 3000" "get url"
+# want http://localhost:3001/login?returnTo=%2Forders — the guard redirects, and
+# the page must NOT render a stale order list from before the logout.
+agent-browser $S storage local get     # want: No storage entries
+agent-browser $S storage session get   # want: No storage entries
 
 # B4. Cleanup
 agent-browser $S close
 ```
 
-## Phase C — telemetry sanity (curl + PromQL, ~2 min)
+## Phase C — telemetry sanity (curl + PromQL + LogsQL + SQL, ~6 min)
 
-The stack ships the full RFC-0014/0017 telemetry pipeline; a change can pass
-A+B and still silently break it. Counters lag the flow by **~30–45s**
-(15s OTLP export + async saga) — always wait before reading.
+The stack ships the full RFC-0014/0017/0019 telemetry pipeline, and a change can
+pass A+B while silently breaking any leg of it. Phase C therefore walks **every**
+leg — four signals, five stores, six export paths — rather than sampling one
+query per backend. It is run **after** Phase A, because most of what it reads is
+produced by Phase A's flow.
+
+Three things to hold in mind before the first query:
+
+- **Wait 30–45 seconds after the last driven request.** The services export OTLP
+  on a 15s interval, the spanmetrics connector flushes on 15s, and the
+  fulfillment saga is asynchronous. Every row below inherits this lag; a row that
+  reads empty inside that window is *pending*, not failed. The lookback windows
+  are **45 minutes** for the same reason in reverse: Phase A takes about ten
+  minutes and Phase B another five, so a 15-minute window would drop A1–A10 out
+  of range and make a healthy stack look uninstrumented.
+- **The edge is the trace root now.** Envoy is the first span of every
+  browser/curl-driven trace, so C2 and C3 are the rows that prove the trace
+  actually starts where the request entered the platform.
+- **Two things are deliberately out of scope, and neither was forgotten.**
+  Envoy's own Prometheus endpoint and its admin interface are unreachable from
+  the host: the compose stack publishes only `8080` (proxy) and `8099` (control
+  plane `/readyz`), the admin listener binds inside the container, and nothing
+  scrapes proxy stats locally because there is no VMAgent here. The
+  `EnvoyProxy` CR's `metrics.prometheus: {}` records intent and keeps the local
+  and cluster CRs comparable — it is not a local signal. Likewise the
+  collector's OTLP **gRPC** receiver on `:4317` is not published; it is reachable
+  only from inside the compose network, which is exactly what the edge needs and
+  why no host-side generator can stand in for it.
 
 ```bash
-VM=http://localhost:8428
+VM=http://localhost:8428/api/v1/query                     # VictoriaMetrics
+VL=http://localhost:9428/select/logsql/query              # VictoriaLogs (LogsQL)
+VT=http://localhost:10428/select/jaeger/api               # VictoriaTraces, Jaeger-compatible API
+CH=http://localhost:8123/                                 # ClickHouse (-u default:otel, db otel)
+GRAF=http://localhost:3002                                # Grafana (anonymous Admin, no auth)
+EDGE=platform.envoy-gateway-system                        # see C2 — discover, do not assume
+
+# Drive ONE request with a unique marker. Several rows below need to point at a
+# specific request rather than "some traffic", and the edge span records the full
+# URL including the query string, so a tagged public route is the cheapest handle
+# that reaches traces AND access logs.
+TAG=$(date +%s)
+curl -s -o /dev/null -w "C0 tagged request: %{http_code} (want 200)\n" \
+  "http://localhost:8080/product/v1/public/products?audit=$TAG"
+sleep 45
 
 # C1. Pipeline health — the collector must not be dropping data
 #     (compose service name — there is no `otel-collector` container_name)
@@ -492,101 +886,413 @@ docker compose logs --since 10m otel-collector 2>&1 \
   | grep -ciE 'export.*fail|"level":"error"|\terror\t' \
   | xargs -I{} sh -c '[ {} -eq 0 ] && echo "C1 OK collector clean" || echo "C1 FAIL: {} error lines"'
 
-# C2. Business counters move with the flow (run a checkout first, wait 45s):
-#     the three ends of the saga should agree — confirmed = saga = authorized.
+# ---- TRACES ----------------------------------------------------------------
+
+# C2. THE EDGE SPAN EXISTS AND IS THE TRACE ROOT. The most important row in this
+#     phase: it is the only proof that the edge is still a span producer. The edge
+#     does not set `service.name` explicitly anywhere in gateway/eg/ — Envoy
+#     Gateway derives it from the Gateway's identity as `<gateway>.<namespace>`,
+#     which for gateway/eg/gateway.yaml plus the file provider's default namespace
+#     is `platform.envoy-gateway-system`. DISCOVER it rather than trusting this
+#     line: the derivation is upstream behaviour and a rename of the Gateway
+#     changes it.
+FOUND=$(curl -s "$CH" -u default:otel --data-binary "
+  SELECT DISTINCT ServiceName FROM otel.otel_traces
+  WHERE Timestamp > now() - INTERVAL 45 MINUTE
+    AND ServiceName NOT IN ('user','product','inventory','cart','order','review',
+                            'shipping','notification','payment','checkout','mockpay')
+  FORMAT TSV" | tr -d '[:space:]')
+echo "C2 discovered edge service.name: '${FOUND:-<none>}' (expected '$EDGE')"
+[ -n "$FOUND" ] || echo "C2 FAIL: the edge is emitting no spans — run the isolation steps below"
+[ "$FOUND" = "$EDGE" ] || echo "C2 NOTE: unexpected value — see the two readings below"
+# Two readings for a mismatch, and they need different fixes:
+#   * the Gateway was renamed, so the derived name changed -> record the new value
+#     in the evidence table and carry on.
+#   * a service that should not be running is emitting spans. `auth` appearing
+#     here means a removed auth-service container is still up.
+EDGE=${FOUND:-$EDGE}     # every row below uses what was actually found
+
+# The strong assertion: the ROOT span of the request driven above belongs to the
+# edge, not to a service. Root == ParentSpanId = ''.
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT ServiceName, SpanName, SpanKind, ParentSpanId = '' AS is_root
+  FROM otel.otel_traces
+  WHERE SpanAttributes['http.url'] LIKE '%audit=$TAG%'
+  FORMAT TSV"
+# want exactly one row: the value of $EDGE, then `ingress`, `Server`, `1`
+# A service name here, or is_root=0, means the trace no longer starts at the edge.
+
+# Fallback identity check, independent of the derived name: the EnvoyProxy CR
+# tags every edge span with a literal customTag, so this counts edge spans even
+# if the service name changed.
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT count() FROM otel.otel_traces
+  WHERE Timestamp > now() - INTERVAL 45 MINUTE
+    AND SpanAttributes['deployment.environment.name'] = 'local'
+  FORMAT TSV"
+# want > 0
+
+# ISOLATION when C2 is empty, in this order:
+#   1. docker compose logs gateway 2>&1 | grep 'failed to find envoyproxy'
+#      — a hit means the EnvoyProxy CR never attached, so tracing was never
+#      configured. The edge still answers 200; only this row notices.
+#   2. docker compose logs otel-collector — it logs its receivers at startup
+#      ("Starting GRPC server ... endpoint [::]:4317"). If that line is absent the
+#      edge had nowhere to export to. `:4317` is not published to the host, so
+#      there is no host-side telemetrygen shortcut here; the logs are the check.
+
+# C3. TRACE CONTINUITY edge -> service. One TraceId, two or more service names
+#     including the edge, and the service's span PARENTED (non-empty
+#     ParentSpanId) — i.e. traceparent survived the hop, rather than the service
+#     starting a second, disconnected trace.
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT ServiceName, SpanName, SpanKind, ParentSpanId != '' AS has_parent
+  FROM otel.otel_traces
+  WHERE TraceId = (SELECT TraceId FROM otel.otel_traces
+                   WHERE SpanAttributes['http.url'] LIKE '%audit=$TAG%' LIMIT 1)
+  ORDER BY Timestamp
+  FORMAT TSV"
+# want: the edge's `ingress` (has_parent 0) then its `router ... egress` client
+# span, then the service's Server span with has_parent 1, then that service's
+# internal/client spans. Two roots, or a service Server span with has_parent 0,
+# is a broken propagation chain.
+
+# C4. PER-SERVICE SPAN COVERAGE, with the server/client split. Row counts alone
+#     hide the interesting failure — a service that only ever appears as someone
+#     else's CLIENT span is not instrumented on its own inbound path.
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT ServiceName, count() AS spans, countIf(SpanKind = 'Server') AS server_spans
+  FROM otel.otel_traces
+  WHERE Timestamp > now() - INTERVAL 45 MINUTE
+  GROUP BY ServiceName ORDER BY spans DESC
+  FORMAT TSV"
+# want every service driven by Phase A present with server_spans > 0, plus $EDGE.
+
+# C5. ClickHouse (RFC-0019 Phase B) ingested OTLP logs AND traces.
+#     otel_logs/otel_traces are auto-created by the collector's clickhouse exporter.
+for t in otel_traces otel_logs; do
+  N=$(curl -s "$CH" -u default:otel --data-binary "SELECT count() FROM otel.$t" 2>/dev/null | tr -d '[:space:]')
+  { [ -n "$N" ] && [ "$N" -gt 0 ] 2>/dev/null && echo "C5 $t: $N rows OK"; } \
+    || echo "C5 $t: ${N:-0} rows FAIL (ingest lag? exporter/plugin?)"
+done
+
+# C6. Trace coverage for the whole local fleet, read from VictoriaTraces'
+#     JAEGER-COMPATIBLE QUERY API. There is no Jaeger container in this stack —
+#     VictoriaTraces serves this API shape so Grafana's `jaeger` datasource type
+#     can query it.
+#
+#     The required set is the TEN application services local-stack runs plus the
+#     EDGE, which is a first-class traced participant now that it is the trace
+#     root. `auth` is deliberately absent: auth-service is removed from
+#     local-stack (its cluster surface retires in RFC-0024 P5), so nothing calls
+#     it and its presence here would be the bug. `mockpay` shows up too and is
+#     legitimate — the provider stub calls back into the edge — but it is not part
+#     of the application fleet, so it is not required.
+curl -s "$VT/services" | python3 -c "
+import json,sys
+actual = set(json.load(sys.stdin)['data'])
+required = {'user','product','inventory','cart','order','review','shipping',
+            'notification','payment','checkout','$EDGE'}
+missing = sorted(required - actual)
+print('C6 traced services:', 'OK all 10 services + edge' if not missing else 'FAIL missing=' + ','.join(missing))
+print('C6 also present (expected, not required):', sorted(actual - required))
+if 'auth' in actual: print('C6 NOTE: auth is traced — auth-service should be gone from local-stack')
+raise SystemExit(1 if missing else 0)"
+# `inventory` appears only via its east-west gRPC callers, so this row is not
+# meaningful before Phase A has run in full.
+
+# ---- METRICS ---------------------------------------------------------------
+
+# C7. spanmetrics / RED leg: the collector's spanmetrics connector derived
+#     metrics FROM the traces above and remote-wrote them to VictoriaMetrics.
+#     This is a different export path from every other metric in this phase
+#     (prometheusremotewrite, not VM's OTLP ingest), so it fails independently.
+curl -s "$VM" --data-urlencode 'query=sum(spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"})' \
+  | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+    v=float(r[0]['value'][1]) if r else 0; \
+    print('C7 spanmetrics_calls_total:', 'OK %g' % v if v > 0 else 'FAIL no server calls')"
+curl -s "$VM" --data-urlencode 'query=count(spanmetrics_duration_milliseconds_bucket)' \
+  | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+    print('C7 duration buckets:', r[0]['value'][1] + ' series' if r else 'FAIL absent')"
+# Bonus check worth reading: the edge appears here as a service too —
+#   sum by (service_name) (spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"})
+# lists $EDGE alongside the applications.
+
+# C8. App semconv metrics leg — the services' own OTLP metrics into VM's native
+#     OTLP ingest, renamed to PromQL style by VM. Separate pipeline from the
+#     business counters in C9 and from spanmetrics in C7.
+for q in 'sum(http_server_request_duration_seconds_count)' \
+         'sum(rpc_server_call_duration_seconds_count{service_name="inventory"})' \
+         'count(go_goroutine_count)'; do
+  curl -s "$VM" --data-urlencode "query=$q" \
+    | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+      print('C8', '$q', '=>', r[0]['value'][1] if r else 'NO SERIES — FAIL')"
+done
+# The `inventory` row carries weight beyond itself: inventory is gRPC-only with no
+# edge route, so `rpc_server_call_duration_seconds_count` is the ONLY metrics
+# evidence that it is instrumented at all. `go_goroutine_count` proves the runtime
+# instrumentation leg (12 series on a full stack = one per instrumented process).
+
+# C9. Business counters move with the flow: the three ends of the saga should
+#     agree — confirmed = saga = authorized.
 #
 #     These are per-process counters, so equality only holds while no process has
 #     restarted. A14 restarts `temporal` and A15 restarts `order-worker`, which
 #     resets the saga counter to 0 — after either row, `order_saga_outcome_total`
 #     counts only the sagas driven SINCE that restart and will read lower than
-#     checkout's and payment's. That is arithmetic, not a failure. Either run C2
+#     checkout's and payment's. That is arithmetic, not a failure. Either run C9
 #     before A14/A15, or settle it with the durable evidence: every
 #     `OrderFulfillmentWorkflow` execution `Completed` and every confirmed order
 #     reaching `completed`.
 for m in checkout_sessions_confirmed_total 'order_saga_outcome_total{outcome="confirmed"}' \
          'payment_authorization_total{result="authorized"}'; do
-  curl -s "$VM/api/v1/query" --data-urlencode "query=sum($m)" \
+  curl -s "$VM" --data-urlencode "query=sum($m)" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
-      print('C2', '$m'.split('{')[0], '=', r[0]['value'][1] if r else 'NO SERIES')"
+      print('C9', '$m'.split('{')[0], '=', r[0]['value'][1] if r else 'NO SERIES')"
+done
+# Do NOT extend this loop with `auth_*` counters. Since the identity cutover the
+# realm performs authentication, so those series may legitimately never exist;
+# asserting them would fail a healthy stack.
+
+# C10. Temporal SDK metrics — the worker processes' own instrumentation, a leg
+#      that no other row touches. Absent series here means obsx wired the SDK
+#      without its metrics handler, which is invisible everywhere else.
+for q in 'count(temporal_workflow_endtoend_latency_seconds_bucket)' \
+         'sum(temporal_activity_execution_latency_seconds_count)'; do
+  curl -s "$VM" --data-urlencode "query=$q" \
+    | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+      print('C10', '$q', '=>', r[0]['value'][1] if r else 'NO SERIES — FAIL')"
 done
 
-# C3. DB client telemetry sane (RFC-0017 W4 — needs pkg >= v0.24.0 in the
-#     services): query p95 must be a real number, not bucket-collapse garbage.
-curl -s "$VM/api/v1/query" --data-urlencode \
+# C11. DB client telemetry sane (RFC-0017 W4 — needs pkg >= v0.24.0 in the
+#      services): query p95 must be a real number, not bucket-collapse garbage.
+curl -s "$VM" --data-urlencode \
   'query=histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_seconds_bucket{pgx_operation_type="query"}[5m])))' \
   | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
     v=float(r[0]['value'][1]) if r else None; \
-    print('C3 DB p95:', 'OK %.2fms' % (v*1000) if v and v < 0.5 else f'FAIL {v} (collapsed buckets? old pkg?)')"
+    print('C11 DB p95:', 'OK %.2fms' % (v*1000) if v and v < 0.5 else f'FAIL {v} (collapsed buckets? old pkg?)')"
 
-# C4. Main + ClickHouse-suite dashboards load with no datasource/parse errors
+# ---- LOGS ------------------------------------------------------------------
+#
+# VictoriaLogs holds TWO independent ingest legs and they are told apart by their
+# STREAM FIELD, which is the only reliable discriminator:
+#   * OTLP leg  — the Go services' otelzap tee -> collector -> VictoriaLogs. The
+#     collector's `VL-Stream-Fields: service.name` header makes `service.name` the
+#     stream identity, so these streams are `_stream:{"service.name"="cart"}`.
+#   * Vector leg — `docker_logs` tails container stdout for everything WITHOUT an
+#     OTel SDK (the edge, infra, the SPA) and ships with
+#     `_stream_fields=service,container_name`, so these streams are
+#     `_stream:{service="gateway"}`.
+# `checkout`, `checkout-worker`, `inventory` and `mockpay` are NOT in Vector's
+# exclude list, so their lines land TWICE — once per leg, under different stream
+# fields. That duplication is by design; it is not a regression to chase.
+
+# C12. App logs, OTLP leg.
+curl -s "$VL" --data-urlencode 'query=_time:45m _stream:{"service.name"="cart"} | count()'
+# want a non-zero count(*). Enumerate the whole leg with:
+curl -s http://localhost:9428/select/logsql/stream_field_values \
+  --data-urlencode 'query=_time:45m' --data-urlencode 'field=service.name'
+# want every service Phase A drove.
+
+# C13. EDGE ACCESS LOGS, Vector leg. The second-most important row in this phase:
+#      the edge's JSON access log is the only structured record of what the edge
+#      did, and the field set is contracted in gateway/eg/envoyproxy.yaml.
+#
+#      `_stream:{service="gateway"}` alone is NOT enough — that same stream also
+#      carries the control plane's own debug logs (xDS snapshots, JWKS fetches),
+#      which are far more numerous. `upstream_cluster` and `route_name` exist only
+#      on access-log lines, so requiring both is the discriminator.
+curl -s "$VL" --data-urlencode \
+  'query=_time:45m _stream:{service="gateway"} upstream_cluster:* route_name:* | count()'
+# want a non-zero count(*). Then pin the specific request driven in C0:
+curl -s "$VL" --data-urlencode \
+  "query=_time:45m _stream:{service=\"gateway\"} upstream_cluster:* uri:\"audit=$TAG\"" \
+  --data-urlencode 'limit=1'
+# want ONE line, whose `_stream` is {container_name="local-stack-gateway-1",
+# service="gateway"} and whose parsed fields are the CR's contract:
+#   uri=/product/v1/public/products?audit=$TAG  status=200  method=GET
+#   host=localhost:8080  upstream_cluster=httproute/envoy-gateway-system/api-product/rule/0
+#   route_name=.../match/0/*  upstream=<ip:8080>  duration=<ms>  request_id=<uuid>
+# Read those FIELD NAMES, not just the values: with the EnvoyProxy CR unattached
+# Envoy falls back to its built-in JSON, which reports the same facts as
+# `x-envoy-origin-path`, `response_code` and `upstream_host` — every Vector-parsed
+# edge panel breaks on that rename while this row would still find "a log line".
+
+# C14. Vector is tailing NON-app containers too — the half of the log estate that
+#      has no OTel SDK at all. `frontend` is the right witness: it is the SPA's
+#      web server, so Phase B guarantees it produced lines, and nothing but Vector
+#      can carry them.
+curl -s "$VL" --data-urlencode 'query=_time:45m _stream:{service="frontend"} | count()'
+# want a non-zero count(*). Enumerate the whole leg to see who else is covered:
+curl -s http://localhost:9428/select/logsql/stream_field_values \
+  --data-urlencode 'query=_time:45m' --data-urlencode 'field=service'
+# expect the chatty infra containers (otel-collector, pyroscope, grafana, postgres)
+# plus gateway, frontend, and the double-shipped app containers. A QUIET container
+# is a bad witness, not a failure: `temporal` logs almost nothing once it is up, so
+# an empty `_stream:{service="temporal"}` proves nothing either way.
+# C13 + C14 both empty, with `service.name` streams healthy, is ONE failure, not
+# two: the Vector leg is down. `docker compose logs vector` names the cause; under
+# podman `Socket not found: /var/run/docker.sock` means the stack was brought up
+# WITHOUT compose.podman.yaml, and the fix is a re-bring-up with the overlay, not
+# a restart (see the container-runtime note in Preconditions).
+
+# C15. LOG <-> TRACE CORRELATION. A log line that carries its TraceId is what
+#      makes "jump from this log to that trace" work in Grafana; without it both
+#      stores are populated and still useless together.
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT count() AS logs, countIf(TraceId != '') AS correlated
+  FROM otel.otel_logs WHERE Timestamp > now() - INTERVAL 45 MINUTE
+  FORMAT TSV"
+# want correlated > 0. The same field is queryable on the VictoriaLogs side as a
+# regular (non-stream) field: `_time:45m _stream:{"service.name"="cart"} trace_id:*`
+
+# ---- PROFILES -------------------------------------------------------------
+
+# C16. Pyroscope has profiles for the services Phase A drove. The HTTP surface is
+#      Pyroscope's Connect-RPC querier: POST, JSON body, no query string — and it
+#      REQUIRES an explicit millisecond time range, answering
+#      `{"code":"invalid_argument","message":"missing time range in the query"}`
+#      without one. (The GET `/pyroscope/label-values` shape returns 400 on this
+#      build however `label`/`name` are spelled — do not use it.)
+curl -s -X POST 'http://localhost:4040/querier.v1.QuerierService/LabelValues' \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"service_name\",\"matchers\":[\"{}\"],\"start\":$(((`date +%s`-3600)*1000)),\"end\":$((`date +%s`*1000))}" \
+  | python3 -c "import json,sys; got=set(json.load(sys.stdin)['names']); \
+  required={'user','product','inventory','cart','order','review','shipping','notification','payment','checkout'}; \
+  missing=sorted(required-got); print('C16 profiled services:', 'OK all 10' if not missing else 'FAIL missing='+','.join(missing)); \
+  print('C16 also present:', sorted(got-required)); \
+  raise SystemExit(1 if missing else 0)"
+# `pyroscope` itself appears in that list (it profiles its own process) — expected.
+# `auth` must NOT appear: the profiler shipped with auth-service, which is gone
+# from local-stack. A stale `auth` here means a leftover container is running.
+# Equivalent through Grafana, useful when checking the datasource path rather than
+# the store: POST $GRAF/api/datasources/proxy/uid/pyroscope/querier.v1.QuerierService/LabelValues
+
+# ---- GRAFANA --------------------------------------------------------------
+
+# C17. Every datasource resolves to the expected uid/type AND answers a health
+#      probe. Grafana runs with anonymous Admin locally, so no auth is needed.
+curl -s "$GRAF/api/datasources" | python3 -c "
+import json,sys
+want = {'victoriametrics':'prometheus','victoriatraces':'jaeger',
+        'clickhouse':'grafana-clickhouse-datasource','pyroscope':'grafana-pyroscope-datasource'}
+got = {d['uid']: d['type'] for d in json.load(sys.stdin)}
+print('C17 datasources:', 'OK' if got == want else f'FAIL got={got}')
+raise SystemExit(0 if got == want else 1)"
+for u in victoriametrics victoriatraces clickhouse pyroscope; do
+  printf 'C17 %-16s ' "$u"
+  curl -s "$GRAF/api/datasources/uid/$u/health" \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['status'], '-', d['message'])"
+done
+# want status OK on all four.
+
+# C18. The provisioned dashboard inventory is complete and every dashboard object
+#      still parses.
+curl -s "$GRAF/api/search?type=dash-db" | python3 -c "
+import json,sys
+want = {'microservices-otel-local','business-otel-local','temporal-worker-local','red-spanmetrics',
+        'clickhouse-otel-sql','clickhouse-service-deepdive','clickhouse-otel-overview',
+        'clickhouse-logs-explorer','clickhouse-traces-explorer'}
+got = {d['uid'] for d in json.load(sys.stdin)}
+print('C18 dashboards:', 'OK all 9' if got == want else f'FAIL missing={sorted(want-got)} extra={sorted(got-want)}')
+raise SystemExit(0 if got == want else 1)"
 for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer; do
-  curl -s -o /dev/null -w "C4 $d: %{http_code} (want 200)\n" \
-    http://localhost:3002/api/dashboards/uid/$d
+  curl -s -o /dev/null -w "C18 $d: %{http_code} (want 200)\n" "$GRAF/api/dashboards/uid/$d"
 done
 
-# C5. Trace coverage is present for every application service.
-curl -s 'http://localhost:10428/select/jaeger/api/services' | python3 -c \
-  "import json,sys; actual=set(json.load(sys.stdin)['data']); \
-  required={'auth','user','product','inventory','cart','order','review','shipping','notification','payment','checkout'}; \
-  missing=sorted(required-actual); print('C5 traced services:', 'OK' if not missing else 'FAIL', \
-  'missing='+','.join(missing) if missing else 'all 11 present'); raise SystemExit(1 if missing else 0)"
-
-# C6. ClickHouse (RFC-0019 Phase B) ingested OTLP logs+traces for the flow.
-#     otel_logs/otel_traces are auto-created by the collector's clickhouse exporter.
-#     Respect the same ~30-45s ingest lag before reading.
-for t in otel_traces otel_logs; do
-  N=$(curl -s 'http://localhost:8123/' -u default:otel --data-binary "SELECT count() FROM otel.$t" 2>/dev/null | tr -d '[:space:]')
-  { [ -n "$N" ] && [ "$N" -gt 0 ] 2>/dev/null && echo "C6 $t: $N rows OK"; } \
-    || echo "C6 $t: ${N:-0} rows FAIL (ingest lag? exporter/plugin?)"
-done
+# C19. PANELS RETURN DATA. C18 only proves the dashboard OBJECTS exist; a
+#      provisioned dashboard loads happily while every panel renders "No data".
+#      Run one representative query per datasource THROUGH Grafana, so the
+#      datasource plugin and its credentials are on the path, not just the store.
+curl -s -X POST "$GRAF/api/ds/query" -H 'Content-Type: application/json' -d '{
+  "from":"now-45m","to":"now",
+  "queries":[{"refId":"A","datasource":{"uid":"victoriametrics","type":"prometheus"},
+              "expr":"sum(spanmetrics_calls_total)","instant":true}]}' \
+  | python3 -c "import json,sys; f=json.load(sys.stdin)['results']['A']['frames'][0]['data']['values']; \
+    print('C19 victoriametrics:', 'OK', f[1][0])"
+curl -s -X POST "$GRAF/api/ds/query" -H 'Content-Type: application/json' -d '{
+  "from":"now-45m","to":"now",
+  "queries":[{"refId":"A","datasource":{"uid":"clickhouse","type":"grafana-clickhouse-datasource"},
+              "rawSql":"SELECT count() AS spans FROM otel.otel_traces","format":1,"queryType":"table"}]}' \
+  | python3 -c "import json,sys; f=json.load(sys.stdin)['results']['A']['frames'][0]['data']['values']; \
+    print('C19 clickhouse:', 'OK', f[0][0])"
+# want a non-zero number from each. A 4xx/5xx or an empty frame means the panel
+# path is broken even though C17's health probe passed — health only proves the
+# plugin can reach the store, not that it can run a query and shape a frame.
 ```
 
 > A brand-new counter has **no series until its first increment** — "NO SERIES"
 > for an error/discrepancy counter on a healthy stack is correct, not a failure.
-> When a change alters histogram **buckets**, old- and new-grid series coexist
-> in one rate window for a few minutes and quantiles read garbage until the old
-> grid ages out (~4–5 min) — re-check before declaring failure.
+> The rows above name the series that MUST exist after Phase A; nothing else is
+> asserted. When a change alters histogram **buckets**, old- and new-grid series
+> coexist in one rate window for a few minutes and quantiles read garbage until
+> the old grid ages out (~4–5 min) — re-check before declaring failure.
 
 ## Pass criteria
 
 | # | Check | Expectation |
 |---|-------|-------------|
-| A1 | Login payload | `access_token` (JWT) + `refresh_token` + `expires_in`; **no `token`** |
-| A2 | Private routes w/ JWT | 200 through Kong edge-jwt |
-| A3 | Bad/missing token | 401 **at the edge** (`WWW-Authenticate` from Kong) |
-| A4 | Refresh reuse | old token 401 **and** whole family revoked |
-| A5 | Logout | 200, idempotent; refresh afterwards 401 |
-| A6 | Removed surfaces | `/auth/v1/private/*` 404; no `sessions` table |
-| A7 | v3 paths (ADR-017) | new `shipments/*` + `auth/*` paths 200; deprecated aliases still 200 (expand phase) |
-| A8 | Internal audience sealed | renamed `notify/*` + `internal/orders/*` 404 in-container (no aliases); and the two `/internal/` paths that DO exist — product create, cart clear — 404 **through Kong**, so no audience leaks at the edge |
-| A9 | Checkout sessions (RFC-0015) | lifecycle 201→200→200→200 through edge-JWT; no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
+| A1 | Realm token (PKCE) | `scripts/keycloak-token.sh` mints a JWT whose `iss` is the realm, whose `aud` includes `duynhlab-platform`, and whose `sub` is alice's fixed UUID **as a string** (ADR-042 evidence); `refresh_token` + `expires_in` present |
+| A2 | Private routes w/ realm token | 200 through the Envoy edge JWT filter |
+| A3 | Bad/missing token | 401 **at the edge**, `text/plain` body `Jwt is missing`, **and** `www-authenticate: Bearer realm="<requested URL>"` — plus `error="invalid_token"` when a token was present but unverifiable. All three are required |
+| A4 | Refresh reuse (realm) | refresh rotates; replaying the consumed token 400 `invalid_grant` / `Maximum allowed refresh token reuse exceeded`; the replay revokes the family, so the rotated token also 400s (`Session doesn't have required client`) |
+| A5 | Logout (realm) | end-session 204, replay **also 204** (idempotent); refresh afterwards 400 `Session not active` |
+| A6 | Removed surfaces | `/auth/v1/private/*` 404 (no HTTPRoute matches) **and the `auth` database does not exist** — auth-service is removed from local-stack; its cluster surface retires in RFC-0024 P5 |
+| A7 | v3 paths (ADR-017) | new `shipments/*` paths 200 and the deprecated `shipping/v1/public/track` alias still 200 (expand phase). The old `auth/v1/public/login` alias is **not** checked — it certified the retired token layer and has no backend |
+| A8 | Internal audience sealed | renamed `notify/*` + `internal/orders/*` 404 in-container (no aliases); and the two `/internal/` paths that DO exist — product create, cart clear — 404 **at the edge** because every HTTPRoute is audience-scoped, so no audience leaks |
+| A9 | Checkout sessions (RFC-0015) | lifecycle **201**→200→200→200 through edge-JWT, with the create's 201 asserted (not just used for its id); no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
 | A10 | Confirm + abandonment (RFC-0015 P2–P4) | fee/tax/promo composition asserted; `Idempotency-Key` required; replay = same order; order reaches `confirmed` or `completed`; order total == session total; lazy-410 past `expires_at` |
 | A11 | Full-fleet fan-out | product details returns product, live inventory availability, reviews, and review summary |
-| A12 | Cancellation unwind (ADR-033) | cancel 202 then replay 200; order reaches `cancelled`; `CancellationWorkflow` execution `Completed`; outbox row `DISPATCHED` with an epoch matching the workflow id's `-v<n>` suffix |
-| A13 | Abandonment timer (ADR-019) | on a **dedicated user**, an untouched session past its TTL reads 410 and the row is `expired \| timer`. `lazy` is inconclusive, not a pass — it proves only the backstop |
+| A12 | Cancellation unwind (ADR-033) | cancel 202 then replay 200; order reaches `cancelled`; `CancellationWorkflow` execution `Completed`; the `cancellation_requests` row for that order is `DISPATCHED` and its `epoch` matches the `-v<n>` suffix of a `CancellationWorkflow` id — **asserted**, not merely printed |
+| A13 | Abandonment timer (ADR-019) | on a **dedicated user** (`bob`, after clearing any leftover session), an untouched session past its TTL reads 410 and the row is `expired \| timer`. `lazy` is inconclusive, not a pass — it proves only the backstop |
 | A14 | Temporal durability | execution count is unchanged and non-zero across `restart temporal`; the driven workflow's history is still readable |
+| A16 | String subject persisted (ADR-042) | a cart write made with a realm token lands in `cart.cart_items.user_id` as the caller's realm UUID — the edge, `pkg/authmw`, the handler, and the column all agree |
 | A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` workflow behind |
-| B1 | UI login | JWT + refresh in localStorage |
-| B2 | Silent refresh | exactly **one** `POST /refresh` for concurrent 401s; retried 200s; no login bounce |
-| B3 | UI logout | `POST /public/auth/logout` 200; storage cleared; redirect to `/login` |
+| B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the nav shows signed-in state; **no JWT-shaped value in localStorage or sessionStorage** (both are empty on this build); the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
+| B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
+| B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Login link, no Logout button); a private route afterwards redirects to `/login?returnTo=…` rather than rendering stale data; both storages empty |
 | B4 | Browser cleanup | the agent-browser session is closed, so a later run starts from a clean profile |
 | C1 | Collector | 0 export failures / error lines |
-| C2 | Business counters | confirmed = saga = authorized for flows driven since the last process restart (after ~45s). A14/A15 reset the saga counter; then the durable evidence settles it — every `OrderFulfillmentWorkflow` `Completed`, every confirmed order `completed` |
-| C3 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
-| C4 | Dashboards | every listed dashboard loads via `/api/dashboards/uid/…` with 200 |
-| C5 | Traces | all 11 application service names are present in the Jaeger services list |
-| C6 | ClickHouse (RFC-0019) | `otel.otel_traces` and `otel.otel_logs` non-empty after the driven flow (SQL over `:8123`) |
+| C2 | Edge span is the trace root | the discovery query returns exactly one non-application service name (`platform.envoy-gateway-system`, derived by Envoy Gateway from `<gateway>.<namespace>` — discovered, not assumed) and the ROOT span of the tagged request is the edge's `ingress` Server span; the `deployment.environment.name=local` customTag corroborates it |
+| C3 | Trace continuity edge→service | one `TraceId` holds the edge **and** the service, with exactly one root and the service's Server span carrying a non-empty `ParentSpanId` |
+| C4 | Per-service span coverage | every service Phase A drove appears in `otel.otel_traces` with `server_spans > 0`, plus the edge |
+| C5 | ClickHouse (RFC-0019) | `otel.otel_traces` and `otel.otel_logs` non-empty after the driven flow (SQL over `:8123`) |
+| C6 | Trace service coverage | the **10** application service names local-stack runs **plus the edge** are present in **VictoriaTraces' Jaeger-compatible query API** (`:10428/select/jaeger/api/services`) — there is no Jaeger container. `mockpay` also appears and is legitimate but not required; `auth` must be **absent** |
+| C7 | spanmetrics / RED leg | `spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"}` > 0 and `spanmetrics_duration_milliseconds_bucket` present — proves the connector plus the remote-write path |
+| C8 | App semconv metrics leg | `http_server_request_duration_seconds_count`, `rpc_server_call_duration_seconds_count{service_name="inventory"}` (the only metrics evidence for gRPC-only inventory), and `go_goroutine_count` all have series |
+| C9 | Business counters | confirmed = saga = authorized for flows driven since the last process restart (after ~45s). A14/A15 reset the saga counter; then the durable evidence settles it — every `OrderFulfillmentWorkflow` `Completed`, every confirmed order `completed`. `auth_*` counters are **not** asserted |
+| C10 | Temporal SDK metrics | `temporal_workflow_endtoend_latency_seconds_bucket` and `temporal_activity_execution_latency_seconds_count` have series |
+| C11 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
+| C12 | App logs (OTLP leg) | `_stream:{"service.name"="cart"}` non-empty in VictoriaLogs, and the stream-field enumeration lists every service Phase A drove |
+| C13 | Edge access logs (Vector leg) | `_stream:{service="gateway"}` filtered on `upstream_cluster:*` + `route_name:*` (the discriminator against the control plane's debug logs in the same stream) is non-empty, and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `host`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` — not Envoy's built-in fallback names |
+| C14 | Vector infra tailing | a non-application container's logs are present, e.g. `_stream:{service="frontend"}`, and the stream enumeration covers the infra containers. C13 + C14 both empty = one failure (the Vector leg), not two |
+| C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
+| C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
+| C17 | Grafana datasources | `/api/datasources` returns exactly the four expected uid/type pairs and each `/api/datasources/uid/<uid>/health` answers `OK` |
+| C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 9 provisioned uids and each loads via `/api/dashboards/uid/…` with 200 |
+| C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
 
-Any failed row blocks the release tag. When a change touches the order-fulfillment
-path, additionally run the saga (checkout in the SPA) and watch it complete in
-the Temporal UI.
+Any failed row blocks the release tag. Two rows share one root cause and must be
+reported as such: **C13 + C14** both empty while C12 is healthy means the Vector
+leg is down, not that two log paths regressed — check `vector` per the
+container-runtime note in Preconditions, recreate the stack, and rerun.
+
+When a change touches the order-fulfillment path, additionally run the saga
+(checkout in the SPA) and watch it complete in the Temporal UI.
 
 ## Release evidence
 
 Copy this block into the service PR or release record and replace every pending
 value. Preserve the candidate SHA list with the audit result.
+
+This audit now also gates the **identity cutover** (RFC-0024 P3) and the **edge
+migration**: A1–A5 are the realm's contract, A2/A3/A8 are the Envoy edge's, and
+A16 is the string-subject contract the fleet's databases were migrated for.
+Changes to `local-stack/gateway/eg/`, `local-stack/keycloak/duynhlab-realm.json`,
+or the cluster's `kubernetes/infra/configs/envoy-gateway/` therefore need this
+evidence table too, not just service and `pkg` changes.
 
 ```markdown
 ### local-stack pre-release evidence
@@ -595,14 +1301,16 @@ value. Preserve the candidate SHA list with the audit result.
 - Candidate commit:
 - Supporting repository SHAs:
 - Executed at:
-- Stack reset before audit: yes / no
+- Container runtime:
+- Stack recreated with `down -v` + `up -d --build` before this audit: yes (mandatory)
+- Edge `service.name` discovered in C2:
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A14 API contract | PASS / FAIL | |
+| A | A1–A14 + A16 API contract | PASS / FAIL | |
 | A | A15 versioning drill | PASS / FAIL / N/A | |
-| B | B1–B3 real browser | PASS / FAIL | |
-| C | C1–C6 telemetry | PASS / FAIL | |
+| B | B1–B4 real browser | PASS / FAIL | |
+| C | C1–C19 telemetry | PASS / FAIL | |
 
 Decision: ELIGIBLE FOR TAG / BLOCKED
 ```
@@ -614,15 +1322,29 @@ a passing decision, continue with the
 
 ## Failure and cleanup
 
-- Treat HTTP 429 as an audit pacing error: wait, then restart the affected phase
-  from a clean authentication state.
+- Treat HTTP 429 as a finding, not pacing: the local limit is 50 req/s, so an
+  audit row cannot reach it by hand.
+- Treat a 401 on a private route as an EDGE question first:
+  `docker compose logs --since 10m gateway` shows both the control plane's config
+  load and Envoy's own output. A JWKS that was unreachable at boot, or an `iss`
+  mismatch between the token and `gateway/eg/securitypolicy.yaml`, produces a
+  fleet-wide 401 that looks exactly like a broken service.
+- Treat an edge that answers 200 but produces no spans as a CONFIG failure, not a
+  collector failure: `docker compose logs gateway 2>&1 | grep 'failed to find
+  envoyproxy'` tells you the EnvoyProxy CR never attached, in which case tracing
+  and the JSON access log were never configured at all.
 - Treat telemetry lag as pending, not passing. Wait for the documented export
   window and rerun the query.
 - Use `docker compose logs --since 10m <service>` to localize failures.
-- Use `docker compose down -v` before the next full run when database state or
-  cumulative telemetry makes the result ambiguous.
+- **Every rerun starts with `docker compose down -v` + `up -d --build`.** There is
+  no such thing as a partial rerun of this audit: the counters, span tables, and
+  log streams that half of Phase C reads are cumulative, so a fix verified against
+  a warm stack proves nothing about the candidate.
 - Always close the named `agent-browser` session, including after a failed
   browser phase.
+- If B2 failed part-way, confirm the client-level token lifespan override was
+  restored before doing anything else — a 60s access token left on `customer-spa`
+  makes unrelated rows fail in confusing ways.
 
 ## References
 
@@ -631,4 +1353,29 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-08-11 — the preamble now defines `$TCLI` and `audit_curl` above A13's arming step, which previously ran before either existed; A8 also probes the two `/internal/` paths that do exist, after local-stack Kong was scoped to audience prefixes; adds A14 (durability across a server restart) and A15 (the conditional versioning drill), the real Kong rate limits, a B4 criterion, and `red-spanmetrics` in C4._
+_Last updated: 2026-08-12 — makes a from-scratch stack recreation mandatory for
+every run and rewrites the two phases that had drifted from reality. **Phase B**
+is rebuilt around the browser's real identity flow: the SPA has no credential
+form, so B1 asserts the redirect to the realm's own login page, that no
+JWT-shaped value exists in either web storage, and the realm claims of the token
+actually in use; B2 observes the keycloak-js pre-emptive refresh inside a bounded
+window using a temporary 60s client-level token lifespan; B3 asserts the
+end-session GET redirect and that no service participates in sign-out. **Phase C**
+grows from 6 rows to 19 so no telemetry leg is sampled by proxy — the edge span as
+the trace root (with the derived `service.name` discovered at runtime), edge→service
+trace continuity, per-service span coverage, spanmetrics, app semconv metrics,
+Temporal SDK metrics, both VictoriaLogs ingest legs with the access-log
+discriminator, log↔trace correlation, profiling, datasource health, and panels
+actually returning data. A3/A4/A5 no longer carry "confirm on the first run"
+placeholders: the `www-authenticate` challenge, realm family revocation, and
+idempotent logout were measured and are asserted. A9 asserts its 201 and A12
+asserts the outbox epoch against the workflow id instead of printing both.
+The gate now runs against local-stack's post-auth-service end state: A6 asserts
+the `auth` DATABASE is gone rather than a table inside it, A7 drops the retired
+`auth/v1/public/login` alias, and the trace/profile coverage sets are the ten
+remaining applications plus the edge (the cluster surface retires in RFC-0024 P5).
+Preconditions carry the podman bring-up (`compose.podman.yaml` — resolved socket,
+`userns_mode: keep-id`, `label=disable`) without which the Vector log leg is
+silently absent. Envoy's admin and proxy Prometheus endpoints, and the collector's
+unpublished gRPC receiver, are documented as out of scope with reasons so nothing
+reads as forgotten._

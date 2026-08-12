@@ -81,6 +81,27 @@ Skeleton (copy what you need):
 
 ### Breaking Change
 
+#### Gateway
+
+- **Kong is decommissioned** (RFC-0024 P2.3 cutover): the `kong-local` /
+  `kong-config-local` Flux Kustomizations, `controllers/kong` HelmRelease +
+  HelmRepository, all `configs/kong/` CRs (plugins, consumer, 5 Ingresses),
+  the `kong` Namespace, the `kong-proxy-tls` Certificate (+ its local issuer
+  patch), the `auth-issuer-jwt` edge-credential ExternalSecret, the
+  `temporal-ui` Ingress (already re-homed as an HTTPRoute), and the
+  `filter/kong_redis_deprecation` OTTL processor are all deleted. **Envoy
+  Gateway is the only edge** and now owns NodePorts 30080/30443 — the P2
+  coexistence caveat resolves and `envoy-gateway-config-local` can go Ready.
+  The blackhole-risk re-points shipped in the same train: 11 NetworkPolicy
+  edge allows (`kong` → `envoy-gateway`, incl. activating identity's edge
+  allow for id.duynh.me + JWKS), the flux-operator-mcp NetworkPolicy
+  namespace list, and `flux-ui.sh` port-forwarding (label-based lookup of the
+  generated Envoy Service) — verified by the new
+  `scripts/edge-isolation-sweep.sh` (manifest-grep mode always; `--live`
+  probes the cluster). The `kong-openbao` PolicyException narrows to
+  `openbao` (EG binds non-privileged ports; no `NET_BIND_SERVICE` waiver
+  needed).
+
 #### Services
 
 - Fleet identity cutover to the Keycloak realm (RFC-0024 P3, executing the
@@ -138,6 +159,25 @@ Skeleton (copy what you need):
   Service cannot bind 30080/30443 while Kong holds them — the config
   Kustomization stays not-ready until the P2.3 cutover frees the ports.
 
+#### Observability
+
+- EG-native edge observability lands with the cutover (RFC-0024 P4 edge
+  slice, replacing the 13 `kong_*` alerts + 20 recording rules):
+  `prometheusrules/envoy-gateway/` carries 11 alerts designed from `envoy_*`
+  semantics — data plane EdgeDown, Edge5xxRatioHigh/Critical,
+  EdgeLatencyP95High/Critical, EdgeNoTraffic, Edge429RatioHigh (local
+  rate-limit pressure), EdgeUpstreamUnhealthy, EdgeJWKSFetchFailing (new —
+  the edge's rotation-transparent JWKS is now a monitored dependency), and
+  control plane EnvoyGatewayControllerDown + EnvoyGatewayReconcileErrors —
+  plus a deliberately lean 11-rule `edge:*` recording set (vs Kong's 20). A
+  new PodMonitor scrapes the proxy fleet (`job="envoy-gateway"`, :19001
+  `/stats/prometheus`). Envoy Gateway's four first-party dashboards (Envoy
+  Global, Envoy Clusters, Envoy Gateway Global, Resources Monitor) are
+  vendored from v1.8.3 into the "API Gateway" folder via configMapRef
+  (global-ratelimit skipped — no RLS deployed, ADR-045); alert catalog §2
+  rewritten for the new set. Two metric names are flagged in-file for the
+  Kind spike: the local-rate-limit and jwt_authn Prometheus renderings.
+
 #### Security
 
 - Keycloak identity foundation lands (RFC-0024 P1, executing the RFC-0022
@@ -188,6 +228,16 @@ Skeleton (copy what you need):
 - local-stack E2E audit gains **A12** (cancellation unwind) and **A13** (the
   abandonment timer), the two Temporal workflows it never exercised, and C4 now
   checks the `temporal-worker-local` dashboard that already ships.
+
+#### Docs
+
+- `docs/platform/kong-gateway.md` is **archived** (banner + a recorded "Why we
+  left" problem list: frozen OSS 3.9 line, unlicensed-Enterprise read-only
+  Admin API, no JWKS at the edge, the `job=kong` relabel trap, unfilterable
+  access logs, pre-1.21 tracer semconv, two bespoke config/log dialects); the
+  body stays as history. `network-policies.md` and the policy-exceptions
+  registry follow the cutover; the live-edge doc (`envoy-gateway.md`) arrives
+  with P6.
 
 #### Proposals
 

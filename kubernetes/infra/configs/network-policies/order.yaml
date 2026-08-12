@@ -24,7 +24,9 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kong
+              # RFC-0024 P2.3 edge cutover: was `kong` — re-pointed to the Envoy
+              # Gateway proxy fleet namespace. Verified by scripts/edge-isolation-sweep.sh.
+              kubernetes.io/metadata.name: envoy-gateway
       ports:
         - protocol: TCP
           port: 8080

@@ -6,9 +6,10 @@
 # the chart's `envoy-gateway` Service:
 #   - watch/reconcile + xDS translation errors (control-plane health)
 #   - status-update and provider queue depths
-# DATA-PLANE (envoy_*) metrics are a P4 concern: the EnvoyProxy CR enables the
-# Prometheus endpoint (telemetry.metrics), and the envoy_* scrape + rules +
-# dashboards land with the telemetry-cutover train, not here.
+# DATA-PLANE (envoy_*) metrics are scraped separately by
+# podmonitors/envoy-gateway-proxy.yaml (job="envoy-gateway") — landed with the
+# P4 edge slice in the P2.3 cutover PR, alongside prometheusrules/envoy-gateway/
+# and the first-party dashboards.
 # job label forced to `envoy-gateway-controller` so future alert/recording
 # rules get a stable selector (same trick as Kong's job=kong relabel).
 apiVersion: monitoring.coreos.com/v1

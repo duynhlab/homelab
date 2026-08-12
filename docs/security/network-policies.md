@@ -15,8 +15,8 @@
   reach the pods on `:8080`; everything else is dropped.
 - The allowlist is **per-callee** and follows the real call graph — `auth` accepts
   all nine services incl. payment (they fetch the JWKS from `/auth/v1/public/auth/jwks`), while
-  `shipping` accepts only `kong` + `order`, and `payment` (the 9th service) is the
-  tightest: `kong`→`:8080` only, `order`→`:9090` only, plus intra-ns `payment`↔`mockpay`.
+  `shipping` accepts only `envoy-gateway` + `order`, and `payment` (the 9th service) is the
+  tightest: `envoy-gateway`→`:8080` only, `order`→`:9090` only, plus intra-ns `payment`↔`mockpay`.
 - **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3). These policies
   are the *active* boundary on the local Kind cluster today — any ingress not
   explicitly allowed is dropped. No additional CNI is required for enforcement.
@@ -59,20 +59,21 @@ is fenced by default even before its explicit allow policy lands.
 Allowed **ingress** callers per callee (TCP `:8080`; the gRPC callees
 `shipping`, `review`, `notification` also allow `:9090` from their gRPC callers, and
 `payment` allows `:9090` from `order` only).
-`kong` is always
-allowed (north-south gateway traffic); the rest mirror the east-west call graph.
+`envoy-gateway` (the Envoy Gateway proxy fleet — RFC-0024 P2.3 re-pointed every
+edge allow from the retired `kong` namespace) is always allowed (north-south
+gateway traffic); the rest mirror the east-west call graph.
 
 | Callee | Allowed callers | Why |
 |--------|-----------------|-----|
-| **auth** | `kong` + **all 9 currently deployed service namespaces** (including self and payment; checkout joins at planned P5) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/auth/jwks` (`:8080`); JWTs are verified locally. |
-| **user** | `kong` | Browser-only today; no service-to-service caller. |
-| **product** | `kong` | Browser-only; aggregates *outward* to review. |
-| **cart** | `kong`, `order` | `order` reads the cart during checkout. |
-| **order** | `kong` | Browser-only inbound; calls *out* to cart/shipping/notification/auth. |
-| **review** | `kong`, `product` | `product` aggregates reviews into product details. |
-| **notification** | `kong`, `order`, `shipping` | Both publish notifications (order-created, shipment updates). |
-| **shipping** | `kong`, `order` | `order` looks up / creates shipments. |
-| **payment** | `kong` (`:8080` only), `order` (`:9090` only), intra-ns `payment` (`:8080`, for `mockpay`↔`payment`) | Payment moves money, so its allows are the tightest: the edge reaches only the HTTP API, the gRPC money transport admits only the order saga worker, and `mockpay`↔`payment` is fenced intra-namespace (ADR-008). |
+| **auth** | `envoy-gateway` + **all 9 currently deployed service namespaces** (including self and payment; checkout joins at planned P5) | Every service refreshes the RS256 JWKS from `GET /auth/v1/public/auth/jwks` (`:8080`); JWTs are verified locally. |
+| **user** | `envoy-gateway` | Browser-only today; no service-to-service caller. |
+| **product** | `envoy-gateway` | Browser-only; aggregates *outward* to review. |
+| **cart** | `envoy-gateway`, `order` | `order` reads the cart during checkout. |
+| **order** | `envoy-gateway` | Browser-only inbound; calls *out* to cart/shipping/notification/auth. |
+| **review** | `envoy-gateway`, `product` | `product` aggregates reviews into product details. |
+| **notification** | `envoy-gateway`, `order`, `shipping` | Both publish notifications (order-created, shipment updates). |
+| **shipping** | `envoy-gateway`, `order` | `order` looks up / creates shipments. |
+| **payment** | `envoy-gateway` (`:8080` only), `order` (`:9090` only), intra-ns `payment` (`:8080`, for `mockpay`↔`payment`) | Payment moves money, so its allows are the tightest: the edge reaches only the HTTP API, the gRPC money transport admits only the order saga worker, and `mockpay`↔`payment` is fenced intra-namespace (ADR-008). |
 
 > The matrix is **deny-by-default**: a caller not listed for a callee cannot reach
 > it, even within the cluster. Adding a new east-west call means adding the caller's
@@ -101,11 +102,11 @@ and `databases-local` / `apps-local` never reconcile:
 ## 3. Allowed-ingress topology
 
 Solid edges = explicit east-west allows; `auth` is the JWKS hub (every service is
-permitted to it to fetch `/auth/v1/public/auth/jwks`); `kong` is permitted to every service.
+permitted to it to fetch `/auth/v1/public/auth/jwks`); `envoy-gateway` is permitted to every service.
 
 ```mermaid
 flowchart LR
-    KONG([Kong gateway]):::gw
+    EDGE([Envoy Gateway edge]):::gw
     AUTH[auth]:::hub
     USER[user]
     PRODUCT[product]
@@ -117,7 +118,7 @@ flowchart LR
     PAYMENT[payment]:::pay
 
     %% North-south: gateway may reach every service
-    KONG --> AUTH & USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP & PAYMENT
+    EDGE --> AUTH & USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP & PAYMENT
 
     %% JWKS hub: the original eight services → auth /auth/v1/public/auth/jwks (cached fetch)
     USER & PRODUCT & CART & ORDER & REVIEW & NOTIF & SHIP -->|"jwks"| AUTH
@@ -188,4 +189,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-08-07 — ADR-026: ns `platform` DB-tier allow is `:5432` for both the PgBouncer pooler `platform-db-pooler-rw` and migrations (PgDog `pgdog-platform` :6432 removed); Temporal direct :5432. Earlier: RFC-0018 auth/user ns Postgres rules removed (apps egress to platform). Earlier: Zalando→CNPG migration; Patroni `:8008` / PgBouncer rows dropped._
+_Last updated: 2026-08-12 — RFC-0024 P2.3: every edge allow re-pointed `kong` → `envoy-gateway` (verified by `scripts/edge-isolation-sweep.sh`); `identity` admits the edge on `:8080` for the id.duynh.me route + JWKS fetches. Earlier: ADR-026: ADR-026: ns `platform` DB-tier allow is `:5432` for both the PgBouncer pooler `platform-db-pooler-rw` and migrations (PgDog `pgdog-platform` :6432 removed); Temporal direct :5432. Earlier: RFC-0018 auth/user ns Postgres rules removed (apps egress to platform). Earlier: Zalando→CNPG migration; Patroni `:8008` / PgBouncer rows dropped._

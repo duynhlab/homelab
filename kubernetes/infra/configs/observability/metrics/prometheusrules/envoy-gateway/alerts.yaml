@@ -1,0 +1,209 @@
+# Alert rules for the Envoy Gateway edge (RFC-0024 P4 edge slice).
+#
+# Designed from envoy_* metric semantics and Envoy Gateway's first-party
+# dashboards — NOT translated from the retired kong_* rules. Two scrape jobs:
+#   job="envoy-gateway"            the proxy fleet (data plane), PodMonitor
+#                                  podmonitors/envoy-gateway-proxy.yaml
+#                                  (:19001 /stats/prometheus)
+#   job="envoy-gateway-controller" the EG controller (control plane),
+#                                  servicemonitors/envoy-gateway-controller.yaml
+#
+# Metric model notes (why these families):
+#   - envoy_http_downstream_rq_* (HTTP conn manager) is the EDGE truth: it
+#     counts every downstream response including locally-generated ones
+#     (429 local rate limit, 401/403 jwt_authn + CIDR authorization) that
+#     never reach an upstream cluster.
+#   - envoy_cluster_* is the per-upstream view; envoy_cluster_name encodes the
+#     owning route (httproute/<ns>/<name>/rule/<n>), which is what EG's
+#     envoy-clusters dashboard drills into.
+#   - Envoy request-time histograms are in MILLISECONDS.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: envoy-gateway-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- Availability ---
+    - name: envoy-gateway-availability
+      interval: 1m
+      rules:
+        - alert: EdgeDown
+          # absent() covers the silent failure mode where the PodMonitor
+          # selects nothing (label drift, fleet deleted) — up{} alone cannot
+          # see a target that no longer exists.
+          expr: |
+            up{job="envoy-gateway"} == 0
+            or absent(up{job="envoy-gateway"})
+          for: 1m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Envoy Gateway edge proxy down or not scraped"
+            description: "An Envoy proxy instance is unreachable (or the whole job='envoy-gateway' scrape is absent). The edge is the single entry point — all API and SPA traffic may be affected."
+
+    # --- Errors ---
+    - name: envoy-gateway-errors
+      interval: 1m
+      rules:
+        - alert: Edge5xxRatioHigh
+          expr: edge:rq_5xx_ratio:rate5m > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "Edge 5xx ratio above 5%"
+            description: "{{ $value | humanizePercentage }} of downstream responses at the edge are 5xx (threshold 5%). Includes upstream failures AND Envoy-generated 5xx (no healthy upstream, UF/UO response flags) — check per-cluster 5xx on the Envoy Clusters dashboard."
+
+        - alert: Edge5xxRatioCritical
+          expr: edge:rq_5xx_ratio:rate5m > 0.15
+          for: 5m
+          labels:
+            severity: critical
+            category: errors
+          annotations:
+            summary: "Edge 5xx ratio above 15%"
+            description: "{{ $value | humanizePercentage }} of downstream responses at the edge are 5xx. The majority of platform traffic is failing."
+
+    # --- Latency ---
+    - name: envoy-gateway-latency
+      interval: 1m
+      rules:
+        - alert: EdgeLatencyP95High
+          expr: edge:latency_ms:p95_5m > 1000
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "Edge P95 downstream request time above 1s"
+            description: "P95 downstream request time is {{ $value | humanize }}ms (threshold 1000ms). envoy_http_downstream_rq_time measures the full request (edge overhead + upstream) — compare against envoy_cluster_upstream_rq_time per cluster to locate the slow hop."
+
+        - alert: EdgeLatencyP95Critical
+          expr: edge:latency_ms:p95_5m > 2000
+          for: 5m
+          labels:
+            severity: critical
+            category: latency
+          annotations:
+            summary: "Edge P95 downstream request time above 2s"
+            description: "P95 downstream request time is {{ $value | humanize }}ms — client-timeout territory for most API requests."
+
+    # --- Traffic ---
+    - name: envoy-gateway-traffic
+      interval: 1m
+      rules:
+        - alert: EdgeNoTraffic
+          # Zero requests while the fleet is up and had traffic in the prior
+          # hour: listener/route regression (or upstream DNS/NodePort break),
+          # not a proxy crash — EdgeDown owns that case via the up guard.
+          expr: |
+            sum(rate(envoy_http_downstream_rq_total{job="envoy-gateway"}[10m])) == 0
+            and sum(rate(envoy_http_downstream_rq_total{job="envoy-gateway"}[1h])) > 0
+            and on() (max(up{job="envoy-gateway"}) == 1)
+          for: 10m
+          labels:
+            severity: warning
+            category: traffic
+          annotations:
+            summary: "Envoy Gateway edge receiving no traffic"
+            description: "The edge served zero downstream requests in the last 10 minutes but had traffic in the prior hour, while the proxy fleet is up — routing to or through the Gateway is broken."
+
+        - alert: Edge429RatioHigh
+          # Local rate-limit pressure (ADR-045: per-replica token buckets).
+          # Sustained 429s mean either an abusive client or budgets mis-sized
+          # after the halving-for-2-replicas math.
+          expr: edge:rq_429_ratio:rate5m > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            category: traffic
+          annotations:
+            summary: "More than 5% of edge requests are locally rate-limited (429)"
+            description: "{{ $value | humanizePercentage }} of downstream requests are being rejected by the BackendTrafficPolicy local rate limits. Check per-client behavior in the access logs and re-derive bucket sizes if legitimate traffic is being clipped."
+
+    # --- Upstream health ---
+    - name: envoy-gateway-upstreams
+      interval: 1m
+      rules:
+        - alert: EdgeUpstreamUnhealthy
+          # membership_healthy < membership_total is the canonical Envoy
+          # signal for endpoints taken out of rotation by ACTIVE health checks
+          # or PASSIVE outlier detection (both configured via the
+          # resilience-default BackendTrafficPolicy). envoy_cluster_name
+          # encodes the owning HTTPRoute.
+          expr: |
+            sum by (envoy_cluster_name) (envoy_cluster_membership_healthy{job="envoy-gateway"})
+            <
+            sum by (envoy_cluster_name) (envoy_cluster_membership_total{job="envoy-gateway"})
+          for: 2m
+          labels:
+            severity: warning
+            category: availability
+          annotations:
+            summary: "Envoy cluster {{ $labels.envoy_cluster_name }} has unhealthy endpoints"
+            description: "One or more endpoints of {{ $labels.envoy_cluster_name }} were ejected by health checking or outlier detection. The route degrades to fewer replicas; if all endpoints eject, requests answer 503/UH."
+
+    # --- Edge auth (SecurityPolicy JWT via Keycloak remoteJWKS) ---
+    - name: envoy-gateway-auth
+      interval: 1m
+      rules:
+        - alert: EdgeJWKSFetchFailing
+          # METRIC NAME TO VERIFY ON THE KIND SPIKE: Envoy's jwt_authn filter
+          # documents counters http.<stat_prefix>.jwt_authn.{allowed,denied,
+          # jwks_fetch_success,jwks_fetch_failed}; the expected Prometheus
+          # rendering is envoy_http_jwt_authn_jwks_fetch_failed (conn-manager
+          # prefix extracted into envoy_http_conn_manager_prefix). If the tag
+          # extractor does not cover jwt_authn, the name will carry the
+          # conn-manager prefix inline — fix the selector then.
+          # Why it matters: the edge holds no key material (RFC-0024); it
+          # verifies against the realm JWKS with a bounded cache. While the
+          # cache lives, traffic keeps flowing — sustained fetch failure is a
+          # ticking outage for every private/protected route.
+          expr: |
+            sum(rate(envoy_http_jwt_authn_jwks_fetch_failed{job="envoy-gateway"}[5m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: availability
+          annotations:
+            summary: "Envoy Gateway cannot refresh the Keycloak JWKS"
+            description: "jwks_fetch_failed is increasing: the edge cannot reach http://keycloak.identity:8080/realms/duynhlab JWKS. Cached keys serve until expiry, then every JWT-protected route starts answering 401. Check Keycloak health and the identity NetworkPolicy."
+
+    # --- Control plane (job="envoy-gateway-controller") ---
+    - name: envoy-gateway-control-plane
+      interval: 1m
+      rules:
+        - alert: EnvoyGatewayControllerDown
+          expr: |
+            up{job="envoy-gateway-controller"} == 0
+            or absent(up{job="envoy-gateway-controller"})
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Envoy Gateway controller down or not scraped"
+            description: "The EG control plane is unreachable. Running proxies keep serving their last xDS config, but no Gateway API change reconciles, and a restarted proxy pod cannot fetch configuration — a data-plane outage one pod restart away."
+
+        - alert: EnvoyGatewayReconcileErrors
+          # The controller's own failure counters, status="failure" verified
+          # against EG v1.8.3 source (internal/metrics: StatusFailure =
+          # "failure"): status_update_total (Gateway API status writes) and
+          # xds_snapshot_{create,update}_total (IR -> xDS translation/publish).
+          # `or vector(0)` keeps the sum alive when a family has never fired.
+          expr: |
+            (
+              (sum(rate(status_update_total{job="envoy-gateway-controller", status="failure"}[5m])) or vector(0))
+              + (sum(rate(xds_snapshot_create_total{job="envoy-gateway-controller", status="failure"}[5m])) or vector(0))
+              + (sum(rate(xds_snapshot_update_total{job="envoy-gateway-controller", status="failure"}[5m])) or vector(0))
+            ) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "Envoy Gateway controller reconcile/xDS failures"
+            description: "The EG controller is failing status updates or xDS snapshot operations. Gateway API changes (routes, policies, certs) may not be reaching the proxy fleet — the running config silently drifts from git. Check the controller logs and the Envoy Gateway Global dashboard."

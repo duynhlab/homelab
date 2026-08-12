@@ -9,7 +9,7 @@ Source manifests live in `kubernetes/infra/configs/kyverno/exceptions/`.
 |------|------------------|---------|-------|---------|---------------|
 | `vector-hostpath` | `pss-baseline` | DaemonSet `vector-*` in `monitoring` | platform-team | 2026-12-31 | Tails container logs from `/var/log/pods` |
 | `postgres-operators` | `pss-baseline`, `require-resources` | CNPG Pods in DB namespaces | platform-team | 2026-12-31 | Operator-defined securityContext for postgres lifecycle |
-| `kong-openbao` | `pss-baseline` | All Pods in `kong`, `openbao` | platform-team | 2026-12-31 | Kong needs `NET_BIND_SERVICE`; OpenBAO needs `IPC_LOCK` |
+| `openbao` | `pss-baseline` | All Pods in `openbao` | platform-team | 2026-12-31 | OpenBAO needs `IPC_LOCK` (mlock) so unsealed secrets never swap to disk |
 
 ## Workflow to add an exception
 
@@ -38,4 +38,4 @@ Source manifests live in `kubernetes/infra/configs/kyverno/exceptions/`.
 
 ---
 
-_Last updated: 2026-07-11 — `postgres-operators` target narrowed to CNPG Pods (Spilo removed with the Zalando operator)._
+_Last updated: 2026-08-12 — `kong-openbao` narrowed to `openbao` (RFC-0024 P2.3: Kong decommissioned; the Envoy Gateway data plane binds non-privileged ports and needs no exception)._

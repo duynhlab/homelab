@@ -209,7 +209,7 @@ Reduce common LLM coding mistakes. Bias toward caution over speed; use judgment 
 ```
 kubernetes/
   clusters/   # Flux bootstrap + Kustomization CRDs per cluster (local/prod) — the dependency chain
-  infra/      # Controllers + configs: monitoring, APM, databases, secrets, SLO, kyverno, kong
+  infra/      # Controllers + configs: monitoring, APM, databases, secrets, SLO, kyverno, envoy-gateway
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
 terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
@@ -249,7 +249,7 @@ make flux-sync    # force reconciliation
 
 ## Platform architecture & conventions
 
-- **Observability (platform stack):** VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Kong emits edge spans (opentelemetry `inject:[w3c]`). Application instrumentation policy (otel middleware chain, OTLP export, trace/log correlation) lives in service repos via `pkg/obsx` — see Cross-repo app context when editing ingress, NetworkPolicy, or observability docs.
+- **Observability (platform stack):** VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Envoy Gateway emits edge spans (OTLP gRPC, W3C, ParentBased). Application instrumentation policy (otel middleware chain, OTLP export, trace/log correlation) lives in service repos via `pkg/obsx` — see Cross-repo app context when editing ingress, NetworkPolicy, or observability docs.
 - **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.). Palette and workflow in Docs conventions below.
 - **Stack:** Go 1.26 (services, not authored here), PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
 
@@ -318,7 +318,8 @@ Every manifest applied to the cluster must satisfy admission:
 
 - **Flux enforces deployment order via `dependsOn`** — apps won't start until infra is ready. Chain (in `kubernetes/clusters/local/`):
   ```
-  flux-system → controllers-local → {cert-manager → kong → kong-config, secrets,
+  flux-system → controllers-local → {cert-manager → gateway-api-crds →
+  envoy-gateway → envoy-gateway-config (also after keycloak), secrets,
   cnpg-barman-plugin, caching, storage} → databases → databases-cnpg-dr
   monitoring-local → kyverno-policies, mcp
   temporal-local → temporal-config-local

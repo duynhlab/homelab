@@ -5,7 +5,7 @@
 #     (self-signed, 10y, ECDSA P-256; for future internal mTLS; CA cert
 #     distributed via trust-manager `homelab-ca-bundle`).
 #   - letsencrypt-staging / letsencrypt-prod (ACME DNS-01 via Cloudflare;
-#     used by `kong-proxy-tls` for browser-facing *.duynh.me).
+#     used by `platform-edge-tls` for browser-facing *.duynh.me).
 #
 # Cloudflare API token is synced from OpenBAO by the ExternalSecret at
 # kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml

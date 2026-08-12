@@ -22,7 +22,10 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 **198 statically-defined alerts** across 9 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
 — by domain: postgres 53, microservices 52, victoriametrics 31, kubernetes 29,
-kong 13, gitops 9, valkey 7, observability 3), plus **64 Sloth-generated** SLO
+envoy-gateway 11, gitops 9, valkey 7, observability 3, keycloak 2, + the
+watchdog; the total is unchanged from the last count only by coincidence — the
+RFC-0024 P2.3 cutover retired kong's 13 for envoy-gateway's 11, and the 2
+keycloak alerts from P1 were missing from the previous breakdown), plus **64 Sloth-generated** SLO
 burn-rate alerts (2 × 32 SLOs). The 32 SLOs cover all 11 Go services: 30 rendered
 by the `mop` chart through the five domain ResourceSets, plus inventory's 2
 hand-written gRPC SLOs. Two CNPG topology rules are **gated** (not
@@ -38,7 +41,7 @@ had been deployed but never listed here.
 | Domain | Count | Protects |
 |--------|-------|----------|
 | [Microservices (RED)](#1-microservices-red-metrics) | 19 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
-| [Kong gateway](#2-kong-gateway) | 13 | The single API ingress for the whole platform |
+| [Envoy Gateway edge](#2-envoy-gateway-edge) | 11 | The single API ingress for the whole platform — proxy fleet + control plane |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 51 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
@@ -79,25 +82,38 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 
 > **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) were **replaced** by `MicroserviceGCThrash`, itself **retired 2026-07-17** (audit: the runtime family has no heap series — only stack/other — so the ratio vs the heap-only GC goal false-fired permanently). `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
 
-## 2. Kong gateway
+## 2. Envoy Gateway edge {#2-envoy-gateway-edge}
 
-Source: `prometheusrules/kong/alerts.yaml`. Base metrics: `kong_http_requests_total`, `kong_*_latency_ms`.
+Supersedes the `kong_*` set — this section was replaced wholesale at the RFC-0024
+P2.3 cutover (Kong decommissioned); the rules are designed from `envoy_*` semantics,
+not translated. Source: `prometheusrules/envoy-gateway/alerts.yaml`. Data plane
+`job="envoy-gateway"` (proxy fleet PodMonitor, `/stats/prometheus`); control plane
+`job="envoy-gateway-controller"`. Base metrics: `envoy_http_downstream_rq_*` (the
+edge truth — includes locally-generated 429/401/403), `envoy_cluster_*`
+(per-upstream view, keyed by `envoy_cluster_name` = `httproute/<ns>/<name>/rule/<n>`),
+and the controller's `status_update_total` / `xds_snapshot_*_total`. Envoy latency
+histograms are in **milliseconds**.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
-| KongDown | critical | `up{job="kong"}==0` | Whole API surface unreachable | 1m |
-| KongHighErrorRate | warning | gateway 5xx ratio >5% | API-wide degradation | 5m |
-| KongErrorRateCritical | critical | gateway 5xx ratio >15% | Most API traffic failing | 5m |
-| KongServiceHighErrorRate | warning | per-`service` 5xx >10% | One upstream service path failing | 5m |
-| KongHighLatencyP95 | warning | `kong_request_latency_ms` P95 >1s | API latency spike | 10m |
-| KongLatencyCritical | critical | P95 >2s | End-to-end timeouts | 5m |
-| KongHighUpstreamLatencyP95 | warning | `kong_upstream_latency_ms` P95 >1.5s | Specific backend is the bottleneck | 10m |
-| KongHighInternalLatency | warning | `kong_kong_latency_ms` P95 >100ms | Kong's own plugin chain slow | 10m |
-| KongNoTraffic | warning | `rate(kong_http_requests_total[10m])==0`, had traffic | Ingress routing broken | 10m |
-| KongHighNginxConnections | warning | `kong_nginx_connections_total{active}>200` | Connection-pool exhaustion risk | 5m |
-| KongSharedMemoryHigh | warning | Lua shared dict >85% | Plugin/rate-limit state evictions soon | 10m |
-| KongSharedMemoryCritical | critical | Lua shared dict >95% | Requests dropped; auth/rate-limit state loss | 5m |
-| KongUpstreamTargetUnhealthy | warning | `kong_upstream_target_health!=1` | A backend target drained by health check | 2m |
+| EdgeDown | critical | `up{job="envoy-gateway"}==0` **or** `absent(up{...})` | Whole API surface unreachable (absent() catches a dead PodMonitor selector too) | 1m |
+| Edge5xxRatioHigh | warning | `edge:rq_5xx_ratio:rate5m` >5% (downstream, incl. Envoy-generated 5xx) | API-wide degradation | 5m |
+| Edge5xxRatioCritical | critical | same ratio >15% | Most API traffic failing | 5m |
+| EdgeLatencyP95High | warning | `edge:latency_ms:p95_5m` >1000ms (`envoy_http_downstream_rq_time`) | API latency spike — edge + upstream combined | 10m |
+| EdgeLatencyP95Critical | critical | same P95 >2000ms | Client-timeout territory | 5m |
+| EdgeNoTraffic | warning | downstream rq `rate[10m]==0`, had traffic in 1h, fleet up | Listener/route regression — routing broken while pods look healthy | 10m |
+| Edge429RatioHigh | warning | `edge:rq_429_ratio:rate5m` >5% (local rate-limit `rate_limited` counter) | ADR-045 local buckets clipping traffic: abusive client or mis-sized halved budgets | 10m |
+| EdgeUpstreamUnhealthy | warning | per-`envoy_cluster_name`: `membership_healthy < membership_total` | Endpoints ejected by health check / outlier detection; route degrades, then 503/UH | 2m |
+| EdgeJWKSFetchFailing | warning | `rate(envoy_http_jwt_authn_jwks_fetch_failed[5m])>0` | Edge can't refresh the Keycloak JWKS — cached keys serve until expiry, then every private/protected route 401s | 10m |
+| EnvoyGatewayControllerDown | critical | `up{job="envoy-gateway-controller"}==0` or absent | xDS frozen: no Gateway API change reconciles; a restarted proxy gets no config | 5m |
+| EnvoyGatewayReconcileErrors | warning | `status_update_total{status="failure"}` + `xds_snapshot_{create,update}_total{status="failure"}` rate >0 | Config changes silently not reaching the fleet — running config drifts from git | 10m |
+
+Retired without an Envoy equivalent (Kong/nginx implementation details, not edge
+signals): `KongHighInternalLatency` (plugin-chain overhead — derive edge-minus-upstream
+from the two Envoy histograms instead), `KongHighNginxConnections`,
+`KongSharedMemoryHigh/Critical` (Lua shared dicts don't exist; local rate-limit
+state is per-process token buckets). Envoy server memory/liveness panels live on
+the first-party **Envoy Global** dashboard.
 
 ## 3. Valkey cache
 
@@ -517,7 +533,7 @@ implemented yet — they are recommendations.
 | etcdDatabaseQuotaLowSpace / ExcessiveDatabaseGrowth / HighNumberOfFailedProposals | Control plane | `etcd_mvcc_db_total_size_in_bytes / etcd_server_quota_backend_bytes > 0.95`; failed proposals | critical/warning | Sudden cluster-wide write freeze | general (etcd mixin) |
 | KubeDeploymentRolloutStuck | Kubernetes | `observed_generation != metadata_generation` >15m | warning | Rollout wedged on bad image / admission rejection (likely with strict Kyverno) | general (k8s mixin) |
 | KubeContainerWaiting | Kubernetes | `kube_pod_container_status_waiting_reason>0` >1h | warning | `ImagePullBackOff` (wrong SHA) never crash-loops → unalerted | general (k8s mixin) |
-| KongRateLimitExceeded / Kong4xxSurge | Kong | `rate(kong_http_requests_total{code=~"429"}[5m])` surge; sustained 4xx | warning | Auth-config regression / abusive client / misfiring rate-limit | ✅ context7 metric availability `/kong/developer.konghq.com`; thresholds general |
+| ~~KongRateLimitExceeded / Kong4xxSurge~~ ✅ superseded by `Edge429RatioHigh` (§2, RFC-0024 cutover) | Edge | local rate-limit `rate_limited` ratio | warning | Abusive client / misfiring rate-limit now alerts at the Envoy edge | ✅ shipped |
 | KubeStateMetricsListErrors / KSM TargetDown | Meta | KSM watch/list error rate; `up{kube-state-metrics}==0` | warning | KSM down → all KSM-sourced k8s alerts silently stop | general (KSM mixin) |
 
 ### Already-tracked DB gaps (from the DR review)
@@ -537,10 +553,10 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 - **Latency duplication — APPLIED (2026-08-06):** raw `MicroserviceHighLatencyP95/P99/LatencyCritical` overlap the Sloth latency SLO burn-rate on the same metric. The burn-rate alert stays the page; all three statics are now `warning` (non-paging here). Only `MicroserviceLatencyCritical` actually changed — P95/P99 were already `warning`. The name `MicroserviceLatencyCritical` was kept so runbook links and alert history survive; it describes the threshold tier, not the routing severity.
 - **Double-page on fail-closed 503s — APPLIED (2026-08-06):** `CheckoutAvailabilityErrors` / `CheckoutAvailabilityUnknownSKU` name the SKU and the fix; the Sloth `CheckoutHighErrorRate` / `CheckoutHighOverallErrorRate` pages fire off the same deliberate 503s. The 503 keeps burning budget (it is a real failed request) but the generic page is now inhibited while a precise one fires — `equal: ['service']`, `sloth_severity="page"`, availability/error-rate only. Latency pages are untouched: a fast 503 burns no latency budget, so one during the incident is a different problem. See [`vmalertmanager.yaml`](../../../kubernetes/infra/configs/observability/metrics/victoriametrics/vmalertmanager.yaml).
-- **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `KongNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition. On this platform they also fire benignly for ~40 min after any bounded traffic burst (no continuous synthetic load); the arithmetic and why `for:` was *not* lengthened are in the [`MicroserviceNoTraffic` runbook](../runbooks/microservices/MicroserviceNoTraffic.md#expected-on-a-rebuilt-cluster--read-this-first).
+- **Outage triple-fire:** `MicroserviceNoTraffic` + `MicroserviceNoSuccessfulRequests` + `EdgeNoTraffic` can all fire for one outage — group them and use Alertmanager inhibition. On this platform they also fire benignly for ~40 min after any bounded traffic burst (no continuous synthetic load); the arithmetic and why `for:` was *not* lengthened are in the [`MicroserviceNoTraffic` runbook](../runbooks/microservices/MicroserviceNoTraffic.md#expected-on-a-rebuilt-cluster--read-this-first).
 - **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
 - **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit.
 
 ---
 
-_Last updated: 2026-08-06 — 164 checked-in alerts (+2 gated) plus 64 Sloth-generated alerts; all 11 services are SLO-enabled — 10 through the domain ResourceSets, inventory through a hand-written gRPC `PrometheusServiceLevel`._
+_Last updated: 2026-08-12 — §2 replaced at the RFC-0024 P2.3 cutover: the 13 `kong_*` alerts retire, 11 EG-native alerts (9 data-plane + 2 control-plane) take over; the 2 Keycloak alerts (P1) join the summary breakdown they had been missing from._

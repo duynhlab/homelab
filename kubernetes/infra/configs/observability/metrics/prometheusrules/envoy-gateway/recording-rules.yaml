@@ -1,0 +1,108 @@
+# Recording rules for the Envoy Gateway edge (RFC-0024 P4 edge slice).
+# Source: proxy fleet /stats/prometheus, job="envoy-gateway"
+# (podmonitors/envoy-gateway-proxy.yaml, 15s interval).
+#
+# DELIBERATELY LEAN — 11 rules, not a port of the 20 kong_* rules. Only the
+# series the envoy-gateway alerts and the alert catalog actually consume are
+# pre-aggregated:
+#   - EG's first-party dashboards query raw envoy_* series with template
+#     variables (per-namespace, per-envoy_cluster_name) — pre-aggregating for
+#     them would duplicate, not accelerate.
+#   - No per-route request-rate rules: the per-upstream slice is
+#     envoy_cluster_* keyed by envoy_cluster_name (httproute/<ns>/<name>/
+#     rule/<n>), recorded below only for the two shapes the catalog names
+#     (5xx, latency P95).
+#   - No nginx/Lua internals equivalents: they were Kong implementation
+#     details with no Envoy counterpart; Envoy server health panels
+#     (memory/uptime/live) read raw gauges.
+# Envoy request-time histograms are in MILLISECONDS.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: envoy-gateway-recording-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    # ---------------------------------------------------------------
+    # Edge (downstream conn-manager) — the client-facing truth,
+    # including locally-generated 4xx/5xx (rate limit, jwt_authn, CIDR)
+    # ---------------------------------------------------------------
+    - name: envoy-gateway-edge-5m
+      interval: 30s
+      rules:
+        # Total downstream request rate — global
+        - record: edge:rq_total:rate5m
+          expr: sum(rate(envoy_http_downstream_rq_total{job="envoy-gateway"}[5m]))
+
+        # 5xx ratio (0-1) of downstream responses
+        - record: edge:rq_5xx_ratio:rate5m
+          expr: |
+            sum(rate(envoy_http_downstream_rq_xx{job="envoy-gateway", envoy_response_code_class="5"}[5m]))
+            / (edge:rq_total:rate5m > 0)
+
+        # Locally rate-limited (429) ratio (0-1). METRIC NAME TO VERIFY ON THE
+        # KIND SPIKE: EG v1.8.3 pins the local_ratelimit filter StatPrefix to
+        # "http_local_rate_limiter" (internal/xds/translator/local_ratelimit.go)
+        # and Envoy emits <stat_prefix>.http_local_rate_limit.rate_limited —
+        # expected Prometheus rendering below.
+        - record: edge:rq_429_ratio:rate5m
+          expr: |
+            sum(rate(envoy_http_local_rate_limiter_http_local_rate_limit_rate_limited{job="envoy-gateway"}[5m]))
+            / (edge:rq_total:rate5m > 0)
+
+        # Downstream request time percentiles (ms) — full edge request,
+        # Envoy processing + upstream
+        - record: edge:latency_ms:p50_5m
+          expr: |
+            histogram_quantile(0.50,
+              sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job="envoy-gateway"}[5m]))
+            )
+
+        - record: edge:latency_ms:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job="envoy-gateway"}[5m]))
+            )
+
+        - record: edge:latency_ms:p99_5m
+          expr: |
+            histogram_quantile(0.99,
+              sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job="envoy-gateway"}[5m]))
+            )
+
+    # ---------------------------------------------------------------
+    # Per-upstream-cluster (envoy_cluster_name = httproute/<ns>/<name>/rule/<n>)
+    # ---------------------------------------------------------------
+    - name: envoy-gateway-upstream-5m
+      interval: 30s
+      rules:
+        # 5xx rate per upstream cluster — "which route's backend is failing"
+        - record: edge_cluster:rq_5xx:rate5m
+          expr: |
+            sum by (envoy_cluster_name) (
+              rate(envoy_cluster_upstream_rq_xx{job="envoy-gateway", envoy_response_code_class="5"}[5m])
+            )
+
+        # Upstream request time P95 (ms) per cluster — upstream-only latency,
+        # subtract from edge:latency_ms:p95_5m to see Envoy's own overhead
+        - record: edge_cluster:upstream_latency_ms:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum by (envoy_cluster_name, le) (
+                rate(envoy_cluster_upstream_rq_time_bucket{job="envoy-gateway"}[5m])
+              )
+            )
+
+    # ---------------------------------------------------------------
+    # Edge bandwidth (downstream connection bytes)
+    # ---------------------------------------------------------------
+    - name: envoy-gateway-bandwidth-5m
+      interval: 30s
+      rules:
+        - record: edge:bandwidth_rx_bytes:rate5m
+          expr: sum(rate(envoy_http_downstream_cx_rx_bytes_total{job="envoy-gateway"}[5m]))
+
+        - record: edge:bandwidth_tx_bytes:rate5m
+          expr: sum(rate(envoy_http_downstream_cx_tx_bytes_total{job="envoy-gateway"}[5m]))

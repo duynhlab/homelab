@@ -1,0 +1,31 @@
+# PodMonitor for the Envoy Gateway DATA PLANE (RFC-0024 P4 edge slice).
+# The per-Gateway proxy fleet exposes Prometheus stats on the named `metrics`
+# container port (:19001, path /stats/prometheus — enabled by
+# telemetry.metrics.prometheus in configs/envoy-gateway/envoyproxy.yaml).
+# A PodMonitor, not a ServiceMonitor: the EG-generated proxy Service
+# (envoy-<ns>-<gateway>-<hash>) carries only the listener ports, so there is
+# no Service port to scrape through.
+# job label forced to `envoy-gateway` — the stable selector every
+# prometheusrules/envoy-gateway/ rule keys on (same trick as the
+# envoy-gateway-controller ServiceMonitor).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-gateway-proxy
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - envoy-gateway
+  selector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gateway-namespace: envoy-gateway
+      gateway.envoyproxy.io/owning-gateway-name: platform
+  podMetricsEndpoints:
+    - port: metrics
+      path: /stats/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: envoy-gateway

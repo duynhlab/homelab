@@ -24,8 +24,10 @@
 # central in this directory — not to Services, so the apps layer has nothing
 # to attach to; and (b) Envoy Gateway resolves multiple same-kind policies on
 # one route by "oldest wins" — two separate BTPs per route would conflict,
-# not compose. The apps-layer KongUpstreamPolicy/annotations stay untouched
-# (inert once Kong is gone; removed by the 2.3 cleanup train).
+# not compose. The apps-layer KongUpstreamPolicy/annotations were removed with
+# the 2.3 cutover (the KongUpstreamPolicy CRD leaves with the Kong chart, so a
+# fresh bring-up could no longer apply them) — this BTP is the only resilience
+# config at the edge.
 #
 # Resilience mapping (Kong -> EG):
 #   retries 2                      -> retry.numRetries 2

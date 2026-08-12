@@ -46,7 +46,7 @@ spec:
           # mop >=0.14 values schema: the HTTP port pair lives under
           # service.http (the old top-level port/targetPort/containerPort keys
           # are silently ignored and the chart default 8080 wins — which broke
-          # this SPA behind Kong, since nginx listens on 80).
+          # this SPA behind the edge gateway, since nginx listens on 80).
           service:
             enabled: true
             type: ClusterIP

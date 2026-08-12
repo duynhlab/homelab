@@ -18,32 +18,6 @@ spec:
         environment: local
         platform.duynhlab/backup: "cnpg"
     ---
-    # Edge resilience policy referenced by the Service annotation above.
-    apiVersion: configuration.konghq.com/v1beta1
-    kind: KongUpstreamPolicy
-    metadata:
-      name: resilience-default
-      namespace: << inputs.namespace >>
-    spec:
-      algorithm: round-robin
-      healthchecks:
-        active:
-          type: http
-          httpPath: /health
-          healthy:
-            interval: 5
-            successes: 2
-          unhealthy:
-            interval: 5
-            httpFailures: 3
-            timeouts: 3
-        passive:
-          healthy:
-            successes: 2
-          unhealthy:
-            httpFailures: 5
-            timeouts: 3
-    ---
     apiVersion: helm.toolkit.fluxcd.io/v2
     kind: HelmRelease
     metadata:
@@ -73,14 +47,10 @@ spec:
         service:
           enabled: true
           type: ClusterIP
-          # Kong edge resilience (RFC-0009 #5): per-service bounded timeouts +
-          # retries, and health-checks via the resilience-default KongUpstreamPolicy.
-          annotations:
-            konghq.com/connect-timeout: "3000"
-            konghq.com/read-timeout: "15000"
-            konghq.com/write-timeout: "15000"
-            konghq.com/retries: "2"
-            konghq.com/upstream-policy: resilience-default
+          # Edge resilience now lives at the gateway: the resilience-default
+          # BackendTrafficPolicy (configs/envoy-gateway/policies/btp-api.yaml)
+          # carries the timeouts/retries/health checks the KongUpstreamPolicy +
+          # konghq.com annotations used to (removed at the RFC-0024 P2.3 cutover).
           http:
             port: 8080
             containerPort: 8080
@@ -196,9 +166,10 @@ spec:
           <<- end >>
           <<- if (index inputs "jwt_signing") >>
           # RFC-0009 Phase 4: RS256 access-token signing key from OpenBAO (via ESO
-          # Secret auth-jwt-signing). iss/aud must match the Kong jwt-edge consumer
-          # credential and pkg/authmw. Empty key => auth would fall back to an
-          # ephemeral key (breaks edge verification), so this is required for auth.
+          # Secret auth-jwt-signing). iss/aud must match pkg/authmw. Empty key =>
+          # auth would fall back to an ephemeral key, so this is required for
+          # auth. Retires with auth-service in RFC-0024 P5 (the Kong edge
+          # credential half was already deleted at the P2.3 cutover).
           - name: JWT_ISSUER
             value: "https://gateway.duynh.me"
           - name: JWT_AUDIENCE

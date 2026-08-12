@@ -16,7 +16,9 @@ resources:
   - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-redis.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml
-  - grafana-dashboard-kong.yaml
+  # Envoy Gateway first-party dashboards (RFC-0024 P4 edge slice) — JSON vendored
+  # from envoyproxy/gateway v1.8.3 via configMapGenerator below
+  - grafana-dashboard-envoy-gateway.yaml
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
   # ClickHouse per-service deep dive — JSON via configMapGenerator below
@@ -59,6 +61,20 @@ configMapGenerator:
   - name: grafana-dashboard-inventory
     files:
       - inventory.json
+  # Envoy Gateway first-party dashboards (envoyproxy/gateway v1.8.3,
+  # charts/gateway-addons-helm/dashboards/) — see grafana-dashboard-envoy-gateway.yaml
+  - name: grafana-dashboard-envoy-proxy-global
+    files:
+      - envoy-gateway/envoy-proxy-global.json
+  - name: grafana-dashboard-envoy-clusters
+    files:
+      - envoy-gateway/envoy-clusters.json
+  - name: grafana-dashboard-envoy-gateway-global
+    files:
+      - envoy-gateway/envoy-gateway-global.json
+  - name: grafana-dashboard-envoy-resources-monitor
+    files:
+      - envoy-gateway/resources-monitor.gen.json
 
 generatorOptions:
   disableNameSuffixHash: true

@@ -2,9 +2,9 @@
 # LIVE. Any ingress not explicitly allowed below is dropped.
 #
 # Payment moves money, so its allows are deliberately tighter than the sibling
-# services' (which admit kong to every port): the edge reaches ONLY the HTTP
+# services' (which admit the edge namespace to every port): the edge reaches ONLY the HTTP
 # API, and the gRPC money transport (:9090) admits ONLY the order namespace
-# (the saga worker) — Kong has no business on it. The internal audience
+# (the saga worker) — the edge gateway has no business on it. The internal audience
 # (/payment/v1/internal/*) is additionally never routed at the gateway.
 ---
 apiVersion: networking.k8s.io/v1
@@ -27,12 +27,14 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    # Edge: Kong → the HTTP API only (private routes + the public webhook
+    # Edge: the gateway → the HTTP API only (private routes + the public webhook
     # receiver). Never :9090.
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kong
+              # RFC-0024 P2.3 edge cutover: was `kong` — re-pointed to the Envoy
+              # Gateway proxy fleet namespace. Verified by scripts/edge-isolation-sweep.sh.
+              kubernetes.io/metadata.name: envoy-gateway
       ports:
         - protocol: TCP
           port: 8080

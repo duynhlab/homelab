@@ -5,7 +5,7 @@
 # chart's PVC is enabled; long-term profile blocks go to the in-cluster RustFS
 # (S3-compatible) bucket pyroscope-profiles with 7d retention — mirroring Tempo.
 # fullnameOverride pins the Service to `pyroscope:4040` so the Grafana datasource
-# and Kong ingress keep working unchanged.
+# and edge route keep working unchanged.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease

@@ -28,11 +28,13 @@ spec:
     # locally, so the east-west :9090 allow is gone. Every service still
     # fetches the JWKS DIRECTLY from auth over HTTP
     # (http://auth.auth.svc:8080/auth/v1/public/auth/jwks, cached + background
-    # refresh), so the app namespaces keep :8080 alongside kong.
+    # refresh), so the app namespaces keep :8080 alongside the edge namespace.
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kong
+              # RFC-0024 P2.3 edge cutover: was `kong` — re-pointed to the Envoy
+              # Gateway proxy fleet namespace. Verified by scripts/edge-isolation-sweep.sh.
+              kubernetes.io/metadata.name: envoy-gateway
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: auth

@@ -16,5 +16,7 @@ resources:
   - servicemonitors/envoy-gateway-controller.yaml
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
   - podmonitors/podmonitor-flux-system.yaml
+  # Envoy Gateway data plane (proxy fleet, job="envoy-gateway") — RFC-0024 P4
+  - podmonitors/envoy-gateway-proxy.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)
   - prometheusrules/

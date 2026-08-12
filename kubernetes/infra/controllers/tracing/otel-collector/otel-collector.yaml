@@ -51,10 +51,12 @@ spec:
             insecure: true
           compression: gzip
         otlphttp/victorialogs:
-          # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee AND
-          # Kong's opentelemetry plugin post OTLP logs here; re-export to
-          # VictoriaLogs. VL-Stream-Fields makes service.name the log-stream
-          # identity; trace_id stays a queryable regular field.
+          # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee posts
+          # OTLP logs here; re-export to VictoriaLogs. VL-Stream-Fields makes
+          # service.name the log-stream identity; trace_id stays a queryable
+          # regular field. (Kong's opentelemetry-plugin log source retired with
+          # the RFC-0024 P2.3 cutover — Envoy Gateway access logs go to stdout
+          # and ride the Vector DaemonSet instead.)
           logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
           headers:
             VL-Stream-Fields: "service.name"
@@ -122,27 +124,6 @@ spec:
         # sample stored in VM silently breaks rate().
         deltatocumulative:
           max_stale: 5m
-        # Drop Kong's redis-shorthand deprecation notice. Audit 2026-08-07 found
-        # it was 3840 of 3840 stored Kong WARN records — i.e. EVERY Kong warning
-        # in the 90-day ClickHouse store was this one line, and no real Kong
-        # warning was present at all. The platform config is already the
-        # non-deprecated nested `redis:` form in both the cluster plugins and
-        # local-stack; Kong 3.9.3 materialises the full deprecated shorthand set
-        # from those values during declarative-config load and warns on each
-        # (proof: redis_ssl and redis_ssl_verify warn just as often and appear
-        # nowhere in this repo). So there is nothing to fix upstream of here and
-        # the notice disappears by itself at the Kong 4.0 bump — until then it
-        # only buys retention cost and buries real warnings.
-        # The dot in `config.redis_` is an unescaped regex any-char on purpose:
-        # a literal-dot escape has to survive YAML single quotes AND the OTTL
-        # string parser, and an OTTL PARSE error fails collector startup (which
-        # error_mode: ignore does not cover). Matching one extra character class
-        # is the cheaper risk.
-        filter/kong_redis_deprecation:
-          error_mode: ignore
-          logs:
-            log_record:
-              - 'resource.attributes["service.name"] == "kong" and IsMatch(body, "config.redis_.* is deprecated")'
       receivers:
         otlp:
           protocols:
@@ -172,7 +153,6 @@ spec:
             - clickhouse
             processors:
             - memory_limiter
-            - filter/kong_redis_deprecation
             - batch
             receivers:
             - otlp

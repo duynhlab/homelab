@@ -2,7 +2,15 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-06-30 | 2026-07-14 |
+| implemented — superseded in part by [RFC-0022](../RFC-0022/README.md)/[RFC-0024](../RFC-0024/README.md) | platform-wide | 2026-06-30 | 2026-08-11 |
+
+> **Superseded in part (2026-08-11).** [RFC-0022](../RFC-0022/README.md) retires the
+> custom `auth-service` issuer this RFC built (Keycloak becomes the platform IdP),
+> and [RFC-0024](../RFC-0024/README.md) retires its Kong vehicle (Envoy Gateway
+> `remoteJWKS` replaces the static-key `jwt-edge` check —
+> [ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)). The defense-in-depth
+> shape this RFC introduced — coarse edge check, services authoritative — survives
+> both moves. Kept as history; not a live design.
 
 > **Don't forget: every decision is a tradeoff.** This RFC moves the platform from
 > opaque DB-backed session tokens to stateless signed JWTs and adds a second

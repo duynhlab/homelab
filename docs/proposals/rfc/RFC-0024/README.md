@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate pending owner sign-off | 2026-08-10 | 2026-08-10 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed, owner signed off 2026-08-11 | 2026-08-10 | 2026-08-11 |
 
 > **Every decision is a tradeoff.** This RFC replaces a mature, working edge (Kong OSS
 > 3.9) with Envoy Gateway **and, in the same greenfield program, executes the Keycloak
@@ -87,7 +87,7 @@ fan-out and the manual edge rotation step) are never built at all.
   per the RFC-0022 design record — one identity, one edge, one rebuild.
 - Keycloak verified at the edge via `remoteJWKS` — zero provisioned key material,
   rotation-transparent; services stay the authoritative verifier (ADR-006's split
-  survives, re-homed by ADR-045).
+  survives, re-homed by ADR-044).
 - `protected` routes ([RFC-0023](../RFC-0023/README.md)) gain an edge role gate
   (`realm_access.roles` ∋ `backoffice_admin`).
 - Local-first rate limiting with no new stateful components; admin-UI CIDR fence and
@@ -231,7 +231,7 @@ pacing re-derives from the new numbers.
 
 ### Observability cutover
 
-The 13 alerts + 19 recording rules on `kong_*` are rewritten on `envoy_*` equivalents
+The 13 alerts + 20 recording rules on `kong_*` are rewritten on `envoy_*` equivalents
 in the same PR train as the route cutover, using EG's four first-party Grafana
 dashboards as the reference for expression shapes; the alert catalog §2 is rewritten.
 Vector's `kong_json` parsing maps once onto the Envoy default JSON schema (richer:
@@ -367,14 +367,17 @@ reverts cheap; no dual-gateway or dual-issuer state ever exists.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Envoy Gateway is the platform edge; Gateway API is the routing config model (supersedes ADR-006's Kong binding — the edge-coarse/service-authoritative split survives) | ADR-045 | Proposed |
-| Edge rate limiting is local-first (no RLS/Redis); global is an escape hatch behind a recorded trigger | ADR-046 | Proposed |
-| The E2E release-audit gate moves to Kind if compose cannot carry the edge (standalone spike fails) | ADR-047 | Proposed |
+| Envoy Gateway is the platform edge; Gateway API is the routing config model (supersedes ADR-006's Kong binding — the edge-coarse/service-authoritative split survives) | [ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/) | Accepted |
+| Edge rate limiting is local-first (no RLS/Redis); global is an escape hatch behind a recorded trigger | [ADR-045](../../adr/ADR-045-local-first-edge-rate-limiting/) | Accepted |
+| The E2E release-audit gate moves to Kind if compose cannot carry the edge (standalone spike fails) | [ADR-046](../../adr/ADR-046-e2e-gate-kind-fallback/) | Accepted |
 
-Numbers count past RFC-0023's 042–044 per owner convention. RFC-0022's proposed
-identity ADRs (039–041: adopt Keycloak; `sub` as user_id; OIDC-for-browsers /
-workload-trust-east-west) remain owned by that design record and flip to Accepted
-together with this RFC's review.
+Numbering note (2026-08-11): the RFC text originally reserved 045–047 on the
+assumption that RFC-0022 held 039–041 and RFC-0023 would take 042–044. ADR-039
+(local-stack Temporal) and ADR-040 (Tempo chart) were consumed by unrelated
+decisions in the meantime, so at acceptance the identity ADRs took
+[041](../../adr/ADR-041-keycloak-platform-idp/)–[043](../../adr/ADR-043-oidc-browser-workload-trust/)
+(owned by the RFC-0022 design record, Accepted with this review) and this RFC's
+edge ADRs took 044–046; RFC-0023's future ADRs shift to 047–049.
 
 ## Implementation History
 
@@ -388,6 +391,13 @@ together with this RFC's review.
   execution.** Keycloak deployment and auth-service retirement run as phases P1/P3/P5
   of this program (RFC-0022 stays the identity design record); the edge never trusts
   auth-service — it is born trusting the Keycloak realm.
+- 2026-08-11 — **Research gate passed; Status → Accepted.** ADRs created at
+  Accepted with this review: identity [ADR-041](../../adr/ADR-041-keycloak-platform-idp/)/[042](../../adr/ADR-042-oidc-sub-as-user-id/)/[043](../../adr/ADR-043-oidc-browser-workload-trust/)
+  (RFC-0022's design record) and edge [ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)/[045](../../adr/ADR-045-local-first-edge-rate-limiting/)/[046](../../adr/ADR-046-e2e-gate-kind-fallback/)
+  (renumbered from the reserved 039–041/045–047 — see Resulting decisions).
+  Repo-verified corrections folded in: the `kong_*` rule set is 13 alerts +
+  **20** recording rules, and the `platform-db` `bootstrap.initdb` contract
+  already rests on `user`/`platform-db-user-secret` (see RFC-0022 history).
 
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
@@ -406,4 +416,4 @@ When Status → implemented, confirm:
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — to be archived read-only
 
 ---
-_Last updated: 2026-08-10_
+_Last updated: 2026-08-11_

@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate pending owner sign-off | 2026-08-09 | 2026-08-09 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed with the RFC-0024 review, 2026-08-11 | 2026-08-09 | 2026-08-11 |
 
 > **⚠ Implementation absorbed into [RFC-0024](../RFC-0024/README.md)** (owner
 > decision 2026-08-10): this RFC remains the platform's **identity design record** —
@@ -509,9 +509,13 @@ supported at any point.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Adopt Keycloak as the platform identity provider; retire the custom auth-service | ADR-039 *(number pending owner confirmation)* | Proposed |
-| Use the single-issuer OIDC subject (`sub`) as the application `user_id` (string, fleet-wide) | ADR-040 *(pending)* | Proposed |
-| Browser identity via OIDC; east-west trust stays workload-level (no Client Credentials) | ADR-041 *(pending)* | Proposed |
+| Adopt Keycloak as the platform identity provider; retire the custom auth-service | [ADR-041](../../adr/ADR-041-keycloak-platform-idp/) | Accepted |
+| Use the single-issuer OIDC subject (`sub`) as the application `user_id` (string, fleet-wide) | [ADR-042](../../adr/ADR-042-oidc-sub-as-user-id/) | Accepted |
+| Browser identity via OIDC; east-west trust stays workload-level (no Client Credentials) | [ADR-043](../../adr/ADR-043-oidc-browser-workload-trust/) | Accepted |
+
+*(Numbering note 2026-08-11: the reserved 039–040 were consumed by unrelated
+decisions — local-stack Temporal and the Tempo chart — so these landed as
+041–043 at acceptance.)*
 
 The subject-as-`user_id` decision stays a separate ADR deliberately — it reshapes
 every domain schema and outlives the choice of IdP.
@@ -535,6 +539,15 @@ every domain schema and outlives the choice of IdP.
   auth-service retirement run as RFC-0024 phases P1/P3/P5. This document stays the
   identity design record; its proposed ADRs (039–041) flip Accepted with RFC-0024's
   review.
+- 2026-08-11 — **Status → Accepted with the RFC-0024 review.** Identity ADRs
+  created at Accepted as [ADR-041](../../adr/ADR-041-keycloak-platform-idp/)/[042](../../adr/ADR-042-oidc-sub-as-user-id/)/[043](../../adr/ADR-043-oidc-browser-workload-trust/)
+  (renumbered — 039/040 were consumed by unrelated decisions). **As-built
+  correction:** the `platform_owner` bootstrap-handover step (Open questions #5)
+  is already moot — `platform-db`'s `bootstrap.initdb` rests on
+  `user`/`platform-db-user-secret` today (`clusters/platform-db/instance.yaml`),
+  not on `auth`; the stale claim lives only in `services/auth.yaml`'s header
+  comment. Retiring the `auth` triplet needs comment hygiene plus a Kind
+  DR-rebuild validation, not a new neutral role.
 - 2026-08-09 — All 13 open questions resolved with owner-approved directions
   ([research → Open questions](./research.md#open-questions)): 15-min access tokens
   with per-client session bounds, refresh rotation/reuse-revocation on, `platform-api`
@@ -563,4 +576,4 @@ When Status → implemented, confirm:
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) · [`docs/secrets/openbao.md`](../../../secrets/openbao.md)
 
 ---
-_Last updated: 2026-08-10_
+_Last updated: 2026-08-11_

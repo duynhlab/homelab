@@ -2,7 +2,16 @@
 
 | Status | Date | Related RFC |
 |--------|------|-------------|
-| Accepted (implemented) | 2026-06-30 | [RFC-0009](../../rfc/RFC-0009/) |
+| Accepted (implemented); Kong vehicle superseded by [ADR-044](../ADR-044-envoy-gateway-platform-edge/) | 2026-06-30 | [RFC-0009](../../rfc/RFC-0009/) |
+
+> **Superseded in vehicle by [ADR-044](../ADR-044-envoy-gateway-platform-edge/)
+> (2026-08-11, [RFC-0024](../../rfc/RFC-0024/README.md)).** The principle this ADR
+> established — a coarse edge check as defense-in-depth, with services
+> (`pkg/authmw`) as the authoritative fail-closed verifier — survives and is
+> re-homed onto Envoy Gateway's `remoteJWKS` SecurityPolicy. What retires is the
+> vehicle: the Kong OSS `jwt` plugin, the statically provisioned RS256 consumer
+> credential, and (with [ADR-041](../ADR-041-keycloak-platform-idp/)) the custom
+> `auth-service` issuer itself. Body kept unchanged below for history.
 
 > **Don't forget: every decision is a tradeoff.** This decision buys edge-side
 > rejection of bad tokens and a stateless, offline-verifiable identity — at the cost

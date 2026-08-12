@@ -75,7 +75,7 @@ Versioning: link api.md § versioning — do not duplicate platform policy here.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
-| **Repository** | [`duynhlab/{service}-service`](https://github.com/duynhlab/{service}-service) | — |
+| **Repository** | `duynhlab/{service}-service` <!-- link it once {service} is filled in --> | — |
 | **Domain** | {bounded context / subdomain} | — |
 | **Owns** | {authoritative data and business rules} | — |
 | **Does not own** | {adjacent data and rules owned elsewhere} | — |
@@ -83,7 +83,7 @@ Versioning: link api.md § versioning — do not duplicate platform policy here.
 | **Cache** | None <!-- or cache name, purpose, authority rule --> | — |
 | **Sensitive data** | None <!-- or PII/token/financial classification --> | — |
 | **Contract sources** | HTTP `{router/types paths}` · gRPC `{proto repository/path}` | — |
-| **Design records** | — | [RFC-NNNN](../proposals/rfc/RFC-NNNN/) <!-- or None --> |
+| **Design records** | — | `RFC-NNNN` <!-- link ../proposals/rfc/RFC-NNNN/ once numbered, or None --> |
 
 ## Temporal participation
 
@@ -114,7 +114,7 @@ versioning rows.
 | **Idempotency** | {business key and replay behavior} |
 | **Retry / timeout ownership** | {Temporal policy owner and service-side limits} |
 | **Versioning** | {workflow patch/version strategy or None} |
-| **Deep dive** | [workflows.md](./workflows.md#workflow-anchor) · [{deep-dive}.md](./{deep-dive}.md) |
+| **Deep dive** | [workflows.md](./workflows.md#workflow-anchor) · `{deep-dive}.md` <!-- link it once named --> |
 
 ## Why it exists
 
@@ -279,7 +279,7 @@ the one most often missing.
 Part 14 — Verify paths against the actual service repo.
 -->
 
-Paths in [`duynhlab/{service}-service`](https://github.com/duynhlab/{service}-service).
+Paths in `duynhlab/{service}-service`.
 Transport peers call `logic/v1`; logic calls `core` only
 ([api.md § Inside Each Service](./api.md#inside-each-service)).
 

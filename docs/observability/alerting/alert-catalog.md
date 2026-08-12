@@ -82,7 +82,7 @@ Source: `prometheusrules/microservices/alerts.yaml` (OTLP push pipeline — RFC-
 
 > **Scrape-era alerts retired at the P3 cutover.** `MicroserviceHighRequestsInFlight` / `MicroserviceRequestsInFlightCritical` (saturation) are **removed** — otelgin v0.69 emits no `http.server.active_requests`, so there is no OTel in-flight metric (re-add when it ships). `MicroserviceHighGCPressure` + `MicroserviceHighGCFrequency` (GC pause) were **replaced** by `MicroserviceGCThrash`, itself **retired 2026-07-17** (audit: the runtime family has no heap series — only stack/other — so the ratio vs the heap-only GC goal false-fired permanently). `MicroserviceDown` / `MicroserviceAllInstancesDown` moved from `up{}` scrape liveness to the D-4 heartbeat-absence check above. The former scrape-era `MicroserviceHighRestartRate` is not part of the OTLP alert set — CrashLoop/restart is covered by `KubePodCrashLooping` (§5).
 
-## 2. Envoy Gateway edge {#2-envoy-gateway-edge}
+## 2. Envoy Gateway edge
 
 Supersedes the `kong_*` set — this section was replaced wholesale at the RFC-0024
 P2.3 cutover (Kong decommissioned); the rules are designed from `envoy_*` semantics,
@@ -358,7 +358,7 @@ saturation). Pyroscope profiling-backend health is covered by `PyroscopeDown`.
 
 ---
 
-## 9. RFC-0021 order-side stock {#9-rfc-0021-order-side-stock}
+## 9. RFC-0021 order-side stock
 
 Source: `prometheusrules/microservices/rfc0021-write-migration.yaml`,
 `prometheusrules/microservices/inventory.yaml`,

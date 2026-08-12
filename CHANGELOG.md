@@ -429,6 +429,13 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Security
+
+- Four `docs/api/` service contracts documented their edge NetworkPolicy ingress
+  as arriving from a namespace that no longer exists. All eleven policies admit
+  `envoy-gateway`; the docs now match the manifests, and the comments in the
+  policies say what the namespace is for rather than what it used to be.
+
 #### Observability
 
 - `VLSingle`/`VTSingle` dropped the inert `removePvcAfterDelete: true` —
@@ -439,6 +446,21 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- `docs/api/` names the deployed edge and speaks Gateway API: HTTPRoute matches
+  rather than ingress annotations, an edge `SecurityPolicy` rather than a
+  per-route plugin, a `URLRewrite` filter rather than a path-stripping flag —
+  17 files. Three claims were wrong about behaviour rather than naming: `cart.md`
+  and `product.md` still reported their audience scoping as Partial when both
+  prefixes stop after the audience segment; `microservices.md` and `caching.md`
+  attributed rate limiting to a shared Valkey database, when the edge limiter is
+  `type: Local`, an in-process token bucket with no datastore to document; and
+  `temporal.md` pointed at a config path that no longer carries the UI route.
+  Cluster statements not yet run on Kind are marked **planned**; `auth.md` is
+  untouched because it documents the service retiring in P5.
+- The E2E runbook blocks on the data plane instead of assuming it. `/readyz`
+  reports the control plane ready as soon as it parses config, which on a cold
+  boot is minutes before Envoy finishes downloading — every edge row returns
+  code `000` in that window and reads like a broken edge rather than a slow one.
 - `docs/api/` and `local-stack/` corrected against deployed reality. The
   release-gate fixes matter most: the abandonment-timer row told operators to
   arm it before Phase A, where `$TCLI` and `audit_curl` were still undefined, so

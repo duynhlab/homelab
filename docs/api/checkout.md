@@ -8,7 +8,7 @@ order-service — which remains the only writer of orders.
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private only · `:8080` · Kong `/checkout/v1/private/` (edge JWT) | Implemented |
+| **HTTP** | private only · `:8080` · edge `/checkout/v1/private/` (`jwt-edge` SecurityPolicy) | Implemented |
 | **gRPC server** | None — client only | None |
 | **gRPC client** | cart (`GetCart`), product (`BatchGetCurrentPrices`), inventory (`CheckAvailability`), shipping (`GetQuote`), order (`CreateOrder`) | Implemented |
 | **Worker** | `checkout-worker` · queue `checkout` | Implemented |
@@ -57,8 +57,8 @@ machine.
 
 ```mermaid
 flowchart LR
-    SPA["SPA (React)"] --> Kong["Kong (edge JWT)"]
-    Kong -->|"/checkout/v1/private/checkout/sessions…"| CK["checkout-service"]
+    SPA["SPA (React)"] --> Edge["Envoy Gateway (edge JWT)"]
+    Edge -->|"/checkout/v1/private/checkout/sessions…"| CK["checkout-service"]
     CK -->|"gRPC GetCart (read-only, ADR-021)"| CART[cart]
     CK -->|"gRPC BatchGetCurrentPrices (prices, cache-bypass)"| PROD[product]
     CK -->|"gRPC CheckAvailability (stock — the only availability authority)"| INV[inventory]
@@ -71,14 +71,14 @@ flowchart LR
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class CK,CART,PROD,SHIP,ORD service;
     class TMP platform;
     class DB data;
 ```
 
-checkout is a **client-only** service: nothing dials into it except Kong (no
-gRPC server, no internal HTTP surface). Every outbound east-west call is gRPC
+checkout is a **client-only** service: nothing dials into it except the edge
+(no gRPC server, no internal HTTP surface). Every outbound east-west call is gRPC
 via `pkg/grpcx` — see [api.md § gRPC Runtime Model](./api.md#grpc-runtime-model).
 
 ## Data model
@@ -136,7 +136,7 @@ mid-flight.
 
 ## HTTP API
 
-All routes are `private` — Kong edge-JWT is the coarse filter, in-service
+All routes are `private` — the edge's `jwt-edge` SecurityPolicy is the coarse filter, in-service
 `pkg/authmw` is authoritative, and sessions are **owner-scoped** by the JWT
 `user_id`. The path uses a process-named segment like auth (literal
 `checkout` segment, resources nested; v3.0.1).
@@ -289,7 +289,7 @@ unique index.
 
 ## Callers & dependencies
 
-**Inbound:** only the SPA via Kong (`/checkout/v1/private/`, edge JWT). No
+**Inbound:** only the SPA via the edge (`/checkout/v1/private/`, `jwt-edge` SecurityPolicy). No
 service calls checkout — no gRPC server, no internal HTTP surface.
 
 **Outbound:** the five gRPC callees above (cart, product, inventory, shipping, order)
@@ -331,8 +331,8 @@ What checkout deliberately does NOT do (the boundary):
 
 - **Local-stack:** service `checkout` + `checkout-migrate` job + `checkout-worker`
   (the AbandonedCheckoutWorkflow poller, task queue `checkout`); migrations seed
-  `tax_rules` and demo promo codes, sessions themselves have no seed; Kong route `/checkout/v1/private/` (edge JWT); no host port
-  (platform convention — services are reached only through Kong). Audit:
+  `tax_rules` and demo promo codes, sessions themselves have no seed; `HTTPRoute` `/checkout/v1/private/` (`jwt-edge` SecurityPolicy); no host port
+  (platform convention — services are reached only through the edge). Audit:
   sections **A9-A10** in
   [`local-stack/docs/e2e-audit.md`](../../local-stack/docs/e2e-audit.md)
   (session lifecycle, price-change detection, confirm + abandonment).
@@ -348,7 +348,7 @@ What checkout deliberately does NOT do (the boundary):
   remember: a sustained majority of `expired{reason="lazy"}` means the worker
   is down or wedged.
 - **Cluster (P5):** RSIP under the existing `checkout` domain ResourceSet,
-  CNPG triplet, NetworkPolicies (Kong→8080; cart, product, inventory, order, and shipping
+  CNPG triplet, NetworkPolicies (envoy-gateway→8080; cart, product, inventory, order, and shipping
   each admit checkout→9090 — the full dial set of the confirm path). The netpol is a **release gate**: RFC-0015's east-west gRPC
   surface is unauthenticated by design and the fence is the policy.
 

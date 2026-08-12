@@ -10,7 +10,7 @@ availability, but it *asks inventory* for it.
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public (+ one internal route, never at the edge) · `:8080` · Kong `/product/v1/public/` (local-stack: bare `/product/` — [divergence](#http-api)) | Partial |
+| **HTTP** | public (+ one internal route, never at the edge) · `:8080` · edge `/product/v1/public/` | Implemented |
 | **gRPC server** | `BatchGetCurrentPrices` · `:9090` — the only RPC. `GetProducts`, `ReserveStock`, `ReleaseStock` were **removed** in RFC-0021 P4 | Implemented |
 | **gRPC client** | review (`ReviewService/GetProductReviews`), inventory (`InventoryService/BatchGetAvailability`) | Implemented |
 | **Worker** | None | None |
@@ -58,8 +58,8 @@ inventory-service, ledger and all.
 
 ```mermaid
 flowchart LR
-    SPA["Browser SPA"] --> Kong["Kong<br/>edge :8080"]
-    Kong -->|"/product/v1/public/…"| Product["product-service<br/>:8080 HTTP · :9090 gRPC"]
+    SPA["Browser SPA"] --> Edge["Envoy Gateway<br/>edge :8080"]
+    Edge -->|"/product/v1/public/…"| Product["product-service<br/>:8080 HTTP · :9090 gRPC"]
     Product --> Cache[("Valkey<br/>cache-aside")]
     Product --> DB[("product DB<br/>via PgDog :6432")]
     Product -->|"gRPC GetProductReviews<br/>3s deadline, soft-fail"| Review[review]
@@ -69,7 +69,7 @@ flowchart LR
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class Product,Review,Checkout,Inventory service;
     class DB,Cache data;
 ```
@@ -114,8 +114,8 @@ Both edges expose exactly `/product/v1/public/`, so the internal create has no
 route to match in either environment — see
 [api.md § Edge exposure](./api.md#edge-exposure). Until 2026-08-11 local-stack
 routed the bare prefix `/product/`, which made that create reachable with no JWT
-at all. Service paths are identical — Variant A pass-through,
-`strip_path: false`.
+at all. Service paths are identical — Variant A pass-through, no `URLRewrite`
+filter configured.
 
 ### Product shape
 
@@ -237,7 +237,7 @@ deadline on top of the `pkg/grpcx` default, and an inventory failure resolves to
 
 | Direction | Peer | Transport | Purpose |
 |-----------|------|-----------|---------|
-| Inbound | Browser SPA via Kong | HTTP | Catalog browsing, product page |
+| Inbound | Browser SPA via the edge | HTTP | Catalog browsing, product page |
 | Inbound | checkout | gRPC `BatchGetCurrentPrices` | **Price** re-validation at session create + confirm; availability comes from inventory ([checkout.md](./checkout.md)) |
 | ~~Inbound~~ | ~~order-worker~~ | ~~gRPC `ReserveStock` / `ReleaseStock`~~ | **Gone.** RFC-0021 P4 deleted the saga branch *and* the RPCs; order no longer dials product at all, and the NetworkPolicy allow **was withdrawn** on 2026-08-06 once the pre-P4 worker builds were shown to hold no pinned histories ([temporal.md](./temporal.md)) |
 | Outbound | inventory | gRPC `BatchGetAvailability` | `/details` availability enrichment; soft-fail to `status: unknown` ([inventory.md](./inventory.md)) |
@@ -275,7 +275,7 @@ Platform-wide call graph: [api.md § Current east-west call graph](./api.md#curr
   `INVENTORY_GRPC_ADDR` (`dns:///inventory.inventory.svc.cluster.local:9090` —
   set explicitly; the code default names a Service this cluster does not have).
 - **Cluster:** RSIP [`kubernetes/apps/services/product.yaml`](../../kubernetes/apps/services/product.yaml)
-  (domain `catalog`); NetworkPolicy admits Kong→`:8080` and checkout→`:9090`.
+  (domain `catalog`); NetworkPolicy admits the edge (`envoy-gateway` namespace)→`:8080` and checkout→`:9090`.
   The order-worker allow on `:9090` is withdrawn once the pre-P4 worker builds
   drain — order has no product client left to use it.
 - **Signals:** `product_cache_gets_total{result}` (`hit` / `miss` / `error`) —
@@ -286,7 +286,7 @@ Platform-wide call graph: [api.md § Current east-west call graph](./api.md#curr
 - **Smoke tests:**
 
 ```bash
-# Catalog via Kong (local-stack)
+# Catalog via the local gateway (local-stack)
 curl -s http://localhost:8080/product/v1/public/products?limit=5 | jq .items[0]
 curl -s http://localhost:8080/product/v1/public/products/1/details | jq .reviews_summary
 

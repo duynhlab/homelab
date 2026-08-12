@@ -74,9 +74,16 @@ for release; every Phase A, B, and C row must pass before a tag is created.
    gate the missing healthcheck cannot provide:
 
    ```bash
-   curl -sf -o /dev/null -w 'edge: %{http_code}\n' \
-     http://localhost:8080/product/v1/public/products   # want 200
    curl -sf http://localhost:8099/readyz                # control plane loaded the config
+   # BLOCK here until the data plane serves. Do not substitute "up completed" or
+   # even a 200 from /readyz for this: the control plane reports ready as soon as
+   # it has parsed the config, which is minutes before a cold-booted Envoy
+   # finishes downloading (see the cold-start note in step 2). Every edge row of
+   # Phase A returns curl exit 7 / code 000 in that window, which reads like a
+   # broken edge rather than a slow one.
+   until [ "$(curl -so /dev/null -w '%{http_code}' \
+     http://localhost:8080/product/v1/public/products)" = 200 ]; do sleep 10; done
+   echo "edge serving"
    ```
 
    One more edge check belongs here, because it is cheap and it invalidates the

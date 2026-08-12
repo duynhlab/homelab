@@ -203,7 +203,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 
 | Topic | Document |
 |-------|----------|
-| Kong routing and plugins | [Kong gateway](../platform/kong-gateway.md) |
+| Edge routing and policy | [Envoy Gateway](../platform/envoy-gateway.md) |
 | NetworkPolicy caller matrix | [Network policies](../security/network-policies.md) |
 | Application observability (normative contract) | [observability.md](./observability.md) · [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md) |
 | Metrics platform ops (alerts, dashboards) | [Application metrics (platform)](../observability/metrics/metrics-apps.md) |

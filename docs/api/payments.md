@@ -7,7 +7,7 @@ reconciliation loop that proves the books match the provider.
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private + public webhooks · `:8080` · Kong `/payment/v1/private/` (JWT) + `/payment/v1/public/payments/webhooks/` (HMAC, anonymous) + deprecated alias `/payment/v1/public/webhooks/` (ADR-017) | Implemented |
+| **HTTP** | private + public webhooks · `:8080` · Edge `/payment/v1/private/` (JWT) + `/payment/v1/public/payments/webhooks/` (HMAC, anonymous) + deprecated alias `/payment/v1/public/webhooks/` (ADR-017) | Implemented |
 | **gRPC server** | `PaymentService/GetPayment, Authorize, Capture, Void, Refund` · `:9090` | Implemented |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
@@ -52,7 +52,7 @@ latency, and reconciliation stay honest against a process that can fail independ
 
 ```mermaid
 flowchart LR
-    Browser -->|"private HTTP via Kong"| Payment["payment-service"]
+    Browser -->|"private HTTP via the edge"| Payment["payment-service"]
     Provider["mockpay provider"] -->|"signed webhook (HMAC)"| Payment
     OrderAPI["order API"] -->|"gRPC GetPayment"| Payment
     Worker["order-worker"] -->|"gRPC Authorize/Capture/Void/Refund"| Payment
@@ -107,9 +107,10 @@ an opaque `tok_` test token — PAN-like data is never accepted, stored, or logg
 | `GET` | `/payment/v1/internal/payments/reconciliation/runs/:id` | In-cluster operator | Read a reconciliation report |
 
 Private responses are owner-scoped by the JWT `user_id`. Internal routes are
-never published through Kong; NetworkPolicy is the cluster boundary. The
+never given an `HTTPRoute` at the edge; NetworkPolicy is the cluster boundary. The
 public webhook is not anonymous in practice: its HMAC signature is the
-credential (Kong's rate/size limits still apply). The deprecated pre-v3 alias
+credential (the edge's rate/size limits still apply — `BackendTrafficPolicy`).
+The deprecated pre-v3 alias
 `/payment/v1/public/webhooks/mockpay` stays mounted during the ADR-017 window
 ([Known gaps](#known-gaps)); shared conventions live in [api.md](./api.md).
 
@@ -385,7 +386,7 @@ older charge read as missing on our side.
 | Inbound | order-worker (saga activities) | gRPC `Authorize`/`Capture`/`Void`/`Refund` |
 | Inbound | order API (details enrichment) | gRPC `GetPayment(order_id)`, soft-fail |
 | Inbound | mockpay | Signed webhook → `/payment/v1/public/payments/webhooks/mockpay` |
-| Inbound | Browser via Kong | `/payment/v1/private/payments…` (edge JWT + `pkg/authmw`) |
+| Inbound | Browser via the edge | `/payment/v1/private/payments…` (edge JWT + `pkg/authmw`) |
 | Outbound | mockpay | Provider HTTP port (charge/capture/void/refund, `GET /transactions`) — payment is not a gRPC client of any service |
 
 ## Known gaps
@@ -424,10 +425,10 @@ older charge read as missing on our side.
   `MOCKPAY_WEBHOOK_URL`, `AUTH_HOLD_TTL`, `IDEMPOTENCY_KEY_TTL`,
   `IDEMPOTENCY_LOCK_TAKEOVER`, `RECON_HEAL_ENABLED`.
 - **Reconciliation API** (internal audience — never routed through the
-  gateway: on the cluster the payment NetworkPolicy is the fence — Kong
+  gateway: on the cluster the payment NetworkPolicy is the fence — the edge
   reaches `:8080` only, the order namespace alone reaches `:9090` — and in
-  local-stack Kong simply omits the route). The ticker also runs a pass
-  every 5 minutes:
+  local-stack the edge simply has no `HTTPRoute` for it). The ticker also
+  runs a pass every 5 minutes:
 
 ```bash
 # trigger one pass over the AUTOMATIC window

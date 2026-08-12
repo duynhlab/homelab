@@ -6,7 +6,7 @@ One place to learn how HTTP and gRPC contracts work across the duynhlab platform
 |-----------|-------|-----------|
 | **Status** | Implemented; checkout P1-P5 runs in local-stack and the cluster | — |
 | **Scope** | Shared HTTP conventions, gRPC conventions, and the current service call graph | — |
-| **Public transport** | HTTP/JSON through Kong on `:8080` | — |
+| **Public transport** | HTTP/JSON through the edge (Envoy Gateway) on `:8080` | — |
 | **Internal transport** | gRPC on `:9090`; one documented cart REST exception remains (worker cart clear) | — |
 | **Contract source** | HTTP routers in each service repo; protobufs in `duynhlab/pkg` | — |
 | **Audience** | Readers learning the platform and engineers changing an API | — |
@@ -18,7 +18,7 @@ There are two complementary contract layers:
 
 | Layer | Used by | Format | Why |
 |-------|---------|--------|-----|
-| Edge API | Browser, provider webhooks, operational clients | HTTP/JSON | Easy to inspect, compatible with Kong and browsers |
+| Edge API | Browser, provider webhooks, operational clients | HTTP/JSON | Easy to inspect directly from a browser or `curl` |
 | East-west API | One microservice calling another | gRPC/Protobuf | Typed contracts, deadlines, code generation, and efficient long-lived connections |
 
 A service owns its data and its business rules. Calling another service does
@@ -40,8 +40,8 @@ flowchart TB
     Internet --> Browser["React SPA"]
 
     %% ===== Layer 3: Gateway =====
-    Browser -->|"HTTP/JSON"| Kong["Kong gateway"]
-    Provider -->|"signed webhook"| Kong
+    Browser -->|"HTTP/JSON"| Edge["Envoy Gateway<br/>edge"]
+    Provider -->|"signed webhook"| Edge
 
     %% ===== Layer 4: Application platform =====
     subgraph Platform["duynhlab application platform"]
@@ -78,17 +78,17 @@ flowchart TB
         Temporal["Temporal"]
     end
 
-    %% Kong -> domain entry points
-    Kong -->|"HTTP :8080"| Auth
-    Kong -->|"HTTP :8080"| User
-    Kong -->|"HTTP :8080"| Product
-    Kong -->|"HTTP :8080"| Review
-    Kong -->|"HTTP :8080"| Cart
-    Kong -->|"HTTP :8080"| Checkout
-    Kong -->|"HTTP :8080"| Order
-    Kong -->|"HTTP :8080"| Shipping
-    Kong -->|"HTTP :8080"| Payment
-    Kong -->|"HTTP :8080"| Notification
+    %% Edge -> domain entry points
+    Edge -->|"HTTP :8080"| Auth
+    Edge -->|"HTTP :8080"| User
+    Edge -->|"HTTP :8080"| Product
+    Edge -->|"HTTP :8080"| Review
+    Edge -->|"HTTP :8080"| Cart
+    Edge -->|"HTTP :8080"| Checkout
+    Edge -->|"HTTP :8080"| Order
+    Edge -->|"HTTP :8080"| Shipping
+    Edge -->|"HTTP :8080"| Payment
+    Edge -->|"HTTP :8080"| Notification
 
     %% Synchronous cross-service calls
     Product -->|"gRPC reviews"| Review
@@ -145,7 +145,7 @@ flowchart TB
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class Browser,Kong edge;
+    class Browser,Edge edge;
     class Auth,User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification service;
     class CheckoutWorker,OrderWorker worker;
     class Temporal platform;
@@ -172,7 +172,7 @@ graph LR
     classDef external fill:#64748b,color:#fff,stroke:#334155;
 ```
 
-Read the diagram **top-down**: Internet → React SPA → Kong → HTTP services and
+Read the diagram **top-down**: Internet → React SPA → the edge → HTTP services and
 workflows → data stores. It names every deployed service and worker. Solid arrows
 are current HTTP, gRPC, workflow, or data-store paths; the dotted arrow is the
 one documented cart REST exception (the worker's cart clear). Exact RPC names are in
@@ -186,8 +186,8 @@ transport peers: both validate input and call the logic layer.
 
 ```mermaid
 flowchart LR
-    Browser --> Kong
-    Kong -->|"HTTP/JSON :8080"| Web["web/v1"]
+    Browser --> Edge["Envoy Gateway"]
+    Edge -->|"HTTP/JSON :8080"| Web["web/v1"]
     Caller["another service"] -->|"gRPC :9090"| GRPC["grpc/v1"]
     Web --> Logic["logic/v1"]
     GRPC --> Logic
@@ -197,7 +197,7 @@ flowchart LR
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class Browser,Kong edge;
+    class Browser,Edge edge;
     class Caller,Web,GRPC,Logic,Core service;
     class DB data;
 ```
@@ -230,21 +230,22 @@ Example:
 | `audience` | Who may call the route | `public`, `private`, `internal`, `protected` |
 | `resource` | Plural collection noun, then identifiers or subresources | `orders/42/details` |
 
-Kong passes the path through unchanged. A route mounted by a service must use
-the same path that the browser sends; there is no gateway rewrite to hide a
-different internal URL.
+The edge passes the path through unchanged — no `URLRewrite` filter is
+configured on any `HTTPRoute`, which is Gateway API's default behavior. A
+route mounted by a service must use the same path that the browser sends;
+there is no gateway rewrite to hide a different internal URL.
 
 ### Audience segments
 
 | Audience | Authentication | Reachability | Typical use |
 |----------|----------------|--------------|-------------|
-| `public` | None, or a route-specific credential such as webhook HMAC | Kong may expose it | Login, catalog browsing, provider webhook |
-| `private` | Valid RS256 access token | Kong and service | Signed-in user acting on owned data |
-| `protected` | Valid token plus privileged policy | Kong and service | Administrative operations |
+| `public` | None, or a route-specific credential such as webhook HMAC | The edge may expose it | Login, catalog browsing, provider webhook |
+| `private` | Valid RS256 access token | Edge and service | Signed-in user acting on owned data |
+| `protected` | Valid token plus privileged policy | Edge and service | Administrative operations |
 | `internal` | Service-specific internal rules | Cluster only | Reconciliation, trusted service operation |
 
-`internal` must never be added to an ingress route. The real security fence is
-NetworkPolicy, not merely the absence of a Kong path.
+`internal` must never be given an `HTTPRoute`. The real security fence is
+NetworkPolicy, not merely the absence of a route.
 
 ### Collection noun rule
 
@@ -265,7 +266,7 @@ those exceptions into ordinary CRUD services.
 | Environment | Browser entry point | In-cluster service name |
 |-------------|---------------------|-------------------------|
 | Local-stack | `http://localhost:8080` | Docker Compose service name |
-| Kubernetes | Kong hostname | `<service>.<namespace>.svc.cluster.local:8080` |
+| Kubernetes | Edge `Gateway` hostname (`gateway.duynh.me`) | `<service>.<namespace>.svc.cluster.local:8080` |
 | Kubernetes gRPC | Not browser-accessible | `dns:///<service>.<namespace>.svc.cluster.local:9090` |
 
 ## Common HTTP Contracts
@@ -301,7 +302,7 @@ sequenceDiagram
 |------|---------|
 | Identity source | Read `user_id` from verified JWT claims (`sub`, string UUID), never from a private request body |
 | Authoritative check | Each service verifies the token locally with `pkg/authmw` (v0.37.0: `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL`) |
-| Gateway check | The cluster edge (Envoy Gateway SecurityPolicy, merged P2) verifies signature/iss/aud/exp against the realm's `remoteJWKS` — no provisioned key material. **Known P3 gap:** local-stack's Kong gateway still matches tokens by `iss` against the retired auth issuer's static key and cannot fetch the realm JWKS (Kong OSS jwt plugin limitation), so its edge JWT check does not accept realm tokens — resolved by the P6 local-gateway replacement |
+| Gateway check | The edge's `SecurityPolicy.jwt` (`remoteJWKS`) verifies signature/iss/aud/exp against the realm's JWKS, with no provisioned key material — verified end-to-end in local-stack; the cluster carries the same policy but it has not yet been exercised on Kind (**planned**) |
 | Auth gRPC | Removed; services do not call auth `GetMe` |
 | Failure mode | Missing, invalid, or unverifiable credentials fail closed |
 
@@ -395,7 +396,7 @@ file's **At a glance** **Deployment** row is the per-service source of truth.
 
 | Question | Use HTTP/JSON | Use gRPC |
 |----------|---------------|----------|
-| Can a browser or Kong reach it? | Yes | No |
+| Can a browser or the edge reach it? | Yes | No |
 | Is it an internal typed machine contract? | Sometimes for a documented legacy exception | Preferred |
 | Is it a provider webhook? | Yes | No |
 | Is easy manual inspection the main need? | Strong fit | Use reflection and `grpcurl` |
@@ -461,21 +462,21 @@ services moved to local JWT verification.
 
 - No `/internal/` audience is exposed at either edge — verified in
   [local-stack routes.yaml](../../local-stack/gateway/eg/routes.yaml) and
-  [ingress-api.yaml](../../kubernetes/infra/configs/kong/ingress-api.yaml).
+  [cluster routes/api.yaml](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml).
 - **The route path is what enforces this, not NetworkPolicy.** Every route in
   both environments is declared on an audience-scoped prefix
   (`/product/v1/public/`, `/cart/v1/private/`, `/order/v1/private/`, …), so an
-  `/internal/` path simply has no route to match. NetworkPolicy is the second
-  fence, and in local-stack there is no NetworkPolicy at all — a bare
+  `/internal/` path simply has no `HTTPRoute` to match. NetworkPolicy is the
+  second fence, and in local-stack there is no NetworkPolicy at all — a bare
   service-wide prefix there would expose the internal audience outright.
 - That is not hypothetical: until 2026-08-11 local-stack routed product, cart and
   order on bare prefixes. `POST /product/v1/internal/products` answered with **no
-  JWT** (its route carried no `jwt` plugin), and `DELETE
+  JWT** (its route carried no edge JWT policy), and `DELETE
   /cart/v1/internal/cart/:userId` answered for any shopper's token — the path
   carries the target user id, so one shopper could clear another's cart. The
   routes are now audience-scoped and the audit's **A8** row probes both.
-- Service paths are identical in both environments (Variant A pass-through,
-  `strip_path: false` everywhere).
+- Service paths are identical in both environments (Variant A pass-through, no
+  `URLRewrite` filter configured anywhere).
 
 ## End-to-end user journeys {#end-to-end-user-journeys}
 
@@ -497,30 +498,33 @@ Owner: [auth.md](./auth.md). **Historical since RFC-0024 P3:** the SPA now
 logs in against the Keycloak realm (`keycloak-js` PKCE,
 [ADR-043](../proposals/adr/ADR-043-oidc-browser-workload-trust/)) and services
 verify realm tokens only — the flow below still runs on the not-yet-retired
-auth-service, but nothing consumes its tokens; it is decommissioned in P5.
+auth-service, but nothing consumes its tokens; it is decommissioned in P5. The
+diagram reflects the cluster, where `api-auth-public` still routes to
+auth-service; local-stack carries no `/auth/v1/` route at all, so this flow
+cannot be driven there.
 
 ```mermaid
 sequenceDiagram
     participant SPA as Browser SPA
-    participant Kong as Kong gateway
+    participant Edge as Edge gateway
     participant Auth as auth
 
-    SPA->>Kong: POST /auth/v1/public/auth/register
-    Kong->>Auth: pass-through (public — no edge JWT)
+    SPA->>Edge: POST /auth/v1/public/auth/register
+    Edge->>Auth: pass-through (public — no edge JWT)
     Auth-->>SPA: 201 access_token (RS256) + refresh_token
 
-    SPA->>Kong: POST /auth/v1/public/auth/login
-    Kong->>Auth: pass-through
+    SPA->>Edge: POST /auth/v1/public/auth/login
+    Edge->>Auth: pass-through
     Auth-->>SPA: 200 access_token + refresh_token
 
     Note over SPA,Auth: access token expires → rotate
-    SPA->>Kong: POST /auth/v1/public/auth/refresh
-    Kong->>Auth: pass-through
+    SPA->>Edge: POST /auth/v1/public/auth/refresh
+    Edge->>Auth: pass-through
     Auth-->>SPA: 200 new pair (old refresh token retired)
 
-    Note over SPA,Kong: all later /private/ calls carry Bearer access_token
-    SPA->>Kong: GET /cart/v1/private/cart (Bearer)
-    Note over Kong: jwt-edge plugin: RS256 signature + iss check
+    Note over SPA,Edge: all later /private/ calls carry Bearer access_token
+    SPA->>Edge: GET /cart/v1/private/cart (Bearer)
+    Note over Edge: jwt-edge SecurityPolicy: RS256 signature + iss check
 ```
 
 ### 2. Browse → cart CRUD
@@ -530,31 +534,31 @@ Owners: [product.md](./product.md), [cart.md](./cart.md).
 ```mermaid
 sequenceDiagram
     participant SPA as Browser SPA
-    participant Kong as Kong gateway
+    participant Edge as Edge gateway
     participant Prod as product
     participant Rev as review
     participant Cart as cart
 
-    SPA->>Kong: GET /product/v1/public/products?page=1
-    Kong->>Prod: pass-through (public)
+    SPA->>Edge: GET /product/v1/public/products?page=1
+    Edge->>Prod: pass-through (public)
     Prod-->>SPA: 200 paginated catalog
 
-    SPA->>Kong: GET /product/v1/public/products/:id/details
-    Kong->>Prod: pass-through
+    SPA->>Edge: GET /product/v1/public/products/:id/details
+    Edge->>Prod: pass-through
     Prod->>Rev: gRPC ReviewService/GetProductReviews
     Rev-->>Prod: reviews + summary (soft-fail to [])
     Prod-->>SPA: 200 product + stock + reviews + related
 
-    SPA->>Kong: POST /cart/v1/private/cart (Bearer)
-    Note over Kong: jwt-edge on /private/
-    Kong->>Cart: pass-through
+    SPA->>Edge: POST /cart/v1/private/cart (Bearer)
+    Note over Edge: jwt-edge SecurityPolicy on /private/
+    Edge->>Cart: pass-through
     Cart-->>SPA: 200 item added (upsert on user_id + product_id)
 
-    SPA->>Kong: PATCH /cart/v1/private/cart/items/:itemId (Bearer)
-    Kong->>Cart: set quantity
+    SPA->>Edge: PATCH /cart/v1/private/cart/items/:itemId (Bearer)
+    Edge->>Cart: set quantity
     Cart-->>SPA: 200 item quantity set
 
-    SPA->>Kong: GET /cart/v1/private/cart/count (Bearer)
+    SPA->>Edge: GET /cart/v1/private/cart/count (Bearer)
     Cart-->>SPA: 200 badge count
 ```
 
@@ -565,7 +569,7 @@ Owners: [checkout.md](./checkout.md), [order.md](./order.md).
 ```mermaid
 sequenceDiagram
     participant SPA as Browser SPA
-    participant Kong as Kong gateway
+    participant Edge as Edge gateway
     participant CK as checkout
     participant Cart as cart
     participant Prod as product
@@ -574,23 +578,23 @@ sequenceDiagram
     participant Ord as order
     participant TMP as Temporal
 
-    SPA->>Kong: POST /checkout/v1/private/checkout/sessions (Bearer)
-    Kong->>CK: pass-through (jwt-edge)
+    SPA->>Edge: POST /checkout/v1/private/checkout/sessions (Bearer)
+    Edge->>CK: pass-through (jwt-edge)
     CK->>Cart: gRPC CartService/GetCart (read-only snapshot)
     CK->>Prod: gRPC ProductService/BatchGetCurrentPrices (cache-bypass re-validation)
     CK->>Inv: gRPC InventoryService/CheckAvailability (fail-closed)
     CK->>TMP: Signal-With-Start AbandonedCheckoutWorkflow (30 min TTL)
     CK-->>SPA: 201 session open (200 if an active session already exists)
 
-    SPA->>Kong: PUT /checkout/v1/private/checkout/sessions/:id/address
+    SPA->>Edge: PUT /checkout/v1/private/checkout/sessions/:id/address
     CK-->>SPA: 200 address_set
-    SPA->>Kong: PUT /checkout/v1/private/checkout/sessions/:id/shipping
+    SPA->>Edge: PUT /checkout/v1/private/checkout/sessions/:id/shipping
     CK->>Ship: gRPC ShippingService/GetQuote (method × region)
     CK-->>SPA: 200 shipping_set (fee + tax composed in SQL)
-    SPA->>Kong: PUT /checkout/v1/private/checkout/sessions/:id/payment
+    SPA->>Edge: PUT /checkout/v1/private/checkout/sessions/:id/payment
     CK-->>SPA: 200 ready (opaque tok_ reference only)
 
-    SPA->>Kong: POST /checkout/v1/private/checkout/sessions/:id/confirm<br/>(Idempotency-Key required)
+    SPA->>Edge: POST /checkout/v1/private/checkout/sessions/:id/confirm<br/>(Idempotency-Key required)
     CK->>Prod: gRPC BatchGetCurrentPrices — final price re-check
     CK->>Inv: gRPC CheckAvailability — final availability re-check (fail-closed)
     alt price or stock changed
@@ -642,7 +646,7 @@ sequenceDiagram
 
 | Port | Name | Purpose | Exposure |
 |------|------|---------|----------|
-| `:8080` | `http` | HTTP API and probes | Kong or allowed internal callers |
+| `:8080` | `http` | HTTP API and probes | The edge or allowed internal callers |
 | `:9090` | `grpc` | Internal Protobuf RPC | Allowed namespaces only |
 
 A service starts its gRPC server whenever it implements one. There is no
@@ -741,10 +745,10 @@ Signal-by-signal matrix:
 
 | Control | Current state | Purpose |
 |---------|---------------|---------|
-| Kong edge JWT | Active on private HTTP routes | Coarse rejection before service work |
+| Edge JWT (`SecurityPolicy.jwt`) | Active on private HTTP routes in local-stack; cluster manifests carry the same policy but are unverified on Kind (**planned**) | Coarse rejection before service work |
 | Service JWT verification | Active | Authoritative identity and claims check |
 | NetworkPolicy on `:9090` | Active for deployed service edges | Restrict which namespaces may call each gRPC server |
-| TLS for external traffic | Environment-dependent at Kong | Protect north-south traffic |
+| TLS for external traffic | Terminated at the cluster `Gateway` https listener; plain HTTP in local-stack | Protect north-south traffic |
 | gRPC mTLS | Planned, not deployed | Authenticate and encrypt east-west connections |
 
 Current gRPC clients use insecure transport credentials inside the cluster, so
@@ -798,7 +802,7 @@ Use this sequence for a new or modified contract:
 | 7. Instrument it | Comply with [observability.md](./observability.md); add only domain-specific instruments required by the owning service contract |
 | 8. Test it | Success, validation, authorization, ownership, retry, and failure paths |
 | 9. Document once | Shared rule here; service-specific contract in its service file |
-| 10. Validate consumers | Frontend, caller service, Kong, local-stack, and GitOps references |
+| 10. Validate consumers | Frontend, caller service, the edge, local-stack, and GitOps references |
 
 A substantial or contested change should start as an RFC. A decision already
 made should be recorded as an ADR.
@@ -820,7 +824,7 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 
 | Task | Command or signal |
 |------|-------------------|
-| Inspect HTTP | `curl` through Kong or an allowed in-cluster address |
+| Inspect HTTP | `curl` through the edge or an allowed in-cluster address |
 | Inspect gRPC services | `grpcurl <target> list` using server reflection |
 | Check service health | HTTP `/health`, `/ready`, or gRPC health |
 | Trace a request | Search Tempo/Jaeger by `trace_id` |
@@ -833,11 +837,11 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [API documentation index](./README.md)
 - [Microservice map](./microservices.md)
 - [Temporal order fulfillment](./temporal.md)
-- [Kong gateway](../platform/kong-gateway.md)
+- [Envoy Gateway](../platform/envoy-gateway.md)
 - [Application observability](./observability.md) · [Application metrics](./metrics.md) · [Application logging](./logs.md) · [Application tracing](./tracing.md) · [Application profiling](./profiling.md)
 - [Metrics (platform ops)](../observability/metrics/metrics-apps.md)
 - [ADR-017: collection-noun API migration](../proposals/adr/ADR-017-api-path-collection-noun/)
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: §Authentication verifies against the Keycloak realm (`OIDC_*`, string `sub` as `user_id`, edge `remoteJWKS` per merged P2); journey 1 marked historical; the local-stack Kong edge-JWT gap is recorded._
+_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: §Authentication verifies against the Keycloak realm (`OIDC_*`, string `sub` as `user_id`, edge `remoteJWKS` per merged P2); journey 1 marked historical; edge JWT verification is uniform between local-stack and the cluster._

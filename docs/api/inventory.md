@@ -20,7 +20,7 @@ elsewhere.
 | **Deployment** | local-stack + cluster — **sole stock authority**; callers: order saga, checkout, product `/details` | Implemented |
 | **Runtime modes** | `api` (serve) + `migrate` + `seed` (dev-only) | Implemented |
 | **HTTP server** | internal · `:8080` · `/health` + `/ready` only | Implemented |
-| **Edge exposure** | None — no Kong route; gRPC-only, NetworkPolicy-fenced | None |
+| **Edge exposure** | None — no `HTTPRoute` at either edge; gRPC-only, NetworkPolicy-fenced | None |
 | **gRPC server** | `inventory.v1.InventoryService/{BatchGetAvailability,CheckAvailability,Reserve,Release,Commit,GetReservation}` · `:9090` | Implemented |
 | **gRPC clients** | None | None |
 | **Worker** | None | None |
@@ -139,8 +139,8 @@ None public. `:8080` serves operational endpoints only:
 | `GET` | `/health` | Liveness | — |
 | `GET` | `/ready` | Readiness (DB reachable) | `503` when the pool is not ready |
 
-No Kong route reaches inventory; kubelet probes are host-level and bypass
-NetworkPolicy. Platform conventions: [api.md](./api.md#error-envelope).
+No route at either edge reaches inventory; kubelet probes are host-level and
+bypass NetworkPolicy. Platform conventions: [api.md](./api.md#error-envelope).
 
 ## gRPC API
 

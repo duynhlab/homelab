@@ -303,4 +303,4 @@ Grafana Explore → Tempo → search by Trace ID. Details: [Application logging]
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-29 — canonical app tracing contract; as-built claims verified against `duynhlab/pkg`, the service repos, and the Kong config._
+_Last updated: 2026-07-29 — canonical app tracing contract; as-built claims verified against `duynhlab/pkg`, the service repos, and the edge config._

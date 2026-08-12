@@ -2,7 +2,7 @@
 
 Cache-Aside contract for services that adopt Valkey — layer placement, stampede locking, key conventions, env vars, fail-open semantics, and invalidation boundaries. **Reference implementation:** product-service (catalog reads only).
 
-> **Platform ops** (Valkey Helm, eviction policy, Kong rate-limit db 1, metrics,
+> **Platform ops** (Valkey Helm, eviction policy, metrics,
 > troubleshooting) live in [Caching (platform)](../caching/README.md). Cross-service
 > rules and roadmap: [RFC-0004](../proposals/rfc/RFC-0004/) (provisional).
 
@@ -10,7 +10,7 @@ Cache-Aside contract for services that adopt Valkey — layer placement, stamped
 |-----------|-------|-----------|
 | **Pattern** | Cache-Aside (read-through), fail-open | — |
 | **Reference impl** | product-service only (catalog) | — |
-| **Platform backend** | [Caching (platform)](../caching/README.md) — Valkey, eviction, Kong db 1 | — |
+| **Platform backend** | [Caching (platform)](../caching/README.md) — Valkey, eviction | — |
 | **Cross-cutting** | [Application observability](./observability.md) · [product.md](./product.md) | — |
 | **Design record** | — | [RFC-0004](../proposals/rfc/RFC-0004/) (provisional) |
 
@@ -189,7 +189,7 @@ Reuses the same single-product cache path (calls `ProductService.GetProduct` int
 
 ### `POST /product/v1/internal/products` — create product (internal only)
 
-> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. Today the boundary is Kong not exposing the route plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See the [API audience model](./api.md#audience-segments).
+> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. The boundary is the edge carrying no `HTTPRoute` for it plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See the [API audience model](./api.md#audience-segments).
 
 1. Validate price, persist via `productRepo.Create(ctx, product)`.
 2. **Cache invalidation**: call `productCache.InvalidateProductList(ctx)` to delete list cache keys so the new product appears in subsequent list queries.
@@ -320,7 +320,7 @@ Server-side Valkey metrics and hit-rate queries: [Caching (platform) § Observab
 
 ## References
 
-- [Caching (platform)](../caching/README.md) — Valkey deployment, eviction, Kong db 1, ops
+- [Caching (platform)](../caching/README.md) — Valkey deployment, eviction, ops
 - [RFC-0004](../proposals/rfc/RFC-0004/) — cross-service caching contract (provisional)
 - [product.md](./product.md) — product-specific cache policy summary
 - [Application observability](./observability.md) — tracing middleware

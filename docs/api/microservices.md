@@ -19,7 +19,7 @@ feature has, and which technique implements it* — plus data ownership.
 
 11 Go backend services (Go 1.26; ten HTTP APIs plus the gRPC-only inventory
 service) and a React/Vite SPA,
-fronted by **Kong pass-through** in both environments; each service follows the
+fronted by **Envoy Gateway pass-through** in both environments; each service follows the
 3-layer `web → logic → core` model and the Variant A URL shape
 `/{service}/v1/{audience}/{resource…}`. The topology diagram and shared
 HTTP/gRPC rules are owned by
@@ -32,7 +32,7 @@ HTTP/gRPC rules are owned by
 The local end-to-end stack ([`local-stack/compose.yaml`](../../local-stack/compose.yaml))
 mirrors the **app plane** (ten HTTP services + inventory gRPC), **workflow plane** (Temporal +
 `order-worker` + `checkout-worker`), **provider stub** (`mockpay`), and edge
-(frontend + Kong). Shared infra (Postgres, Valkey) and the observability pipeline
+(frontend + gateway). Shared infra (Postgres, Valkey) and the observability pipeline
 (OTel collector, Victoria*, ClickHouse, Grafana, Pyroscope) are internal-only —
 see [`local-stack/README.md`](../../local-stack/README.md) for host ports and
 audit gates.
@@ -46,10 +46,10 @@ health-gated and blocks the collector and Grafana until ready.
 
 ```mermaid
 flowchart LR
-    SPA["frontend :3001"] --> Kong["gateway :8080"]
-    Kong --> SVC["10 HTTP services"]
+    SPA["frontend :3001"] --> Edge["gateway :8080"]
+    Edge --> SVC["10 HTTP services"]
     MP["mockpay"] -->|"provider HTTP"| PAY["payment"]
-    MP -->|"webhook"| Kong
+    MP -->|"webhook"| Edge
     SVC --> PG[("Postgres<br/>13 DBs")]
     SVC -->|"gRPC inventory calls"| INV["inventory<br/>gRPC only"]
     INV --> PG
@@ -67,7 +67,7 @@ flowchart LR
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class SVC,INV,PAY,CK,ORD service;
     class OW,CW worker;
     class TMP platform;
@@ -79,21 +79,21 @@ flowchart LR
 |-----------|------|------|------------------|-------|------------------------|
 | keycloak | `:8080` (host `:8081`) | — | `keycloak` | — | the platform IdP (RFC-0024 P3): SPA login (PKCE), realm JWKS verified by every authmw consumer |
 | auth | `:8080` | — | `auth` | — | none outbound; **nothing verifies its tokens since P3** (retires in P5) |
-| user | `:8080` | — | `user` | — | Keycloak (JWKS); caller: Kong |
-| product | `:8080` | `:9090` server | `product` | Valkey | review + inventory (gRPC); callers: Kong, checkout |
+| user | `:8080` | — | `user` | — | Keycloak (JWKS); caller: the edge |
+| product | `:8080` | `:9090` server | `product` | Valkey | review + inventory (gRPC); callers: the edge, checkout |
 | inventory | health only | `:9090` server | `inventory` | — | callers: product details, checkout, order API, order-worker |
-| cart | `:8080` | `:9090` server | `cart` | — | Keycloak (JWKS); callers: Kong, checkout (`GetCart`), order/order-worker (REST) |
-| order | `:8080` | `:9090` server | `order` | — | Keycloak (JWKS), Temporal, shipping/payment/inventory (gRPC), cart (REST); callers: Kong, checkout (`CreateOrder`) |
-| review | `:8080` | `:9090` server | `review` | — | Keycloak (JWKS); callers: Kong, product (gRPC) |
-| shipping | `:8080` | `:9090` server | `shipping` | — | none outbound; callers: Kong, checkout, order, order-worker |
-| notification | `:8080` | `:9090` server | `notification` | — | Keycloak (JWKS); callers: Kong, order-worker (`SendEmail`) |
-| payment | `:8080` | `:9090` server | `payment` | — | Keycloak (JWKS), mockpay (HTTP); callers: Kong, order (GetPayment), order-worker (saga money) |
-| checkout | `:8080` internal-only | client only | `checkout` | — | Keycloak (JWKS), cart/product/inventory/shipping/order (gRPC), Temporal; caller: Kong only |
+| cart | `:8080` | `:9090` server | `cart` | — | Keycloak (JWKS); callers: the edge, checkout (`GetCart`), order/order-worker (REST) |
+| order | `:8080` | `:9090` server | `order` | — | Keycloak (JWKS), Temporal, shipping/payment/inventory (gRPC), cart (REST); callers: the edge, checkout (`CreateOrder`) |
+| review | `:8080` | `:9090` server | `review` | — | Keycloak (JWKS); callers: the edge, product (gRPC) |
+| shipping | `:8080` | `:9090` server | `shipping` | — | none outbound; callers: the edge, checkout, order, order-worker |
+| notification | `:8080` | `:9090` server | `notification` | — | Keycloak (JWKS); callers: the edge, order-worker (`SendEmail`) |
+| payment | `:8080` | `:9090` server | `payment` | — | Keycloak (JWKS), mockpay (HTTP); callers: the edge, order (GetPayment), order-worker (saga money) |
+| checkout | `:8080` internal-only | client only | `checkout` | — | Keycloak (JWKS), cart/product/inventory/shipping/order (gRPC), Temporal; caller: the edge only |
 | order-worker | `:8080` health | client only | `order` | — | Temporal; inventory/shipping/notification/payment (gRPC), cart (REST clear) |
 | checkout-worker | `:8080` health | — | `checkout` | — | Temporal (`AbandonedCheckoutWorkflow`; DB-only activities) |
 | mockpay | `:8080` | — | — | — | called by payment; webhooks → gateway → payment public route |
 | temporal | — (`7233` gRPC, `8233` UI) | — | `temporal`, `temporal_visibility` | — | callers: order, checkout, both workers; CLI via `temporal-admintools` |
-| gateway (Kong 3.9) | `8000` → host `8080` | — | — | Valkey (rate-limit) | ten HTTP services + cache; inventory remains east-west only; callers: frontend, browser, mockpay webhooks |
+| gateway (Envoy Gateway v1.8.3, standalone provider) | `8000` → host `8080` | — | — | — (in-process local rate limit, no shared store) | ten HTTP services + cache; inventory remains east-west only; callers: frontend, browser, mockpay webhooks |
 | frontend | `80` → host `3001` | — | — | — | gateway only |
 
 > **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`platform-db-pooler-rw.platform.svc.cluster.local:5432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);
@@ -157,7 +157,7 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 
 > Owns `checkout_sessions`, item snapshots, totals, promo attachment, and
 > confirm idempotency. DB `checkout` on `product-db` (CloudNativePG, via PgDog).
-> The service is client-only: Kong calls its HTTP API and it calls cart, product,
+> The service is client-only: the edge calls its HTTP API and it calls cart, product,
 > shipping, and order over gRPC. **One binary, two deployments:** `checkout`
 > (API) and `checkout-worker` (Temporal worker — `AbandonedCheckoutWorkflow`,
 > task queue `checkout`). P1-P5 ship in local-stack and the cluster.
@@ -319,6 +319,6 @@ templates.
 
 ---
 
-*Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, Kong gateway at http://localhost:8080 (demo login `alice` / `password123`).*
+*Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, edge gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
 _Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: Keycloak mints and every authmw consumer verifies realm tokens (string `sub` as `user_id`); user's internal create is replaced by JIT provisioning; auth's tokens are unconsumed pending P5._

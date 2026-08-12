@@ -78,7 +78,7 @@ spec:
 # Needed, not optional: the SPA is served from http://localhost:3001 and calls
 # the edge on http://localhost:8080 — different port, therefore a different
 # origin, therefore every non-simple request is preflighted. Attached to the
-# Gateway so all 13 routes inherit it (Gateway API has no global filter; this
+# Gateway so all 12 routes inherit it (Gateway API has no global filter; this
 # is the EG-native equivalent of Kong's global cors plugin).
 #
 # Header lists are the SPA's actual needs:

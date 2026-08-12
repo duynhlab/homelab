@@ -445,6 +445,30 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- The edge access log's `upstream_time` field carried `null` on every request in
+  both environments. `%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%` was Kong's nginx
+  `$upstream_response_time` translated literally, and Envoy Gateway suppresses
+  the `x-envoy-*` response headers by default, so the operator read a header the
+  proxy never emitted. Both `EnvoyProxy` CRs now use the native
+  `%RESPONSE_DURATION%`, which pairs with `%DURATION%` to give the
+  upstream-vs-total split the field was added for. Caught by running the gate —
+  110/110 access-log lines were null before the fix.
+- `btp-api` in local-stack targeted `api-auth-public`, an HTTPRoute that no
+  longer exists after the identity cutover. Dropped, leaving 12 targetRefs for
+  the 12 routes the file actually serves; the "13 routes" counts in
+  `routes.yaml`, `securitypolicy.yaml` and the rate-limit comment were stale for
+  the same reason. The comment also still advertised a 3000-per-minute window
+  that the single-rule policy cannot have.
+- The E2E runbook could not complete under podman: A14 polled
+  `docker compose ps --format '{{.Status}}'` for the substring `healthy`, which
+  podman's compose provider never emits (it prints a bare `Up 54 seconds`), so
+  the wait spun forever against an already-healthy container. Now pinned to
+  `{{.Health}}`. Two more gate defects fixed alongside: A13's arming moved into
+  the preamble so the block is runnable top-to-bottom (armed in place, it read a
+  three-minute-old timer and reported a false 200), and B2 now re-mints the
+  60-second admin token before restoring the client token lifespan — the stale
+  token answered 401 and the confirming GET parsed the error body into a
+  `None` that looked exactly like success.
 - local-stack Kong routes are audience-scoped, matching the cluster Ingress.
   Bare `/product/`, `/cart/` and `/order/` prefixes routed the `/internal/`
   audience too: `POST /product/v1/internal/products` answered with **no JWT**,

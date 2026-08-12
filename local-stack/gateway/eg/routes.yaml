@@ -1,4 +1,4 @@
-# HTTPRoutes — the entire local edge surface: 13 routes over 10 backends.
+# HTTPRoutes — the entire local edge surface: 12 routes over 10 backends.
 #
 # What this exposes: /{service}/v1/{public|private}/... pass-through, no
 # rewrite (Gateway API's default, == Kong's `strip_path: false`). Route names

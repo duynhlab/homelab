@@ -143,7 +143,7 @@ needs another restart: a plain `up` re-reads `compose.yaml` and remounts the sam
 broken symlink. Do not start Phase C with `vector` down.
 
 **Request pacing is not required.** The local edge allows 50 requests per second
-with a 3000-per-minute ceiling and no hourly window
+in a single window — no minute and no hour bucket
 (`gateway/eg/backendtrafficpolicy.yaml`) — a limit no shell-driven row can reach
 by hand, and one that cannot leak across runs because Envoy's local rate limiter
 is an in-process token bucket with no shared datastore. A 429 during this audit
@@ -154,6 +154,16 @@ looping. Investigate it, do not wait it out.
 clients, so no `grant_type=password` shortcut exists. Every token below is minted
 by `scripts/keycloak-token.sh`, a headless Authorization Code + PKCE flow
 (read its header before changing anything about identity).
+
+**A token lives 900 seconds, so mint it in the same block that spends it.** The
+realm's access-token lifespan is 15 minutes (A1 asserts it), which is ample for a
+human typing rows in sequence and *not* ample for a session that pauses between
+them — an agent-driven run, or a run interrupted by a question. A token minted at
+the top and used twenty minutes later fails as `401` with body `Jwt is expired`,
+which reads exactly like an edge misconfiguration and sends the reader hunting
+through the SecurityPolicy. If a row needs a token, either run it in the same
+shell block as its `$KCT` call or re-mint first; several rows below (A9, A13, A16)
+already mint their own for this reason.
 
 ## Phase A — API contract (curl, ~10 min hands-on)
 
@@ -182,6 +192,33 @@ audit_curl() {
 # `temporalio/server` image ships only the server binary, so
 # `exec -T temporal temporal ...` fails with "not found".
 TCLI="docker compose exec -T temporal-admintools temporal"
+
+# ---- A13 (arm). Physically here, not down at A13, because the block must be
+#      runnable top-to-bottom: the timer needs the session's full TTL (30 min by
+#      default) to fire, and A13's read is the LAST thing Phase A does. Arming it
+#      in place would read a timer three minutes old and report a false 200.
+#
+#      It needs its OWN user. One active session per user is a partial unique
+#      index, so A9/A10 would adopt this session and every mutation re-arms it.
+#      That user is `bob`, a seeded realm user — self-registration is gone with
+#      the identity cutover (the realm sets registrationAllowed=false and only an
+#      admin API call could create a user), and every other Phase A row is alice.
+#      Because the user is a FIXED one, clear any session an earlier run left
+#      active first — otherwise the POST below adopts it and A13 silently watches
+#      the previous run's timer.
+TAT=$(USERNAME=bob $KCT)
+OLD=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $TAT" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+[ -n "$OLD" ] && audit_curl -s -o /dev/null -X DELETE \
+  $BASE/checkout/v1/private/checkout/sessions/$OLD -H "Authorization: Bearer $TAT"
+audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $TAT" \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
+TSID=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $TAT" | \
+  python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+$TCLI workflow list --namespace mop \
+  -q "WorkflowId = 'checkout-abandon-$TSID'" </dev/null 2>/dev/null | head -3   # want Running
+echo "A13 armed: session $TSID — do not touch it; read the result at A13"
 
 # A1. Token acquisition through the realm (RFC-0024 P3). Headless
 #     Authorization Code + PKCE — there is no password grant, because the realm's
@@ -526,30 +563,11 @@ $TCLI workflow list --namespace mop \
 # A13. The abandonment timer actually fires (ADR-019). A10 above only ever
 #      produces expired(lazy) — it moves the DB deadline, not the armed timer — so
 #      without this row the third workflow has no evidence it works at all.
-#      ARM THIS FIRST — after the preamble above, before A1 — and read it at the
-#      end: the timer runs for the session's full TTL while the rest of the audit
-#      proceeds, so arming it early costs no extra wall-clock.
-#      It needs its OWN user. One active session per user is a partial unique
-#      index, so A9/A10 would adopt this session and every mutation re-arms it.
-#      That user is `bob`, a seeded realm user — self-registration is gone with
-#      the identity cutover (the realm sets registrationAllowed=false and only an
-#      admin API call could create a user), and every other Phase A row is alice.
-#      Because the user is now a FIXED one, clear any session an earlier run left
-#      active first — otherwise the POST below adopts it and this row silently
-#      watches the previous run's timer.
-TAT=$(USERNAME=bob $KCT)
-OLD=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $TAT" \
-  | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
-[ -n "$OLD" ] && audit_curl -s -o /dev/null -X DELETE \
-  $BASE/checkout/v1/private/checkout/sessions/$OLD -H "Authorization: Bearer $TAT"
-audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $TAT" \
-  -H 'Content-Type: application/json' \
-  -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
-TSID=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $TAT" | \
-  python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
-$TCLI workflow list --namespace mop \
-  -q "WorkflowId = 'checkout-abandon-$TSID'" </dev/null 2>/dev/null | head -3   # want Running
-# ...then DO NOT TOUCH that session. After its TTL has elapsed:
+#      ARMED IN THE PREAMBLE, read here: $TAT and $TSID come from that block, and
+#      the timer has been running for the whole of A1–A12 by the time this line
+#      is reached. If the session's TTL has not elapsed yet the read below returns
+#      200 — that is `pending`, not a failure. Leave the session untouched and
+#      re-run these three lines later; anything that mutates it re-arms the timer.
 audit_curl -s -o /dev/null -w "A13 timer-410: %{http_code} (want 410)\n" \
   "$BASE/checkout/v1/private/checkout/sessions/$TSID" -H "Authorization: Bearer $TAT"
 docker compose exec -T postgres psql -U postgres -d checkout -t -c \
@@ -564,7 +582,12 @@ docker compose exec -T postgres psql -U postgres -d checkout -t -c \
 #      executions to zero.
 BEFORE=$($TCLI workflow list --namespace mop </dev/null 2>/dev/null | tail -n +2 | grep -c .)
 docker compose restart temporal >/dev/null
-until docker compose ps temporal --format '{{.Status}}' | grep -c healthy | grep -qx 1; do sleep 5; done
+# Poll `.Health`, never `.Status`. Docker's `.Status` embeds "(healthy)" but
+# podman's compose provider does NOT — it prints a bare "Up 54 seconds" — so a
+# `.Status | grep healthy` loop spins forever there against a container that is
+# already healthy. An infinite wait is indistinguishable from a slow restart,
+# which is why this is pinned to the field both providers populate.
+until [ "$(docker compose ps temporal --format '{{.Health}}')" = healthy ]; do sleep 5; done
 AFTER=$($TCLI workflow list --namespace mop </dev/null 2>/dev/null | tail -n +2 | grep -c .)
 echo "A14 executions: before=$BEFORE after=$AFTER (want equal and non-zero)"
 $TCLI workflow show --workflow-id "order-fulfillment-$OID" --namespace mop </dev/null 2>/dev/null | head -3
@@ -802,9 +825,27 @@ raise SystemExit(0 if api and set(api) <= {200} else 1)"
 #     the polling widgets to age the 60s token out again; clear and redo the row.
 # RESTORE THE LIFESPAN. Do not leave the override on the client — it survives
 # nothing (down -v drops it) but it will skew B3 and any later manual poking.
+#
+# RE-MINT $ADM FIRST. The master realm's admin-cli token lives 60 seconds, and
+# this row spends more than that between the two PUTs (a reload, a 35s wait, a
+# navigation, and one request-detail fetch per token POST). Reusing the token
+# minted above answers 401, the override stays at 60, and the failure is quiet:
+# the confirming GET then parses the 401 error body, finds no `attributes`, and
+# prints `None` — which looks exactly like a successful restore. Re-mint, then
+# assert on the HTTP code AND the value.
+ADM=$(curl -s -X POST $KCA/realms/master/protocol/openid-connect/token \
+  -d client_id=admin-cli -d username=admin -d password=admin -d grant_type=password \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
 curl -s -o /dev/null -w "B2 lifespan restored: %{http_code} (want 204)\n" -X PUT \
   -H "Authorization: Bearer $ADM" -H 'Content-Type: application/json' \
   "$KCA/admin/realms/duynhlab/clients/$CID" -d '{"attributes":{"access.token.lifespan":""}}'
+curl -s -w '\nB2 verify HTTP %{http_code} (want 200)\n' -o /tmp/b2-client.json \
+  -H "Authorization: Bearer $ADM" "$KCA/admin/realms/duynhlab/clients/$CID"
+python3 -c "
+import json
+a = json.load(open('/tmp/b2-client.json')).get('attributes', {})
+v = a.get('access.token.lifespan')
+print('B2 override cleared: OK' if not v else 'B2 FAIL: lifespan still %r' % v)"
 
 # B3. LOGOUT VIA THE REALM'S END-SESSION ENDPOINT. keycloak.logout() is a GET
 #     redirect to the realm, not a POST to any service — no service participates

@@ -51,7 +51,17 @@ spec:
               response_flags: "%RESPONSE_FLAGS%"
               bytes: "%BYTES_SENT%"
               duration: "%DURATION%"
-              upstream_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+              # %RESPONSE_DURATION%, not %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%.
+              # That header is the literal translation of Kong's nginx
+              # $upstream_response_time, and it renders null on EVERY line here:
+              # Envoy Gateway suppresses the x-envoy-* response headers by
+              # default, so the operator reads a header the proxy never emitted.
+              # Verified by running it — 110/110 access-log lines carried null.
+              # RESPONSE_DURATION is the native operator for the same quantity
+              # (request start to first byte from upstream), and paired with
+              # %DURATION% above it gives the upstream-vs-total split the field
+              # was added for.
+              upstream_time: "%RESPONSE_DURATION%"
               upstream: "%UPSTREAM_HOST%"
               upstream_cluster: "%UPSTREAM_CLUSTER%"
               route_name: "%ROUTE_NAME%"

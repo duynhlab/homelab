@@ -1,7 +1,7 @@
 # BackendTrafficPolicy — local rate limit + request body size cap.
 #
 # What this exposes: the two edge protections worth exercising locally, applied
-# to all 13 routes by one policy. In the cluster this is eleven near-identical
+# to all 12 routes by one policy. In the cluster this is eleven near-identical
 # files (one per namespace, because targetRefs are namespace-scoped); here every
 # route lives in one namespace, so one policy is the honest shape. Two policies
 # would not compose anyway — Envoy Gateway resolves same-kind policy conflicts
@@ -24,13 +24,12 @@
 #    the audit, so the filter is still WIRED and still emits X-RateLimit-*
 #    headers (that is what local should prove), without ever firing by accident.
 #
-# The MINUTE window is 3000, i.e. exactly the same 50/s sustained — it exists
-# only so a bug that spins the SPA in a retry loop still gets stopped.
-#
-# NO HOUR window, unlike the cluster: an hour bucket cannot be waited out inside
-# an audit run. Kong's 2500/h was the one limit the runbook admitted "waiting a
-# few seconds will not clear", which turns a re-run into a blocked release for
-# reasons that have nothing to do with the candidate.
+# There is exactly ONE window — see the `rules` comment below for why more than
+# one is not merely unnecessary but rejected. Neither a minute nor an hour bucket
+# exists here, and the hour one would be actively harmful: it cannot be waited
+# out inside an audit run. Kong's 2500/h was the one limit the runbook admitted
+# "waiting a few seconds will not clear", which turns a re-run into a blocked
+# release for reasons that have nothing to do with the candidate.
 #
 # ---- requestBuffer -----------------------------------------------------------
 # 10Mi == Kong's request-size-limiting 10 MB == the cluster's requestBuffer.
@@ -51,9 +50,6 @@ metadata:
   name: btp-api
 spec:
   targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: api-auth-public
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: api-user-public

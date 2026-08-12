@@ -137,7 +137,7 @@ sync any more.
 | Route backends | `Backend` resources with `fqdn` endpoints (Compose DNS) | Kubernetes `Service` references |
 | Listener | one plain-HTTP listener on 8000, published as 8080 | HTTPS on 443 with a wildcard certificate, plus a 301 redirect listener |
 | Edge JWT | `remoteJWKS` against `http://keycloak:8080/...`, issuer `http://localhost:8081/realms/duynhlab` | `remoteJWKS` against the in-cluster Service, issuer `https://id.duynh.me/realms/duynhlab` |
-| Rate limit | 50/s + 3000/min, single in-process bucket | 2/s + 50/min + 1250/h per replica |
+| Rate limit | 50/s, one window, one in-process bucket | 2/s + 50/min + 1250/h per replica |
 
 The **one honest divergence** is the backend reference: Compose has no
 Kubernetes Services, so HTTPRoutes point at `Backend` resources naming the

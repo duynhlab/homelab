@@ -77,7 +77,13 @@ spec:
               response_flags: "%RESPONSE_FLAGS%"
               bytes: "%BYTES_SENT%"
               duration: "%DURATION%"
-              upstream_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+              # %RESPONSE_DURATION%, not %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%:
+              # that header is Kong's nginx $upstream_response_time translated
+              # literally, and Envoy Gateway suppresses x-envoy-* response
+              # headers by default, so the operator reads a header the proxy
+              # never emitted and the field renders null on every line. Caught
+              # in local-stack, where 110/110 access-log lines carried null.
+              upstream_time: "%RESPONSE_DURATION%"
               upstream: "%UPSTREAM_HOST%"
               upstream_cluster: "%UPSTREAM_CLUSTER%"
               route_name: "%ROUTE_NAME%"

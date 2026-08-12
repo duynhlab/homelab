@@ -24,7 +24,7 @@
 # service pushes pprof to the local Pyroscope (:4040, Grafana → Explore → Pyroscope).
 # Identity (RFC-0024 P3): the SPA logs in against Keycloak (http://localhost:8081,
 # realm `duynhlab`, keycloak-js PKCE) and services verify realm tokens via OIDC_*
-# (pkg v0.37.0 authmw). The realm is the only token issuer: there is no
+# (pkg authmw). The realm is the only token issuer: there is no
 # auth-service here, and no service, worker, or route refers to one. Its
 # cluster surface retires in P5.
 # Demo login: alice / password123 (by username, on the Keycloak login page).
@@ -51,7 +51,7 @@ x-svc-env: &svc-env
   DB_USER: postgres
   DB_PASSWORD: postgres
   DB_SSLMODE: disable
-  # RFC-0024 P3: services verify Keycloak realm tokens (pkg v0.37.0 authmw).
+  # RFC-0024 P3: services verify Keycloak realm tokens (pkg authmw).
   # Split-horizon issuer: the browser reaches Keycloak at the published
   # http://localhost:8081, and start-dev (no --hostname) derives `iss` from the
   # request host — so tokens carry iss=http://localhost:8081/realms/duynhlab and

@@ -1,0 +1,115 @@
+# MCP server routes — 1:1 translation of configs/kong/ingress-mcp.yaml
+# (3 Ingresses -> 3 HTTPRoutes). Used by AI clients (Crush, Claude Desktop,
+# VS Code) via Streamable HTTP. Each Kong Ingress carried
+# `ip-restriction-internal,rate-limiting-admin`:
+#   - CIDR fence       -> policies/security-admin-cidr.yaml
+#   - admin rate limit -> policies/btp-admin.yaml
+# security-headers filter: see routes/api.yaml header note.
+---
+# VictoriaMetrics MCP — vm-mcp.duynh.me (translates Ingress victoria-metrics-mcp)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: victoria-metrics-mcp
+  namespace: monitoring
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - vm-mcp.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: victoria-metrics-mcp-vmm
+          port: 8080
+---
+# VictoriaLogs MCP — vl-mcp.duynh.me (translates Ingress victoria-logs-mcp)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: victoria-logs-mcp
+  namespace: monitoring
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - vl-mcp.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: victoria-logs-mcp-vlm
+          port: 8080
+---
+# Flux Operator MCP — flux-mcp.duynh.me (translates Ingress flux-operator-mcp)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: flux-operator-mcp
+  namespace: flux-system
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - flux-mcp.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: flux-operator-mcp
+          port: 9090

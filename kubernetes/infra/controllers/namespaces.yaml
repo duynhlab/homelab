@@ -65,6 +65,15 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # Platform component namespace (like kong/temporal) — no app-tier label.
+    # Envoy Gateway control plane + per-Gateway Envoy proxy fleet (RFC-0024 P2).
+  name: envoy-gateway
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
     platform.duynhlab.dev/needs-trust: "true"
     # Receive the RustFS S3 credentials for Tempo trace + Pyroscope profile storage (ClusterExternalSecret)
     platform.duynhlab/s3: "tempo"

@@ -1,0 +1,29 @@
+# Gateway API + Envoy Gateway CRDs (RFC-0024 P2). Own Kustomization so the
+# envoy-gateway controller can dependsOn applied CRDs, and so a controller
+# rollback never prunes CRDs (prune: false — deleting Gateway API CRDs would
+# cascade-delete every HTTPRoute/policy).
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gateway-api-crds-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 5m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./controllers/gateway-api-crds
+  prune: false
+  wait: true
+  dependsOn:
+    - name: controllers-local # `envoy-gateway` namespace (controllers/namespaces.yaml)
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: gateway-api-crds
+      namespace: envoy-gateway

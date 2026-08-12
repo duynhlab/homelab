@@ -96,6 +96,11 @@ spec:
     - apiVersion: v1
       kind: Namespace
       name: kong
+    # Envoy Gateway namespace (workloads deployed by gateway-api-crds-local +
+    # envoy-gateway-local — RFC-0024 P2).
+    - apiVersion: v1
+      kind: Namespace
+      name: envoy-gateway
     # Identity namespace (Keycloak workload deployed by keycloak-local).
     - apiVersion: v1
       kind: Namespace

@@ -1,0 +1,518 @@
+# API-route BackendTrafficPolicies — one per API namespace, each translating
+# THREE Kong artifacts at once (configs/kong/plugins.yaml +
+# kubernetes/apps/domains/*-rs.yaml):
+#
+#   1. `rate-limiting-api` (5/s, 100/min, 2500/h, shared Valkey counter for 2
+#      replicas) -> rateLimit.local with the numbers HALVED for
+#      replicaCount 2 (per-instance buckets; effective ceiling = configured x
+#      replicas — ADR-046 local-first decision): 2/Second (round of 2.5),
+#      50/Minute, 1250/Hour. Envoy applies the STRICTEST matching rule, so
+#      the three windows behave like Kong's three windows. X-RateLimit
+#      draft-03 headers enabled per rule (replaces Kong's RateLimit-*; the
+#      CORS expose list swapped accordingly). No Redis/Valkey at the edge:
+#      in-process buckets cannot fail open OR closed.
+#   2. `request-size-limiting-api` (10 MB) -> requestBuffer 10Mi (413).
+#   3. The `resilience-default` KongUpstreamPolicy + konghq.com Service
+#      annotations (connect-timeout 3000 / read/write-timeout 15000 /
+#      retries 2, templated per domain in apps/domains/*-rs.yaml) ->
+#      retry/timeout/healthCheck here.
+#
+# PLACEMENT DEVIATION from the original P2 plan (recorded for review): the
+# resilience settings were planned as templated BTPs in the apps-layer
+# ResourceSets, and the rate limits as a separate btp-api.yaml. Both moved
+# HERE and merged because (a) BTP targetRefs attach to HTTPRoutes, which are
+# central in this directory — not to Services, so the apps layer has nothing
+# to attach to; and (b) Envoy Gateway resolves multiple same-kind policies on
+# one route by "oldest wins" — two separate BTPs per route would conflict,
+# not compose. The apps-layer KongUpstreamPolicy/annotations stay untouched
+# (inert once Kong is gone; removed by the 2.3 cleanup train).
+#
+# Resilience mapping (Kong -> EG):
+#   retries 2                      -> retry.numRetries 2
+#   connect-timeout 3000ms         -> timeout.tcp.connectTimeout 3s
+#   read/write-timeout 15000ms     -> timeout.http.requestTimeout 15s
+#   active http /health interval 5 -> healthCheck.active (HTTP GET /health,
+#     healthy successes 2 / unhealthy httpFailures 3 = healthyThreshold 2 /
+#     unhealthyThreshold 3; expectedStatuses default 200)
+#   passive httpFailures 5         -> healthCheck.passive.consecutive5XxErrors
+#     5 (Envoy outlier detection; remaining knobs keep EG defaults)
+
+---
+# auth — api-auth-public (route removed in P5 with the auth-service retirement)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: auth
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-auth-public
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# user — api-user-public + api-user-private
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: user
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-user-public
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-user-private
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# product — api-product
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: product
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-product
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# cart — api-cart
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: cart
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-cart
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# order — api-order
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: order
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-order
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# review — api-review-public + api-review-private
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: review
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-review-public
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-review-private
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# notification — api-notification
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: notification
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-notification
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# shipping — api-shipping
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: shipping
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-shipping
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# payment — api-payment-private + api-payment-webhooks
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: payment
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-payment-private
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-payment-webhooks
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5
+---
+# checkout — api-checkout-private
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-api
+  namespace: checkout
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-checkout-private
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 2
+            unit: Second
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 50
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03
+        - limit:
+            requests: 1250
+            unit: Hour
+          xRateLimitHeaders: DraftVersion03
+  requestBuffer:
+    limit: 10Mi
+  retry:
+    numRetries: 2
+  timeout:
+    tcp:
+      connectTimeout: 3s
+    http:
+      requestTimeout: 15s
+  healthCheck:
+    active:
+      type: HTTP
+      interval: 5s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      http:
+        path: /health
+    passive:
+      consecutive5XxErrors: 5

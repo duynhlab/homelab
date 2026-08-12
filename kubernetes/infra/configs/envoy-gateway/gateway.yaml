@@ -1,0 +1,63 @@
+# Gateway `platform` — the single edge entry point (RFC-0024 P2).
+#
+# Listener design: ONE wildcard HTTPS listener (`*.duynh.me`) instead of one
+# listener per host. The platform-edge-tls certificate is a wildcard covering
+# every exposed host (gateway/local/id/grafana/.../temporal.duynh.me — all
+# single-label subdomains), so per-host listeners would add 20 config blocks
+# for zero isolation gain; HTTPRoutes select traffic by their own `hostnames`.
+# No apex (duynh.me) listener: no route serves the apex today (Kong exposed
+# none either).
+#
+# HTTP->HTTPS: Kong forced `konghq.com/protocols: https` + a 301 redirect
+# annotation per Ingress. The canonical Gateway API shape is an :80 listener
+# whose ONLY route is a RequestRedirect(301, https) filter — the redirect
+# HTTPRoute below. allowedRoutes on the http listener is Same-namespace so no
+# app route can ever attach to plaintext; the https listener accepts routes
+# from All namespaces (each route lives with its backend service).
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: platform
+  namespace: envoy-gateway
+spec:
+  gatewayClassName: platform
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.duynh.me"
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.duynh.me"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: platform-edge-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+# HTTP -> HTTPS redirect (translates Kong's per-Ingress
+# `konghq.com/https-redirect-status-code: "301"`). Attaches ONLY to the http
+# listener via sectionName; every plaintext request is answered 301 to https.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: https-redirect
+  namespace: envoy-gateway
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

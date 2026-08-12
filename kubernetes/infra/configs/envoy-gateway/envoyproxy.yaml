@@ -1,0 +1,127 @@
+# EnvoyProxy — data-plane shape for the `platform` GatewayClass (RFC-0024 P2).
+# Translates the Kong HelmRelease proxy values 1:1:
+#   replicas 2 + PDB minAvailable 1   <- kong replicaCount/podDisruptionBudget
+#   resources                         <- kong proxy resources
+#   NodePort 30080/30443              <- kong proxy.http/tls nodePorts
+#   JSON access log to stdout         <- kong nginx_http_log_format kong_json
+#   OTLP tracing, 10% sampling        <- kong tracing_sampling_rate 0.1 +
+#                                        opentelemetry-tracing KongClusterPlugin
+#   Prometheus metrics endpoint       <- kong prometheus-metrics KongClusterPlugin
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: platform
+  namespace: envoy-gateway
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        # Two replicas for HA — same reasoning as Kong: a stateless edge proxy
+        # that scales horizontally; the PDB below keeps one pod serving during
+        # voluntary disruptions.
+        replicas: 2
+        container:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+      envoyPDB:
+        minAvailable: 1
+      envoyService:
+        # NodePort for the Kind extraPortMappings — no LoadBalancer here.
+        type: NodePort
+        # Pin the nodePorts the Kind config forwards (same 30080/30443 the
+        # Kong proxy Service claims today). NOTE: while Kong is still
+        # deployed (until cutover PR 2.3) this Service cannot bind these
+        # nodePorts — the API server rejects the duplicate allocation and
+        # envoy-gateway-config-local stays not-ready. That is expected for
+        # this additive train; 2.3 frees the ports.
+        # Strategic merge key for Service.spec.ports is `port`; the live
+        # merge behavior of this patch gets verified on the P0/Kind spike.
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - port: 80
+                  protocol: TCP
+                  nodePort: 30080
+                - port: 443
+                  protocol: TCP
+                  nodePort: 30443
+  telemetry:
+    # Prometheus metrics endpoint on the proxy fleet (enabled by default; the
+    # empty block records intent). envoy_* scrape objects + rules + dashboards
+    # land with the P4 telemetry train — this only guarantees the endpoint.
+    metrics:
+      prometheus: {}
+    accessLog:
+      settings:
+        # Structured JSON access log to stdout — Vector's DaemonSet tails pod
+        # stdout exactly as it did for Kong's kong_json format. Field names
+        # kept close to kong_json (time/client/method/uri/status/...) with the
+        # Envoy-only extras the RFC calls out (response_flags,
+        # upstream_cluster, route_name).
+        - format:
+            type: JSON
+            json:
+              time: "%START_TIME%"
+              client: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+              method: "%REQ(:METHOD)%"
+              uri: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              status: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes: "%BYTES_SENT%"
+              duration: "%DURATION%"
+              upstream_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+              upstream: "%UPSTREAM_HOST%"
+              upstream_cluster: "%UPSTREAM_CLUSTER%"
+              route_name: "%ROUTE_NAME%"
+              host: "%REQ(:AUTHORITY)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              user_agent: "%REQ(USER-AGENT)%"
+          # CEL filter: emit everything EXCEPT successful probe traffic
+          # (health/readiness paths or kube-probe user agents answered 2xx) —
+          # closes observability audit F-2's biggest log volume at source.
+          # Kong had no equivalent (its access log was unfilterable).
+          # Conservative expression: failures on probe paths still log.
+          matches:
+            - "!((request.url_path.startsWith('/health') || request.url_path.startsWith('/ready') || request.useragent.startsWith('kube-probe')) && response.code >= 200u && response.code < 300u)"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # PERCENT (0-100), not a ratio: 10 == Kong's tracing_sampling_rate 0.1.
+      # Envoy's default sampler is ParentBased, so an inbound sampled
+      # traceparent is always honored — the fleet's sampling model is
+      # unchanged (RFC-0024 research F-7). The LOCAL cluster overrides this to
+      # 100 via a patch in clusters/local/envoy-gateway-config.yaml.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        # Same collector the Kong opentelemetry plugin exported to, but OTLP
+        # gRPC (:4317) instead of HTTP (:4318) — EG's tracing provider speaks
+        # gRPC.
+        backendRefs:
+          - name: otel-collector-opentelemetry-collector
+            namespace: monitoring
+            port: 4317
+      customTags:
+        # Pod identity on every edge span (Kong had only a static
+        # service.name resource attribute).
+        k8s.pod.name:
+          type: Environment
+          environment:
+            name: ENVOY_POD_NAME
+            defaultValue: "-"
+        k8s.namespace.name:
+          type: Environment
+          environment:
+            name: ENVOY_POD_NAMESPACE
+            defaultValue: "envoy-gateway"

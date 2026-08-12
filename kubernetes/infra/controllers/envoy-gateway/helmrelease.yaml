@@ -1,0 +1,52 @@
+# Envoy Gateway control plane (RFC-0024 P2, ADR-045) — replaces Kong as the
+# platform edge; Kong stays deployed until the P2 cutover PR (2.3) removes it.
+# Chart: envoyproxy/gateway-helm — the envoy-gateway controller Deployment
+# (xDS server + Gateway API reconciler). Data-plane Envoy Deployments are
+# created per Gateway by this controller, shaped by the EnvoyProxy CR in
+# configs/envoy-gateway/envoyproxy.yaml.
+#
+# Namespace: `envoy-gateway` (platform short-name convention, like `kong`),
+# not the upstream default envoy-gateway-system. Created in
+# controllers/namespaces.yaml.
+#
+# CRDs: crds Skip on install AND upgrade — the gateway-api-crds HelmRelease
+# (controllers/gateway-api-crds/) owns both the Gateway API standard-channel
+# CRDs and the EG extension CRDs.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: envoy-gateway
+  namespace: envoy-gateway
+spec:
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: envoy-gateway-oci
+    namespace: flux-system
+  install:
+    crds: Skip
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+  values:
+    # Control-plane resources (homelab-friendly). The chart default is
+    # unbounded; bound like the other operators. Data-plane (Envoy proxy)
+    # resources are set in the EnvoyProxy CR, not here.
+    deployment:
+      envoyGateway:
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+    # No chart-native ServiceMonitor toggle exists (verified against the
+    # gateway-helm values docs) — the control-plane scrape (metrics :19001)
+    # is hand-rolled in
+    # configs/observability/metrics/servicemonitors/envoy-gateway-controller.yaml
+    # with job label `envoy-gateway-controller`.

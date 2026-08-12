@@ -1,0 +1,157 @@
+# Admin-UI CIDR fence — translates the Kong `ip-restriction-internal`
+# KongClusterPlugin (configs/kong/plugins.yaml): private/in-cluster networks
+# only, everything else denied. Applied to exactly the routes that carried
+# the plugin annotation: the 10 monitoring UIs, the 2 MCP servers in
+# monitoring, flux-ui + flux-mcp, rustfs-console, openbao-ui.
+# (temporal-ui and frontend carried no ip-restriction in Kong — parity kept.)
+#
+# One SecurityPolicy per namespace (targetRefs are same-namespace only).
+# `defaultAction: Deny` + a single Allow rule = Kong's allowlist semantics,
+# now explicit (RFC-0024 Security considerations). CIDR list matches Kong's
+# allow list 1:1 (incl. ::1/128 loopback).
+# `mergeType: StrategicMerge` keeps the gateway-level CORS baseline applied.
+#
+# Same defense-in-depth caveat as Kong's plugin: behind the Kind
+# port-forward the client address seen by Envoy depends on forwarded-header
+# trust — pair with real auth later.
+
+---
+# monitoring: 10 admin UIs + 2 MCP servers
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: admin-cidr-internal
+  namespace: monitoring
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: grafana
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoriametrics
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: vmalert
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: karma
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: jaeger
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoriatraces
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: tempo
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: pyroscope
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victorialogs
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: sloth-ui
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoria-metrics-mcp
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: victoria-logs-mcp
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: allow-internal
+        action: Allow
+        principal:
+          clientCIDRs:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+            - "127.0.0.1/32"
+            - "::1/128"
+            - "fc00::/7"
+---
+# flux-system: Flux Web UI + Flux Operator MCP
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: admin-cidr-internal
+  namespace: flux-system
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: flux-ui
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: flux-operator-mcp
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: allow-internal
+        action: Allow
+        principal:
+          clientCIDRs:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+            - "127.0.0.1/32"
+            - "::1/128"
+            - "fc00::/7"
+---
+# rustfs: RustFS console
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: admin-cidr-internal
+  namespace: rustfs
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: rustfs-console
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: allow-internal
+        action: Allow
+        principal:
+          clientCIDRs:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+            - "127.0.0.1/32"
+            - "::1/128"
+            - "fc00::/7"
+---
+# openbao: OpenBAO UI
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: admin-cidr-internal
+  namespace: openbao
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openbao-ui
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: allow-internal
+        action: Allow
+        principal:
+          clientCIDRs:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+            - "127.0.0.1/32"
+            - "::1/128"
+            - "fc00::/7"

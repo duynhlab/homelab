@@ -13,3 +13,4 @@ resources:
   - payment.yaml
   - checkout.yaml
   - inventory.yaml
+  - identity.yaml

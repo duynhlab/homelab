@@ -1,0 +1,40 @@
+# PrometheusRule for Keycloak alerts (RFC-0022 / RFC-0024 P1).
+# Availability first: Keycloak is required for NEW logins and refreshes only —
+# already-issued tokens keep verifying locally against cached keys, so it is
+# not on the hot path of authenticated requests (RFC-0022 availability model).
+#
+# Metrics source: Keycloak management interface (:9000, KC_METRICS_ENABLED)
+# scraped via the keycloak ServiceMonitor (job="keycloak").
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: keycloak-alerts
+  namespace: monitoring
+spec:
+  groups:
+    # --- Availability ---
+    - name: keycloak-availability
+      interval: 1m
+      rules:
+        - alert: KeycloakDown
+          # absent() covers the target disappearing entirely (Service/pod gone),
+          # which `up == 0` alone would miss.
+          expr: up{job="keycloak"} == 0 or absent(up{job="keycloak"})
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Keycloak identity provider down"
+            description: "Keycloak (identity/keycloak) has been unreachable for more than 5 minutes. New logins and token refreshes fail; already-issued access tokens keep verifying until expiry (15 min)."
+
+        - alert: KeycloakRestartLoop
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="identity", container="keycloak"}[15m]) > 2
+          for: 0m
+          labels:
+            severity: warning
+            category: availability
+          annotations:
+            summary: "Keycloak restarting repeatedly ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: "The keycloak container restarted {{ $value | humanize }} times in the last 15 minutes. Check DB connectivity to platform-db-rw:5432, the realm import, and memory limits: kubectl logs -n identity {{ $labels.pod }} --previous"

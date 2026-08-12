@@ -2,7 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # platform-db cluster (CloudNativePG) — RFC-0018
-# Databases: auth, user, notification, shipping, review, temporal, temporal_visibility
+# Databases: auth, user, notification, shipping, review, temporal, temporal_visibility, keycloak
 # Order: secrets (app-ns copies) -> instance -> services (triplets) -> configmaps -> poolers -> monitoring -> backup
 resources:
   - secrets/platform-db-secret-auth-ns.yaml
@@ -11,6 +11,7 @@ resources:
   - secrets/platform-db-shipping-secret-shipping-ns.yaml
   - secrets/platform-db-review-secret-review-ns.yaml
   - secrets/platform-db-temporal-secret-temporal-ns.yaml
+  - secrets/platform-db-keycloak-secret-identity-ns.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - objectstore.yaml
   - instance.yaml

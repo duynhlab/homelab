@@ -11,3 +11,4 @@ resources:
   - shipping.yaml
   - review.yaml
   - temporal.yaml
+  - keycloak.yaml

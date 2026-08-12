@@ -12,6 +12,7 @@ resources:
   - servicemonitors/kube-apiserver.yaml
   - servicemonitors/kube-dns.yaml
   - servicemonitors/otel-collector.yaml
+  - servicemonitors/keycloak.yaml
   # Note: CloudNativePG PodMonitors moved to configs/databases/monitoring/ to deploy AFTER database clusters
   - podmonitors/podmonitor-flux-system.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)

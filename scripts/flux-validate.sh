@@ -28,6 +28,10 @@ kubeconform_config=(
   "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-source-{{.ResourceAPIVersion}}.json"
   "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-image-{{.ResourceAPIVersion}}.json"
   "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-notification-{{.ResourceAPIVersion}}.json"
+  # Community CRD schemas (datree CRDs-catalog): validates ExternalSecret,
+  # DatabaseRole/Database, ServiceMonitor/PrometheusRule and — next train —
+  # Gateway API CRs, which -ignore-missing-schemas used to wave through.
+  "-schema-location" "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
   "-verbose"
 )
 
@@ -41,6 +45,9 @@ kustomize_overlays=(
   # Kustomization so apps-local can depend on a Ready server), so a build of
   # controllers never reaches it — without these lines nothing validated it.
   "kubernetes/infra/controllers/temporal"
+  # keycloak/ is excluded from controllers/kustomization.yaml for the same
+  # reason (its own Kustomization, keycloak-local) — validate it explicitly.
+  "kubernetes/infra/controllers/keycloak"
   "kubernetes/infra/configs/temporal"
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/observability"

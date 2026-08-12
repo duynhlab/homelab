@@ -84,6 +84,14 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    # Keycloak → platform-db direct (5432, no pooler — RFC-0022 OQ#8 / ADR-041).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: identity
+      ports:
+        - protocol: TCP
+          port: 5432
     # OpenBAO database secrets engine (openbao ns) → platform-db primary to
     # rotate the notification role's password (static-role, RFC-0008 / ADR-025).
     - from:

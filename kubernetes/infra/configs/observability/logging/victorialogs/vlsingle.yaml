@@ -9,7 +9,9 @@ metadata:
   namespace: monitoring
 spec:
   retentionPeriod: "7d"
-  removePvcAfterDelete: true
+  # removePvcAfterDelete removed: VLSingleSpec (operator v1) never defined it —
+  # the API server pruned it silently (VMSingle-only field, caught by the
+  # CRDs-catalog schema check in flux-validate.sh).
 
   storage:
     resources:

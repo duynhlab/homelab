@@ -24,4 +24,5 @@ resources:
   - mcp.yaml             # MCP servers (depends on monitoring)
   - temporal.yaml        # Temporal server chart (controllers/temporal)
   - temporal-config.yaml # its ingress + alerts (configs/temporal, after temporal-local)
+  - keycloak.yaml        # Keycloak identity provider (controllers/keycloak, RFC-0024 P1)
   - apps.yaml            # Microservices

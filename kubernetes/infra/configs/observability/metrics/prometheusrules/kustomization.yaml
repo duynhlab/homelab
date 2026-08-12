@@ -6,6 +6,7 @@ resources:
   - microservices/
   - postgres/
   - kong/
+  - keycloak/
   - victoriametrics/
   - observability/
   - valkey/

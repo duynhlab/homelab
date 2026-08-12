@@ -196,3 +196,13 @@ metadata:
   labels:
     environment: local
   name: temporal
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
+    # No app-tier label: Keycloak is a platform component (like temporal/kong),
+    # not a domain service — the app-tier default-deny generation and
+    # pss-restricted-apps policy do not apply here (RFC-0022 / RFC-0024 P1).
+  name: identity

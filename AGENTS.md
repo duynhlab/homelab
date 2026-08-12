@@ -407,7 +407,7 @@ reference style.
 | Observability | [`docs/observability/README.md`](docs/observability/README.md) |
 | Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
 | Secrets | [`docs/secrets/README.md`](docs/secrets/README.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) |
-| Kong gateway | [`docs/platform/kong-gateway.md`](docs/platform/kong-gateway.md) |
+| Platform edge (gateway) | [`docs/platform/envoy-gateway.md`](docs/platform/envoy-gateway.md) |
 | Caching | [`docs/api/caching.md`](docs/api/caching.md) · [`docs/caching/README.md`](docs/caching/README.md) |
 | Alerts catalog | [`docs/observability/alerting/alert-catalog.md`](docs/observability/alerting/alert-catalog.md) |
 | Proposals (RFC/ADR) | [`docs/proposals/`](docs/proposals/) |

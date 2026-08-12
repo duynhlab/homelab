@@ -5,13 +5,21 @@
 # edge at all.
 #
 # ---- Edge JWT ----------------------------------------------------------------
-# This is why local-stack can no longer run Kong. Kong OSS matches a token to a
-# consumer credential by its `iss` claim and verifies with a STATIC public key
-# provisioned in kong.yml; it cannot fetch a JWKS. After the RFC-0024 P3
-# identity cutover the fleet's tokens are minted by Keycloak, so every private
-# route 401'd at the Kong edge and the audit's private-route rows could not
-# pass. Envoy fetches and refreshes the realm JWKS itself — zero key material
-# in git, and key rotation needs no edge action.
+# Envoy's `jwt_authn` filter runs INSIDE the request path, ahead of routing to
+# an upstream, so an unauthenticated request never reaches a service at all.
+# Three properties of that follow, and each one is asserted by an audit row:
+#
+#   * The 401 is the edge's, not a service's. Its body is `text/plain` with a
+#     short reason (`Jwt is missing`, `Jwt is expired`), and it carries
+#     `www-authenticate: Bearer realm="<the requested URL>"` — the realm value
+#     echoes what was asked for, it is not an identity-provider URL. When a
+#     token was present but unverifiable, `error="invalid_token"` is added.
+#   * The reason is also visible in the access log as `response_code_details`
+#     (for example `jwt_authn_access_denied{Jwt_is_missing}`), which is how a
+#     401 gets diagnosed without reproducing it.
+#   * Zero key material lives in git. The filter fetches the realm's JWKS over
+#     HTTP and refreshes it on its own, so a signing-key rotation at the realm
+#     needs no edge change and no redeploy.
 #
 # `issuer` must be the string the token actually carries. Keycloak `start-dev`
 # has no --hostname, so it derives `iss` from the request host, and the browser
@@ -23,22 +31,33 @@
 # backwards fails one way at boot (JWKS unreachable) and the other way at
 # request time (`Jwt issuer is not configured`).
 #
-# Plain HTTP to Keycloak, matching the cluster (KC_HTTP_ENABLED=true), so no
-# Backend + BackendTLSPolicy is needed for the JWKS hop.
+# Plain HTTP to Keycloak, matching the cluster (KC_HTTP_ENABLED=true), so the
+# JWKS hop needs no Backend + BackendTLSPolicy pair. Were the realm reached over
+# HTTPS, `remoteJWKS.uri` alone would not be enough — the trust material for
+# that connection is configured separately.
 #
-# No `audiences`: same as the cluster. Audience enforcement is the service's
-# job (pkg/authmw checks aud=duynhlab-platform and is authoritative); the edge
-# is the coarse filter (ADR-006 principle, re-homed by ADR-045). Do not "tighten"
-# this without changing the cluster policy too — divergence is worse than
-# duplication here.
+# No `audiences`, deliberately. Listing one here would make the edge reject a
+# token whose `aud` did not match, which sounds stricter and is actually a
+# duplicated authority: `pkg/authmw` already enforces `aud=duynhlab-platform`
+# inside every service and is the authoritative check (ADR-006 principle,
+# re-homed by ADR-045). The edge's job is the coarse filter — is this a live,
+# correctly-signed token from the realm we trust — and the service's job is
+# whether that token may do this particular thing. Do not "tighten" this without
+# changing the cluster policy too; divergence between the two edges is worse
+# than duplicated enforcement.
 #
-# `mergeType: StrategicMerge` keeps the gateway-level CORS baseline below
-# applied to these seven routes; without it a route-level SecurityPolicy
-# replaces the gateway one outright and the SPA's preflights start failing on
-# exactly the routes it needs most.
+# `mergeType: StrategicMerge` is what keeps the gateway-level CORS baseline
+# below applied to these seven routes. Policy attachment in Gateway API is
+# hierarchical, and the DEFAULT for a route-level policy of the same kind is to
+# replace the gateway-level one outright rather than layer onto it — so without
+# this field the seven private routes would lose CORS entirely, and they are
+# exactly the routes the SPA preflights most.
 #
-# Preflight: Envoy's CORS filter answers OPTIONS before JWT auth runs, which is
-# what Kong's `run_on_preflight: false` bought explicitly.
+# Ordering, which matters for preflight: Envoy's CORS filter sits ahead of
+# jwt_authn in the filter chain, so an OPTIONS preflight is answered before
+# authentication runs. That is required rather than convenient — a browser
+# preflight carries no Authorization header by definition, so a JWT check ahead
+# of CORS would 401 every preflight and the real request would never be sent.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -78,19 +97,33 @@ spec:
 # Needed, not optional: the SPA is served from http://localhost:3001 and calls
 # the edge on http://localhost:8080 — different port, therefore a different
 # origin, therefore every non-simple request is preflighted. Attached to the
-# Gateway so all 12 routes inherit it (Gateway API has no global filter; this
-# is the EG-native equivalent of Kong's global cors plugin).
+# **Gateway**, not to routes, so all 12 routes inherit one baseline: Gateway API
+# has no global-filter concept, and hierarchical policy attachment at the
+# Gateway is how a cross-cutting concern is expressed once.
 #
-# Header lists are the SPA's actual needs:
+# `allowHeaders` is an allowlist of REQUEST headers, and a missing entry fails
+# closed at the preflight — the browser refuses to send the real request, so the
+# symptom is a request that never appears in any server log:
 #   Authorization    realm access token on every private call
 #   Content-Type     JSON bodies
-#   Idempotency-Key  checkout confirm (RFC-0015 P3) — without it the preflight
-#                    rejects the POST and the request is never sent
+#   Idempotency-Key  checkout confirm (RFC-0015 P3)
 #   X-Request-ID     client-supplied correlation id when present
-# and on the way out, the rate-limit headers the local rate limiter emits are
-# X-RateLimit-* (IETF draft-03), NOT Kong's RateLimit-* — a real behavioral
-# difference the SPA sees. Retry-After is not CORS-safelisted, so the 429
-# "wait Ns" hint has to be exposed explicitly.
+#
+# `exposeHeaders` is the opposite direction and the more surprising one: a
+# cross-origin response's headers are hidden from JavaScript unless named here,
+# even though they arrived intact. The rate-limit headers are listed because the
+# SPA can only show a budget it can read, and Retry-After is listed because it
+# is not one of the seven CORS-safelisted response headers — without it, the 429
+# arrives complete and the "wait N seconds" hint is invisible to the client.
+#
+# `allowCredentials: true` is what permits the SPA's requests to carry
+# credentials cross-origin, and it is also why `allowOrigins` must stay an
+# explicit list: a wildcard origin and credentials are mutually exclusive per
+# the CORS specification, so widening this to "*" would silently break every
+# authenticated call rather than loosening anything.
+#
+# `maxAge: 1h` lets the browser cache each preflight result, so the OPTIONS
+# round-trip is paid once per hour per route rather than before every mutation.
 #
 # localhost:3000 is allowed because the realm's customer-spa client permits it
 # as a redirect origin (`npm run dev` outside Compose).

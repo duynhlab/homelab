@@ -4,13 +4,14 @@
 # standalone controller (`controllerName` must equal `gateway.controllerName`
 # in standalone.yaml).
 #
-# `parametersRef` points at the local EnvoyProxy CR (envoyproxy.yaml). The
-# cluster's CR additionally shapes a Deployment (replicas, PDB, NodePorts) —
-# none of which exists here — but the *telemetry* half must be present in both
-# environments or the edge stops emitting spans and structured access logs.
-# Kong's opentelemetry plugin made the local edge a span producer; dropping
-# that on the way to Envoy Gateway would be a silent observability regression,
-# so the local CR carries tracing and the JSON access log deliberately.
+# `parametersRef` points at the local EnvoyProxy CR (envoyproxy.yaml), and this
+# indirection is the whole reason a GatewayClass is more than a formality: it is
+# where "which proxy implementation, configured how" is decided for every Gateway
+# that names this class. The cluster's CR additionally shapes a Deployment
+# (replicas, PDB, NodePorts), none of which exists here, but the *telemetry* half
+# must be present in both environments — an edge that emits neither spans nor
+# structured access logs is invisible in exactly the incidents it is meant to
+# explain, so the local CR carries tracing and the JSON access log deliberately.
 #
 # No namespace on any resource in this directory, deliberately: the file
 # provider drops every namespace-less object into one default namespace, which

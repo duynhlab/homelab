@@ -1,9 +1,8 @@
 # Temporal Web UI — temporal.duynh.me. Translates
 # configs/temporal/ingress.yaml (Ingress temporal-ui). The official chart
 # exposes the UI as the `temporal-web` Service on :8080 (ADR-030 revision).
-# Kong parity note: the temporal-ui Ingress carried NO
-# ip-restriction/rate-limiting plugins, so this route deliberately gets no
-# admin CIDR SecurityPolicy and no admin BTP either.
+# This route deliberately gets no admin CIDR SecurityPolicy and no admin BTP
+# either — the Temporal UI needs no IP restriction or rate limiting.
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

@@ -1,9 +1,7 @@
-# Frontend SPA — https://local.duynh.me. Translates
-# configs/kong/ingress-frontend.yaml (Ingress frontend): all non-API traffic
-# to the frontend Nginx container (static files + SPA fallback). No
-# rate-limit / CIDR policies — the Kong Ingress carried none (only the global
-# plugins, translated as the CORS SecurityPolicy on the Gateway + the
-# security-headers filter here).
+# Frontend SPA — https://local.duynh.me. Routes all non-API traffic to the
+# frontend Nginx container (static files + SPA fallback). No rate-limit /
+# CIDR policies here — only the gateway-level CORS SecurityPolicy and the
+# security-headers filter below apply.
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

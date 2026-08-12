@@ -1,16 +1,14 @@
-# Admin-surface BackendTrafficPolicies — translate the Kong
-# `rate-limiting-admin` KongClusterPlugin (1200/min, 30000/h, shared Valkey
-# counter for 2 replicas) into rateLimit.local with the numbers HALVED for
-# replicaCount 2 (per-instance buckets, ADR-046): 600/Minute, 15000/Hour.
+# Admin-surface BackendTrafficPolicies — rateLimit.local sized as
+# per-instance buckets for replicaCount 2 (ADR-046): 600/Minute, 15000/Hour.
 # More generous than the API limit because dashboards (e.g. Grafana) fan out
 # many asset/API requests per view.
 #
-# Targets exactly the routes that carried the plugin: the monitoring UIs,
-# both MCP servers in monitoring, flux-ui + flux-mcp, rustfs-console,
+# Targets exactly the admin surfaces that need it: the monitoring UIs, both
+# MCP servers in monitoring, flux-ui + flux-mcp, rustfs-console,
 # openbao-ui. One BTP per namespace (targetRefs are same-namespace only).
-# No requestBuffer / resilience block: Kong applied neither
-# request-size-limiting nor a KongUpstreamPolicy to these surfaces.
-# temporal-ui had no Kong rate limit — parity kept (no BTP).
+# No requestBuffer / resilience block on these surfaces — out of scope for
+# admin UIs.
+# temporal-ui has no rate limit (no BTP) — intentionally left open.
 
 ---
 # monitoring: 10 admin UIs + 2 MCP servers

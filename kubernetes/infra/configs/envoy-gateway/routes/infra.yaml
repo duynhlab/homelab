@@ -1,6 +1,5 @@
-# Infrastructure routes — 1:1 translation of configs/kong/ingress-infra.yaml
-# (3 Ingresses -> 3 HTTPRoutes). Each Kong Ingress carried
-# `ip-restriction-internal,rate-limiting-admin`:
+# Infrastructure routes — one HTTPRoute per admin surface (3 routes total).
+# Each carries:
 #   - CIDR fence       -> policies/security-admin-cidr.yaml
 #   - admin rate limit -> policies/btp-admin.yaml
 # security-headers filter: see routes/api.yaml header note.

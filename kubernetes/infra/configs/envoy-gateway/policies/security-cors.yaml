@@ -1,14 +1,13 @@
-# CORS — translates the GLOBAL Kong `cors-policy` KongClusterPlugin
-# (configs/kong/plugins.yaml). Kong applied it to every route, so the EG
-# equivalent targets the whole `platform` Gateway; route-level
-# SecurityPolicies (security-jwt.yaml, security-admin-cidr.yaml) declare
+# CORS — applied GLOBALLY, targeting the whole `platform` Gateway so every
+# route inherits the same baseline; route-level SecurityPolicies
+# (security-jwt.yaml, security-admin-cidr.yaml) declare
 # `mergeType: StrategicMerge` so this gateway-level baseline still applies to
 # their routes instead of being overridden.
 #
-# Values mirror the Kong plugin 1:1 EXCEPT the exposed rate-limit headers:
-# Envoy's local rate limiter emits X-RateLimit-* (IETF draft-03, enabled
-# per-rule in policies/btp-*.yaml), not Kong's RateLimit-* — the expose list
-# swaps accordingly (RFC-0024 Design Details -> Rate limiting).
+# exposeHeaders lists Envoy's local rate limiter response headers,
+# X-RateLimit-* (IETF draft-03, enabled per-rule in policies/btp-*.yaml), so
+# the SPA can read remaining-quota info (RFC-0024 Design Details -> Rate
+# limiting).
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy

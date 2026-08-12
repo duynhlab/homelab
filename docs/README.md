@@ -130,7 +130,8 @@ docs/
 │   ├── cicd.md                   # CI/CD pipelines + standard/policy (pinning, permissions, signing, GoReleaser)
 │   ├── gitflow.md                # Git branching & release standard
 │   ├── sonarcloud.md             # SonarCloud integration
-│   ├── kong-gateway.md           # Kong API gateway — concept + DB-less, plugins, routing, rate-limiting
+│   ├── envoy-gateway.md          # Platform edge — Gateway API resource model, both provider modes, edge telemetry
+│   ├── kong-gateway.md           # Archived — the platform's previous API gateway
 │   ├── kyverno.md                # Kyverno admission-policy platform guide
 │   ├── mcp-servers.md            # MCP servers wired into the platform
 │   └── ruleset-automation.md     # GitHub ruleset automation
@@ -457,7 +458,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
-- [Kong API Gateway](./platform/kong-gateway.md) - API-gateway concept + tradeoffs; DB-less Kong (plugins, routing, rate-limiting, TLS)
+- [Envoy Gateway](./platform/envoy-gateway.md) - The platform edge: Gateway API resource model, policy attachment, Kubernetes vs standalone providers, edge JWT, and the telemetry the proxy itself produces
+- [Kong API Gateway](./platform/kong-gateway.md) - **Archived.** The platform's previous API gateway, kept for reference
 - [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
 - [Identity Cutover Runbook](./platform/identity-cutover-runbook.md) - RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm)
 - [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 11 services)

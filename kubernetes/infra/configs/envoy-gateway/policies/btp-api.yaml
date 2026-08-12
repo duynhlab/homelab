@@ -1,43 +1,36 @@
-# API-route BackendTrafficPolicies — one per API namespace, each translating
-# THREE Kong artifacts at once (configs/kong/plugins.yaml +
-# kubernetes/apps/domains/*-rs.yaml):
+# API-route BackendTrafficPolicies — one per API namespace, each setting
+# THREE things at once (kubernetes/apps/domains/*-rs.yaml carries the
+# per-domain resilience source values):
 #
-#   1. `rate-limiting-api` (5/s, 100/min, 2500/h, shared Valkey counter for 2
-#      replicas) -> rateLimit.local with the numbers HALVED for
-#      replicaCount 2 (per-instance buckets; effective ceiling = configured x
-#      replicas — ADR-046 local-first decision): 2/Second (round of 2.5),
-#      50/Minute, 1250/Hour. Envoy applies the STRICTEST matching rule, so
-#      the three windows behave like Kong's three windows. X-RateLimit
-#      draft-03 headers enabled per rule (replaces Kong's RateLimit-*; the
-#      CORS expose list swapped accordingly). No Redis/Valkey at the edge:
-#      in-process buckets cannot fail open OR closed.
-#   2. `request-size-limiting-api` (10 MB) -> requestBuffer 10Mi (413).
-#   3. The `resilience-default` KongUpstreamPolicy + konghq.com Service
-#      annotations (connect-timeout 3000 / read/write-timeout 15000 /
-#      retries 2, templated per domain in apps/domains/*-rs.yaml) ->
-#      retry/timeout/healthCheck here.
+#   1. rateLimit.local sized as per-instance buckets (effective ceiling =
+#      configured x replicas — ADR-046 local-first decision): 2/Second
+#      (round of 2.5), 50/Minute, 1250/Hour. Envoy applies the STRICTEST
+#      matching rule, so all three windows are enforced together.
+#      X-RateLimit draft-03 headers enabled per rule (the CORS expose list
+#      matches accordingly). No Redis/Valkey at the edge: in-process buckets
+#      cannot fail open OR closed.
+#   2. requestBuffer 10Mi (413 over the limit).
+#   3. retry/timeout/healthCheck (connect-timeout 3s / request-timeout 15s /
+#      retries 2, templated per domain in apps/domains/*-rs.yaml).
 #
-# PLACEMENT DEVIATION from the original P2 plan (recorded for review): the
-# resilience settings were planned as templated BTPs in the apps-layer
-# ResourceSets, and the rate limits as a separate btp-api.yaml. Both moved
-# HERE and merged because (a) BTP targetRefs attach to HTTPRoutes, which are
-# central in this directory — not to Services, so the apps layer has nothing
-# to attach to; and (b) Envoy Gateway resolves multiple same-kind policies on
-# one route by "oldest wins" — two separate BTPs per route would conflict,
-# not compose. The apps-layer KongUpstreamPolicy/annotations were removed with
-# the 2.3 cutover (the KongUpstreamPolicy CRD leaves with the Kong chart, so a
-# fresh bring-up could no longer apply them) — this BTP is the only resilience
-# config at the edge.
+# PLACEMENT NOTE (recorded for review): the resilience settings were
+# originally planned as templated BTPs in the apps-layer ResourceSets, and
+# the rate limits as a separate btp-api.yaml. Both live HERE and are merged
+# because (a) BTP targetRefs attach to HTTPRoutes, which are central in this
+# directory — not to Services, so the apps layer has nothing to attach to;
+# and (b) Envoy Gateway resolves multiple same-kind policies on one route by
+# "oldest wins" — two separate BTPs per route would conflict, not compose.
+# This policy is therefore the only resilience config at the edge.
 #
-# Resilience mapping (Kong -> EG):
-#   retries 2                      -> retry.numRetries 2
-#   connect-timeout 3000ms         -> timeout.tcp.connectTimeout 3s
-#   read/write-timeout 15000ms     -> timeout.http.requestTimeout 15s
-#   active http /health interval 5 -> healthCheck.active (HTTP GET /health,
-#     healthy successes 2 / unhealthy httpFailures 3 = healthyThreshold 2 /
-#     unhealthyThreshold 3; expectedStatuses default 200)
-#   passive httpFailures 5         -> healthCheck.passive.consecutive5XxErrors
-#     5 (Envoy outlier detection; remaining knobs keep EG defaults)
+# Resilience settings:
+#   retry.numRetries 2
+#   timeout.tcp.connectTimeout 3s
+#   timeout.http.requestTimeout 15s
+#   healthCheck.active (HTTP GET /health, healthy successes 2 / unhealthy
+#     httpFailures 3 = healthyThreshold 2 / unhealthyThreshold 3;
+#     expectedStatuses default 200)
+#   healthCheck.passive.consecutive5XxErrors 5 (Envoy outlier detection;
+#     remaining knobs keep EG defaults)
 
 ---
 # auth — api-auth-public (route removed in P5 with the auth-service retirement)

@@ -1,49 +1,62 @@
 # BackendTrafficPolicy — local rate limit + request body size cap.
 #
 # What this exposes: the two edge protections worth exercising locally, applied
-# to all 12 routes by one policy. In the cluster this is eleven near-identical
-# files (one per namespace, because targetRefs are namespace-scoped); here every
-# route lives in one namespace, so one policy is the honest shape. Two policies
-# would not compose anyway — Envoy Gateway resolves same-kind policy conflicts
-# on a route by "oldest wins", it does not merge them.
+# to all 12 routes by one policy.
+#
+# ONE policy, not several, and that is a correctness point rather than tidiness.
+# `targetRefs` is namespace-scoped, so a policy can only name routes in its own
+# namespace — the cluster needs one file per application namespace for that
+# reason, while every route here lives in one namespace. Splitting anyway would
+# not compose: when two policies of the same kind target the same route, Envoy
+# Gateway resolves the conflict by creation order ("oldest wins") and reports
+# the loser as not-accepted in its status. It does not merge their fields, so a
+# second policy silently contributes nothing.
 #
 # ---- Rate limit: 50/s, deliberately generous ---------------------------------
-# The cluster is 2/s + 50/min + 1250/h per replica (5/s + 100/min + 2500/h
-# effective across two replicas, translating Kong's shared-Valkey counter). The
-# local numbers are NOT that, on purpose:
+# `type: Local` means each Envoy process holds its own token bucket in memory.
+# There is no shared datastore and no coordination, which has two consequences
+# worth stating plainly:
 #
-#  * There is no replica division. One Envoy process, one in-process token
-#    bucket, so a configured number is the real ceiling — copying the cluster's
-#    halved per-replica figures would make the local edge twice as strict as
-#    production.
-#  * Kong's 5/s cost the audit a `sleep 0.3` after every single curl and still
-#    tripped 429s, which the runbook had to document as "the gateway working,
-#    not a bug". That is pure friction: a release gate that throttles its own
-#    evidence collection produces flaky rows, not security signal.
-#  * 50/s at one request per shell round-trip is unreachable by a human or by
-#    the audit, so the filter is still WIRED and still emits X-RateLimit-*
-#    headers (that is what local should prove), without ever firing by accident.
+#  * The configured number is the real ceiling here, because there is exactly
+#    one Envoy process. Under multiple replicas the effective fleet-wide limit
+#    would be the configured number times the replica count, so a local number
+#    and a cluster number are not comparable figures even when they look alike.
+#  * A local bucket cannot leak across runs. It is process state, so a fresh
+#    stack starts with a full bucket and nothing an earlier audit did can
+#    throttle this one.
 #
-# There is exactly ONE window — see the `rules` comment below for why more than
-# one is not merely unnecessary but rejected. Neither a minute nor an hour bucket
-# exists here, and the hour one would be actively harmful: it cannot be waited
-# out inside an audit run. Kong's 2500/h was the one limit the runbook admitted
-# "waiting a few seconds will not clear", which turns a re-run into a blocked
-# release for reasons that have nothing to do with the candidate.
+# 50/s is unreachable at one request per shell round-trip, which is the point:
+# the filter stays WIRED and keeps emitting the X-RateLimit-* headers that prove
+# it is in the chain, without ever firing by accident. A release gate that
+# throttles its own evidence collection produces flaky rows, not security
+# signal. A 429 during the audit is therefore a real finding — either the policy
+# was tightened or something is looping.
+#
+# ONE window, and no hour bucket by choice: an hour bucket cannot be waited out
+# inside an audit run, so tripping one turns a re-run into a blocked release for
+# reasons that have nothing to do with the candidate. See the `rules` comment
+# below for why more than one window is not merely unnecessary but rejected.
 #
 # ---- requestBuffer -----------------------------------------------------------
-# 10Mi == Kong's request-size-limiting 10 MB == the cluster's requestBuffer.
-# Over the limit answers 413. Same number in all three places, deliberately:
-# it is a contract the SPA and the services are written against.
+# 10Mi body cap; over it Envoy answers 413 without opening an upstream
+# connection, so an oversized client cannot occupy a backend. Identical in both
+# environments deliberately: the number is a contract the SPA and the services
+# are written against, and a local edge that accepted more than production
+# would let an oversized-payload bug reach a release.
 #
 # ---- What is NOT here --------------------------------------------------------
-# retry / timeout / healthCheck. The cluster BTP carries them because it
-# translates Kong's KongUpstreamPolicy (retries 2, connect 3s, read/write 15s,
-# active /health probes, passive ejection). Locally: Envoy's default route
-# timeout is already 15s, Compose healthchecks already gate the services behind
-# `depends_on`, there is one replica per backend so there is nothing to eject,
-# and outlier detection on a single host only ever removes the only upstream —
-# turning a transient 5xx into a hard outage mid-audit. Documented divergence.
+# retry, timeout, and healthCheck — all three present in the cluster policy,
+# all three deliberately absent here, and none of them by oversight:
+#   * timeout — Envoy's default route timeout is 15s, which is already the
+#     intended value, so setting it would restate a default.
+#   * healthCheck (active probing) — Compose healthchecks already gate every
+#     service behind `depends_on`, so the edge never starts with a dead upstream.
+#   * outlier detection (passive ejection) — with one endpoint per backend,
+#     ejecting the unhealthy one ejects the only one. A transient 5xx would
+#     become a hard outage in the middle of an audit.
+#   * retry — one endpoint means a retry re-sends to the same process, so it
+#     converts a fast failure into a slow one without improving the odds.
+# Documented divergence, kept in this list so the next reader does not "fix" it.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:
@@ -89,17 +102,34 @@ spec:
   rateLimit:
     type: Local
     local:
-      # Exactly ONE rule, and that is a hard constraint, not a preference:
-      # Envoy's local rate limiter rejects a policy with more than one rule
-      # unless every rule carries `clientSelectors`, and a rejected policy
-      # makes Envoy Gateway attach a 500 direct response to every route the
-      # policy targets — the whole edge, not just the limiter. Multi-window
-      # limiting (per-second AND per-minute AND per-hour) belongs to a
-      # counter-based limiter; here one window is the design.
+      # Exactly ONE rule without `clientSelectors`, and that is a hard
+      # constraint rather than a preference.
+      #
+      # A rule with no clientSelectors applies to ALL traffic on the targeted
+      # routes — it is the catch-all descriptor. Two catch-all rules are
+      # therefore two identical descriptors, the local rate limit filter
+      # refuses the configuration, and a refused policy does not degrade
+      # gracefully: Envoy Gateway attaches a 500 direct response to every route
+      # the policy targets. The blast radius is the whole edge, not the limiter,
+      # and the symptom gives no hint of its cause — every route answers 500
+      # while the routes, the JWT policy, and every backend are perfectly
+      # healthy. `make validate` cannot see it either, because the YAML is
+      # schema-valid; only a driven request finds it.
+      #
+      # Several rules ARE legal when each carries clientSelectors, because then
+      # each describes a distinct subset (a path, a header, a source CIDR, a
+      # method) rather than the same everything. When more than one matches, the
+      # strictest limit wins. Multi-window limiting — per-second AND per-minute
+      # AND per-hour on the same traffic — is not that shape; it needs a
+      # counter-based limiter with a shared store. One window is the design here.
       rules:
         - limit:
             requests: 50
             unit: Second
+          # Emit the rate-limit budget to clients. DraftVersion03 is the
+          # `ratelimit-limit` / `ratelimit-remaining` / `ratelimit-reset`
+          # header set from the IETF draft; without this field the limiter
+          # still enforces, it just tells the client nothing until the 429.
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi

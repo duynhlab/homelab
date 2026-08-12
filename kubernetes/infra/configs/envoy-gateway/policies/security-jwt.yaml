@@ -1,12 +1,10 @@
-# Edge JWT — translates the Kong `jwt-edge` KongClusterPlugin + KongConsumer
-# auth-issuer + its static-key ExternalSecret (configs/kong/plugins.yaml,
-# consumer.yaml) into SecurityPolicy remoteJWKS verification against the
-# Keycloak realm (RFC-0024 / ADR-045; RFC-0022 is the identity design record).
+# Edge JWT — SecurityPolicy remoteJWKS verification against the Keycloak
+# realm (RFC-0024 / ADR-045; RFC-0022 is the identity design record).
 # Zero provisioned key material: Envoy fetches and refreshes the realm JWKS
 # itself, so key rotation needs no edge action.
 #
-# Targets EXACTLY the routes that carried `jwt-edge` (the seven /private/
-# API surfaces): user-private, cart, order, review-private, notification,
+# Targets EXACTLY the seven /private/ API surfaces that require
+# authentication: user-private, cart, order, review-private, notification,
 # payment-private, checkout. One SecurityPolicy per namespace because
 # targetRefs only resolve same-namespace objects.
 #
@@ -20,14 +18,14 @@
 # points at the Service directly and no Backend/BackendTLSPolicy is needed.
 # Revisit when internal TLS lands (RFC-0020/RFC-0006 territory).
 #
-# Preflight parity: Kong set run_on_preflight:false; Envoy's CORS filter
-# answers OPTIONS preflights before JWT auth runs, preserving the behavior.
+# Preflight handling: Envoy's CORS filter answers OPTIONS preflights before
+# JWT auth runs, so a preflight is never rejected for lacking a token.
 #
 # Services STILL verify tokens (pkg/authmw, fail-closed, authoritative) —
-# the edge is the coarse filter (ADR-006 principle, vehicle superseded).
+# the edge is the coarse filter (ADR-006 principle).
 
 ---
-# user — api-user-private (Kong Ingress api-user-private had jwt-edge)
+# user — api-user-private
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -46,7 +44,7 @@ spec:
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
 ---
-# cart — api-cart (Kong Ingress api-cart had jwt-edge)
+# cart — api-cart
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -65,7 +63,7 @@ spec:
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
 ---
-# order — api-order (Kong Ingress api-order had jwt-edge)
+# order — api-order
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -103,7 +101,7 @@ spec:
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
 ---
-# notification — api-notification (Kong Ingress api-notification had jwt-edge)
+# notification — api-notification
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -142,7 +140,7 @@ spec:
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
 ---
-# checkout — api-checkout-private (Kong Ingress api-checkout-private had jwt-edge)
+# checkout — api-checkout-private
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:

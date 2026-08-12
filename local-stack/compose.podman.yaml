@@ -1,0 +1,37 @@
+# Podman overlay for the local stack.
+#
+# Everything in compose.yaml targets the Docker contract, which is what CI and
+# the runbooks assume. Podman runs the same stack unchanged with one exception:
+# Vector's `docker_logs` source reads the container runtime's API socket, and
+# inside a podman machine `/var/run/docker.sock` is a **symlink** to
+# `/run/user/<uid>/podman/podman.sock`. A bind-mounted symlink resolves inside
+# the container, where its target does not exist — so Vector starts, fails with
+# `Source "docker": Socket not found: /var/run/docker.sock`, and exits 78. The
+# stack then looks healthy while shipping no container logs at all, which costs
+# the audit its edge-access-log and infrastructure-log rows.
+#
+# Mount the resolved socket instead. Two more things are needed and neither is
+# guessable: the socket is `srw-rw---- core core` inside the machine, so the
+# container must run as that same user (`userns_mode: keep-id` maps it, where
+# `user: "0:0"` does not — container root is a subuid, not the socket's owner),
+# and the socket carries an SELinux label that denies the mount until labelling
+# is disabled for this one container. Verified by probing both: with keep-id
+# alone the container is uid 502(core) and still gets EACCES; adding
+# `label=disable` is what makes `test -S /var/run/docker.sock` succeed.
+#
+# Usage — resolve the socket first, then pass both files:
+#
+#   export PODMAN_SOCKET="$(podman machine ssh readlink -f /var/run/docker.sock | tr -d '\r')"
+#   export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')"
+#   docker compose -f compose.yaml -f compose.podman.yaml up -d --build
+#
+# Every other command in the runbooks works unchanged; only `up` needs the
+# second file, and only because it is what creates the container.
+services:
+  vector:
+    userns_mode: "keep-id"
+    security_opt:
+      - label=disable
+    volumes: !override
+      - ${PODMAN_SOCKET:?set PODMAN_SOCKET - see the usage note in compose.podman.yaml}:/var/run/docker.sock:ro
+      - ./observability/vector.yaml:/etc/vector/vector.yaml:ro

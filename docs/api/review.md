@@ -7,7 +7,7 @@ details aggregation.
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public + private · `:8080` · Kong `/review/v1/public/` and `/review/v1/private/` (edge JWT on private) | Implemented |
+| **HTTP** | public + private · `:8080` · edge `/review/v1/public/` and `/review/v1/private/` (`jwt-edge` SecurityPolicy on private) | Implemented |
 | **gRPC server** | `ReviewService/GetProductReviews` · `:9090` | Implemented |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
@@ -32,7 +32,7 @@ Product pages need social proof, and the catalog needs it without turning the
 SPA into an orchestrator. Two consumers, two transports, one logic layer:
 
 - **Browser** lists reviews for a product (public) and submits the
-  authenticated user's own review (private) over HTTP through Kong.
+  authenticated user's own review (private) over HTTP through the edge.
 - **product-service** builds one product-details response server-side; it
   fetches reviews over the gRPC twin instead of asking the SPA to fan out to
   multiple services ([aggregation rules](./api.md#aggregation-rules)).
@@ -48,8 +48,8 @@ and where the duplicate gate lives.
 
 ```mermaid
 flowchart LR
-    SPA["Browser SPA"] --> Kong["Kong<br/>(edge JWT on /private/)"]
-    Kong -->|"HTTP list + create"| Review["review-service<br/>:8080 / :9090"]
+    SPA["Browser SPA"] --> Edge["Envoy Gateway<br/>(edge JWT on /private/)"]
+    Edge -->|"HTTP list + create"| Review["review-service<br/>:8080 / :9090"]
     Product["product-service"] -->|"gRPC GetProductReviews :9090"| Review
     Review --> Logic["review logic<br/>(shared by both transports)"]
     Logic --> DB[("review DB<br/>UNIQUE (product_id, user_id)")]
@@ -57,14 +57,14 @@ flowchart LR
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class Review,Product,Logic service;
     class DB data;
 ```
 
 The HTTP and gRPC adapters are thin transports over the same
 `internal/logic/v1` service, so both paths return identical data and share
-one validation surface. Nothing except Kong and product may dial review —
+one validation surface. Nothing except the edge and product may dial review —
 the namespace NetworkPolicy admits only those two callers on `8080`/`9090`.
 
 ## Data model
@@ -153,7 +153,7 @@ invalid values fall back to defaults).
 | HTTP | Code | Trigger |
 |------|------|---------|
 | `400` | `VALIDATION_ERROR` | Missing `product_id` query param; invalid JSON body; rating outside 1–5; non-numeric `product_id` (`user_id` is a string subject since RFC-0024 P3 — no numeric check) |
-| `401` | `UNAUTHORIZED` | Missing/invalid JWT — rejected at the Kong edge or by in-service `pkg/authmw` |
+| `401` | `UNAUTHORIZED` | Missing/invalid JWT — rejected at the edge's `jwt-edge` SecurityPolicy or by in-service `pkg/authmw` |
 | `409` | `CONFLICT` | The user already reviewed this product |
 | `500` | `INTERNAL_ERROR` | Database or unexpected failure, no leaked internals |
 
@@ -226,13 +226,13 @@ so a non-numeric subject can no longer degrade a query quietly.
 
 | Direction | Peer | Transport | Notes |
 |-----------|------|-----------|-------|
-| Inbound | Browser SPA via Kong | HTTP `:8080` | Public list; private create behind edge JWT |
+| Inbound | Browser SPA via the edge | HTTP `:8080` | Public list; private create behind edge JWT |
 | Inbound | product-service | gRPC `:9090` | `GetProductReviews` for details aggregation; 3s deadline, soft-fail to `[]` |
 | Outbound | `review` DB on `platform-db` | PostgreSQL | Via `platform-db-pooler-rw.platform:5432` |
 | Outbound | Keycloak realm JWKS | HTTP | `OIDC_ISSUER`/`OIDC_JWKS_URL` — local RS256 verification (`pkg/authmw` v0.37.0); no runtime IdP call per request |
 
 NetworkPolicy (`kubernetes/infra/configs/network-policies/review.yaml`):
-default deny-all ingress; only the `kong` and `product` namespaces are
+default deny-all ingress; only the `envoy-gateway` and `product` namespaces are
 admitted, on ports `8080` and `9090`.
 
 ## Known gaps
@@ -264,7 +264,7 @@ are reserved for that future surface).
 | `reviews_duplicate_rejected_total` | counter | How often duplicates are rejected (pre-check + 23505 race combined) |
 | `grpc_reviews_truncated_total` | counter | Are gRPC reads silently hitting the 10k page cap? |
 
-- **Smoke test via Kong** (local-stack `:8080`; demo login `alice` /
+- **Smoke test via the edge** (local-stack `:8080`; demo login `alice` /
   `password123` by username):
 
 ```bash

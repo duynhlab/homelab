@@ -8,7 +8,7 @@ and identity claims.
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public + private · `:8080` · Kong `/user/v1/public/` and `/user/v1/private/` (edge JWT on private) | Implemented |
+| **HTTP** | public + private · `:8080` · edge `/user/v1/public/` and `/user/v1/private/` (`jwt-edge` SecurityPolicy on private) | Implemented |
 | **gRPC server** | None | None |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
@@ -60,8 +60,8 @@ profile data live?
 
 ```mermaid
 flowchart LR
-    SPA["Browser SPA"] --> Kong["Kong (edge JWT on /private/)"]
-    Kong -->|"/user/v1/public/ + /user/v1/private/"| Web["web/v1 handlers"]
+    SPA["Browser SPA"] --> Edge["Envoy Gateway (edge JWT on /private/)"]
+    Edge -->|"/user/v1/public/ + /user/v1/private/"| Web["web/v1 handlers"]
     Web --> Logic["logic/v1"]
     Logic --> Repo["core/repository (pgx)"]
     Repo --> DB[("user DB<br/>platform-db")]
@@ -71,14 +71,14 @@ flowchart LR
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class Web,Logic,Repo service;
     class DB data;
     class KC platform;
 ```
 
 Nothing dials user-service east-west today: no gRPC server, no gRPC client, no
-service-to-service HTTP caller. The only live traffic is the SPA through Kong.
+service-to-service HTTP caller. The only live traffic is the SPA through the edge.
 
 ## Data model
 

@@ -1,0 +1,165 @@
+# EnvoyProxy `platform-edge` — the local edge's telemetry contract.
+#
+# What this exposes: nothing routable. An EnvoyProxy resource is not traffic
+# config at all; it is infrastructure config for the proxy the control plane
+# starts. Routes, policies, and backends describe what the edge *does* with a
+# request, and this file describes what the edge *is*: how it reports on itself.
+#
+# HOW THIS FILE REACHES THE PROXY — the one wiring mistake that hides:
+# an EnvoyProxy is never attached by name from here. The GatewayClass points at
+# it, via `parametersRef` in gatewayclass.yaml, and that reference is
+# namespace-scoped: omit the namespace and the controller looks for
+# `default/platform-edge`, finds nothing, and starts an Envoy with **no
+# telemetry at all**. The edge then answers 200 on every route while emitting
+# zero spans and zero access logs. Nothing in the request path degrades, so the
+# only way to notice is to query for the spans (audit row C2). Read
+# gatewayclass.yaml next; the namespace on that reference is load-bearing.
+#
+# The Kubernetes-shaped fields of an EnvoyProxy — replicas, resources,
+# PodDisruptionBudget, Service type — are absent here because standalone mode
+# runs one Envoy child process inside this container, so those fields have
+# nothing to act on. The telemetry block is the part that is environment
+# independent, and its field names are kept identical to
+# kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml so a reader diffing the
+# two sees only intended differences.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: platform-edge
+spec:
+  telemetry:
+    # Envoy's own Prometheus endpoint, exposing the proxy's internal stats
+    # (cluster health, connection counts, per-listener totals) as distinct from
+    # the RED metrics derived downstream from spans. Nothing scrapes it in this
+    # stack — there is no agent here, and the admin/stats listener binds inside
+    # the container rather than on a published port — so it records intent and
+    # keeps the two environments' CRs comparable. Locally the edge's request
+    # metrics come from the spanmetrics connector in the collector instead.
+    metrics:
+      prometheus: {}
+
+    accessLog:
+      settings:
+        # A custom JSON format, chosen over the built-in default for one
+        # reason: field NAMES are a contract. Vector parses these lines and
+        # Grafana panels select on the parsed fields, so the names have to be
+        # ours and they have to be identical in both environments. Accepting
+        # the default format would make every field name upstream's to change.
+        - format:
+            type: JSON
+            json:
+              time: "%START_TIME%"
+              client: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+              method: "%REQ(:METHOD)%"
+              # X-ENVOY-ORIGINAL-PATH?:PATH means "the original path if a
+              # filter rewrote it, otherwise the path as received". Without the
+              # fallback, any route that rewrites would log the rewritten path
+              # and the log would no longer answer "what did the client ask
+              # for".
+              uri: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              status: "%RESPONSE_CODE%"
+              # The most diagnostic field in the line and the least obvious.
+              # RESPONSE_FLAGS is a compact code for how Envoy itself disposed
+              # of the request — UAEX (denied by an ext-authz or JWT filter),
+              # UF/UC (upstream connect failure), URX (retry limit), NR (no
+              # route matched), DC (downstream disconnect), and `-` for "the
+              # upstream answered normally". A 503 with UF is a broken backend;
+              # a 503 with `-` came from the backend itself. Same status code,
+              # opposite investigations.
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes: "%BYTES_SENT%"
+              # DURATION is the whole downstream-visible time: first byte in to
+              # last byte out, including time spent in this proxy's filters.
+              duration: "%DURATION%"
+              # RESPONSE_DURATION — request start to the first byte of the
+              # upstream response — so `duration` minus this is the time the
+              # request spent in the edge rather than in the backend. That
+              # split is the entire reason both fields are here.
+              #
+              # DO NOT switch this to %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%,
+              # which reports the same quantity as measured by the upstream
+              # rather than by the proxy. Envoy Gateway disables the x-envoy-*
+              # headers by default, so that operator sources a response header
+              # the proxy never emitted and the field renders null on every
+              # single line. Upstream's own default access-log format contains
+              # exactly that field and it is dead there for the same reason —
+              # which is why this file's earlier revision, which copied it,
+              # logged 110 nulls out of 110 requests. Enabling the headers is
+              # possible (`enableEnvoyHeaders: true` on a ClientTrafficPolicy)
+              # but it adds a header to every client response purely so the
+              # proxy can log a number it already knows.
+              upstream_time: "%RESPONSE_DURATION%"
+              # The resolved endpoint that served this request: ip:port, not a
+              # name. With one replica per backend it is near-constant locally;
+              # it is what identifies a single bad endpoint when there are many.
+              upstream: "%UPSTREAM_HOST%"
+              # The Envoy cluster the request was sent to. Envoy Gateway derives
+              # cluster and route names from the HTTPRoute that produced them,
+              # so these two fields carry the route's identity into the log —
+              # `httproute/<namespace>/<name>/rule/<n>`. When ROUTE_NAME is
+              # empty, no HTTPRoute matched and the 404 came from the edge
+              # rather than from a service; that distinction cannot be made
+              # from the status code alone and it is what audit rows A6 and A8
+              # assert.
+              upstream_cluster: "%UPSTREAM_CLUSTER%"
+              route_name: "%ROUTE_NAME%"
+              host: "%REQ(:AUTHORITY)%"
+              # Envoy generates x-request-id per request and propagates it to
+              # the upstream, so this value appears in the service's own logs
+              # too. It is the join key between an edge access-log line and the
+              # application logs for the same request.
+              request_id: "%REQ(X-REQUEST-ID)%"
+              user_agent: "%REQ(USER-AGENT)%"
+          # No CEL filter locally, on purpose. The cluster settings drop
+          # successful probe traffic, because health and readiness probes
+          # dominate access-log volume in a cluster and carry no diagnostic
+          # value once they are green. Locally that volume is irrelevant, and
+          # seeing every request — probes included — is what makes a failed
+          # audit row diagnosable.
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+
+    tracing:
+      # PERCENT (0–100), not a 0–1 fraction: 100 means every request.
+      #
+      # This value only decides what the EDGE does when it is the one starting
+      # a trace. Envoy's sampler is ParentBased, so a request that already
+      # carries a sampled `traceparent` is honored regardless of this number —
+      # the edge never un-samples a trace someone upstream decided to keep.
+      # 100 is right locally because a release gate that samples is a gate that
+      # intermittently cannot find its own evidence.
+      samplingRate: 100
+      provider:
+        type: OpenTelemetry
+        # OTLP over **gRPC** on 4317. This is a hard constraint worth knowing
+        # before debugging a silent tracing failure: the tracing provider
+        # speaks gRPC only, while the Go services all export over OTLP HTTP on
+        # 4318. A collector configured for HTTP alone therefore serves every
+        # service perfectly and gives the edge nowhere to send anything, with
+        # no error on the request path. The collector runs both receivers for
+        # this reason (observability/otel-collector-config.yaml).
+        #
+        # `kind: Backend` rather than a Service reference: standalone mode has
+        # no Kubernetes API and therefore no Services, so the collector is
+        # declared as a Backend like every other upstream (backends.yaml), and
+        # `extensionApis.enableBackend: true` in standalone.yaml is what makes
+        # the Backend kind resolvable at all.
+        backendRefs:
+          - group: gateway.envoyproxy.io
+            kind: Backend
+            name: otel-collector
+            port: 4317
+      customTags:
+        # Span attributes added to every edge span. The cluster tags pod
+        # identity from the downward API; there are no pods here, so record the
+        # environment instead. Two uses: telling a local edge span from a
+        # cluster one when both land in the same explorer, and serving as an
+        # identity check that does not depend on the derived service name —
+        # `service.name` for the edge is computed as `<gateway>.<namespace>`,
+        # so renaming the Gateway changes it, while this literal does not.
+        deployment.environment.name:
+          type: Literal
+          literal:
+            value: local

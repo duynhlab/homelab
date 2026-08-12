@@ -22,8 +22,9 @@ Depth guide:
 Do not omit contract semantics merely to meet a line-count target.
 
 This document is NORMATIVE. It is what agents and service authors implement
-against. HTTP routers, request/response types, protobufs, tests, Kong
-configuration, manifests, and local-stack are VERIFICATION EVIDENCE: they are
+against. HTTP routers, request/response types, protobufs, tests, edge
+configuration (`HTTPRoute`/`SecurityPolicy`/`BackendTrafficPolicy`),
+manifests, and local-stack are VERIFICATION EVIDENCE: they are
 how a claim here is proved true, not a competing source to prefer when it is
 more convenient.
 
@@ -55,7 +56,7 @@ Use the same rows in every service document.
 | **Deployment** | local-stack + cluster | Implemented |
 | **Runtime modes** | `api` <!-- + migrate / seed / worker / reaper --> | Implemented |
 | **HTTP server** | {public/private/protected/internal/none} · `:8080` | Implemented |
-| **Edge exposure** | Kong `{canonical prefixes}`; `{internal prefixes}` off-edge | Implemented |
+| **Edge exposure** | Edge `HTTPRoute` on `{canonical prefixes}`; `{internal prefixes}` off-edge | Implemented |
 | **gRPC server** | None <!-- or `package.Service/RPCs` · `:9090` --> | None |
 | **gRPC clients** | None <!-- or short callee list --> | None |
 | **Worker** | None <!-- or `{worker}` · queue `{queue}` --> | None |
@@ -74,7 +75,7 @@ Versioning: link api.md § versioning — do not duplicate platform policy here.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
-| **Repository** | [`duynhlab/{service}-service`](https://github.com/duynhlab/{service}-service) | — |
+| **Repository** | `duynhlab/{service}-service` <!-- link it once {service} is filled in --> | — |
 | **Domain** | {bounded context / subdomain} | — |
 | **Owns** | {authoritative data and business rules} | — |
 | **Does not own** | {adjacent data and rules owned elsewhere} | — |
@@ -82,7 +83,7 @@ Versioning: link api.md § versioning — do not duplicate platform policy here.
 | **Cache** | None <!-- or cache name, purpose, authority rule --> | — |
 | **Sensitive data** | None <!-- or PII/token/financial classification --> | — |
 | **Contract sources** | HTTP `{router/types paths}` · gRPC `{proto repository/path}` | — |
-| **Design records** | — | [RFC-NNNN](../proposals/rfc/RFC-NNNN/) <!-- or None --> |
+| **Design records** | — | `RFC-NNNN` <!-- link ../proposals/rfc/RFC-NNNN/ once numbered, or None --> |
 
 ## Temporal participation
 
@@ -113,7 +114,7 @@ versioning rows.
 | **Idempotency** | {business key and replay behavior} |
 | **Retry / timeout ownership** | {Temporal policy owner and service-side limits} |
 | **Versioning** | {workflow patch/version strategy or None} |
-| **Deep dive** | [workflows.md](./workflows.md#workflow-anchor) · [{deep-dive}.md](./{deep-dive}.md) |
+| **Deep dive** | [workflows.md](./workflows.md#workflow-anchor) · `{deep-dive}.md` <!-- link it once named --> |
 
 ## Why it exists
 
@@ -144,7 +145,7 @@ Do not write generic microservice theory.
 <!--
 For checkout-like orchestrators, state explicitly that the service is not a
 platform-wide BFF. Unrelated domain reads and writes continue to go from the
-SPA/admin portal through Kong to the owning service.
+SPA/admin portal through the edge to the owning service.
 -->
 
 ## Architecture
@@ -259,7 +260,7 @@ Write "None." if empty.
 ## Operations
 
 <!--
-Part 13 — env vars, probes, key metrics, curl/grpcurl examples via Kong.
+Part 13 — env vars, probes, key metrics, curl/grpcurl examples via the edge.
 Include trace/correlation env when instrumented (RFC-0017 / observability.md).
 
 Restricted to what is DEPLOYED. An env var the manifests do not set, or a probe
@@ -278,7 +279,7 @@ the one most often missing.
 Part 14 — Verify paths against the actual service repo.
 -->
 
-Paths in [`duynhlab/{service}-service`](https://github.com/duynhlab/{service}-service).
+Paths in `duynhlab/{service}-service`.
 Transport peers call `logic/v1`; logic calls `core` only
 ([api.md § Inside Each Service](./api.md#inside-each-service)).
 
@@ -316,7 +317,7 @@ present-tense sentence.
 - [ ] RPCs and messages match the protobufs — pkg/proto/<svc>/v1
 - [ ] Documented failures are covered by tests, so the codes are real
 - [ ] The service and its wiring exist in local-stack/compose.yaml
-- [ ] Edge exposure matches the Kong routes actually configured
+- [ ] Edge exposure matches the `HTTPRoute`s actually configured (`kubernetes/infra/configs/envoy-gateway/routes/`, `local-stack/gateway/eg/routes.yaml`)
 - [ ] Deployment claims match kubernetes/apps/ — image, probes, env
 - [ ] Call-graph edges owned by api.md are not redrawn here, only linked
 - [ ] Deployment status uses the hub vocabulary, and Planned is used for

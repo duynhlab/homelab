@@ -5,7 +5,7 @@ Cart turns browsing intent into a per-user, mutable basket — and hands checkou
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private + internal clear · `:8080` · Kong `/cart/v1/private/` (local Kong: wide `/cart/` prefix) · edge JWT | Partial |
+| **HTTP** | private + internal clear · `:8080` · edge `/cart/v1/private/` · edge JWT | Implemented |
 | **gRPC server** | `CartService/GetCart` · `:9090` | Implemented |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
@@ -57,8 +57,8 @@ One question: **who reads and writes the cart, and over which transport?**
 
 ```mermaid
 flowchart LR
-    SPA["Browser SPA"] --> Kong["Kong (edge JWT)"]
-    Kong -->|"/cart/v1/private/… HTTP CRUD"| Cart["cart-service"]
+    SPA["Browser SPA"] --> Edge["Envoy Gateway<br/>(edge JWT)"]
+    Edge -->|"/cart/v1/private/… HTTP CRUD"| Cart["cart-service"]
     CK["checkout"] -->|"gRPC GetCart :9090 (read-only, ADR-021)"| Cart
     W["order-worker"] -.->|"REST DELETE /cart/v1/internal/… — documented exception"| Cart
     Cart --> PGD["PgDog pooler"] --> DB[("cart DB on product-db")]
@@ -67,7 +67,7 @@ flowchart LR
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class Cart,CK service;
     class W worker;
     class PGD,DB data;
@@ -102,7 +102,7 @@ the int64 minor-units conversion happens exactly once, at the gRPC boundary
 
 Shared rules (auth model, error envelope, pagination, data conventions) live
 in [api.md](./api.md#common-http-contracts) — not repeated here. All private
-routes require Kong edge JWT + in-service `pkg/authmw` verification;
+routes require edge JWT (`SecurityPolicy.jwt`) + in-service `pkg/authmw` verification;
 `user_id` always comes from the verified JWT subject, never from request JSON
 or query.
 
@@ -114,12 +114,12 @@ or query.
 | `GET` | `/cart/v1/private/cart/count` | Private | Item count for the SPA badge |
 | `PATCH` | `/cart/v1/private/cart/items/:itemId` | Private | Set one item's quantity |
 | `DELETE` | `/cart/v1/private/cart/items/:itemId` | Private | Remove one item |
-| `DELETE` | `/cart/v1/internal/cart/:userId` | Internal | Post-saga clear — tokenless, called by order-worker over the service network. **Not routed at either edge**: both Kong route sets are audience-scoped to `/cart/v1/private/`. The path carries the target user id, so edge exposure here would be an IDOR — which it was in local-stack until 2026-08-11 |
+| `DELETE` | `/cart/v1/internal/cart/:userId` | Internal | Post-saga clear — tokenless, called by order-worker over the service network. **Not routed at either edge**: both edges' route sets are audience-scoped to `/cart/v1/private/`. The path carries the target user id, so edge exposure here would be an IDOR — which it was in local-stack until 2026-08-11 |
 
-Both Kong route sets expose only `/cart/v1/private/`; local-stack no longer
-routes the whole service on a wide `/cart/` prefix.
-Service paths are identical in both (Variant A pass-through,
-`strip_path: false`) — see [api.md § Edge exposure](./api.md#edge-exposure).
+Both edges' route sets expose only `/cart/v1/private/`; local-stack routes only
+that narrow prefix, not the whole service on a wide `/cart/` prefix.
+Service paths are identical in both (Variant A pass-through, no path
+rewrite) — see [api.md § Edge exposure](./api.md#edge-exposure).
 
 ### Add item — `POST /cart/v1/private/cart`
 
@@ -236,7 +236,7 @@ deadlines, health): [api.md § gRPC Runtime Model](./api.md#grpc-runtime-model).
 
 | Caller | Transport | What it does |
 |--------|-----------|--------------|
-| Browser SPA (via Kong) | HTTP private | Full cart CRUD + badge count |
+| Browser SPA (via the edge) | HTTP private | Full cart CRUD + badge count |
 | checkout | gRPC `GetCart` | Read-only snapshot at `POST /checkout/v1/private/checkout/sessions` |
 | order-worker (`ClearCart` activity) | REST `DELETE /cart/v1/internal/cart/:userId` | Best-effort basket clear after fulfillment |
 

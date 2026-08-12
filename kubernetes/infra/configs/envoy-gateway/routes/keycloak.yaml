@@ -1,15 +1,15 @@
-# Keycloak — id.duynh.me (NEW surface, no Kong predecessor: RFC-0024 P2 is
-# the first edge exposure of the RFC-0022 identity provider). Terminates TLS
-# at the edge and forwards plain HTTP to the Keycloak application port
-# (KC_HTTP_ENABLED=true — controllers/keycloak/service.yaml; the :9000
-# management interface stays in-cluster only).
+# Keycloak — id.duynh.me (RFC-0024 P2 is the first edge exposure of the
+# RFC-0022 identity provider). Terminates TLS at the edge and forwards plain
+# HTTP to the Keycloak application port (KC_HTTP_ENABLED=true —
+# controllers/keycloak/service.yaml; the :9000 management interface stays
+# in-cluster only).
 #
 # NO security-headers ResponseHeaderModifier here on purpose: Keycloak
 # manages its own security headers (including X-Frame-Options SAMEORIGIN for
 # the account console) — an edge `set: X-Frame-Options: DENY` would clobber
 # them and break its console iframes. No rate limit / CIDR policy either: the
-# login surface must be publicly reachable, and no Kong artifact translates
-# to it (revisit with the P3 identity cutover if abuse shows up).
+# login surface must be publicly reachable (revisit with the P3 identity
+# cutover if abuse shows up).
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

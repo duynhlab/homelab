@@ -1,0 +1,42 @@
+# GatewayClass `platform` — what claims the Gateway in gateway.yaml.
+#
+# What this exposes: nothing directly; it binds the local Gateway to the
+# standalone controller (`controllerName` must equal `gateway.controllerName`
+# in standalone.yaml).
+#
+# `parametersRef` points at the local EnvoyProxy CR (envoyproxy.yaml), and this
+# indirection is the whole reason a GatewayClass is more than a formality: it is
+# where "which proxy implementation, configured how" is decided for every Gateway
+# that names this class. The cluster's CR additionally shapes a Deployment
+# (replicas, PDB, NodePorts), none of which exists here, but the *telemetry* half
+# must be present in both environments — an edge that emits neither spans nor
+# structured access logs is invisible in exactly the incidents it is meant to
+# explain, so the local CR carries tracing and the JSON access log deliberately.
+#
+# No namespace on any resource in this directory, deliberately: the file
+# provider drops every namespace-less object into one default namespace, which
+# is what makes same-namespace `parentRefs` and policy `targetRefs` resolve
+# without writing a namespace into six files.
+#
+# `parametersRef.namespace` is the ONE exception and it is load-bearing. It is
+# not a namespaced-object field; it is a cross-reference the controller resolves
+# literally, and it does NOT inherit the file provider's default namespace. Left
+# out, the controller looks for `default/platform-edge`, logs
+#   failed to find envoyproxy default/platform-edge for GatewayClass platform
+# once at startup, and then serves traffic with NO EnvoyProxy attached — so no
+# edge spans and Envoy's built-in access log instead of the JSON field set in
+# envoyproxy.yaml. The edge keeps answering 200, which is why only Phase C of
+# docs/e2e-audit.md catches it. The file provider's default namespace is
+# `envoy-gateway-system` (visible as the Gateway's namespace in the control
+# plane's own logs), so that is the value this must carry.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: platform
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: platform-edge
+    namespace: envoy-gateway-system

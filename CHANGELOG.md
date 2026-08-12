@@ -101,6 +101,36 @@ Skeleton (copy what you need):
   probes the cluster). The `kong-openbao` PolicyException narrows to
   `openbao` (EG binds non-privileged ports; no `NET_BIND_SERVICE` waiver
   needed).
+#### Local-stack
+
+- The compose edge is **Envoy Gateway in standalone mode** (RFC-0024 P3,
+  ADR-046 arm A): `envoyproxy/gateway:v1.8.3` running
+  `server --config-path /config/standalone.yaml` over the same Gateway API
+  resources the cluster reconciles, in `local-stack/gateway/eg/`: GatewayClass +
+  one plain-HTTP Gateway on 8000 (published as 8080), 12 audience-scoped
+  HTTPRoutes, a JWT SecurityPolicy verifying the realm via `remoteJWKS`, a
+  Gateway-level CORS policy, and one BackendTrafficPolicy (50/s single-window
+  local rate limit, `requestBuffer: 10Mi`). Backends are `Backend` resources with
+  `fqdn` endpoints because Compose has no Services — the single documented
+  divergence. This is what lets the release gate run the real translation layer
+  before Kind, so a routing or policy mistake is found on a laptop. Consequences
+  to plan for: the distroless image can run **no compose healthcheck**, so
+  `frontend` waits on `service_started` and readiness is checked from the host;
+  the gateway depends on `keycloak` and not on `cache`; and a cold start
+  self-signs xDS material and downloads the Envoy binary into the new
+  `envoy-gateway-data` volume, so the first boot after `down -v` needs outbound
+  internet.
+- Audit tokens come from the realm, not auth-service
+  (`local-stack/scripts/keycloak-token.sh`): a headless Authorization Code +
+  PKCE flow, because the realm's clients have Direct Access Grants disabled and
+  `grant_type=password` cannot mint a token. The E2E gate is retargeted
+  accordingly — A1 asserts the realm `iss` and alice's **string** `sub`
+  (ADR-042), A2/A3 assert the Envoy edge (401 `Jwt is missing`), A4/A5 move to
+  the realm's token and end-session endpoints (400/204, not 401/200), A8 restates
+  its 404 as "no HTTPRoute matches", A13 uses the seeded user `bob` instead of
+  registering one, and a new **A16** proves the string subject reaches
+  `cart.cart_items.user_id`. Request pacing is gone — the local edge allows 50
+  requests per second, so a 429 during the audit is a finding, not a pacing error.
 
 #### Services
 
@@ -131,8 +161,8 @@ Skeleton (copy what you need):
   in-network at `keycloak:8080`), the seven authmw consumers + both workers
   gate on its bash `/dev/tcp` health probe, and the frontend build gains the
   `KEYCLOAK_URL`/`KEYCLOAK_REALM`/`KEYCLOAK_CLIENT_ID` args (frontend#90).
-  Known gap until P6: the local Kong edge JWT still matches the retired auth
-  issuer's static key and cannot verify realm tokens.
+  The edge-side gap this opened — Kong could not verify realm tokens — is closed
+  by the Envoy Gateway standalone entry under Breaking Change.
 
 #### Gateway
 
@@ -366,6 +396,22 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- `docs/platform/envoy-gateway.md` — the platform edge documented as its own
+  subject: the six-kind resource model and how policies attach (including the
+  two attachment behaviours that surprise people — route-level policy replaces
+  rather than layers without `mergeType`, and two same-kind policies on one
+  target resolve oldest-wins instead of merging), both provider modes side by
+  side, the audience-scoped routing rule and why segment-wise matching is what
+  makes it safe, and the three telemetry signals the proxy itself produces. Ends
+  with a failure-mode table of six defects that a running edge exhibits and
+  manifest validation cannot see. Three Mermaid diagrams, rendered and
+  inspected. Linked from the docs hub and AGENTS.md; the previous gateway's guide
+  stays as archived reference.
+- The Envoy Gateway resources in both environments now document themselves as
+  Envoy Gateway rather than by comparison: 27 files rewritten so each setting
+  carries its own engineering reason (filter ordering, privileged-port shifting,
+  derived span `service.name`, `response_flags` semantics, the segment-matching
+  guarantee). Comments only — no spec value changed.
 - `docs/api/temporal.md` (renamed from `temporal-order-fulfillment.md`): Part 2 is
   now one section per workflow — `AbandonedCheckoutWorkflow` documented for the
   first time, `CancellationWorkflow` given its first diagram, and a "which
@@ -383,6 +429,13 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Security
+
+- Four `docs/api/` service contracts documented their edge NetworkPolicy ingress
+  as arriving from a namespace that no longer exists. All eleven policies admit
+  `envoy-gateway`; the docs now match the manifests, and the comments in the
+  policies say what the namespace is for rather than what it used to be.
+
 #### Observability
 
 - `VLSingle`/`VTSingle` dropped the inert `removePvcAfterDelete: true` —
@@ -393,6 +446,21 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- `docs/api/` names the deployed edge and speaks Gateway API: HTTPRoute matches
+  rather than ingress annotations, an edge `SecurityPolicy` rather than a
+  per-route plugin, a `URLRewrite` filter rather than a path-stripping flag —
+  17 files. Three claims were wrong about behaviour rather than naming: `cart.md`
+  and `product.md` still reported their audience scoping as Partial when both
+  prefixes stop after the audience segment; `microservices.md` and `caching.md`
+  attributed rate limiting to a shared Valkey database, when the edge limiter is
+  `type: Local`, an in-process token bucket with no datastore to document; and
+  `temporal.md` pointed at a config path that no longer carries the UI route.
+  Cluster statements not yet run on Kind are marked **planned**; `auth.md` is
+  untouched because it documents the service retiring in P5.
+- The E2E runbook blocks on the data plane instead of assuming it. `/readyz`
+  reports the control plane ready as soon as it parses config, which on a cold
+  boot is minutes before Envoy finishes downloading — every edge row returns
+  code `000` in that window and reads like a broken edge rather than a slow one.
 - `docs/api/` and `local-stack/` corrected against deployed reality. The
   release-gate fixes matter most: the abandonment-timer row told operators to
   arm it before Phase A, where `$TCLI` and `audit_curl` were still undefined, so
@@ -415,6 +483,30 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- The edge access log's `upstream_time` field carried `null` on every request in
+  both environments. `%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%` sources a response
+  header that Envoy Gateway disables by default, so the operator read a header
+  the proxy never emitted — the same field is dead in Envoy Gateway's own
+  default access-log format for the same reason. Both `EnvoyProxy` CRs now use
+  `%RESPONSE_DURATION%`, which the proxy measures itself and which pairs with
+  `%DURATION%` to give the upstream-vs-total split the field was added for.
+  Caught by running the gate: 110/110 access-log lines were null before the fix.
+- `btp-api` in local-stack targeted `api-auth-public`, an HTTPRoute that no
+  longer exists after the identity cutover. Dropped, leaving 12 targetRefs for
+  the 12 routes the file actually serves; the "13 routes" counts in
+  `routes.yaml`, `securitypolicy.yaml` and the rate-limit comment were stale for
+  the same reason. The comment also still advertised a per-minute window that a
+  single-rule local rate limit cannot express.
+- The E2E runbook could not complete under podman: A14 polled
+  `docker compose ps --format '{{.Status}}'` for the substring `healthy`, which
+  podman's compose provider never emits (it prints a bare `Up 54 seconds`), so
+  the wait spun forever against an already-healthy container. Now pinned to
+  `{{.Health}}`. Two more gate defects fixed alongside: A13's arming moved into
+  the preamble so the block is runnable top-to-bottom (armed in place, it read a
+  three-minute-old timer and reported a false 200), and B2 now re-mints the
+  60-second admin token before restoring the client token lifespan — the stale
+  token answered 401 and the confirming GET parsed the error body into a
+  `None` that looked exactly like success.
 - local-stack Kong routes are audience-scoped, matching the cluster Ingress.
   Bare `/product/`, `/cart/` and `/order/` prefixes routed the `/internal/`
   audience too: `POST /product/v1/internal/products` answered with **no JWT**,

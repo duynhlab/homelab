@@ -54,11 +54,16 @@ delivery uses explicit semver pins; image automation is planned, not active.
 
 ## Prerequisites
 
-- Docker with Docker Compose v2.
+- Docker with Docker Compose v2. Podman with its compose provider is a supported
+  substitute — every command in this document and in the audit is written as
+  `docker compose` and works unchanged when podman's socket is exported as
+  `DOCKER_HOST`.
 - All application repositories checked out beside `homelab/`, including the 11
   service repositories, `frontend`, and shared `pkg` repository.
 - Enough CPU, memory, and disk to build the full fleet and run its observability
   stack.
+- Outbound internet on the first gateway start: Envoy Gateway standalone fetches
+  the Envoy binary at runtime and caches it in a named volume.
 - `agent-browser` for the mandatory real-browser phase.
 
 Build contexts resolve sibling repositories such as `../../auth-service` and
@@ -89,12 +94,15 @@ reports `healthy`, and every run-once container has exited `0`. The run-once set
 is wider than the migrate and seed jobs: `temporal-schema` and
 `temporal-bootstrap` also exit `0` and gate the services behind them. Most
 observability containers declare no healthcheck at all and only ever show `Up`,
-so `running` alone is not evidence of readiness for those.
+so `running` alone is not evidence of readiness for those — and the `gateway`
+container is now one of them (see [Gateway](#gateway)), so probe the edge with
+`curl` before starting the audit.
 
 | Component | URL | Notes |
 |-----------|-----|-------|
-| Frontend SPA | http://localhost:3001 | Demo login `alice` / `password123`, by username |
-| Kong API gateway | http://localhost:8080 | Pass-through edge for the application services |
+| Frontend SPA | http://localhost:3001 | Demo login `alice` / `password123`, by username, against the realm |
+| API gateway (Envoy) | http://localhost:8080 | Pass-through edge for the application services |
+| Keycloak | http://localhost:8081 | Realm `duynhlab`; the origin the SPA logs in against and the `iss` in every token |
 | Temporal Web UI | http://localhost:8233 | Order and checkout workflows |
 | Grafana | http://localhost:3002 | RED, business, Temporal, and ClickHouse dashboards; Explore over VictoriaMetrics, VictoriaTraces, ClickHouse, and Pyroscope |
 | VictoriaTraces | http://localhost:10428 | Trace storage, Jaeger query API, and vmui |
@@ -104,12 +112,57 @@ so `running` alone is not evidence of readiness for those.
 | Pyroscope | http://localhost:4040 | Continuous profiling |
 
 PostgreSQL, Valkey, services, workers, and mockpay are internal-only. Reach the
-application through Kong unless an audit step explicitly probes a container.
+application through the gateway unless an audit step explicitly probes a
+container.
 
-Three more ports are published but are not part of the audit surface: Temporal's
+Four more ports are published but are not part of the audit surface: Temporal's
 frontend gRPC on `7233`, the collector's OTLP-HTTP receiver on `4318` (handy for
-a host-side `telemetrygen` smoke test), and ClickHouse's native protocol on
-`9000`.
+a host-side `telemetrygen` smoke test), ClickHouse's native protocol on `9000`,
+and the gateway control plane's `/readyz` on `8099`.
+
+## Gateway
+
+The edge is **Envoy Gateway in standalone mode** — one container that runs both
+the `envoy-gateway` control plane and, as its child process, the Envoy data
+plane. It reads the same Gateway API dialect as the cluster edge from
+`gateway/eg/`: `GatewayClass`, `Gateway`, `HTTPRoute`, `SecurityPolicy` (edge JWT
++ CORS), `BackendTrafficPolicy` (local rate limit + 10Mi request buffer). Kong and
+its bespoke `kong.yml` are gone; there is no second config dialect to keep in
+sync any more.
+
+| Aspect | local-stack | Local Kind |
+|--------|-------------|------------|
+| Control plane | `envoy-gateway server --config-path` reading files | Envoy Gateway controller watching the Kubernetes API |
+| Data plane | one Envoy child process in the same container | `EnvoyProxy`-shaped Deployment, 2 replicas |
+| Route backends | `Backend` resources with `fqdn` endpoints (Compose DNS) | Kubernetes `Service` references |
+| Listener | one plain-HTTP listener on 8000, published as 8080 | HTTPS on 443 with a wildcard certificate, plus a 301 redirect listener |
+| Edge JWT | `remoteJWKS` against `http://keycloak:8080/...`, issuer `http://localhost:8081/realms/duynhlab` | `remoteJWKS` against the in-cluster Service, issuer `https://id.duynh.me/realms/duynhlab` |
+| Rate limit | 50/s, one window, one in-process bucket | 2/s + 50/min + 1250/h per replica |
+
+The **one honest divergence** is the backend reference: Compose has no
+Kubernetes Services, so HTTPRoutes point at `Backend` resources naming the
+compose service (`hostname: cart`, `port: 8080`). Everything else — the route
+paths, the JWT provider shape, the policy kinds — is the same YAML the cluster
+reconciles.
+
+Two consequences worth knowing before an audit:
+
+- **The gateway container declares no healthcheck.** The upstream image is
+  distroless, with no shell and no `wget`/`curl`, so a Compose healthcheck is
+  impossible; `frontend` waits on `service_started` and the container only ever
+  reports `Up`. Verify the edge yourself with
+  `curl -sf http://localhost:8080/product/v1/public/products` before Phase A.
+- **A cold start needs outbound internet.** Standalone mode obtains the Envoy
+  binary at runtime and caches it in the `envoy-gateway-data` volume, so
+  `docker compose down -v` makes the next boot download it again.
+
+Identity is unchanged by the edge swap: the SPA logs in against Keycloak
+(`http://localhost:8081`, realm `duynhlab`, keycloak-js PKCE) with the same demo
+credentials `alice` / `password123` by username, and both the edge and the
+services verify the realm's tokens. For a token in a shell — the audit's Phase A
+path — use `scripts/keycloak-token.sh`; the realm's clients have Direct Access
+Grants disabled, exactly as in the cluster, so there is no password-grant
+shortcut.
 
 ## Architecture
 
@@ -119,19 +172,24 @@ controls.
 
 ```mermaid
 flowchart LR
-    SPA["React SPA<br/>:3001"] --> KONG["Kong DB-less<br/>:8080"]
-    KONG --> SVC["10 HTTP services"]
-    SVC -->|"gRPC, no Kong route"| INV["inventory<br/>gRPC only"]
+    SPA["React SPA<br/>:3001"] --> EDGE["Envoy Gateway standalone<br/>:8080"]
+    SPA -->|"login, PKCE"| KC["Keycloak<br/>realm duynhlab :8081"]
+    EDGE -->|"JWKS, edge JWT"| KC
+    EDGE --> SVC["10 HTTP services"]
+    SVC -->|"verify realm token"| KC
+    SVC -->|"gRPC, no edge route"| INV["inventory<br/>gRPC only"]
     SVC -->|"payment provider HTTP"| MP["mockpay<br/>provider stub"]
-    MP -->|"signed webhook"| KONG
-    SVC --> PG[("PostgreSQL<br/>13 databases")]
+    MP -->|"signed webhook"| EDGE
+    SVC --> PG[("PostgreSQL<br/>14 databases")]
+    KC -->|"realm state"| PG
     SVC -->|"product cache"| VALKEY[("Valkey")]
-    KONG -->|"rate limit"| VALKEY
     SVC -->|"order + checkout"| TMP["Temporal server :7233<br/>+ UI :8233"]
     TMP -->|"durable state"| PG
     TMP --> OW["order-worker<br/>checkout-worker"]
-    SVC -->|"OTLP/HTTP<br/>traces · metrics · logs"| COL["OTel Collector<br/>:4318"]
+    SVC -->|"OTLP/HTTP<br/>traces · metrics · logs"| COL["OTel Collector<br/>:4318 HTTP · :4317 gRPC"]
     MP -->|"OTLP/HTTP"| COL
+    EDGE -->|"OTLP/gRPC<br/>root span, 100% sampled"| COL
+    EDGE -->|"JSON access log<br/>on stdout"| VEC
     TAILED["containers Vector still tails:<br/>infra + inventory, checkout,<br/>checkout-worker, mockpay"] -->|"container stdout"| VEC["Vector"]
     COL --> VT["VictoriaTraces<br/>:10428"]
     COL -->|"native + span metrics"| VM["VictoriaMetrics<br/>:8428"]
@@ -159,7 +217,7 @@ flowchart LR
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class SPA,KONG,LEdge edge;
+    class SPA,EDGE,KC,LEdge edge;
     class SVC,INV,LService service;
     class TMP,OW,LWorker worker;
     class COL,VEC,TAILED,VT,VM,VL,GRAF,PYRO,LPlatform platform;
@@ -175,7 +233,9 @@ local execution and verification procedure.
 
 Run the [full E2E audit](docs/e2e-audit.md) after the stack is ready. The gate is
 mandatory for any change touching a service repository, `pkg`, the frontend,
-Kong/gateway configuration, or `compose.yaml`.
+gateway/edge configuration (`gateway/eg/` here or
+`kubernetes/infra/configs/envoy-gateway/` in the cluster), the realm
+(`keycloak/duynhlab-realm.json`), or `compose.yaml`.
 
 The audit always includes:
 
@@ -266,13 +326,14 @@ ambiguous.
 |---------|-------------|------------|
 | Runtime | Docker Compose | Kubernetes + Flux Operator |
 | Application image | Built from sibling source checkout | Released semver image pinned in manifests |
-| Database | One PostgreSQL container, 13 databases | CloudNativePG clusters and poolers |
+| Database | One PostgreSQL container, 14 databases (including Keycloak's) | CloudNativePG clusters and poolers |
 | Temporal | `temporalio/server` on that PostgreSQL, all roles in one container, `numHistoryShards: 4` | Official Helm chart, four role Deployments, `numHistoryShards: 512` |
 | Secrets | Inline development values | OpenBAO + External Secrets Operator |
-| Network controls | Single Compose network | NetworkPolicy + Kong ingress boundaries |
+| Network controls | Single Compose network | NetworkPolicy + Gateway route boundaries |
 | Admission | None | Kyverno and PSS policies |
-| TLS | Plain HTTP on localhost | Kong TLS using the local `homelab-ca` issuer |
-| Telemetry | Local single-node backends | Cluster observability controllers and CRs |
+| TLS | Plain HTTP on localhost | Gateway TLS termination using the local `homelab-ca` issuer |
+| Edge | Envoy Gateway standalone, one container, file-driven | Envoy Gateway controller + `EnvoyProxy` Deployment reconciled by Flux |
+| Telemetry | Local single-node backends; the edge samples every request (100%) and its access log is unfiltered, so a failed audit row is diagnosable | Cluster observability controllers and CRs; the edge samples 10% and a CEL filter drops successful probe access logs at source |
 
 Passing one environment never implies that the other environment passes.
 
@@ -285,9 +346,8 @@ Passing one environment never implies that the other environment passes.
 - [Observability](../docs/observability/README.md)
 - [agent-browser CLI](https://github.com/vercel-labs/agent-browser)
 
-_Last updated: 2026-08-11 — corrects the topology against `compose.yaml` and
-`gateway/kong.yml`: Kong fronts ten HTTP services with inventory east-west only,
-Temporal is a five-container set holding durable state in PostgreSQL, Vector
-tails only the containers it does not exclude, and VictoriaLogs has no Grafana
-datasource. Also records the conditional audit row, the three published ports
-outside the audit surface, and what readiness actually means here._
+_Last updated: 2026-08-12 — the edge is Envoy Gateway in standalone mode reading
+the cluster's Gateway API dialect from `gateway/eg/` (Kong and `kong.yml` are
+deleted): adds the Gateway section with the cluster comparison, the `Backend`-vs-
+`Service` divergence, the missing healthcheck and the cold-start download, the
+Keycloak row and `scripts/keycloak-token.sh`, and the fourth non-audit port._

@@ -1,7 +1,6 @@
-# MCP server routes — 1:1 translation of configs/kong/ingress-mcp.yaml
-# (3 Ingresses -> 3 HTTPRoutes). Used by AI clients (Crush, Claude Desktop,
-# VS Code) via Streamable HTTP. Each Kong Ingress carried
-# `ip-restriction-internal,rate-limiting-admin`:
+# MCP server routes — one HTTPRoute per MCP server (3 routes total). Used by
+# AI clients (Crush, Claude Desktop, VS Code) via Streamable HTTP. Each
+# carries:
 #   - CIDR fence       -> policies/security-admin-cidr.yaml
 #   - admin rate limit -> policies/btp-admin.yaml
 # security-headers filter: see routes/api.yaml header note.

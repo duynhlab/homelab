@@ -1,14 +1,17 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
-# Brings up: Postgres (14 DBs) + Valkey cache + per-service golang-migrate migrations
-# + 11 Go services + Temporal (server 1.31.2 on Postgres, as in the cluster)
+# Brings up: Postgres (13 DBs) + Valkey cache + per-service golang-migrate migrations
+# + 10 Go services + Temporal (server 1.31.2 on Postgres, as in the cluster)
 # + Keycloak (realm `duynhlab`, RFC-0024 P3 identity cutover) + the
-# order-fulfillment worker + a Kong DB-less gateway (mirrors the in-cluster Kong)
-# + the React frontend.
+# order-fulfillment worker + an Envoy Gateway standalone edge (same Gateway API
+# resources as the cluster edge) + the React frontend.
 #
 # Build contexts point at sibling repos (../../<service>), so all repos must be
 # checked out next to homelab/. Run from this directory:
 #   docker compose up -d --build
+# `docker compose` is the documented command; podman with its compose provider
+# (`podman compose`, or podman's socket exported as DOCKER_HOST) is a supported
+# local substitute and needs no change to this file.
 # Then open the SPA at http://localhost:3001 (API gateway at http://localhost:8080,
 # Temporal UI at http://localhost:8233).
 #
@@ -21,9 +24,10 @@
 # service pushes pprof to the local Pyroscope (:4040, Grafana → Explore → Pyroscope).
 # Identity (RFC-0024 P3): the SPA logs in against Keycloak (http://localhost:8081,
 # realm `duynhlab`, keycloak-js PKCE) and services verify realm tokens via OIDC_*
-# (pkg v0.37.0 authmw). auth-service still runs and mints its own JWT_* tokens,
-# but nothing verifies against it any more — it retires in P5.
-# Demo login: alice / password123 (by username).
+# (pkg authmw). The realm is the only token issuer: there is no
+# auth-service here, and no service, worker, or route refers to one. Its
+# cluster surface retires in P5.
+# Demo login: alice / password123 (by username, on the Keycloak login page).
 
 x-svc-env: &svc-env
   ENV: development
@@ -47,7 +51,7 @@ x-svc-env: &svc-env
   DB_USER: postgres
   DB_PASSWORD: postgres
   DB_SSLMODE: disable
-  # RFC-0024 P3: services verify Keycloak realm tokens (pkg v0.37.0 authmw).
+  # RFC-0024 P3: services verify Keycloak realm tokens (pkg authmw).
   # Split-horizon issuer: the browser reaches Keycloak at the published
   # http://localhost:8081, and start-dev (no --hostname) derives `iss` from the
   # request host — so tokens carry iss=http://localhost:8081/realms/duynhlab and
@@ -319,8 +323,10 @@ services:
 
   # Log pipeline sink (mirrors the in-cluster VLSingle). Receives BOTH paths:
   #   1. Vector (below) tailing every container's stdout -> jsonline ingest
-  #   2. Kong's OTel runtime logs via the collector -> OTLP ingest
-  # so the Vector-vs-OTel comparison from the pilot is visible locally.
+  #   2. the application fleet's OTLP logs via the collector -> OTLP ingest
+  # so the Vector-vs-OTel comparison from the pilot is visible locally. The edge
+  # now contributes only path 1: Envoy Gateway standalone logs to stdout and,
+  # unlike Kong's opentelemetry plugin, exports no runtime logs of its own.
   victoria-logs:
     image: victoriametrics/victoria-logs:v1.51.0
     command:
@@ -391,22 +397,6 @@ services:
       clickhouse: { condition: service_healthy }
 
   # ---- golang-migrate migrations (one-shot, per service DB; app image `migrate`) ----
-  auth-migrate:
-    build: { context: ../../auth-service }
-    command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth }
-    depends_on: { postgres: { condition: service_healthy } }
-    restart: "no"
-  # Dev-only demo users (alice/password123). Seeding lives OUTSIDE the migration
-  # chain (prod never seeds); local-stack applies it explicitly after migrate.
-  auth-seed:
-    build: { context: ../../auth-service }
-    command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: auth, DB_NAME: auth }
-    depends_on:
-      postgres: { condition: service_healthy }
-      auth-migrate: { condition: service_completed_successfully }
-    restart: "no"
   user-migrate:
     build: { context: ../../user-service }
     command: ["migrate"]
@@ -539,59 +529,6 @@ services:
     restart: "no"
 
   # ---- Backend services ----
-  auth:
-    build: { context: ../../auth-service }
-    # HTTP-only (Phase 5): the gRPC GetMe server was removed — services verify
-    # JWTs locally against the JWKS; nothing dials auth east-west any more.
-    environment:
-      <<: *svc-env
-      SERVICE_NAME: auth
-      OTEL_SERVICE_NAME: auth
-      DB_NAME: auth
-      # Edge JWT (RFC-0009 Phase 4): stable DEV-ONLY RS256 signing key so the
-      # gateway's jwt consumer credential (kong.yml holds the matching public
-      # half) stays valid across restarts. In the cluster this key comes from
-      # OpenBAO via ESO. iss/aud match the Kong jwt_secret key.
-      # RFC-0024 P3: auth still mints these tokens, but its consumers no longer
-      # verify against them — services trust the Keycloak realm (OIDC_* in
-      # x-svc-env). JWT_* stays only until auth-service retires in P5.
-      JWT_ISSUER: https://gateway.duynh.me
-      JWT_AUDIENCE: duynhlab-platform
-      JWT_PRIVATE_KEY_PEM: |
-        -----BEGIN PRIVATE KEY-----
-        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDtVNmPLaVYsR0q
-        7epFZfj4Fvi4s/AQnw9+u59ywbzsbItKk6qGU0oAColkGG91gKDWWZ9GRS266fVU
-        k9t8mju5wAoo4eztoIN0RRQoYHDxREI0B1jJAUSJanLrmneGeeCP8H5eT1pqRiVP
-        gQe9L0ZRWGVL6emMH6xXz+eI8vMu7og4tXBLyIBLmUEn6NzuJgQNje/8gQP2puxQ
-        b56prNQUVFqTFbD4gI4+YJwh6B2UgYQeFb5l69BtuixfOLl2aSs6BdYxU0xDk0dL
-        yC/qv7UexnzonLe4suNb6oCDxMRkPetvfbyNv/02qNFUVkbaLN8cwqzLT38JCaoU
-        lVoN0a5VAgMBAAECggEAHSgBo0aZC9SUb//y+iwdIkNWMoC+kxgrY+ciX0uATW5H
-        TXXnKuHkEy24M8ERvlZ7S+IOQGiCxfX0kvuoKP5crIT0apHY1NeVlqze3Vf9wBIh
-        7PjjFiyO8i/O5vVezjk+VoiVybnHcotkDYidPgdnBNrOdP1LWRDSECalO+yW5hKg
-        tS7yk+axl60TxYVsLR4HCTvcADAjuAya7zFBTyCwuEqwC8p5X6Wjp/OZYlB1HgUn
-        ac+WSbRni810pksH8kRAWPUvxbGwsjnbbq+ciqjEYJnv71aTxSVmFGsTxe/IvtQB
-        UDaEyN/vHKYI+WWsZXyN8Ye4c1OPTm9kYjNwEsMUuQKBgQD/VCfXnpicPNPk0GWQ
-        jeSuJOmiywpNC8Va3pG+EiIXytOoWP/IL0dqoQ0sxUxE2as1nAVmYJ4dXJL0dm/U
-        2ybWFz4511vYMxWpP84pX8GSuQ7EnKdErz8BIhzPcPVjVY9p4INYTkwcwedlNMtU
-        6VA1I2aHSOQ7JeFSi5kt4PrhyQKBgQDt9JTagfOMs5TpqlQAxWSNlW8njYaFLpzj
-        fl9eIqy07UXEU98qsB6ei0wYZMcLR1ovGCyXehPIUPXbLOkYVGD9D7d9m7LfSsuj
-        9aNrzDBtUEjutxyooWTWPIhw8qVzLXv8NrmPGs7zJEhKWYjWUhi8w1MqKH2jpF6V
-        kRU4JecOLQKBgBHK9IfTFoF0v7NnTlyXdsMn8VwV2B7sXhFqBy/+pX+Q89T8dr6l
-        hM2KcZeYHCuEG6k9uSacPwh+xgLhKgPkTb2Hmx9+wXi8fprvxlcdxCiMWtoarJFd
-        wP88OFPAZGlKshbHvX9u3WD3pj9oQW8mXx+E2wU8cCMrDZup/L+0uOb5AoGAIJ+M
-        nNx+IIcqXlK8y5JEc+jN4XVUwQOf/MyBlK1aUj/Jdd4t1XNp70CXwSxn4ZL5uUUu
-        L+JLvgXjfxYMKwq+dVNnS7BB+L0PaD4wFoJbDVGZfijao//kjD6mUh3iMwVEX1K9
-        Y/I/9zO9OXxG92MwAwkgaMI+X2YUlZrbduQzZk0CgYEAsyXPJdPNUNIZu/fQBZVB
-        +66gXGbuXoSE8Ad76+7diPPbfAmKvUPXnd5HEfD1bd1pNcppp+bJIVGIpp7iRj26
-        IpN3u+E3f9+nsYgffNb/9eR4HUdJ0B2s1sezanHunJfJ1gzp0YdM56qLlaE5Vwnd
-        alsBBTTqdRNCDXK3HEuCYwM=
-        -----END PRIVATE KEY-----
-    healthcheck: *svc-healthcheck
-    depends_on:
-      postgres: { condition: service_healthy }
-      auth-migrate: { condition: service_completed_successfully }
-      auth-seed: { condition: service_completed_successfully }
-
   user:
     build: { context: ../../user-service }
     environment:
@@ -604,9 +541,6 @@ services:
       postgres: { condition: service_healthy }
       user-migrate: { condition: service_completed_successfully }
       user-seed: { condition: service_completed_successfully }
-      # RFC-0024 P3: Keycloak is the token verifier (JWKS); the auth dependency
-      # coexists until P5 retires auth-service.
-      auth: { condition: service_healthy }
       keycloak: { condition: service_healthy }
 
   shipping:
@@ -632,7 +566,6 @@ services:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
       review-seed: { condition: service_completed_successfully }
-      auth: { condition: service_healthy }
       keycloak: { condition: service_healthy }
 
   notification:
@@ -647,7 +580,6 @@ services:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
       notification-seed: { condition: service_completed_successfully }
-      auth: { condition: service_healthy }
       keycloak: { condition: service_healthy }
 
   product:
@@ -689,11 +621,10 @@ services:
       postgres: { condition: service_healthy }
       cart-migrate: { condition: service_completed_successfully }
       cart-seed: { condition: service_completed_successfully }
-      auth: { condition: service_healthy }
       keycloak: { condition: service_healthy }
 
   # ---- Inventory (RFC-0021): sole stock authority. gRPC-only (:9090,
-  # inventory.v1) — no Kong route. Three live callers since phase 4: the order
+  # inventory.v1) — no edge route. Three live callers since phase 4: the order
   # saga (reserve/commit/release), checkout (availability), and product /details.
   # Product no longer has a stock column to fall back to.
   inventory:
@@ -711,7 +642,7 @@ services:
       inventory-seed: { condition: service_completed_successfully }
 
   # ---- Checkout (RFC-0015): session orchestrator — client-only, reached only
-  # through Kong (no host port, platform convention). Snapshots the cart via
+  # through the edge (no host port, platform convention). Snapshots the cart via
   # cart.v1/GetCart and re-validates prices via product.v1/GetProducts.
   checkout:
     build: { context: ../../checkout-service }
@@ -739,7 +670,6 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       checkout-migrate: { condition: service_completed_successfully }
-      auth: { condition: service_healthy }
       keycloak: { condition: service_healthy }
       cart: { condition: service_healthy }
       product: { condition: service_healthy }
@@ -802,7 +732,6 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       payment-migrate: { condition: service_completed_successfully }
-      auth: { condition: service_healthy }
       keycloak: { condition: service_healthy }
       mockpay: { condition: service_healthy }
 
@@ -836,7 +765,6 @@ services:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
       order-seed: { condition: service_completed_successfully }
-      auth: { condition: service_healthy }
       keycloak: { condition: service_healthy }
       cart: { condition: service_healthy }
       shipping: { condition: service_healthy }
@@ -881,50 +809,61 @@ services:
       cart: { condition: service_healthy }
       payment: { condition: service_healthy }
 
-  # ---- Gateway (pass-through + CORS) ----
-  gateway:
-    # Kong DB-less — same gateway as the cluster (replaces the old nginx
-    # stand-in). Declarative config in ./gateway/kong.yml mirrors the
-    # in-cluster Kong (routing + CORS + correlation-id + security headers +
-    # rate/size limits) so local e2e exercises the real gateway behaviour.
-    image: kong:3.9
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
-      KONG_PROXY_LISTEN: "0.0.0.0:8000"
-      KONG_ADMIN_LISTEN: "off"
-      KONG_STATUS_LISTEN: "0.0.0.0:8100"
-      KONG_PLUGINS: bundled
-      # Edge tracing: generate spans and propagate W3C traceparent so a trace
-      # starts at the gateway (not the service). Exported via the opentelemetry
-      # plugin (kong.yml) to the collector. Sample everything locally.
-      KONG_TRACING_INSTRUMENTATIONS: all
-      KONG_TRACING_SAMPLING_RATE: "1.0"
-      # Drop server_tokens (Server/Via fingerprint), keep latency debug headers
-      KONG_HEADERS: latency_tokens
-      # Structured JSON access logs (named nginx log_format) — one line per
-      # request with status/latency/request_id, parseable by any log pipeline.
-      # NOTE: nginx vars only — Kong route/service names are NOT in scope here
-      # (that context comes via the OTel access-logs pilot, see kong.yml).
-      # $$ = compose-escaped $ (nginx must see the literal variable).
-      KONG_NGINX_HTTP_LOG_FORMAT: >-
-        kong_json escape=json
-        '{"time":"$$time_iso8601","client":"$$remote_addr","method":"$$request_method","uri":"$$request_uri","status":$$status,"bytes":$$body_bytes_sent,"request_time":$$request_time,"upstream_time":"$$upstream_response_time","upstream":"$$upstream_addr","host":"$$host","request_id":"$$kong_request_id","user_agent":"$$http_user_agent"}'
-      KONG_PROXY_ACCESS_LOG: /dev/stdout kong_json
-      KONG_PROXY_ERROR_LOG: /dev/stderr
+  # ---- Gateway (Envoy Gateway, STANDALONE mode — ADR-046) ----
+  # Same Gateway API dialect as the cluster edge
+  # (kubernetes/infra/configs/envoy-gateway/): GatewayClass + Gateway +
+  # HTTPRoute + SecurityPolicy + BackendTrafficPolicy, in ./gateway/eg/. One
+  # container runs BOTH halves: the `envoy-gateway` control plane reads those
+  # files (no Kubernetes API server) and starts Envoy as a child process (no
+  # Deployment). Read ./gateway/eg/standalone.yaml first — it explains the two
+  # writable-path requirements below.
+  #
+  # Why Kong is gone: after the RFC-0024 P3 identity cutover the fleet's tokens
+  # come from Keycloak, and Kong OSS can only verify a JWT against a STATIC
+  # public key matched by `iss` — it cannot fetch a JWKS. Every private route
+  # 401'd at the edge, which blocked the release gate itself (the E2E audit runs
+  # on Compose before Kind). Envoy fetches the realm JWKS itself.
+  # The control plane refuses to start without its own xDS TLS material: it
+  # serves xDS to its Envoy child over mTLS and self-signs that pair. In
+  # Kubernetes a certgen Job writes those certs as Secrets before the
+  # controller runs; here the same binary does it with `certgen --local`.
+  # It is a separate service because the image is distroless — no shell, so
+  # `certgen && server` cannot be chained inside one container.
+  gateway-certgen:
+    image: envoyproxy/gateway:v1.8.3@sha256:e7a8c70537628bf996e5dec5c4c835704b4b9f4f715a74cf361bea30608c49ac
+    command: ["certgen", "--local", "--overwrite", "--config-home", "/var/lib/eg"]
     volumes:
-      - ./gateway/kong.yml:/kong/kong.yml:ro
+      - envoy-gateway-data:/var/lib/eg
+    restart: "no"
+
+  gateway:
+    image: envoyproxy/gateway:v1.8.3@sha256:e7a8c70537628bf996e5dec5c4c835704b4b9f4f715a74cf361bea30608c49ac
+    # The image ENTRYPOINT is /usr/local/bin/envoy-gateway, so `command` is just
+    # its arguments.
+    command: ["server", "--config-path", "/config/standalone.yaml"]
+    volumes:
+      - ./gateway/eg:/config:ro
+      # Writable state, and NOT optional. In Host infrastructure mode the
+      # control plane self-signs the xDS TLS material for its own Envoy child
+      # process AND obtains the Envoy BINARY at runtime (upstream uses func-e,
+      # which downloads it into dataHome on first start — so a cold boot needs
+      # outbound internet). The named volume caches that download across
+      # `docker compose down` + `up`; `down -v` re-downloads it.
+      # /var/lib/eg exists world-writable in the image for this purpose, which
+      # is what lets the container keep running as its non-root uid 65532.
+      - envoy-gateway-data:/var/lib/eg
     ports:
-      - "8080:8000"
-    healthcheck:
-      test: ["CMD", "kong", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
+      - "8080:8000" # unchanged: the Envoy listener is on 8000 (see gateway/eg/gateway.yaml)
+      - "8099:8081" # control-plane /readyz — the only machine-readable "config loaded" signal
+    # NO healthcheck, and it is not an oversight: the image is
+    # gcr.io/distroless/base-nossl:nonroot, which ships no shell and no
+    # wget/curl, so every form of Compose healthcheck (CMD, CMD-SHELL, bash
+    # /dev/tcp) is impossible. Consequence: `frontend` can only wait for
+    # `service_started` below, so the SPA may be reachable a few seconds before
+    # the edge accepts requests — a page load in that window fails its API
+    # calls and needs a refresh. Gate on the edge from the host instead:
+    #   curl -sf -o /dev/null http://localhost:8080/product/v1/public/products
     depends_on:
-      cache: { condition: service_healthy }
-      auth: { condition: service_healthy }
       user: { condition: service_healthy }
       product: { condition: service_healthy }
       cart: { condition: service_healthy }
@@ -934,6 +873,17 @@ services:
       notification: { condition: service_healthy }
       payment: { condition: service_healthy }
       checkout: { condition: service_healthy }
+      # The realm must be reachable before the edge starts: Envoy fetches the
+      # JWKS for the jwt_authn filter and a private route cannot be served
+      # until it has one.
+      keycloak: { condition: service_healthy }
+      # xDS certificates must exist before the control plane boots.
+      gateway-certgen: { condition: service_completed_successfully }
+      # `cache` is intentionally NOT here any more. Kong's rate limiter used
+      # Valkey for a counter shared across replicas; Envoy's local rate limiter
+      # is an in-process token bucket (gateway/eg/backendtrafficpolicy.yaml),
+      # which cannot fail open or closed and needs no datastore. Valkey still
+      # serves product-service's cache.
 
   # ---- Frontend (built with the gateway origin baked in) ----
   frontend:
@@ -956,9 +906,15 @@ services:
       retries: 5
       start_period: 5s
     depends_on:
-      gateway: { condition: service_healthy }
+      # service_started, not service_healthy: the Envoy Gateway image is
+      # distroless and cannot run a Compose healthcheck at all (see the gateway
+      # service). The cost is a startup race — the SPA can be served before the
+      # edge accepts requests, so a page loaded in that window shows failed API
+      # calls until it is refreshed.
+      gateway: { condition: service_started }
 
 volumes:
+  envoy-gateway-data:
   victoria-traces-data:
   victoria-logs-data:
   victoria-metrics-data:

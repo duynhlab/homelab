@@ -1,34 +1,29 @@
-# API routes on the public gateway (gateway.duynh.me) — 1:1 translation of
-# configs/kong/ingress-api.yaml (13 Ingresses -> 13 HTTPRoutes).
+# API routes on the public gateway (gateway.duynh.me) — one HTTPRoute per
+# exposed service (13 routes total).
 #
 # URL shape: /{service}/v1/{audience}/{resource...} — Variant A
-# (docs/api/api.md#http-url-model). Pure pass-through, no rewrite (Kong
-# `strip-path: false` == Gateway API default). Only `public` and `private`
-# audiences are exposed; `internal` routes stay in-cluster only.
+# (docs/api/api.md#http-url-model). Pure pass-through, no rewrite (Gateway
+# API's default behavior). Only `public` and `private` audiences are
+# exposed; `internal` routes stay in-cluster only.
 #
 # Each HTTPRoute lives in its backend's namespace and attaches to the shared
 # `platform` Gateway (https listener; the http listener only serves the 301
-# redirect — Kong's `protocols: https` + redirect annotations).
+# redirect).
 #
-# PathPrefix values drop Kong's trailing slash: Gateway API PathPrefix is
-# SEGMENT-based, so `/user/v1/private` matches `/user/v1/private` and
-# `/user/v1/private/...` but never `/user/v1/privatefoo` — same match set as
-# Kong's Ingress Prefix `/user/v1/private/`.
+# PathPrefix is SEGMENT-based, so `/user/v1/private` matches
+# `/user/v1/private` and `/user/v1/private/...` but never
+# `/user/v1/privatefoo`.
 #
-# EDGE AUTH (ADR-006 principle, re-homed by ADR-045): routes that carried the
-# `jwt-edge` plugin get a SecurityPolicy with a Keycloak remoteJWKS provider —
+# EDGE AUTH (ADR-006 principle, re-homed by ADR-045): routes that require
+# authentication get a SecurityPolicy with a Keycloak remoteJWKS provider —
 # see policies/security-jwt.yaml. Services STILL validate JWTs (pkg/authmw,
 # authoritative) — defense-in-depth.
 #
-# security-headers: every route carries a ResponseHeaderModifier filter
-# translating the GLOBAL Kong `security-headers` response-transformer plugin
-# (plugins.yaml). Semantic note: Kong's `add` set a header only if the
-# upstream did not send it; Gateway API `set` always wins — the edge value is
-# now guaranteed (upstream can no longer weaken these headers).
+# security-headers: every route carries a ResponseHeaderModifier filter that
+# sets a baseline set of response headers. Gateway API `set` always wins —
+# the edge value is guaranteed regardless of what the upstream sends.
 #
-# Rate/size limits + resilience: policies/btp-api.yaml (translates
-# rate-limiting-api, request-size-limiting-api, and the resilience-default
-# KongUpstreamPolicy + konghq.com Service annotations).
+# Rate/size limits + resilience: policies/btp-api.yaml.
 
 ---
 # Auth Service — public (login, register, refresh, logout, jwks): anonymous.
@@ -440,8 +435,7 @@ spec:
 ---
 # Payment webhooks — public, anonymous: the HMAC signature over the raw body
 # is the credential (mockpay signs, payment verifies). Rate/size limits still
-# apply (btp-api.yaml). Translates api-payment-webhooks — both paths in one
-# route, matching the Kong Ingress's two path entries.
+# apply (btp-api.yaml). Both webhook paths are matched by one route.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

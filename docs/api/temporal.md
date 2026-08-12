@@ -612,14 +612,14 @@ flowchart TB
         RECON --> PDB
     end
     OW -->|"gRPC :9090 (saga money ops)"| PGRPC
-    KONG["Kong gateway"] -->|"/payment/v1/public/payments/webhooks/mockpay"| PHTTP
+    EDGE["Envoy Gateway<br/>edge"] -->|"/payment/v1/public/payments/webhooks/mockpay"| PHTTP
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class KONG edge;
+    class EDGE edge;
     class PGRPC,PHTTP,PLOGIC service;
     class OW,RELAY,RECON worker;
     class PDB data;
@@ -1003,7 +1003,7 @@ flowchart LR
         OW[order worker<br/>task queue: order-fulfillment]
     end
     OW -- gRPC :7233 --> TC
-    Kong[Kong] -- temporal.duynh.me --> UI
+    Edge[Envoy Gateway] -- temporal.duynh.me --> UI
     TC -- /metrics --> VM[VictoriaMetrics]
     OW -- OTLP --> Tempo
 
@@ -1011,7 +1011,7 @@ flowchart LR
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class Kong edge;
+    class Edge edge;
     class OW worker;
     class HR,TC,UI,VM,Tempo platform;
     class TDB data;
@@ -1022,7 +1022,7 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 - **`HelmRelease temporal`** — `controllers/temporal/helmrelease.yaml`: chart `1.6.0` (server **`1.31.2`** — Worker Versioning needs ≥ 1.29.1, which the retired operator could not run), `numHistoryShards: 512`, persistence → `platform-db-rw.platform:5432` (`temporal` + `temporal_visibility`, `createDatabase: false` — the role has no CREATEDB) via **`platform-db-temporal-secret`**, `mop` namespace (retention 168h) created by the chart's namespace Job, `web.enabled`, `admintools.enabled`, `server.metrics.serviceMonitor.enabled`, `schema.useHelmHooks: false` (Flux does not reconcile Helm hooks), resources set on every component. The frontend Service keeps the name **`temporal-frontend`**, so `TEMPORAL_HOSTPORT` is unchanged across the re-platform; the UI Service is **`temporal-web`** (was `temporal-ui`).
 - **Retired operator** — its HelmRelease, both CRs and its HelmRepository are kept as `*.yaml.bak` beside their replacements: readable, and inert because no kustomization lists them (ADR-030). The `TemporalCluster`/`TemporalNamespace` CRDs and the cert-manager admission webhook are gone with the operator.
 - **`platform-db`** — `configs/databases/clusters/platform-db/`: consolidated CloudNativePG cluster (RFC-0018) hosting `temporal` + `temporal_visibility` alongside auth and supporting databases. 3-node HA; Barman backups at `s3://pg-backups-cnpg/platform-db/`.
-- **Edge & alerts** — Kong ingress `temporal.duynh.me` + `TemporalServerDown` and service/persistence error-rate `PrometheusRule`s, both in `configs/temporal/` (applied by `temporal-config-local`, after the chart).
+- **Edge & alerts** — the edge `HTTPRoute temporal-ui` (`configs/envoy-gateway/routes/temporal.yaml`, hostname `temporal.duynh.me`, **planned** — not yet exercised on Kind) plus `TemporalServerDown` and service/persistence error-rate `PrometheusRule`s in `configs/temporal/` (applied by `temporal-config-local`, after the chart).
 - **Flux order** — `controllers` (namespace only — no operator, and the cert-manager dependency retired with the webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, databases, monitoring) before `apps`, health-checked on the `HelmRelease` + `temporal-frontend` Deployment (helm-controller waits for release resources, so Ready also means the `mop` namespace Job completed — the ordering guarantee `apps-local` needs); the order worker `dependsOn` temporal.
 
 ### Worker Deployment Versioning (as-built)

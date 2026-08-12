@@ -1,0 +1,120 @@
+# Backends — one per Compose service the edge fronts.
+#
+# What this exposes: the upstream targets HTTPRoutes send traffic to. This is
+# the ONE structural divergence from the cluster edge: in Kubernetes an
+# HTTPRoute `backendRefs` entry names a Service, and no Services exist in
+# Compose. `Backend` (gateway.envoyproxy.io/v1alpha1, enabled by
+# `extensionApis.enableBackend` in standalone.yaml) is the Gateway API-native
+# answer: an explicit FQDN endpoint, resolved by Envoy through the Compose
+# network's DNS, where the hostname IS the compose service name.
+#
+# Nine backends for ten services: `inventory` is gRPC-only (inventory.v1,
+# :9090) and has never been reachable from the edge — order, checkout and
+# product dial it east-west. `mockpay` likewise: it calls IN to the edge webhook
+# route, it is never a route target. There is no identity backend either — the
+# realm is reached by the browser directly, and by the edge only for its JWKS.
+#
+# Every application container listens on 8080 (PORT in x-svc-env).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: user
+spec:
+  endpoints:
+    - fqdn:
+        hostname: user
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: product
+spec:
+  endpoints:
+    - fqdn:
+        hostname: product
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: cart
+spec:
+  endpoints:
+    - fqdn:
+        hostname: cart
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: order
+spec:
+  endpoints:
+    - fqdn:
+        hostname: order
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: review
+spec:
+  endpoints:
+    - fqdn:
+        hostname: review
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: shipping
+spec:
+  endpoints:
+    - fqdn:
+        hostname: shipping
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: notification
+spec:
+  endpoints:
+    - fqdn:
+        hostname: notification
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: payment
+spec:
+  endpoints:
+    - fqdn:
+        hostname: payment
+        port: 8080
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: checkout
+spec:
+  endpoints:
+    - fqdn:
+        hostname: checkout
+        port: 8080
+---
+# Not a routable backend: the OTLP gRPC sink the EnvoyProxy CR's tracing
+# provider exports edge spans to. In the cluster this is a Kubernetes Service
+# reference; standalone has no Services, so the collector gets a Backend like
+# everything else.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: otel-collector
+spec:
+  endpoints:
+    - fqdn:
+        hostname: otel-collector
+        port: 4317

@@ -346,12 +346,13 @@ graph LR
     class B,G,H,I trace;
 ```
 
-Services accept and propagate W3C Trace Context (`traceparent`). At the edge,
-Kong's opentelemetry plugin **forces** a W3C `traceparent` onto every upstream
-request (`propagation.inject: [w3c]`, extracting w3c/b3/jaeger/ot), so the
-service span always joins the edge trace — verified in
-`kubernetes/infra/configs/kong/plugins.yaml`. gRPC metadata carries the same
-context via `pkg/grpcx`.
+Services accept and propagate W3C Trace Context (`traceparent`). The edge speaks
+W3C natively: Envoy starts a span for every accepted request and sends
+`traceparent` upstream, so the service span always joins the edge trace — the
+edge is the root sampling authority, and its ParentBased sampler honours any
+inbound decision. Configured in the `EnvoyProxy` resource
+(`telemetry.tracing`); the platform's only propagation format is W3C. gRPC
+metadata carries the same context via `pkg/grpcx`.
 
 ## Worker and Temporal instrumentation
 

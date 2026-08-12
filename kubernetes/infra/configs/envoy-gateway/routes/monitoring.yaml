@@ -1,15 +1,13 @@
-# Monitoring routes — 1:1 translation of configs/kong/ingress-monitoring.yaml
-# (10 Ingresses -> 10 HTTPRoutes, all in the monitoring namespace).
+# Monitoring routes — one HTTPRoute per admin surface (10 routes total, all
+# in the monitoring namespace).
 # Each admin surface keeps its dedicated *.duynh.me host, reachable via
 # /etc/hosts -> the edge NodePorts.
 #
-# Kong plugin translation (each Ingress carried
-# `ip-restriction-internal,rate-limiting-admin`):
+# Each surface carries:
 #   - CIDR fence      -> policies/security-admin-cidr.yaml (SecurityPolicy)
 #   - admin rate limit-> policies/btp-admin.yaml (BackendTrafficPolicy)
-# The security-headers ResponseHeaderModifier translates the GLOBAL Kong
-# security-headers plugin (see routes/api.yaml header for the add-vs-set
-# semantic note).
+# The security-headers ResponseHeaderModifier sets a baseline set of response
+# headers (see routes/api.yaml header for the `set`-semantics note).
 ---
 # Grafana — grafana.duynh.me (translates Ingress grafana)
 apiVersion: gateway.networking.k8s.io/v1

@@ -1,0 +1,37 @@
+# Gateway `platform` — the single local edge entry point.
+#
+# What this exposes: one plain-HTTP listener on container port 8000, published
+# to the host as 8080 by compose.yaml. Every route in routes.yaml attaches here.
+#
+# ONE listener, HTTP only. TLS termination and the :80 -> :443 redirect are
+# CLUSTER concerns (a wildcard *.duynh.me certificate issued by cert-manager);
+# local-stack has no certificate and no hostname, so adding an HTTPS listener
+# would only add a failure mode. Same reason there is no `hostnames` field on
+# the routes: requests arrive as `localhost:8080` / `gateway:8000` and must match
+# on path alone.
+#
+# Port 8000 is deliberate and load-bearing. Envoy Gateway shifts PRIVILEGED
+# listener ports (below 1024) by +10000 when it binds them, so that Envoy needs
+# no elevated capability to run: a listener declared on port 80 is actually bound
+# on 10080. Declaring 80 here would therefore leave nothing listening on the port
+# the published `8080:8000` mapping targets, and the failure looks like a dead
+# edge rather than a port arithmetic surprise. 8000 is above 1024, so it is bound
+# verbatim, and `mockpay` can post its webhook to http://gateway:8000/... on the
+# compose network while the host reaches the same listener on 8080.
+#
+# `allowedRoutes.namespaces.from: All` — the field exists so a platform team can
+# decide which namespaces may attach routes to a shared edge. There is one
+# namespace here, so there is no isolation to gain by narrowing it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: platform
+spec:
+  gatewayClassName: platform
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 8000
+      allowedRoutes:
+        namespaces:
+          from: All

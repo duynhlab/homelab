@@ -1,7 +1,7 @@
-# Envoy Gateway edge configuration (RFC-0024 P2) — the Gateway API
-# translation of configs/kong/. Reconciled by envoy-gateway-config-local
-# (clusters/local/envoy-gateway-config.yaml), which also carries the
-# LOCAL-only patches (homelab-ca issuer, 100% trace sampling).
+# Envoy Gateway edge configuration (RFC-0024 P2). Reconciled by
+# envoy-gateway-config-local (clusters/local/envoy-gateway-config.yaml),
+# which also carries the LOCAL-only patches (homelab-ca issuer, 100% trace
+# sampling).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -9,7 +9,7 @@ resources:
   - envoyproxy.yaml
   - certificate.yaml
   - gateway.yaml
-  # Routes — every Kong Ingress translated 1:1 (+ the new keycloak surface)
+  # Routes — one HTTPRoute per exposed host (+ the new keycloak surface)
   - routes/api.yaml
   - routes/monitoring.yaml
   - routes/infra.yaml
@@ -17,7 +17,7 @@ resources:
   - routes/frontend.yaml
   - routes/temporal.yaml
   - routes/keycloak.yaml
-  # Policies — the KongClusterPlugin / KongUpstreamPolicy translations
+  # Policies — CORS, JWT, CIDR, and traffic-management policies
   - policies/security-cors.yaml
   - policies/security-jwt.yaml
   - policies/security-admin-cidr.yaml

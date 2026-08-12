@@ -56,30 +56,6 @@ data:
           }
         ]
       },
-      "clientScopes": [
-        {
-          "name": "platform-api",
-          "description": "Adds the duynhlab-platform audience to access tokens",
-          "protocol": "openid-connect",
-          "attributes": {
-            "include.in.token.scope": "false",
-            "display.on.consent.screen": "false"
-          },
-          "protocolMappers": [
-            {
-              "name": "duynhlab-platform-audience",
-              "protocol": "openid-connect",
-              "protocolMapper": "oidc-audience-mapper",
-              "consentRequired": false,
-              "config": {
-                "included.custom.audience": "duynhlab-platform",
-                "access.token.claim": "true",
-                "id.token.claim": "false"
-              }
-            }
-          ]
-        }
-      ],
       "clients": [
         {
           "clientId": "customer-spa",
@@ -94,16 +70,35 @@ data:
           "attributes": {
             "pkce.code.challenge.method": "S256"
           },
-          "redirectUris": ["http://localhost:3001/*", "http://localhost:3000/*"],
-          "webOrigins": ["http://localhost:3001", "http://localhost:3000"],
+          "redirectUris": [
+            "http://localhost:3001/*",
+            "http://localhost:3000/*"
+          ],
+          "webOrigins": [
+            "http://localhost:3001",
+            "http://localhost:3000"
+          ],
           "defaultClientScopes": [
             "web-origins",
             "acr",
             "profile",
             "roles",
             "basic",
-            "email",
-            "platform-api"
+            "email"
+          ],
+          "protocolMappers": [
+            {
+              "name": "platform-audience",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "consentRequired": false,
+              "config": {
+                "included.custom.audience": "duynhlab-platform",
+                "access.token.claim": "true",
+                "id.token.claim": "false",
+                "introspection.token.claim": "true"
+              }
+            }
           ]
         },
         {
@@ -121,16 +116,33 @@ data:
             "client.session.idle.timeout": "1800",
             "client.session.max.lifespan": "36000"
           },
-          "redirectUris": ["http://localhost:3002/*"],
-          "webOrigins": ["http://localhost:3002"],
+          "redirectUris": [
+            "http://localhost:3002/*"
+          ],
+          "webOrigins": [
+            "http://localhost:3002"
+          ],
           "defaultClientScopes": [
             "web-origins",
             "acr",
             "profile",
             "roles",
             "basic",
-            "email",
-            "platform-api"
+            "email"
+          ],
+          "protocolMappers": [
+            {
+              "name": "platform-audience",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "consentRequired": false,
+              "config": {
+                "included.custom.audience": "duynhlab-platform",
+                "access.token.claim": "true",
+                "id.token.claim": "false",
+                "introspection.token.claim": "true"
+              }
+            }
           ]
         }
       ],
@@ -142,9 +154,19 @@ data:
           "enabled": true,
           "emailVerified": true,
           "credentials": [
-            {"type": "password", "value": "password123", "temporary": false}
+            {
+              "type": "password",
+              "value": "password123",
+              "temporary": false
+            }
           ],
-          "realmRoles": ["customer", "backoffice_admin"]
+          "realmRoles": [
+            "customer",
+            "backoffice_admin"
+          ],
+          "firstName": "Alice",
+          "lastName": "Johnson",
+          "requiredActions": []
         },
         {
           "id": "a11ce000-0000-4000-8000-000000000002",
@@ -153,9 +175,18 @@ data:
           "enabled": true,
           "emailVerified": true,
           "credentials": [
-            {"type": "password", "value": "password123", "temporary": false}
+            {
+              "type": "password",
+              "value": "password123",
+              "temporary": false
+            }
           ],
-          "realmRoles": ["customer"]
+          "realmRoles": [
+            "customer"
+          ],
+          "firstName": "Bob",
+          "lastName": "Smith",
+          "requiredActions": []
         },
         {
           "id": "a11ce000-0000-4000-8000-000000000003",
@@ -164,9 +195,18 @@ data:
           "enabled": true,
           "emailVerified": true,
           "credentials": [
-            {"type": "password", "value": "password123", "temporary": false}
+            {
+              "type": "password",
+              "value": "password123",
+              "temporary": false
+            }
           ],
-          "realmRoles": ["customer"]
+          "realmRoles": [
+            "customer"
+          ],
+          "firstName": "Carol",
+          "lastName": "White",
+          "requiredActions": []
         },
         {
           "id": "a11ce000-0000-4000-8000-000000000004",
@@ -175,9 +215,18 @@ data:
           "enabled": true,
           "emailVerified": true,
           "credentials": [
-            {"type": "password", "value": "password123", "temporary": false}
+            {
+              "type": "password",
+              "value": "password123",
+              "temporary": false
+            }
           ],
-          "realmRoles": ["customer"]
+          "realmRoles": [
+            "customer"
+          ],
+          "firstName": "David",
+          "lastName": "Brown",
+          "requiredActions": []
         },
         {
           "id": "a11ce000-0000-4000-8000-000000000005",
@@ -186,9 +235,18 @@ data:
           "enabled": true,
           "emailVerified": true,
           "credentials": [
-            {"type": "password", "value": "password123", "temporary": false}
+            {
+              "type": "password",
+              "value": "password123",
+              "temporary": false
+            }
           ],
-          "realmRoles": ["customer"]
+          "realmRoles": [
+            "customer"
+          ],
+          "firstName": "Eve",
+          "lastName": "Davis",
+          "requiredActions": []
         }
       ]
     }

@@ -5,7 +5,7 @@ Shipping turns "an order that must move" into a tracked shipment — and turns "
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public only · `:8080` · Kong `/shipping/v1/public/` (no JWT) | Implemented |
+| **HTTP** | public only · `:8080` · edge `/shipping/v1/public/` (no JWT) | Implemented |
 | **gRPC server** | `ShippingService/GetQuote, GetShipmentByOrder, CreateShipment, CancelShipment` · `:9090` | Implemented |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
@@ -55,7 +55,7 @@ One question: **who calls shipping, and over which transport?**
 
 ```mermaid
 flowchart LR
-    SPA["Browser SPA"] -->|"HTTP via Kong<br/>/shipping/v1/public/"| SHIP["shipping-service<br/>:8080 HTTP · :9090 gRPC"]
+    SPA["Browser SPA"] -->|"HTTP via the edge<br/>/shipping/v1/public/"| SHIP["shipping-service<br/>:8080 HTTP · :9090 gRPC"]
     CK["checkout"] -->|"gRPC GetQuote"| SHIP
     ORD["order"] -->|"gRPC GetShipmentByOrder"| SHIP
     OW["order-worker"] -->|"gRPC CreateShipment /<br/>CancelShipment"| SHIP
@@ -72,7 +72,7 @@ flowchart LR
 ```
 
 Shipping is a **leaf service**: it dials nothing east-west (gRPC client: None).
-Every caller reaches it either through Kong (public HTTP) or directly on `:9090`
+Every caller reaches it either through the edge (public HTTP) or directly on `:9090`
 inside the cluster, fenced by NetworkPolicy (see
 [Callers & dependencies](#callers--dependencies)).
 
@@ -103,7 +103,7 @@ Two rate surfaces are **not** in the database:
 
 ## HTTP API
 
-Public routes only — Kong exposes `/shipping/v1/public/` with **no JWT** (anonymous
+Public routes only — the edge exposes `/shipping/v1/public/` with **no JWT** (anonymous
 tracking is a feature). The `internal` route is never on the gateway. Shared
 conventions (error envelope, snake_case, data types): [api.md](./api.md#common-http-contracts).
 
@@ -214,7 +214,7 @@ return identical data, and error mapping is per-transport (`InvalidArgument` vs
 
 | Caller | Transport | Calls | Why |
 |--------|-----------|-------|-----|
-| Browser SPA | HTTP via Kong (no JWT) | track, estimate | Anonymous tracking + cost preview |
+| Browser SPA | HTTP via the edge (no JWT) | track, estimate | Anonymous tracking + cost preview |
 | checkout | gRPC | `GetQuote` | Fee authority for session totals (RFC-0015 P3) |
 | order | gRPC | `GetShipmentByOrder` | Enrich order details with shipment state |
 | order-worker | gRPC | `CreateShipment`, `CancelShipment` | Saga step + compensation |
@@ -222,7 +222,7 @@ return identical data, and error mapping is per-transport (`InvalidArgument` vs
 Dependencies: the `shipping` database only — shipping dials no other service.
 
 **NetworkPolicy fence** ([network-policies/shipping.yaml](../../kubernetes/infra/configs/network-policies/shipping.yaml)):
-default deny-all ingress; `kong` and `order` namespaces may reach `:8080` + `:9090`;
+default deny-all ingress; `envoy-gateway` and `order` namespaces may reach `:8080` + `:9090`;
 `checkout` may reach `:9090` **only** (it prices quotes, never the HTTP API). The
 east-west gRPC surface is unauthenticated by design — the policy is the fence.
 
@@ -254,7 +254,7 @@ east-west gRPC surface is unauthenticated by design — the policy is the fence.
   (is `CreateShipment` failing the saga?), `shipment_cancelled_total{outcome}`
   (is the compensation failing?), `shipment_lookup_total{kind, found}` (track vs
   by-order hit rate). Outcomes are bounded: `ok` / `invalid_order_id` / `error`.
-- **Smoke test via Kong:**
+- **Smoke test via the local gateway:**
 
 ```bash
 curl "http://localhost:8080/shipping/v1/public/shipments/estimate?origin=HCM&destination=HN&weight=1.5"

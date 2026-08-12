@@ -1,19 +1,17 @@
-# Admin-UI CIDR fence — translates the Kong `ip-restriction-internal`
-# KongClusterPlugin (configs/kong/plugins.yaml): private/in-cluster networks
-# only, everything else denied. Applied to exactly the routes that carried
-# the plugin annotation: the 10 monitoring UIs, the 2 MCP servers in
-# monitoring, flux-ui + flux-mcp, rustfs-console, openbao-ui.
-# (temporal-ui and frontend carried no ip-restriction in Kong — parity kept.)
+# Admin-UI CIDR fence — private/in-cluster networks only, everything else
+# denied. Applied to exactly the admin surfaces that need it: the 10
+# monitoring UIs, the 2 MCP servers in monitoring, flux-ui + flux-mcp,
+# rustfs-console, openbao-ui.
+# (temporal-ui and frontend intentionally carry no CIDR fence.)
 #
 # One SecurityPolicy per namespace (targetRefs are same-namespace only).
-# `defaultAction: Deny` + a single Allow rule = Kong's allowlist semantics,
-# now explicit (RFC-0024 Security considerations). CIDR list matches Kong's
-# allow list 1:1 (incl. ::1/128 loopback).
+# `defaultAction: Deny` + a single Allow rule implements an explicit
+# allowlist (RFC-0024 Security considerations), including ::1/128 loopback.
 # `mergeType: StrategicMerge` keeps the gateway-level CORS baseline applied.
 #
-# Same defense-in-depth caveat as Kong's plugin: behind the Kind
-# port-forward the client address seen by Envoy depends on forwarded-header
-# trust — pair with real auth later.
+# Defense-in-depth caveat: behind the Kind port-forward the client address
+# seen by Envoy depends on forwarded-header trust — pair with real auth
+# later.
 
 ---
 # monitoring: 10 admin UIs + 2 MCP servers

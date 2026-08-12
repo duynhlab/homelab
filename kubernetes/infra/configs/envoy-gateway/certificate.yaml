@@ -2,9 +2,7 @@
 # *.duynh.me, referenced by the Gateway's https listener certificateRefs
 # (same namespace, so no ReferenceGrant needed).
 #
-# Deliberately a NEW Certificate, not a move of kong-proxy-tls: Kong keeps its
-# own cert until the cutover PR (2.3) deletes it — the two coexist during this
-# additive train. Spec is otherwise identical to
+# Spec is otherwise identical to
 # configs/cert-manager/certificates-microservices.yaml.
 #
 # Issued by Let's Encrypt (DNS-01 via Cloudflare) on prod. The LOCAL cluster

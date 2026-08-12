@@ -6,7 +6,7 @@ only writer of orders and the only place the fulfillment saga starts.
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private · `:8080` · Kong `/order/v1/private/` (local-stack: bare `/order/` prefix) · edge JWT | Partial |
+| **HTTP** | private · `:8080` · Edge `/order/v1/private/` (audience-scoped in both environments) · edge JWT | Partial |
 | **gRPC server** | `OrderService/CreateOrder` · `:9090` | Implemented |
 | **gRPC client** | shipping (`GetShipmentByOrder`), payment (`GetPayment`), inventory (`GetReservation`) — enrichment reads | Implemented |
 | **Worker** | `order-worker` · queue `order-fulfillment` | Implemented |
@@ -64,8 +64,8 @@ One question: **who talks to order, and what does the saga fan out to?**
 
 ```mermaid
 flowchart LR
-    SPA["Browser SPA"] --> Kong["Kong<br/>edge JWT"]
-    Kong -->|"/order/v1/private/orders…"| Order["order HTTP :8080"]
+    SPA["Browser SPA"] --> Edge["Envoy Gateway<br/>edge JWT"]
+    Edge -->|"/order/v1/private/orders…"| Order["order HTTP :8080"]
     CK["checkout"] -->|"gRPC CreateOrder :9090"| OrderG["order gRPC :9090"]
     Order --> DB[("order DB<br/>product-db via PgDog")]
     OrderG --> DB
@@ -86,7 +86,7 @@ flowchart LR
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class Order,OrderG,CK,INV,SHIP,PAY,NOTIF,CART service;
     class W worker;
     class TMP platform;
@@ -135,9 +135,9 @@ catalog changes.
 ## HTTP API
 
 Shared rules (auth, error envelope, pagination) live in [api.md](./api.md).
-All routes are `private`: Kong edge JWT is the coarse filter, in-service
-`pkg/authmw` is authoritative, and every query is owner-scoped by the JWT
-`user_id`.
+All routes are `private`: the edge's `jwt-edge` `SecurityPolicy` is the coarse
+filter, in-service `pkg/authmw` is authoritative, and every query is
+owner-scoped by the JWT `user_id`.
 
 | Method | Path | Purpose | Notes |
 |--------|------|---------|-------|
@@ -314,7 +314,7 @@ Both transports delegate the kickoff to one package
 
 | Direction | Peer | Transport | Purpose |
 |-----------|------|-----------|---------|
-| Inbound | Browser SPA via Kong | HTTP private | List/read orders, order details, cancel |
+| Inbound | Browser SPA via the edge | HTTP private | List/read orders, order details, cancel |
 | Inbound | checkout | gRPC `CreateOrder` | Confirm handoff (ADR-018) — only NetworkPolicy-admitted caller of `:9090` |
 | Outbound (API) | shipping, payment, inventory | gRPC | Enrichment reads for `/details` (soft-fail) |
 | Outbound (API) | Temporal | SDK | Inline `CancellationWorkflow` start after the cancel CAS commits (outbox sweeps the misses) |
@@ -343,7 +343,7 @@ Both transports delegate the kickoff to one package
 | Signals to watch | Rising `compensation.total{step="void_payment",result="error"}` or `{step="refund_payment"}` failures mean money may be held or unreturned — reconcile against payment's ledger ([payments.md](./payments.md)) |
 | Telemetry | HTTP/gRPC RED over OTLP, workflow traces, structured logs with shared trace IDs (obsx, RFC-0014) |
 
-Example read through Kong (local-stack — bare `/order/` prefix, same service path):
+Example read through the edge (local-stack, same service path):
 
 ```bash
 curl -s http://localhost:8080/order/v1/private/orders \

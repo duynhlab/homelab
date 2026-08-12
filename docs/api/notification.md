@@ -8,7 +8,7 @@ triggered it.
 | Dimension | Value | Status |
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private · `:8080` · Kong `/notification/v1/private/` (edge JWT) | Implemented |
+| **HTTP** | private · `:8080` · edge `/notification/v1/private/` (edge JWT) | Implemented |
 | **gRPC server** | `NotificationService/SendEmail`, `SendSMS` · `:9090` | Implemented |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
@@ -54,8 +54,8 @@ One question: who writes into the inbox, and who reads it?
 
 ```mermaid
 flowchart LR
-    SPA["Browser SPA"] --> Kong["Kong (edge JWT)"]
-    Kong -->|"/notification/v1/private/notifications…"| NOTIF["notification-service<br/>:8080 HTTP · :9090 gRPC"]
+    SPA["Browser SPA"] --> Edge["Envoy Gateway<br/>(edge JWT)"]
+    Edge -->|"/notification/v1/private/notifications…"| NOTIF["notification-service<br/>:8080 HTTP · :9090 gRPC"]
     Worker["order-worker<br/>(SendNotification / SendReceipt)"] -->|"gRPC SendEmail :9090"| NOTIF
     NOTIF --> Logic["logic layer<br/>(shared by HTTP + gRPC)"]
     Logic --> DB[("notification DB<br/>on platform-db")]
@@ -65,7 +65,7 @@ flowchart LR
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class SPA,Kong edge;
+    class SPA,Edge edge;
     class NOTIF,Logic service;
     class Worker worker;
     class DB data;
@@ -104,8 +104,8 @@ notifications across 3 users with mixed read state.
 
 ## HTTP API
 
-All private routes derive the owner from the JWT (Kong edge filter +
-authoritative in-service verification — see
+All private routes derive the owner from the JWT (edge `SecurityPolicy.jwt`
+filter + authoritative in-service verification — see
 [api.md § Authentication](./api.md#authentication)).
 
 | Method | Path | Audience | Purpose |
@@ -118,8 +118,8 @@ authoritative in-service verification — see
 | `POST` | `/notification/v1/internal/notifications/email` | Internal | HTTP twin of `SendEmail` — **No caller** |
 | `POST` | `/notification/v1/internal/notifications/sms` | Internal | HTTP twin of `SendSMS` — **No caller** |
 
-`/internal/` routes are never exposed at either edge (Kong local-stack and the
-cluster ingress both route only `/notification/v1/private/`); the namespace
+`/internal/` routes are never exposed at either edge (local-stack and the
+cluster edge both route only `/notification/v1/private/`); the namespace
 NetworkPolicy is the fence.
 
 ### Notification shape
@@ -221,7 +221,7 @@ no ids, no recipient text.
 
 | Direction | Peer | Transport | Purpose |
 |-----------|------|-----------|---------|
-| Inbound | Browser SPA via Kong | HTTP `/notification/v1/private/` | Inbox read + mark-read |
+| Inbound | Browser SPA via the edge | HTTP `/notification/v1/private/` | Inbox read + mark-read |
 | Inbound | order-worker | gRPC `SendEmail` `:9090` | Saga notify + receipt steps |
 | Outbound | `notification` DB on platform-db | SQL via pooler | Only dependency — no east-west client calls |
 
@@ -258,7 +258,8 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
   `notification_send_duration_seconds` p99 with a healthy DB means the send
   path (future provider) is degrading, not the inbox.
 - **Local-stack:** `notification` + `notification-migrate` + `notification-seed`
-  (compose); Kong route `/notification/v1/private/` with the jwt plugin.
+  (compose); edge `HTTPRoute api-notification` at `/notification/v1/private/`
+  with the `jwt-edge` `SecurityPolicy`.
 - **Smoke test via the local gateway:**
 
   ```bash

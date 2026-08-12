@@ -94,8 +94,8 @@ data:
           "attributes": {
             "pkce.code.challenge.method": "S256"
           },
-          "redirectUris": ["http://localhost:3001/*"],
-          "webOrigins": ["http://localhost:3001"],
+          "redirectUris": ["http://localhost:3001/*", "http://localhost:3000/*"],
+          "webOrigins": ["http://localhost:3001", "http://localhost:3000"],
           "defaultClientScopes": [
             "web-origins",
             "acr",

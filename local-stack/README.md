@@ -109,6 +109,9 @@ container is now one of them (see [Gateway](#gateway)), so probe the edge with
 | VictoriaMetrics | http://localhost:8428 | OTLP/remote-write metrics and PromQL |
 | VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL, through its own vmui — there is no Grafana datasource for it |
 | ClickHouse | http://localhost:8123 | SQL over `otel.otel_logs` and `otel.otel_traces`; credentials `default` / `otel` |
+| ClickHouse /metrics | http://localhost:9363/metrics | The engine's own Prometheus endpoint (scraped by vmagent — audit C20) |
+| vmagent | http://localhost:8429 | Scrape targets UI + `/api/v1/targets` (audit C20) |
+| vmalert | http://localhost:8880 | Ported cluster alert rules; UI + `/api/v1/alerts` (audit C21) |
 | Pyroscope | http://localhost:4040 | Continuous profiling |
 
 PostgreSQL, Valkey, services, workers, and mockpay are internal-only. Reach the

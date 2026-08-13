@@ -1,0 +1,32 @@
+# Collector alerts — otelcol_* names are identical in both stacks, so these
+# two map 1:1 from the cluster catalog (tempo-alerts.yaml's OtelCollectorDown
+# and clickhouse-alerts.yaml's ClickHouseExporterUnhealthy).
+groups:
+  - name: otel-collector
+    interval: 30s
+    rules:
+      # The single OTLP funnel: when it is down, every app metric, trace and
+      # log stops arriving and most other alerts go blind rather than firing.
+      - alert: OtelCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: observability
+        annotations:
+          summary: "OTel collector is down"
+          description: "The collector's :8888 self-telemetry has been unreachable for 5 minutes — the whole OTLP path (metrics, traces, logs) is not being ingested."
+
+      # Consumer-side view of ClickHouse: the collector can be perfectly up
+      # while its clickhouse exporter backpressures.
+      - alert: ClickHouseExporterUnhealthy
+        expr: |
+          sum(rate(otelcol_exporter_send_failed_log_records{exporter="clickhouse"}[5m])) > 0
+            or sum(rate(otelcol_exporter_send_failed_spans{exporter="clickhouse"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+          category: observability
+        annotations:
+          summary: "OTel → ClickHouse export failing"
+          description: "The collector's clickhouse exporter has been failing sends for 10 minutes — OTel rows are not landing in the OLAP store (VictoriaLogs/VictoriaTraces keep their own copies)."

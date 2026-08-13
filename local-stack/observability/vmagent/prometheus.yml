@@ -1,0 +1,32 @@
+# vmagent scrape config — the local counterpart of the cluster's
+# ServiceMonitor/PodMonitor CRs (kubernetes/infra/configs/observability/
+# metrics/{servicemonitors,podmonitors}/). Static targets because Compose has
+# no service discovery; job names are chosen so the alert exprs' job matchers
+# mean the same thing in both stacks.
+#
+# Deliberately NOT scraped here:
+#   - the application services — their metrics arrive over OTLP through the
+#     collector (RFC-0014 P3: OTLP is the only app-metrics pipeline);
+#     scraping them too would double-ingest.
+#   - victoria-* backends — singletons whose own /metrics matter less locally
+#     than the two targets below; add them if a local investigation needs it.
+global:
+  scrape_interval: 15s
+  external_labels:
+    env: local
+
+scrape_configs:
+  # The engine that stores OTel logs+traces SQL. Its built-in Prometheus
+  # endpoint (observability/clickhouse/metrics.xml) is the local engine view;
+  # `up{job="clickhouse"}` is a REAL server-liveness signal here, unlike the
+  # cluster where liveness is inferred from the Altinity exporter's fetches.
+  - job_name: clickhouse
+    static_configs:
+      - targets: ["clickhouse:9363"]
+
+  # The collector's :8888 self-telemetry — otelcol_* series, identical names
+  # to the cluster, so OtelCollectorDown and ClickHouseExporterUnhealthy map
+  # 1:1 from the cluster catalog.
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]

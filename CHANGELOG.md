@@ -96,6 +96,10 @@ Skeleton (copy what you need):
   audience scoping, in-service 403 for a customer token, operator reads, the
   receipt/replay/invariant command lifecycle, and ledger actor = token sub.
 - `inventory` gains the `keycloak` dependency its new authmw verifier needs.
+- `temporal` gains `restart: on-failure:5`: a restart can exit(1) fatally
+  ~90s later on ringpop stale-membership ("join duration exceeded max 30s"),
+  silently killing every workflow timer — observed live in the 2026-08-13
+  audit; the A14 runbook row now carries the caution.
 - The `admin-portal` realm client's dev origin moves from the `:3002`
   placeholder to the owner-picked **`:3009`** (RFC-0023 Admin Portal; `:3002`
   is Grafana) in both realm twins — the cluster ConfigMap and the local

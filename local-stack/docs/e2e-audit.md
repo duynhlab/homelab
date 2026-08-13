@@ -727,6 +727,14 @@ audit_curl -s -H "Authorization: Bearer $AT" \
 > stack up with `SESSION_TTL_SECONDS=15` on `checkout` **and** `checkout-worker`
 > for a ~15s cycle.
 >
+> A14 can KILL the server it restarts: on a restart Temporal's ringpop layer
+> may retry joining its own stale membership entry until "join duration
+> exceeded max 30s" and exit(1) FATALLY ~90 seconds AFTER the row's read
+> passed (observed 2026-08-13; compose now carries `restart: on-failure:5`
+> for exactly this). After A14, confirm `temporal` is still Up ~2 minutes
+> later — a dead engine fires no timers, which silently turns A13 into
+> `expired|lazy` (inconclusive) and strands every workflow row after it.
+>
 > A13 needs its own user. One active session per user is enforced by a partial
 > unique index, so running A9/A10 as the same user makes them adopt the watched
 > session, and every mutation re-arms its timer. Since the cutover that user is

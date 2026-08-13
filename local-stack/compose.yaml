@@ -181,6 +181,12 @@ services:
 
   temporal:
     image: temporalio/server:1.31.2
+    # on-failure: a restart can die FATALLY after ~50s when ringpop tries to
+    # rejoin its own stale membership entry ("join duration exceeded max 30s")
+    # — seen live in the 2026-08-13 audit: `restart temporal` (A14) answered
+    # the row, then exited(1) 90s later and stayed down, silently taking every
+    # timer with it. The retry starts clean once the stale entry has aged out.
+    restart: on-failure:5
     environment:
       DB: postgres12
       DB_PORT: "5432"

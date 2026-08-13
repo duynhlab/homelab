@@ -11,18 +11,22 @@
 #   * refresh rotation/reuse-revocation ON (revokeRefreshToken + maxReuse 0)
 #   * audience `duynhlab-platform` via client scope `platform-api`
 #     (oidc-audience-mapper, access token only)
-#   * admin-portal: client-session idle 30 min / max 10 h as client attribute
-#     overrides (stricter backoffice posture); its redirect/origin
-#     http://localhost:3009 is the RFC-0023 Backoffice portal's local dev
-#     origin (owner-picked :3009 — :3002 is Grafana; JSON cannot carry
-#     comments, this note is authoritative)
 #   * registration OFF — deterministic demo users only
+#
+# ADR-050 split: this ConfigMap now carries TWO realms. `duynhlab` is the
+# CUSTOMER realm (client customer-spa only). `duynhlab-staff` is the
+# WORKFORCE realm: operator `duyne`, role backoffice_admin, client
+# admin-portal (dev origin http://localhost:3009 — :3002 is Grafana), with
+# the staff posture as REALM policy: registration off, brute-force on,
+# SSO idle 30 min / max 10 h. p@ss1234 is the dev-only demo placeholder,
+# never a committed prod value.
 #
 # Demo-user UUID scheme (fixed subjects, RFC-0022 OQ#10 — seeds and services
 # reference these as string user_id): a11ce000-0000-4000-8000-00000000000N
-# where N = 1 alice, 2 bob, 3 carol, 4 david, 5 eve. alice additionally holds
-# backoffice_admin as the RFC-0023 test operator. password123 is the local
-# demo password (dev-only realm-import placeholder, never a committed prod value).
+# where N = 1 alice, 2 bob, 3 carol, 4 david, 5 eve — customers only since
+# ADR-050 (the operator lives in duynhlab-staff as d0e00000-…-001 `duyne`).
+# password123 is the local demo password (dev-only realm-import placeholder,
+# never a committed prod value).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -50,10 +54,6 @@ data:
           {
             "name": "customer",
             "description": "May access private customer APIs; owner-scoped by sub"
-          },
-          {
-            "name": "backoffice_admin",
-            "description": "May access protected business APIs (RFC-0023)"
           }
         ]
       },
@@ -101,50 +101,6 @@ data:
               }
             }
           ]
-        },
-        {
-          "clientId": "admin-portal",
-          "name": "Backoffice Admin Portal (RFC-0023)",
-          "enabled": true,
-          "protocol": "openid-connect",
-          "publicClient": true,
-          "standardFlowEnabled": true,
-          "implicitFlowEnabled": false,
-          "directAccessGrantsEnabled": false,
-          "serviceAccountsEnabled": false,
-          "attributes": {
-            "pkce.code.challenge.method": "S256",
-            "client.session.idle.timeout": "1800",
-            "client.session.max.lifespan": "36000"
-          },
-          "redirectUris": [
-            "http://localhost:3009/*"
-          ],
-          "webOrigins": [
-            "http://localhost:3009"
-          ],
-          "defaultClientScopes": [
-            "web-origins",
-            "acr",
-            "profile",
-            "roles",
-            "basic",
-            "email"
-          ],
-          "protocolMappers": [
-            {
-              "name": "platform-audience",
-              "protocol": "openid-connect",
-              "protocolMapper": "oidc-audience-mapper",
-              "consentRequired": false,
-              "config": {
-                "included.custom.audience": "duynhlab-platform",
-                "access.token.claim": "true",
-                "id.token.claim": "false",
-                "introspection.token.claim": "true"
-              }
-            }
-          ]
         }
       ],
       "users": [
@@ -162,8 +118,7 @@ data:
             }
           ],
           "realmRoles": [
-            "customer",
-            "backoffice_admin"
+            "customer"
           ],
           "firstName": "Alice",
           "lastName": "Johnson",
@@ -247,6 +202,93 @@ data:
           ],
           "firstName": "Eve",
           "lastName": "Davis",
+          "requiredActions": []
+        }
+      ]
+    }
+  duynhlab-staff-realm.json: |
+    {
+      "realm": "duynhlab-staff",
+      "enabled": true,
+      "registrationAllowed": false,
+      "rememberMe": false,
+      "bruteForceProtected": true,
+      "accessTokenLifespan": 900,
+      "ssoSessionIdleTimeout": 1800,
+      "ssoSessionMaxLifespan": 36000,
+      "revokeRefreshToken": true,
+      "refreshTokenMaxReuse": 0,
+      "roles": {
+        "realm": [
+          {
+            "name": "backoffice_admin",
+            "description": "May access protected business APIs (RFC-0023 / ADR-050)"
+          }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "admin-portal",
+          "name": "Backoffice Admin Portal (RFC-0023, staff realm per ADR-050)",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "attributes": {
+            "pkce.code.challenge.method": "S256"
+          },
+          "redirectUris": [
+            "http://localhost:3009/*"
+          ],
+          "webOrigins": [
+            "http://localhost:3009"
+          ],
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "profile",
+            "roles",
+            "basic",
+            "email"
+          ],
+          "protocolMappers": [
+            {
+              "name": "platform-audience",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "consentRequired": false,
+              "config": {
+                "included.custom.audience": "duynhlab-platform",
+                "access.token.claim": "true",
+                "id.token.claim": "false",
+                "introspection.token.claim": "true"
+              }
+            }
+          ]
+        }
+      ],
+      "users": [
+        {
+          "id": "d0e00000-0000-4000-8000-000000000001",
+          "username": "duyne",
+          "email": "duyne@example.com",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {
+              "type": "password",
+              "value": "p@ss1234",
+              "temporary": false
+            }
+          ],
+          "realmRoles": [
+            "backoffice_admin"
+          ],
+          "firstName": "Duy",
+          "lastName": "Ne",
           "requiredActions": []
         }
       ]

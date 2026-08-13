@@ -395,7 +395,7 @@ ships, and the owning `docs/api/{service}.md` documents each as-built contract.
 
 | Concern | Convention |
 |---------|------------|
-| Guard chain | Edge `jwt-edge` SecurityPolicy (coarse signature/iss/aud/exp) → in-service `pkg/authmw` (authoritative) → `MiddlewareRequireRole("backoffice_admin")` |
+| Guard chain | Edge `jwt-edge-staff` SecurityPolicy (coarse signature/iss/aud/exp against the **workforce realm** `duynhlab-staff`, [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) → in-service `pkg/authmw` staff verifier (authoritative) → `MiddlewareRequireRole("backoffice_admin")`. A customer-realm token is wrong-issuer at the edge — it never reaches the role gate |
 | Role miss | `403` with the shared envelope, code `FORBIDDEN`; never retried by clients |
 | Actor | `actor_sub` = the verified token `sub`; a body-supplied actor is ignored |
 | Pagination | The standard `page`/`page_size` envelope above — including on services whose public reads diverge (product's `limit`) |
@@ -863,4 +863,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-13 — protected conventions are live: inventory ships the first `/protected/` surface (RFC-0023 slice A)._
+_Last updated: 2026-08-14 — ADR-050: protected surfaces verify the workforce realm (`duynhlab-staff`); customer tokens die at the edge as wrong-issuer._

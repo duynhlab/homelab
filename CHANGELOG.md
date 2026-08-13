@@ -79,74 +79,7 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
-### Feature
-
-#### Gateway
-
-- **The platform's first `/protected/` route**: `api-inventory-protected`
-  (`/inventory/v1/protected`, RFC-0023 slice A) in both config sets —
-  inventory's first edge exposure ever. Attached to `jwt-edge` and the shared
-  BackendTrafficPolicy locally; own `jwt-edge` SecurityPolicy plus a new
-  edge-only `:8080` NetworkPolicy allow in the cluster. East-west stays
-  gRPC-only.
-
-#### Local-stack
-
-- E2E audit row **A17**: the protected Backoffice surface — edge 401,
-  audience scoping, in-service 403 for a customer token, operator reads, the
-  receipt/replay/invariant command lifecycle, and ledger actor = token sub.
-- `inventory` gains the `keycloak` dependency its new authmw verifier needs.
-- `temporal` gains `restart: on-failure:5`: a restart can exit(1) fatally
-  ~90s later on ringpop stale-membership ("join duration exceeded max 30s"),
-  silently killing every workflow timer — observed live in the 2026-08-13
-  audit; the A14 runbook row now carries the caution.
-- The `admin-portal` realm client's dev origin moves from the `:3002`
-  placeholder to the owner-picked **`:3009`** (RFC-0023 Admin Portal; `:3002`
-  is Grafana) in both realm twins — the cluster ConfigMap and the local
-  import copy — and the edge `cors-policy` allowlists
-  `http://localhost:3009`.
-
-#### Docs
-
-- `docs/api/inventory.md` documents the as-built protected contract (first
-  HTTP business surface + first edge route); `api.md`'s protected conventions
-  flip from planned to **live**.
-
-#### Proposals
-
-- **ADR-050 — staff realm**: workforce identity separates from customer
-  identity (CIAM vs workforce, the documented Keycloak pattern). Operators
-  move to a new `duynhlab-staff` realm (registration off, brute-force on,
-  short sessions); `/protected/` surfaces will trust the staff issuer;
-  alice returns to a pure customer. RFC-0022/0023 amended (History,
-  append-only).
-
-
-- **RFC-0023 → Accepted**; ADR-047 (administrative commands through
-  role-gated `/protected/` APIs on owning services), ADR-048 (Admin Portal
-  calls owning services directly, admin BFF deferred), and ADR-049 (Admin
-  Portal as a separate React SPA on the TanStack stack) created at Accepted,
-  Adoption Not started. The RFC's Kong-era edge mechanics are restated
-  EG-native in its Implementation History; `docs/api/api.md` gains the
-  protected route conventions (**planned** until the first route ships).
-
 ### Breaking Change
-
-#### Services
-
-- **auth-service's cluster surface is deleted** (RFC-0024 P5): the app
-  manifest (`apps/services/auth.yaml`), the `auth` namespace, the `auth`
-  database triplet on platform-db (plus its pg_hba rule, five monitoring-query
-  list entries, and the OpenBAO credential seed), the `auth-jwt-signing`
-  ExternalSecret and the `jwt_signing` template block in `identity-rs.yaml`,
-  the `auth` NetworkPolicy and the platform-db policy's `auth` client selector,
-  the `api-auth-public` HTTPRoute and its BackendTrafficPolicy, and the
-  `controllers-local` health check on the namespace. `/auth/v1/*` now matches
-  nothing at either environment's edge. Executed **before** the first Kind
-  bring-up, so the cluster greenfields without the service instead of
-  decommissioning it live; the compose gate already ran auth-free.
-  [`docs/api/auth.md`](docs/api/auth.md) is archived in place (filename kept
-  for link stability), and the realm is the platform's only token issuer.
 
 #### Gateway
 
@@ -168,6 +101,48 @@ Skeleton (copy what you need):
   probes the cluster). The `kong-openbao` PolicyException narrows to
   `openbao` (EG binds non-privileged ports; no `NET_BIND_SERVICE` waiver
   needed).
+
+#### Security
+
+- **ADR-050 executed — the workforce realm `duynhlab-staff`**: operator
+  identity leaves the customer realm. Realm twins now carry two realms
+  (staff: operator `duyne`, role `backoffice_admin`, client `admin-portal`,
+  registration off, brute-force on, SSO idle 30m/max 10h); alice is a pure
+  customer again. `/protected/` rides `jwt-edge-staff` (staff issuer) at both
+  edges and inventory's in-service verifier moves to `OIDC_STAFF_*` — a
+  customer-realm token is now wrong-issuer at the edge. Audit row A17
+  rewritten for the split.
+
+#### Services
+
+- **auth-service's cluster surface is deleted** (RFC-0024 P5): the app
+  manifest (`apps/services/auth.yaml`), the `auth` namespace, the `auth`
+  database triplet on platform-db (plus its pg_hba rule, five monitoring-query
+  list entries, and the OpenBAO credential seed), the `auth-jwt-signing`
+  ExternalSecret and the `jwt_signing` template block in `identity-rs.yaml`,
+  the `auth` NetworkPolicy and the platform-db policy's `auth` client selector,
+  the `api-auth-public` HTTPRoute and its BackendTrafficPolicy, and the
+  `controllers-local` health check on the namespace. `/auth/v1/*` now matches
+  nothing at either environment's edge. Executed **before** the first Kind
+  bring-up, so the cluster greenfields without the service instead of
+  decommissioning it live; the compose gate already ran auth-free.
+  [`docs/api/auth.md`](docs/api/auth.md) is archived in place (filename kept
+  for link stability), and the realm is the platform's only token issuer.
+
+- Fleet identity cutover to the Keycloak realm (RFC-0024 P3, executing the
+  RFC-0022 design record / ADR-041/042, coordinated pkg `v0.37.0`): every
+  authmw consumer (user, cart, review, notification, payment, order,
+  checkout + both workers) now verifies `OIDC_ISSUER` /
+  `OIDC_AUDIENCE` / `OIDC_JWKS_URL` — the old `AUTH_JWKS_URL`/`JWT_ISSUER`/
+  `JWT_AUDIENCE` names are gone — and `user_id` is the token `sub` (string
+  UUID) end to end: 5 `INTEGER` columns, the notification/payment protos,
+  `pkg/idempotency`, and the Temporal workflow inputs. Requires the
+  greenfield DB reset in
+  [`docs/platform/identity-cutover-runbook.md`](docs/platform/identity-cutover-runbook.md);
+  the domain ResourceSets inject the explicit `OIDC_*` pair behind the new
+  `authmw` RSIP input. auth-service keeps running (nothing verifies its
+  tokens) until the P5 decommission.
+
 #### Local-stack
 
 - The compose edge is **Envoy Gateway in standalone mode** (RFC-0024 P3,
@@ -199,54 +174,16 @@ Skeleton (copy what you need):
   `cart.cart_items.user_id`. Request pacing is gone — the local edge allows 50
   requests per second, so a 429 during the audit is a finding, not a pacing error.
 
-#### Services
-
-- Fleet identity cutover to the Keycloak realm (RFC-0024 P3, executing the
-  RFC-0022 design record / ADR-041/042, coordinated pkg `v0.37.0`): every
-  authmw consumer (user, cart, review, notification, payment, order,
-  checkout + both workers) now verifies `OIDC_ISSUER` /
-  `OIDC_AUDIENCE` / `OIDC_JWKS_URL` — the old `AUTH_JWKS_URL`/`JWT_ISSUER`/
-  `JWT_AUDIENCE` names are gone — and `user_id` is the token `sub` (string
-  UUID) end to end: 5 `INTEGER` columns, the notification/payment protos,
-  `pkg/idempotency`, and the Temporal workflow inputs. Requires the
-  greenfield DB reset in
-  [`docs/platform/identity-cutover-runbook.md`](docs/platform/identity-cutover-runbook.md);
-  the domain ResourceSets inject the explicit `OIDC_*` pair behind the new
-  `authmw` RSIP input. auth-service keeps running (nothing verifies its
-  tokens) until the P5 decommission.
-
 ### Feature
 
-#### Local-stack
-
-- The engine-health loop arrives locally: ClickHouse's built-in Prometheus
-  endpoint opens on `:9363` (`metrics.xml` — metrics/events/async/errors; the
-  obsolete `status_info` key deliberately absent), `vmagent` scrapes it plus
-  the collector's `:8888`, and `vmalert` evaluates the ported cluster alert
-  catalog — same alert names as § 8b, local series, minus the two operator
-  rules Compose cannot have. The `clickhouse-server-engine` dashboard becomes
-  **dual-target** (cluster `chi_*` and local `ClickHouseMetrics_*` queries
-  side by side) so one JSON serves both stacks — a plain copy was rejected
-  because all of its original series were exporter-shaped and rendered an
-  empty board locally. Two audit rows land with it: **C20** (both scrape
-  targets up) and **C21** (12 rules loaded, none firing).
-  `local-stack/docs/observability.md` is rewritten as-built and committed —
-  its draft still described the pre-cutover stack (wrong edge, 11 services,
-  draft rule names, a config key the server no longer supports).
-
-- Keycloak joins compose (RFC-0024 P3): the cluster-pinned
-  `keycloak:26.5.7` image in `start-dev --import-realm` mode on Postgres
-  (`keycloak` database in `init.sql`), importing a verbatim copy of the
-  cluster realm at `local-stack/keycloak/duynhlab-realm.json`, published at
-  the browser origin `http://localhost:8081`. Split-horizon issuer wired in
-  `x-svc-env` (`iss` = `http://localhost:8081/realms/duynhlab`, JWKS fetched
-  in-network at `keycloak:8080`), the seven authmw consumers + both workers
-  gate on its bash `/dev/tcp` health probe, and the frontend build gains the
-  `KEYCLOAK_URL`/`KEYCLOAK_REALM`/`KEYCLOAK_CLIENT_ID` args (frontend#90).
-  The edge-side gap this opened — Kong could not verify realm tokens — is closed
-  by the Envoy Gateway standalone entry under Breaking Change.
-
 #### Gateway
+
+- **The platform's first `/protected/` route**: `api-inventory-protected`
+  (`/inventory/v1/protected`, RFC-0023 slice A) in both config sets —
+  inventory's first edge exposure ever. Attached to `jwt-edge` and the shared
+  BackendTrafficPolicy locally; own `jwt-edge` SecurityPolicy plus a new
+  edge-only `:8080` NetworkPolicy allow in the cluster. East-west stays
+  gRPC-only.
 
 - Envoy Gateway v1.8.3 (digest-pinned chart + CRDs chart) lands as the
   RFC-0024 P2 **additive** edge (ADR-044): namespace `envoy-gateway`, Flux
@@ -290,6 +227,51 @@ Skeleton (copy what you need):
   rewritten for the new set. Two metric names are flagged in-file for the
   Kind spike: the local-rate-limit and jwt_authn Prometheus renderings.
 
+- ClickHouse joins the platform monitoring/alert stack, closing the
+  engine-health blind spot beside the five OTel-data-plane dashboards: the
+  operator chart's ServiceMonitor is enabled (`/metrics` control plane +
+  `/chi` engine view), a 12-rule PrometheusRule lands
+  (`observability/clickhouse-alerts.yaml` — server-unreachable, the disk
+  pair, the delayed→rejected→failed insert ladder, merges, `system.errors`,
+  operator reconciles, and the consumer-side collector-exporter check), and a
+  `ClickHouse Server / Engine` Grafana dashboard (VictoriaMetrics datasource)
+  covers what the SQL boards cannot. Catalogued in alert-catalog § 8b with
+  runbook stubs in the ClickHouse hub. **Planned** until the Kind gate: the
+  first scrape verifies the chart ServiceMonitor covers both paths and tunes
+  the VERIFY-AT-KIND expressions against live series names. The per-pod
+  `clickhouse-server` endpoint stays deliberately off at 1×1 — recorded as
+  the thing to enable with the first extra replica.
+- Telemetry audit findings log added at
+  [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
+  — the `api/observability.md` contract measured against the deployed platform.
+  Six findings, four falsified suspicions (one of them my own bad test), and an
+  explicit compliant list so the next audit can diff instead of re-deriving.
+- E2E #1 evidence recorded in the telemetry audit: the local-stack release audit
+  run that gates the pkg per-module split. All Phase A/B/C rows pass on 47/47
+  healthy services, so the module split is runtime-neutral. The same run captured
+  the pre-fix F-1/F-2 baseline that E2E #2 has to move — **96.2% of all exported
+  log records are successful-probe access logs**.
+- `InventoryReserveUnknownSKU` (critical, count-once) — a reservation hit a
+  SKU inventory does not track: a data gap on the money path that checkout's
+  fail-closed layer cannot see mid-flight. `PaymentReconciliationWindowViolation`
+  (warning) — the provider ignored its window bounds; rows excluded, watermark
+  held, re-scan guaranteed. Runbooks for both; the discrepancy runbook and
+  metrics catalog follow the `kind`→`class` rename and the new `stage` label.
+
+#### Databases
+
+- **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
+  Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
+  stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;
+  the two DR drills that only make sense on durable hardware (C promotion, D
+  platform-db restore) are deferred to RFC-0011 with the reason recorded.
+- `scripts/db-isolation-sweep.sh` — the RFC-0012 P4 role×database isolation
+  matrix as the scripted psql sweep ADR-015 promised: credential-free (a
+  forbidden pair rejects at pg_hba BEFORE auth; an allowed pair probed with a
+  wrong password fails AT auth — the error message is the verdict), covering
+  product-db (6 allow / 30 reject) and platform-db (8 allow / 41 reject),
+  exit-code gated for Drill Day.
+
 #### Security
 
 - Keycloak identity foundation lands (RFC-0024 P1, executing the RFC-0022
@@ -310,15 +292,53 @@ Skeleton (copy what you need):
   + monitoring). No edge route yet — `id.duynh.me` arrives with the P2
   Envoy Gateway train.
 
-#### CI
+#### Services
 
-- `make validate` now validates community CRDs against the datree
-  CRDs-catalog schemas (ExternalSecret, CNPG `DatabaseRole`/`Database`,
-  ServiceMonitor/PrometheusRule, and the Gateway API CRs the next train
-  adds) instead of waving them through with `-ignore-missing-schemas`, and
-  explicitly validates the chain-excluded `controllers/keycloak` overlay.
+- Kind E2E (#3) evidence for the pinned fleet: 11/11 services on their pinned
+  tag, 0 probe access records, native trace id on 12/12 HTTP access records.
 
 #### Local-stack
+
+- E2E audit row **A17**: the protected Backoffice surface — edge 401,
+  audience scoping, in-service 403 for a customer token, operator reads, the
+  receipt/replay/invariant command lifecycle, and ledger actor = token sub.
+- `inventory` gains the `keycloak` dependency its new authmw verifier needs.
+- `temporal` gains `restart: on-failure:5`: a restart can exit(1) fatally
+  ~90s later on ringpop stale-membership ("join duration exceeded max 30s"),
+  silently killing every workflow timer — observed live in the 2026-08-13
+  audit; the A14 runbook row now carries the caution.
+- The `admin-portal` realm client's dev origin moves from the `:3002`
+  placeholder to the owner-picked **`:3009`** (RFC-0023 Admin Portal; `:3002`
+  is Grafana) in both realm twins — the cluster ConfigMap and the local
+  import copy — and the edge `cors-policy` allowlists
+  `http://localhost:3009`.
+
+- The engine-health loop arrives locally: ClickHouse's built-in Prometheus
+  endpoint opens on `:9363` (`metrics.xml` — metrics/events/async/errors; the
+  obsolete `status_info` key deliberately absent), `vmagent` scrapes it plus
+  the collector's `:8888`, and `vmalert` evaluates the ported cluster alert
+  catalog — same alert names as § 8b, local series, minus the two operator
+  rules Compose cannot have. The `clickhouse-server-engine` dashboard becomes
+  **dual-target** (cluster `chi_*` and local `ClickHouseMetrics_*` queries
+  side by side) so one JSON serves both stacks — a plain copy was rejected
+  because all of its original series were exporter-shaped and rendered an
+  empty board locally. Two audit rows land with it: **C20** (both scrape
+  targets up) and **C21** (12 rules loaded, none firing).
+  `local-stack/docs/observability.md` is rewritten as-built and committed —
+  its draft still described the pre-cutover stack (wrong edge, 11 services,
+  draft rule names, a config key the server no longer supports).
+
+- Keycloak joins compose (RFC-0024 P3): the cluster-pinned
+  `keycloak:26.5.7` image in `start-dev --import-realm` mode on Postgres
+  (`keycloak` database in `init.sql`), importing a verbatim copy of the
+  cluster realm at `local-stack/keycloak/duynhlab-realm.json`, published at
+  the browser origin `http://localhost:8081`. Split-horizon issuer wired in
+  `x-svc-env` (`iss` = `http://localhost:8081/realms/duynhlab`, JWKS fetched
+  in-network at `keycloak:8080`), the seven authmw consumers + both workers
+  gate on its bash `/dev/tcp` health probe, and the frontend build gains the
+  `KEYCLOAK_URL`/`KEYCLOAK_REALM`/`KEYCLOAK_CLIENT_ID` args (frontend#90).
+  The edge-side gap this opened — Kong could not verify realm tokens — is closed
+  by the Envoy Gateway standalone entry under Breaking Change.
 
 - Temporal now runs `temporalio/server` 1.31.2 on the shared PostgreSQL —
   the same server version the cluster chart deploys, through the same
@@ -343,6 +363,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- `docs/api/inventory.md` documents the as-built protected contract (first
+  HTTP business surface + first edge route); `api.md`'s protected conventions
+  flip from planned to **live**.
+
 - `docs/platform/kong-gateway.md` is **archived** (banner + a recorded "Why we
   left" problem list: frozen OSS 3.9 line, unlicensed-Enterprise read-only
   Admin API, no JWKS at the edge, the `job=kong` relabel trap, unfilterable
@@ -351,7 +375,49 @@ Skeleton (copy what you need):
   registry follow the cutover; the live-edge doc (`envoy-gateway.md`) arrives
   with P6.
 
+- `docs/platform/envoy-gateway.md` — the platform edge documented as its own
+  subject: the six-kind resource model and how policies attach (including the
+  two attachment behaviours that surprise people — route-level policy replaces
+  rather than layers without `mergeType`, and two same-kind policies on one
+  target resolve oldest-wins instead of merging), both provider modes side by
+  side, the audience-scoped routing rule and why segment-wise matching is what
+  makes it safe, and the three telemetry signals the proxy itself produces. Ends
+  with a failure-mode table of six defects that a running edge exhibits and
+  manifest validation cannot see. Three Mermaid diagrams, rendered and
+  inspected. Linked from the docs hub and AGENTS.md; the previous gateway's guide
+  stays as archived reference.
+- The Envoy Gateway resources in both environments now document themselves as
+  Envoy Gateway rather than by comparison: 27 files rewritten so each setting
+  carries its own engineering reason (filter ordering, privileged-port shifting,
+  derived span `service.name`, `response_flags` semantics, the segment-matching
+  guarantee). Comments only — no spec value changed.
+- `docs/api/temporal.md` (renamed from `temporal-order-fulfillment.md`): Part 2 is
+  now one section per workflow — `AbandonedCheckoutWorkflow` documented for the
+  first time, `CancellationWorkflow` given its first diagram, and a "which
+  workflow, when" overview. Four new Mermaid diagrams; all 18 rendered and
+  inspected.
+- `docs/api` governance: the contract/service-README/service-AGENTS ownership
+  boundary, a four-class mismatch procedure whose "implementation violates the
+  contract" class blocks the release tag, and an author checklist in
+  `_template-service.md`.
+
 #### Proposals
+
+- **ADR-050 — staff realm**: workforce identity separates from customer
+  identity (CIAM vs workforce, the documented Keycloak pattern). Operators
+  move to a new `duynhlab-staff` realm (registration off, brute-force on,
+  short sessions); `/protected/` surfaces will trust the staff issuer;
+  alice returns to a pure customer. RFC-0022/0023 amended (History,
+  append-only).
+
+
+- **RFC-0023 → Accepted**; ADR-047 (administrative commands through
+  role-gated `/protected/` APIs on owning services), ADR-048 (Admin Portal
+  calls owning services directly, admin BFF deferred), and ADR-049 (Admin
+  Portal as a separate React SPA on the TanStack stack) created at Accepted,
+  Adoption Not started. The RFC's Kong-era edge mechanics are restated
+  EG-native in its Implementation History; `docs/api/api.md` gains the
+  protected route conventions (**planned** until the first route ships).
 
 - RFC-0024 (Envoy Gateway + Keycloak, one greenfield cutover) and RFC-0022
   (Keycloak as platform IdP; design record) both flip to **Accepted**; the
@@ -443,85 +509,13 @@ Skeleton (copy what you need):
   `obsx.TraceContext`. Direction only: the F-1/F-2 fix still lands as eleven
   in-place patches, so this is not on the critical path.
 
-#### Observability
+#### CI
 
-- ClickHouse joins the platform monitoring/alert stack, closing the
-  engine-health blind spot beside the five OTel-data-plane dashboards: the
-  operator chart's ServiceMonitor is enabled (`/metrics` control plane +
-  `/chi` engine view), a 12-rule PrometheusRule lands
-  (`observability/clickhouse-alerts.yaml` — server-unreachable, the disk
-  pair, the delayed→rejected→failed insert ladder, merges, `system.errors`,
-  operator reconciles, and the consumer-side collector-exporter check), and a
-  `ClickHouse Server / Engine` Grafana dashboard (VictoriaMetrics datasource)
-  covers what the SQL boards cannot. Catalogued in alert-catalog § 8b with
-  runbook stubs in the ClickHouse hub. **Planned** until the Kind gate: the
-  first scrape verifies the chart ServiceMonitor covers both paths and tunes
-  the VERIFY-AT-KIND expressions against live series names. The per-pod
-  `clickhouse-server` endpoint stays deliberately off at 1×1 — recorded as
-  the thing to enable with the first extra replica.
-- Telemetry audit findings log added at
-  [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
-  — the `api/observability.md` contract measured against the deployed platform.
-  Six findings, four falsified suspicions (one of them my own bad test), and an
-  explicit compliant list so the next audit can diff instead of re-deriving.
-- E2E #1 evidence recorded in the telemetry audit: the local-stack release audit
-  run that gates the pkg per-module split. All Phase A/B/C rows pass on 47/47
-  healthy services, so the module split is runtime-neutral. The same run captured
-  the pre-fix F-1/F-2 baseline that E2E #2 has to move — **96.2% of all exported
-  log records are successful-probe access logs**.
-- `InventoryReserveUnknownSKU` (critical, count-once) — a reservation hit a
-  SKU inventory does not track: a data gap on the money path that checkout's
-  fail-closed layer cannot see mid-flight. `PaymentReconciliationWindowViolation`
-  (warning) — the provider ignored its window bounds; rows excluded, watermark
-  held, re-scan guaranteed. Runbooks for both; the discrepancy runbook and
-  metrics catalog follow the `kind`→`class` rename and the new `stage` label.
-
-#### Databases
-
-- **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
-  Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
-  stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;
-  the two DR drills that only make sense on durable hardware (C promotion, D
-  platform-db restore) are deferred to RFC-0011 with the reason recorded.
-- `scripts/db-isolation-sweep.sh` — the RFC-0012 P4 role×database isolation
-  matrix as the scripted psql sweep ADR-015 promised: credential-free (a
-  forbidden pair rejects at pg_hba BEFORE auth; an allowed pair probed with a
-  wrong password fails AT auth — the error message is the verdict), covering
-  product-db (6 allow / 30 reject) and platform-db (8 allow / 41 reject),
-  exit-code gated for Drill Day.
-
-#### Docs
-
-- `docs/platform/envoy-gateway.md` — the platform edge documented as its own
-  subject: the six-kind resource model and how policies attach (including the
-  two attachment behaviours that surprise people — route-level policy replaces
-  rather than layers without `mergeType`, and two same-kind policies on one
-  target resolve oldest-wins instead of merging), both provider modes side by
-  side, the audience-scoped routing rule and why segment-wise matching is what
-  makes it safe, and the three telemetry signals the proxy itself produces. Ends
-  with a failure-mode table of six defects that a running edge exhibits and
-  manifest validation cannot see. Three Mermaid diagrams, rendered and
-  inspected. Linked from the docs hub and AGENTS.md; the previous gateway's guide
-  stays as archived reference.
-- The Envoy Gateway resources in both environments now document themselves as
-  Envoy Gateway rather than by comparison: 27 files rewritten so each setting
-  carries its own engineering reason (filter ordering, privileged-port shifting,
-  derived span `service.name`, `response_flags` semantics, the segment-matching
-  guarantee). Comments only — no spec value changed.
-- `docs/api/temporal.md` (renamed from `temporal-order-fulfillment.md`): Part 2 is
-  now one section per workflow — `AbandonedCheckoutWorkflow` documented for the
-  first time, `CancellationWorkflow` given its first diagram, and a "which
-  workflow, when" overview. Four new Mermaid diagrams; all 18 rendered and
-  inspected.
-- `docs/api` governance: the contract/service-README/service-AGENTS ownership
-  boundary, a four-class mismatch procedure whose "implementation violates the
-  contract" class blocks the release tag, and an author checklist in
-  `_template-service.md`.
-
-#### Services
-
-- Kind E2E (#3) evidence for the pinned fleet: 11/11 services on their pinned
-  tag, 0 probe access records, native trace id on 12/12 HTTP access records.
+- `make validate` now validates community CRDs against the datree
+  CRDs-catalog schemas (ExternalSecret, CNPG `DatabaseRole`/`Database`,
+  ServiceMonitor/PrometheusRule, and the Gateway API CRs the next train
+  adds) instead of waving them through with `-ignore-missing-schemas`, and
+  explicitly validates the chain-excluded `controllers/keycloak` overlay.
 
 ### Bugfix
 
@@ -535,81 +529,26 @@ Skeleton (copy what you need):
   Kustomization `clickhouse-local` keeps its name, `dependsOn`, and
   healthCheck — only its `path` moves.
 
-#### Security
-
-- Four `docs/api/` service contracts documented their edge NetworkPolicy ingress
-  as arriving from a namespace that no longer exists. All eleven policies admit
-  `envoy-gateway`; the docs now match the manifests, and the comments in the
-  policies say what the namespace is for rather than what it used to be.
-
-#### Observability
-
-- `VLSingle`/`VTSingle` dropped the inert `removePvcAfterDelete: true` —
-  the field exists only on `VMSingle`; the operator's v1 specs never defined
-  it and the API server was pruning it silently, so the data PVCs were never
-  going to be garbage-collected on delete. Surfaced by the new CRDs-catalog
-  schema validation in `make validate`.
-
-#### Docs
-
-- The rest of `docs/` now describes the deployed edge — 24 files across
-  observability, secrets, caching, and platform. Three claims were wrong about
-  live behaviour, not naming: `docs/caching/README.md` documented a Valkey
-  database backing edge rate limiting (the limiter is `type: Local`, in-process
-  — the section is deleted and the hub now says so, citing ADR-045);
-  `docs/secrets/openbao.md` documented a static RS256 edge credential (the edge
-  fetches the realm JWKS itself, zero provisioned key material, and only
-  auth-service's own signing secret survives until P5); and the observability
-  family described the edge dual-shipping spans **and** runtime logs over OTLP
-  (the edge has no OTLP logs path — one JSON access log on stdout, tailed by
-  Vector). Also fixed: two references to deleted manifest paths (the edge
-  scrape objects and the monitoring route), `docs/platform/setup.md`'s Flux
-  graph and its login examples (which still curled a password-grant endpoint
-  that no longer exists — now the PKCE helper), and `cert-manager.md`'s
-  fabricated `renewBefore: 720h` (the manifest says `360h`). Cluster behaviour
-  not yet run on Kind is marked **planned**; the two dated audit records keep
-  their history. All 70 Mermaid blocks in the touched files re-rendered.
-- Ten headings carried `{#custom-id}` attributes, which GitHub does not
-  support — it folds the braces into the anchor, so every link targeting such
-  an id is dead on GitHub and fails the `markdown-links` check the moment a PR
-  touches the file (this felled two PRs this week). All dropped; the two whose
-  custom id differed from the natural slug had their one inbound link
-  re-pointed and one heading simplified so its slug is deterministic. One
-  orphaned TOC row linking a section that no longer exists is removed.
-- `docs/api/` names the deployed edge and speaks Gateway API: HTTPRoute matches
-  rather than ingress annotations, an edge `SecurityPolicy` rather than a
-  per-route plugin, a `URLRewrite` filter rather than a path-stripping flag —
-  17 files. Three claims were wrong about behaviour rather than naming: `cart.md`
-  and `product.md` still reported their audience scoping as Partial when both
-  prefixes stop after the audience segment; `microservices.md` and `caching.md`
-  attributed rate limiting to a shared Valkey database, when the edge limiter is
-  `type: Local`, an in-process token bucket with no datastore to document; and
-  `temporal.md` pointed at a config path that no longer carries the UI route.
-  Cluster statements not yet run on Kind are marked **planned**; `auth.md` is
-  untouched because it documents the service retiring in P5.
-- The E2E runbook blocks on the data plane instead of assuming it. `/readyz`
-  reports the control plane ready as soon as it parses config, which on a cold
-  boot is minutes before Envoy finishes downloading — every edge row returns
-  code `000` in that window and reads like a broken edge rather than a slow one.
-- `docs/api/` and `local-stack/` corrected against deployed reality. The
-  release-gate fixes matter most: the abandonment-timer row told operators to
-  arm it before Phase A, where `$TCLI` and `audit_curl` were still undefined, so
-  it could not run where it said to; the README demanded that *every* row pass
-  while the audit marks the versioning drill conditional with `N/A`; and C2's
-  "three ends of the saga agree" compared per-process counters that A14 and A15
-  themselves reset. Also corrected: four wrong statements about system
-  boundaries — the `/internal/` audience is sealed by the route path, not
-  NetworkPolicy; product is no longer a saga participant; the legacy
-  `POST /order/v1/private/orders` create and the legacy order→cart pricing hop
-  do not exist; and the product CORS "known defect" was never in the code.
-  Smaller factual repairs across twelve `docs/api/` files: HTTP log levels are
-  500→error / 400–499→warn on `pkg/grpcx v0.36.1`, probe filtering is
-  as-built, the business catalog holds 63 instruments, checkout's
-  `availability.check` was missing from the only table that documents it,
-  inventory's fence admits three namespaces, `product-db` holds six databases,
-  and auth's pooler is PgBouncer. `local-stack/README.md`'s topology diagram now
-  matches `kong.yml` and `vector.yaml` — Kong fronts ten services, Vector tails
-  only what it does not exclude, and VictoriaLogs has no Grafana datasource.
+- **The RustFS bucket gate reported success without creating anything.** On a
+  fresh `make up` (2026-08-07) Tempo crash-looped on
+  `The specified bucket does not exist` even though
+  `Job/rustfs-setup-buckets-init` was `Complete` and had logged all three
+  buckets created. The wait loop tested `mc alias set` — which can succeed
+  against an endpoint whose disk is not open yet — and, worse, **fell through
+  after ten failed attempts and created buckets anyway with no non-zero exit**.
+  RustFS opened `/data` 70s later and found it empty. Flux's `wait: true` read
+  the Complete Job as a satisfied dependency and released `tracing-local` and
+  `profiling-local` onto buckets that were never written; `pg-backups-cnpg` was
+  missing too, so Barman archiving would have failed next. The gate now waits on
+  `mc ls` (serving, not merely reachable) for up to 5 minutes, stats every
+  bucket after creating it, and **exits non-zero** on either failure so the
+  retry actually happens. Same fix in the `*/30` CronJob, which carried an
+  identical copy.
+- Stale in-manifest references corrected: the checkout-worker note named the
+  retired `order-worker-1-13-1.yaml`, and the `auth`/`user` NetworkPolicy
+  headers still credited the removed `pgdog-platform` pooler.
+- `mockpay.yaml` records that its pin tracks payment by hand only — currently two
+  patches behind, no functional skew, but the F1 finding was exactly a skew here.
 
 #### Gateway
 
@@ -647,6 +586,12 @@ Skeleton (copy what you need):
   audience leaks.
 
 #### Observability
+
+- `VLSingle`/`VTSingle` dropped the inert `removePvcAfterDelete: true` —
+  the field exists only on `VMSingle`; the operator's v1 specs never defined
+  it and the API server was pruning it silently, so the data PVCs were never
+  going to be garbage-collected on delete. Surfaced by the new CRDs-catalog
+  schema validation in `make validate`.
 
 - **F-1 corrected a second time, and the severity goes back up.** The first
   restatement said nine of eleven services already carried trace context on the
@@ -765,6 +710,95 @@ Skeleton (copy what you need):
   matrix row and reported a false FAIL on its first live run; only `PAIR`-tagged
   lines are verdicts now (85/85 pairs pass, exit 0).
 
+#### Security
+
+- Four `docs/api/` service contracts documented their edge NetworkPolicy ingress
+  as arriving from a namespace that no longer exists. All eleven policies admit
+  `envoy-gateway`; the docs now match the manifests, and the comments in the
+  policies say what the namespace is for rather than what it used to be.
+
+#### Services
+
+- `mockpay` realigned with `payment` 1.5.3, per the rule the manifest already
+  states; verified `internal/mockpay/` changed by zero lines across the range.
+
+#### Docs
+
+- The rest of `docs/` now describes the deployed edge — 24 files across
+  observability, secrets, caching, and platform. Three claims were wrong about
+  live behaviour, not naming: `docs/caching/README.md` documented a Valkey
+  database backing edge rate limiting (the limiter is `type: Local`, in-process
+  — the section is deleted and the hub now says so, citing ADR-045);
+  `docs/secrets/openbao.md` documented a static RS256 edge credential (the edge
+  fetches the realm JWKS itself, zero provisioned key material, and only
+  auth-service's own signing secret survives until P5); and the observability
+  family described the edge dual-shipping spans **and** runtime logs over OTLP
+  (the edge has no OTLP logs path — one JSON access log on stdout, tailed by
+  Vector). Also fixed: two references to deleted manifest paths (the edge
+  scrape objects and the monitoring route), `docs/platform/setup.md`'s Flux
+  graph and its login examples (which still curled a password-grant endpoint
+  that no longer exists — now the PKCE helper), and `cert-manager.md`'s
+  fabricated `renewBefore: 720h` (the manifest says `360h`). Cluster behaviour
+  not yet run on Kind is marked **planned**; the two dated audit records keep
+  their history. All 70 Mermaid blocks in the touched files re-rendered.
+- Ten headings carried `{#custom-id}` attributes, which GitHub does not
+  support — it folds the braces into the anchor, so every link targeting such
+  an id is dead on GitHub and fails the `markdown-links` check the moment a PR
+  touches the file (this felled two PRs this week). All dropped; the two whose
+  custom id differed from the natural slug had their one inbound link
+  re-pointed and one heading simplified so its slug is deterministic. One
+  orphaned TOC row linking a section that no longer exists is removed.
+- `docs/api/` names the deployed edge and speaks Gateway API: HTTPRoute matches
+  rather than ingress annotations, an edge `SecurityPolicy` rather than a
+  per-route plugin, a `URLRewrite` filter rather than a path-stripping flag —
+  17 files. Three claims were wrong about behaviour rather than naming: `cart.md`
+  and `product.md` still reported their audience scoping as Partial when both
+  prefixes stop after the audience segment; `microservices.md` and `caching.md`
+  attributed rate limiting to a shared Valkey database, when the edge limiter is
+  `type: Local`, an in-process token bucket with no datastore to document; and
+  `temporal.md` pointed at a config path that no longer carries the UI route.
+  Cluster statements not yet run on Kind are marked **planned**; `auth.md` is
+  untouched because it documents the service retiring in P5.
+- The E2E runbook blocks on the data plane instead of assuming it. `/readyz`
+  reports the control plane ready as soon as it parses config, which on a cold
+  boot is minutes before Envoy finishes downloading — every edge row returns
+  code `000` in that window and reads like a broken edge rather than a slow one.
+- `docs/api/` and `local-stack/` corrected against deployed reality. The
+  release-gate fixes matter most: the abandonment-timer row told operators to
+  arm it before Phase A, where `$TCLI` and `audit_curl` were still undefined, so
+  it could not run where it said to; the README demanded that *every* row pass
+  while the audit marks the versioning drill conditional with `N/A`; and C2's
+  "three ends of the saga agree" compared per-process counters that A14 and A15
+  themselves reset. Also corrected: four wrong statements about system
+  boundaries — the `/internal/` audience is sealed by the route path, not
+  NetworkPolicy; product is no longer a saga participant; the legacy
+  `POST /order/v1/private/orders` create and the legacy order→cart pricing hop
+  do not exist; and the product CORS "known defect" was never in the code.
+  Smaller factual repairs across twelve `docs/api/` files: HTTP log levels are
+  500→error / 400–499→warn on `pkg/grpcx v0.36.1`, probe filtering is
+  as-built, the business catalog holds 63 instruments, checkout's
+  `availability.check` was missing from the only table that documents it,
+  inventory's fence admits three namespaces, `product-db` holds six databases,
+  and auth's pooler is PgBouncer. `local-stack/README.md`'s topology diagram now
+  matches `kong.yml` and `vector.yaml` — Kong fronts ten services, Vector tails
+  only what it does not exclude, and VictoriaLogs has no Grafana datasource.
+
+- Temporal docs drift: the worker build id disagreed three ways (`1-13-0` /
+  `1.13.1` / the manifest's `1.13.2`), `workflows.md` linked a manifest that does
+  not exist and offered a removed RPC as a current activity example, and the
+  Grafana Temporal dashboard was marked Planned although it ships.
+- `docs/api/pkg.md` rewritten for the per-module `pkg`: 13 independently tagged
+  modules, the import layering, per-module bump/release mechanics, and a release
+  ledger split into the per-module and single-module lines.
+- The same single-module claim corrected in `api.md`, `observability.md`,
+  `opentelemetry/{README,fundamentals}.md` and the `AGENTS.md` E2E gate; `pkg`
+  added to both ownership tables and the docs/api map.
+- `docs/api/` synced to what the RFC-0021 follow-up releases actually do:
+  inventory's reservation path surfaces `SKU_NOT_FOUND` (0.4.1) rather than a
+  generic `NOT_FOUND`, order's bounded failure reasons include `UNKNOWN_SKU`
+  (1.13.2), and payment verifies the provider's transaction window instead of
+  trusting it (1.5.2).
+
 #### Proposals
 
 - **ADR-026 shipped without its paper trail.** The CNPG PgBouncer `Pooler`
@@ -807,52 +841,6 @@ Skeleton (copy what you need):
   two orders); the reconciler verifies its window. Gameday follow-ups (b) and (c)
   closed too — the one-minute doubt sweep is tested, and the provider-unknown
   counter's park/resolve ambiguity is fixed.
-
-#### Docs
-
-- Temporal docs drift: the worker build id disagreed three ways (`1-13-0` /
-  `1.13.1` / the manifest's `1.13.2`), `workflows.md` linked a manifest that does
-  not exist and offered a removed RPC as a current activity example, and the
-  Grafana Temporal dashboard was marked Planned although it ships.
-- `docs/api/pkg.md` rewritten for the per-module `pkg`: 13 independently tagged
-  modules, the import layering, per-module bump/release mechanics, and a release
-  ledger split into the per-module and single-module lines.
-- The same single-module claim corrected in `api.md`, `observability.md`,
-  `opentelemetry/{README,fundamentals}.md` and the `AGENTS.md` E2E gate; `pkg`
-  added to both ownership tables and the docs/api map.
-- `docs/api/` synced to what the RFC-0021 follow-up releases actually do:
-  inventory's reservation path surfaces `SKU_NOT_FOUND` (0.4.1) rather than a
-  generic `NOT_FOUND`, order's bounded failure reasons include `UNKNOWN_SKU`
-  (1.13.2), and payment verifies the provider's transaction window instead of
-  trusting it (1.5.2).
-
-#### GitOps
-
-- **The RustFS bucket gate reported success without creating anything.** On a
-  fresh `make up` (2026-08-07) Tempo crash-looped on
-  `The specified bucket does not exist` even though
-  `Job/rustfs-setup-buckets-init` was `Complete` and had logged all three
-  buckets created. The wait loop tested `mc alias set` — which can succeed
-  against an endpoint whose disk is not open yet — and, worse, **fell through
-  after ten failed attempts and created buckets anyway with no non-zero exit**.
-  RustFS opened `/data` 70s later and found it empty. Flux's `wait: true` read
-  the Complete Job as a satisfied dependency and released `tracing-local` and
-  `profiling-local` onto buckets that were never written; `pg-backups-cnpg` was
-  missing too, so Barman archiving would have failed next. The gate now waits on
-  `mc ls` (serving, not merely reachable) for up to 5 minutes, stats every
-  bucket after creating it, and **exits non-zero** on either failure so the
-  retry actually happens. Same fix in the `*/30` CronJob, which carried an
-  identical copy.
-- Stale in-manifest references corrected: the checkout-worker note named the
-  retired `order-worker-1-13-1.yaml`, and the `auth`/`user` NetworkPolicy
-  headers still credited the removed `pgdog-platform` pooler.
-- `mockpay.yaml` records that its pin tracks payment by hand only — currently two
-  patches behind, no functional skew, but the F1 finding was exactly a skew here.
-
-#### Services
-
-- `mockpay` realigned with `payment` 1.5.3, per the rule the manifest already
-  states; verified `internal/mockpay/` changed by zero lines across the range.
 
 ### Dependency
 

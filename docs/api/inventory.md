@@ -137,9 +137,10 @@ the platform's first `protected` group (RFC-0023 slice A,
 [ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/)) — the
 Backoffice's stock views and the first callers of the idempotent stock
 commands. Guard chain per [api.md § Protected route conventions](./api.md#protected-route-conventions):
-edge `jwt-edge` (coarse) → in-service `pkg/authmw` (authoritative) →
+edge `jwt-edge-staff` (coarse, **staff realm** `duynhlab-staff` — ADR-050) →
+in-service `pkg/authmw` staff verifier (`OIDC_STAFF_ISSUER`, authoritative) →
 `MiddlewareRequireRole("backoffice_admin")`; `actor` is always the verified
-token `sub`.
+token `sub`. Customer-realm tokens are wrong-issuer at the edge.
 
 | Method | Path | Purpose | Errors worth knowing |
 |--------|------|---------|----------------------|
@@ -360,4 +361,4 @@ Transport peers call `logic/v1`; logic calls `core` only
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
 
-_Last updated: 2026-08-13 — RFC-0023 slice A: the protected Backoffice group is inventory's first HTTP business surface and first edge route (`api-inventory-protected`); the stock commands gain their first callers._
+_Last updated: 2026-08-14 — ADR-050: the protected group verifies the workforce realm (`OIDC_STAFF_*`); the customer realm can no longer reach it._

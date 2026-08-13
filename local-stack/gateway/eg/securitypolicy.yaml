@@ -70,9 +70,6 @@ spec:
       name: api-user-private
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: api-inventory-protected
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
       name: api-cart
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
@@ -95,6 +92,32 @@ spec:
         issuer: http://localhost:8081/realms/duynhlab
         remoteJWKS:
           uri: http://keycloak:8080/realms/duynhlab/protocol/openid-connect/certs
+---
+# jwt-edge-staff — the WORKFORCE issuer (ADR-050). Protected routes verify
+# tokens from the duynhlab-staff realm; a customer-realm token dies here as
+# wrong-issuer before any service-side role logic runs. Same split-horizon
+# rule as the customer provider: the issuer string is the browser-facing
+# localhost:8081 origin, the JWKS FETCH runs in-network against keycloak:8080.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge-staff
+spec:
+  # StrategicMerge keeps the gateway-level cors-policy applied to this route —
+  # without it a route-level SecurityPolicy overrides the gateway policy
+  # entirely and the Admin Portal's cross-origin calls die at preflight.
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-inventory-protected
+  jwt:
+    providers:
+      - name: keycloak-staff
+        issuer: http://localhost:8081/realms/duynhlab-staff
+        remoteJWKS:
+          uri: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
+
 ---
 # ---- CORS -------------------------------------------------------------------
 # Needed, not optional: the SPA is served from http://localhost:3001 and calls

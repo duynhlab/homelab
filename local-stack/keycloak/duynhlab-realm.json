@@ -15,10 +15,6 @@
       {
         "name": "customer",
         "description": "May access private customer APIs; owner-scoped by sub"
-      },
-      {
-        "name": "backoffice_admin",
-        "description": "May access protected business APIs (RFC-0023)"
       }
     ]
   },
@@ -66,50 +62,6 @@
           }
         }
       ]
-    },
-    {
-      "clientId": "admin-portal",
-      "name": "Backoffice Admin Portal (RFC-0023)",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
-      "attributes": {
-        "pkce.code.challenge.method": "S256",
-        "client.session.idle.timeout": "1800",
-        "client.session.max.lifespan": "36000"
-      },
-      "redirectUris": [
-        "http://localhost:3009/*"
-      ],
-      "webOrigins": [
-        "http://localhost:3009"
-      ],
-      "defaultClientScopes": [
-        "web-origins",
-        "acr",
-        "profile",
-        "roles",
-        "basic",
-        "email"
-      ],
-      "protocolMappers": [
-        {
-          "name": "platform-audience",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "consentRequired": false,
-          "config": {
-            "included.custom.audience": "duynhlab-platform",
-            "access.token.claim": "true",
-            "id.token.claim": "false",
-            "introspection.token.claim": "true"
-          }
-        }
-      ]
     }
   ],
   "users": [
@@ -127,8 +79,7 @@
         }
       ],
       "realmRoles": [
-        "customer",
-        "backoffice_admin"
+        "customer"
       ],
       "firstName": "Alice",
       "lastName": "Johnson",

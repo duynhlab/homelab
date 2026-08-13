@@ -1,0 +1,24 @@
+# ClickHouse — server/engine health (VictoriaMetrics datasource, NOT the SQL
+# datasource): up/uptime, insert pressure, parts/merges, disk, memory,
+# system.errors, and the operator control plane. Complements the five
+# OTel-data-plane boards, which query the DATA over the clickhouse SQL
+# datasource; this one watches the ENGINE that stores it. Series come from
+# the Altinity metrics-exporter (/chi) and the operator (/metrics), scraped
+# via the chart's ServiceMonitor (see controllers/clickhouse-operator).
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: clickhouse-server-engine
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-clickhouse-server-engine
+    key: clickhouse-server-engine.json
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: VictoriaMetrics

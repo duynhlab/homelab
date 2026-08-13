@@ -40,6 +40,17 @@ spec:
     remediation:
       retries: 5
   values:
+    # Scrape the operator's metrics Service (:8888) with the chart's own
+    # ServiceMonitor template — /metrics is the operator control plane,
+    # /chi the metrics-exporter's engine view of the CHI.
+    # VERIFY-AT-KIND: whether the chart's ServiceMonitor covers BOTH paths;
+    # if it only scrapes /metrics, add a hand-rolled ServiceMonitor at
+    # configs/observability/metrics/servicemonitors/clickhouse-operator.yaml
+    # with two endpoints[] (shape: servicemonitors/otel-collector.yaml).
+    serviceMonitor:
+      enabled: true
+      keeperMetrics:
+        enabled: false # no ClickHouseKeeper deployed
     operator:
       resources:
         requests:

@@ -358,6 +358,36 @@ saturation). Pyroscope profiling-backend health is covered by `PyroscopeDown`.
 
 ---
 
+## 8b. ClickHouse (OTel OLAP engine)
+
+Source: `prometheusrules/observability/clickhouse-alerts.yaml`. Series come from
+the Altinity operator's metrics Service (`/metrics` = operator control plane,
+`/chi` = metrics-exporter engine view), scraped by the chart's ServiceMonitor
+(`controllers/clickhouse-operator`). **Planned** — merged but not yet run on
+Kind; the expressions marked VERIFY-AT-KIND in the rule file get tuned against
+the first live scrape.
+
+| Alert | Sev | Metric & trigger | Impact | for |
+|-------|-----|------------------|--------|-----|
+| ClickHouseServerUnreachable | critical | exporter fetch errors >0 | OTel logs/traces store down; collector `create_schema` blocks every collector restart | 5m |
+| ClickHouseOperatorDown | warning | `up{clickhouse-operator}==0` | CHI reconciles frozen (server keeps serving) | 10m |
+| ClickHouseDiskAlmostFull | warning | free/total <15% | MergeTree refuses writes near full; TTL cleanup can't outrun sustained ingest | 15m |
+| ClickHouseDiskCritical | critical | free/total <5% | Write failures imminent | 5m |
+| ClickHouseTooManyParts | warning | active parts >300 | Merge backlog → delayed → rejected inserts | 10m |
+| ClickHouseInsertsRejected | warning | rejected-inserts rate >0 | Collector retries then drops | 5m |
+| ClickHouseInsertsFailing | warning | failed-insert rate >0 | Telemetry rows lost at the door | 5m |
+| ClickHouseMergesFailing | warning | failed-merges rate >0 | Parts accumulate toward insert throttling | 10m |
+| ClickHouseInsertsDelayed | info | delayed-inserts rate >0 | The step before rejection | 10m |
+| ClickHouseServerErrorsElevated | info | `system.errors` sum-rate >5/s | Broad server error census | 10m |
+| ClickHouseOperatorReconcileErrors | warning | host-reconcile errors >0 | CHI stuck between spec and reality | 15m |
+| ClickHouseExporterUnhealthy | warning | collector `send_failed_*{exporter="clickhouse"}` >0 | OTel→CH backpressure/loss (VictoriaLogs/Traces keep their copies) | 10m |
+
+The consumer-side `ClickHouseExporterUnhealthy` complements `OtelCollectorDown`:
+the collector can be perfectly up while its ClickHouse exporter backpressures. A
+ZooKeeper-exceptions rule sits commented in the file until replication exists.
+
+---
+
 ## 9. RFC-0021 order-side stock
 
 Source: `prometheusrules/microservices/rfc0021-write-migration.yaml`,

@@ -21,6 +21,7 @@ resources:
   - grafana-dashboard-envoy-gateway.yaml
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
+  - grafana-dashboard-clickhouse-server-engine.yaml
   # ClickHouse per-service deep dive — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse-deepdive.yaml
   # ClickHouse standard suite: Overview → Logs Explorer → Trace Explorer
@@ -40,6 +41,9 @@ resources:
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
 configMapGenerator:
+  - name: grafana-dashboard-clickhouse-server-engine
+    files:
+      - clickhouse-server-engine.json
   - name: grafana-dashboard-clickhouse-otel-sql
     files:
       - clickhouse-otel-sql.json

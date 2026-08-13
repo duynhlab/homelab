@@ -1,0 +1,189 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-clickhouse-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    # Engine health of the OTel OLAP store. Two producers feed these series,
+    # both on the clickhouse-operator-metrics Service (:8888), scraped via the
+    # chart's ServiceMonitor (serviceMonitor.enabled in the operator
+    # HelmRelease):
+    #   /metrics -> clickhouse_operator_*  (operator control plane)
+    #   /chi     -> chi_clickhouse_*       (metrics-exporter: system.metrics,
+    #               system.events, asynchronous_metrics, disks, parts, errors)
+    #
+    # PLANNED until the first Kind bring-up: these expressions are authored
+    # against the Altinity exporter's documented series names and MUST be
+    # tuned against a live scrape on the Kind gate — exact casing
+    # (PartsActive vs parts_active), event-counter names
+    # (FailedInsertQuery), and the job label the VM operator derives. Every
+    # expr carrying that risk says so in a comment.
+    #
+    # There is deliberately NO ServiceMonitor on the clickhouse-server pod
+    # itself (settings.prometheus/* stays unset): with one shard × one
+    # replica the exporter's /chi already carries the engine signals, and
+    # per-pod scrape is the thing to add the moment replicas appear —
+    # recorded in docs/observability/clickhouse/README.md § Metrics &
+    # alerting.
+    - name: observability-clickhouse
+      interval: 30s
+      rules:
+        # The exporter fetches system.* tables from the server on every
+        # scrape; fetch errors are the earliest "server unreachable" signal
+        # we have without a per-pod scrape. `up` on the operator job covers
+        # the exporter itself being gone.
+        # VERIFY-AT-KIND: fetch-error series name.
+        - alert: ClickHouseServerUnreachable
+          expr: chi_clickhouse_metric_fetch_errors > 0
+          for: 5m
+          labels:
+            severity: critical
+            category: observability
+          annotations:
+            summary: "ClickHouse server unreachable ({{ $labels.hostname }})"
+            description: "The metrics-exporter has failed to fetch system tables from {{ $labels.hostname }} for 5 minutes — the OTel logs/traces store is effectively down, and the OTel Collector's create_schema step will block every collector restart until it returns."
+
+        - alert: ClickHouseOperatorDown
+          expr: up{job=~".*clickhouse-operator.*"} == 0
+          for: 10m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse operator is down"
+            description: "The Altinity operator target (job {{ $labels.job }}) has been down for 10 minutes — CHI reconciles are frozen. The running server keeps serving; config changes and self-healing stop."
+
+        # MergeTree refuses inserts as the disk approaches full; 15% is the
+        # act-now line for a 10Gi PVC, 5% is minutes from write failures.
+        - alert: ClickHouseDiskAlmostFull
+          expr: |
+            chi_clickhouse_metric_DiskFreeBytes
+              / (chi_clickhouse_metric_DiskDataBytes + chi_clickhouse_metric_DiskFreeBytes) < 0.15
+          for: 15m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse disk under 15% free ({{ $labels.hostname }})"
+            description: "The OTel store's volume is filling. MergeTree starts refusing writes near full, and 30-day TTL cleanup cannot outrun a sustained ingest spike on its own."
+
+        - alert: ClickHouseDiskCritical
+          expr: |
+            chi_clickhouse_metric_DiskFreeBytes
+              / (chi_clickhouse_metric_DiskDataBytes + chi_clickhouse_metric_DiskFreeBytes) < 0.05
+          for: 5m
+          labels:
+            severity: critical
+            category: observability
+          annotations:
+            summary: "ClickHouse disk under 5% free ({{ $labels.hostname }})"
+            description: "Write failures are imminent on the OTel logs/traces store. Expand the PVC or drop partitions now."
+
+        # Early merge-starvation signal, well before parts_to_throw_insert
+        # (default 300 active parts per partition throws; we alert at the
+        # table-wide count trend instead).
+        # VERIFY-AT-KIND: PartsActive casing.
+        - alert: ClickHouseTooManyParts
+          expr: chi_clickhouse_metric_PartsActive > 300
+          for: 10m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse active parts high ({{ $labels.hostname }})"
+            description: "Active part count is sustained above 300 — merges are not keeping up with inserts. Left alone this ends in delayed, then rejected inserts."
+
+        # VERIFY-AT-KIND: event-counter names below (RejectedInserts,
+        # FailedInsertQuery, FailedMerges, DelayedInserts).
+        - alert: ClickHouseInsertsRejected
+          expr: rate(chi_clickhouse_event_RejectedInserts[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse rejecting inserts ({{ $labels.hostname }})"
+            description: "Inserts are being rejected (too-many-parts guard). The OTel Collector will retry, then drop — check merges and disk."
+
+        - alert: ClickHouseInsertsFailing
+          expr: rate(chi_clickhouse_event_FailedInsertQuery[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse insert queries failing ({{ $labels.hostname }})"
+            description: "Insert queries are erroring on the OTel store — telemetry rows are being lost at the door."
+
+        - alert: ClickHouseMergesFailing
+          expr: rate(chi_clickhouse_event_FailedMerges[5m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse merges failing ({{ $labels.hostname }})"
+            description: "Background merges are failing; parts will accumulate until inserts are delayed and then rejected."
+
+        - alert: ClickHouseInsertsDelayed
+          expr: rate(chi_clickhouse_event_DelayedInserts[5m]) > 0
+          for: 10m
+          labels:
+            severity: info
+            category: observability
+          annotations:
+            summary: "ClickHouse throttling inserts ({{ $labels.hostname }})"
+            description: "Inserts are being slowed by the parts_to_delay_insert guard — the step before outright rejection. Watch the parts and merges panels."
+
+        # system.errors is broad by design: a sustained error rate across the
+        # server is worth a look even when no specific alert fired.
+        - alert: ClickHouseServerErrorsElevated
+          expr: sum(rate(chi_clickhouse_system_errors_value[5m])) > 5
+          for: 10m
+          labels:
+            severity: info
+            category: observability
+          annotations:
+            summary: "ClickHouse system.errors rate elevated"
+            description: "The server is accumulating errors across system.errors faster than 5/s for 10 minutes. Check the top-N errors table on the server-engine dashboard."
+
+        - alert: ClickHouseOperatorReconcileErrors
+          expr: rate(clickhouse_operator_host_reconciles_errors[15m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse operator reconcile errors"
+            description: "Host reconciles are erroring — the CHI may be stuck between spec and reality. Check operator logs and recent CHI changes."
+
+        # The consumer-side view: the OTel Collector's clickhouse exporter.
+        # Complements OtelCollectorDown (tempo-alerts.yaml) — the collector
+        # can be perfectly up while its ClickHouse exporter backpressures.
+        - alert: ClickHouseExporterUnhealthy
+          expr: |
+            sum(rate(otelcol_exporter_send_failed_log_records{exporter="clickhouse"}[5m])) > 0
+              or sum(rate(otelcol_exporter_send_failed_spans{exporter="clickhouse"}[5m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "OTel → ClickHouse export failing"
+            description: "The Collector's clickhouse exporter has been failing sends for 10 minutes — OTel logs/traces are not landing in the OLAP store (VictoriaLogs/VictoriaTraces keep their own copies)."
+
+        # Latent: only meaningful if ClickHouseKeeper/ZooKeeper is ever
+        # adopted (replication). Uncomment with the first replicated table.
+        # - alert: ClickHouseZooKeeperExceptions
+        #   expr: rate(chi_clickhouse_event_ZooKeeperHardwareExceptions[5m]) > 0
+        #   for: 5m
+        #   labels:
+        #     severity: warning
+        #     category: observability
+        #   annotations:
+        #     summary: "ClickHouse ZooKeeper exceptions"
+        #     description: "Keeper/ZooKeeper hardware exceptions on the replication path."

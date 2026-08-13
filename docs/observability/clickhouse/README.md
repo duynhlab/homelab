@@ -36,12 +36,13 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 7. [How it works in this platform](#how-it-works-in-this-platform)
 8. [Operations](#operations)
 9. [Grafana](#grafana) — datasource, Explore, dashboard grammar, the standard suite
-10. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
-11. [Glossary](#glossary)
-12. [ClickHouse vs PostgreSQL](#clickhouse-vs-postgresql)
-13. [Commerce analytics (Phase A — not deployed)](#commerce-analytics-phase-a--not-deployed)
-14. [FAQ](#faq)
-15. [References](#references)
+10. [Metrics & alerting](#metrics--alerting) — engine-health scrape, alert catalog, runbook stubs
+11. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
+12. [Glossary](#glossary)
+13. [ClickHouse vs PostgreSQL](#clickhouse-vs-postgresql)
+14. [Commerce analytics (Phase A — not deployed)](#commerce-analytics-phase-a--not-deployed)
+15. [FAQ](#faq)
+16. [References](#references)
 
 ---
 
@@ -481,6 +482,78 @@ Grafana folder on both environments (local: file provider
 Integration checks: plugin version via `GET /api/plugins/grafana-clickhouse-datasource`
 (→ `4.20.0`); datasource health via *Save & test* or `SELECT 1` in Explore; data
 not appearing → [Runbook](#runbook--data-not-appearing).
+
+---
+
+## Metrics & alerting
+
+> **Planned** — the manifests below are merged; the first scrape, the alert
+> load into VMAlert, and the expression tuning all happen at the Kind gate.
+> local-stack does not run the operator, so nothing here is exercisable on
+> compose.
+
+The five dashboards above watch the **data** (OTel rows over the SQL
+datasource). This chapter is the **engine**: is the server up, is the disk
+filling, are merges keeping pace with inserts. Before this landed the engine
+view was blind — no scrape, no alert — and a dead ClickHouse surfaces in the
+worst possible way: the OTel Collector's `create_schema` startup step blocks
+every collector restart until the store returns.
+
+### Metric sources
+
+| Endpoint | Producer | Families | Use |
+|---|---|---|---|
+| operator Service `:8888/metrics` | Altinity operator | `clickhouse_operator_chi_reconciles_*`, `clickhouse_operator_host_reconciles_*`, pod events | Control-plane health |
+| operator Service `:8888/chi` | metrics-exporter sidecar | `chi_clickhouse_metric_*` (system.metrics), `chi_clickhouse_event_*` (system.events), `chi_clickhouse_async_metric_*`, disks, parts, `chi_clickhouse_system_errors_*` | Engine health per CHI |
+| CHI pod `:8001/metrics` (opt-in `settings.prometheus/*`) | `clickhouse-server` itself | `ClickHouseProfileEvents_*`, `ClickHouseMetrics_*` | Per-pod granularity |
+
+Both operator endpoints are scraped by the **chart's ServiceMonitor**
+(`serviceMonitor.enabled` in `controllers/clickhouse-operator/helmrelease.yaml`).
+
+**The third source is deliberately not enabled.** With one shard × one replica
+the exporter's `/chi` already carries every engine signal the alerts need, and
+a per-pod scrape would duplicate it. The moment a second replica appears this
+decision flips: per-pod series are what decouple "an engine is sick" from "the
+shared exporter is sick", so enabling `settings.prometheus/*` plus a
+ServiceMonitor on the CHI headless Service is part of any scale-out change.
+
+### Alerts
+
+Twelve rules in
+`configs/observability/metrics/prometheusrules/observability/clickhouse-alerts.yaml`,
+catalogued in [alert-catalog § 8b](../alerting/alert-catalog.md#8b-clickhouse-otel-olap-engine).
+The spine: **ServerUnreachable** (exporter fetch errors — the collector's
+`create_schema` blocker), the **disk pair** (<15% warn, <5% critical), the
+**insert-pressure ladder** (delayed → rejected → failed, the too-many-parts
+guard escalating), and the consumer-side **ExporterUnhealthy** (the collector's
+`send_failed_*{exporter="clickhouse"}` — the collector can be up while its
+ClickHouse exporter backpressures).
+
+### Dashboard
+
+`ClickHouse Server / Engine` (folder ClickHouse, VictoriaMetrics datasource —
+not the SQL one): up/uptime, query and insert rates, the insert-pressure
+ladder, parts and merges, disk and memory, a `system.errors` top-N table, and
+the operator's reconcile counters.
+
+### Runbook stubs
+
+- **ClickHouseServerUnreachable** — `kubectl -n monitoring get po -l
+  clickhouse.altinity.com/chi=clickhouse`, then pod logs. If the pod is up but
+  fetch fails, check the `clickhouse-credentials` Secret sync (ESO). Remember
+  the blast radius: collector restarts block on `create_schema` until the
+  store returns — do not bounce collectors while this fires.
+- **ClickHouseDiskCritical** — `SELECT sum(bytes_on_disk) FROM system.parts
+  GROUP BY table` to find the eater; drop the oldest partitions
+  (`ALTER TABLE … DROP PARTITION …`) or grow the PVC. The 30-day TTL cannot
+  rescue a same-day spike.
+- **ClickHouseTooManyParts** — inserts too small or merges starved. Check the
+  collector's batch processor settings first (bigger, fewer inserts), then
+  merge failures on the dashboard.
+- **ClickHouseExporterUnhealthy** — engine-side cause fires alongside it if
+  CH is the problem; alone, it points at the collector's exporter config or
+  the network path. VictoriaLogs/VictoriaTraces hold their own copies, so
+  loss is scoped to the OLAP store.
 
 ---
 

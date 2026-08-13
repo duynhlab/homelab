@@ -379,6 +379,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- ClickHouse joins the platform monitoring/alert stack, closing the
+  engine-health blind spot beside the five OTel-data-plane dashboards: the
+  operator chart's ServiceMonitor is enabled (`/metrics` control plane +
+  `/chi` engine view), a 12-rule PrometheusRule lands
+  (`observability/clickhouse-alerts.yaml` — server-unreachable, the disk
+  pair, the delayed→rejected→failed insert ladder, merges, `system.errors`,
+  operator reconciles, and the consumer-side collector-exporter check), and a
+  `ClickHouse Server / Engine` Grafana dashboard (VictoriaMetrics datasource)
+  covers what the SQL boards cannot. Catalogued in alert-catalog § 8b with
+  runbook stubs in the ClickHouse hub. **Planned** until the Kind gate: the
+  first scrape verifies the chart ServiceMonitor covers both paths and tunes
+  the VERIFY-AT-KIND expressions against live series names. The per-pod
+  `clickhouse-server` endpoint stays deliberately off at 1×1 — recorded as
+  the thing to enable with the first extra replica.
 - Telemetry audit findings log added at
   [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
   — the `api/observability.md` contract measured against the deployed platform.

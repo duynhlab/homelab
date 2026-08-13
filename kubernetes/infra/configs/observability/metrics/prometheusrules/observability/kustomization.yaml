@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - tempo-alerts.yaml
   - pyroscope-alerts.yaml
+  - clickhouse-alerts.yaml

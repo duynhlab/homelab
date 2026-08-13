@@ -123,7 +123,7 @@ for its own sake.
 | [RFC-0020](RFC-0020/) | Internal TLS everywhere on the `homelab-ca` root (DB, pooler, gRPC, OpenBAO) | platform-wide | P1 | provisional |
 | [RFC-0021](RFC-0021/) | Platform overhaul: inventory extraction, order aggregate, payment hardening (supersedes [RFC-0003](RFC-0003/)) | platform-wide | done | **implemented (P0–P7 landed)** — inventory is the sole stock authority; product's stock RPCs, read fields and schema are removed; the order aggregate ([ADR-033](../adr/ADR-033-order-status-cancellation/)) and payment ambiguity ([ADR-034](../adr/ADR-034-provider-outcome-ambiguity/)…[ADR-037](../adr/ADR-037-per-request-refund-identity/)) shipped; migration flags gone and the first [GameDay run](RFC-0021/gameday.md) recorded (5 faults, 2 claims falsified). Deferred items are listed in the RFC's Implementation History, not dropped |
 | [RFC-0022](RFC-0022/) | Adopt Keycloak as the platform identity provider; retire auth-service (supersedes the custom-issuer portions of [RFC-0009](RFC-0009/)) | platform-wide | P1 | Accepted — **implementation absorbed into [RFC-0024](RFC-0024/)** (design record stands) |
-| [RFC-0023](RFC-0023/) | Basic Backoffice portal (React + TanStack) and the first `protected` business APIs (depends on [RFC-0022](RFC-0022/)) | platform-wide | P2 | provisional |
+| [RFC-0023](RFC-0023/) | Basic Backoffice portal (React + TanStack) and the first `protected` business APIs (depends on [RFC-0022](RFC-0022/)) | platform-wide | P2 | Accepted |
 | [RFC-0024](RFC-0024/) | Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover (executes [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | Accepted |
 
 ## Backlog — candidate RFCs
@@ -151,4 +151,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-11 — RFC-0022 and RFC-0024 Accepted; ADR-041..046 created at Accepted (identity + edge); RFC-0023's future ADRs renumbered to 047–049._
+_Last updated: 2026-08-13 — RFC-0023 Accepted (Backoffice portal + first `protected` APIs); ADR-047..049 created at Accepted._

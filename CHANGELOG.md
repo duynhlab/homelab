@@ -79,6 +79,26 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Feature
+
+#### Local-stack
+
+- The `admin-portal` realm client's dev origin moves from the `:3002`
+  placeholder to the owner-picked **`:3009`** (RFC-0023 Admin Portal; `:3002`
+  is Grafana) in both realm twins — the cluster ConfigMap and the local
+  import copy — and the edge `cors-policy` allowlists
+  `http://localhost:3009`.
+
+#### Proposals
+
+- **RFC-0023 → Accepted**; ADR-047 (administrative commands through
+  role-gated `/protected/` APIs on owning services), ADR-048 (Admin Portal
+  calls owning services directly, admin BFF deferred), and ADR-049 (Admin
+  Portal as a separate React SPA on the TanStack stack) created at Accepted,
+  Adoption Not started. The RFC's Kong-era edge mechanics are restated
+  EG-native in its Implementation History; `docs/api/api.md` gains the
+  protected route conventions (**planned** until the first route ships).
+
 ### Breaking Change
 
 #### Services

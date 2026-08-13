@@ -13,8 +13,9 @@
 #     (oidc-audience-mapper, access token only)
 #   * admin-portal: client-session idle 30 min / max 10 h as client attribute
 #     overrides (stricter backoffice posture); its redirect/origin
-#     http://localhost:3002 is a DEV PLACEHOLDER for the RFC-0023 Backoffice
-#     portal (JSON cannot carry comments — this note is authoritative)
+#     http://localhost:3009 is the RFC-0023 Backoffice portal's local dev
+#     origin (owner-picked :3009 — :3002 is Grafana; JSON cannot carry
+#     comments, this note is authoritative)
 #   * registration OFF — deterministic demo users only
 #
 # Demo-user UUID scheme (fixed subjects, RFC-0022 OQ#10 — seeds and services
@@ -117,10 +118,10 @@ data:
             "client.session.max.lifespan": "36000"
           },
           "redirectUris": [
-            "http://localhost:3002/*"
+            "http://localhost:3009/*"
           ],
           "webOrigins": [
-            "http://localhost:3002"
+            "http://localhost:3009"
           ],
           "defaultClientScopes": [
             "web-origins",

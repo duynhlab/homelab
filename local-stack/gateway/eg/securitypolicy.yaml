@@ -126,7 +126,9 @@ spec:
 # round-trip is paid once per hour per route rather than before every mutation.
 #
 # localhost:3000 is allowed because the realm's customer-spa client permits it
-# as a redirect origin (`npm run dev` outside Compose).
+# as a redirect origin (`npm run dev` outside Compose). localhost:3009 is the
+# RFC-0023 Admin Portal's dev origin (realm client `admin-portal`) — allowlisted
+# here and in the twinned realm files in the same change.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -140,6 +142,7 @@ spec:
     allowOrigins:
       - "http://localhost:3001"
       - "http://localhost:3000"
+      - "http://localhost:3009"
     allowMethods:
       - GET
       - POST

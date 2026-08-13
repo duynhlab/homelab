@@ -103,6 +103,10 @@ kind: SecurityPolicy
 metadata:
   name: jwt-edge-staff
 spec:
+  # StrategicMerge keeps the gateway-level cors-policy applied to this route —
+  # without it a route-level SecurityPolicy overrides the gateway policy
+  # entirely and the Admin Portal's cross-origin calls die at preflight.
+  mergeType: StrategicMerge
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute

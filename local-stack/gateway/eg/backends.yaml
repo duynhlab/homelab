@@ -25,6 +25,18 @@ spec:
         hostname: user
         port: 8080
 ---
+# inventory's first edge target ever (RFC-0023): only the protected
+# audience routes here — east-west stays gRPC :9090 with no route.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: inventory
+spec:
+  endpoints:
+    - fqdn:
+        hostname: inventory
+        port: 8080
+---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: Backend
 metadata:

@@ -44,6 +44,25 @@ spec:
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
 ---
+# inventory — api-inventory-protected (RFC-0023)
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge
+  namespace: inventory
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-inventory-protected
+  jwt:
+    providers:
+      - name: keycloak
+        issuer: https://id.duynh.me/realms/duynhlab
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+---
 # cart — api-cart
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy

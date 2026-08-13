@@ -1,9 +1,10 @@
 # NOTE: kindnet DOES enforce NetworkPolicy on Kind K8s 1.34+ — these rules are
 # LIVE. Any ingress not explicitly allowed below is dropped.
 #
-# Inventory is gRPC-only (RFC-0021): no edge route reaches it, so there is no
-# edge :8080 allow — kubelet health probes are host-level and bypass
-# NetworkPolicy (same stance as checkout). Only the gRPC callers get in.
+# East-west inventory is gRPC-only (RFC-0021). RFC-0023 adds ONE http ingress:
+# the edge, for the protected Backoffice surface (api-inventory-protected) —
+# no service-to-service HTTP is allowed. Kubelet health probes are host-level
+# and bypass NetworkPolicy (same stance as checkout).
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -49,3 +50,26 @@ spec:
       ports:
         - protocol: TCP
           port: 9090
+---
+# The edge's protected Backoffice route (RFC-0023, api-inventory-protected):
+# Envoy Gateway is inventory's only HTTP caller. jwt-edge screens tokens at
+# the edge; the service's authmw + role gate is the authoritative check.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-inventory-protected-http
+  namespace: inventory
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: inventory
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway
+      ports:
+        - protocol: TCP
+          port: 8080

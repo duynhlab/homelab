@@ -81,6 +81,22 @@ Skeleton (copy what you need):
 
 ### Breaking Change
 
+#### Services
+
+- **auth-service's cluster surface is deleted** (RFC-0024 P5): the app
+  manifest (`apps/services/auth.yaml`), the `auth` namespace, the `auth`
+  database triplet on platform-db (plus its pg_hba rule, five monitoring-query
+  list entries, and the OpenBAO credential seed), the `auth-jwt-signing`
+  ExternalSecret and the `jwt_signing` template block in `identity-rs.yaml`,
+  the `auth` NetworkPolicy and the platform-db policy's `auth` client selector,
+  the `api-auth-public` HTTPRoute and its BackendTrafficPolicy, and the
+  `controllers-local` health check on the namespace. `/auth/v1/*` now matches
+  nothing at either environment's edge. Executed **before** the first Kind
+  bring-up, so the cluster greenfields without the service instead of
+  decommissioning it live; the compose gate already ran auth-free.
+  [`docs/api/auth.md`](docs/api/auth.md) is archived in place (filename kept
+  for link stability), and the realm is the platform's only token issuer.
+
 #### Gateway
 
 - **Kong is decommissioned** (RFC-0024 P2.3 cutover): the `kong-local` /

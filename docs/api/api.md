@@ -48,7 +48,6 @@ flowchart TB
         direction TB
 
         subgraph Identity["Identity domain"]
-            Auth["auth"]
             User["user"]
         end
 
@@ -79,7 +78,6 @@ flowchart TB
     end
 
     %% Edge -> domain entry points
-    Edge -->|"HTTP :8080"| Auth
     Edge -->|"HTTP :8080"| User
     Edge -->|"HTTP :8080"| Product
     Edge -->|"HTTP :8080"| Review
@@ -123,7 +121,6 @@ flowchart TB
         Valkey[("Valkey")]
     end
 
-    Auth --> PlatformDB
     User --> PlatformDB
     Review --> PlatformDB
     Shipping --> PlatformDB
@@ -146,7 +143,7 @@ flowchart TB
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
     class Browser,Edge edge;
-    class Auth,User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification service;
+    class User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification service;
     class CheckoutWorker,OrderWorker worker;
     class Temporal platform;
     class PlatformDB,ProductDB,Valkey data;
@@ -277,9 +274,11 @@ those exceptions into ordinary CRUD services.
 Keycloak realm — `iss https://id.duynh.me/realms/duynhlab` (local-stack:
 `http://localhost:8081/realms/duynhlab`), audience `duynhlab-platform`
 (vocabulary unchanged), `user_id` = the token `sub` (string UUID,
-[ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)). auth-service still
-runs and mints its own tokens until the P5 decommission, but **no service or
-edge verifies against it any more**.
+[ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)). The auth-service surface is
+**deleted** (RFC-0024 P5): no manifest, no namespace, no database, no edge
+route — `/auth/v1/*` matches nothing at either environment's edge. The realm
+is the only issuer; the retired contract stays readable in
+[auth.md](./auth.md) as an archived record.
 
 Private routes use the same layered model:
 

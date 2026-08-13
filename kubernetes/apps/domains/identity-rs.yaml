@@ -164,22 +164,6 @@ spec:
           - name: NOTIFICATION_GRPC_ADDR
             value: << inputs.notification_grpc_addr >>
           <<- end >>
-          <<- if (index inputs "jwt_signing") >>
-          # RFC-0009 Phase 4: RS256 access-token signing key from OpenBAO (via ESO
-          # Secret auth-jwt-signing). iss/aud must match pkg/authmw. Empty key =>
-          # auth would fall back to an ephemeral key, so this is required for
-          # auth. Retires with auth-service in RFC-0024 P5 (the Kong edge
-          # credential half was already deleted at the P2.3 cutover).
-          - name: JWT_ISSUER
-            value: "https://gateway.duynh.me"
-          - name: JWT_AUDIENCE
-            value: "duynhlab-platform"
-          - name: JWT_PRIVATE_KEY_PEM
-            valueFrom:
-              secretKeyRef:
-                name: auth-jwt-signing
-                key: private-key
-          <<- end >>
           <<- if (index inputs "authmw") >>
           # RFC-0024 P3 (identity cutover; RFC-0022 design record): authmw
           # (pkg v0.37.0) verifies Keycloak realm tokens. The compiled defaults

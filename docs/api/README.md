@@ -158,7 +158,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 
 | Component | Local | Cluster | Status | CI |
 |-----------|:-----:|:-------:|--------|-----|
-| [auth API](./auth.md) | — | ✓ | Technical debt — no token consumers since the identity cutover; removed from local-stack; cluster surface deleted (and the doc archived) at RFC-0024 P5 | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) |
+| [auth API](./auth.md) | — | — | **Archived** — RFC-0024 P5 executed: the whole surface is deleted; the realm is the only issuer. Contract kept as history | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) |
 | [user API](./user.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/user-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/user-service/actions) |
 | [product API + gRPC](./product.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/product-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/product-service/actions) |
 | [inventory gRPC](./inventory.md) | ✓ | ✓ | Implemented — the sole stock authority; callers: order saga, checkout, product /details | [![CI](https://github.com/duynhlab/inventory-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/inventory-service/actions) |

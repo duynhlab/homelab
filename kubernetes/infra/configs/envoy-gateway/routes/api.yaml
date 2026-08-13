@@ -1,5 +1,5 @@
 # API routes on the public gateway (gateway.duynh.me) — one HTTPRoute per
-# exposed service (13 routes total).
+# exposed service (12 routes total).
 #
 # URL shape: /{service}/v1/{audience}/{resource...} — Variant A
 # (docs/api/api.md#http-url-model). Pure pass-through, no rewrite (Gateway
@@ -25,45 +25,6 @@
 #
 # Rate/size limits + resilience: policies/btp-api.yaml.
 
----
-# Auth Service — public (login, register, refresh, logout, jwks): anonymous.
-# KEPT during P2/P3/P4: auth-service still serves login until the P3 identity
-# cutover; this route is removed in P5 with the auth-service decommission.
-# Translates Ingress api-auth-public.
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: api-auth-public
-  namespace: auth
-spec:
-  parentRefs:
-    - name: platform
-      namespace: envoy-gateway
-      sectionName: https
-  hostnames:
-    - gateway.duynh.me
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /auth/v1/public
-      filters:
-        - type: ResponseHeaderModifier
-          responseHeaderModifier:
-            set:
-              - name: X-Content-Type-Options
-                value: nosniff
-              - name: Referrer-Policy
-                value: strict-origin-when-cross-origin
-              - name: X-Frame-Options
-                value: DENY
-              - name: Strict-Transport-Security
-                value: "max-age=31536000; includeSubDomains"
-            remove:
-              - Server
-      backendRefs:
-        - name: auth
-          port: 8080
 ---
 # User Service — public GET /users/:id: anonymous. Translates api-user-public.
 apiVersion: gateway.networking.k8s.io/v1

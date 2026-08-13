@@ -1301,7 +1301,7 @@ want = {'microservices-otel-local','business-otel-local','temporal-worker-local'
         'clickhouse-logs-explorer','clickhouse-traces-explorer',
         'clickhouse-server-engine'}
 got = {d['uid'] for d in json.load(sys.stdin)}
-print('C18 dashboards:', 'OK all 9' if got == want else f'FAIL missing={sorted(want-got)} extra={sorted(got-want)}')
+print('C18 dashboards:', 'OK all ' + str(len(want)) + '' if got == want else f'FAIL missing={sorted(want-got)} extra={sorted(got-want)}')
 raise SystemExit(0 if got == want else 1)"
 for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
          clickhouse-otel-sql clickhouse-service-deepdive \

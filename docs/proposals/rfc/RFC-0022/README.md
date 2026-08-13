@@ -522,6 +522,13 @@ every domain schema and outlives the choice of IdP.
 
 ## Implementation History
 
+- 2026-08-13 — **Amendment ([ADR-050](../../adr/ADR-050-separate-staff-identity-realm/))**:
+  operator (workforce) identity moves out of the `duynhlab` realm into a new
+  `duynhlab-staff` realm — the single-realm reading of this RFC now covers
+  **customer** identity only. `backoffice_admin`, the `admin-portal` client,
+  and the test-operator seeding leave the customer realm; alice returns to a
+  pure customer.
+
 - 2026-08-09 — Research ([./research.md](./research.md)) and provisional RFC created
   from the owner's draft, corrected against a fleet-wide as-built audit (freshly
   pulled service repos + manifests) and a Context7 documentation audit.

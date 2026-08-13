@@ -114,6 +114,14 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-050 — staff realm**: workforce identity separates from customer
+  identity (CIAM vs workforce, the documented Keycloak pattern). Operators
+  move to a new `duynhlab-staff` realm (registration off, brute-force on,
+  short sessions); `/protected/` surfaces will trust the staff issuer;
+  alice returns to a pure customer. RFC-0022/0023 amended (History,
+  append-only).
+
+
 - **RFC-0023 → Accepted**; ADR-047 (administrative commands through
   role-gated `/protected/` APIs on owning services), ADR-048 (Admin Portal
   calls owning services directly, admin BFF deferred), and ADR-049 (Admin

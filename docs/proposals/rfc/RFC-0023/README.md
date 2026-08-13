@@ -598,6 +598,12 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   keycloak-js and zod confirmed after researched comparisons vs `oidc-client-ts` and
   valibot; detailed product lifecycle/categories/audit proposal added; the
   `product-design` skill named the portal's UI design authority.
+- 2026-08-13 — **Identity amendment ([ADR-050](../../adr/ADR-050-separate-staff-identity-realm/))**:
+  the operator population moves to a dedicated `duynhlab-staff` realm (owner
+  decision after meeting the alice dual-role test seed in practice). The
+  `/protected/` audience verifies the staff issuer end to end; a customer
+  token now fails at the edge as wrong-issuer before any role logic. The
+  role-gate conventions of this RFC are unchanged.
 - 2026-08-13 — **Status → Accepted**; ADR-047/048/049 created at Accepted (Adoption:
   Not started). **Edge translation note:** this RFC's text predates RFC-0024's edge
   cutover — every Kong-specific mechanism reads as its Envoy Gateway equivalent

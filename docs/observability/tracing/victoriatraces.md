@@ -84,7 +84,7 @@ exporters:
   including Grafana Traces Drilldown support. This platform keeps the proven
   Jaeger datasource during the pilot; TraceQL metrics and pipelines remain a
   Tempo-only capability.
-- **UI / API** — exposed at `victoriatraces.duynh.me` (Kong ingress → `:10428`).
+- **UI / API** — exposed at `victoriatraces.duynh.me` (the `victoriatraces` HTTPRoute → `:10428`).
 - **LogsQL** (advanced, traces-as-logs) — `POST /select/logsql/query`, e.g.:
 
   ```bash
@@ -120,4 +120,4 @@ Jaeger API returns them). Tempo + Jaeger are unchanged and Tempo stays primary/d
 See [backends-comparison.md](./backends-comparison.md) for the decision context.
 
 ---
-_Last updated: 2026-07-14 — VictoriaTraces v0.9.4 and VM Operator v0.73.1 compatibility review._
+_Last updated: 2026-08-13 — exposure re-documented as the `victoriatraces` HTTPRoute; VictoriaTraces v0.9.4 and VM Operator v0.73.1 compatibility review._

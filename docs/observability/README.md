@@ -17,7 +17,7 @@ GitOps (Flux).
 Since RFC-0014 the 10 Go services plus order-worker and checkout-worker
 **push** all three signals over OTLP to one OpenTelemetry Collector, which fans
 each out to its backend. Vector
-is the side path for everything without an OTel SDK (databases, Kong access log,
+is the side path for everything without an OTel SDK (databases, the edge's access log,
 Postgres query plans, the frontend). Profiles push straight to Pyroscope.
 
 ```mermaid
@@ -28,8 +28,8 @@ flowchart TB
     end
 
     subgraph nonSdk["Workloads without an OTel SDK"]
-        Infra["Databases · frontend<br/>Kong access log · PG plans"]
-        Kong["Kong gateway<br/>runtime telemetry"]
+        Infra["Databases · frontend<br/>edge access log · PG plans"]
+        Edge["Envoy Gateway edge<br/>telemetry.tracing"]
     end
 
     subgraph collectorNode["OpenTelemetry Collector"]
@@ -64,7 +64,7 @@ flowchart TB
     Services & Workers -->|"OTLP metrics · logs · traces"| Receiver
     Services & Workers -->|"pprof push"| Pyro
     Infra -->|"stdout / files"| Vector
-    Kong -->|"OTLP runtime logs + spans"| Receiver
+    Edge -->|"OTLP/gRPC :4317 spans"| Receiver
     Processors -->|"metrics"| VMAgent
     Processors -->|"logs"| VLogs
     Processors -->|"logs + traces"| CH
@@ -103,7 +103,7 @@ flowchart TB
     class CH data;
     class Pyro profile;
     class Sloth,VMAlert,VMAM,Grafana platform;
-    class Kong edge;
+    class Edge edge;
     class Infra external;
 ```
 ```mermaid
@@ -354,9 +354,9 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger` | 16686 | Trace query UI (alternative to Tempo) |
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.9.4`, OTLP HTTP + Jaeger query API) |
-| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee + Kong runtime → VictoriaLogs + ClickHouse), trace fan-out (Tempo/Jaeger/VT + ClickHouse) — see [collector.md](opentelemetry/collector.md) |
+| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (Tempo/Jaeger/VT + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
-| Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, Kong access log, PG plans, frontend); app logs go OTLP |
+| Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, the edge's access log, PG plans, frontend); app logs go OTLP |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
 | Sloth | monitoring | operator | -- | SLO-to-PrometheusRule generator |
 
@@ -440,4 +440,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-07-29 — added OTel fundamentals/collector/histograms docs; stack diagram now shows the live ClickHouse fan-out._
+_Last updated: 2026-08-13 — edge re-documented as Envoy Gateway (native `telemetry.tracing`, OTLP gRPC :4317 spans only, no OTLP logs path); added OTel fundamentals/collector/histograms docs; stack diagram now shows the live ClickHouse fan-out._

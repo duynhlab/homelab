@@ -97,7 +97,7 @@ horizontal scale — overkill for this platform. Profiles are stored as **blocks
 (Parquet tables + a TSDB index for series + a symbols table) on **object storage**; the
 local PVC only holds the v2 metastore (raft) and scratch, so a pod restart loses nothing.
 
-## Trace correlation (platform) {#trace-correlation-platform}
+## Trace correlation (platform)
 
 Grafana links Tempo spans to Pyroscope via the datasource config
 (`datasource-tempo.yaml`: `tracesToProfiles` maps `service.name` →
@@ -118,7 +118,7 @@ Verified inventory of the actual deployment:
 | **Security** | `runAsNonRoot`, `runAsUser: 10001`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault` |
 | **Self-monitoring** | `serviceMonitor.enabled: true`; `PyroscopeDown` alert — `up{job=~".*pyroscope.*"} == 0` for 5m |
 | **Resources** | requests `100m` / `256Mi`, limit `512Mi` |
-| **Access** | Grafana datasource `uid: pyroscope` (`http://pyroscope.monitoring.svc.cluster.local:4040`); Kong ingress `pyroscope.duynh.me` |
+| **Access** | Grafana datasource `uid: pyroscope` (`http://pyroscope.monitoring.svc.cluster.local:4040`); the `pyroscope` HTTPRoute `pyroscope.duynh.me` |
 | **Client** | `obsx.SetupProfiling` in all 10 services + both workers; **on by default** (`PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT=http://pyroscope.monitoring.svc.cluster.local:4040`) |
 | **local-stack** | `grafana/pyroscope:2.1.0` container + Grafana Pyroscope datasource; `PROFILING_ENABLED: "true"` in the `x-svc-env` anchor; storage is an **ephemeral** volume (`pyroscope-data`), no S3 |
 
@@ -180,7 +180,7 @@ Per-service env vars and the `PROFILING_ENABLED` toggle:
 - **local-stack** — http://localhost:4040 (Pyroscope) and Grafana's Explore → Pyroscope;
   a checkout generates profiles for all services.
 
-### Runbook — profiles not appearing {#troubleshooting}
+### Runbook — profiles not appearing
 
 1. **Flag on?** Check the service env `PROFILING_ENABLED` and its startup log
    `Profiling initialized`.
@@ -207,4 +207,4 @@ Per-service env vars and the `PROFILING_ENABLED` toggle:
 - [Traces to profiles](https://grafana.com/docs/grafana/latest/datasources/pyroscope/configure-traces-to-profiles/)
 
 ---
-_Last updated: 2026-07-14 — Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.18.1), local-stack profiling enabled._
+_Last updated: 2026-08-13 — access row re-documented as the `pyroscope` HTTPRoute; Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.18.1), local-stack profiling enabled._

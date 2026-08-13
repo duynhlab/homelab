@@ -1,6 +1,6 @@
 # Platform delivery
 
-GitOps bring-up, application delivery (ResourceSets), Kong edge, CI/CD policy, and
+GitOps bring-up, application delivery (ResourceSets), the Envoy Gateway edge, CI/CD policy, and
 day-2 platform patterns for the duynhlab homelab.
 
 | | |
@@ -9,7 +9,7 @@ day-2 platform patterns for the duynhlab homelab.
 | **Applications** | 10 Go microservices + React frontend + Temporal workers (`order-worker`, `checkout-worker`) + `mockpay` |
 | **GitOps** | Flux Operator + OCI artifacts + Kustomize — [`setup.md`](setup.md) |
 | **App onboarding** | Domain ResourceSets + InputProviders — [`application-delivery.md`](application-delivery.md) |
-| **Edge** | Kong DB-less gateway — [`kong-gateway.md`](kong-gateway.md) |
+| **Edge** | Envoy Gateway on the Gateway API — [`envoy-gateway.md`](envoy-gateway.md) |
 | **Planned (not in homelab yet)** | Prod cluster overlay (`kubernetes/clusters/production/` stub); dev/uat branch CI promotion — see [`gitflow.md`](gitflow.md) + [`cicd.md`](cicd.md) callouts |
 
 > **Homelab vs target:** docs in this folder describe both what runs on **local Kind
@@ -25,7 +25,7 @@ Platform delivery splits into three layers:
 
 1. **Bootstrap** — Kind + local OCI registry + OpenTofu Flux Operator install (`make up`).
 2. **Reconcile** — Flux Kustomizations apply infra then apps in `dependsOn` order.
-3. **Operate** — Kyverno admission, Kong ingress, observability, secrets sync, SLOs.
+3. **Operate** — Kyverno admission, edge HTTPRoutes, observability, secrets sync, SLOs.
 
 Application business logic and handlers live in separate service repos; homelab owns
 manifests, GitOps pins, gateway routes, and the docs index.
@@ -40,7 +40,9 @@ flowchart TD
     controllers["controllers-local<br/>operators + namespaces"]
     secrets["secrets-local<br/>bootstrap Job + ESO configs"]
     certmgr["cert-manager-local"]
-    kong["kong-local + kong-config-local"]
+    gwcrds["gateway-api-crds-local"]
+    keycloak["keycloak-local<br/>duynhlab realm"]
+    edge["envoy-gateway-local +<br/>envoy-gateway-config-local"]
     monitoring["monitoring-local<br/>observability configs + SLO CRs"]
     storage["storage-local"]
     clickhouse["clickhouse-local"]
@@ -53,7 +55,12 @@ flowchart TD
     controllers --> certmgr
     controllers --> monitoring
     secrets --> certmgr
-    certmgr --> kong
+    controllers --> gwcrds
+    gwcrds --> edge
+    certmgr --> edge
+    keycloak --> edge
+    databases --> keycloak
+    secrets --> keycloak
     controllers --> storage
     secrets --> storage
     controllers --> clickhouse
@@ -82,7 +89,8 @@ specific Kustomization or run `make sync`.
 |-----|----------------|
 | [`setup.md`](setup.md) | First bring-up, Makefile commands, hosts, seed data, full Flux graph, project tree |
 | [`application-delivery.md`](application-delivery.md) | Add a service, ResourceSet contract, image pins, domain labels |
-| [`kong-gateway.md`](kong-gateway.md) | Routing, TLS, plugins, rate limits, ingress runbooks |
+| [`envoy-gateway.md`](envoy-gateway.md) | The edge: resource model, policy attachment, both provider modes, failure modes |
+| [`kong-gateway.md`](kong-gateway.md) | **Archived** — the previous gateway's guide, kept for reference |
 | [`identity-cutover-runbook.md`](identity-cutover-runbook.md) | RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm) |
 | [`graceful-shutdown.md`](graceful-shutdown.md) | Go shutdown pattern, probe tuning per HTTP service |
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |
@@ -104,4 +112,4 @@ Workflow templates (not prose docs): `build_template.yml`, `check_template.yml`.
 - [`kubernetes/apps/`](../../kubernetes/apps/) — ResourceSets and InputProviders
 - [`terraform/README.md`](../../terraform/README.md) — Flux Operator bootstrap
 
-_Last updated: 2026-07-22 — platform hub; drift fixes tracked in setup, kong-gateway, application-delivery._
+_Last updated: 2026-08-13 — platform hub; edge is Envoy Gateway + Keycloak realm in the Flux graph._

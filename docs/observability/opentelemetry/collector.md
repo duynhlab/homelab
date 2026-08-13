@@ -55,7 +55,7 @@ three together per signal:
 ```mermaid
 flowchart LR
     APPS["services + workers<br/>pkg/obsx"] -->|"OTLP/HTTP :4318"| RCV
-    KONG["Kong edge spans"] -->|"OTLP"| RCV
+    EDGE["Envoy Gateway edge<br/>telemetry.tracing"] -->|"OTLP/gRPC :4317"| RCV
 
     subgraph COLLECTOR["otel-collector (gateway, deployment ×1)"]
         RCV["otlp receiver"] --> ML["memory_limiter<br/>800MiB soft limit"]
@@ -89,7 +89,7 @@ flowchart LR
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class APPS service;
-    class KONG edge;
+    class EDGE edge;
     class RCV,ML,D2C,BM,BT,VMA collector;
     class VM metric;
     class VL,CHL,TEMPO,JAE,VT,CHT data;
@@ -189,7 +189,7 @@ Self-metrics on `:8888` feed the
 [`OtelMetricsPipelineExportFailures`](../runbooks/microservices/OtelMetricsPipelineExportFailures.md)
 alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_*`.
 
-### Runbook — common failures {#troubleshooting}
+### Runbook — common failures
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -206,4 +206,4 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 
 ---
 
-_Last updated: 2026-07-29 — initial dedicated Collector doc; every value verified against the deployed HelmRelease._
+_Last updated: 2026-08-13 — trace source diagram re-documented as the Envoy Gateway edge (OTLP/gRPC :4317, `telemetry.tracing`); initial dedicated Collector doc; every value verified against the deployed HelmRelease._

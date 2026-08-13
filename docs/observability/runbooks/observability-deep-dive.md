@@ -187,7 +187,7 @@ flowchart TD
     subgraph workloads["Instrumented workloads"]
         services["10 Go services<br/>auth · user · product · cart · order<br/>review · notification · shipping · payment · checkout"]
         workers["2 workers<br/>order-worker · checkout-worker"]
-        kong["Kong gateway"]
+        edgeGw["Envoy Gateway edge"]
     end
 
     subgraph instrumentation["Application instrumentation"]
@@ -222,7 +222,7 @@ flowchart TD
 
     services --> http -->|"OTLP traces · metrics · logs"| otel
     workers --> workerObs -->|"OTLP traces · metrics · logs"| otel
-    kong -->|"OTLP spans + runtime logs"| otel
+    edgeGw -->|"OTLP/gRPC spans"| otel
     infra -->|scrape| vmAgent
     vector -->|jsonline| victoriaLogs
     otel -->|metrics| vmAgent -->|remote write| vmSingle
@@ -252,7 +252,7 @@ flowchart TD
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     class services,http service;
     class workers,workerObs worker;
-    class kong edge;
+    class edgeGw edge;
     class vector,infra external;
     class otel collector;
     class vmAgent,vmSingle metric;
@@ -848,4 +848,4 @@ For every answer, structure as:
 - [Profiling Guide](../profiling/README.md) -- Continuous profiling, flamegraphs
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-13 — 4-pillar diagram's edge node re-documented as the Envoy Gateway edge (OTLP/gRPC spans only; the edge has no OTLP logs path)_

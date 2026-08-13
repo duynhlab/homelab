@@ -11,7 +11,7 @@ This document explains the distributed tracing architecture used in this project
 ```mermaid
 flowchart TB
     Client{{"Browser / API client"}}
-    Kong["Kong gateway<br/>root span + W3C traceparent"]
+    Edge["Envoy Gateway edge<br/>root span + W3C traceparent"]
 
     subgraph workloads["Instrumented workloads"]
         Services["10 Go services<br/>otelgin + otelgrpc"]
@@ -36,12 +36,12 @@ flowchart TB
     Grafana{{"Grafana"}}
     JaegerUI{{"Jaeger UI"}}
 
-    Client -->|"HTTP"| Kong
-    Kong -->|"HTTP + traceparent"| Services
+    Client -->|"HTTP"| Edge
+    Edge -->|"HTTP + traceparent"| Services
     Services -->|"gRPC + traceparent"| Services
     Services -->|"start workflow"| Temporal
     Temporal -->|"task queue"| Workers
-    Kong -->|"OTLP edge spans"| Receiver
+    Edge -->|"OTLP/gRPC :4317 edge spans"| Receiver
     Services & Workers -->|"OTLP application spans"| Receiver
     Processors -->|"OTLP/gRPC"| Tempo
     Processors -->|"OTLP/gRPC"| Jaeger
@@ -59,7 +59,7 @@ flowchart TB
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class Client,Kong edge;
+    class Client,Edge edge;
     class Services service;
     class Workers worker;
     class Receiver,Processors collector;
@@ -68,21 +68,21 @@ flowchart TB
     class Temporal,Grafana,JaegerUI platform;
 ```
 
-The trace now **begins at the gateway**: Kong's `opentelemetry` plugin creates
-the root request span and injects the W3C `traceparent` so each service span is a
+The trace **begins at the edge**: Envoy Gateway's native tracing opens the root
+request span and propagates the W3C `traceparent` so each service span is a
 child of the edge span (previously traces started at the service — a blind first
 hop). See [Edge → service linkage](#edge--service-linkage) for the propagation
-config that makes this reliable.
+behavior that makes this reliable.
 
 ### Component Details
 
-**0. Kong API Gateway (edge)**
-- **Technology**: Kong `opentelemetry` plugin (`plugin: opentelemetry`, global)
-- **Enabled by**: `tracing_instrumentations: all` + `tracing_sampling_rate` in the Kong config (HelmRelease env for the cluster; `KONG_TRACING_*` for local-stack)
-- **Export**: OTLP HTTP to the same collector endpoint the services use (`…:4318/v1/traces`), `service.name=kong`
-- **Role**: creates the **root request span** for every proxied call and injects the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service
-- **Logs**: the same plugin also sets `logs_endpoint` (Kong ≥ 3.8) — Kong **runtime** logs ship via OTLP to the collector's `logs` pipeline → VictoriaLogs. That same pipeline also carries the **fleet-wide app `otelzap` tee** (every service's structured logs, since RFC-0014 P4), alongside Vector (see [../logging/README.md](../logging/README.md))
-- **Config**: `kubernetes/infra/configs/kong/plugins.yaml` (`opentelemetry-tracing` KongClusterPlugin) + `kubernetes/infra/controllers/kong/helmrelease.yaml`; local mirror in `local-stack/gateway/kong.yml` + `local-stack/compose.yaml`
+**0. Envoy Gateway (edge)**
+- **Technology**: `EnvoyProxy.spec.telemetry.tracing` — native Envoy tracing, no plugin
+- **Enabled by**: the `platform` GatewayClass's `parametersRef` — cluster CR `kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml` (`samplingRate: 10`, **planned** — not yet run on Kind); local overlay `local-stack/gateway/eg/envoyproxy.yaml` patches `samplingRate: 100` (verified in local-stack)
+- **Export**: OTLP **gRPC** to the collector on `:4317` — the tracing provider speaks gRPC only, unlike the app SDKs which export over OTLP HTTP `:4318`; `service.name` is derived as `<gateway>.<namespace>` (locally `platform.envoy-gateway-system`)
+- **Role**: opens the **root request span** for every proxied call and propagates the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service. Envoy's sampler is `ParentBased`, so an inbound sampled `traceparent` is always honored regardless of `samplingRate`
+- **Logs**: the edge has **no OTLP logs path** — its only log output is the JSON access log on stdout, tailed by Vector (see [../logging/README.md](../logging/README.md))
+- **Config**: `kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml` (cluster); local mirror `local-stack/gateway/eg/envoyproxy.yaml`
 
 **1. Microservices (SDK Approach)**
 - **Technology**: Go OpenTelemetry SDK
@@ -93,7 +93,7 @@ config that makes this reliable.
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
-- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (fleet-wide app `otelzap` tee + Kong runtime-logs → VictoriaLogs)
+- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (fleet-wide app `otelzap` tee → VictoriaLogs). The edge has no OTLP logs path; its only log output is the JSON access log on stdout, tailed separately by Vector
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
@@ -159,7 +159,7 @@ Inside `SetupObservability`, `obsx` builds the OTLP trace exporter
 (`otlptracehttp`), batches it into an `sdktrace.TracerProvider`, sets the W3C
 `traceparent` propagator, and installs the sampler
 `ParentBased(TraceIDRatioBased(rate))` — so downstream hops honour the root
-(Kong) decision and a service's own ratio only applies when it is itself the
+(edge) decision and a service's own ratio only applies when it is itself the
 root of a trace.
 
 **Advantages:**
@@ -195,53 +195,38 @@ root of a trace.
 
 ## Edge → service linkage
 
-For Kong's edge span and the downstream service span to land in the **same
-trace**, Kong must inject a W3C `traceparent` onto the upstream request that the
-service then extracts. The catch: the OpenTelemetry plugin's default
-propagation is `inject: [preserve]`, which only re-injects a format it
-*extracted* — so for a browser call (no inbound trace header) it injects
-**nothing**, and the service starts a brand-new root (split traces).
-
-**Fix (required config):** force W3C injection on the plugin. This needs
-**Kong ≥ 3.5** (the `propagation` block):
-
-```yaml
-plugins:
-  - name: opentelemetry
-    config:
-      traces_endpoint: http://…:4318/v1/traces
-      propagation:
-        default_format: w3c
-        extract: [w3c, b3, jaeger, ot]
-        inject: [w3c]        # ← forces traceparent onto every upstream request
-```
+For the edge's root span and the downstream service span to land in the **same
+trace**, the edge must propagate a W3C `traceparent` onto the upstream request
+that the service then extracts. Envoy Gateway's tracing does this **natively** —
+there is no propagation config to set or plugin to enable: every proxied
+request carries `traceparent` upstream, whether or not the inbound request had
+one.
 
 ```mermaid
 flowchart LR
-    K["Kong edge span<br/>inject:[w3c] → traceparent on upstream"] -->|"service extracts (W3C propagator)"| L["service span = child<br/>(one trace)"]
+    E["Envoy Gateway edge span<br/>propagates traceparent → upstream"] -->|"service extracts (W3C propagator)"| L["service span = child<br/>(one trace)"]
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    class K edge;
+    class E edge;
     class L service;
 ```
 
-**Verified:** local-stack (Kong **3.9**, sampling 1.0) links **100%** of proxied
-requests Kong→service after adding `inject: [w3c]` (was intermittent on Kong 3.2,
-which predates the `propagation` block). Service-to-service hops (the order saga
-over gRPC) were already linking, confirming the service-side W3C propagator works
+**Verified:** local-stack (Envoy Gateway standalone, `samplingRate: 100`) links
+**100%** of proxied requests edge→service. Service-to-service hops (the order
+saga over gRPC) already link, confirming the service-side W3C propagator works
 — no service change was needed.
 
-> **Cluster sampling note:** Kong samples head-based at `0.1` as the trace root.
-> Each service wraps its ratio in **`ParentBased`**
-> (`ParentBased(TraceIDRatioBased(rate))`, set inside `obsx.SetupObservability`), so it honours
-> Kong's `sampled` flag: a sampled remote parent → keep, an unsampled one → drop.
-> A service's own `0.1` ratio therefore only applies when it is itself the root of
-> a trace. This guarantees *sampling completeness* — a trace Kong keeps is kept
-> whole downstream regardless of any per-service rate drift — on top of the
-> `inject: [w3c]` linkage mechanism. Verified empirically: with a service forced to
-> root-rate `0.0` behind a Kong root at `1.0`, the service still records 100% of
-> its spans (it honours the parent), where a bare `TraceIDRatioBased(0.0)` would
-> drop them all.
+> **Cluster sampling note:** the edge samples head-based at `samplingRate: 10`
+> (10%, **planned** — the cluster CR has not yet run on Kind) as the trace
+> root; the local overlay patches this to `100`. Each service wraps its ratio in
+> **`ParentBased`** (`ParentBased(TraceIDRatioBased(rate))`, set inside
+> `obsx.SetupObservability`), and so does the edge's own sampler — both honour
+> whichever `traceparent.sampled` flag reaches them: a sampled remote parent →
+> keep, an unsampled one → drop. A service's own ratio therefore only applies
+> when it is itself the root of a trace. This guarantees *sampling
+> completeness* — a trace the edge keeps is kept whole downstream regardless of
+> any per-service rate drift — on top of the edge's native `traceparent`
+> propagation.
 
 ## Configuration
 
@@ -290,7 +275,7 @@ the ClickHouse startup coupling, and the troubleshooting runbook:
 
 ### Trace Lifecycle
 
-0. **Request hits Kong** — the `opentelemetry` plugin opens the **root span** and injects `traceparent` upstream
+0. **Request hits the edge** — Envoy Gateway's tracing opens the **root span** and propagates `traceparent` upstream
 1. **Request arrives** at the microservice carrying that `traceparent`
 2. **SDK creates span** via Gin middleware (child of the edge span)
 3. **Span attributes** added (service name, HTTP method, path)
@@ -455,4 +440,4 @@ spec:
 - [Jaeger v2 Deployment Guide](https://www.jaegertracing.io/docs/2.13/deployment/kubernetes/)
 - [OpenTelemetry Operator](https://opentelemetry.io/docs/platforms/kubernetes/operator/)
 
-_Last updated: 2026-07-29 — diagrams and pipeline table aligned with the deployed collector (ClickHouse fan-out, `clickhouse-local` ordering); collector deep dive split out to [collector.md](../opentelemetry/collector.md)._
+_Last updated: 2026-08-13 — edge documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, ParentBased sampler, no OTLP logs path); diagrams and pipeline table aligned with the deployed collector (ClickHouse fan-out, `clickhouse-local` ordering); collector deep dive split out to [collector.md](../opentelemetry/collector.md)._

@@ -40,7 +40,7 @@ env:
 
 Full env table: [Application observability § Environment variables](./observability.md#environment-variables).
 
-### Sampling {#sampling}
+### Sampling
 
 Configured inside `obsx.SetupObservability` as `ParentBased(TraceIDRatioBased(rate))`:
 

@@ -446,6 +446,30 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- The rest of `docs/` now describes the deployed edge — 24 files across
+  observability, secrets, caching, and platform. Three claims were wrong about
+  live behaviour, not naming: `docs/caching/README.md` documented a Valkey
+  database backing edge rate limiting (the limiter is `type: Local`, in-process
+  — the section is deleted and the hub now says so, citing ADR-045);
+  `docs/secrets/openbao.md` documented a static RS256 edge credential (the edge
+  fetches the realm JWKS itself, zero provisioned key material, and only
+  auth-service's own signing secret survives until P5); and the observability
+  family described the edge dual-shipping spans **and** runtime logs over OTLP
+  (the edge has no OTLP logs path — one JSON access log on stdout, tailed by
+  Vector). Also fixed: two references to deleted manifest paths (the edge
+  scrape objects and the monitoring route), `docs/platform/setup.md`'s Flux
+  graph and its login examples (which still curled a password-grant endpoint
+  that no longer exists — now the PKCE helper), and `cert-manager.md`'s
+  fabricated `renewBefore: 720h` (the manifest says `360h`). Cluster behaviour
+  not yet run on Kind is marked **planned**; the two dated audit records keep
+  their history. All 70 Mermaid blocks in the touched files re-rendered.
+- Ten headings carried `{#custom-id}` attributes, which GitHub does not
+  support — it folds the braces into the anchor, so every link targeting such
+  an id is dead on GitHub and fails the `markdown-links` check the moment a PR
+  touches the file (this felled two PRs this week). All dropped; the two whose
+  custom id differed from the natural slug had their one inbound link
+  re-pointed and one heading simplified so its slug is deterministic. One
+  orphaned TOC row linking a section that no longer exists is removed.
 - `docs/api/` names the deployed edge and speaks Gateway API: HTTPRoute matches
   rather than ingress annotations, an edge `SecurityPolicy` rather than a
   per-route plugin, a `URLRewrite` filter rather than a path-stripping flag —

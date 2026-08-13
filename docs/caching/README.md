@@ -1,6 +1,6 @@
 # Caching (Valkey)
 
-Platform cache tier — a **single-node Valkey** instance (`cache-system` namespace) shared by product-service Cache-Aside (db `0`) and Kong distributed rate limiting (db `1`). App-side patterns (Cache-Aside, stampede lock, keys, env) are normative in [`../api/caching.md`](../api/caching.md).
+Platform cache tier — a **single-node Valkey** instance (`cache-system` namespace) backing product-service Cache-Aside on db `0`. App-side patterns (Cache-Aside, stampede lock, keys, env) are normative in [`../api/caching.md`](../api/caching.md).
 
 | Attribute | Value |
 |-----------|-------|
@@ -14,18 +14,22 @@ Platform cache tier — a **single-node Valkey** instance (`cache-system` namesp
 
 > **Service authors:** implement caching in your repo per
 > [**Application caching**](../api/caching.md). This hub covers **platform**
-> deployment, eviction theory, Kong's second consumer, observability, and on-call
-> troubleshooting — not Go handler code.
+> deployment, eviction theory, observability, and on-call troubleshooting — not
+> Go handler code.
 
 ---
 
 ## Overview
 
-Valkey backs read-heavy catalog caching for product-service and shared rate-limit
-counters for Kong. Reads through the cache are **fail-open** (degrade to PostgreSQL);
-a Valkey outage affects latency, not availability, for product paths. Kong uses
-`fault_tolerant: true` on its redis policy so gateway traffic continues if Valkey
-is down.
+Valkey backs read-heavy catalog caching for product-service. Reads through the
+cache are **fail-open** (degrade to PostgreSQL); a Valkey outage affects latency,
+not availability, for product paths.
+
+Nothing at the edge uses Valkey. Edge rate limiting is an **in-process token
+bucket** on the gateway itself (`BackendTrafficPolicy`, `rateLimit.type: Local`)
+— no shared counter store exists, so the edge has no failure mode tied to this
+instance, and Valkey is never on the gateway request path. The reasoning is
+recorded in [ADR-045](../proposals/adr/ADR-045-local-first-edge-rate-limiting/).
 
 ## Platform deployment
 
@@ -40,25 +44,20 @@ is down.
 
 ```mermaid
 flowchart LR
-    subgraph consumers [Consumers]
-        PROD["product-service<br/>db 0"]
-        KONG["Kong gateway<br/>db 1 rate limits"]
-    end
-    PROD --> VALKEY["Valkey :6379<br/>cache-system"]
-    KONG --> VALKEY
+    PROD["product-service<br/>db 0 cache-aside"] --> VALKEY["Valkey :6379<br/>cache-system"]
     VALKEY --> SM["ServiceMonitor<br/>redis_exporter"]
     SM --> VM["VictoriaMetrics<br/>via VMAgent scrape"]
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    class PROD,KONG service;
+    class PROD service;
     class VALKEY data;
     class SM metric;
     class VM platform;
 ```
 
-## Key eviction policy {#eviction-policy}
+## Key eviction policy
 
 ### Overview
 
@@ -131,23 +130,19 @@ per-key bookkeeping cost.
 Configured in Helm: `valkeyConfig: maxmemory-policy allkeys-lru` in
 [`helmrelease.yaml`](../../kubernetes/infra/controllers/caching/valkey/helmrelease.yaml).
 
-## Second consumer: Kong rate-limit counters (db 1)
-
-The same Valkey instance backs **Kong's distributed rate limiting**
-(`rate-limiting-api` + `rate-limiting-admin` KongClusterPlugins, `policy: redis`)
-— which puts Valkey **on the gateway request path**, not just the product read
-path. Keyspaces are isolated by database index:
+## One consumer, one database
 
 | Consumer | DB index | Purpose | Failure mode |
 |---|---|---|---|
 | product-service cache-aside | `0` | product/list cache | fail-open → DB |
-| Kong rate limiting | `1` | shared counters across both Kong replicas | `fault_tolerant: true` → requests pass unlimited |
 
-**Eviction caveat:** `allkeys-lru` applies to the whole instance — under memory
-pressure it can evict *rate-limit counters* as readily as cache entries
-(a counter reset momentarily raises a client's remaining quota). Acceptable at
-homelab scale; a dedicated instance (or `volatile-*` policy) is the production
-answer. See [kong-gateway.md](../platform/kong-gateway.md) for the plugin config.
+The instance has exactly one client, which simplifies the eviction story:
+`allkeys-lru` can only ever evict cache entries, and evicting a cache entry
+costs one PostgreSQL read. There is no second keyspace whose entries carry
+different semantics, so no consumer can be hurt by another's memory pressure.
+Adding a future consumer means re-answering that question — isolate it on its
+own DB index, and check whether the whole-instance eviction policy is still
+safe for both.
 
 ## Distributed cache (concept and current state)
 
@@ -185,7 +180,7 @@ cross-node consistency, rebalancing, and operational cost; not worth it until a
 single node can't keep up (reads here already fail-open to PostgreSQL, so an outage
 degrades rather than breaks).
 
-## Observability {#observability}
+## Observability
 
 Valkey metrics are scraped via the chart's **ServiceMonitor** (redis_exporter):
 
@@ -291,8 +286,7 @@ Prioritized platform and contract gaps; cross-service rules owner: [RFC-0004](..
 
 - [Application caching](../api/caching.md) — normative app contract
 - [RFC-0004](../proposals/rfc/RFC-0004/) — cross-service caching and invalidation
-- [Kong gateway](../platform/kong-gateway.md) — rate-limit redis policy
 - [Valkey Documentation](https://valkey.io/)
 - [Valkey Helm chart](https://valkey.io/valkey-helm/)
 
-_Last updated: 2026-07-22 — platform hub; app contract in docs/api/caching.md._
+_Last updated: 2026-08-13 — platform hub; app contract in docs/api/caching.md._

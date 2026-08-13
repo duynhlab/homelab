@@ -214,7 +214,7 @@ slo:current_burn_rate:ratio{sloth_service="auth", sloth_slo="availability"}
 
 ## Sloth Web UI (v0.16.0)
 
-The `sloth server` sub-command ships a built-in read-only web UI. We run it as a separate Deployment in `monitoring` (the upstream Helm chart only deploys the controller) and expose it through Kong.
+The `sloth server` sub-command ships a built-in read-only web UI. We run it as a separate Deployment in `monitoring` (the upstream Helm chart only deploys the controller) and expose it through the edge (HTTPRoute).
 
 **URL**: [http://slo.duynh.me](http://slo.duynh.me)
 
@@ -257,7 +257,7 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - inventory gRPC SLOs (the only `PrometheusServiceLevel` in this repo): `kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml`
 - Sloth Operator (controller): `kubernetes/infra/controllers/metrics/sloth-operator.yaml`
 - Sloth Web UI (Deployment + Service + PodMonitor): `kubernetes/infra/configs/observability/sloth/sloth-ui.yaml`
-- Sloth UI Ingress: `kubernetes/infra/configs/kong/ingress-monitoring.yaml` (`slo.duynh.me`)
+- Sloth UI HTTPRoute: `kubernetes/infra/configs/envoy-gateway/routes/monitoring.yaml` (`slo.duynh.me`)
 - OTLP metrics pipeline (app services push, no scrape): `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 
 ### External References
@@ -269,4 +269,4 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - [Google SRE Workbook -- Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)
 
 ---
-_Last updated: 2026-08-06_
+_Last updated: 2026-08-13 — Sloth UI exposure documented as the edge HTTPRoute (envoy-gateway/routes/monitoring.yaml)_

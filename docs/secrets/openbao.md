@@ -379,55 +379,66 @@ secret/{environment}/{category}/{service}/{resource}
 | `secret/local/databases/product-db/payment` | `username`, `password` | CNPG payment owner (consumed in `product` + `payment` ns) |
 | `secret/local/databases/pgdog-cnpg/credentials` | `username`, `password` | PgDog pooler admin |
 | `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) |
-| `secret/local/auth/jwt-signing` | `private_key`, `public_key` | RS256 access-token keypair — auth signer (private → ns `auth`) + Kong edge JWT (public → ns `kong`); see [JWT signing key](#jwt-signing-key-auth--kong) |
+| `secret/local/auth/jwt-signing` | `private_key`, `public_key` | RS256 keypair for auth-service's own access tokens (private → ns `auth`, `JWT_PRIVATE_KEY_PEM`); the edge does not consume this secret — see [JWT signing key](#jwt-signing-key-auth-service) |
 | `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (all CloudNativePG clusters — bucket `pg-backups-cnpg`) |
-| `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) — **prod only**; on local Kind `kong-proxy-tls` is `homelab-ca`-issued |
+| `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) — **prod only**; on local Kind `platform-edge-tls` is `homelab-ca`-issued |
 
 > **Note — `secret/local/services/payment/webhook-hmac`**: follows the standard 4-level `secret/{env}/{category}/{service}/{resource}` structure and is covered by the existing `eso-read` `local/services/*` grant. (It was briefly seeded at the 3-level `secret/local/payment/webhook-hmac`, which sat outside every `eso-read` prefix; renaming it into `local/services/*` fixed both the convention and the RBAC scope.)
 
-> ⚠️ **Local vs prod**: on **local Kind** `openbao-bootstrap` **now seeds a dev placeholder** (`dev-cloudflare-placeholder`) so the `cloudflare-api-token` ExternalSecret syncs and doesn't block `secrets-local` (DNS-01 fails locally, which is fine — `kong-proxy-tls` is `homelab-ca`-issued). On **prod** the real token is **operator-supplied** and **not** in Git — re-seed after every fresh cluster — see [OpenBAO initial setup](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
+> ⚠️ **Local vs prod**: on **local Kind** `openbao-bootstrap` **now seeds a dev placeholder** (`dev-cloudflare-placeholder`) so the `cloudflare-api-token` ExternalSecret syncs and doesn't block `secrets-local` (DNS-01 fails locally, which is fine — `platform-edge-tls` is `homelab-ca`-issued, planned). On **prod** the real token is **operator-supplied** and **not** in Git — re-seed after every fresh cluster — see [OpenBAO initial setup](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
 
-#### JWT signing key (auth + Kong)
+#### JWT signing key (auth-service)
 
-The RS256 access-token keypair is a single OpenBAO secret,
-`secret/local/auth/jwt-signing` (`private_key` + `public_key`), that **ESO fans out
-to two consumers** — the private half signs, the public half verifies at the edge:
+`secret/local/auth/jwt-signing` (`private_key` + `public_key`) is auth-service's
+own RS256 signing keypair. ESO syncs only the private half to auth itself — the
+edge does not consume this secret at all:
 
 ```mermaid
 flowchart LR
-  KV[("OpenBAO<br/>secret/local/auth/jwt-signing<br/>private_key + public_key")]
+  KV[("OpenBAO<br/>secret/local/auth/jwt-signing<br/>private_key (+ public_key, unused)")]
   ES1["ExternalSecret auth-jwt-signing<br/>(ns auth · private_key)"]
-  ES2["ExternalSecret auth-issuer-jwt<br/>(ns kong · public_key)"]
   AUTH["auth<br/>JWT_PRIVATE_KEY_PEM<br/>signs iss/aud/kid"]
-  KONG["Kong jwt-edge<br/>auth-issuer consumer cred<br/>verify RS256 by iss"]
+  KC[("Keycloak realm<br/>duynhlab")]
+  EDGE["Envoy Gateway<br/>SecurityPolicy jwt-edge<br/>remoteJWKS"]
   KV --> ES1 --> AUTH
-  KV --> ES2 --> KONG
+  KC -->|"GET /realms/duynhlab/protocol/openid-connect/certs"| EDGE
 
   classDef external fill:#64748b,color:#fff,stroke:#334155;
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
   classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  class KV external; class ES1,ES2,AUTH service; class KONG edge;
+  class KV,KC external; class ES1,AUTH service; class EDGE edge;
 ```
 
 | ExternalSecret | Namespace | Property | Consumer |
 |---|---|---|---|
 | `auth-jwt-signing` | `auth` | `private_key` | auth env `JWT_PRIVATE_KEY_PEM` — signs access tokens (`iss=https://gateway.duynh.me`, `aud=duynhlab-platform`, `kid`) |
-| `auth-issuer-jwt` | `kong` | `public_key` | rendered as a Kong `jwt` credential (`key=https://gateway.duynh.me`, `algorithm=RS256`, `rsa_public_key`) on the `auth-issuer` `KongConsumer` |
 
-**Verification is two-layer.** Kong's `jwt-edge` plugin (on `/private/` routes) looks
-up the credential **by the token's `iss` claim** (`key_claim_name: iss`) and checks the
-RS256 signature + `exp` — Kong holds only the public key. Each service's `pkg/authmw`
-then re-verifies the full token (audience, `nbf`, …) against auth's cached JWKS
-(`/auth/v1/public/auth/jwks`) and is authoritative. Contract detail:
-[auth service API](../api/auth.md); edge detail: [Kong gateway](../platform/kong-gateway.md).
+The `auth-issuer-jwt` ExternalSecret (`public_key`) is **deleted** — see the
+header comment in
+[`kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml`](../../kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml).
+The edge provisions **zero key material**: Envoy Gateway's `SecurityPolicy`
+fetches the Keycloak realm's JWKS itself over `remoteJWKS`
+([`kubernetes/infra/configs/envoy-gateway/policies/security-jwt.yaml`](../../kubernetes/infra/configs/envoy-gateway/policies/security-jwt.yaml)),
+so there is nothing to rotate at the edge and no edge rotation step. This
+`auth-jwt-signing` ExternalSecret itself retires with auth-service in RFC-0024
+P5 — until then, auth-service keeps signing and serving its own tokens for the
+routes it still owns (see [routes/api.yaml](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) `api-auth-public`).
 
-**Rotation.** Because Kong verifies against the statically provisioned public key (Kong
-OSS `jwt` can't fetch a JWKS), the key is dual-target — rotate **both** ExternalSecrets:
+**Verification today is two independent trust anchors.** Envoy Gateway's edge
+`SecurityPolicy` validates Keycloak-issued tokens against the realm's live
+JWKS — no provisioned key, no edge rotation step. Separately, each service's
+`pkg/authmw` verifies auth-service's own tokens against auth's cached JWKS
+(`/auth/v1/public/auth/jwks`) and is authoritative for those. Contract detail:
+[auth service API](../api/auth.md); edge detail:
+[Envoy Gateway](../platform/envoy-gateway.md).
 
-1. Write a new keypair to `secret/local/auth/jwt-signing` (both `private_key` + `public_key`).
-2. Both ExternalSecrets re-sync (`refreshInterval`); force with `kubectl annotate externalsecret … force-sync=$(date +%s)` if needed.
-3. **Restart auth** so it loads the new `JWT_PRIVATE_KEY_PEM`; Kong reloads the new `auth-issuer-jwt` credential automatically.
-4. Overlap window: tokens signed by the old key keep validating until their `exp` — keep the old public key alongside the new one until the longest-lived token expires, or accept a short reject window. A JWKS refresh alone only covers the services, **not** Kong's edge credential.
+**Rotation.** Only auth-service's own signing key needs rotating — there is no
+edge credential to update in step with it:
+
+1. Write a new keypair to `secret/local/auth/jwt-signing` (`private_key` + `public_key`).
+2. The `auth-jwt-signing` ExternalSecret re-syncs (`refreshInterval: 1h`); force with `kubectl annotate externalsecret auth-jwt-signing -n auth force-sync=$(date +%s)` if needed.
+3. **Restart auth** so it loads the new `JWT_PRIVATE_KEY_PEM`.
+4. Overlap window: tokens signed by the old key keep validating in each service's `pkg/authmw` until their `exp`, bounded by the 300s JWKS cache — no edge-side overlap concern since the edge never held a provisioned key.
 
 > Path note: this ships at `secret/local/auth/jwt-signing`; [RFC-0009](../proposals/rfc/RFC-0009/) references a pre-implementation `secret/data/<env>/apps/auth/jwt-signing` — the deployed path is the one above.
 
@@ -1023,7 +1034,7 @@ gantt
 
 - [RFC-0008 — Production secrets hardening](../proposals/rfc/RFC-0008/) (+ [research.md](../proposals/rfc/RFC-0008/research.md) — deep dive, auto-unseal PoC, DB redesign)
 - [Secrets hub](./README.md#secret-organization) — ESO patterns, path conventions, secret catalog
-- [cert-manager](./cert-manager.md) — Certificate issuers and `kong-proxy-tls` wildcard pipeline
+- [cert-manager](./cert-manager.md) — Certificate issuers and `platform-edge-tls` wildcard pipeline
 - [Trust Distribution](./trust-distribution.md) — trust-manager `homelab-ca-bundle` distribution
 - [Secrets proposals](../proposals/) — ADR-004/005 (audit, HA) + RFC backlog (rotation, PushSecret, hardening)
 - [OpenBAO Documentation](https://openbao.org/docs)
@@ -1033,4 +1044,4 @@ gantt
 
 ---
 
-_Last updated: 2026-07-17 — Split from `docs/secrets/README.md`; RFC-0018 platform-db paths and compat OpenBAO layout._
+_Last updated: 2026-08-13 — JWT signing key section reflects the edge's `remoteJWKS` verification against the Keycloak realm (zero provisioned key material); `auth-jwt-signing` is the only surviving ExternalSecret from that KV secret, retiring with auth-service in RFC-0024 P5._

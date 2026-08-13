@@ -1,6 +1,14 @@
 # cert-manager + Let's Encrypt + Flux CD
 
-This guide documents how cert-manager is wired into Flux in this repo: **two ClusterIssuer families** (internal `homelab-ca` + public `letsencrypt-{staging,prod}`), a **single `kong-proxy-tls` wildcard cert** issued via **Cloudflare DNS-01** on prod (the local Kind overlay patches it to the self-signed **`homelab-ca`** instead), and **trust-manager** distributing the homelab CA bundle.
+This guide documents how cert-manager is wired into Flux in this repo: **two ClusterIssuer families** (internal `homelab-ca` + public `letsencrypt-{staging,prod}`), a **single `platform-edge-tls` wildcard cert** issued via **Cloudflare DNS-01** on prod (the local Kind overlay patches it to the self-signed **`homelab-ca`** instead), and **trust-manager** distributing the homelab CA bundle.
+
+> **Cluster status:** the `envoy-gateway-config-local` Kustomization that owns
+> this Certificate is **planned** — the manifests are written and validate but
+> have not yet reconciled on this Kind cluster (see the status table in
+> [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)). The
+> ClusterIssuers, `homelab-ca` Certificate, and trust-manager Bundle described
+> below are already live; §6 and §9's steps 3–6 describe the edge
+> Certificate's target behavior once Envoy Gateway reconciles.
 
 **Repository paths (implemented in this repo):**
 
@@ -10,7 +18,7 @@ This guide documents how cert-manager is wired into Flux in this repo: **two Clu
 | cert-manager `HelmRelease` | [`kubernetes/infra/controllers/cert-manager/helmrelease.yaml`](../../kubernetes/infra/controllers/cert-manager/helmrelease.yaml) |
 | trust-manager `HelmRelease` | [`kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml`](../../kubernetes/infra/controllers/cert-manager/trust-manager-helmrelease.yaml) |
 | ClusterIssuers (selfsigned + homelab-ca + LE) | [`kubernetes/infra/configs/cert-manager/clusterissuers.yaml`](../../kubernetes/infra/configs/cert-manager/clusterissuers.yaml) |
-| Kong proxy Certificate | [`kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`](../../kubernetes/infra/configs/cert-manager/certificates-microservices.yaml) |
+| Platform edge Certificate | [`kubernetes/infra/configs/envoy-gateway/certificate.yaml`](../../kubernetes/infra/configs/envoy-gateway/certificate.yaml) |
 | trust-manager Bundle | [`kubernetes/infra/configs/cert-manager/bundles.yaml`](../../kubernetes/infra/configs/cert-manager/bundles.yaml) |
 | Committed CA PEM (Bundle source) | [`kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt`](../../kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt) |
 | CA bundle distribution deep-dive | [`./trust-distribution.md`](./trust-distribution.md) |
@@ -42,7 +50,7 @@ flowchart LR
     HCA[ClusterIssuer<br/>homelab-ca]
     LES[ClusterIssuer<br/>letsencrypt-staging]
     LEP[ClusterIssuer<br/>letsencrypt-prod]
-    KCert[Certificate<br/>kong/kong-proxy-tls<br/>SANs: duynh.me, *.duynh.me]
+    EdgeCert[Certificate<br/>envoy-gateway/platform-edge-tls<br/>SANs: duynh.me, *.duynh.me]
     CACOPY[ConfigMap<br/>homelab-ca-source<br/>committed PEM]
     Bundle[Bundle<br/>homelab-ca-bundle]
     OUT[ConfigMap<br/>homelab-ca-bundle<br/>across labeled namespaces]
@@ -50,8 +58,8 @@ flowchart LR
   HR --> cm
   K --> SS --> CA --> HCA
   Bao --> ES --> Sec --> LES & LEP
-  LEP -->|prod| KCert
-  HCA -->|local Kind overlay patch| KCert
+  LEP -->|prod| EdgeCert
+  HCA -->|local Kind overlay patch, planned| EdgeCert
   CA -. one-time export .-> CACOPY --> Bundle --> OUT
   LE[Let's Encrypt ACME] <-->|DNS-01 TXT on duynh.me zone| LEP
   LE <-->|staging| LES
@@ -62,10 +70,10 @@ flowchart LR
 
 | PKI | Issuer chain | Used by | Trusted by |
 |---|---|---|---|
-| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Webhooks, future internal mTLS, **and `kong-proxy-tls` on local Kind** (via the overlay patch) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
-| Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `kong-proxy-tls` (browser-facing wildcard) **on prod** | Browsers (Mozilla bundle covers LE roots) |
+| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Webhooks, future internal mTLS, **and `platform-edge-tls` on local Kind** (via the overlay patch, planned) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
+| Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `platform-edge-tls` (browser-facing wildcard) **on prod** | Browsers (Mozilla bundle covers LE roots) |
 
-> **Local vs prod:** on the local Kind cluster the `kong-proxy-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it is Let's Encrypt via Cloudflare DNS-01. The switch is a `spec.patches` override in `clusters/local/cert-manager-config.yaml`; prod has no such patch.
+> **Local vs prod:** on the local Kind cluster the `platform-edge-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it is Let's Encrypt via Cloudflare DNS-01. The switch is a `spec.patches` override in [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) (not `cert-manager-config.yaml` — the edge Certificate lives in the `envoy-gateway` Kustomization, not the `cert-manager` one); prod has no such patch. This patch is **planned** along with the rest of the Envoy Gateway rollout on Kind.
 
 ---
 
@@ -264,61 +272,73 @@ spec:
           dnsZones: [duynh.me]
 ```
 
-**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`). On **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** value so the ExternalSecret syncs and does not block `secrets-local` — the local `kong-proxy-tls` is `homelab-ca`-signed, so the (failing) DNS-01 solver never uses this token. On **prod** the token is **operator-supplied** — a real Cloudflare token, not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [OpenBAO initial setup § Step 7](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
+**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`). On **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** value so the ExternalSecret syncs and does not block `secrets-local` — the local `platform-edge-tls` is `homelab-ca`-signed (planned), so the (failing) DNS-01 solver never uses this token. On **prod** the token is **operator-supplied** — a real Cloudflare token, not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [OpenBAO initial setup § Step 7](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
 
 ---
 
-## 6. Kong proxy Certificate (single wildcard for all browser-facing hosts)
+## 6. Platform edge Certificate (single wildcard for all browser-facing hosts)
 
-Kong terminates TLS centrally. There is **one** Certificate — `kong/kong-proxy-tls` — covering the apex and wildcard (`duynh.me`, `*.duynh.me`); every browser-facing host (`local.duynh.me`, `gateway.duynh.me`, …) is covered by the `*.duynh.me` wildcard, not listed as an explicit SAN. Per-service Certificates are not used; Ingresses do not carry `tls:` blocks because Kong serves the cert via `default-ssl-cert`.
+Envoy Gateway terminates TLS centrally, at the `platform` Gateway's `https`
+listener. There is **one** Certificate — `envoy-gateway/platform-edge-tls` —
+covering the apex and wildcard (`duynh.me`, `*.duynh.me`); every browser-facing
+host (`local.duynh.me`, `gateway.duynh.me`, …) is covered by the `*.duynh.me`
+wildcard, not listed as an explicit SAN. Per-service Certificates are not used;
+HTTPRoutes do not carry any TLS configuration because the Gateway listener
+references the Secret directly via `certificateRefs`.
 
 > **No redundant SANs.** Do not add an explicit SAN that is already covered by the wildcard (e.g. `local.duynh.me`): ACME (RFC 8555 §7.1.3) rejects a SAN redundant with a wildcard in the same request (Let's Encrypt returns `400 malformed`).
 
-**File:** `kubernetes/infra/configs/cert-manager/certificates-microservices.yaml`
+**File:** `kubernetes/infra/configs/envoy-gateway/certificate.yaml`
 
 ```yaml
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: kong-proxy-tls
-  namespace: kong
+  name: platform-edge-tls
+  namespace: envoy-gateway
 spec:
-  secretName: kong-proxy-tls
-  duration: 2160h          # 90d — LE max
-  renewBefore: 720h        # 30d before expiry
+  secretName: platform-edge-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
   privateKey:
     algorithm: ECDSA
     size: 256
     rotationPolicy: Always
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
   commonName: duynh.me
   dnsNames:
     - duynh.me
     - "*.duynh.me"
-  issuerRef:
-    kind: ClusterIssuer
-    name: letsencrypt-prod
 ```
 
-> **Local overlay:** the base manifest above uses `letsencrypt-prod`, but `clusters/local/cert-manager-config.yaml` patches `issuerRef.name` → `homelab-ca` on the local Kind cluster (self-signed; no ACME). Only prod issues this cert from Let's Encrypt.
+> **Local overlay:** the base manifest above uses `letsencrypt-prod`, but [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) patches `issuerRef.name` → `homelab-ca` on the local Kind cluster (self-signed; no ACME). Only prod issues this cert from Let's Encrypt. **This patch is planned** — the `envoy-gateway-config-local` Kustomization has not yet reconciled on this Kind cluster (see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
 
 On prod, switch `letsencrypt-prod` → `letsencrypt-staging` while iterating to avoid LE prod rate limits.
 
 ### Adding a new browser-facing host
 
-If a new subdomain (e.g. `newtool.duynh.me`) is added to a Kong Ingress, **no Certificate change is needed** — it is already covered by the `*.duynh.me` SAN. Just add the host to `scripts/setup-hosts.sh` and create the Ingress.
+If a new subdomain (e.g. `newtool.duynh.me`) is added as an HTTPRoute, **no Certificate change is needed** — it is already covered by the `*.duynh.me` SAN and the Gateway's `https` listener, which is itself a wildcard (`*.duynh.me`). Just add the host to `scripts/setup-hosts.sh` and create the HTTPRoute (see [Envoy Gateway routing](../platform/envoy-gateway.md#routing-is-audience-scoped)).
 
 ---
 
-## 7. Ingress wiring (Kong, no per-Ingress TLS block)
+## 7. Gateway API TLS termination (no per-route TLS)
 
-This platform uses **Kong** as the only ingress controller. Kong terminates TLS at the proxy with the wildcard `kong-proxy-tls` Secret; Ingress objects do **not** carry `tls:` blocks and do **not** use the `cert-manager.io/cluster-issuer` annotation. They only:
+Envoy Gateway is the only edge control plane. TLS terminates once, on the
+`platform` Gateway's `https` listener
+([`kubernetes/infra/configs/envoy-gateway/gateway.yaml`](../../kubernetes/infra/configs/envoy-gateway/gateway.yaml)),
+via `certificateRefs` pointing at the `platform-edge-tls` Secret. HTTPRoute
+objects carry **no** TLS block and **no** `cert-manager.io/cluster-issuer`
+annotation — a route only declares `hostnames` and path matches; the listener
+it attaches to is what decides encryption.
 
-- declare hosts (`*.duynh.me`),
-- force HTTPS via per-Ingress annotations:
-  - `konghq.com/protocols: "https"`
-  - `konghq.com/https-redirect-status-code: "301"`
+Plaintext (`:80`) is handled the canonical Gateway API way: a single `http`
+listener whose only route is a `RequestRedirect` filter (301 to `https`), so no
+app route can ever be reached over plaintext.
 
-For the full Kong setup (CORS, rate limiting, ingress catalog, verification runbook) see [`docs/platform/kong-gateway.md`](../platform/kong-gateway.md).
+For the full edge setup (resource model, routing, JWT policy, telemetry,
+operations) see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md).
 
 ---
 
@@ -331,10 +351,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - clusterissuers.yaml
-  - certificates-microservices.yaml
+  - ca-source
   - bundles.yaml
-  - ca-source/
 ```
+
+The platform edge Certificate is **not** in this directory — it is owned by
+[`configs/envoy-gateway/certificate.yaml`](../../kubernetes/infra/configs/envoy-gateway/certificate.yaml),
+reconciled by the separate `envoy-gateway-config-local` Kustomization (§6).
 
 **File:** `kubernetes/clusters/local/cert-manager-config.yaml`
 
@@ -359,11 +382,16 @@ spec:
     - name: secrets-local       # cloudflare-api-token Secret must exist before LE issuers reconcile
 ```
 
-`cert-manager-config.yaml` is registered in `kubernetes/clusters/local/kustomization.yaml` between `controllers.yaml`/`secrets.yaml` and `kong-local`/`apps.yaml`.
+`cert-manager-config.yaml` is registered in `kubernetes/clusters/local/kustomization.yaml` right after `controllers.yaml`, ahead of `envoy-gateway.yaml`/`envoy-gateway-config.yaml`/`secrets.yaml`/`apps.yaml`.
 
 ---
 
 ## 9. Deployment (step-by-step)
+
+> **Planned on Kind:** steps 3–6 describe the target behavior of the
+> `envoy-gateway-config-local` Kustomization, which has not yet reconciled on
+> this cluster (see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
+> Steps 1–2 (ClusterIssuers + `cloudflare-api-token`) are already live.
 
 1. **Seed Cloudflare API token in OpenBAO** (host setup, runs once per fresh cluster):
    ```bash
@@ -375,13 +403,13 @@ spec:
    ```bash
    flux reconcile ks secrets-local --with-source
    ```
-3. **Reconcile** `cert-manager-local` — on **local Kind** the overlay patches `kong-proxy-tls` to `homelab-ca`, so cert-manager signs the wildcard Secret directly (no ACME Order / DNS-01 / LE validation) and `kong-proxy-tls` lands in the `kong` namespace immediately. On **prod** the `letsencrypt-{staging,prod}` ClusterIssuers go Ready, cert-manager creates an Order, publishes the DNS-01 TXT, LE validates, and the Secret lands.
-4. **Reconcile** `kong-local` (and `kong-config-local`) — Kong pod starts and mounts the Secret as `ssl_cert`/`ssl_cert_key`.
+3. **Reconcile** `cert-manager-local`, then `envoy-gateway-config-local` — on **local Kind** the overlay patches `platform-edge-tls` to `homelab-ca`, so cert-manager signs the wildcard Secret directly (no ACME Order / DNS-01 / LE validation) and `platform-edge-tls` lands in the `envoy-gateway` namespace. On **prod** the `letsencrypt-{staging,prod}` ClusterIssuers go Ready, cert-manager creates an Order, publishes the DNS-01 TXT, LE validates, and the Secret lands.
+4. **Reconcile** `envoy-gateway-local` (and `envoy-gateway-config-local`) — Envoy Gateway starts the data plane and mounts the Secret via the Gateway listener's `certificateRefs`.
 5. **Verify**:
    ```bash
    kubectl get clusterissuer
    kubectl get certificate -A
-   kubectl get secret kong-proxy-tls -n kong
+   kubectl get secret platform-edge-tls -n envoy-gateway
    ```
 6. **Browser test**: `https://local.duynh.me` (after `sudo ./scripts/setup-hosts.sh`). On **local Kind** the cert is `homelab-ca`-signed, so expect an untrusted-CA warning unless `homelab-ca` is added to the trust store. On **prod** it shows a green padlock with a Let's Encrypt-issued cert covering `*.duynh.me`.
 
@@ -400,7 +428,7 @@ kubectl describe clusterissuer letsencrypt-staging
 kubectl get certificate,certificaterequest,order,challenge -A
 
 # One certificate detail
-kubectl -n kong describe certificate kong-proxy-tls
+kubectl -n envoy-gateway describe certificate platform-edge-tls
 
 # cert-manager logs
 kubectl -n cert-manager logs deploy/cert-manager -f
@@ -418,7 +446,7 @@ flux reconcile kustomization cert-manager-local --with-source
 | Order stuck in `pending` | DNS-01 challenge waiting on Cloudflare TXT propagation — cert-manager retries automatically (1–2 min) |
 | `cloudflare API call failed` | Token revoked or scope wrong (needs Zone\:Read + DNS\:Edit on `duynh.me`); regenerate and re-seed OpenBAO |
 | LE prod rate-limit (429) | Iterate on `letsencrypt-staging` first; switch `issuerRef` to `prod` only when SANs are stable |
-| Cert SAN mismatch in browser | Check `kubectl describe cert kong-proxy-tls -n kong` — SANs must include the host being browsed; add to `dnsNames` and reissue |
+| Cert SAN mismatch in browser | Check `kubectl describe cert platform-edge-tls -n envoy-gateway` — SANs must include the host being browsed; add to `dnsNames` and reissue |
 
 ---
 
@@ -438,4 +466,4 @@ cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace. W
 
 ---
 
-_Last updated: 2026-07-10 — chart pin corrected to `v1.20.2`. cert-manager + Let's Encrypt (DNS-01 via Cloudflare) for the `kong-proxy-tls` wildcard on prod; local Kind issues it from the self-signed `homelab-ca` (overlay patch). SANs `duynh.me`, `*.duynh.me`. `cloudflare-api-token` is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod._
+_Last updated: 2026-08-13 — the edge Certificate is `platform-edge-tls` in namespace `envoy-gateway` (`configs/envoy-gateway/certificate.yaml`), terminated on the `platform` Gateway's `https` listener via Gateway API — no per-route TLS. cert-manager + Let's Encrypt (DNS-01 via Cloudflare) issue the wildcard on prod; local Kind issues it from the self-signed `homelab-ca` (overlay patch in `envoy-gateway-config.yaml`, planned — not yet reconciled on Kind). SANs `duynh.me`, `*.duynh.me`. `cloudflare-api-token` is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod._

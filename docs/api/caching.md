@@ -299,7 +299,7 @@ type CacheConfig struct {
 }
 ```
 
-## Observability (app instrumentation) {#observability-app-instrumentation}
+## Observability (app instrumentation)
 
 Cache operations are traced via OpenTelemetry spans:
 

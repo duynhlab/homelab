@@ -5,14 +5,14 @@ The **logs pillar** of the platform — the "**why is it broken?**" signal
 profiles "which line of code?"; see [`../README.md`](../README.md)). Logs reach
 VictoriaLogs by **two complementary paths**: instrumented Go services ship over
 **OTLP** (otelzap → OpenTelemetry Collector), and everything not OTel-instrumented
-(databases, Kong access log, the frontend, system pods) is tailed by **Vector**.
+(databases, the edge's access log, the frontend, system pods) is tailed by **Vector**.
 Both land in one backend, queryable with LogsQL and correlated to traces by
 `trace_id`.
 
 | | |
 |---|---|
 | **App-log path** | otelzap tee → OTLP (`otlploghttp`) → **OpenTelemetry Collector** → VictoriaLogs (fleet-wide since RFC-0014 P4) |
-| **Infra-log path** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source — DBs, Kong access log, PG `auto_explain`, frontend, system pods |
+| **Infra-log path** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source — DBs, the edge's access log, PG `auto_explain`, frontend, system pods |
 | **Storage** | VictoriaLogs **VLSingle** `:9428` (`monitoring`, VM Operator CRD) — 7-day retention, 20Gi PVC |
 | **Query** | LogsQL (VictoriaLogs) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
@@ -42,7 +42,7 @@ The platform has **two log paths into one backend**:
   gets its own stream and **`trace_id` is a first-class queryable field**. This is
   the fleet-wide path since RFC-0014 P4.
 - **Infra path (Vector).** Everything **not** OTel-instrumented — databases
-  (CloudNativePG, incl. parsed **`auto_explain`** query plans), Kong's access log,
+  (CloudNativePG, incl. parsed **`auto_explain`** query plans), the edge's access log,
   the frontend, and system pods — is tailed by a single **Vector** DaemonSet and
   shipped over the jsonline endpoint. Vector explicitly **excludes the app pods**
   (they carry `platform.duynhlab.dev/otlp-logs=true`), so the two paths never
@@ -64,14 +64,13 @@ flowchart LR
     end
     subgraph infra["Non-instrumented workloads"]
         CNPG["CloudNativePG<br/>auto_explain plans"]
-        KONG["Kong access log<br/>(kong_json stdout)"]
+        EDGE["Envoy Gateway edge<br/>access log (JSON stdout)"]
         FE["Frontend + system pods"]
     end
     OTLP[/"OTLP logs :4318"/] --> COL[/"OpenTelemetry Collector<br/>logs pipeline"/]
     CNPG --> VEC["Vector DaemonSet · kube-system<br/>(excludes app pods)"]
-    KONG --> VEC
+    EDGE --> VEC
     FE --> VEC
-    KONGRT["Kong opentelemetry plugin<br/>runtime logs"] -->|OTLP| COL
     COL -->|"/insert/opentelemetry/v1/logs<br/>VL-Stream-Fields: service.name"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
     VEC -->|"/insert/jsonline"| VL
     VL --> GRAF{{"Grafana Explore<br/>(LogsQL)"}}
@@ -83,12 +82,10 @@ flowchart LR
     class VL log;
     class TEMPO trace;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     class Z service;
-    class CNPG,KONG,FE external;
-    class KONGRT edge;
+    class CNPG,EDGE,FE external;
     class VEC,KLOGS log;
     class GRAF platform;
 ```
@@ -102,14 +99,18 @@ collector is deployed), so Vector remains the single agent for that path. App po
 (`platform.duynhlab.dev/otlp-logs=true`), which is the double-ingest guard.
 Pipeline internals, sink headers, and stream definitions are below in [Platform pipeline](#platform-pipeline).
 
-### Kong logs (both paths)
+### Edge access logs (single path)
 
-Kong feeds **both** paths, complementary not duplicate: its `opentelemetry`
-plugin ships **runtime logs** over OTLP (`logs_endpoint`, Kong ≥ 3.8) →
-OpenTelemetry Collector, while Vector still tails Kong's **`kong_json` access
-log** from stdout. Per-request access logs over OTLP (`access_logs_endpoint`) are
-not available on Kong OSS 3.9. Tradeoff table + decision criteria:
-[`docs/platform/kong-gateway.md#observability`](../../platform/kong-gateway.md#observability).
+The edge feeds Vector by a **single** path: `EnvoyProxy.spec.telemetry.accessLog`
+writes a JSON access log to stdout, and Vector tails it like any other
+non-instrumented workload. The edge has **no OTLP logs path** — its only
+telemetry export to the collector is the OTLP/gRPC trace span (see
+[../opentelemetry/README.md](../opentelemetry/README.md)). Field names are a
+parse contract for Vector sources and Grafana panels: `time`, `client`,
+`method`, `uri`, `status`, `response_flags`, `bytes`, `duration`,
+`upstream_time`, `upstream`, `upstream_cluster`, `route_name`, `host`,
+`request_id`, `user_agent`. Config:
+[`kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml`](../../../kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml).
 
 ## Why VictoriaLogs (and why not Loki / ELK)
 
@@ -211,7 +212,7 @@ full backend troubleshooting are in [Troubleshooting](#troubleshooting) below. F
 symptom-driven on-call (blank Grafana logs panel), see
 [`victorialogs-kubernetes-logs-debug.md`](../runbooks/victorialogs-kubernetes-logs-debug.md).
 
-## Platform pipeline {#platform-pipeline}
+## Platform pipeline
 
 ### Components
 
@@ -477,4 +478,4 @@ If Vector is consuming too much memory:
 
 ---
 
-_Last updated: 2026-07-22 — platform infra hub; app contract → docs/api/logs.md — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, Kong access log, PG `auto_explain`, frontend); VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._
+_Last updated: 2026-08-13 — platform infra hub; app contract → docs/api/logs.md — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, the edge's access log, PG `auto_explain`, frontend); the edge has no OTLP logs path — its only log output is the JSON access log on stdout; VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._

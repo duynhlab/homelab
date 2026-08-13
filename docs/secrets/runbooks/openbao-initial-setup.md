@@ -35,7 +35,7 @@ kubectl exec -n openbao openbao-0 -- bao token revoke $ROOT_TOKEN
 
 ## Step 7 — Seed bootstrap-only Cloudflare token (operator)
 
-**Local Kind:** nothing to do — `openbao-bootstrap` seeds a **dev placeholder** (`api_token="dev-cloudflare-placeholder"`) so the ExternalSecret syncs. Local `kong-proxy-tls` is `homelab-ca`-issued, so the (failing) DNS-01 challenge is irrelevant.
+**Local Kind:** nothing to do — `openbao-bootstrap` seeds a **dev placeholder** (`api_token="dev-cloudflare-placeholder"`) so the ExternalSecret syncs. Local `platform-edge-tls` is `homelab-ca`-issued (planned — not yet reconciled on Kind), so the (failing) DNS-01 challenge is irrelevant.
 
 **Prod:** the real Cloudflare API token used by cert-manager DNS-01 is **operator-supplied** — **not** in Git. Override the placeholder with the real token after every fresh cluster, then trigger downstream reconciles:
 
@@ -54,7 +54,7 @@ flux reconcile ks secrets-local --with-source
 flux reconcile ks cert-manager-local --with-source
 ```
 
-Verify: `kubectl get secret cloudflare-api-token -n cert-manager` should exist with key `api-token`. The `kong-proxy-tls` Certificate then transitions to `Ready=True`.
+Verify: `kubectl get secret cloudflare-api-token -n cert-manager` should exist with key `api-token`. The `platform-edge-tls` Certificate then transitions to `Ready=True`.
 
 ## Check Status
 
@@ -78,4 +78,4 @@ kubectl describe externalsecret product-db-secret -n product
 
 ---
 
-_Last updated: 2026-07-14 - Split from `docs/secrets/README.md` during the runbook refactor._
+_Last updated: 2026-08-13 - Cloudflare token references the `platform-edge-tls` Certificate (namespace `envoy-gateway`); the local-Kind `homelab-ca` issuance is planned, not yet reconciled on Kind._

@@ -458,7 +458,7 @@ exception on the order side.
 Auth has no gRPC server. The former `auth.GetMe` dependency was retired when
 services moved to local JWT verification.
 
-## Edge exposure {#edge-exposure}
+## Edge exposure
 
 - No `/internal/` audience is exposed at either edge — verified in
   [local-stack routes.yaml](../../local-stack/gateway/eg/routes.yaml) and
@@ -478,7 +478,7 @@ services moved to local JWT verification.
 - Service paths are identical in both environments (Variant A pass-through, no
   `URLRewrite` filter configured anywhere).
 
-## End-to-end user journeys {#end-to-end-user-journeys}
+## End-to-end user journeys
 
 Four user journeys — register, browse, checkout, fulfill — traced as sequence
 diagrams across every service they touch. HTTP edges use the canonical shape

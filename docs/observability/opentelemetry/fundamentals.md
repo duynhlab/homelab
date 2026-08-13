@@ -17,7 +17,7 @@ rest is detail.
 |------|-------|
 | **What OTel is** | A framework to **generate, collect, and export** telemetry — not a backend, not a UI |
 | **Signals here** | Traces, metrics, logs (+ continuous profiling via a separate SDK) |
-| **Wire protocol** | OTLP/HTTP + protobuf + gzip, `:4318` (gRPC `:4317` exposed, unused by apps) |
+| **Wire protocol** | OTLP/HTTP + protobuf + gzip, `:4318` for apps (gRPC `:4317` for the edge's tracing provider) |
 | **Propagation** | W3C `traceparent` + `baggage` (composite propagator in `pkg/obsx`) |
 | **Who registers providers** | `pkg/obsx.SetupObservability` — exactly once per process |
 | **How we got here** | RFC-0014 P0–P5 (2026-07): metrics pull→push at P3, logs Vector-only→OTLP tee at P4 — [the story](#how-this-platform-got-here--rfc-0014-in-pictures) |
@@ -288,8 +288,9 @@ the logs for this trace" silently returned nothing.
 lines still go to stdout (for `kubectl logs`), and a second core
 (`obs.ZapCore`, an `otelzap` bridge) sends them over OTLP to the Collector →
 VictoriaLogs, where `trace_id` **is** a real field. Vector stays — but only
-for things without an SDK (databases, Kong access log, Postgres `auto_explain`
-plans, the frontend). It skips the app pods so no line is ingested twice.
+for things without an SDK (databases, the edge's access log, Postgres
+`auto_explain` plans, the frontend). It skips the app pods so no line is
+ingested twice.
 
 ```mermaid
 flowchart LR
@@ -299,7 +300,7 @@ flowchart LR
         z -->|"otelzap tee"| ex[/"OTLP log exporter"/]
     end
     subgraph noni["Non-instrumented workloads"]
-        infra["DBs · Kong · frontend<br/>(no SDK)"]
+        infra["DBs · edge access log · frontend<br/>(no SDK)"]
         vec["Vector<br/>(skips app pods)"]
         infra -->|"stdout"| vec
     end
@@ -408,29 +409,31 @@ Two practical notes that cut through most gRPC-vs-HTTP debates:
 
 **Platform decision:** every Go process exports **OTLP/HTTP + protobuf +
 gzip to `:4318`** (`pkg/obsx`, all three signals, one code path). The
-collector also listens on gRPC `:4317` for compatible platform tools, but the
-application path never uses it. Switching transports would be an
-exporter-config change in `pkg/obsx`, not a service change.
+collector also listens on gRPC `:4317`, which the edge's tracing provider uses
+(Envoy's tracing speaks gRPC only) — the application path never uses it.
+Switching transports would be an exporter-config change in `pkg/obsx`, not a
+service change.
 
 ## Context propagation and baggage on the wire
 
 Two W3C headers carry the cross-service context:
 
 - **`traceparent`** (+ optional `tracestate`) — trace ID, parent span ID, and
-  the sampling flag. Kong **forces** injection at the edge
-  (`inject: [w3c]`), so even header-less browser requests join one trace.
+  the sampling flag. The edge propagates it **natively**
+  (Envoy Gateway `telemetry.tracing`, no plugin config), so even header-less
+  browser requests join one trace.
 - **`baggage`** — application key-value pairs that propagate on every hop.
   The composite propagator `obsx` installs handles both automatically.
 
-The `traceparent` thread in motion: a request enters at Kong, which starts the
-root span and injects the header. Every hop (HTTP via `otelgin`, gRPC via
-`otelgrpc`) reads it, continues the same trace, and injects it onward. The SDK
-samples with **ParentBased(10%)** — if the parent was sampled, the child is
-too, so a trace is never half-captured.
+The `traceparent` thread in motion: a request enters at the edge, which starts
+the root span and propagates the header. Every hop (HTTP via `otelgin`, gRPC
+via `otelgrpc`) reads it, continues the same trace, and propagates it onward.
+The SDK samples with **ParentBased(10%)** — if the parent was sampled, the
+child is too, so a trace is never half-captured.
 
 ```mermaid
 flowchart LR
-    kong["Kong<br/>root span + traceparent"] -->|"HTTP + traceparent"| a["service A<br/>(otelgin)"]
+    edge["Envoy Gateway edge<br/>root span + traceparent"] -->|"HTTP + traceparent"| a["service A<br/>(otelgin)"]
     a -->|"gRPC + traceparent"| b["service B<br/>(otelgrpc)"]
     a -->|"OTLP"| col[/"OTel Collector"/]
     b -->|"OTLP"| col
@@ -457,7 +460,7 @@ service identity and time window because this platform has no exemplars.
 ```mermaid
 sequenceDiagram
     participant U as Browser
-    participant K as Kong (edge)
+    participant K as Envoy Gateway (edge)
     participant A as product (otelgin)
     participant R as review (otelgrpc)
     participant C as OTel Collector
@@ -519,7 +522,7 @@ never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 | Log bridge | otelzap tee (`obs.ZapCore`) — [`docs/api/logs.md`](../../api/logs.md) |
 | Collector | [collector.md](collector.md) — pipelines, processors, fan-out |
 | Metrics ingest | **vmagent** `:8429` — translates OTLP names to Prometheus style, relabels, remote-writes to VictoriaMetrics; also scrapes infra exporters |
-| Non-SDK logs | **Vector** DaemonSet — ships logs for everything without an OTel SDK (DBs, Kong access log, PG plans, frontend); skips app pods |
+| Non-SDK logs | **Vector** DaemonSet — ships logs for everything without an OTel SDK (DBs, the edge's access log, PG plans, frontend); skips app pods |
 | Backends | VictoriaMetrics (PromQL) · VictoriaLogs (LogsQL, `trace_id` first-class) · Tempo/Jaeger/VictoriaTraces · ClickHouse OLAP · Pyroscope |
 | UI | **Grafana** — one pane over all backends; pivots between signals via `trace_id` |
 | Sampling | `ParentBased(TraceIDRatioBased)`, `OTEL_SAMPLE_RATE` — [README.md § Sampling](README.md#sampling) |
@@ -533,4 +536,4 @@ never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 
 ---
 
-_Last updated: 2026-07-29 — absorbed the RFC-0014 explainer (all diagrams preserved; cutover pipeline diagram kept as historical, superseded by collector.md); facts audited against the OTel specification._
+_Last updated: 2026-08-13 — edge diagrams and the traceparent walkthrough re-documented for Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, no plugin); absorbed the RFC-0014 explainer (all diagrams preserved; cutover pipeline diagram kept as historical, superseded by collector.md); facts audited against the OTel specification._

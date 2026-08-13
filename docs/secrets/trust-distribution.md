@@ -43,14 +43,14 @@ The cluster runs **two independent issuer chains** that serve different audience
 
 | PKI | Used for | Trust source on the client | Distributed by trust-manager? |
 |---|---|---|---|
-| **Let's Encrypt** (`letsencrypt-prod` / `letsencrypt-staging`, DNS-01 via Cloudflare) | Browser-facing TLS on the Kong proxy **on prod** — `gateway.duynh.me`, `*.duynh.me` (single `kong-proxy-tls` wildcard) | Mozilla root store (already in browsers and the `useDefaultCAs: true` portion of `homelab-ca-bundle`) | No — public roots are already trusted everywhere |
-| **homelab-ca** (self-signed via cert-manager `selfsigned-bootstrap` → `homelab-ca` ClusterIssuer) | Future internal mTLS / private TLS endpoints **not** exposed via the public DNS name — **and `kong-proxy-tls` on local Kind** (the overlay patches the wildcard to `homelab-ca`) | Distributed via `homelab-ca-bundle` ConfigMap to namespaces labeled `platform.duynhlab.dev/needs-trust=true` | Yes — this is the entire reason trust-manager exists |
+| **Let's Encrypt** (`letsencrypt-prod` / `letsencrypt-staging`, DNS-01 via Cloudflare) | Browser-facing TLS on the platform edge **on prod** — `gateway.duynh.me`, `*.duynh.me` (single `platform-edge-tls` wildcard) | Mozilla root store (already in browsers and the `useDefaultCAs: true` portion of `homelab-ca-bundle`) | No — public roots are already trusted everywhere |
+| **homelab-ca** (self-signed via cert-manager `selfsigned-bootstrap` → `homelab-ca` ClusterIssuer) | Future internal mTLS / private TLS endpoints **not** exposed via the public DNS name — **and `platform-edge-tls` on local Kind** (the overlay patches the wildcard to `homelab-ca`; planned, not yet reconciled on Kind — see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)) | Distributed via `homelab-ca-bundle` ConfigMap to namespaces labeled `platform.duynhlab.dev/needs-trust=true` | Yes — this is the entire reason trust-manager exists |
 
 **Implications**
 
-- On **prod**, a pod calling `https://gateway.duynh.me` does not need `homelab-ca-bundle` to verify Kong; the cert is signed by Let's Encrypt and the Mozilla CAs in the same bundle (or in the system trust store) already cover it. On **local Kind** the Kong proxy cert is `homelab-ca`-issued, so an in-cluster client verifying it over TLS *does* need `homelab-ca` (via the bundle or system trust). The bundle is also for *future* private endpoints.
-- Do **not** issue any *additional* leaf cert from `homelab-ca` for a hostname that is also resolvable to the Kong proxy — that would create two competing TLS chains for the same SNI and confuse clients. (On local, `kong-proxy-tls` itself being `homelab-ca`-issued is the single intended chain, not a second one.)
-- Adding a new browser-facing host means adding a SAN to the single `kong-proxy-tls` cert (LE on prod, `homelab-ca` on local), **not** issuing a separate homelab-ca cert.
+- On **prod**, a pod calling `https://gateway.duynh.me` does not need `homelab-ca-bundle` to verify the edge; the cert is signed by Let's Encrypt and the Mozilla CAs in the same bundle (or in the system trust store) already cover it. On **local Kind** the edge cert is `homelab-ca`-issued (planned), so an in-cluster client verifying it over TLS *does* need `homelab-ca` (via the bundle or system trust). The bundle is also for *future* private endpoints.
+- Do **not** issue any *additional* leaf cert from `homelab-ca` for a hostname that is also resolvable to the platform edge — that would create two competing TLS chains for the same SNI and confuse clients. (On local, `platform-edge-tls` itself being `homelab-ca`-issued is the single intended chain, not a second one.)
+- Adding a new browser-facing host means adding a SAN to the single `platform-edge-tls` cert (LE on prod, `homelab-ca` on local), **not** issuing a separate homelab-ca cert.
 
 ---
 
@@ -196,7 +196,7 @@ kubectl get secret homelab-ca-v2-secret -n cert-manager \
 
 # 4. PR + merge. Now every labeled namespace trusts BOTH old and new CAs.
 
-# 5. Switch leaf Certificates (kong-proxy-tls, future ones) issuerRef to
+# 5. Switch leaf Certificates (platform-edge-tls, future ones) issuerRef to
 #    homelab-ca-v2. Wait for cert-manager to reissue.
 
 # 6. After all leaves are reissued (verify with `kubectl get certificate -A`):
@@ -270,4 +270,4 @@ flux reconcile kustomization cert-manager-local --with-source
 
 ---
 
-_Last updated: 2026-07-10 — Flux reconcile commands corrected to `cert-manager-local`. trust-manager distributes the `homelab-ca` bundle to opted-in namespaces (`platform.duynhlab.dev/needs-trust=true`); dual-PKI (public Let's Encrypt on prod + private homelab-ca; on local Kind `kong-proxy-tls` is itself `homelab-ca`-issued)._
+_Last updated: 2026-08-13 — dual-PKI table and rotation notes reference the edge Certificate `platform-edge-tls` (namespace `envoy-gateway`); trust-manager distributes the `homelab-ca` bundle to opted-in namespaces (`platform.duynhlab.dev/needs-trust=true`); on local Kind `platform-edge-tls` is itself `homelab-ca`-issued (planned — not yet reconciled)._

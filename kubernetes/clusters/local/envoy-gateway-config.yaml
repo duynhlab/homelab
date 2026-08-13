@@ -1,6 +1,6 @@
 # Envoy Gateway edge configuration (RFC-0024 P2) — GatewayClass + EnvoyProxy +
-# Gateway + HTTPRoutes + SecurityPolicies + BackendTrafficPolicies, the
-# Gateway API translation of configs/kong/. Runs AFTER:
+# Gateway + HTTPRoutes + SecurityPolicies + BackendTrafficPolicies: the whole
+# routed edge surface in configs/envoy-gateway/. Runs AFTER:
 #   - envoy-gateway-local: controller + CRDs Ready
 #   - cert-manager-local:  ClusterIssuers exist for the platform-edge-tls cert
 #   - keycloak-local:      the SecurityPolicy remoteJWKS endpoint

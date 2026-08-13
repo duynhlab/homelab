@@ -157,7 +157,7 @@ Full env table: [Application observability § Environment variables](./observabi
 1. Check startup log: `Profiling initialized` (with the `endpoint` field), or `Failed to initialize profiling` when setup failed, or `Profiling disabled (PROFILING_ENABLED=false)`
 2. Confirm env: `PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT` reachable
 
-Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling (platform) § Troubleshooting](../observability/profiling/README.md#troubleshooting).
+Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling (platform) § Troubleshooting](../observability/profiling/README.md#runbook--profiles-not-appearing).
 
 ---
 

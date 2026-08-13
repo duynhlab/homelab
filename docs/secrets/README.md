@@ -16,7 +16,7 @@ Secrets — they never call OpenBAO directly.
 | App secret delivery | ESO reads OpenBAO KV v2 and writes Kubernetes Secrets | Same, plus dynamic DB credentials |
 | OpenBAO endpoint | Plain HTTP in-cluster (`tlsDisable: true`) | TLS via cert-manager |
 | OpenBAO unseal | `awskms` auto-unseal via the floci KMS emulator (pods self-unseal at boot); `openbao-init-keys` holds only a break-glass recovery key; root token revoked ([ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap floci `endpoint`) |
-| TLS issuer split | Local `kong-proxy-tls` is signed by `homelab-ca` | Prod `kong-proxy-tls` is Let's Encrypt via Cloudflare DNS-01 |
+| TLS issuer split | Local `platform-edge-tls` is signed by `homelab-ca` (planned — not yet reconciled on Kind) | Prod `platform-edge-tls` is Let's Encrypt via Cloudflare DNS-01 |
 | Trust distribution | trust-manager distributes `homelab-ca-bundle` to labeled namespaces | Same, with rotation runbooks |
 | Unsafe local choices | Dev placeholders, root token persistence, plaintext listener | Remove before production; tracked by RFC-0008 |
 
@@ -27,8 +27,8 @@ Secrets — they never call OpenBAO directly.
 | Understand the whole homelab secrets/TLS/trust chain | This file |
 | Understand OpenBAO internals: HA/Raft, seal, auth, engines, policies | [OpenBAO Architecture](./openbao.md) |
 | Add, rotate, or troubleshoot an ESO-managed secret | [Runbooks](./runbooks/) |
-| Understand/rotate the RS256 JWT signing key (auth signs, Kong verifies) | [OpenBAO — JWT signing key](./openbao.md#jwt-signing-key-auth--kong) |
-| Understand cert-manager, Let's Encrypt DNS-01, and `kong-proxy-tls` | [cert-manager + Let's Encrypt](./cert-manager.md) |
+| Understand/rotate the RS256 JWT signing key (auth-service's own signing key; the edge verifies via Keycloak `remoteJWKS` instead) | [OpenBAO — JWT signing key](./openbao.md#jwt-signing-key-auth-service) |
+| Understand cert-manager, Let's Encrypt DNS-01, and `platform-edge-tls` | [cert-manager + Let's Encrypt](./cert-manager.md) |
 | Understand `homelab-ca-bundle`, namespace opt-in, and CA rotation | [Trust Distribution](./trust-distribution.md) |
 | Study production hardening targets | [Production Hardening](./production-hardening.md) and [RFC-0008](../proposals/rfc/RFC-0008/) |
 | Review accepted decisions | [ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) and [ADR-005](../proposals/adr/ADR-005-openbao-ha-raft/) |
@@ -63,7 +63,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     apps(Application Pods):::service
     cfsecret[(cloudflare-api-token<br/>namespace: cert-manager)]:::data
     cm(cert-manager<br/>ClusterIssuers + Certificates):::platform
-    kong[(kong-proxy-tls<br/>namespace: kong)]:::edge
+    edgecert[(platform-edge-tls<br/>namespace: envoy-gateway)]:::edge
     tm(trust-manager Bundle<br/>homelab-ca-bundle):::platform
     cabundle[(ConfigMap<br/>ca-bundle.pem)]:::data
     trusted(Trust-enabled Workloads):::service
@@ -77,7 +77,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     k8ssecret -->|"env / volume / secretKeyRef"| apps
     eso -->|"syncs DNS-01 token"| cfsecret
     cfsecret -->|"Cloudflare API token"| cm
-    cm -->|"local: homelab-ca<br/>prod: Let's Encrypt DNS-01"| kong
+    cm -->|"local: homelab-ca (planned)<br/>prod: Let's Encrypt DNS-01"| edgecert
     cm -->|"homelab CA source"| tm
     tm -->|"namespaceSelector: needs-trust=true"| cabundle
     cabundle -->|"mounted PEM trust store"| trusted
@@ -166,7 +166,7 @@ root token revoked; production target is a real cloud KMS. See
 | 2 | OpenBAO bootstrap | Ensures the floci KMS alias, initializes OpenBAO (**awskms auto-unseal** — pods self-unseal), enables KV v2, Kubernetes auth, policies, seeds learning secrets, then **revokes the root token** |
 | 3 | ClusterSecretStore | Points ESO at `http://openbao.openbao.svc.cluster.local:8200` with Kubernetes auth role `eso-reader` |
 | 4 | ESO | Reads OpenBAO paths and materializes Kubernetes Secrets with `refreshInterval: 1h` |
-| 5 | cert-manager | Uses `cloudflare-api-token` only for prod Let's Encrypt DNS-01; local Kind patches `kong-proxy-tls` to `homelab-ca` |
+| 5 | cert-manager | Uses `cloudflare-api-token` only for prod Let's Encrypt DNS-01; local Kind patches `platform-edge-tls` to `homelab-ca` (planned — the patch lives in `envoy-gateway-config.yaml`, not yet reconciled on Kind) |
 | 6 | trust-manager | Combines Mozilla CAs and the committed `homelab-ca` PEM into `homelab-ca-bundle` ConfigMaps |
 | 7 | Workloads | Consume Kubernetes Secrets or mount trust bundles; they do not call OpenBAO directly |
 
@@ -328,7 +328,7 @@ future use. See [Production Hardening](./production-hardening.md) and
 
 - [OpenBAO Architecture](./openbao.md) — OpenBAO internals and learning notes.
 - [Runbooks](./runbooks/) — add, rotate, bootstrap, and troubleshoot secrets.
-- [cert-manager + Let's Encrypt](./cert-manager.md) — TLS issuance for `kong-proxy-tls`.
+- [cert-manager + Let's Encrypt](./cert-manager.md) — TLS issuance for `platform-edge-tls`.
 - [Trust Distribution](./trust-distribution.md) — CA bundle distribution with trust-manager.
 - [Production Hardening](./production-hardening.md) — planned production target and guardrails.
 - [OpenBAO file reference](./openbao.md#16-file-reference) — canonical manifest paths.
@@ -336,4 +336,4 @@ future use. See [Production Hardening](./production-hardening.md) and
 
 ---
 
-_Last updated: 2026-07-19 — Merged `secrets-management.md` into this hub; operational procedures live in `runbooks/`._
+_Last updated: 2026-08-13 — edge Certificate references updated to `platform-edge-tls` (namespace `envoy-gateway`); JWT signing key link points to auth-service's own key, the edge verifies via Keycloak `remoteJWKS` instead._

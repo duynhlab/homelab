@@ -96,11 +96,13 @@ services:
   # Same image pin as the cluster Deployment; `start-dev` instead of `start`
   # is the deliberate compose divergence (HTTP, no --hostname: the issuer is
   # derived from the request host — see the OIDC_ISSUER note in x-svc-env).
-  # ./keycloak/duynhlab-realm.json is a verbatim copy of the cluster ConfigMap's
-  # realm JSON (fixed demo-user UUIDs a11ce000-…{1..5}, clients customer-spa /
-  # admin-portal, audience duynhlab-platform); its redirect URIs already point
-  # at the localhost dev origins. --import-realm only imports when the realm
-  # does not exist yet — `docker compose down -v` re-converges to this state.
+  # ./keycloak/*.json are verbatim copies of the cluster ConfigMap's realm
+  # JSONs (ADR-050 split): `duynhlab` = customers only (fixed demo-user UUIDs
+  # a11ce000-…{1..5}, client customer-spa), `duynhlab-staff` = workforce
+  # (operator duyne, client admin-portal, registration off, brute-force on).
+  # Both carry audience duynhlab-platform; redirect URIs already point at the
+  # localhost dev origins. --import-realm only imports when a realm does not
+  # exist yet — `docker compose down -v` re-converges to this state.
   keycloak:
     image: quay.io/keycloak/keycloak:26.5.7@sha256:45ae20191531eb608ddb0b775d012b40d3e4f942697f3214694887dd7c108d13
     command: ["start-dev", "--import-realm"]
@@ -117,6 +119,7 @@ services:
       KC_HTTP_PORT: "8080"
     volumes:
       - ./keycloak/duynhlab-realm.json:/opt/keycloak/data/import/duynhlab-realm.json:ro
+      - ./keycloak/duynhlab-staff-realm.json:/opt/keycloak/data/import/duynhlab-staff-realm.json:ro
     ports:
       - "8081:8080" # browser-facing origin http://localhost:8081 (SPA login + iss)
     # The image ships no curl/wget; probe /health/ready on the management port
@@ -690,6 +693,11 @@ services:
       OTEL_SERVICE_NAME: inventory
       DB_NAME: inventory
       GRPC_PORT: "9090"
+      # ADR-050: the protected group verifies the STAFF realm (split-horizon
+      # like OIDC_ISSUER above — issuer is the browser-facing origin, JWKS
+      # fetch is in-network).
+      OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
+      OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
     healthcheck: *svc-healthcheck
     depends_on:
       keycloak: { condition: service_healthy }

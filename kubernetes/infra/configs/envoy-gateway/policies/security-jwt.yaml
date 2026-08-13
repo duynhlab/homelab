@@ -44,11 +44,13 @@ spec:
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
 ---
-# inventory — api-inventory-protected (RFC-0023)
+# inventory — api-inventory-protected (RFC-0023). STAFF issuer (ADR-050):
+# protected surfaces trust the workforce realm; customer tokens are
+# wrong-issuer at the edge.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
-  name: jwt-edge
+  name: jwt-edge-staff
   namespace: inventory
 spec:
   mergeType: StrategicMerge
@@ -58,10 +60,10 @@ spec:
       name: api-inventory-protected
   jwt:
     providers:
-      - name: keycloak
-        issuer: https://id.duynh.me/realms/duynhlab
+      - name: keycloak-staff
+        issuer: https://id.duynh.me/realms/duynhlab-staff
         remoteJWKS:
-          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs
 ---
 # cart — api-cart
 apiVersion: gateway.envoyproxy.io/v1alpha1

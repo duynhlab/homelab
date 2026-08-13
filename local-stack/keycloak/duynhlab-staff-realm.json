@@ -1,0 +1,86 @@
+{
+  "realm": "duynhlab-staff",
+  "enabled": true,
+  "registrationAllowed": false,
+  "rememberMe": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "roles": {
+    "realm": [
+      {
+        "name": "backoffice_admin",
+        "description": "May access protected business APIs (RFC-0023 / ADR-050)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "admin-portal",
+      "name": "Backoffice Admin Portal (RFC-0023, staff realm per ADR-050)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "redirectUris": [
+        "http://localhost:3009/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3009"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "basic",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "platform-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "duynhlab-platform",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "d0e00000-0000-4000-8000-000000000001",
+      "username": "duyne",
+      "email": "duyne@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "p@ss1234",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "backoffice_admin"
+      ],
+      "firstName": "Duy",
+      "lastName": "Ne",
+      "requiredActions": []
+    }
+  ]
+}

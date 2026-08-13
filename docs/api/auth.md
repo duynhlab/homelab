@@ -2,17 +2,24 @@
 
 Auth turns credentials into short-lived RS256 access tokens and rotating refresh-token families.
 
-> **RFC-0024 P3:** consumers no longer verify against this service — the fleet trusts the Keycloak realm (`OIDC_*`, [api.md § Authentication](./api.md#authentication)); auth still runs and mints tokens nothing consumes, and is decommissioned (with this doc archived) in P5.
+> **Retiring — RFC-0024 P5.** No consumer verifies this service's tokens
+> anymore: the fleet trusts the Keycloak realm
+> (`OIDC_*`, [api.md § Authentication](./api.md#authentication)), and
+> **local-stack no longer runs auth at all** — no container, no route, no
+> database. What survives is the cluster surface (manifests + one edge route),
+> which mints tokens nothing consumes until the P5 decommission deletes it and
+> archives this document. Read this contract as history with a shutdown date,
+> not as a target.
 
 | Dimension | Value | Status |
 |-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public only · `:8080` · Kong `/auth/v1/public/` (no edge JWT) | Implemented |
+| **Deployment** | cluster only — removed from local-stack (RFC-0024 P3) | Technical debt — removed at P5 |
+| **HTTP** | public only · `:8080` · cluster edge HTTPRoute `api-auth-public` (no edge JWT); **no local route** — `/auth/v1/*` 404s at the local edge | Technical debt — removed at P5 |
 | **gRPC server** | None | None |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
 | **Temporal** | None · [workflows.md](./workflows.md) | None |
-| **Technical debt** | None | None |
+| **Technical debt** | The whole service: shipped, unconsumed, scheduled for the P5 decommission | Technical debt |
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|

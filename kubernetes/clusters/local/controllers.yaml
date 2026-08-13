@@ -28,9 +28,6 @@ spec:
       name: monitoring
     - apiVersion: v1
       kind: Namespace
-      name: auth
-    - apiVersion: v1
-      kind: Namespace
       name: database
     - apiVersion: v1
       kind: Namespace

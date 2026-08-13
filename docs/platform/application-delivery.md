@@ -19,7 +19,6 @@ Migrating from a traditional GitOps approach (Kustomize + Helm) to **Flux Operat
 ```mermaid
 flowchart TD
     subgraph services [Per-Service InputProviders]
-        authIP["rsip-auth<br/>domain: identity"]
         userIP["rsip-user<br/>domain: identity"]
         productIP["rsip-product<br/>domain: catalog"]
         reviewIP["rsip-review<br/>domain: catalog"]
@@ -39,13 +38,12 @@ flowchart TD
     end
 
     subgraph output [Generated Resources]
-        hrIdentity["NS + HR: auth, user"]
+        hrIdentity["NS + HR: user"]
         hrCatalog["NS + HR: product, review"]
         hrCheckout["NS + HR: cart, checkout, order, payment"]
         hrComms["NS + HR: notification, shipping"]
     end
 
-    authIP -->|"label selector"| rsIdentity
     userIP -->|"label selector"| rsIdentity
     productIP -->|"label selector"| rsCatalog
     reviewIP -->|"label selector"| rsCatalog
@@ -67,12 +65,11 @@ flowchart TD
 ```
 kubernetes/apps/
 ├── domains/                       # Domain ResourceSets (template + inputsFrom selector)
-│   ├── identity-rs.yaml           # rs-identity: auth, user
+│   ├── identity-rs.yaml           # rs-identity: user
 │   ├── catalog-rs.yaml            # rs-catalog: product, review
 │   ├── checkout-rs.yaml           # rs-checkout: cart, checkout, order, payment
 │   └── comms-rs.yaml              # rs-comms: notification, shipping
 ├── services/                      # Per-service InputProviders (Static)
-│   ├── auth.yaml                  # labels: domain=identity
 │   ├── user.yaml                  # labels: domain=identity
 │   ├── product.yaml               # labels: domain=catalog
 │   ├── review.yaml                # labels: domain=catalog

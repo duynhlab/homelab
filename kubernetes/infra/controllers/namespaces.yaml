@@ -9,16 +9,6 @@ metadata:
   labels:
     environment: local
     platform.duynhlab/backup: "cnpg"
-    platform.duynhlab.dev/needs-trust: "true"
-    platform.duynhlab.dev/tier: app
-  name: auth
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    environment: local
-    platform.duynhlab/backup: "cnpg"
     platform.duynhlab.dev/tier: app
   name: cart
 ---

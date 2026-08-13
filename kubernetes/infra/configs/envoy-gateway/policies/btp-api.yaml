@@ -33,53 +33,6 @@
 #     remaining knobs keep EG defaults)
 
 ---
-# auth — api-auth-public (route removed in P5 with the auth-service retirement)
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: BackendTrafficPolicy
-metadata:
-  name: btp-api
-  namespace: auth
-spec:
-  targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: api-auth-public
-  rateLimit:
-    type: Local
-    local:
-      rules:
-        - limit:
-            requests: 2
-            unit: Second
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
-  requestBuffer:
-    limit: 10Mi
-  retry:
-    numRetries: 2
-  timeout:
-    tcp:
-      connectTimeout: 3s
-    http:
-      requestTimeout: 15s
-  healthCheck:
-    active:
-      type: HTTP
-      interval: 5s
-      healthyThreshold: 2
-      unhealthyThreshold: 3
-      http:
-        path: /health
-    passive:
-      consecutive5XxErrors: 5
----
 # user — api-user-public + api-user-private
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy

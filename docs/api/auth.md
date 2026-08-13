@@ -2,24 +2,25 @@
 
 Auth turns credentials into short-lived RS256 access tokens and rotating refresh-token families.
 
-> **Retiring — RFC-0024 P5.** No consumer verifies this service's tokens
-> anymore: the fleet trusts the Keycloak realm
-> (`OIDC_*`, [api.md § Authentication](./api.md#authentication)), and
-> **local-stack no longer runs auth at all** — no container, no route, no
-> database. What survives is the cluster surface (manifests + one edge route),
-> which mints tokens nothing consumes until the P5 decommission deletes it and
-> archives this document. Read this contract as history with a shutdown date,
-> not as a target.
+> **Archived — RFC-0024 P5 executed.** This service no longer exists anywhere:
+> the identity cutover (P3) moved every consumer to the Keycloak realm
+> (`OIDC_*`, [api.md § Authentication](./api.md#authentication)), and P5
+> deleted the entire cluster surface — app manifest, `auth` namespace, the
+> `auth` database triplet on platform-db, the `auth-jwt-signing`
+> ExternalSecret, the NetworkPolicy, and the `api-auth-public` edge route.
+> `/auth/v1/*` matches nothing at either environment's edge. This document is
+> the retired contract, kept for history; the repository itself is archived
+> separately by the owner. It describes nothing deployed.
 
 | Dimension | Value | Status |
 |-----------|-------|--------|
-| **Deployment** | cluster only — removed from local-stack (RFC-0024 P3) | Technical debt — removed at P5 |
-| **HTTP** | public only · `:8080` · cluster edge HTTPRoute `api-auth-public` (no edge JWT); **no local route** — `/auth/v1/*` 404s at the local edge | Technical debt — removed at P5 |
+| **Deployment** | none — surface deleted (RFC-0024 P5) | Archived |
+| **HTTP** | none — `api-auth-public` deleted; `/auth/v1/*` 404s at both edges | Archived |
 | **gRPC server** | None | None |
 | **gRPC client** | None | None |
 | **Worker** | None | None |
 | **Temporal** | None · [workflows.md](./workflows.md) | None |
-| **Technical debt** | The whole service: shipped, unconsumed, scheduled for the P5 decommission | Technical debt |
+| **Technical debt** | None — the decommission is complete | None |
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|

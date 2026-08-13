@@ -1,6 +1,6 @@
 # platform-db — consolidated CNPG cluster (RFC-0018).
 # Merges auth-db + shared-db + temporal-db persistence.
-# App databases: auth, user, notification, shipping, review (RFC-0012 triplets);
+# App databases: user, notification, shipping, review (RFC-0012 triplets);
 # temporal + temporal_visibility (Temporal server, direct :5432);
 # keycloak (identity provider, direct :5432 — RFC-0022 / RFC-0024 P1).
 # HA: 3 instances (1 primary, 1 sync replica, 1 async replica).
@@ -32,7 +32,6 @@ spec:
       - auto_explain
 
     pg_hba:
-      - host auth         auth         all scram-sha-256
       - host user         user         all scram-sha-256
       - host notification notification all scram-sha-256
       - host shipping     shipping     all scram-sha-256

@@ -12,7 +12,7 @@ docs/
 │   ├── README.md                 # Area hub and recommended learning path
 │   ├── api.md                    # Canonical shared HTTP + gRPC conventions and call graph
 │   ├── microservices.md          # Feature ownership, techniques, dependencies, known gaps
-│   ├── auth.md                   # Auth HTTP contract, refresh rotation, JWKS
+│   ├── auth.md                   # Archived — the retired token issuer's contract (RFC-0024 P5)
 │   ├── user.md                   # User profile contract
 │   ├── product.md                # Catalog, price gRPC contract, aggregation
 │   ├── cart.md                   # Cart HTTP contract + checkout gRPC read

@@ -25,7 +25,7 @@
 | **Supersedes** | [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) (vehicle only — the edge-coarse/service-authoritative split is preserved) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — P2/P4/P5 trains |
-| **Adoption** | Not started |
+| **Adoption** | Partial — Kong is deleted from main and Envoy Gateway is the only edge in both config sets; local standalone edge verified end to end (trace root, access log, edge JWT); cluster edge not yet run on Kind |
 
 ## Context
 

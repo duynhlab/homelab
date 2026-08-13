@@ -25,7 +25,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — P2/P4/P5 trains |
-| **Adoption** | Not started |
+| **Adoption** | Partial — local bucket live and verified (one catch-all rule, X-RateLimit-* headers, in-process bucket); cluster BackendTrafficPolicies merged, unverified on Kind |
 
 ## Context
 

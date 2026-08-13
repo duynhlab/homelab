@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — phases P1/P3/P5 (PR trains) |
-| **Adoption** | Not started |
+| **Adoption** | Partial — frontend 2.0.0 (keycloak-js) merged; browser flow verified in the audit (B1–B3: PKCE redirect, no token in web storage, end-session logout); cluster pending Kind |
 
 ## Context
 

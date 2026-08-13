@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — phases P1/P3/P5 (PR trains) |
-| **Adoption** | Not started |
+| **Adoption** | Partial — local-stack runs the realm as the only issuer (compose E2E audit passed 2026-08-12); cluster manifests merged, first Kind deploy pending; auth-service retirement is P5 |
 
 ## Context
 

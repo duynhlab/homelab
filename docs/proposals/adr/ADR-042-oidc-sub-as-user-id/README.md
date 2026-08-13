@@ -23,7 +23,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — phases P1/P3/P5 (PR trains) |
-| **Adoption** | Not started |
+| **Adoption** | Partial — all seven services + workers merged and tagged (2.0.0 wave) with the string subject verified to the column in the audit (A16); cluster greenfield reset pending Kind |
 
 ## Context
 

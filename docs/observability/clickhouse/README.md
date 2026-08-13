@@ -194,7 +194,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 |--------|--------|
 | **Engine** | `clickhouse/clickhouse-server:25.3`, MergeTree, 1 shard × 1 replica |
 | **Operator** | Altinity `altinity-clickhouse-operator` `0.27.1` (HelmRelease in the `controllers` wave, ns `monitoring`); CRDs health-checked before the CHI applies (`kubernetes/infra/controllers/clickhouse-operator/`) |
-| **Instance** | `ClickHouseInstallation` `clickhouse` (cluster `otel`) → StatefulSet `chi-clickhouse-otel-0-0`; own Flux Kustomization `clickhouse-local` `dependsOn [controllers-local, secrets-local]` (`kubernetes/infra/controllers/clickhouse/`) |
+| **Instance** | `ClickHouseInstallation` `clickhouse` (cluster `otel`) → StatefulSet `chi-clickhouse-otel-0-0`; own Flux Kustomization `clickhouse-local` `dependsOn [controllers-local, secrets-local]` (`kubernetes/infra/configs/clickhouse/`) |
 | **Storage** | PVC `standard` `10Gi` (`volumeClaimTemplates`); local-stack uses an ephemeral `clickhouse-data` volume |
 | **Credentials** | `default` user password from OpenBAO `secret/local/infra/clickhouse/admin` via the `clickhouse-credentials` `ClusterExternalSecret` → Secret in `monitoring` (selector label `platform.duynhlab/clickhouse`); local-stack uses an inline dev password |
 | **Ingest** | Collector contrib `clickhouse` exporter appended to the `traces` + `logs` pipelines; `create_schema: true` bootstraps the tables; `ttl: 2160h` (90d); `async_insert`, `sending_queue`, `retry_on_failure`; password via `${env:CLICKHOUSE_PASSWORD}` (`extraEnvs` secretKeyRef) |

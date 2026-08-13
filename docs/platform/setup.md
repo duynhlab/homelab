@@ -388,6 +388,7 @@ homelab/
 │   │   │   ├── databases/              # PostgreSQL clusters and PgDog poolers
 │   │   │   ├── secrets/                # Bootstrap Job, ClusterSecretStore, ExternalSecrets
 │   │   │   ├── cert-manager/           # ClusterIssuers
+│   │   │   ├── clickhouse/             # ClickHouseInstallation CR (operator lives in controllers/)
 │   │   │   └── envoy-gateway/          # Gateway, HTTPRoutes, policies, platform-edge-tls Certificate
 │   │   └── kustomization.yaml
 │   ├── apps/                           # Application definitions (Hybrid ResourceSet)

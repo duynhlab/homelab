@@ -1,0 +1,125 @@
+---
+# Parallel Tempo running the upstream `grafana-community/tempo` chart
+# (ADR-040, phase 1). Runs side-by-side with the raw `tempo` Deployment
+# so the OTel Collector can fan traces to both while we verify parity.
+# Cutover (phase 2) will delete the raw manifests and rename this
+# release to `tempo` so the consumer DNS `tempo.monitoring.svc` is
+# preserved. Uses a distinct RustFS bucket `tempo-chart-traces` for
+# storage isolation during the parallel run.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tempo-chart
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      chart: tempo
+      sourceRef:
+        kind: HelmRepository
+        name: grafana-community
+        namespace: flux-system
+      version: '2.2.3'
+  interval: 10m
+  releaseName: tempo-chart
+  timeout: 10m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    replicas: 1
+    tempo:
+      # Pin explicit tag — Renovate bumps via chart version + this tag.
+      tag: "2.10.7"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          memory: "256Mi"
+      # `-config.expand-env=true` splices ${ACCESS_KEY_ID}/${ACCESS_SECRET_KEY}
+      # from extraEnv (below) into the S3 storage config at startup.
+      extraArgs:
+        "config.expand-env": "true"
+      extraEnv:
+        - name: ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: tempo-rustfs-credentials
+              key: ACCESS_KEY_ID
+        - name: ACCESS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tempo-rustfs-credentials
+              key: ACCESS_SECRET_KEY
+      # 7 days — matches raw Tempo and VMSingle/VLSingle retention.
+      retention: 168h
+      # RED span-metrics + service-graphs → vmagent OTLP-adjacent
+      # remote_write (prometheus protobuf). Same vmagent target the
+      # OTel Collector already uses for app metrics.
+      metricsGenerator:
+        enabled: true
+        storage:
+          path: /var/tempo/generator/wal
+          remote_write:
+            - url: http://vmagent-victoria-metrics.monitoring.svc.cluster.local:8429/api/v1/write
+              send_exemplars: true
+        traces_storage:
+          path: /var/tempo/generator/traces
+        registry:
+          external_labels:
+            source: tempo
+          collection_interval: 15s
+        processor:
+          service_graphs:
+            dimensions:
+              - resource.service.name
+              - resource.cluster
+              - resource.namespace
+              - resource.pod
+          span_metrics:
+            dimensions:
+              - resource.service.name
+              - resource.cluster
+              - resource.namespace
+              - resource.pod
+              - http.method
+              - http.status_code
+      # Turn the metrics-generator on for all tenants (single-tenant
+      # setup, so `defaults` is the whole knob).
+      overrides:
+        defaults:
+          metrics_generator:
+            processors:
+              - service-graphs
+              - span-metrics
+      ingester:
+        max_block_duration: 5m
+      storage:
+        trace:
+          backend: s3
+          s3:
+            bucket: tempo-chart-traces
+            endpoint: rustfs-svc.rustfs.svc.cluster.local:9000
+            access_key: ${ACCESS_KEY_ID}
+            secret_key: ${ACCESS_SECRET_KEY}
+            insecure: true
+            forcepathstyle: true
+            region: us-east-1
+          wal:
+            path: /var/tempo/wal
+          pool:
+            max_workers: 100
+            queue_depth: 10000
+    # Chart ServiceMonitor emits Prometheus scrape config; the platform
+    # runs VMOperator, so leave off here — a VMServiceScrape lives in
+    # `configs/observability/metrics/servicemonitors/` if we need it.
+    serviceMonitor:
+      enabled: false
+    persistence:
+      enabled: false
+    service:
+      type: ClusterIP

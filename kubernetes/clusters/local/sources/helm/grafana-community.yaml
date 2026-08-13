@@ -1,0 +1,17 @@
+---
+# grafana-community/helm-charts — third-party maintained (Apache-2.0)
+# Ships the Tempo `tempo` chart (single-binary) and `tempo-distributed`
+# (microservices). Homelab uses the single-binary chart per ADR-040 to
+# replace the hand-written Tempo manifests. Not `grafana/helm-charts`
+# (which does not carry `tempo-operator` either — that was the reason
+# ADR-032 was withdrawn in favour of ADR-040).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: grafana-community
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-repository
+spec:
+  interval: 1h
+  url: https://grafana-community.github.io/helm-charts

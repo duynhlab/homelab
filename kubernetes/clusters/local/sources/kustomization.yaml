@@ -37,3 +37,4 @@ resources:
   # helm/temporal-operator.yaml.bak (ADR-030).
   - helm/temporalio.yaml
   - helm/altinity.yaml
+  - helm/grafana-community.yaml

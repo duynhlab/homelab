@@ -776,6 +776,20 @@ Skeleton (copy what you need):
 
 ### Dependency
 
+#### Observability
+
+- Bump `altinity-clickhouse-operator` 0.27.1 → 0.27.3. Primary reason is the
+  security pair: Go stdlib 1.26.5 + `x/net`/`x/text` CVE bumps (two of them
+  `govulncheck`-reachable in the operator/exporter), and 0.27.2's removal of
+  the accidentally-registered `/debug/pprof` on the operator's `:9999`
+  metrics port. Also picks up: last-healthy-replica protection during
+  interrupted rolls, host-exclude-first restored on image upgrades, bounded
+  retries on transient kube-API errors, and an informer panic fix. The
+  0.27.2 config rename (`reconcile.recovery.from.*` → `.onStatus.*`) does not
+  affect this HelmRelease — the key was never set. `upgrade.crds:
+  CreateReplace` picks up the CRD delta; the CHI itself does not restart on
+  an operator upgrade.
+
 #### Services
 
 - **Fleet pinned to the RFC-0024 identity cutover** (2026-08-13): the seven

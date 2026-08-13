@@ -1269,6 +1269,43 @@ curl -s -X POST "$GRAF/api/ds/query" -H 'Content-Type: application/json' -d '{
 # want a non-zero number from each. A 4xx/5xx or an empty frame means the panel
 # path is broken even though C17's health probe passed — health only proves the
 # plugin can reach the store, not that it can run a query and shape a frame.
+
+# ---- ENGINE-HEALTH SLICE (scrape + alert loop) -------------------------------
+
+# C20. vmagent scrapes both engine-health targets. `up` is the only signal that
+#      says a BACKEND itself is down — everything else in Phase C is telemetry
+#      the backends receive, not telemetry about them. A target that is absent
+#      here means the alert rules in C21 evaluate against nothing and can never
+#      fire, which is invisible until the day they were needed.
+curl -s http://localhost:8429/api/v1/targets | python3 -c "
+import json, sys
+t = {x['labels']['job']: x['health'] for x in json.load(sys.stdin)['data']['activeTargets']}
+want = {'clickhouse', 'otel-collector'}
+ok = want <= set(t) and all(t[j] == 'up' for j in want)
+print('C20', 'OK both targets up:' if ok else 'FAIL:', t)"
+# want: C20 OK both targets up: {'clickhouse': 'up', 'otel-collector': 'up'}
+
+# C21. vmalert loaded the ported cluster rules and nothing is firing on a
+#      healthy stack. Twelve names are expected: ten ClickHouse engine rules
+#      (same names as the cluster catalog § 8b, minus the two operator rules
+#      that have no local counterpart) plus the two collector rules.
+curl -s http://localhost:8880/api/v1/rules | python3 -c "
+import json, sys
+gs = json.load(sys.stdin)['data']['groups']
+rules = [r for g in gs for r in g['rules']]
+firing = [r['name'] for r in rules if r.get('state') == 'firing']
+print(f'C21 rules loaded: {len(rules)} (want 12); firing: {firing or "none"}')"
+# want: 12 rules, firing none. A missing rule file mounts silently — the count
+# is the tripwire. A firing rule on a fresh stack is a real finding: chase it
+# before calling the audit passed.
+
+#      Optional drill (NOT part of the pass bar — it takes ~6 minutes): stop
+#      clickhouse, wait out the 5m `for`, confirm ClickHouseServerUnreachable
+#      fires, then start it again. Run it when the rules themselves changed.
+# docker compose stop clickhouse && sleep 360 \
+#   && curl -s http://localhost:8880/api/v1/alerts | python3 -c "import json,sys; \
+#      print([a['labels']['alertname'] for a in json.load(sys.stdin)['data']['alerts']])" \
+#   && docker compose start clickhouse
 ```
 
 > A brand-new counter has **no series until its first increment** — "NO SERIES"
@@ -1321,6 +1358,8 @@ curl -s -X POST "$GRAF/api/ds/query" -H 'Content-Type: application/json' -d '{
 | C17 | Grafana datasources | `/api/datasources` returns exactly the four expected uid/type pairs and each `/api/datasources/uid/<uid>/health` answers `OK` |
 | C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 9 provisioned uids and each loads via `/api/dashboards/uid/…` with 200 |
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
+| C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows BOTH jobs — `clickhouse` and `otel-collector` — with `health: up`; a missing target means the C21 rules evaluate against nothing |
+| C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **11** rules (9 ClickHouse engine + 2 collector) and zero `firing` on a healthy stack — the count is the tripwire for a silently unmounted rule file |
 
 Any failed row blocks the release tag. Two rows share one root cause and must be
 reported as such: **C13 + C14** both empty while C12 is healthy means the Vector
@@ -1358,7 +1397,7 @@ evidence table too, not just service and `pkg` changes.
 | A | A1–A14 + A16 API contract | PASS / FAIL | |
 | A | A15 versioning drill | PASS / FAIL / N/A | |
 | B | B1–B4 real browser | PASS / FAIL | |
-| C | C1–C19 telemetry | PASS / FAIL | |
+| C | C1–C21 telemetry + engine-health loop | PASS / FAIL | |
 
 Decision: ELIGIBLE FOR TAG / BLOCKED
 ```

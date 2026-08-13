@@ -312,9 +312,15 @@ services:
       nofile: { soft: 262144, hard: 262144 }
     volumes:
       - clickhouse-data:/var/lib/clickhouse
+      # Built-in Prometheus endpoint (engine self-view; scraped by vmagent).
+      # The cluster deliberately does NOT enable this at 1×1 — there the
+      # Altinity exporter carries the engine signals; locally there is no
+      # operator, so this endpoint IS the engine view.
+      - ./observability/clickhouse/metrics.xml:/etc/clickhouse-server/config.d/metrics.xml:ro
     ports:
       - "8123:8123" # HTTP interface (SQL over curl — the C6 audit check)
       - "9000:9000" # native protocol (collector clickhouse exporter)
+      - "9363:9363" # Prometheus /metrics (vmagent scrape; C20 audit check)
     healthcheck:
       test: ["CMD", "clickhouse-client", "--password=otel", "--query", "SELECT 1"]
       interval: 5s
@@ -325,8 +331,8 @@ services:
   #   1. Vector (below) tailing every container's stdout -> jsonline ingest
   #   2. the application fleet's OTLP logs via the collector -> OTLP ingest
   # so the Vector-vs-OTel comparison from the pilot is visible locally. The edge
-  # now contributes only path 1: Envoy Gateway standalone logs to stdout and,
-  # unlike Kong's opentelemetry plugin, exports no runtime logs of its own.
+  # contributes only path 1: Envoy Gateway standalone writes its JSON access
+  # log to stdout and has no OTLP logs path of its own.
   victoria-logs:
     image: victoriametrics/victoria-logs:v1.51.0
     command:
@@ -367,6 +373,48 @@ services:
       - victoria-metrics-data:/victoria-metrics-data
     ports:
       - "8428:8428" # remote-write (/api/v1/write) + PromQL + vmui
+
+  # ---- Scrape + alert loop (the local counterpart of the cluster's
+  # VM-operator stack) ----------------------------------------------------
+  # vmagent scrapes what OTLP cannot carry: `up` for the backends themselves.
+  # Without it no series says "ClickHouse is down" — the store's absence only
+  # shows up as collector export failures. Jobs live in
+  # observability/vmagent/prometheus.yml (the local ServiceMonitor analogue).
+  vmagent:
+    image: victoriametrics/vmagent:v1.147.0
+    command:
+      - "-promscrape.config=/etc/vmagent/prometheus.yml"
+      - "-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"
+    volumes:
+      - ./observability/vmagent/prometheus.yml:/etc/vmagent/prometheus.yml:ro
+    ports:
+      - "8429:8429" # vmagent UI + /api/v1/targets (C20 audit check)
+    depends_on:
+      victoria-metrics: { condition: service_started }
+
+  # vmalert evaluates the ported cluster alert rules against local series, so
+  # an alert expression is exercised here BEFORE it matters in the cluster.
+  # No notifier on purpose: the UI/API on :8880 is the validation surface;
+  # routing (alertmanager) is a later decision, recorded in
+  # local-stack/docs/observability.md § Non-goals.
+  vmalert:
+    image: victoriametrics/vmalert:v1.147.0
+    command:
+      - "-datasource.url=http://victoria-metrics:8428"
+      - "-remoteWrite.url=http://victoria-metrics:8428"
+      - "-remoteRead.url=http://victoria-metrics:8428"
+      - "-rule=/etc/vmalert/rules/*.yaml"
+      - "-external.label=env=local"
+      # vmalert refuses to start with alerting rules and no notifier at all;
+      # blackhole is the explicit "evaluate, expose on the UI/API, route
+      # nowhere" mode this stack wants (routing is a recorded non-goal).
+      - "-notifier.blackhole"
+    volumes:
+      - ./observability/vmalert/rules:/etc/vmalert/rules:ro
+    ports:
+      - "8880:8880" # vmalert UI + /api/v1/alerts (C21 audit check)
+    depends_on:
+      victoria-metrics: { condition: service_started }
 
   # ---- Continuous profiling: Pyroscope (single-binary, ephemeral local storage) ----
   # The Go services push pprof data here (PROFILING_ENABLED=true + PYROSCOPE_ENDPOINT

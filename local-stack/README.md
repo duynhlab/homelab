@@ -98,27 +98,37 @@ so `running` alone is not evidence of readiness for those — and the `gateway`
 container is now one of them (see [Gateway](#gateway)), so probe the edge with
 `curl` before starting the audit.
 
+This is the **canonical published-port table** — every host port the stack
+opens, nothing else in `docs/` repeats it. The first group is what a person
+opens; the second is machine surfaces (probed by the audit or by tooling, not
+browsed).
+
 | Component | URL | Notes |
 |-----------|-----|-------|
 | Frontend SPA | http://localhost:3001 | Demo login `alice` / `password123`, by username, against the realm |
-| API gateway (Envoy) | http://localhost:8080 | Pass-through edge for the application services |
+| API gateway (Envoy) | http://localhost:8080 | Pass-through edge for the application services; the root path has no route, so `/` answers 404 by design |
 | Keycloak | http://localhost:8081 | Realm `duynhlab`; the origin the SPA logs in against and the `iss` in every token |
 | Temporal Web UI | http://localhost:8233 | Order and checkout workflows |
-| Grafana | http://localhost:3002 | RED, business, Temporal, and ClickHouse dashboards; Explore over VictoriaMetrics, VictoriaTraces, ClickHouse, and Pyroscope |
+| Grafana | http://localhost:3002 | RED, business, Temporal, and ClickHouse dashboards (incl. **ClickHouse Server / Engine**); Explore over VictoriaMetrics, VictoriaTraces, ClickHouse, and Pyroscope |
 | VictoriaTraces | http://localhost:10428 | Trace storage, Jaeger query API, and vmui |
-| VictoriaMetrics | http://localhost:8428 | OTLP/remote-write metrics and PromQL |
+| VictoriaMetrics | http://localhost:8428 | OTLP/remote-write metrics, PromQL, and vmui |
 | VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL, through its own vmui — there is no Grafana datasource for it |
 | ClickHouse | http://localhost:8123 | SQL over `otel.otel_logs` and `otel.otel_traces`; credentials `default` / `otel` |
+| vmagent | http://localhost:8429 | Scrape-target UI + `/api/v1/targets` (audit C20) |
+| vmalert | http://localhost:8880 | Ported cluster alert rules; UI + `/api/v1/alerts` (audit C21) |
 | Pyroscope | http://localhost:4040 | Continuous profiling |
 
-PostgreSQL, Valkey, services, workers, and mockpay are internal-only. Reach the
-application through the gateway unless an audit step explicitly probes a
-container.
+| Machine surface | Address | Notes |
+|-----------------|---------|-------|
+| ClickHouse Prometheus | http://localhost:9363/metrics | The engine's own metric families (`ClickHouseMetrics_*`, `ClickHouseProfileEvents_*`, …); scraped in-network by vmagent |
+| ClickHouse native protocol | localhost:9000 (TCP) | The collector's `clickhouse` exporter; also `clickhouse-client --port 9000` |
+| Temporal frontend gRPC | localhost:7233 (gRPC) | `temporal` CLI from the host; the audit uses `temporal-admintools` instead |
+| OTLP HTTP receiver | http://localhost:4318 | Host-side `telemetrygen` smoke tests; the fleet sends in-network |
+| Gateway control plane | http://localhost:8099/readyz | Envoy Gateway standalone readiness — the data plane's readiness gate before Phase A |
 
-Four more ports are published but are not part of the audit surface: Temporal's
-frontend gRPC on `7233`, the collector's OTLP-HTTP receiver on `4318` (handy for
-a host-side `telemetrygen` smoke test), ClickHouse's native protocol on `9000`,
-and the gateway control plane's `/readyz` on `8099`.
+PostgreSQL, Valkey, the application services, workers, mockpay, and the
+collector's gRPC receiver (`:4317`) are internal-only. Reach the application
+through the gateway unless an audit step explicitly probes a container.
 
 ## Gateway
 
@@ -346,8 +356,7 @@ Passing one environment never implies that the other environment passes.
 - [Observability](../docs/observability/README.md)
 - [agent-browser CLI](https://github.com/vercel-labs/agent-browser)
 
-_Last updated: 2026-08-12 — the edge is Envoy Gateway in standalone mode reading
-the cluster's Gateway API dialect from `gateway/eg/` (Kong and `kong.yml` are
-deleted): adds the Gateway section with the cluster comparison, the `Backend`-vs-
-`Service` divergence, the missing healthcheck and the cold-start download, the
-Keycloak row and `scripts/keycloak-token.sh`, and the fourth non-audit port._
+_Last updated: 2026-08-13 — the port table is now canonical and complete (17
+published ports in two groups: browsable + machine surfaces), adding the
+engine-health slice: ClickHouse `:9363/metrics`, vmagent `:8429`, vmalert
+`:8880` (audit rows C20/C21; see `docs/observability.md`)._

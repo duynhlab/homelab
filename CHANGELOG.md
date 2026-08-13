@@ -168,6 +168,21 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- The engine-health loop arrives locally: ClickHouse's built-in Prometheus
+  endpoint opens on `:9363` (`metrics.xml` — metrics/events/async/errors; the
+  obsolete `status_info` key deliberately absent), `vmagent` scrapes it plus
+  the collector's `:8888`, and `vmalert` evaluates the ported cluster alert
+  catalog — same alert names as § 8b, local series, minus the two operator
+  rules Compose cannot have. The `clickhouse-server-engine` dashboard becomes
+  **dual-target** (cluster `chi_*` and local `ClickHouseMetrics_*` queries
+  side by side) so one JSON serves both stacks — a plain copy was rejected
+  because all of its original series were exporter-shaped and rendered an
+  empty board locally. Two audit rows land with it: **C20** (both scrape
+  targets up) and **C21** (12 rules loaded, none firing).
+  `local-stack/docs/observability.md` is rewritten as-built and committed —
+  its draft still described the pre-cutover stack (wrong edge, 11 services,
+  draft rule names, a config key the server no longer supports).
+
 - Keycloak joins compose (RFC-0024 P3): the cluster-pinned
   `keycloak:26.5.7` image in `start-dev --import-realm` mode on Postgres
   (`keycloak` database in `init.sql`), importing a verbatim copy of the

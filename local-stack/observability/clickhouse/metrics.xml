@@ -1,0 +1,26 @@
+<!-- ClickHouse's built-in Prometheus endpoint (:9363/metrics), the engine's
+     own view of itself: system.metrics (gauges), system.events (counters),
+     system.asynchronous_metrics (periodic samples), and system.errors as
+     ClickHouseErrorMetric_* — the local stand-in for the alert the cluster
+     derives from the Altinity exporter's system_errors series.
+
+     Key set verified against current server docs: metrics / events /
+     asynchronous_metrics / errors. (status_info existed in older servers and
+     is gone — do not re-add it.)
+
+     The cluster does NOT enable this endpoint: with one shard × one replica
+     the Altinity metrics-exporter's /chi already carries the engine signals
+     there, and the per-pod endpoint is recorded as the thing to enable with
+     the first extra replica (docs/observability/clickhouse/README.md
+     § Metrics & alerting). Locally there is no operator and no exporter, so
+     this endpoint IS the engine view. -->
+<clickhouse>
+  <prometheus>
+    <endpoint>/metrics</endpoint>
+    <port>9363</port>
+    <metrics>true</metrics>
+    <events>true</events>
+    <asynchronous_metrics>true</asynchronous_metrics>
+    <errors>true</errors>
+  </prometheus>
+</clickhouse>

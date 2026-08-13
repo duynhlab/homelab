@@ -1,0 +1,119 @@
+# ClickHouse engine alerts — the local port of the cluster catalog
+# (kubernetes/infra/configs/observability/metrics/prometheusrules/
+# observability/clickhouse-alerts.yaml, alert-catalog § 8b). Same alert NAMES
+# where the signal exists locally, so a runbook practised here transfers.
+#
+# The series differ by design: the cluster reads the Altinity
+# metrics-exporter's chi_clickhouse_* families; locally the server's own
+# Prometheus endpoint speaks ClickHouseMetrics_* / ClickHouseProfileEvents_* /
+# ClickHouseAsyncMetrics_* / ClickHouseErrorMetric_* (metrics.xml). Two
+# cluster rules have no local counterpart and are deliberately absent:
+# ClickHouseOperatorDown and ClickHouseOperatorReconcileErrors — there is no
+# operator in Compose.
+groups:
+  - name: clickhouse-engine
+    interval: 30s
+    rules:
+      # Locally `up` is the genuine server-liveness signal: vmagent scrapes
+      # the server itself, not a sidecar. Same blast radius as the cluster
+      # rule: the collector's create_schema blocks every collector restart
+      # while this fires.
+      - alert: ClickHouseServerUnreachable
+        expr: up{job="clickhouse"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: observability
+        annotations:
+          summary: "ClickHouse is down"
+          description: "The OTel logs/traces store has been unreachable for 5 minutes — SQL over otel.otel_logs/otel_traces is gone, and the OTel Collector's create_schema step will block every collector restart until it returns."
+
+      # Async disk metrics carry a per-disk suffix; `_default` is the single
+      # local disk. Verified against the live scrape during the release audit
+      # that shipped this file.
+      - alert: ClickHouseDiskAlmostFull
+        expr: |
+          ClickHouseAsyncMetrics_DiskAvailable_default
+            / ClickHouseAsyncMetrics_DiskTotal_default < 0.15
+        for: 15m
+        labels:
+          severity: warning
+          category: observability
+        annotations:
+          summary: "ClickHouse disk under 15% free"
+          description: "The OTel store's volume is filling. MergeTree refuses writes near full; the 30-day TTL cannot outrun a sustained ingest spike."
+
+      - alert: ClickHouseDiskCritical
+        expr: |
+          ClickHouseAsyncMetrics_DiskAvailable_default
+            / ClickHouseAsyncMetrics_DiskTotal_default < 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: observability
+        annotations:
+          summary: "ClickHouse disk under 5% free"
+          description: "Write failures are imminent. Drop old partitions or grow the volume now."
+
+      - alert: ClickHouseTooManyParts
+        expr: ClickHouseMetrics_PartsActive > 300
+        for: 10m
+        labels:
+          severity: warning
+          category: observability
+        annotations:
+          summary: "ClickHouse active parts high"
+          description: "Merges are not keeping up with inserts. Left alone this ends in delayed, then rejected inserts."
+
+      - alert: ClickHouseInsertsRejected
+        expr: rate(ClickHouseProfileEvents_RejectedInserts[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: observability
+        annotations:
+          summary: "ClickHouse rejecting inserts"
+          description: "The too-many-parts guard is rejecting inserts; the collector will retry, then drop."
+
+      - alert: ClickHouseInsertsFailing
+        expr: rate(ClickHouseProfileEvents_FailedInsertQuery[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: observability
+        annotations:
+          summary: "ClickHouse insert queries failing"
+          description: "Insert queries are erroring — telemetry rows are being lost at the door."
+
+      - alert: ClickHouseMergesFailing
+        expr: rate(ClickHouseProfileEvents_FailedMerges[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          category: observability
+        annotations:
+          summary: "ClickHouse merges failing"
+          description: "Background merges are failing; parts will accumulate until inserts throttle."
+
+      - alert: ClickHouseInsertsDelayed
+        expr: rate(ClickHouseProfileEvents_DelayedInserts[5m]) > 0
+        for: 10m
+        labels:
+          severity: info
+          category: observability
+        annotations:
+          summary: "ClickHouse throttling inserts"
+          description: "The parts_to_delay_insert guard is slowing inserts — the step before rejection."
+
+      # system.errors arrives as one series per error name
+      # (ClickHouseErrorMetric_<NAME>) — the local shape of the cluster's
+      # system_errors family. The __name__ regex sums the whole census.
+      - alert: ClickHouseServerErrorsElevated
+        expr: sum(rate({__name__=~"ClickHouseErrorMetric_.+"}[5m])) > 5
+        for: 10m
+        labels:
+          severity: info
+          category: observability
+        annotations:
+          summary: "ClickHouse system.errors rate elevated"
+          description: "The server is accumulating errors faster than 5/s. Check the top-N errors panel on the server-engine dashboard."

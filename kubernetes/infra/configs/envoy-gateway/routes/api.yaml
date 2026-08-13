@@ -99,6 +99,45 @@ spec:
         - name: user
           port: 8080
 ---
+# inventory — protected Backoffice surface only (RFC-0023, net-new: the
+# service's first edge route ever). Edge JWT coarse check; the
+# backoffice_admin role gate is in-service (ADR-047). gRPC :9090 stays
+# unrouted east-west.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-inventory-protected
+  namespace: inventory
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /inventory/v1/protected
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: inventory
+          port: 8080
+---
 # Product Service — public catalog: anonymous. Translates api-product.
 # (POST /product/v1/internal/products is NOT exposed here.)
 apiVersion: gateway.networking.k8s.io/v1

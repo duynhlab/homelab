@@ -92,6 +92,26 @@ spec:
           kind: Backend
           name: user
 ---
+# inventory — protected Backoffice surface only (RFC-0023). Edge JWT; the
+# role gate is in-service. gRPC :9090 stays unrouted (east-west only).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-inventory-protected
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /inventory/v1/protected
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: inventory
+---
 # product — public catalog. NOT /product/v1/internal/products (A8).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

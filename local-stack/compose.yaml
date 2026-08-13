@@ -181,6 +181,12 @@ services:
 
   temporal:
     image: temporalio/server:1.31.2
+    # on-failure: a restart can die FATALLY after ~50s when ringpop tries to
+    # rejoin its own stale membership entry ("join duration exceeded max 30s")
+    # — seen live in the 2026-08-13 audit: `restart temporal` (A14) answered
+    # the row, then exited(1) 90s later and stayed down, silently taking every
+    # timer with it. The retry starts clean once the stale entry has aged out.
+    restart: on-failure:5
     environment:
       DB: postgres12
       DB_PORT: "5432"
@@ -671,10 +677,11 @@ services:
       cart-seed: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
 
-  # ---- Inventory (RFC-0021): sole stock authority. gRPC-only (:9090,
-  # inventory.v1) — no edge route. Three live callers since phase 4: the order
-  # saga (reserve/commit/release), checkout (availability), and product /details.
-  # Product no longer has a stock column to fall back to.
+  # ---- Inventory (RFC-0021): sole stock authority. East-west gRPC-only
+  # (:9090, inventory.v1) — saga (reserve/commit/release), checkout
+  # (availability), product /details. RFC-0023 adds its first HTTP business
+  # surface: /inventory/v1/protected on :8080 behind the edge (Backoffice).
+  # Keycloak dependency = the authmw JWKS verifier, like every verifying svc.
   inventory:
     build: { context: ../../inventory-service }
     environment:
@@ -685,6 +692,7 @@ services:
       GRPC_PORT: "9090"
     healthcheck: *svc-healthcheck
     depends_on:
+      keycloak: { condition: service_healthy }
       postgres: { condition: service_healthy }
       inventory-migrate: { condition: service_completed_successfully }
       inventory-seed: { condition: service_completed_successfully }

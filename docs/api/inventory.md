@@ -19,8 +19,8 @@ elsewhere.
 |-----------|-------|--------|
 | **Deployment** | local-stack + cluster — **sole stock authority**; callers: order saga, checkout, product `/details` | Implemented |
 | **Runtime modes** | `api` (serve) + `migrate` + `seed` (dev-only) | Implemented |
-| **HTTP server** | internal · `:8080` · `/health` + `/ready` only | Implemented |
-| **Edge exposure** | None — no `HTTPRoute` at either edge; gRPC-only, NetworkPolicy-fenced | None |
+| **HTTP server** | `:8080` · operational (`/health`, `/ready`) + **protected Backoffice group** (RFC-0023) | Implemented |
+| **Edge exposure** | `api-inventory-protected` → `/inventory/v1/protected` only (edge JWT); east-west stays gRPC, no other audience routed | Implemented |
 | **gRPC server** | `inventory.v1.InventoryService/{BatchGetAvailability,CheckAvailability,Reserve,Release,Commit,GetReservation}` · `:9090` | Implemented |
 | **gRPC clients** | None | None |
 | **Worker** | None | None |
@@ -132,15 +132,30 @@ variant model can add SKUs without a contract change.
 
 ## HTTP API
 
-None public. `:8080` serves operational endpoints only:
+No public or private audience. `:8080` serves the operational endpoints plus
+the platform's first `protected` group (RFC-0023 slice A,
+[ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/)) — the
+Backoffice's stock views and the first callers of the idempotent stock
+commands. Guard chain per [api.md § Protected route conventions](./api.md#protected-route-conventions):
+edge `jwt-edge` (coarse) → in-service `pkg/authmw` (authoritative) →
+`MiddlewareRequireRole("backoffice_admin")`; `actor` is always the verified
+token `sub`.
 
 | Method | Path | Purpose | Errors worth knowing |
 |--------|------|---------|----------------------|
 | `GET` | `/health` | Liveness | — |
 | `GET` | `/ready` | Readiness (DB reachable) | `503` when the pool is not ready |
+| `GET` | `/inventory/v1/protected/balances` | Paginated balance rows; filters `sku_id`, `warehouse_id`, `low_stock=true` (keeps `atp <= safety_stock`); `atp = on_hand - reserved` derived in SQL | `400 VALIDATION_ERROR` on a bad `warehouse_id` |
+| `GET` | `/inventory/v1/protected/balances/:skuId` | All warehouse rows for one SKU (`{"items": […]}`) | `404 NOT_FOUND` when the SKU is untracked — never an empty 200 |
+| `GET` | `/inventory/v1/protected/movements` | Append-only ledger, newest first; filters `sku_id`, `warehouse_id`; rows carry `command_id`, deltas, `reason`, `actor` | — |
+| `GET` | `/inventory/v1/protected/reservations` | Reservation headers, newest first; `status` filter (`reserved\|committed\|released\|expired`) | `400` on an unknown status |
+| `POST` | `/inventory/v1/protected/receipts` | Receive stock. Body: `command_id` (idempotency key), `sku_id`, `warehouse_id`, `quantity > 0`, optional `reason` | `201` + `applied:true` first time; **`200` + `applied:false` on exact replay**; `409 IDEMPOTENCY_CONFLICT` on key reuse with a different payload |
+| `POST` | `/inventory/v1/protected/adjustments` | Signed on-hand `delta` with **mandatory `reason`** | same replay contract; `409 STOCK_UNAVAILABLE` when the delta would violate `on_hand >= reserved >= 0` |
 
-No route at either edge reaches inventory; kubelet probes are host-level and
-bypass NetworkPolicy. Platform conventions: [api.md](./api.md#error-envelope).
+List responses use the standard pagination envelope. The movement ledger IS
+the stock audit (actor-aware, same-transaction — RFC-0023 audit contract);
+there is no separate audit table here. Platform conventions:
+[api.md](./api.md#error-envelope).
 
 ## gRPC API
 
@@ -345,4 +360,4 @@ Transport peers call `logic/v1`; logic calls `core` only
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
 
-_Last updated: 2026-08-11 — the gRPC fence admits three namespaces — product reads availability for `GetProductDetails`._
+_Last updated: 2026-08-13 — RFC-0023 slice A: the protected Backoffice group is inventory's first HTTP business surface and first edge route (`api-inventory-protected`); the stock commands gain their first callers._

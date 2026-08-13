@@ -71,6 +71,9 @@ spec:
       name: api-user-private
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
+      name: api-inventory-protected
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
       name: api-product
     - group: gateway.networking.k8s.io
       kind: HTTPRoute

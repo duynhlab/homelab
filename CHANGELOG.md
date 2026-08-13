@@ -728,7 +728,17 @@ Skeleton (copy what you need):
 
 #### Services
 
-- **Fleet pinned to the access-log fix**: auth/user/cart/review/shipping
+- **Fleet pinned to the RFC-0024 identity cutover** (2026-08-13): the seven
+  authmw consumers take a MAJOR — user/cart/review/notification/payment/order
+  **2.0.0**, checkout **0.7.0** — because the release is breaking twice over:
+  the `AUTH_JWKS_URL`/`JWT_*` env contract is gone in favour of `OIDC_*`, and
+  `user_id` is the token `sub` as a string UUID through handler, proto, and
+  column (ADR-042, greenfield DB reset). frontend **2.0.0** replaces the
+  custom token layer with keycloak-js. The proto-pin-only repos take a patch:
+  product **1.11.3**, shipping **1.4.3**, inventory **0.4.3**. auth stays at
+  **1.4.2** — nothing verifies its tokens anymore and the pin retires with the
+  service in P5. Gated on the compose E2E audit run against this code before
+  merge; the first cluster deploy of these tags goes through the Kind gate.
   **1.4.2**, product **1.11.2**, order **1.13.3**, notification **1.5.2**,
   payment **1.5.3**, checkout **0.6.3**, inventory **0.4.2**, plus
   checkout-worker **0.6.3**. Each tag carries three things at once — the

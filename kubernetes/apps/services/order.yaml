@@ -49,7 +49,12 @@ spec:
     # probes while keeping failing ones, logs the span trace id or none rather
     # than a fabricated one, and treats 4xx as warn. Local-stack E2E #2: probe
     # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
-    image_tag: "1.13.3" # {"$imagepolicy": "flux-system:order:tag"}
+    # 2.0.0: RFC-0024 identity cutover (2026-08-13). Verifies Keycloak realm
+    # tokens via OIDC_* (pkg authmw v0.37.1, preferred_username), user_id is
+    # the token sub as a string UUID end to end (ADR-042), greenfield DB
+    # reset per the identity-cutover runbook. Compose E2E audit passed on
+    # this code before merge; first fleet deploy goes through the Kind gate.
+    image_tag: "2.0.0" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

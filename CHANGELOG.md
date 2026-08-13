@@ -445,6 +445,16 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### GitOps
+
+- The `ClickHouseInstallation` CR moves from `infra/controllers/clickhouse/` to
+  `infra/configs/clickhouse/`, matching the operator-vs-instance split every
+  other pair already follows (cert-manager, envoy-gateway, CloudNativePG,
+  Temporal): operators and CRDs live under `controllers/`, the CR instances
+  they reconcile live under `configs/`. Contents unchanged; the Flux
+  Kustomization `clickhouse-local` keeps its name, `dependsOn`, and
+  healthCheck — only its `path` moves.
+
 #### Security
 
 - Four `docs/api/` service contracts documented their edge NetworkPolicy ingress

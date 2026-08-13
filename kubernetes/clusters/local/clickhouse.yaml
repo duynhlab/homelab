@@ -19,7 +19,7 @@ spec:
   sourceRef:
     kind: OCIRepository
     name: infrastructure-oci
-  path: ./controllers/clickhouse
+  path: ./configs/clickhouse
   prune: true
   wait: true
   dependsOn:

@@ -65,22 +65,6 @@ Decision alternatives — may be a shorter subset of research.md § Alternatives
 Link research for the full plain-language analysis.
 -->
 
-## Other solutions considered
-
-<!--
-What other options exist? Why are they not a suitable or the best choice?
-One row per option — name it, sketch the shape, and state the concrete reason
-we rejected it (cost, ops burden, blast radius, missing capability, licence,
-lock-in, doesn't fit deployed reality). Complements § Alternatives above:
-Alternatives = decision-level tradeoffs on the chosen path; this section =
-every other option we looked at and ruled out.
--->
-
-| Option | Shape | Why not chosen |
-|--------|-------|----------------|
-| `<option-A>` | <!-- one-line sketch --> | <!-- concrete rejection reason --> |
-| `<option-B>` | <!-- --> | <!-- --> |
-
 ## Architecture & Diagrams
 
 <!--

@@ -290,9 +290,11 @@ identity workload sits today (databases → identity → apps).
 
 ### Retiring the `auth` database is not a plain drop
 
-As-built, the `auth` role and `platform-db-secret` **double as the CNPG
-`bootstrap.initdb` credentials** for the whole `platform-db` cluster
-([`kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml)).
+As-built at the time of writing, the `auth` role and `platform-db-secret`
+**doubled as the CNPG `bootstrap.initdb` credentials** for the whole
+`platform-db` cluster (`kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml`
+— the manifest is deleted with the RFC-0024 P5 auth retirement; the path is
+kept as prose for the historical record).
 Before the `auth` database and role retire, the bootstrap contract must move to a new
 owner — a required, explicit step in the implementation plan. **Decision:** re-point
 `bootstrap.initdb` to a neutral `platform_owner` role + secret owned by the databases

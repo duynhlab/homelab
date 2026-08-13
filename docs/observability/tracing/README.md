@@ -40,7 +40,7 @@ Track requests as they flow through multiple microservices to understand perform
 **Without tracing**: Check logs from every service and worker manually, then guess which hop is slow.
 
 **With Tracing**: 
-- See the entire request flow: `Kong → Order → Shipping / Notification`
+- See the entire request flow: `Edge → Order → Shipping / Notification`
 - Identify bottleneck: **Shipping service took 2000ms** (everything else < 100ms)
 - Jump to Shipping logs using `trace_id` to see exact error
 
@@ -76,11 +76,11 @@ Track requests as they flow through multiple microservices to understand perform
 
 ```mermaid
 flowchart LR
-    A[User Request] -->|1. HTTP Request| K[Kong gateway<br/>root span + traceparent]
+    A[User Request] -->|1. HTTP Request| K[Envoy Gateway edge<br/>root span + traceparent]
     K -->|2. W3C traceparent header| C[Order Service]
     C -->|3. traceparent via gRPC metadata| D[Shipping Service]
 
-    K -->|Spans OTLP| O[OTel Collector]
+    K -->|Spans OTLP/gRPC :4317| O[OTel Collector]
     C -->|Spans OTLP| O
     D -->|Spans OTLP| O
 
@@ -104,10 +104,10 @@ flowchart LR
 
 ### Trace Flow
 
-1. **Request arrives** at **Kong** (edge), which creates the **root span** with `trace_id` and injects the W3C `traceparent` (its `opentelemetry` plugin)
+1. **Request arrives** at the **edge** (Envoy Gateway), which creates the **root span** with `trace_id` and propagates the W3C `traceparent` — native tracing (`EnvoyProxy.spec.telemetry.tracing`), no plugin required
 2. **W3C Trace Context** header (`traceparent`) propagated to the services and downstream
-3. Each service creates **child spans** for its operations (Kong forces a W3C `traceparent` via `inject: [w3c]` — see [edge→service linkage](architecture.md#edge--service-linkage))
-4. **10% sampling** — Kong (root) decides by ratio; each service wraps its ratio in `ParentBased` (`ParentBased(TraceIDRatioBased(rate))`), so downstream hops honour the root's `sampled` flag and traces stay whole — a service's own ratio only applies when it is itself the root (see the [sampling note](architecture.md#edge--service-linkage))
+3. Each service creates **child spans** for its operations (the edge propagates a W3C `traceparent` natively on every proxied request — see [edge→service linkage](architecture.md#edge--service-linkage))
+4. **10% sampling** — the edge (root) decides by ratio (`samplingRate: 10` in the cluster CR, **planned**; `100` in local-stack); each service wraps its ratio in `ParentBased` (`ParentBased(TraceIDRatioBased(rate))`), so downstream hops honour the root's `sampled` flag and traces stay whole — a service's own ratio only applies when it is itself the root (see the [sampling note](architecture.md#edge--service-linkage))
 5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **Tempo**, **Jaeger**, and **VictoriaTraces**
 6. **Grafana** queries Tempo for trace visualization
 
@@ -280,4 +280,4 @@ attribute.String("db.table", "users")
 **Last Updated**: 2026-07-14 — metrics-generator noted configured-but-inert (`remote_write: []`); collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.9.4 (pilot)
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-13 — trace root re-documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, no plugin)_

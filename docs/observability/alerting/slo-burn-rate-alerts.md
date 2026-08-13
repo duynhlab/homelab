@@ -202,7 +202,7 @@ Open [vmalert.duynh.me](http://vmalert.duynh.me) and search for the alert name (
 
 ### Force the alert to fire (synthetic load)
 
-Real traffic is the safest source. If you need to synthesise traffic for testing burn-rate alerts, generate it ad-hoc against the public endpoints via Kong — **do not** invent endpoints (`/api/error`, `/api/slow`) — none exist in the services. To exercise the availability SLO, target a real handler and induce errors via fault injection or by toggling a feature flag.
+Real traffic is the safest source. If you need to synthesise traffic for testing burn-rate alerts, generate it ad-hoc against the public endpoints via the edge — **do not** invent endpoints (`/api/error`, `/api/slow`) — none exist in the services. To exercise the availability SLO, target a real handler and induce errors via fault injection or by toggling a feature flag.
 
 ### Test the routing without real traffic
 
@@ -244,4 +244,4 @@ open http://karma.duynh.me
 - [Sloth alerting docs](https://sloth.dev/usage/alerts/) — generator details and overrides
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-13 — traffic-generation note corrected to "via the edge"_

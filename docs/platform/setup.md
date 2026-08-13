@@ -63,13 +63,13 @@ This creates a structured local environment with all necessary source code.
 
 Before the first `make up`, one host-side prerequisite must be in place:
 
-1. **`/etc/hosts` entries for `*.duynh.me`** — Kong runs as NodePort and Kind maps host ports 80/443. Use the helper:
+1. **`/etc/hosts` entries for `*.duynh.me`** — the Envoy Gateway edge Service is a NodePort and Kind maps host ports 80/443. Use the helper:
    ```bash
    sudo ./scripts/setup-hosts.sh           # adds the marker block
    sudo ./scripts/setup-hosts.sh remove    # cleans it up
    ```
 
-On **local Kind** that is enough: the `clusters/local` overlay patches the `kong-proxy-tls` Certificate to the self-signed **`homelab-ca`** issuer, so Kong terminates HTTPS with a self-signed wildcard (expect a browser warning unless `homelab-ca` is trusted). **No Cloudflare token or Let's Encrypt is needed locally.**
+On **local Kind** that is enough: `envoy-gateway-config.yaml` in the `clusters/local` overlay patches the `platform-edge-tls` Certificate to the self-signed **`homelab-ca`** issuer, so the edge terminates HTTPS with a self-signed wildcard (expect a browser warning unless `homelab-ca` is trusted). **No Cloudflare token or Let's Encrypt is needed locally.**
 
 **Prod only — Cloudflare API token in OpenBAO:** on prod the `letsencrypt-prod` ClusterIssuer uses Cloudflare DNS-01 to issue a publicly-trusted wildcard `*.duynh.me` cert. That token is **bootstrap-only** (not in Git) and must be re-seeded after every fresh cluster:
    ```bash
@@ -79,7 +79,7 @@ On **local Kind** that is enough: the `clusters/local` overlay patches the `kong
    flux reconcile ks secrets-local --with-source
    flux reconcile ks cert-manager-local --with-source
    ```
-   ESO syncs the token to `Secret/cloudflare-api-token` in the `cert-manager` namespace via `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. Without it, the `letsencrypt-*` issuers stay NotReady on prod — but this is **not** a local bring-up blocker (`homelab-ca` issues `kong-proxy-tls` locally).
+   ESO syncs the token to `Secret/cloudflare-api-token` in the `cert-manager` namespace via `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. Without it, the `letsencrypt-*` issuers stay NotReady on prod — but this is **not** a local bring-up blocker (`homelab-ca` issues `platform-edge-tls` locally).
 
 ---
 
@@ -138,7 +138,7 @@ make flux-up
 - Flux then reconciles the pushed artifacts in dependency order:
   - **Phase 1: Foundation** — `controllers-local`: namespaces + operators (cert-manager, CNPG, VictoriaMetrics/Grafana operators, OpenBAO + ESO, Kyverno, ClickHouse operator).
   - **Phase 2: Security & configs** — `secrets-local` (bootstrap Job + ClusterSecretStore + ExternalSecrets), `cert-manager-local`, `monitoring-local` (observability configs + Sloth SLO CRs).
-  - **Phase 3: Platform services** — Kong, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
+  - **Phase 3: Platform services** — Envoy Gateway, Keycloak, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
   - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workers (`order-worker`, `checkout-worker`, `mockpay`).
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
@@ -175,17 +175,17 @@ kubectl get prometheusservicelevel -n monitoring
 ```
 
 **Expected State:**
-- Namespaces for every domain provisioned (auth, user, product, cart, **checkout**, order, review, notification, shipping, payment, frontend, **platform**, **product**, **cache-system**, **rustfs**, kong, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, flux-system, **temporal**, …).
+- Namespaces for every domain provisioned (auth, user, product, cart, **checkout**, order, review, notification, shipping, payment, frontend, **platform**, **product**, **cache-system**, **rustfs**, envoy-gateway, identity, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, flux-system, **temporal**, …).
 - 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
 - HelmReleases for the **10 microservices** + frontend, plus **`mockpay`**, **`order-worker`**, and **`checkout-worker`** (in the `payment` / `order` / `checkout` namespaces), in `Ready` state.
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
-- ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `kong-proxy-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
+- ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `platform-edge-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
 ---
 
 ## Accessing Services
 
-All user-facing endpoints go through Kong on `*.duynh.me` (on local Kind, terminated with the self-signed `homelab-ca` wildcard — expect a browser warning; prod uses the Let's Encrypt wildcard). Make sure `scripts/setup-hosts.sh` has been run.
+All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on local Kind, terminated with the self-signed `homelab-ca` wildcard — expect a browser warning; prod uses the Let's Encrypt wildcard). Make sure `scripts/setup-hosts.sh` has been run.
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
@@ -199,7 +199,7 @@ All user-facing endpoints go through Kong on `*.duynh.me` (on local Kind, termin
 | Flux UI | https://ui.duynh.me | - |
 | OpenBAO UI | https://openbao.duynh.me | root token from `openbao-init-keys` secret |
 
-The full host inventory lives in `scripts/setup-hosts.sh` and `docs/platform/kong-gateway.md`.
+The full host inventory lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
 
 ---
 
@@ -221,12 +221,20 @@ All services include seed data via golang-migrate `000002_*.up.sql` migrations f
 | David Brown | `david@example.com` | `password123` | Recent order with tracking |
 | Eve Davis | `eve@example.com` | `password123` | Inactive user |
 
-**Login Example** (login binds `username`, not `email`):
+**Login** (binds `username`, not `email`): identity is the realm's job — the SPA
+redirects to Keycloak (`https://id.duynh.me`, realm `duynhlab`) and there is no
+password-grant endpoint to curl, because Direct Access Grants are disabled on the
+realm's clients. Sign in through the SPA, or mint a token headlessly with the
+Authorization Code + PKCE helper (the same one the local release audit uses):
+
 ```bash
-curl -X POST http://localhost:8080/auth/v1/public/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "password123"}'
+KC_URL=https://id.duynh.me USERNAME=alice PASSWORD=password123 \
+  ./local-stack/scripts/keycloak-token.sh
 ```
+
+> **Planned:** the cluster half of this flow has not run on Kind yet; it is the
+> first thing the Kind gate proves. On local-stack the same flow is verified
+> end to end (`KC_URL` defaults to `http://localhost:8081`).
 
 ### Seeded Data Summary
 
@@ -336,23 +344,24 @@ Seed data located in each service:
 ### Verification
 
 ```bash
-# Check products
-curl http://localhost:8080/product/v1/public/products
+# Check products (Kind edge; on local-stack use http://localhost:8080)
+curl -k https://gateway.duynh.me/product/v1/public/products
 
-# Login as Alice (login binds username, not email)
-TOKEN=$(curl -X POST http://localhost:8080/auth/v1/public/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "password123"}' \
-  | jq -r '.access_token')
+# Mint Alice's realm token (Authorization Code + PKCE — no password grant exists)
+TOKEN=$(KC_URL=https://id.duynh.me USERNAME=alice PASSWORD=password123 \
+  ./local-stack/scripts/keycloak-token.sh)
 
 # Check Alice's cart
-curl http://localhost:8080/cart/v1/private/cart \
+curl -k https://gateway.duynh.me/cart/v1/private/cart \
   -H "Authorization: Bearer $TOKEN"
 
 # Check Alice's orders
-curl http://localhost:8080/order/v1/private/orders \
+curl -k https://gateway.duynh.me/order/v1/private/orders \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+`-k` because local Kind terminates TLS with the self-signed `homelab-ca`
+wildcard; drop it once `homelab-ca` is trusted, and on prod.
 
 
 ---
@@ -373,13 +382,13 @@ homelab/
 │   │   │   ├── clickhouse-operator/    # Altinity ClickHouse operator (CRDs)
 │   │   │   ├── temporal/               # Temporal operator
 │   │   │   └── kyverno/
-│   │   │   # tracing/, profiling/, caching/, storage/, kong/ — separate Flux Kustomizations
+│   │   │   # tracing/, profiling/, caching/, storage/, envoy-gateway/, keycloak/ — separate Flux Kustomizations
 │   │   ├── configs/                    # Component instances and configurations
 │   │   │   ├── observability/          # Metrics, logging, tracing, Grafana, Sloth SLO CRs
 │   │   │   ├── databases/              # PostgreSQL clusters and PgDog poolers
 │   │   │   ├── secrets/                # Bootstrap Job, ClusterSecretStore, ExternalSecrets
-│   │   │   ├── cert-manager/           # ClusterIssuers, kong-proxy-tls Certificate
-│   │   │   └── kong/                   # KongClusterPlugins + Ingress routes
+│   │   │   ├── cert-manager/           # ClusterIssuers
+│   │   │   └── envoy-gateway/          # Gateway, HTTPRoutes, policies, platform-edge-tls Certificate
 │   │   └── kustomization.yaml
 │   ├── apps/                           # Application definitions (Hybrid ResourceSet)
 │   │   ├── domains/                    # Domain ResourceSets (template + inputsFrom selector)
@@ -409,7 +418,8 @@ homelab/
 │           ├── controllers.yaml        # Operator orchestration
 │           ├── secrets.yaml            # Secrets bootstrap configs
 │           ├── cert-manager-config.yaml
-│           ├── kong.yaml / kong-config.yaml
+│           ├── gateway-api-crds.yaml / envoy-gateway.yaml / envoy-gateway-config.yaml
+│           ├── keycloak.yaml
 │           ├── caching.yaml / storage.yaml
 │           ├── clickhouse.yaml / tracing.yaml / profiling.yaml
 │           ├── databases.yaml / databases-cnpg-dr.yaml
@@ -421,14 +431,16 @@ homelab/
 ```
 
 **Dependency Graph:**
-1. `controllers-local`: Provisions namespaces and operators (cert-manager, CNPG, VictoriaMetrics/Grafana/Sloth, OpenBAO + ESO **HelmReleases**, Kyverno, ClickHouse operator). The Temporal operator was retired (ADR-030) — Temporal now ships as a HelmRelease in `temporal-local`. **Does not** install Kong or Tempo/Pyroscope (those are separate Kustomizations to avoid deadlocks).
+1. `controllers-local`: Provisions namespaces and operators (cert-manager, CNPG, VictoriaMetrics/Grafana/Sloth, OpenBAO + ESO **HelmReleases**, Kyverno, ClickHouse operator). The Temporal operator was retired (ADR-030) — Temporal now ships as a HelmRelease in `temporal-local`. **Does not** install the edge or Tempo/Pyroscope (those are separate Kustomizations to avoid deadlocks).
 2. `secrets-local`: Applies `./configs/secrets` — OpenBAO bootstrap Job, ClusterSecretStore, ExternalSecrets (depends on `controllers-local` for the OpenBAO/ESO operators).
-3. `cert-manager-local`: ClusterIssuers (`selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod`), `kong-proxy-tls` Certificate, trust-manager Bundle (depends on `controllers-local`, `secrets-local` — needs the synced `cloudflare-api-token` Secret on prod).
-4. `kong-local`: Kong HelmRelease (depends on `cert-manager-local` — mounts `kong-proxy-tls` Secret as a volume).
-5. `kong-config-local`: KongClusterPlugins + Ingress resources for every host (depends on `kong-local`, `cert-manager-local`).
+3. `cert-manager-local`: ClusterIssuers (`selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod`), trust-manager Bundle (depends on `controllers-local`, `secrets-local` — needs the synced `cloudflare-api-token` Secret on prod).
+3a. `keycloak-local`: the `duynhlab` realm — Keycloak on `platform-db` with the deterministic realm import (depends on `controllers-local`, `databases-local`, `secrets-local`).
+4. `gateway-api-crds-local`: Gateway API CRDs chart (depends on `controllers-local`).
+5. `envoy-gateway-local`: the Envoy Gateway controller (depends on `gateway-api-crds-local`, `cert-manager-local`).
+5a. `envoy-gateway-config-local`: GatewayClass + Gateway + HTTPRoutes + SecurityPolicies + BackendTrafficPolicies + the `platform-edge-tls` Certificate, with the local `homelab-ca` issuer patch (depends on `envoy-gateway-local`, `cert-manager-local`, `keycloak-local` — the JWT SecurityPolicy's `remoteJWKS` endpoint must resolve).
 6. `monitoring-local`: Observability **configs** — Grafana dashboards, VMAlert rules, Sloth **PrometheusServiceLevel** CRs (depends on `controllers-local`; Sloth **operator** is in `controllers-local`).
 7. `storage-local`: Provisions RustFS (S3) object storage (depends on `controllers-local`, `secrets-local`).
-7a. `caching-local`: Valkey (product cache-aside db 0 + Kong rate-limit counters db 1) (depends on `controllers-local`, `monitoring-local`).
+7a. `caching-local`: Valkey (product cache-aside, db 0 — the edge does not use it) (depends on `controllers-local`, `monitoring-local`).
 8. `network-policies-local`: Per-namespace NetworkPolicies (depends on `controllers-local`).
 8a. `clickhouse-local`: ClickHouse OLAP for OTel logs+traces SQL (depends on `controllers-local`, `secrets-local`).
 9. `tracing-local`: Tempo + Jaeger + OTel Collector configs (depends on `secrets-local`, `storage-local`, **`clickhouse-local`** — collector `create_schema` needs ClickHouse up first).
@@ -443,7 +455,7 @@ homelab/
 
 > **`make flux-sync` caveat:** `scripts/flux-sync.sh` reconciles only six Kustomizations
 > (`flux-system`, `controllers-local`, `databases-local`, `monitoring-local`,
-> `secrets-local`, `apps-local`). It does **not** force Kong, Temporal, ClickHouse,
+> `secrets-local`, `apps-local`). It does **not** force the edge, Keycloak, Temporal, ClickHouse,
 > tracing, or cert-manager. After changes to those layers, run
 > `flux reconcile kustomization <name>-local --with-source` or `make sync` after
 > `make flux-push` and reconcile the specific Kustomization manually.
@@ -455,4 +467,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-07-22 — 10 microservices + checkout-worker; Flux graph adds clickhouse-local; secrets-local vs controllers-local split; configs/observability paths; make flux-sync caveat._
+_Last updated: 2026-08-13 — Envoy Gateway edge + Keycloak realm in the Flux graph and access instructions; realm-token login examples (PKCE, no password grant); cluster half marked planned until the Kind gate._

@@ -141,7 +141,8 @@ This is the most important concept to understand. The cluster runs **two separat
 |----------|------|---------|
 | `ServiceMonitor/external-secrets` | `configs/observability/metrics/servicemonitors/external-secrets.yaml` | Manual (platform team) |
 | `ServiceMonitor/tempo` | `configs/observability/metrics/servicemonitors/tempo.yaml` | Manual (platform team) |
-| `ServiceMonitor/kong` | `controllers/kong/helmrelease.yaml` (`serviceMonitor.enabled: true`) | Kong chart (scrapes the proxy status port `:8100`) |
+| `ServiceMonitor/envoy-gateway-controller` | `configs/observability/metrics/servicemonitors/envoy-gateway-controller.yaml` | Manual (platform team) — control-plane metrics on the `metrics` port `:19001` |
+| `PodMonitor/envoy-gateway-proxy` | `configs/observability/metrics/podmonitors/envoy-gateway-proxy.yaml` | Manual (platform team) — data-plane `envoy_*` stats on `:19001` `/stats/prometheus` |
 | `ServiceMonitor/kube-apiserver` | `configs/observability/metrics/servicemonitors/kube-apiserver.yaml` | Manual (platform team) |
 | `PrometheusRule` (PostgreSQL, many) | `configs/observability/metrics/prometheusrules/postgres/` (`cnpg/`, `cnpg-platform-db/`) | Manual (platform team) |
 | `PrometheusRule/postgres-backup-alerts` | `configs/observability/metrics/prometheusrules/postgres/backup-alerts.yaml` | Manual (platform team) |
@@ -977,4 +978,4 @@ kubectl get helmreleases -A -o wide
 
 ---
 
-_Last updated: 2026-07-18 — Merge vmauth into this page; trim duplicated VLSingle/logs content (see logging/README.md#platform-pipeline)._
+_Last updated: 2026-08-13 — edge scrape objects corrected to the envoy-gateway-controller ServiceMonitor + envoy-gateway-proxy PodMonitor; merged vmauth into this page; trim duplicated VLSingle/logs content (see logging/README.md#platform-pipeline)._

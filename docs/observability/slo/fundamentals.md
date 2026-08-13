@@ -2,7 +2,7 @@
 
 > Plain-English primer on SLA / SLO / SLI / Error Budget / Burn Rate, written
 > against this platform's actual stack (Sloth v0.16.0 + VictoriaMetrics +
-> 10 microservices on Kong). Read this **before**
+> 10 microservices on Envoy Gateway). Read this **before**
 > [`getting_started.md`](./getting_started.md) and the
 > [SLO system overview](./README.md). Once you've internalised it, jump to
 > [`alerting/slo-burn-rate-alerts.md`](../alerting/slo-burn-rate-alerts.md)
@@ -261,4 +261,4 @@ Full layering and pipeline diagrams: [`alerting/README.md`](../alerting/README.m
 - Sloth — [Introduction & concepts](https://sloth.dev/introduction/)
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-13 — intro corrected to Envoy Gateway (the edge)_

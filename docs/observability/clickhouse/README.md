@@ -165,7 +165,7 @@ primaries (`sending_queue` + `retry_on_failure` isolate it).
 
 ```mermaid
 flowchart LR
-  Apps["10 services + 2 workers<br/>+ Kong"] -->|OTLP| Col["OTel Collector<br/>(contrib)"]
+  Apps["10 services + 2 workers<br/>+ edge"] -->|OTLP| Col["OTel Collector<br/>(contrib)"]
   Col -->|metrics| VM[("VictoriaMetrics")]
   Col -->|logs| VL[("VictoriaLogs")]
   Col -->|traces| Tempo[("Tempo")]
@@ -414,8 +414,10 @@ Design decisions, all verified against live data:
 - **Variables**: `$severity` is lowercase (`error,warn,info,notice,debug` — what
   the services actually emit); `$environment` reads
   `deployment.environment.name` (`local` locally, `production` in-cluster) and
-  binds to member spans (the kong edge spans carry no environment attribute);
-  textbox vars run through `$__conditionalAll`.
+  binds to member spans (the edge's own spans carry `deployment.environment.name: local`
+  locally via a `customTags` literal, but the cluster CR tags pod identity
+  instead and has no `deployment.environment.name`); textbox vars run through
+  `$__conditionalAll`.
 - **Duration heatmap**: raw `(time, duration_ms)` rows, panel-side bucketing,
   log₂ y-scale, `$sample_mod` constant (1 = no sampling; raise ~500 at volume).
   Span `Events.*` are not populated here — error text comes from `StatusMessage`.
@@ -535,19 +537,23 @@ SELECT count() FROM system.parts WHERE database='otel' AND table='otel_logs' AND
 
 ```sql
 EXPLAIN indexes = 1
-SELECT count() FROM otel.otel_traces WHERE ServiceName = 'kong';
+SELECT count() FROM otel.otel_traces WHERE ServiceName = 'platform.envoy-gateway-system';
 ```
 ```
 ReadFromMergeTree (otel.otel_traces)
 Indexes:
   PrimaryKey
     Keys:  ServiceName
-    Condition: (ServiceName in ['kong', 'kong'])
+    Condition: (ServiceName in ['platform.envoy-gateway-system', 'platform.envoy-gateway-system'])
     Parts: 1/5          -- 4 parts skipped outright
     Granules: 1/5       -- only 1 granule read
 ```
 Because `ServiceName` is the first `ORDER BY` key, ClickHouse reads **1 of 5
 granules** instead of scanning everything — the payoff of the sort key.
+`platform.envoy-gateway-system` is the edge's `service.name` as **derived** by
+Envoy Gateway (`<gateway>.<namespace>`, locally `platform` in
+`envoy-gateway-system`) — not configured, and environment-dependent since it
+embeds the namespace.
 
 ### 4. Inspect partitions & TTL
 
@@ -658,4 +664,4 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-07-22_
+_Last updated: 2026-08-13 — edge `ServiceName` example corrected to the real derived value `platform.envoy-gateway-system`; `$environment` variable note corrected for the edge's local `deployment.environment.name` customTag_

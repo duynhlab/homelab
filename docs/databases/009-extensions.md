@@ -4,7 +4,6 @@
 
 1. [Extension Delivery Models (CNPG)](#extension-delivery-models-cnpg) - Path A (operand built-in) vs Path B (Image Volume)
 2. [Current State](#current-state)
-3. [Problem Statement](#problem-statement)
 4. [Solutions](#solutions)
    - [CloudNativePG Operator](#cloudnativepg-operator)
      - [Image Volume Extensions](#solution-1-image-volume-extensions-postgresql-18-recommended)
@@ -164,7 +163,7 @@ This means **all extensions work correctly**, including `pg_stat_statements`.
 
 ### CloudNativePG Operator
 
-#### Solution 1: Image Volume Extensions (PostgreSQL 18+) ⭐ **Recommended** {#solution-1-image-volume-extensions-postgresql-18-recommended}
+#### Solution 1: Image Volume Extensions (PostgreSQL 18, recommended)
 
 CloudNativePG supports the dynamic loading of PostgreSQL extensions into a Cluster at Pod startup using the Kubernetes `ImageVolume` feature and the `extension_control_path` GUC introduced in PostgreSQL 18.
 

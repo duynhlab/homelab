@@ -120,7 +120,7 @@ docs/
 │       ├── microservices/               # Per-alert runbooks (19 files)
 │       └── postgresql/                  # Per-alert CNPG runbooks
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
-│   └── README.md                 # Valkey platform hub (eviction, Kong db1, ops)
+│   └── README.md                 # Valkey platform hub (eviction, ops)
 ├── platform/                     # Platform/deployment documentation
 │   ├── README.md                 # Platform hub — deployed vs planned, doc map, Flux summary
 │   ├── setup.md                  # GitOps deployment guide (+ seed data & demo accounts)
@@ -446,7 +446,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 ### Caching
 
 - [Application caching](./api/caching.md) - Cache-Aside contract, stampede prevention, keys, env
-- [Caching (Valkey)](./caching/README.md) - Platform deployment, eviction policies, Kong db1, distributed-cache concept
+- [Caching (Valkey)](./caching/README.md) - Platform deployment, eviction policies, distributed-cache concept
 
 ### Platform
 

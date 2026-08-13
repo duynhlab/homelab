@@ -1,6 +1,6 @@
 # OpenTelemetry (OTel)
 
-OpenTelemetry is the common language every service, worker, and Kong use to describe
+OpenTelemetry is the common language every service, worker, and the edge use to describe
 "what just happened" during a request. This doc explains it from zero, shows
 how this platform uses it today (Collector topology, sampling, operations).
 **Service instrumentation policy** (normative rules for PRs) lives in
@@ -13,9 +13,9 @@ how this platform uses it today (Collector topology, sampling, operations).
 | SDK | OpenTelemetry Go **v1.44.0**, wired by **`pkg/obsx` `SetupObservability`** (one call in `main()`) |
 | Semconv | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate `obsx` release |
 | Collector | `otel-collector` (contrib distribution, `monitoring` namespace) |
-| Signals | Traces ✅ (10 services, 2 workers, and Kong) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4; Kong runtime logs via OTLP ✅) |
-| Protocol | Services and workers use OTLP/HTTP protobuf on `:4318`; the cluster Collector also accepts OTLP/gRPC on `:4317` |
-| Propagation | W3C Trace Context (`traceparent`); Kong forces injection (`inject: [w3c]`) |
+| Signals | Traces ✅ (10 services, 2 workers, and the edge) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4) |
+| Protocol | Services and workers use OTLP/HTTP protobuf on `:4318`; the cluster Collector also accepts OTLP/gRPC on `:4317`, which the edge's tracing provider uses |
+| Propagation | W3C Trace Context (`traceparent`); the edge propagates it natively (Envoy Gateway `telemetry.tracing`, no plugin config) |
 | Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` (see [Sampling](#sampling)) |
 | Trace backends | Tempo (primary) + Jaeger (in-memory UI) + VictoriaTraces (pilot) |
 | Service identity | `OTEL_SERVICE_NAME` + Downward API envs, injected by the app ResourceSets |
@@ -36,7 +36,7 @@ original RFC, which remains the historical decision and rollout record.
 
 ## OTel in plain words
 
-When a user clicks "checkout", the request travels through Kong, the order
+When a user clicks "checkout", the request travels through the edge, the order
 service, the shipping service, a database, a cache. If something is slow or
 broken, you need the story of that trip. **Telemetry** is that story, and it
 comes in three forms — the three OTel **signals**:
@@ -74,15 +74,16 @@ Other concepts, in one line each:
 - **Span / trace** — a span is one leg of the trip (one handler, one DB
   query); a trace is every span sharing one `trace_id`, forming a tree.
 - **Context propagation** — the `trace_id` travels in the W3C `traceparent`
-  header (or gRPC metadata); Kong stamps it at the edge, `pkg/grpcx`/HTTP
+  header (or gRPC metadata); the edge stamps it natively, `pkg/grpcx`/HTTP
   middleware pass it on.
 - **Resource attributes** — the name tag on everything a process emits
   (`service.name`, `k8s.namespace.name`, …). Built by `obsx` from env.
 - **OTLP** — the common wire protocol for all three signals. Services and
   workers standardize on **HTTP/protobuf `:4318`** (D-6). The cluster Collector
-  also exposes OTLP/gRPC on `:4317` for compatible platform tools, but the Go
-  application path does not use it. The Collector then translates and routes
-  each signal to the backend-specific ingest endpoint.
+  also exposes OTLP/gRPC on `:4317`, which the edge's tracing provider uses
+  (Envoy's tracing speaks gRPC only) — the Go application path itself stays on
+  HTTP. The Collector then translates and routes each signal to the
+  backend-specific ingest endpoint.
 - **Collector** — the mail room between producers and backends: receivers →
   processors → exporters, one pipeline per signal. Producers know one
   address; the collector owns the fan-out.
@@ -122,15 +123,14 @@ cutovers (the metrics path is detailed in the next diagram):
 flowchart LR
     subgraph Producers
         SVC["10 Go services + 2 workers<br/>obsx SetupObservability<br/>traces + logs via OTLP (metrics → next diagram)"]
-        KONG["Kong gateway<br/>(opentelemetry plugin)"]
+        EDGE["Envoy Gateway edge<br/>telemetry.tracing"]
     end
     subgraph Collector["otel-collector (monitoring)"]
         TP["traces pipeline<br/>memory_limiter → batch"]
         LP["logs pipeline<br/>memory_limiter → batch"]
     end
     SVC -->|"OTLP/HTTP :4318"| TP
-    KONG -->|"spans :4318"| TP
-    KONG -->|"runtime logs"| LP
+    EDGE -->|"OTLP/gRPC :4317 spans"| TP
     TP --> TEMPO["Tempo (primary)"]
     TP --> JAEGER["Jaeger (in-memory UI)"]
     TP --> VT["VictoriaTraces (pilot)"]
@@ -145,12 +145,15 @@ flowchart LR
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SVC app;
-    class KONG edge;
+    class EDGE edge;
     class TP,LP otc;
     class TEMPO,JAEGER,VT trace;
     class VL log;
     class CH,CH2 data;
 ```
+
+The edge has **no OTLP logs path** — its only log output is the JSON access
+log on stdout, tailed by Vector (see [../logging/README.md](../logging/README.md)).
 
 The metrics path in full (live per RFC-0014 P1–P4):
 
@@ -184,7 +187,7 @@ flowchart LR
 > for metrics today.
 
 - **Traces** — unchanged: every service and worker exports spans via `obsx`;
-  Kong opens the root span at the edge; the collector fans out to three backends.
+  the edge opens the root span; the collector fans out to three backends.
 - **Metrics** — OTLP push, fleet-wide: services and workers emit semconv
   metrics through the OTel Meter API to the collector, which forwards them to vmagent's OTLP
   ingest and on to VMSingle. The `/metrics` scrape and client_golang RED were
@@ -204,8 +207,8 @@ matters when a local query returns a series that does not exist in the cluster.
 
 | Concern | Kubernetes | Local-stack |
 |---------|------------|-------------|
-| Producer sampling | `0.1` at Kong and services | `1.0` for complete demo traces |
-| Collector receivers | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` | OTLP/HTTP `:4318` only |
+| Producer sampling | 10% at the edge (`samplingRate: 10`, **planned**) and `0.1` at services | 100% at the edge (`samplingRate: 100`) and `1.0` at services |
+| Collector receivers | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (gRPC receiver enabled for the edge's tracing provider) | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (same reason) |
 | Trace fan-out | Tempo, Jaeger, and VictoriaTraces | VictoriaTraces |
 | RED metrics | Application SDK metrics; no spanmetrics connector | Application SDK metrics plus a spanmetrics compatibility connector |
 | Infrastructure logs | Vector DaemonSet | Container logging path used by the local stack |
@@ -221,16 +224,17 @@ about 10% (**head sampling** — the decision is made when the trace starts, per
 `trace_id`, via `TraceIDRatioBased`; env `OTEL_SAMPLE_RATE=0.1`). Local-stack
 sets the rate to `1.0` so a learner can inspect every demo request.
 
-The subtlety is *who decides*. The design: Kong (root) decides once, everyone
-downstream honours it — that is what the `ParentBased` wrapper does (the
-official default, `parentbased_traceidratio`: sample the root by ratio, then
-follow the parent's decision). All services and workers configure
+The subtlety is *who decides*. The design: the edge (root) decides once,
+everyone downstream honours it — that is what the `ParentBased` wrapper does
+(the official default, `parentbased_traceidratio`: sample the root by ratio,
+then follow the parent's decision). All services and workers configure
 `ParentBased(TraceIDRatioBased(rate))` (now inside `obsx.SetupObservability`),
-so a service's own ratio only applies when it is the *root* of a trace; when
-it has a parent (the Kong→service edge, or a service→service gRPC hop) it
-always honours the parent's `sampled` flag. Concretely, per the OTel Go SDK: a
-sampled remote parent → `AlwaysOn`, an unsampled one → `AlwaysOff`. This makes
-sampling *complete* — a trace Kong keeps is kept whole downstream. Details in
+and the edge's own sampler is `ParentBased` too, so a service's own ratio only
+applies when it is the *root* of a trace; when it has a parent (the
+edge→service hop, or a service→service gRPC hop) it always honours the
+parent's `sampled` flag. Concretely, per the OTel Go SDK: a sampled remote
+parent → `AlwaysOn`, an unsampled one → `AlwaysOff`. This makes sampling
+*complete* — a trace the edge keeps is kept whole downstream. Details in
 [tracing/architecture.md](../tracing/architecture.md).
 
 ## Operations
@@ -252,6 +256,6 @@ Quick verification:
 ## References
 
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
-- In-house: [OTel fundamentals](fundamentals.md) (concepts + old-vs-new migration story) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/histograms.md](../metrics/histograms.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/kong-gateway.md](../../platform/kong-gateway.md)
+- In-house: [OTel fundamentals](fundamentals.md) (concepts + old-vs-new migration story) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/histograms.md](../metrics/histograms.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/envoy-gateway.md](../../platform/envoy-gateway.md)
 
-_Last updated: 2026-07-14 — moved into the OpenTelemetry area; verified SDK, protocol, worker coverage, environment differences, and checkout rollout history._
+_Last updated: 2026-08-13 — edge telemetry re-documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, ParentBased sampler); removed the edge's OTLP logs path (the edge has none — access logs are stdout-only, tailed by Vector); local-stack collector receivers corrected to include gRPC :4317._

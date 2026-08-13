@@ -665,6 +665,51 @@ docker compose start order-worker
 $TCLI workflow list --namespace mop | awk 'NR>1 && $1=="Running"'   # want: no output
 ```
 
+```bash
+# A17. Protected Backoffice surface (RFC-0023 slice A) — the platform's first
+#      /protected/ audience: inventory behind edge JWT + in-service role gate.
+#      Needs BOTH demo identities: alice holds backoffice_admin, bob does not.
+KCT_BOB=$(bash -c 'export USERNAME=bob PASSWORD=password123; bash scripts/keycloak-token.sh')
+
+# Edge coarse check: tokenless never reaches the service.
+audit_curl -s -o /dev/null -w "A17 edge-401: %{http_code} (want 401)\n" \
+  http://localhost:8080/inventory/v1/protected/balances
+# Audience scoping: nothing but /protected is routed for inventory.
+audit_curl -s -o /dev/null -w "A17 no-bare-route: %{http_code} (want 404)\n" \
+  -H "Authorization: Bearer $KCT" http://localhost:8080/inventory/v1/private/balances
+
+# In-service role gate: a valid CUSTOMER token is 403 FORBIDDEN on read and write.
+audit_curl -s -w "  -> A17 bob-read: %{http_code} (want 403 FORBIDDEN)\n" \
+  -H "Authorization: Bearer $KCT_BOB" http://localhost:8080/inventory/v1/protected/balances
+audit_curl -s -w "  -> A17 bob-write: %{http_code} (want 403)\n" -X POST \
+  -H "Authorization: Bearer $KCT_BOB" -H 'Content-Type: application/json' \
+  -d '{"command_id":"a17-x","sku_id":"S","warehouse_id":1,"quantity":1}' \
+  http://localhost:8080/inventory/v1/protected/receipts
+
+# Operator reads: real seeded balances with SQL-derived atp = on_hand - reserved.
+audit_curl -s -H "Authorization: Bearer $KCT" \
+  "http://localhost:8080/inventory/v1/protected/balances?page_size=3" | head -c 300; echo
+
+# Command lifecycle on a dedicated SKU: 201 applied -> exact replay 200
+# applied:false -> invariant-violating adjustment 409 STOCK_UNAVAILABLE.
+A17_BODY='{"command_id":"a17-rcpt-1","sku_id":"A17-SKU","warehouse_id":1,"quantity":7,"reason":"PO-A17"}'
+audit_curl -s -w "  -> A17 receipt: %{http_code} (want 201 applied:true)\n" -X POST \
+  -H "Authorization: Bearer $KCT" -H 'Content-Type: application/json' \
+  -d "$A17_BODY" http://localhost:8080/inventory/v1/protected/receipts
+audit_curl -s -w "  -> A17 replay: %{http_code} (want 200 applied:false)\n" -X POST \
+  -H "Authorization: Bearer $KCT" -H 'Content-Type: application/json' \
+  -d "$A17_BODY" http://localhost:8080/inventory/v1/protected/receipts
+audit_curl -s -w "  -> A17 over-adjust: %{http_code} (want 409 STOCK_UNAVAILABLE)\n" -X POST \
+  -H "Authorization: Bearer $KCT" -H 'Content-Type: application/json' \
+  -d '{"command_id":"a17-adj-1","sku_id":"A17-SKU","warehouse_id":1,"delta":-9999,"reason":"a17"}' \
+  http://localhost:8080/inventory/v1/protected/adjustments
+
+# Ledger: the movement row carries actor = alice's token sub, never a body value.
+audit_curl -s -H "Authorization: Bearer $KCT" \
+  "http://localhost:8080/inventory/v1/protected/movements?sku_id=A17-SKU" \
+  | grep -o '"actor":"[^"]*"'                # want alice's fixed UUID
+```
+
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
 > row cannot reach the limit, so a 429 means either the policy was tightened or
 > something is looping. Investigate before re-running.
@@ -1335,6 +1380,7 @@ print(f'C21 rules loaded: {len(rules)} (want 12); firing: {firing or "none"}')"
 | A14 | Temporal durability | execution count is unchanged and non-zero across `restart temporal`; the driven workflow's history is still readable |
 | A16 | String subject persisted (ADR-042) | a cart write made with a realm token lands in `cart.cart_items.user_id` as the caller's realm UUID — the edge, `pkg/authmw`, the handler, and the column all agree |
 | A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` workflow behind |
+| A17 | Protected surface (RFC-0023) | tokenless 401 **at the edge**; bare `/inventory/v1/private/*` 404 (only `/protected` is routed); bob's valid customer token 403 `FORBIDDEN` **in-service** on read and write; alice's operator token lists real balances with derived `atp`; receipt 201 `applied:true`, exact replay 200 `applied:false`, invariant-violating adjustment 409 `STOCK_UNAVAILABLE`; the movement row's `actor` is alice's token `sub` |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the nav shows signed-in state; **no JWT-shaped value in localStorage or sessionStorage** (both are empty on this build); the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Login link, no Logout button); a private route afterwards redirects to `/login?returnTo=…` rather than rendering stale data; both storages empty |

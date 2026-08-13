@@ -387,11 +387,11 @@ their service documents.
 
 ### Protected route conventions (planned)
 
-**Status: planned** — [RFC-0023](../proposals/rfc/RFC-0023/) /
-[ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/) are
-Accepted, but **zero `/protected/` routes exist yet**. These conventions become
-binding for every `/{service}/v1/protected/…` route as it ships; the owning
-`docs/api/{service}.md` then documents the as-built contract.
+**Status: live** — [RFC-0023](../proposals/rfc/RFC-0023/) /
+[ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/). The
+first protected surface is **inventory** ([inventory.md](./inventory.md#http-api),
+slice A); these conventions bind every `/{service}/v1/protected/…` route as it
+ships, and the owning `docs/api/{service}.md` documents each as-built contract.
 
 | Concern | Convention |
 |---------|------------|
@@ -863,4 +863,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-13 — RFC-0023 accepted: adds §Protected route conventions (planned — zero `/protected/` routes exist yet; binding as each ships)._
+_Last updated: 2026-08-13 — protected conventions are live: inventory ships the first `/protected/` surface (RFC-0023 slice A)._

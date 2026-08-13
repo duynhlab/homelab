@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — P6 train |
-| **Adoption** | Not started |
+| **Adoption** | Complete — the standalone-spike arm was taken and passed: one EG container reads the same Gateway API YAML as the cluster and carried the full release audit twice (2026-08-12); kong.yml and the second dialect are gone; the Kind-fallback arm was never needed |
 
 ## Context
 

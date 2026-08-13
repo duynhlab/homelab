@@ -385,6 +385,26 @@ An idempotency key identifies one logical command, not one network attempt.
 Checkout, order, and payment have additional crash-recovery rules described in
 their service documents.
 
+### Protected route conventions (planned)
+
+**Status: planned** — [RFC-0023](../proposals/rfc/RFC-0023/) /
+[ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/) are
+Accepted, but **zero `/protected/` routes exist yet**. These conventions become
+binding for every `/{service}/v1/protected/…` route as it ships; the owning
+`docs/api/{service}.md` then documents the as-built contract.
+
+| Concern | Convention |
+|---------|------------|
+| Guard chain | Edge `jwt-edge` SecurityPolicy (coarse signature/iss/aud/exp) → in-service `pkg/authmw` (authoritative) → `MiddlewareRequireRole("backoffice_admin")` |
+| Role miss | `403` with the shared envelope, code `FORBIDDEN`; never retried by clients |
+| Actor | `actor_sub` = the verified token `sub`; a body-supplied actor is ignored |
+| Pagination | The standard `page`/`page_size` envelope above — including on services whose public reads diverge (product's `limit`) |
+| Idempotency | Retryable commands use `Idempotency-Key` (payment-lineage style) **or** body `command_id` (inventory style); the owning contract names which |
+| Concurrency | Edits that can overwrite carry an expected `version`; mismatch returns the conflict for the operator to reconcile |
+| Reason | Stock- and state-changing commands require a bounded `reason` (+ optional note) |
+| Audit | A durable audit record commits in the **same transaction** as the write; a failed audit insert fails the command |
+| Caller | The Backoffice browser only ever calls `/protected/` — never `/internal/` ([ADR-048](../proposals/adr/ADR-048-admin-portal-no-bff/): no BFF in between) |
+
 ## Service Contract Index
 
 The per-service contract index and platform deployment rollup live in
@@ -843,4 +863,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: §Authentication verifies against the Keycloak realm (`OIDC_*`, string `sub` as `user_id`, edge `remoteJWKS` per merged P2); journey 1 marked historical; edge JWT verification is uniform between local-stack and the cluster._
+_Last updated: 2026-08-13 — RFC-0023 accepted: adds §Protected route conventions (planned — zero `/protected/` routes exist yet; binding as each ships)._

@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate pending owner sign-off | 2026-08-10 | 2026-08-10 |
+| Accepted | platform-wide | [./research.md](./research.md) | 2026-08-10 | 2026-08-13 |
 
 > **Every decision is a tradeoff.** This RFC creates a second browser application that
 > calls owning services directly through Kong on a new `/protected/` audience. We accept
@@ -576,9 +576,9 @@ schema exists anywhere.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | ADR-047 *(renumbered 2026-08-11: the identity ADRs took 041–043 and RFC-0024's edge ADRs took 044–046 at acceptance)* | Proposed |
-| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | ADR-048 | Proposed |
-| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui — owner-selected | ADR-049 | Proposed |
+| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | [ADR-047](../../adr/ADR-047-protected-apis-on-owning-services/) *(renumbered 2026-08-11: the identity ADRs took 041–043 and RFC-0024's edge ADRs took 044–046 at acceptance)* | Accepted |
+| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | [ADR-048](../../adr/ADR-048-admin-portal-no-bff/) | Accepted |
+| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui — owner-selected | [ADR-049](../../adr/ADR-049-admin-portal-tanstack-spa/) | Accepted |
 
 The MVP write-scope cut (product/inventory only) stays an RFC scope decision, not an ADR.
 
@@ -598,6 +598,19 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   keycloak-js and zod confirmed after researched comparisons vs `oidc-client-ts` and
   valibot; detailed product lifecycle/categories/audit proposal added; the
   `product-design` skill named the portal's UI design authority.
+- 2026-08-13 — **Status → Accepted**; ADR-047/048/049 created at Accepted (Adoption:
+  Not started). **Edge translation note:** this RFC's text predates RFC-0024's edge
+  cutover — every Kong-specific mechanism reads as its Envoy Gateway equivalent
+  per [ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/): `api-<svc>-protected`
+  Ingress → `HTTPRoute` (audience-scoped `PathPrefix`, both config sets), `jwt-edge`
+  plugin → `jwt-edge` SecurityPolicy (`remoteJWKS`), `rate-limiting-admin` plugin →
+  BackendTrafficPolicy local rate limit, twinned CORS configs → the `cors-policy`
+  SecurityPolicy + realm client origins. The local bare-prefix JWT trap is already
+  closed as-built: local EG routes match by audience segment (`/{svc}/v1/{audience}`),
+  so the pre-work item "split local routes by audience" is done. Identity
+  prerequisites are live in both realm twins (`backoffice_admin`, `admin-portal`
+  client, PKCE S256, alice as test operator); the client's dev origin moved from
+  the `:3002` placeholder to the owner-picked `:3009` with this acceptance.
 - 2026-08-10 — Final open items closed: `manual_review` resolve stays a **Future**
   command outside the MVP slices (own safety review); the SPA repository is named
   **`admin-service`** (a static frontend despite the suffix — no admin backend, BFF,
@@ -621,4 +634,4 @@ When Status → implemented, confirm:
 - [OrderManualReviewBacklog runbook](../../../observability/runbooks/microservices/OrderManualReviewBacklog.md) — the raw-SQL path this RFC eventually retires
 
 ---
-_Last updated: 2026-08-10_
+_Last updated: 2026-08-13_

@@ -83,10 +83,10 @@
         "client.session.max.lifespan": "36000"
       },
       "redirectUris": [
-        "http://localhost:3002/*"
+        "http://localhost:3009/*"
       ],
       "webOrigins": [
-        "http://localhost:3002"
+        "http://localhost:3009"
       ],
       "defaultClientScopes": [
         "web-origins",

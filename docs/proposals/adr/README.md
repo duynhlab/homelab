@@ -422,6 +422,9 @@ and extend Adoption instead.
 | [ADR-044](ADR-044-envoy-gateway-platform-edge/) | Make Envoy Gateway the platform edge on the Gateway API | Accepted | Partial | [RFC-0024](../rfc/RFC-0024/) |
 | [ADR-045](ADR-045-local-first-edge-rate-limiting/) | Rate-limit at the edge with local token buckets, not a global RLS | Accepted | Partial | [RFC-0024](../rfc/RFC-0024/) |
 | [ADR-046](ADR-046-e2e-gate-kind-fallback/) | Move the E2E release-audit gate to Kind if compose cannot carry the edge | Accepted | Complete | [RFC-0024](../rfc/RFC-0024/) |
+| [ADR-047](ADR-047-protected-apis-on-owning-services/) | Expose administrative commands through role-gated protected APIs on owning services | Accepted | Not started | [RFC-0023](../rfc/RFC-0023/) |
+| [ADR-048](ADR-048-admin-portal-no-bff/) | Call owning services directly from the Admin Portal; defer an admin BFF | Accepted | Not started | [RFC-0023](../rfc/RFC-0023/) |
+| [ADR-049](ADR-049-admin-portal-tanstack-spa/) | Build the Admin Portal as a separate React SPA on the TanStack stack | Accepted | Not started | [RFC-0023](../rfc/RFC-0023/) |
 
 Principles:
 
@@ -432,4 +435,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-10_
+_Last updated: 2026-08-13 — ADR-047..049 added at Accepted with RFC-0023 (protected APIs, no-BFF topology, TanStack Admin Portal)._

@@ -405,6 +405,10 @@ services:
       - "-remoteRead.url=http://victoria-metrics:8428"
       - "-rule=/etc/vmalert/rules/*.yaml"
       - "-external.label=env=local"
+      # vmalert refuses to start with alerting rules and no notifier at all;
+      # blackhole is the explicit "evaluate, expose on the UI/API, route
+      # nowhere" mode this stack wants (routing is a recorded non-goal).
+      - "-notifier.blackhole"
     volumes:
       - ./observability/vmalert/rules:/etc/vmalert/rules:ro
     ports:

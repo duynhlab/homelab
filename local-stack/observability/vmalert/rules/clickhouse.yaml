@@ -5,7 +5,7 @@
 #
 # The series differ by design: the cluster reads the Altinity
 # metrics-exporter's chi_clickhouse_* families; locally the server's own
-# Prometheus endpoint speaks ClickHouseMetrics_* / ClickHouseEvents_* /
+# Prometheus endpoint speaks ClickHouseMetrics_* / ClickHouseProfileEvents_* /
 # ClickHouseAsyncMetrics_* / ClickHouseErrorMetric_* (metrics.xml). Two
 # cluster rules have no local counterpart and are deliberately absent:
 # ClickHouseOperatorDown and ClickHouseOperatorReconcileErrors — there is no
@@ -66,7 +66,7 @@ groups:
           description: "Merges are not keeping up with inserts. Left alone this ends in delayed, then rejected inserts."
 
       - alert: ClickHouseInsertsRejected
-        expr: rate(ClickHouseEvents_RejectedInserts[5m]) > 0
+        expr: rate(ClickHouseProfileEvents_RejectedInserts[5m]) > 0
         for: 5m
         labels:
           severity: warning
@@ -76,7 +76,7 @@ groups:
           description: "The too-many-parts guard is rejecting inserts; the collector will retry, then drop."
 
       - alert: ClickHouseInsertsFailing
-        expr: rate(ClickHouseEvents_FailedInsertQuery[5m]) > 0
+        expr: rate(ClickHouseProfileEvents_FailedInsertQuery[5m]) > 0
         for: 5m
         labels:
           severity: warning
@@ -86,7 +86,7 @@ groups:
           description: "Insert queries are erroring — telemetry rows are being lost at the door."
 
       - alert: ClickHouseMergesFailing
-        expr: rate(ClickHouseEvents_FailedMerges[5m]) > 0
+        expr: rate(ClickHouseProfileEvents_FailedMerges[5m]) > 0
         for: 10m
         labels:
           severity: warning
@@ -96,7 +96,7 @@ groups:
           description: "Background merges are failing; parts will accumulate until inserts throttle."
 
       - alert: ClickHouseInsertsDelayed
-        expr: rate(ClickHouseEvents_DelayedInserts[5m]) > 0
+        expr: rate(ClickHouseProfileEvents_DelayedInserts[5m]) > 0
         for: 10m
         labels:
           severity: info

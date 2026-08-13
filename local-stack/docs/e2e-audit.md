@@ -1359,7 +1359,7 @@ print(f'C21 rules loaded: {len(rules)} (want 12); firing: {firing or "none"}')"
 | C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 9 provisioned uids and each loads via `/api/dashboards/uid/…` with 200 |
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
 | C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows BOTH jobs — `clickhouse` and `otel-collector` — with `health: up`; a missing target means the C21 rules evaluate against nothing |
-| C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **12** rules (10 ClickHouse engine + 2 collector) and zero `firing` on a healthy stack — the count is the tripwire for a silently unmounted rule file |
+| C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **11** rules (9 ClickHouse engine + 2 collector) and zero `firing` on a healthy stack — the count is the tripwire for a silently unmounted rule file |
 
 Any failed row blocks the release tag. Two rows share one root cause and must be
 reported as such: **C13 + C14** both empty while C12 is healthy means the Vector

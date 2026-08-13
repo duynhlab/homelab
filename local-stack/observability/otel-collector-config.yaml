@@ -98,6 +98,18 @@ exporters:
     verbosity: normal
 
 service:
+  # Self-telemetry (otelcol_* series) must bind 0.0.0.0: recent collectors
+  # default the Prometheus reader to localhost, which no other container can
+  # reach — vmagent's otel-collector job scrapes this endpoint (audit C20),
+  # and OtelCollectorDown/ClickHouseExporterUnhealthy evaluate over it.
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
   pipelines:
     traces:
       receivers: [otlp]

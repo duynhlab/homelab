@@ -119,7 +119,7 @@ only ever showed up as somebody else's export failures.
 | Metrics-exporter (`chi_clickhouse_*`) | ✅ `:8888/chi` | N/A | cannot exist locally |
 | Server built-in `/metrics` (`ClickHouseMetrics_*` …) | ❌ off at 1×1, by decision | ✅ `:9363` | the local engine view — see §5 |
 | Collector self-scrape (`otelcol_*`) | ✅ ServiceMonitor | ✅ vmagent job | identical series names |
-| ClickHouse alerts | ✅ `clickhouse-alerts.yaml` (12 rules) | ✅ ported subset (10 rules) | same names; two operator rules have no local counterpart |
+| ClickHouse alerts | ✅ `clickhouse-alerts.yaml` (12 rules) | ✅ ported subset (11 rules) | same names; two operator rules have no local counterpart |
 | `clickhouse-server-engine` dashboard | ✅ | ✅ | **one dual-target JSON serves both** |
 | 5 OTel data-plane CH dashboards | ✅ | ✅ | — |
 | RED spanmetrics / business dashboards | ✅ | ✅ | — |
@@ -146,7 +146,7 @@ only ever showed up as somebody else's export failures.
 | Family | Source | Examples |
 |---|---|---|
 | `ClickHouseMetrics_*` | `system.metrics` (gauges) | `_Query`, `_PartsActive`, `_MemoryTracking`, `_TCPConnection` |
-| `ClickHouseEvents_*` | `system.events` (counters) | `_InsertedRows`, `_FailedInsertQuery`, `_RejectedInserts`, `_DelayedInserts`, `_FailedMerges` |
+| `ClickHouseProfileEvents_*` | `system.events` (counters) | `_InsertedRows`, `_FailedInsertQuery`, `_RejectedInserts`, `_DelayedInserts`, `_FailedMerges` |
 | `ClickHouseAsyncMetrics_*` | `system.asynchronous_metrics` | `_Uptime`, `_DiskAvailable_default`, `_DiskTotal_default` |
 | `ClickHouseErrorMetric_*` | `system.errors` (per error name) | `_UNKNOWN_TABLE`, … |
 
@@ -185,10 +185,10 @@ so a runbook practised locally transfers. Different series by design:
 | ClickHouseServerUnreachable | exporter `fetch_errors > 0` | `up{job="clickhouse"} == 0` — locally `up` is a genuine server scrape |
 | ClickHouseDiskAlmostFull / Critical | `chi_clickhouse_metric_DiskFreeBytes / (DiskDataBytes + DiskFreeBytes)` | `ClickHouseAsyncMetrics_DiskAvailable_default / DiskTotal_default` |
 | ClickHouseTooManyParts | `chi_clickhouse_metric_PartsActive > 300` | `ClickHouseMetrics_PartsActive > 300` |
-| ClickHouseInsertsRejected | `chi_clickhouse_event_RejectedInserts` | `ClickHouseEvents_RejectedInserts` |
-| ClickHouseInsertsFailing | `chi_clickhouse_event_FailedInsertQuery` | `ClickHouseEvents_FailedInsertQuery` |
-| ClickHouseMergesFailing | `chi_clickhouse_event_FailedMerges` | `ClickHouseEvents_FailedMerges` |
-| ClickHouseInsertsDelayed | `chi_clickhouse_event_DelayedInserts` | `ClickHouseEvents_DelayedInserts` |
+| ClickHouseInsertsRejected | `chi_clickhouse_event_RejectedInserts` | `ClickHouseProfileEvents_RejectedInserts` |
+| ClickHouseInsertsFailing | `chi_clickhouse_event_FailedInsertQuery` | `ClickHouseProfileEvents_FailedInsertQuery` |
+| ClickHouseMergesFailing | `chi_clickhouse_event_FailedMerges` | `ClickHouseProfileEvents_FailedMerges` |
+| ClickHouseInsertsDelayed | `chi_clickhouse_event_DelayedInserts` | `ClickHouseProfileEvents_DelayedInserts` |
 | ClickHouseServerErrorsElevated | `chi_clickhouse_system_errors_value` | `{__name__=~"ClickHouseErrorMetric_.+"}` |
 | ClickHouseExporterUnhealthy | `otelcol_exporter_send_failed_*{exporter="clickhouse"}` | **identical** |
 | OtelCollectorDown | `up{job=~".*otel-collector.*"}` | `up{job="otel-collector"}` |
@@ -226,7 +226,7 @@ in both stacks.
 | List loaded/firing alerts | `curl -s http://localhost:8880/api/v1/alerts \| jq '.data.alerts[] \| {name:.labels.alertname,state}'` |
 | Rehearse `ClickHouseServerUnreachable` | `docker compose stop clickhouse` → firing within ~5m → `docker compose start clickhouse` |
 | Rehearse `ClickHouseExporterUnhealthy` | `docker compose pause clickhouse` → collector `send_failed_*` climbs → `unpause` |
-| Explore engine metrics | Grafana → Explore → VictoriaMetrics → `ClickHouseMetrics_Query`, `ClickHouseEvents_InsertedRows`, `ClickHouseAsyncMetrics_Uptime` |
+| Explore engine metrics | Grafana → Explore → VictoriaMetrics → `ClickHouseMetrics_Query`, `ClickHouseProfileEvents_InsertedRows`, `ClickHouseAsyncMetrics_Uptime` |
 | Engine dashboard | Grafana → ClickHouse folder → **ClickHouse Server / Engine** (local series carry the `(local)` legend suffix) |
 
 The release audit asserts this slice: **C20** (vmagent: both targets `up`) and

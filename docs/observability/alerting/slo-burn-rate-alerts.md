@@ -241,7 +241,7 @@ open http://karma.duynh.me
 - [Alerting overview](./README.md) — Layer 1 + Layer 2 pipeline
 - [Microservices alerts runbook](../runbooks/microservices-alerts.md) — Layer-1 per-alert investigation
 - [Google SRE Workbook — Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) — origin of the method
-- [Sloth alerting docs](https://sloth.dev/usage/alerts/) — generator details and overrides
+- [Sloth](https://github.com/slok/sloth) — generator details and alert overrides (the sloth.dev docs site no longer serves the alerts page)
 
 ---
 _Last updated: 2026-08-13 — traffic-generation note corrected to "via the edge"_

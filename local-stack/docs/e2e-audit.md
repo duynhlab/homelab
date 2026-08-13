@@ -676,7 +676,7 @@ audit_curl -s -o /dev/null -w "A17 edge-401: %{http_code} (want 401)\n" \
   http://localhost:8080/inventory/v1/protected/balances
 # Audience scoping: nothing but /protected is routed for inventory.
 audit_curl -s -o /dev/null -w "A17 no-bare-route: %{http_code} (want 404)\n" \
-  -H "Authorization: Bearer $KCT" http://localhost:8080/inventory/v1/private/balances
+  -H "Authorization: Bearer $AT" http://localhost:8080/inventory/v1/private/balances
 
 # In-service role gate: a valid CUSTOMER token is 403 FORBIDDEN on read and write.
 audit_curl -s -w "  -> A17 bob-read: %{http_code} (want 403 FORBIDDEN)\n" \
@@ -687,25 +687,25 @@ audit_curl -s -w "  -> A17 bob-write: %{http_code} (want 403)\n" -X POST \
   http://localhost:8080/inventory/v1/protected/receipts
 
 # Operator reads: real seeded balances with SQL-derived atp = on_hand - reserved.
-audit_curl -s -H "Authorization: Bearer $KCT" \
+audit_curl -s -H "Authorization: Bearer $AT" \
   "http://localhost:8080/inventory/v1/protected/balances?page_size=3" | head -c 300; echo
 
 # Command lifecycle on a dedicated SKU: 201 applied -> exact replay 200
 # applied:false -> invariant-violating adjustment 409 STOCK_UNAVAILABLE.
 A17_BODY='{"command_id":"a17-rcpt-1","sku_id":"A17-SKU","warehouse_id":1,"quantity":7,"reason":"PO-A17"}'
 audit_curl -s -w "  -> A17 receipt: %{http_code} (want 201 applied:true)\n" -X POST \
-  -H "Authorization: Bearer $KCT" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' \
   -d "$A17_BODY" http://localhost:8080/inventory/v1/protected/receipts
 audit_curl -s -w "  -> A17 replay: %{http_code} (want 200 applied:false)\n" -X POST \
-  -H "Authorization: Bearer $KCT" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' \
   -d "$A17_BODY" http://localhost:8080/inventory/v1/protected/receipts
 audit_curl -s -w "  -> A17 over-adjust: %{http_code} (want 409 STOCK_UNAVAILABLE)\n" -X POST \
-  -H "Authorization: Bearer $KCT" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' \
   -d '{"command_id":"a17-adj-1","sku_id":"A17-SKU","warehouse_id":1,"delta":-9999,"reason":"a17"}' \
   http://localhost:8080/inventory/v1/protected/adjustments
 
 # Ledger: the movement row carries actor = alice's token sub, never a body value.
-audit_curl -s -H "Authorization: Bearer $KCT" \
+audit_curl -s -H "Authorization: Bearer $AT" \
   "http://localhost:8080/inventory/v1/protected/movements?sku_id=A17-SKU" \
   | grep -o '"actor":"[^"]*"'                # want alice's fixed UUID
 ```

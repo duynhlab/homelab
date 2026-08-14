@@ -178,6 +178,17 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **The edge finally monitors itself in local-stack**: vmagent gains two
+  jobs — `envoy-gateway` (the control plane's :19001 metrics) and `envoy`
+  (the proxy's native `envoy_*` stats). Host mode ships no prometheus stats
+  listener (the CP owns :19001 in the shared netns and the proxy admin hides
+  on an ephemeral loopback port), so the EnvoyProxy bootstrap `Merge` pins
+  the admin to `127.0.0.1:19006` and appends a `0.0.0.0:19005` listener
+  serving exactly `/stats/prometheus` — the same shape as upstream's
+  Kubernetes bootstrap. Grafana gets the three Envoy Gateway dashboards
+  vendored verbatim from `charts/gateway-addons-helm` at the pinned v1.8.3
+  tag (folder Gateway/: Envoy Global, Envoy Clusters, Envoy Gateway Global);
+  audit rows C18 (13 dashboards) and C20 (4 scrape targets) extended.
 - **Train 3 — the protected read fan-out**: `api-{order,payment,shipping,user}-protected`
   HTTPRoutes in both config sets, riding `jwt-edge-staff` (ADR-050) and the
   shared BackendTrafficPolicy; compose provides `OIDC_STAFF_*` to all four

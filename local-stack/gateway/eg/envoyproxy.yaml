@@ -30,11 +30,16 @@ spec:
   telemetry:
     # Envoy's own Prometheus endpoint, exposing the proxy's internal stats
     # (cluster health, connection counts, per-listener totals) as distinct from
-    # the RED metrics derived downstream from spans. Nothing scrapes it in this
-    # stack — there is no agent here, and the admin/stats listener binds inside
-    # the container rather than on a published port — so it records intent and
-    # keeps the two environments' CRs comparable. Locally the edge's request
-    # metrics come from the spanmetrics connector in the collector instead.
+    # the RED metrics derived downstream from spans. In Host infrastructure
+    # mode this field alone is NOT enough to make the stats scrapable: in
+    # Kubernetes it renders the bootstrap's 0.0.0.0:19001 prometheus listener,
+    # but here the control plane and its Envoy child share one network
+    # namespace and the control plane's OWN metrics server already owns
+    # :19001, so the generated bootstrap omits the proxy stats listener and
+    # the only remaining surface is the admin server on 127.0.0.1:19000 —
+    # unreachable from the compose network. The `bootstrap` Merge below adds
+    # the missing listener on :19005; vmagent scrapes both (jobs
+    # `envoy-gateway` and `envoy` in observability/vmagent/prometheus.yml).
     metrics:
       prometheus: {}
 
@@ -163,3 +168,74 @@ spec:
           type: Literal
           literal:
             value: local
+
+  # Host-mode stand-in for the prometheus stats listener the Kubernetes
+  # bootstrap ships by default (see the metrics comment above). Two merges in
+  # one, and both are needed:
+  #
+  #   1. Pin the proxy's ADMIN server to 127.0.0.1:19006. The Host-mode
+  #      default is 127.0.0.1:0 — an ephemeral port written to
+  #      admin-address.txt — because 19000, the Kubernetes default, is taken
+  #      by the control plane's own admin server in this shared network
+  #      namespace. A random port cannot be a cluster target, so it is pinned;
+  #      it stays loopback-only, 19006 because 19000-19003 are claimed (CP
+  #      admin, CP metrics, shutdown manager, proxy readiness) and 19005 is
+  #      the listener below.
+  #   2. Append one listener on 0.0.0.0:19005 that routes exactly
+  #      /stats/prometheus to that admin server — the same shape upstream's
+  #      19001 prometheus listener uses in the Kubernetes bootstrap. Only the
+  #      stats path is exposed to the compose network.
+  #
+  # Names carry a local_ prefix so they can never collide with generated
+  # resources. vmagent scrapes gateway:19005 (job `envoy`) next to the control
+  # plane's gateway:19001/metrics (job `envoy-gateway`) — see
+  # observability/vmagent/prometheus.yml.
+  bootstrap:
+    type: Merge
+    value: |
+      admin:
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 19006
+      static_resources:
+        listeners:
+        - name: local_prometheus_stats
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: 19005
+          filter_chains:
+          - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: local_prometheus_stats
+                normalize_path: true
+                route_config:
+                  name: local_prometheus_route
+                  virtual_hosts:
+                  - name: local_prometheus_stats
+                    domains: ["*"]
+                    routes:
+                    - match:
+                        path: /stats/prometheus
+                      route:
+                        cluster: local_admin
+                http_filters:
+                - name: envoy.filters.http.router
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        clusters:
+        - name: local_admin
+          connect_timeout: 1s
+          type: STATIC
+          load_assignment:
+            cluster_name: local_admin
+            endpoints:
+            - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 19006

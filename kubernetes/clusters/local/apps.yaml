@@ -52,3 +52,7 @@ spec:
       kind: ResourceSet
       name: rs-frontend
       namespace: default
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: ResourceSet
+      name: rs-backoffice
+      namespace: default

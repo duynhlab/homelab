@@ -1,0 +1,83 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: ResourceSet
+metadata:
+  name: rs-backoffice
+  # `default`, like every domain ResourceSet — this is where the apps-local
+  # Kustomization health-checks it. The workload it generates lives in
+  # `backoffice`; the ResourceSet object itself is control-plane state.
+  namespace: default
+spec:
+  inputs:
+    - name: admin-service
+      replicaCount: 1
+  resources:
+    # RFC-0023 Backoffice Admin Portal — the operator SPA (ADR-048: no BFF, the
+    # browser calls the services through the edge; ADR-049: TanStack SPA).
+    #
+    # BUILD-TIME CONTRACT, enforced in the SPA's own CI (admin-service
+    # .github/workflows/build.yml `build-args`), not here: the bundle bakes
+    # API_BASE_URL=https://gateway.duynh.me, KEYCLOAK_URL=https://id.duynh.me,
+    # KEYCLOAK_REALM=duynhlab-staff, KEYCLOAK_CLIENT_ID=admin-portal. The mop
+    # chart passes no build args and the image is not built here, so a tag
+    # pinned below is only deployable if its build carried those four values —
+    # otherwise the portal loads and then talks to localhost from the
+    # operator's browser.
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      metadata:
+        name: << inputs.name >>
+        namespace: backoffice
+      spec:
+        interval: 10m
+        timeout: 10m
+        chartRef:
+          kind: OCIRepository
+          name: mop-chart-oci
+          namespace: flux-system
+        releaseName: << inputs.name >>
+        install:
+          remediation:
+            retries: 3
+        upgrade:
+          remediation:
+            retries: 3
+        values:
+          name: << inputs.name >>
+          replicaCount: << inputs.replicaCount | int >>
+          image:
+            repository: ghcr.io/duynhlab/admin-service/admin-service
+            tag: "0.1.0" # {"$imagepolicy": "flux-system:admin-service:tag"}
+            pullPolicy: IfNotPresent
+          # mop >=0.14: the HTTP port pair lives under service.http — this is
+          # an Nginx image listening on 80, and the chart default 8080 would
+          # silently win otherwise (the bug the customer SPA hit).
+          service:
+            enabled: true
+            type: ClusterIP
+            http:
+              port: 80
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          livenessProbe:
+            enabled: true
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            enabled: true
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          # Static bundle: no database, so no migration Job.
+          migrations:
+            enabled: false

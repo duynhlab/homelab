@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0023 program — SPA foundation + page trains |
-| **Adoption** | Not started |
+| **Adoption** | Partial — `admin-service` runs the chosen stack as-built (TanStack Router/Query/Table v9 + Form, zod, Tailwind v4, shadcn preset, keycloak-js), with URL-owned list state and one shared table/detail convention across every screen. Verified locally (Playwright + axe against the live stack); the cluster deployment is merged but unverified until the Kind gate |
 
 ## Context
 

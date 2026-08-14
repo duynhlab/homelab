@@ -25,7 +25,7 @@
 | **Supersedes** | RFC-0010's older *signed-webhook* reading of the `protected` class (webhooks stay `public` + HMAC) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0023 program — authmw train, per-service slice A/B trains |
-| **Adoption** | Not started |
+| **Adoption** | Partial — the audience is real on **five** services (inventory, order, payment, shipping, user): role-gated `/protected/` groups behind the staff issuer, edge HTTPRoutes in both config sets, verified end to end through the local edge (audit rows A17/A18). **product** is slice B and has no protected surface yet; the cluster edge is unverified until the Kind gate |
 
 ## Context
 

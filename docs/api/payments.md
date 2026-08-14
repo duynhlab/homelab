@@ -388,6 +388,7 @@ Read-only: refunds and recon triggers stay `internal`.
 |--------|------|---------|
 | `GET` | `/payment/v1/protected/payments?status=` | Cross-customer list (FSM-vocabulary filter) |
 | `GET` | `/payment/v1/protected/payments/:id` | Case view: payment + **full attempt history** + append-only **ledger lineage summary** (`{payment, attempts, ledger}`) |
+| `GET` | `/payment/v1/protected/attempts/open` | The doubt worklist: every attempt still `UNKNOWN` and unresolved, across customers, oldest first. Paginated total is the dashboard's count; the reconciler still owns resolving them |
 | `GET` | `/payment/v1/protected/reconciliations/runs` | Run headers, newest first — the detect-only recon records' first reader |
 | `GET` | `/payment/v1/protected/reconciliations/runs/:id` | Run + its discrepancies (`{run, discrepancies}`) — the triage view |
 

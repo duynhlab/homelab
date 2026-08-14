@@ -371,10 +371,39 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **An operator can resolve an order out of `manual_review`** (RFC-0023 train 7,
+  [ADR-051](docs/proposals/adr/ADR-051-trusted-operator-resolution/README.md)):
+  `POST /order/v1/protected/orders/:id/resolve` replaces the platform's last
+  raw-SQL runbook step, which survives only as break-glass. The domain command
+  and its transactional writer already existed with zero callers, so the train is
+  mostly wiring — but three things are new: a bounded resolution reason
+  vocabulary (`REFUNDED_MANUALLY` … `WRITTEN_OFF`) so the trail distinguishes
+  recovering the money from writing it off; the echoed `version` enforced as a
+  precondition **under the row lock**, which it previously was not (the guarded
+  update used the version read under the lock, so a version the order was not at
+  simply applied); and a case view that fans out to payment, inventory and
+  shipping and returns the full transition history. Every enrichment soft-fails
+  and `degraded` distinguishes a failed read from an absent one — this route has
+  to keep answering while the services it reports on are the ones having the
+  incident. Counter `order.operator.resolve.total{target,reason,result}`;
+  deliberately **no new alert** (an operator draining the queue is the system
+  working; the backlog gauge already alerts on it not draining).
+
 - Kind E2E (#3) evidence for the pinned fleet: 11/11 services on their pinned
   tag, 0 probe access records, native trace id on 12/12 HTTP access records.
 
 #### Local-stack
+
+- E2E audit row **A20**: the operator resolve, armed through the **real** park
+  path rather than SQL. mockpay declines a refund whose cents end in `07` while
+  still allowing the charge, and order maps a declined refund to a non-retryable
+  error, so the cancellation compensation cannot converge and the order parks in
+  `manual_review(COMPENSATION_INCOMPLETE)`. The row then proves the whole
+  contract: wrong-issuer at the edge for a customer token, 400 for a missing note
+  or a foreign reason, 409 for an illegal target and for a stale version, 201
+  `applied:true`, an identical retry 200 `applied:false` with no second history
+  row, and an `OPERATOR` trail row carrying duyne's staff subject even though the
+  body named someone else.
 
 - E2E audit row **A17**: the protected Backoffice surface — edge 401,
   audience scoping, in-service 403 for a customer token, operator reads, the
@@ -440,6 +469,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The `manual_review` runbook leads with the portal, not psql.** Diagnosis
+  starts at the order case view (the three external truths read live, plus the
+  transition history); recovery step 2 is the Resolve button or its endpoint, with
+  a table of every answer and what it means. The `BEGIN … COMMIT` block is
+  retained and labelled **break-glass**, saying plainly what it skips — FSM and
+  actor validation, the version precondition, the replay check, and the counter.
+  A short "why you are trusted" section explains ADR-051 at the point of use, and
+  the absence of a resolve alert is recorded as a decision rather than left to
+  read as an omission.
+
 - `docs/api/inventory.md` documents the as-built protected contract (first
   HTTP business surface + first edge route); `api.md`'s protected conventions
   flip from planned to **live**.
@@ -479,6 +518,19 @@ Skeleton (copy what you need):
   `_template-service.md`.
 
 #### Proposals
+
+- **ADR-051 — trust the operator; the audit trail is the control**: the safety
+  review RFC-0023 deferred on 2026-08-10 is decided. An operator resolving a
+  parked order acts on judgement the platform cannot check, because the evidence
+  lives in a provider console or a carrier portal; so the service validates what
+  it owns (FSM edge, version, replay) and records who decided, which unaccounted
+  effect they settled, and what they checked — all in the transition's own
+  transaction. Rejected: reading payment/inventory/shipping to **veto** a target
+  (unavailable during exactly the incidents that fill the queue, and only ever
+  partial), and maker-checker (needs a second staff-realm role; with one operator
+  the second signature is the same human) — both recorded as revisit triggers.
+  RFC-0023 amended (History + the Orders scope row), `docs/api/order.md` carries
+  the as-built contract, and the runbook now leads with the endpoint.
 
 - **ADR-050 — staff realm**: workforce identity separates from customer
   identity (CIAM vs workforce, the documented Keycloak pattern). Operators

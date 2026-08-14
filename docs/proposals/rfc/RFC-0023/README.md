@@ -198,7 +198,7 @@ Adjustments, Movements, Reservations) · Orders · Payments · Shipments · Cust
 | Inventory balances | Filter by SKU/warehouse; low/out-of-stock views | read-only | shows all four numbers: on_hand, reserved, safety_stock, derived ATP |
 | Inventory receipts / adjustments | Receive stock; adjust with mandatory reason | write — **slice A** | wires the existing idempotent `StockCommand`s (`command_id`, actor from token) |
 | Movements / Reservations | Append-only history; reservation inspection | read-only | tables exist; readers net-new |
-| Orders | Cross-customer list + case detail | read-only | unscoped repo path net-new; `manual_review` resolve = flagship Future command |
+| Orders | Cross-customer list + case detail + `manual_review` resolve | read/write — **train 7** | unscoped repo path net-new; the resolve shipped after its own safety review ([ADR-051](../../adr/ADR-051-trusted-operator-resolution/)), and the case view grew the external truths + transition history that decision requires |
 | Payments | Cross-customer list, detail incl. attempts + ledger summary + recon discrepancies | read-only | unscoped `Get(id, 0)` path already exists; attempts/ledger/recon readers net-new |
 | Shipments | Cross-customer list + detail | read-only | list net-new; status shows **as-built vocabulary** (`pending`/`cancelled`; seed-only values labelled) — no FSM exists, transitions deferred |
 | Customers | Search + operator-safe detail | read-only | search by name/phone/user_id only — **email/username columns do not exist** in user-service (identity lives in Keycloak) |
@@ -666,6 +666,27 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   Still open: `manual_review` resolve remains a Future command, the portal does
   not yet surface the audit history the API now returns, and the cluster is
   unverified until the Kind gate.
+- 2026-08-14 — **The flagship Future command shipped.** The safety review this
+  RFC deferred on 2026-08-10 is decided in
+  [ADR-051](../../adr/ADR-051-trusted-operator-resolution/): the operator is
+  trusted, and the audit trail is the control. `POST
+  /order/v1/protected/orders/:id/resolve` replaces the runbook's raw-SQL block,
+  which survives only as documented break-glass. Rejected in the review:
+  reading payment/inventory/shipping to **veto** a target (unavailable during
+  exactly the incidents that fill this queue, and only ever partial — a refund
+  issued in a provider console reads as a contradiction), and maker-checker
+  (needs a second staff-realm role; with one operator the second signature is
+  the same human).
+  Three things landed with it because the decision requires all three: a bounded
+  resolution reason vocabulary so the trail distinguishes recovering the money
+  from writing it off; the echoed version enforced as a precondition under the
+  row lock, which it previously was not — the guarded update used the version
+  read under the lock, so a version the order was not at would simply apply; and
+  the case view carrying the external truths plus the transition history, since
+  a control nobody can see is not a control. Audit row **A20** drives it through
+  the edge against an order parked by a real declined refund. This also closes
+  the "portal does not surface the audit history" item above for orders.
+  Still open: the cluster remains unverified until the Kind gate.
 
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
@@ -682,7 +703,8 @@ When Status → implemented, confirm:
 - [RFC-0021 — Platform overhaul](../RFC-0021/README.md) — inventory extraction this RFC builds on
 - [RFC-0009](../RFC-0009/README.md) / [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — edge/service verification split inherited by protected routes
 - [`docs/api/api.md`](../../../api/api.md) · [`docs/api/product.md`](../../../api/product.md) · [`docs/api/inventory.md`](../../../api/inventory.md) · [`docs/api/order.md`](../../../api/order.md) · [`docs/api/payments.md`](../../../api/payments.md) · [`docs/api/shipping.md`](../../../api/shipping.md) · [`docs/api/user.md`](../../../api/user.md)
-- [OrderManualReviewBacklog runbook](../../../observability/runbooks/microservices/OrderManualReviewBacklog.md) — the raw-SQL path this RFC eventually retires
+- [ADR-051](../../adr/ADR-051-trusted-operator-resolution/) — the safety review behind the `manual_review` resolve
+- [OrderManualReviewBacklog runbook](../../../observability/runbooks/microservices/OrderManualReviewBacklog.md) — the raw-SQL path this RFC retired to break-glass
 
 ---
-_Last updated: 2026-08-13_
+_Last updated: 2026-08-14_

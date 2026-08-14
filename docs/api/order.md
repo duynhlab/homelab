@@ -253,9 +253,11 @@ stateDiagram-v2
 ```
 
 Actor discipline (enforced under the row lock): **USER** only reaches
-`cancelling`; only an **OPERATOR** command leaves `manual_review` (SQL
-discipline in the [OrderManualReviewBacklog runbook](../observability/runbooks/microservices/OrderManualReviewBacklog.md));
-**WORKFLOW** drives the saga edges; **SYSTEM** only `pending → failed`.
+`cancelling`; only an **OPERATOR** command leaves `manual_review` — through the
+protected resolve endpoint above, with the
+[runbook's](../observability/runbooks/microservices/OrderManualReviewBacklog.md)
+SQL block kept as break-glass; **WORKFLOW** drives the saga edges; **SYSTEM**
+only `pending → failed`.
 
 - `failed` means *all* compensations converged — money and stock are back
   where they started. Any exhaustion parks in `manual_review`
@@ -310,7 +312,7 @@ Both transports delegate the kickoff to one package
 | An unservable participant on a REPLAY answers the existing order, not an error | The call is idempotent, so an error would say "not placed" about an order that was — and checkout treats anything but `InvalidArgument` as transient, retrying forever and eventually minting a second order (a second authorize and capture) |
 | The refusal also lives inside `fulfillment.Start` | It is the single place a saga is created, so a future start path inherits it. The workflow-level panic is the last backstop, not the guard: it fails only the workflow TASK, while the call still answers success and the row closes |
 
-### Protected (Backoffice — RFC-0023 Train 3)
+### Protected (Backoffice — RFC-0023 Trains 3 and 7)
 
 Staff-realm guard chain per [api.md § Protected route conventions](./api.md#protected-route-conventions)
 (edge `jwt-edge-staff` → in-service staff verifier → `backoffice_admin`).
@@ -319,9 +321,34 @@ Customer-realm tokens are wrong-issuer at the edge.
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/order/v1/protected/orders?status=&page=&page_size=` | Cross-customer list (explicitly-unscoped repo path; FSM-vocabulary status filter — `manual_review`/`cancelling` feed the portal's backlog cards) |
-| `GET` | `/order/v1/protected/orders/:id` | Operator case view: order + items + owner subject; 404 preserved |
+| `GET` | `/order/v1/protected/orders/:id` | Operator case view: the order inline (embedded, so every pre-train-7 field keeps its place) + `version` + soft-fail `payment`/`inventory`/`shipment`/`processing` blocks + full `status_history`; `degraded` lists blocks whose fetch FAILED, distinct from blocks simply absent. 404 preserved |
+| `POST` | `/order/v1/protected/orders/:id/resolve` | Move a parked order to `confirmed`/`completed`/`cancelled`/`failed` — the operator command that replaced the raw-SQL runbook ([ADR-051](../proposals/adr/ADR-051-trusted-operator-resolution/)) |
 
-The `manual_review` **resolution** stays a Future command (own safety review).
+**The resolve contract.** Body: `target`, `version` (as read with the case),
+`reason` (bounded), `note` (mandatory). Actor is the token `sub` — a
+body-supplied actor is ignored.
+
+| Result | Response |
+|--------|----------|
+| Applied | `201 {"order": {…}, "applied": true}` |
+| Replay of the same decision | `200 {"order": {…}, "applied": false}` — no second history row |
+| Version the order is not at | `409 VERSION_CONFLICT` |
+| Target the FSM or actor matrix refuses (incl. an unknown status) | `409 INVALID_TRANSITION` |
+| Same command id, different outcome recorded | `409 IDEMPOTENCY_CONFLICT` |
+| Missing note, unknown reason, or a reason from another command's vocabulary | `400 VALIDATION_ERROR` |
+
+`reason` ∈ `REFUNDED_MANUALLY`, `STOCK_RELEASED_MANUALLY`,
+`SHIPMENT_CANCELLED_MANUALLY`, `NO_SIDE_EFFECTS`, `WRITTEN_OFF`,
+`OPERATOR_RESOLVED` (the unspecific catch-all, kept for rows written before the
+vocabulary existed and for the runbook's break-glass SQL).
+
+The service deliberately does **not** call payment, inventory or shipping to
+refuse a target: it reads them for the operator to weigh, because the evidence
+lives outside the platform and a cross-service veto would make the command
+unavailable during the incidents that fill this queue. The transition and its
+history row commit in one transaction; the command id is
+`resolve:<id>:v<version>:<target>`, which is what makes a retry a replay.
+Counter: `order.operator.resolve.total{target,reason,result}`.
 
 ## Callers & dependencies
 
@@ -388,5 +415,7 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [temporal.md](./temporal.md) — saga theory + as-built + runbook
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
+- [ADR-051](../proposals/adr/ADR-051-trusted-operator-resolution/) — why the resolve command trusts the operator, and what it records instead
+- [OrderManualReviewBacklog runbook](../observability/runbooks/microservices/OrderManualReviewBacklog.md) — operating the parked queue
 
-_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._
+_Last updated: 2026-08-14 — RFC-0023 Train 7: the `manual_review` resolve command ships (ADR-051); the case view gains the external truths, the transition history, and `version`._

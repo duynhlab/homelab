@@ -509,8 +509,20 @@ C2=${C2_RAW%$'\n'*}
   && echo "A10 replay:   OK same order $OID" || { echo "A10 replay: FAIL different order"; exit 1; }
 # The order exists, its saga ran, AND its total equals the session total
 # (fee + tax + discount crossed the boundary — the P3 demo-fee gap is closed).
-sleep 5
+# POLL, do not sleep. The saga is asynchronous, so a fixed wait asserts on
+# whatever state the clock happened to catch: measured on a stack whose product
+# and payment containers had just been rebuilt, five seconds caught order 15 at
+# `pending` and the row failed — then A12 failed too, because it tried to cancel
+# an order that had not reached a cancellable state. The same order read
+# `completed` moments later. Poll until the status is terminal, with a bound so
+# a genuinely stuck saga still fails the row instead of hanging the audit.
 STOTAL=$(echo "$C" | python3 -c "import json,sys;print(json.load(sys.stdin)['total'])")
+for _ in $(seq 1 30); do
+  OSTATUS=$(audit_curl -s $BASE/order/v1/private/orders/$OID -H "Authorization: Bearer $AT0" \
+    | python3 -c "import json,sys;print(json.load(sys.stdin).get('status',''))")
+  case "$OSTATUS" in confirmed|completed|failed|cancelled) break;; esac
+  sleep 2
+done
 audit_curl -s $BASE/order/v1/private/orders/$OID -H "Authorization: Bearer $AT0" | \
   python3 -c "import json,sys; o=json.load(sys.stdin); \
   ok=o['status'] in {'confirmed','completed'} and abs(float(o['total'])-float('$STOTAL'))<0.001; \
@@ -703,7 +715,14 @@ audit_curl -s -H "Authorization: Bearer $KCT_STAFF" \
 
 # Command lifecycle on a dedicated SKU: 201 applied -> exact replay 200
 # applied:false -> invariant-violating adjustment 409 STOCK_UNAVAILABLE.
-A17_BODY='{"command_id":"a17-rcpt-1","sku_id":"A17-SKU","warehouse_id":1,"quantity":7,"reason":"PO-A17"}'
+# The command id is UNIQUE PER RUN, and that matters: with a fixed id the first
+# call proves "201 applied:true" only on a never-before-audited stack, and every
+# re-run against the same volumes replays instead (200 applied:false), which
+# looks like a regression in the create path when it is the idempotency working.
+# The replay assertion below deliberately reuses THIS run's id, so both halves
+# hold on a fresh stack and on a re-run.
+A17_CMD="a17-rcpt-$(date +%s)"
+A17_BODY="{\"command_id\":\"$A17_CMD\",\"sku_id\":\"A17-SKU\",\"warehouse_id\":1,\"quantity\":7,\"reason\":\"PO-A17\"}"
 audit_curl -s -w "  -> A17 receipt: %{http_code} (want 201 applied:true)\n" -X POST \
   -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
   -d "$A17_BODY" http://localhost:8080/inventory/v1/protected/receipts
@@ -712,7 +731,7 @@ audit_curl -s -w "  -> A17 replay: %{http_code} (want 200 applied:false)\n" -X P
   -d "$A17_BODY" http://localhost:8080/inventory/v1/protected/receipts
 audit_curl -s -w "  -> A17 over-adjust: %{http_code} (want 409 STOCK_UNAVAILABLE)\n" -X POST \
   -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
-  -d '{"command_id":"a17-adj-1","sku_id":"A17-SKU","warehouse_id":1,"delta":-9999,"reason":"a17"}' \
+  -d "{\"command_id\":\"a17-adj-$(date +%s)\",\"sku_id\":\"A17-SKU\",\"warehouse_id\":1,\"delta\":-9999,\"reason\":\"a17\"}" \
   http://localhost:8080/inventory/v1/protected/adjustments
 
 # Ledger: the movement row carries actor = duyne's staff-realm sub.

@@ -2,7 +2,13 @@ apiVersion: fluxcd.controlplane.io/v1
 kind: ResourceSet
 metadata:
   name: rs-frontend
-  namespace: frontend
+  # `default`, like every other ResourceSet — and, more to the point, where
+  # clusters/*/apps.yaml health-checks it. While this object lived in
+  # `frontend` that health check named an object that did not exist, so
+  # `apps-local` (wait: true) would have blocked on it forever the first time
+  # a cluster was actually brought up. The HelmRelease it renders still targets
+  # the `frontend` namespace, so nothing about the workload moves.
+  namespace: default
 spec:
   inputs:
     - name: frontend

@@ -176,6 +176,15 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Proposals
+
+- **ADR-047 Adoption → Complete** — product is the sixth and last service in
+  its scope, so the `protected` audience is now real everywhere the decision
+  claimed it would be. RFC-0023 gains the slice B history entry: the catalog
+  lifecycle, the same-transaction audit, the portal's last stub becoming a
+  screen, the retirement of product's unauthenticated seed create, and the four
+  defects the gate surfaced (three of which a green CI was hiding).
+
 #### Gateway
 
 - **The protected catalog reaches the edge** (RFC-0023 slice B):

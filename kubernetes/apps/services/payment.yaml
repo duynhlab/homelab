@@ -45,7 +45,7 @@ spec:
     # the token sub as a string UUID end to end (ADR-042), greenfield DB
     # reset per the identity-cutover runbook. Compose E2E audit passed on
     # this code before merge; first fleet deploy goes through the Kind gate.
-    image_tag: "2.2.0" # {"$imagepolicy": "flux-system:payment:tag"}
+    image_tag: "2.2.1" # {"$imagepolicy": "flux-system:payment:tag"}
     namespace: payment
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

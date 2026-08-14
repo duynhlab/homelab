@@ -310,6 +310,19 @@ Both transports delegate the kickoff to one package
 | An unservable participant on a REPLAY answers the existing order, not an error | The call is idempotent, so an error would say "not placed" about an order that was — and checkout treats anything but `InvalidArgument` as transient, retrying forever and eventually minting a second order (a second authorize and capture) |
 | The refusal also lives inside `fulfillment.Start` | It is the single place a saga is created, so a future start path inherits it. The workflow-level panic is the last backstop, not the guard: it fails only the workflow TASK, while the call still answers success and the row closes |
 
+### Protected (Backoffice — RFC-0023 Train 3)
+
+Staff-realm guard chain per [api.md § Protected route conventions](./api.md#protected-route-conventions)
+(edge `jwt-edge-staff` → in-service staff verifier → `backoffice_admin`).
+Customer-realm tokens are wrong-issuer at the edge.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/order/v1/protected/orders?status=&page=&page_size=` | Cross-customer list (explicitly-unscoped repo path; FSM-vocabulary status filter — `manual_review`/`cancelling` feed the portal's backlog cards) |
+| `GET` | `/order/v1/protected/orders/:id` | Operator case view: order + items + owner subject; 404 preserved |
+
+The `manual_review` **resolution** stays a Future command (own safety review).
+
 ## Callers & dependencies
 
 | Direction | Peer | Transport | Purpose |
@@ -376,4 +389,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [checkout.md](./checkout.md) · [payments.md](./payments.md) · [shipping.md](./shipping.md) — adjacent contracts
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (Keycloak `sub`) in rows and workflow inputs; `OIDC_*` verification env._
+_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._

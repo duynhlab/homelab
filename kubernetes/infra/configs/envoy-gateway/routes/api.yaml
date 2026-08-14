@@ -138,6 +138,154 @@ spec:
         - name: inventory
           port: 8080
 ---
+# order — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge
+# JWT (ADR-050); role gate in-service (ADR-047).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-order-protected
+  namespace: order
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /order/v1/protected
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: order
+          port: 8080
+---
+# payment — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge
+# JWT (ADR-050); role gate in-service (ADR-047).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-payment-protected
+  namespace: payment
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /payment/v1/protected
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: payment
+          port: 8080
+---
+# shipping — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge
+# JWT (ADR-050); role gate in-service (ADR-047).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-shipping-protected
+  namespace: shipping
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /shipping/v1/protected
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: shipping
+          port: 8080
+---
+# user — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge
+# JWT (ADR-050); role gate in-service (ADR-047).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-user-protected
+  namespace: user
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /user/v1/protected
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: user
+          port: 8080
+---
 # Product Service — public catalog: anonymous. Translates api-product.
 # (POST /product/v1/internal/products is NOT exposed here.)
 apiVersion: gateway.networking.k8s.io/v1

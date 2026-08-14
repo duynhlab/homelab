@@ -112,6 +112,86 @@ spec:
           kind: Backend
           name: inventory
 ---
+# order — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge JWT
+# (jwt-edge-staff); role gate in-service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-order-protected
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /order/v1/protected
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: order
+---
+# payment — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge JWT
+# (jwt-edge-staff); role gate in-service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-payment-protected
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /payment/v1/protected
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: payment
+---
+# shipping — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge JWT
+# (jwt-edge-staff); role gate in-service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-shipping-protected
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /shipping/v1/protected
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: shipping
+---
+# user — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge JWT
+# (jwt-edge-staff); role gate in-service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-user-protected
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /user/v1/protected
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: user
+---
 # product — public catalog. NOT /product/v1/internal/products (A8).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

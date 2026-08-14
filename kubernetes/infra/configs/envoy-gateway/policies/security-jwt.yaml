@@ -65,6 +65,90 @@ spec:
         remoteJWKS:
           uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs
 ---
+# order — api-order-protected (RFC-0023). STAFF issuer (ADR-050):
+# protected surfaces trust the workforce realm; customer tokens are
+# wrong-issuer at the edge.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge-staff
+  namespace: order
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-order-protected
+  jwt:
+    providers:
+      - name: keycloak-staff
+        issuer: https://id.duynh.me/realms/duynhlab-staff
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs
+---
+# payment — api-payment-protected (RFC-0023). STAFF issuer (ADR-050):
+# protected surfaces trust the workforce realm; customer tokens are
+# wrong-issuer at the edge.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge-staff
+  namespace: payment
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-payment-protected
+  jwt:
+    providers:
+      - name: keycloak-staff
+        issuer: https://id.duynh.me/realms/duynhlab-staff
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs
+---
+# shipping — api-shipping-protected (RFC-0023). STAFF issuer (ADR-050):
+# protected surfaces trust the workforce realm; customer tokens are
+# wrong-issuer at the edge.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge-staff
+  namespace: shipping
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-shipping-protected
+  jwt:
+    providers:
+      - name: keycloak-staff
+        issuer: https://id.duynh.me/realms/duynhlab-staff
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs
+---
+# user — api-user-protected (RFC-0023). STAFF issuer (ADR-050):
+# protected surfaces trust the workforce realm; customer tokens are
+# wrong-issuer at the edge.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: jwt-edge-staff
+  namespace: user
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-user-protected
+  jwt:
+    providers:
+      - name: keycloak-staff
+        issuer: https://id.duynh.me/realms/duynhlab-staff
+        remoteJWKS:
+          uri: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs
+---
 # cart — api-cart
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy

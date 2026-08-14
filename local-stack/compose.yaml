@@ -593,6 +593,9 @@ services:
       SERVICE_NAME: user
       OTEL_SERVICE_NAME: user
       DB_NAME: user
+      # ADR-050: the protected group verifies the STAFF realm (split-horizon).
+      OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
+      OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -604,7 +607,15 @@ services:
     build: { context: ../../shipping-service }
     # gRPC ShippingService always runs on :9090; HTTP :8080 is unchanged.
     # order reaches it at dns:///shipping:9090.
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, OTEL_SERVICE_NAME: shipping, DB_NAME: shipping, GRPC_PORT: "9090" }
+    environment:
+      <<: *svc-env
+      SERVICE_NAME: shipping
+      OTEL_SERVICE_NAME: shipping
+      DB_NAME: shipping
+      GRPC_PORT: "9090"
+      # ADR-050: the protected group verifies the STAFF realm (split-horizon).
+      OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
+      OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -792,6 +803,9 @@ services:
       # Shared HMAC secret for verifying mockpay webhook signatures (must match
       # the value mockpay signs with — wired on mockpay when it starts emitting).
       MOCKPAY_WEBHOOK_SECRET: whsec_local_demo
+      # ADR-050: the protected group verifies the STAFF realm (split-horizon).
+      OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
+      OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -808,6 +822,9 @@ services:
       DB_NAME: order
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_SERVICE_URL: http://shipping:8080
+      # ADR-050: the protected group verifies the STAFF realm (split-horizon).
+      OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
+      OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
       # When set, order calls shipping over gRPC (Phase 1 pilot); unset = REST fallback.
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
       NOTIFICATION_GRPC_ADDR: dns:///notification:9090

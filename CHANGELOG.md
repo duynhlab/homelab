@@ -178,6 +178,12 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **Train 3 — the protected read fan-out**: `api-{order,payment,shipping,user}-protected`
+  HTTPRoutes in both config sets, riding `jwt-edge-staff` (ADR-050) and the
+  shared BackendTrafficPolicy; compose provides `OIDC_STAFF_*` to all four
+  services; audit row **A18** covers staff-list 200 + customer-token 401 per
+  service and the first reconciliation reader; the four owning `docs/api/`
+  contracts document the new reads.
 - **The platform's first `/protected/` route**: `api-inventory-protected`
   (`/inventory/v1/protected`, RFC-0023 slice A) in both config sets —
   inventory's first edge exposure ever. Attached to `jwt-edge` and the shared

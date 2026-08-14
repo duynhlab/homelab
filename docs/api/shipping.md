@@ -210,6 +210,16 @@ needs: the layer above never has to distinguish first-run from replay (the
 return identical data, and error mapping is per-transport (`InvalidArgument` vs
 `400 VALIDATION_ERROR`).
 
+### Protected (Backoffice — RFC-0023 Train 3)
+
+Staff-realm guard chain per [api.md § Protected route conventions](./api.md#protected-route-conventions).
+Shipping's **first authmw wiring**; shipments have no owner scope.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/shipping/v1/protected/shipments?status=` | Cross-customer list, newest first; the status filter accepts only the as-built vocabulary (`pending`/`cancelled` written by code, `in_transit`/`delivered` seed-only). No FSM exists → no transitions exposed |
+| `GET` | `/shipping/v1/protected/shipments/:id` | Operator case view by primary key |
+
 ## Callers & dependencies
 
 | Caller | Transport | Calls | Why |
@@ -286,4 +296,4 @@ Paths in [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-serv
 - [checkout.md](./checkout.md) · [order.md](./order.md) — quote and enrichment callers
 - [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-01_
+_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._

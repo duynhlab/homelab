@@ -380,8 +380,16 @@ audit_curl -s -o /dev/null -w "A8 cart internal:    %{http_code} (want 404 — n
   -X DELETE $BASE/cart/v1/internal/cart/1 -H "Authorization: Bearer $AT"
 
 # A9. Checkout sessions (RFC-0015 P1) — lifecycle through the edge JWT filter.
-#     Cart must have at least one item (add via the SPA or cart API first).
+#     CLEAR THE CART FIRST. The row's totals must be its own: anything left in
+#     this shopper's cart from a previous session, a demo, or a traffic
+#     generator changes the amount — and mockpay declines by amount SUFFIX
+#     (cents 02 generic_decline, 95 insufficient_funds, 19 processing_error,
+#     provider.go). A leftover item that pushes the total onto one of those
+#     suffixes fails A10's confirm and then A12, for a reason that has nothing
+#     to do with the change under test. Measured: a contaminated cart produced
+#     total=62.02 and a deterministic generic_decline.
 AT9=$(USERNAME=alice $KCT)
+audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT9"
 audit_curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT9" \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null
@@ -433,6 +441,8 @@ audit_curl -s -o /dev/null -w "A9 price-session cleanup: %{http_code} (want 200)
 #      session → address → shipping → payment → confirm (Idempotency-Key
 #      REQUIRED) → order created + fulfillment saga → replay = same order.
 AT0=$(USERNAME=alice $KCT)
+# Same reason as A9: the confirm's amount must be this row's, not a leftover's.
+audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT0"
 audit_curl -s -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT0" \
   -H 'Content-Type: application/json' \
   -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}' -o /dev/null

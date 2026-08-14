@@ -937,6 +937,13 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **Admin Portal pinned to `0.2.0`**: the cluster ResourceSet still served the
+  slice-A image, which predates the five PRs that finished RFC-0023 — the five
+  case views, the open-attempt worklist card, the Catalog page (products,
+  categories, lifecycle transitions), and the product audit-history timeline.
+  The Kind gate would otherwise have passed a portal missing the whole of
+  slice B.
+
 - **Fleet pinned to the RFC-0024 identity cutover** (2026-08-13): the seven
   authmw consumers take a MAJOR — user/cart/review/notification/payment/order
   **2.0.0**, checkout **0.7.0** — because the release is breaking twice over:

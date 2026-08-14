@@ -74,6 +74,18 @@ spec:
       name: api-inventory-protected
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
+      name: api-order-protected
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-payment-protected
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-shipping-protected
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: api-user-protected
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
       name: api-product
     - group: gateway.networking.k8s.io
       kind: HTTPRoute

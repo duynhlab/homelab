@@ -711,6 +711,29 @@ audit_curl -s -H "Authorization: Bearer $KCT_STAFF" \
   | grep -o '"actor":"[^"]*"'                # want d0e00000-0000-4000-8000-000000000001
 ```
 
+```bash
+# A18. Protected read fan-out (RFC-0023 Train 3): order, payment, shipping,
+#      user each serve their Backoffice list to the staff operator, and every
+#      one of them rejects a customer-realm token AT THE EDGE (wrong issuer).
+#      $KCT_STAFF and $AT come from A17/A1.
+for svc in order payment shipping user; do
+  path="$svc/v1/protected"
+  case $svc in
+    order)    res="orders";;
+    payment)  res="payments";;
+    shipping) res="shipments";;
+    user)     res="users";;
+  esac
+  audit_curl -s -o /dev/null -w "A18 $svc staff-list: %{http_code} (want 200)\n" \
+    -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/$path/$res?page_size=1"
+  audit_curl -s -o /dev/null -w "A18 $svc customer-token: %{http_code} (want 401 wrong-issuer)\n" \
+    -H "Authorization: Bearer $AT" "http://localhost:8080/$path/$res"
+done
+# The recon triage view exists and pages (payment's first recon reader):
+audit_curl -s -o /dev/null -w "A18 recon runs: %{http_code} (want 200)\n" \
+  -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/payment/v1/protected/reconciliations/runs?page_size=1"
+```
+
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
 > row cannot reach the limit, so a 429 means either the policy was tightened or
 > something is looping. Investigate before re-running.
@@ -1396,6 +1419,7 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | A16 | String subject persisted (ADR-042) | a cart write made with a realm token lands in `cart.cart_items.user_id` as the caller's realm UUID — the edge, `pkg/authmw`, the handler, and the column all agree |
 | A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` workflow behind |
 | A17 | Protected surface (RFC-0023 + ADR-050) | tokenless 401 **at the edge**; bare `/inventory/v1/private/*` 404 (only `/protected` is routed); a valid **customer-realm** token 401 **wrong-issuer at the edge** (the ADR-050 fence — stronger than the old in-service 403); staff operator `duyne` (realm `duynhlab-staff`) lists real balances with derived `atp`; receipt 201 `applied:true`, exact replay 200 `applied:false`, invariant-violating adjustment 409 `STOCK_UNAVAILABLE`; the movement row's `actor` is duyne's staff-realm `sub` (`d0e00000-…-001`) |
+| A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the nav shows signed-in state; **no JWT-shaped value in localStorage or sessionStorage** (both are empty on this build); the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Login link, no Logout button); a private route afterwards redirects to `/login?returnTo=…` rather than rendering stale data; both storages empty |

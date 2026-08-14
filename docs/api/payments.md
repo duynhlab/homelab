@@ -379,6 +379,18 @@ positive of precisely this shape: a provider build that discarded its
 `from`/`to` bounds made a bounded internal set face the whole ledger, and every
 older charge read as missing on our side.
 
+### Protected (Backoffice — RFC-0023 Train 3)
+
+Staff-realm guard chain per [api.md § Protected route conventions](./api.md#protected-route-conventions).
+Read-only: refunds and recon triggers stay `internal`.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/payment/v1/protected/payments?status=` | Cross-customer list (FSM-vocabulary filter) |
+| `GET` | `/payment/v1/protected/payments/:id` | Case view: payment + **full attempt history** + append-only **ledger lineage summary** (`{payment, attempts, ledger}`) |
+| `GET` | `/payment/v1/protected/reconciliations/runs` | Run headers, newest first — the detect-only recon records' first reader |
+| `GET` | `/payment/v1/protected/reconciliations/runs/:id` | Run + its discrepancies (`{run, discrepancies}`) — the triage view |
+
 ## Callers & dependencies
 
 | Direction | Peer | Contract |
@@ -500,4 +512,4 @@ Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-servic
 - [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: proto `user_id` is `string` (was `int64`), `OIDC_*` verification env._
+_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._

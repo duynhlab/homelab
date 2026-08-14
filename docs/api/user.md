@@ -202,6 +202,15 @@ east-west surface; nothing in the saga or checkout call graph touches it.
 | JIT provisioning | Profile rows appear on first private read (claims fallback) / first `PUT` (upsert) for the token's `sub`; user-service never mints identity IDs ([ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/)) |
 | Sanitized validation errors | Binder/validator messages are pattern-filtered before responding; short safe messages pass through, structural ones collapse to `"Invalid request"` |
 
+### Protected (Backoffice — RFC-0023 Train 3)
+
+Staff-realm guard chain per [api.md § Protected route conventions](./api.md#protected-route-conventions).
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/user/v1/protected/users?query=` | Operator search: ILIKE on first/last name/phone + exact `user_id` — the whole searchable surface (identity claims live in Keycloak). List payload never carries the address |
+| `GET` | `/user/v1/protected/users/:userId` | Case view incl. address (explicit-detail-only sensitive field) + timestamps; 404 when no profile row |
+
 ## Callers & dependencies
 
 | Direction | Party | Contract |
@@ -271,4 +280,4 @@ Paths in [`duynhlab/user-service`](https://github.com/duynhlab/user-service). Tr
 - [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-12_
+_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._

@@ -176,6 +176,17 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Proposals
+
+- **RFC-0023 slice A is built** — ADR-047/048/049/050 Adoption `Not started` →
+  **Partial**, each carrying what is actually true: five services expose
+  role-gated `/protected/` reads behind the staff issuer (product waits for
+  slice B), the portal calls them directly with no BFF, and both realm twins
+  hold the workforce split — all verified in local-stack, none verified on a
+  cluster until the Kind gate. RFC-0023 gains the slice A implementation-history
+  entry, including the two defects the work surfaced (portal image baked local
+  origins; route-level SecurityPolicy replaces gateway CORS without
+  `mergeType: StrategicMerge`).
 #### GitOps
 
 - **The Backoffice portal gets a cluster home** (RFC-0023): namespace

@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) | 2026-08-10 | 2026-08-13 |
+| Accepted | platform-wide | [./research.md](./research.md) | 2026-08-10 | 2026-08-14 |
 
 > **Every decision is a tradeoff.** This RFC creates a second browser application that
 > calls owning services directly through Kong on a new `/protected/` audience. We accept
@@ -621,6 +621,23 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   command outside the MVP slices (own safety review); the SPA repository is named
   **`admin-service`** (a static frontend despite the suffix — no admin backend, BFF,
   or database exists; RFC wording adjusted to keep the non-goal unambiguous).
+
+- 2026-08-14 — **Slice A is built.** Five services carry role-gated `/protected/`
+  reads behind the staff issuer (inventory balances/movements/reservations +
+  receipt and adjustment commands; order, payment, shipping, user reads; the
+  payment attempt worklist and the reconciliation records' first reader). The
+  portal ships every screen the scope table names except the catalog pair:
+  dashboard attention cards, five list screens, five case views, and the two
+  inventory commands — all reading the live edge, never a mock. Verified by two
+  full compose E2E audits (rows **A17**/**A18** added for the protected surface)
+  and the portal's own Playwright suite. Deployment path merged: namespace
+  `backoffice`, `rs-backoffice`, and `backoffice.duynh.me` — unverified until
+  the Kind gate, which is why the four ADRs read **Partial**, not Complete.
+  Two defects surfaced and were fixed on the way: the released portal image
+  baked local dev origins (no CI build args), and route-level SecurityPolicies
+  silently replace the gateway CORS baseline without `mergeType: StrategicMerge`.
+  Still open for slice B: product lifecycle + categories, and the `manual_review`
+  resolve command (still Future).
 
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)

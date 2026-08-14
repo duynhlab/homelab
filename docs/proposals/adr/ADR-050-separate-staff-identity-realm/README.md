@@ -26,7 +26,7 @@
 | **Supersedes** | — (narrows ADR-041's scope; does not replace it) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0023 program — identity-split train |
-| **Adoption** | Not started |
+| **Adoption** | Partial — both realm twins carry the split: `duynhlab-staff` holds the operator, the `backoffice_admin` role, and the `admin-portal` client with the staff posture; the customer realm holds customers only. Every `/protected/` route verifies the staff issuer, so a customer token fails at the edge as wrong-issuer (audit A17/A18). Verified in local-stack; the cluster realm import is unverified until the Kind gate |
 
 ## Context
 

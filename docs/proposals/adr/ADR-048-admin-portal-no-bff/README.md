@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0023 program — SPA trains |
-| **Adoption** | Not started |
+| **Adoption** | Partial — the portal calls each owning service directly through the edge, with no admin BFF anywhere in the tree; partial-data tolerance is real (every dashboard card owns its query and its error state). Verified locally (Playwright against the live stack); cluster manifests merged, unverified until the Kind gate |
 
 ## Context
 

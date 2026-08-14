@@ -275,6 +275,18 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The edge's eleven alerts finally have runbooks.** They shipped with the P4
+  edge slice below — expressions, catalog rows, recording rules — and nothing
+  linked them to an investigation, so an on-call page arrived carrying a
+  threshold and no next step. Nine runbooks now cover them (paired
+  High/Critical severities share one, because only the urgency differs), each
+  built around the question that decides the response: is the fleet down or the
+  scrape blind; whose 5xx, a backend's or Envoy's own; is the latency in the
+  edge or upstream; which route stopped matching while everything looks
+  healthy; how long until cached JWKS expires and every route 401s. The alert
+  catalog's edge table gains a Runbook column, and the local-stack job-name
+  difference (`envoy` vs `envoy-gateway`) is written down where someone
+  reproducing an alert will hit it.
 - EG-native edge observability lands with the cutover (RFC-0024 P4 edge
   slice, replacing the 13 `kong_*` alerts + 20 recording rules):
   `prometheusrules/envoy-gateway/` carries 11 alerts designed from `envoy_*`

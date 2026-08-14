@@ -94,19 +94,19 @@ edge truth — includes locally-generated 429/401/403), `envoy_cluster_*`
 and the controller's `status_update_total` / `xds_snapshot_*_total`. Envoy latency
 histograms are in **milliseconds**.
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| EdgeDown | critical | `up{job="envoy-gateway"}==0` **or** `absent(up{...})` | Whole API surface unreachable (absent() catches a dead PodMonitor selector too) | 1m |
-| Edge5xxRatioHigh | warning | `edge:rq_5xx_ratio:rate5m` >5% (downstream, incl. Envoy-generated 5xx) | API-wide degradation | 5m |
-| Edge5xxRatioCritical | critical | same ratio >15% | Most API traffic failing | 5m |
-| EdgeLatencyP95High | warning | `edge:latency_ms:p95_5m` >1000ms (`envoy_http_downstream_rq_time`) | API latency spike — edge + upstream combined | 10m |
-| EdgeLatencyP95Critical | critical | same P95 >2000ms | Client-timeout territory | 5m |
-| EdgeNoTraffic | warning | downstream rq `rate[10m]==0`, had traffic in 1h, fleet up | Listener/route regression — routing broken while pods look healthy | 10m |
-| Edge429RatioHigh | warning | `edge:rq_429_ratio:rate5m` >5% (local rate-limit `rate_limited` counter) | ADR-045 local buckets clipping traffic: abusive client or mis-sized halved budgets | 10m |
-| EdgeUpstreamUnhealthy | warning | per-`envoy_cluster_name`: `membership_healthy < membership_total` | Endpoints ejected by health check / outlier detection; route degrades, then 503/UH | 2m |
-| EdgeJWKSFetchFailing | warning | `rate(envoy_http_jwt_authn_jwks_fetch_failed[5m])>0` | Edge can't refresh the Keycloak JWKS — cached keys serve until expiry, then every private/protected route 401s | 10m |
-| EnvoyGatewayControllerDown | critical | `up{job="envoy-gateway-controller"}==0` or absent | xDS frozen: no Gateway API change reconciles; a restarted proxy gets no config | 5m |
-| EnvoyGatewayReconcileErrors | warning | `status_update_total{status="failure"}` + `xds_snapshot_{create,update}_total{status="failure"}` rate >0 | Config changes silently not reaching the fleet — running config drifts from git | 10m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| EdgeDown | critical | `up{job="envoy-gateway"}==0` **or** `absent(up{...})` | Whole API surface unreachable (absent() catches a dead PodMonitor selector too) | 1m | [EdgeDown](../runbooks/envoy-gateway/EdgeDown.md) |
+| Edge5xxRatioHigh | warning | `edge:rq_5xx_ratio:rate5m` >5% (downstream, incl. Envoy-generated 5xx) | API-wide degradation | 5m | [Edge5xxRatio](../runbooks/envoy-gateway/Edge5xxRatio.md) |
+| Edge5xxRatioCritical | critical | same ratio >15% | Most API traffic failing | 5m | [Edge5xxRatio](../runbooks/envoy-gateway/Edge5xxRatio.md) |
+| EdgeLatencyP95High | warning | `edge:latency_ms:p95_5m` >1000ms (`envoy_http_downstream_rq_time`) | API latency spike — edge + upstream combined | 10m | [EdgeLatencyP95](../runbooks/envoy-gateway/EdgeLatencyP95.md) |
+| EdgeLatencyP95Critical | critical | same P95 >2000ms | Client-timeout territory | 5m | [EdgeLatencyP95](../runbooks/envoy-gateway/EdgeLatencyP95.md) |
+| EdgeNoTraffic | warning | downstream rq `rate[10m]==0`, had traffic in 1h, fleet up | Listener/route regression — routing broken while pods look healthy | 10m | [EdgeNoTraffic](../runbooks/envoy-gateway/EdgeNoTraffic.md) |
+| Edge429RatioHigh | warning | `edge:rq_429_ratio:rate5m` >5% (local rate-limit `rate_limited` counter) | ADR-045 local buckets clipping traffic: abusive client or mis-sized halved budgets | 10m | [Edge429RatioHigh](../runbooks/envoy-gateway/Edge429RatioHigh.md) |
+| EdgeUpstreamUnhealthy | warning | per-`envoy_cluster_name`: `membership_healthy < membership_total` | Endpoints ejected by health check / outlier detection; route degrades, then 503/UH | 2m | [EdgeUpstreamUnhealthy](../runbooks/envoy-gateway/EdgeUpstreamUnhealthy.md) |
+| EdgeJWKSFetchFailing | warning | `rate(envoy_http_jwt_authn_jwks_fetch_failed[5m])>0` | Edge can't refresh the Keycloak JWKS — cached keys serve until expiry, then every private/protected route 401s | 10m | [EdgeJWKSFetchFailing](../runbooks/envoy-gateway/EdgeJWKSFetchFailing.md) |
+| EnvoyGatewayControllerDown | critical | `up{job="envoy-gateway-controller"}==0` or absent | xDS frozen: no Gateway API change reconciles; a restarted proxy gets no config | 5m | [EnvoyGatewayControllerDown](../runbooks/envoy-gateway/EnvoyGatewayControllerDown.md) |
+| EnvoyGatewayReconcileErrors | warning | `status_update_total{status="failure"}` + `xds_snapshot_{create,update}_total{status="failure"}` rate >0 | Config changes silently not reaching the fleet — running config drifts from git | 10m | [EnvoyGatewayReconcileErrors](../runbooks/envoy-gateway/EnvoyGatewayReconcileErrors.md) |
 
 Retired without an Envoy equivalent (Kong/nginx implementation details, not edge
 signals): `KongHighInternalLatency` (plugin-chain overhead — derive edge-minus-upstream

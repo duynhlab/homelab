@@ -1,0 +1,58 @@
+# Envoy Gateway Edge Alert Runbooks
+
+Per-alert investigation guides for the platform edge (ADR-044). Nine files cover
+eleven alerts: the paired High/Critical severities share one runbook, because
+the investigation is identical and only the urgency differs.
+
+| Quick facts | |
+|---|---|
+| Alert rules | [`prometheusrules/envoy-gateway/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/alerts.yaml) |
+| Recording rules | [`prometheusrules/envoy-gateway/recording-rules.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/envoy-gateway/recording-rules.yaml) |
+| Data-plane scrape | [`podmonitors/envoy-gateway-proxy.yaml`](../../../../kubernetes/infra/configs/observability/metrics/podmonitors/envoy-gateway-proxy.yaml) — `job="envoy-gateway"` |
+| Control-plane scrape | [`servicemonitors/envoy-gateway-controller.yaml`](../../../../kubernetes/infra/configs/observability/metrics/servicemonitors/envoy-gateway-controller.yaml) — `job="envoy-gateway-controller"` |
+| Alert catalog | [§ Envoy Gateway edge](../../alerting/alert-catalog.md) |
+| Edge architecture | [`platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) |
+
+## Two jobs, two failure stories
+
+The split matters more here than anywhere else on the platform, because the
+halves fail independently and only one of them is visible to users:
+
+| Job | What it is | When it breaks |
+|-----|------------|----------------|
+| `envoy-gateway` | the proxy fleet — the request path | users feel it immediately |
+| `envoy-gateway-controller` | the control plane — translates Gateway API into xDS | traffic is unaffected **until** a config change or a proxy restart |
+
+An `envoy_*` series always comes from the data plane; `status_update_total`,
+`xds_snapshot_*` and `watchable_*` always come from the control plane. Envoy's
+latency histograms are in **milliseconds**, while application OTLP histograms
+are in seconds — the single most common misreading of an edge dashboard.
+
+## Runbooks
+
+| Alert(s) | Runbook | The question it answers |
+|----------|---------|------------------------|
+| `EdgeDown` | [EdgeDown](EdgeDown.md) | Is the fleet down, or is the scrape blind? |
+| `Edge5xxRatioHigh` · `Edge5xxRatioCritical` | [Edge5xxRatio](Edge5xxRatio.md) | Whose 5xx — a backend's, or Envoy's own? |
+| `EdgeLatencyP95High` · `EdgeLatencyP95Critical` | [EdgeLatencyP95](EdgeLatencyP95.md) | Is the time spent in the edge or upstream? |
+| `EdgeNoTraffic` | [EdgeNoTraffic](EdgeNoTraffic.md) | Healthy fleet, zero requests — which route stopped matching? |
+| `Edge429RatioHigh` | [Edge429RatioHigh](Edge429RatioHigh.md) | Abusive client contained, or real users clipped? |
+| `EdgeUpstreamUnhealthy` | [EdgeUpstreamUnhealthy](EdgeUpstreamUnhealthy.md) | Does Kubernetes agree the endpoints are unhealthy? |
+| `EdgeJWKSFetchFailing` | [EdgeJWKSFetchFailing](EdgeJWKSFetchFailing.md) | How long until cached keys expire and everything 401s? |
+| `EnvoyGatewayControllerDown` | [EnvoyGatewayControllerDown](EnvoyGatewayControllerDown.md) | What breaks next, given traffic is still fine? |
+| `EnvoyGatewayReconcileErrors` | [EnvoyGatewayReconcileErrors](EnvoyGatewayReconcileErrors.md) | Which resource failed to reach the fleet? |
+
+## Local-stack equivalents
+
+Every PromQL query here also works against local-stack: vmagent scrapes the same
+two jobs there (`envoy` for the proxy's `/stats/prometheus` on `:19005`,
+`envoy-gateway` for the control plane on `:19001` — see
+[`local-stack/observability/vmagent/prometheus.yml`](../../../../local-stack/observability/vmagent/prometheus.yml)),
+and the same upstream dashboards are provisioned under the Grafana folder
+`Gateway`. The **job names differ**: the cluster's data plane is
+`job="envoy-gateway"` while local-stack's is `job="envoy"`, because in Host mode
+the proxy's stats had to be published on a bootstrap-added listener rather than
+the port a PodMonitor would select. Substitute accordingly when reproducing an
+alert locally.
+
+_Last updated: 2026-08-14 — created with the nine edge runbooks (the alerts had shipped with the P4 edge slice; nothing linked them to an investigation)._

@@ -20,7 +20,7 @@ spec:
     # 1.4.3: RFC-0024 wave (2026-08-13): pkg/proto v0.37.0 pin alignment
     # (string user_id in the notification/payment protos); no behaviour
     # change in this service beyond the shared-contract bump.
-    image_tag: "1.4.3" # {"$imagepolicy": "flux-system:shipping:tag"}
+    image_tag: "1.5.0" # {"$imagepolicy": "flux-system:shipping:tag"}
     namespace: shipping
     grpc_server: true
     replicaCount: 1

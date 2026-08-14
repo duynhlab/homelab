@@ -23,7 +23,13 @@ spec:
     allowOrigins:
       - "https://local.duynh.me"
       - "https://duynh.me"
+      # The operator portal is its own host (routes/backoffice.yaml): its
+      # fetches to gateway.duynh.me are cross-origin exactly like the customer
+      # SPA's, so the browser needs it listed here or every protected read
+      # dies at preflight.
+      - "https://backoffice.duynh.me"
       - "http://localhost:3001"
+      - "http://localhost:3009"
       - "http://localhost:8000"
     allowMethods:
       - GET

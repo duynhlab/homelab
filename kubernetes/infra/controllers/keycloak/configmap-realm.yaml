@@ -16,7 +16,9 @@
 # ADR-050 split: this ConfigMap now carries TWO realms. `duynhlab` is the
 # CUSTOMER realm (client customer-spa only). `duynhlab-staff` is the
 # WORKFORCE realm: operator `duyne`, role backoffice_admin, client
-# admin-portal (dev origin http://localhost:3009 — :3002 is Grafana), with
+# admin-portal (cluster origin https://backoffice.duynh.me; the dev origin
+# http://localhost:3009 stays listed so a developer can run the portal against
+# this realm — :3002 is Grafana), with
 # the staff posture as REALM policy: registration off, brute-force on,
 # SSO idle 30 min / max 10 h. p@ss1234 is the dev-only demo placeholder,
 # never a committed prod value.
@@ -241,9 +243,11 @@ data:
             "pkce.code.challenge.method": "S256"
           },
           "redirectUris": [
+            "https://backoffice.duynh.me/*",
             "http://localhost:3009/*"
           ],
           "webOrigins": [
+            "https://backoffice.duynh.me",
             "http://localhost:3009"
           ],
           "defaultClientScopes": [

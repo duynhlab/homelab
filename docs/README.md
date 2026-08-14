@@ -202,6 +202,7 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | Checkout | [checkout-service](https://github.com/duynhlab/checkout-service) | [checkout.md](./api/checkout.md) | `ghcr.io/duynhlab/checkout-service/checkout-service` | [![CI](https://github.com/duynhlab/checkout-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/checkout-service/actions) |
 | Payment | [payment-service](https://github.com/duynhlab/payment-service) | [payments.md](./api/payments.md) | `ghcr.io/duynhlab/payment-service/payment-service` | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) |
 | Frontend | [frontend](https://github.com/duynhlab/frontend) | — | `ghcr.io/duynhlab/frontend/frontend` | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
+| Backoffice portal | [admin-service](https://github.com/duynhlab/admin-service) | — (operator SPA; the reads it calls are in each service's contract) | `ghcr.io/duynhlab/admin-service/admin-service` | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
 
 Clone all repositories: [platform/setup.md](./platform/setup.md).
 

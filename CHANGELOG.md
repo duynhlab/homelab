@@ -187,6 +187,18 @@ Skeleton (copy what you need):
   entry, including the two defects the work surfaced (portal image baked local
   origins; route-level SecurityPolicy replaces gateway CORS without
   `mergeType: StrategicMerge`).
+#### GitOps
+
+- **The Backoffice portal gets a cluster home** (RFC-0023): namespace
+  `backoffice`, standalone ResourceSet `rs-backoffice` (mop chart, Nginx on
+  :80, no DB), and the `backoffice.duynh.me` HTTPRoute under the existing
+  `*.duynh.me` certificate with the same security-header filter the customer
+  SPA carries. The staff realm's `admin-portal` client gains the cluster
+  redirect/origin, and the gateway CORS policy gains the portal host — without
+  both, sign-in bounces and every protected read dies at preflight. The image
+  is only deployable when its build carried the four cluster build args
+  (admin-service CI now passes them); `rs-backoffice` lives in `default` so
+  the `apps-local` health check can actually find it.
 
 #### Gateway
 

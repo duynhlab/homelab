@@ -15,6 +15,7 @@ resources:
   - routes/infra.yaml
   - routes/mcp.yaml
   - routes/frontend.yaml
+  - routes/backoffice.yaml
   - routes/temporal.yaml
   - routes/keycloak.yaml
   # Policies — CORS, JWT, CIDR, and traffic-management policies

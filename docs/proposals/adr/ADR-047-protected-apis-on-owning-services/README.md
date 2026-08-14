@@ -25,7 +25,26 @@
 | **Supersedes** | RFC-0010's older *signed-webhook* reading of the `protected` class (webhooks stay `public` + HMAC) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0023 program — authmw train, per-service slice A/B trains |
-| **Adoption** | Partial — the audience is real on **five** services (inventory, order, payment, shipping, user): role-gated `/protected/` groups behind the staff issuer, edge HTTPRoutes in both config sets, verified end to end through the local edge (audit rows A17/A18). **product** is slice B and has no protected surface yet; the cluster edge is unverified until the Kind gate |
+| **Adoption** | **Complete** |
+
+**Adoption evidence (2026-08-14).** All **six** services in this ADR's scope now
+serve `/{service}/v1/protected/…`: inventory (balances, movements, reservations,
+receipt and adjustment commands), order, payment, shipping, user (cross-customer
+reads), and — closing the set — product (catalog lifecycle, category endpoints,
+per-target audit history). Every route verifies the staff issuer in-service and
+requires `backoffice_admin`; every command takes its actor from the verified
+token; product's writes commit their `admin_action_audit` row in the same
+transaction as the change, enforced by construction (the insert helper takes a
+`pgx.Tx`, so there is no way to call it outside one). The rule that superseded
+routes are replaced rather than promoted is also honoured: product's
+seed-only unauthenticated `POST /internal/products` is deleted, verified
+callerless first. Verified through the local edge by audit rows **A17** (inventory
+commands), **A18** (the four read services) and **A19** (the full catalog
+lifecycle: DRAFT invisible publicly, duplicate 409, publish, re-publish
+`INVALID_TRANSITION`, stale edit `VERSION_CONFLICT`, archive, audit trail actor).
+The cluster edge carries the same routes in both config sets but remains
+unverified until the Kind gate — which is a deployment question, not an open
+decision.
 
 ## Context
 

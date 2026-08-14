@@ -639,6 +639,34 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   Still open for slice B: product lifecycle + categories, and the `manual_review`
   resolve command (still Future).
 
+- 2026-08-14 — **Slice B is built: the catalog is the sixth protected service.**
+  `products` gains a three-state lifecycle (`DRAFT`/`ACTIVE`/`ARCHIVED`, arriving
+  `DEFAULT 'ACTIVE'` so the migration is backfill-free) and a `version`
+  concurrency token; `admin_action_audit` records who changed what, committed in
+  the same transaction as the change. Eleven protected routes: the operator
+  catalog in every state, create (DRAFT), edit under optimistic concurrency,
+  three transition commands, the per-product audit read, and the category
+  endpoints the table had been waiting for since it was created. The portal's
+  last stub becomes a real screen, offering only the transitions the current
+  state allows and turning both conflicts into sentences. The deliberate
+  asymmetry is documented as-built: an archived product's page 404s while its
+  gRPC price read still resolves, because a cart holding it must still price
+  correctly. Product's seed-only unauthenticated create is deleted (ADR-047's
+  boundary rule), verified callerless first. Audit row **A19** covers the
+  lifecycle end to end; **ADR-047 Adoption → Complete**.
+  Four defects surfaced and were fixed in the same round, three of them the kind
+  a green CI hides: a JSONB parameter passed as `[]byte` failed only under the
+  service's simple-protocol pool while the test's extended-protocol pool passed;
+  a duplicate product name answered 500 instead of 409; a 500 from those handlers
+  logged nothing at all; and two reconciliation reads compared the database's
+  clock against the process's, so the reaper deleted nothing and the open-doubt
+  gauge could report a negative age. Three audit rows also stopped asserting on
+  luck (cart contamination vs mockpay's decline-by-amount-suffix, a fixed
+  idempotency key, a fixed sleep for an async saga).
+  Still open: `manual_review` resolve remains a Future command, the portal does
+  not yet surface the audit history the API now returns, and the cluster is
+  unverified until the Kind gate.
+
 When Status → implemented, confirm:
 - [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
 - [ ] docs/api/ synced — api.md protected conventions; per-service contracts; rollup;

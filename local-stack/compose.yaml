@@ -669,6 +669,11 @@ services:
       # product serves BatchGetCurrentPrices on gRPC :9090 (checkout's price
       # re-validation). The saga's ReserveStock/ReleaseStock left in 1.7.0.
       GRPC_PORT: "9090"
+      # ADR-050: the protected catalog group verifies the STAFF realm
+      # (split-horizon: the issuer is the browser-facing origin, the JWKS fetch
+      # runs in-network).
+      OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
+      OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -676,6 +681,10 @@ services:
       product-seed: { condition: service_completed_successfully }
       cache: { condition: service_healthy }
       review: { condition: service_healthy }
+      # New since slice B: the protected catalog group builds a staff-realm
+      # verifier at startup, so the realm has to exist first — same reason every
+      # other protected service waits on it.
+      keycloak: { condition: service_healthy }
 
   cart:
     build: { context: ../../cart-service }

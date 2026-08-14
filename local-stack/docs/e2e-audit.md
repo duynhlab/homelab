@@ -178,7 +178,9 @@ Timing is dominated by waits, not by typing: A10 sleeps 13s, A12 polls up to 24s
 A14 restarts `temporal` and waits for it to report healthy, and the conditional
 A15 adds roughly 5 minutes of drill. **A13 is the outlier** — it is gated on the
 checkout session TTL (30 minutes by default), which is exactly why it is armed
-before A1 and read at the end instead of being run in place.
+before A1 and read at the end instead of being run in place. **A20** adds its own
+wait: it parks an order through a real declined refund and polls for up to 2
+minutes, because the compensation has to fail before there is anything to resolve.
 
 ```bash
 # ---- Preamble. Run this first, in the shell you will use for every row —
@@ -826,6 +828,129 @@ print('A19 audit trail:', 'OK' if ok else 'FAIL', actions, actors)"
 # Categories: list + create + the unique-name conflict.
 audit_curl -s -o /dev/null -w "A19 categories: %{http_code} (want 200)\n" \
   -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/product/v1/protected/categories?page_size=5"
+
+# A20. The operator RESOLVE (RFC-0023 train 7 / ADR-051) — the command that
+#      retired the raw-SQL runbook. Armed through the real park path, not SQL:
+#      mockpay declines a refund whose cents end in 07 while still allowing the
+#      charge, and order maps a declined refund to a NON-retryable error, so the
+#      cancellation compensation cannot converge and parks the order in
+#      manual_review(COMPENSATION_INCOMPLETE) within seconds.
+#
+#      Pick a price whose order total lands on .07: total = subtotal + 3.00 fee
+#      + round((subtotal + 3.00) * 0.08, 2) tax.
+A20_PRICE=$(python3 -c "
+for cents in range(1000, 9999):
+    sub = cents / 100
+    tax = round((sub + 3.0) * 0.08, 2)
+    total = round(sub + 3.0 + tax, 2)
+    if round(total * 100) % 100 == 7:
+        print('%.2f' % sub); break")
+A20_NAME="A20 Refund Trap $(date +%s)"
+A20_PID=$(audit_curl -s -X POST http://localhost:8080/product/v1/protected/products \
+  -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
+  -d "{\"name\":\"$A20_NAME\",\"price\":$A20_PRICE,\"category\":\"Electronics\"}" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+audit_curl -s -o /dev/null -X POST "http://localhost:8080/product/v1/protected/products/$A20_PID/publish" \
+  -H "Authorization: Bearer $KCT_STAFF"
+# The saga reserves stock by sku_id = product_id, so a brand-new product has no
+# balance row and would fail the order with UNKNOWN_SKU instead of parking it.
+# Give it stock through the protected receipt A17 already proves.
+audit_curl -s -o /dev/null -w "A20 stock receipt: %{http_code} (want 201)\n" -X POST \
+  http://localhost:8080/inventory/v1/protected/receipts \
+  -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
+  -d "{\"command_id\":\"a20-rcpt-$(date +%s)\",\"sku_id\":\"$A20_PID\",\"warehouse_id\":1,\"quantity\":5,\"reason\":\"a20 arm\"}"
+# One clean checkout on that product, as its own user so no session is adopted.
+AT20=$(USERNAME=carol $KCT)
+audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT20"
+audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT20" \
+  -H 'Content-Type: application/json' \
+  -d "{\"product_id\":\"$A20_PID\",\"product_name\":\"$A20_NAME\",\"product_price\":$A20_PRICE,\"quantity\":1}"
+S20=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT20" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+audit_curl -s -o /dev/null -X PUT $BASE/checkout/v1/private/checkout/sessions/$S20/address \
+  -H "Authorization: Bearer $AT20" -H 'Content-Type: application/json' \
+  -d '{"full_name":"Carol","line1":"1 Main St","city":"HN","country":"VN"}'
+audit_curl -s -X PUT $BASE/checkout/v1/private/checkout/sessions/$S20/shipping \
+  -H "Authorization: Bearer $AT20" -H 'Content-Type: application/json' \
+  -d '{"shipping_method":"standard"}' | python3 -c "
+import json,sys; s=json.load(sys.stdin)
+print('A20 total:', 'OK' if round(s['total']*100) % 100 == 7 else 'FAIL', s['total'], '(cents must end 07)')"
+audit_curl -s -o /dev/null -X PUT $BASE/checkout/v1/private/checkout/sessions/$S20/payment \
+  -H "Authorization: Bearer $AT20" -H 'Content-Type: application/json' \
+  -d '{"payment_method_token":"tok_visa_ok"}'
+O20=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions/$S20/confirm \
+  -H "Authorization: Bearer $AT20" -H "Idempotency-Key: a20-$(date +%s)" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['order_id'])")
+# Cancel: the refund is declined, so the compensation parks the order.
+audit_curl -s -o /dev/null -X POST "$BASE/order/v1/private/orders/$O20/cancel" -H "Authorization: Bearer $AT20"
+for i in $(seq 1 40); do
+  A20_STATUS=$(audit_curl -s -H "Authorization: Bearer $KCT_STAFF" \
+    "$BASE/order/v1/protected/orders/$O20" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])")
+  [ "$A20_STATUS" = "manual_review" ] && break
+  sleep 3
+done
+echo "A20 parked: $([ "$A20_STATUS" = manual_review ] && echo OK || echo FAIL) (status=$A20_STATUS)"
+# Diagnosing a FAIL here: `failed` means the refund SUCCEEDED (the total's cents
+# did not end in 07, or mockpay is stubbed in-memory — check MOCKPAY_URL);
+# `cancelling` means the compensation is still retrying; `confirmed` means the
+# cancel never opened an episode.
+
+# The case view carries what the decision needs: version + the external truths +
+# the history. A soft-failed read is listed in `degraded`, never silently absent.
+A20_CASE=$(audit_curl -s -H "Authorization: Bearer $KCT_STAFF" "$BASE/order/v1/protected/orders/$O20")
+A20_V=$(echo "$A20_CASE" | python3 -c "import json,sys;print(json.load(sys.stdin)['version'])")
+echo "$A20_CASE" | python3 -c "
+import json,sys
+c = json.load(sys.stdin)
+pay = c.get('payment') or {}
+ok = c['version'] > 0 and 'status_history' in c and pay.get('status') in ('captured', 'partially_refunded')
+print('A20 case view:', 'OK' if ok else 'FAIL', 'v%s' % c['version'],
+      'payment=%s' % pay.get('status'), 'history=%d' % len(c['status_history']),
+      'degraded=%s' % c.get('degraded'))"
+# A customer token dies at the EDGE on the command, before any role logic.
+audit_curl -s -o /dev/null -w "A20 customer-token: %{http_code} (want 401 wrong-issuer at the edge)\n" \
+  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $AT20" \
+  -H 'Content-Type: application/json' -d '{"target":"cancelled","version":1,"reason":"WRITTEN_OFF","note":"x"}'
+# Evidence is not optional, and the vocabulary is closed.
+audit_curl -s -o /dev/null -w "A20 no note: %{http_code} (want 400)\n" \
+  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+  -H 'Content-Type: application/json' -d "{\"target\":\"cancelled\",\"version\":$A20_V,\"reason\":\"WRITTEN_OFF\",\"note\":\"\"}"
+audit_curl -s -w "  -> A20 foreign reason: %{http_code} (want 400 — CUSTOMER_REQUEST is not a resolution)\n" \
+  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+  -H 'Content-Type: application/json' \
+  -d "{\"target\":\"cancelled\",\"version\":$A20_V,\"reason\":\"CUSTOMER_REQUEST\",\"note\":\"n\"}" | head -c 140; echo
+audit_curl -s -w "  -> A20 illegal target: %{http_code} (want 409 INVALID_TRANSITION)\n" \
+  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+  -H 'Content-Type: application/json' \
+  -d "{\"target\":\"pending\",\"version\":$A20_V,\"reason\":\"WRITTEN_OFF\",\"note\":\"n\"}" | head -c 140; echo
+# A version the order is not at is refused, not silently applied.
+audit_curl -s -w "  -> A20 stale version: %{http_code} (want 409 VERSION_CONFLICT)\n" \
+  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+  -H 'Content-Type: application/json' \
+  -d "{\"target\":\"cancelled\",\"version\":$((A20_V + 5)),\"reason\":\"WRITTEN_OFF\",\"note\":\"n\"}" | head -c 140; echo
+# The decision itself. The body names another actor on purpose: it must be ignored.
+A20_BODY="{\"target\":\"cancelled\",\"version\":$A20_V,\"reason\":\"WRITTEN_OFF\",\"note\":\"a20: refund permanently declined by the provider; closing\",\"actor_id\":\"ignored-by-design\"}"
+audit_curl -s -w "\n  -> A20 resolve: %{http_code} (want 201 applied:true)\n" -X POST \
+  "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+  -H 'Content-Type: application/json' -d "$A20_BODY" | head -c 160
+audit_curl -s -w "\n  -> A20 replay: %{http_code} (want 200 applied:false)\n" -X POST \
+  "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+  -H 'Content-Type: application/json' -d "$A20_BODY" | head -c 160
+# Terminal now, so the command is refused; and the trail says who decided.
+audit_curl -s -o /dev/null -w "A20 resolve again: %{http_code} (want 409 — no longer parked)\n" \
+  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+  -H 'Content-Type: application/json' \
+  -d "{\"target\":\"failed\",\"version\":$((A20_V + 1)),\"reason\":\"WRITTEN_OFF\",\"note\":\"n\"}"
+audit_curl -s -H "Authorization: Bearer $KCT_STAFF" "$BASE/order/v1/protected/orders/$O20" | python3 -c "
+import json,sys
+c = json.load(sys.stdin)
+ops = [r for r in c['status_history'] if r['actor_type'] == 'OPERATOR']
+ok = (c['status'] == 'cancelled' and len(ops) == 1
+      and ops[0]['reason_code'] == 'WRITTEN_OFF'
+      and ops[0]['actor_id'] == 'd0e00000-0000-4000-8000-000000000001'
+      and 'permanently declined' in (ops[0]['note'] or ''))
+print('A20 audit trail:', 'OK' if ok else 'FAIL', c['status'],
+      [(r['from_status'], r['to_status'], r['actor_type']) for r in c['status_history']])"
 ```
 
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
@@ -1523,6 +1648,7 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | A17 | Protected surface (RFC-0023 + ADR-050) | tokenless 401 **at the edge**; bare `/inventory/v1/private/*` 404 (only `/protected` is routed); a valid **customer-realm** token 401 **wrong-issuer at the edge** (the ADR-050 fence — stronger than the old in-service 403); staff operator `duyne` (realm `duynhlab-staff`) lists real balances with derived `atp`; receipt 201 `applied:true`, exact replay 200 `applied:false`, invariant-violating adjustment 409 `STOCK_UNAVAILABLE`; the movement row's `actor` is duyne's staff-realm `sub` (`d0e00000-…-001`) |
 | A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
 | A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
+| A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the nav shows signed-in state; **no JWT-shaped value in localStorage or sessionStorage** (both are empty on this build); the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Login link, no Logout button); a private route afterwards redirects to `/login?returnTo=…` rather than rendering stale data; both storages empty |

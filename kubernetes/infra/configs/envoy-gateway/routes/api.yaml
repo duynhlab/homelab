@@ -138,6 +138,44 @@ spec:
         - name: inventory
           port: 8080
 ---
+# product — protected catalog (RFC-0023 slice B). Staff-realm edge JWT
+# (ADR-050); role gate in-service (ADR-047). The public catalog route above is
+# anonymous and stays that way; this prefix is the operator's write path.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-product-protected
+  namespace: product
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - gateway.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /product/v1/protected
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: product
+          port: 8080
+---
 # order — protected Backoffice reads (RFC-0023 Train 3). Staff-realm edge
 # JWT (ADR-050); role gate in-service (ADR-047).
 apiVersion: gateway.networking.k8s.io/v1

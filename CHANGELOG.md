@@ -176,6 +176,21 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Gateway
+
+- **The protected catalog reaches the edge** (RFC-0023 slice B):
+  `api-product-protected` in both config sets on the shared
+  BackendTrafficPolicy, riding `jwt-edge-staff` — so product's brand-new write
+  surface is staff-only and a customer token dies as wrong-issuer before any
+  role logic. Compose gives product `OIDC_STAFF_*` and makes it wait on
+  Keycloak (it builds a verifier at startup now). Audit row **A19** walks the
+  whole lifecycle through the edge: DRAFT create invisible to the public
+  catalog, duplicate-name 409, publish → public, re-publish 409
+  `INVALID_TRANSITION`, stale edit 409 `VERSION_CONFLICT`, archive 404s the
+  page, and the audit trail carrying the token's subject as actor.
+  `docs/api/product.md` documents the routes and the deliberate status-blind
+  price-read asymmetry.
+
 #### Proposals
 
 - **RFC-0023 slice A is built** — ADR-047/048/049/050 Adoption `Not started` →

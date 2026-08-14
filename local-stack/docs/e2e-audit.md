@@ -732,6 +732,71 @@ done
 # The recon triage view exists and pages (payment's first recon reader):
 audit_curl -s -o /dev/null -w "A18 recon runs: %{http_code} (want 200)\n" \
   -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/payment/v1/protected/reconciliations/runs?page_size=1"
+
+# A19. The protected CATALOG (RFC-0023 slice B) — the first protected surface
+#      that WRITES. Reads prove the fence; the lifecycle proves the guards.
+#      Every command is verified against the staff realm and audited with the
+#      token's subject as actor, so this row also proves that a body-supplied
+#      actor is ignored.
+audit_curl -s -o /dev/null -w "A19 catalog staff-list: %{http_code} (want 200)\n" \
+  -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/product/v1/protected/products?page_size=1"
+audit_curl -s -o /dev/null -w "A19 customer-token: %{http_code} (want 401 wrong-issuer)\n" \
+  -H "Authorization: Bearer $AT" "http://localhost:8080/product/v1/protected/products"
+# Create lands in DRAFT — invisible to the public catalog until published.
+A19_NAME="Audit Widget $(date +%s)"
+A19_CREATE=$(audit_curl -s -X POST http://localhost:8080/product/v1/protected/products \
+  -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
+  -d "{\"name\":\"$A19_NAME\",\"price\":19.99,\"category\":\"Electronics\",\"actor_sub\":\"ignored-by-design\"}")
+A19_ID=$(echo "$A19_CREATE" | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "$A19_CREATE" | python3 -c "
+import json,sys
+p = json.load(sys.stdin)
+print('A19 create:', 'OK' if p['status'] == 'DRAFT' and p['version'] == 1 else 'FAIL', p['id'], p['status'], 'v%s' % p['version'])"
+audit_curl -s -o /dev/null -w "A19 draft not public: %{http_code} (want 404 — DRAFT is invisible)\n" \
+  "http://localhost:8080/product/v1/public/products/$A19_ID"
+# A duplicate name is the conflict that makes a retried create safe.
+audit_curl -s -o /dev/null -w "A19 duplicate name: %{http_code} (want 409)\n" \
+  -X POST http://localhost:8080/product/v1/protected/products \
+  -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
+  -d "{\"name\":\"$A19_NAME\",\"price\":1}"
+# publish → public; a second publish is a refused edge, not a no-op.
+audit_curl -s -o /dev/null -w "A19 publish: %{http_code} (want 200)\n" \
+  -X POST "http://localhost:8080/product/v1/protected/products/$A19_ID/publish" \
+  -H "Authorization: Bearer $KCT_STAFF"
+audit_curl -s -o /dev/null -w "A19 now public: %{http_code} (want 200)\n" \
+  "http://localhost:8080/product/v1/public/products/$A19_ID"
+audit_curl -s -w "  -> A19 re-publish: %{http_code} (want 409 INVALID_TRANSITION)\n" \
+  -X POST "http://localhost:8080/product/v1/protected/products/$A19_ID/publish" \
+  -H "Authorization: Bearer $KCT_STAFF" | head -c 120; echo
+# Optimistic concurrency: the same version cannot win twice.
+audit_curl -s -o /dev/null -w "A19 edit v2: %{http_code} (want 200)\n" \
+  -X PUT "http://localhost:8080/product/v1/protected/products/$A19_ID" \
+  -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
+  -d '{"name":"'"$A19_NAME"' edited","price":21.5,"category":"Electronics","version":2,"reason":"audit"}'
+audit_curl -s -w "  -> A19 stale edit: %{http_code} (want 409 VERSION_CONFLICT)\n" \
+  -X PUT "http://localhost:8080/product/v1/protected/products/$A19_ID" \
+  -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
+  -d '{"name":"overwrite","price":99,"version":2}' | head -c 120; echo
+# archive → the page 404s while the PRICE still resolves (the deliberate
+# asymmetry: a cart holding this product must still price correctly).
+audit_curl -s -o /dev/null -w "A19 archive: %{http_code} (want 200)\n" \
+  -X POST "http://localhost:8080/product/v1/protected/products/$A19_ID/archive" \
+  -H "Authorization: Bearer $KCT_STAFF"
+audit_curl -s -o /dev/null -w "A19 archived page: %{http_code} (want 404)\n" \
+  "http://localhost:8080/product/v1/public/products/$A19_ID"
+podman compose exec -T product true 2>/dev/null || true
+# The audit trail carries the TOKEN's subject, never the body's.
+audit_curl -s -H "Authorization: Bearer $KCT_STAFF" \
+  "http://localhost:8080/product/v1/protected/products/$A19_ID/audit" | python3 -c "
+import json,sys
+rows = json.load(sys.stdin)['items']
+actions = [r['action'] for r in rows]
+actors = {r['actor_sub'] for r in rows}
+ok = actions[:1] == ['ARCHIVE'] and 'CREATE' in actions and actors == {'d0e00000-0000-4000-8000-000000000001'}
+print('A19 audit trail:', 'OK' if ok else 'FAIL', actions, actors)"
+# Categories: list + create + the unique-name conflict.
+audit_curl -s -o /dev/null -w "A19 categories: %{http_code} (want 200)\n" \
+  -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/product/v1/protected/categories?page_size=5"
 ```
 
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
@@ -1428,6 +1493,7 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` workflow behind |
 | A17 | Protected surface (RFC-0023 + ADR-050) | tokenless 401 **at the edge**; bare `/inventory/v1/private/*` 404 (only `/protected` is routed); a valid **customer-realm** token 401 **wrong-issuer at the edge** (the ADR-050 fence — stronger than the old in-service 403); staff operator `duyne` (realm `duynhlab-staff`) lists real balances with derived `atp`; receipt 201 `applied:true`, exact replay 200 `applied:false`, invariant-violating adjustment 409 `STOCK_UNAVAILABLE`; the movement row's `actor` is duyne's staff-realm `sub` (`d0e00000-…-001`) |
 | A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
+| A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the nav shows signed-in state; **no JWT-shaped value in localStorage or sessionStorage** (both are empty on this build); the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Login link, no Logout button); a private route afterwards redirects to `/login?returnTo=…` rather than rendering stale data; both storages empty |

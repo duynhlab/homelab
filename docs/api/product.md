@@ -108,10 +108,43 @@ Money units differ by transport on purpose:
 | `GET` | `/product/v1/public/products` | Public | Paginated catalog with category, search, sort, order filters |
 | `GET` | `/product/v1/public/products/:id` | Public | Get one product |
 | `GET` | `/product/v1/public/products/:id/details` | Public | Aggregate product + inventory-sourced availability + reviews + summary + related products |
-| `POST` | `/product/v1/internal/products` | Internal | Create a product (admin/seed) — **never exposed at either edge**; NetworkPolicy is the fence |
+| `POST` | `/product/v1/internal/products` | Internal | Create a product (admin/seed) — **never exposed at either edge**; NetworkPolicy is the fence. Retirement pending: the protected create below is its governed replacement |
+| `GET` | `/product/v1/protected/products?status=&page=&page_size=` | Backoffice | Operator catalog list — the only read that shows `DRAFT` and `ARCHIVED` |
+| `GET` | `/product/v1/protected/products/:id` | Backoffice | Operator detail in any lifecycle state |
+| `POST` | `/product/v1/protected/products` | Backoffice | Create — lands in **`DRAFT`**; a duplicate name is `409` (which is what makes a retry safe) |
+| `PUT` | `/product/v1/protected/products/:id` | Backoffice | Edit under optimistic concurrency; body carries the `version` read, mismatch → `409 VERSION_CONFLICT` |
+| `POST` | `/product/v1/protected/products/:id/publish` | Backoffice | `DRAFT → ACTIVE`; illegal edge → `409 INVALID_TRANSITION` |
+| `POST` | `/product/v1/protected/products/:id/archive` | Backoffice | `DRAFT\|ACTIVE → ARCHIVED` |
+| `POST` | `/product/v1/protected/products/:id/restore` | Backoffice | `ARCHIVED → ACTIVE` |
+| `GET` | `/product/v1/protected/products/:id/audit` | Backoffice | That product's change history (newest first) |
+| `GET` | `/product/v1/protected/categories` | Backoffice | Flat taxonomy, paginated |
+| `POST` | `/product/v1/protected/categories` | Backoffice | Create; duplicate name → `409` |
+| `PUT` | `/product/v1/protected/categories/:id` | Backoffice | Rename / re-describe. **No delete** — `products.category_id` is `ON DELETE SET NULL`, so a delete would silently uncategorize products |
 
-Both edges expose exactly `/product/v1/public/`, so the internal create has no
-route to match in either environment — see
+### Protected catalog (RFC-0023 slice B)
+
+Product's first authenticated routes. Guard chain: staff-realm edge JWT
+(`jwt-edge-staff`, ADR-050 — a customer token is **wrong-issuer at the edge**),
+then `pkg/authmw` re-verifies in-service and requires `backoffice_admin`
+(ADR-047). The audit actor is the verified token `sub`; a body field claiming to
+be the actor is ignored.
+
+**Lifecycle.** `status ∈ DRAFT | ACTIVE | ARCHIVED`, `version` is the
+concurrency token. Transitions are the three commands above — there is no status
+setter, so an illegal edge is a refusal rather than a silent write. Every command
+commits its `admin_action_audit` row **in the same transaction** as the change.
+
+**The status asymmetry — read this before debugging a "missing" product.**
+Public reads (`ListProducts`, `GetProduct`, `/details`, related products) filter
+`status = 'ACTIVE'`, so an archived product's page **404s**. The gRPC batch price
+read (`BatchGetCurrentPrices` → `FindByIDs`) is deliberately **status-blind** and
+still resolves it: a customer whose cart already holds a product the operator
+archives a second later must still price correctly, and checkout's price
+re-validation — not an empty lookup — is what decides whether the order proceeds.
+Same product, two different answers, on purpose.
+
+Both edges expose `/product/v1/public/` and `/product/v1/protected/`, so the
+internal create still has no route to match in either environment — see
 [api.md § Edge exposure](./api.md#edge-exposure). Until 2026-08-11 local-stack
 routed the bare prefix `/product/`, which made that create reachable with no JWT
 at all. Service paths are identical — Variant A pass-through, no `URLRewrite`

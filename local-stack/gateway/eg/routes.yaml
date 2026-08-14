@@ -211,6 +211,27 @@ spec:
           kind: Backend
           name: product
 ---
+# product — protected catalog (RFC-0023 slice B). Staff-realm edge JWT
+# (jwt-edge-staff); role gate in-service. The public catalog above is anonymous
+# and stays that way; this prefix is the operator's write path.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-product-protected
+spec:
+  parentRefs:
+    - name: platform
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /product/v1/protected
+      backendRefs:
+        - group: gateway.envoyproxy.io
+          kind: Backend
+          name: product
+---
 # cart — private only. Edge JWT. NOT /cart/v1/internal/cart/{userId} (A8).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

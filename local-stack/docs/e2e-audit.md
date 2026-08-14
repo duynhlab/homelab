@@ -1322,14 +1322,18 @@ import json,sys
 want = {'microservices-otel-local','business-otel-local','temporal-worker-local','red-spanmetrics',
         'clickhouse-otel-sql','clickhouse-service-deepdive','clickhouse-otel-overview',
         'clickhouse-logs-explorer','clickhouse-traces-explorer',
-        'clickhouse-server-engine'}
+        'clickhouse-server-engine',
+        # Gateway/ — Envoy Gateway's own dashboards, vendored verbatim from
+        # charts/gateway-addons-helm at the pinned EG tag, uids upstream's:
+        'heHhNSFf6Na8vIZWRs8H','8WkEOMnANKE6PW5hhpVv','bdn8lriao7myoa'}
 got = {d['uid'] for d in json.load(sys.stdin)}
 print('C18 dashboards:', 'OK all ' + str(len(want)) + '' if got == want else f'FAIL missing={sorted(want-got)} extra={sorted(got-want)}')
 raise SystemExit(0 if got == want else 1)"
 for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer \
-         clickhouse-server-engine; do
+         clickhouse-server-engine \
+         heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa; do
   curl -s -o /dev/null -w "C18 $d: %{http_code} (want 200)\n" "$GRAF/api/dashboards/uid/$d"
 done
 
@@ -1355,18 +1359,22 @@ curl -s -X POST "$GRAF/api/ds/query" -H 'Content-Type: application/json' -d '{
 
 # ---- ENGINE-HEALTH SLICE (scrape + alert loop) -------------------------------
 
-# C20. vmagent scrapes both engine-health targets. `up` is the only signal that
+# C20. vmagent scrapes every static target. `up` is the only signal that
 #      says a BACKEND itself is down — everything else in Phase C is telemetry
 #      the backends receive, not telemetry about them. A target that is absent
 #      here means the alert rules in C21 evaluate against nothing and can never
-#      fire, which is invisible until the day they were needed.
+#      fire, which is invisible until the day they were needed. The two envoy
+#      jobs are the edge's halves: `envoy-gateway` is the control plane's own
+#      :19001 metrics, `envoy` is the proxy's native stats through the
+#      bootstrap-merged :19005 listener (gateway/eg/envoyproxy.yaml).
 curl -s http://localhost:8429/api/v1/targets | python3 -c "
 import json, sys
 t = {x['labels']['job']: x['health'] for x in json.load(sys.stdin)['data']['activeTargets']}
-want = {'clickhouse', 'otel-collector'}
+want = {'clickhouse', 'otel-collector', 'envoy-gateway', 'envoy'}
 ok = want <= set(t) and all(t[j] == 'up' for j in want)
-print('C20', 'OK both targets up:' if ok else 'FAIL:', t)"
-# want: C20 OK both targets up: {'clickhouse': 'up', 'otel-collector': 'up'}
+print('C20', 'OK all targets up:' if ok else 'FAIL:', t)"
+# want: C20 OK all targets up: {'clickhouse': 'up', 'otel-collector': 'up',
+#       'envoy-gateway': 'up', 'envoy': 'up'}
 
 # C21. vmalert loaded the ported cluster rules and nothing is firing on a
 #      healthy stack. Eleven names are expected: nine ClickHouse engine rules
@@ -1441,9 +1449,9 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
 | C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
 | C17 | Grafana datasources | `/api/datasources` returns exactly the four expected uid/type pairs and each `/api/datasources/uid/<uid>/health` answers `OK` |
-| C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 9 provisioned uids and each loads via `/api/dashboards/uid/…` with 200 |
+| C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 13 provisioned uids (incl. the three vendored Envoy Gateway dashboards under Gateway/) and each loads via `/api/dashboards/uid/…` with 200 |
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
-| C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows BOTH jobs — `clickhouse` and `otel-collector` — with `health: up`; a missing target means the C21 rules evaluate against nothing |
+| C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all four jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001) and `envoy` (proxy native stats :19005) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **11** rules (9 ClickHouse engine + 2 collector) and zero `firing` on a healthy stack — the count is the tripwire for a silently unmounted rule file |
 
 Any failed row blocks the release tag. Two rows share one root cause and must be

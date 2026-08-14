@@ -30,3 +30,24 @@ scrape_configs:
   - job_name: otel-collector
     static_configs:
       - targets: ["otel-collector:8888"]
+
+  # The edge, both halves (dashboards: Observability/envoy-gateway-local):
+  #
+  # envoy-gateway — the CONTROL PLANE's own metrics server (xds_snapshot_*,
+  # watchable_*, status updater, go_*): is the thing that programs the proxy
+  # healthy and keeping up.
+  - job_name: envoy-gateway
+    static_configs:
+      - targets: ["gateway:19001"]
+
+  # envoy — the DATA PLANE. Native envoy_* stats (downstream rq/cx per
+  # listener, per-cluster upstream rq/latency/membership) served through the
+  # bootstrap-merged :19005 listener (gateway/eg/envoyproxy.yaml) because Host
+  # mode ships no prometheus listener of its own. These are the edge's own
+  # counters, as distinct from the span-derived RED the collector computes;
+  # a request the edge rejects before a span exists (JWT 401, no route) is
+  # visible only here.
+  - job_name: envoy
+    metrics_path: /stats/prometheus
+    static_configs:
+      - targets: ["gateway:19005"]

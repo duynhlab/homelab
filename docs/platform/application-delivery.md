@@ -80,6 +80,7 @@ kubernetes/apps/
 │   ├── notification.yaml          # labels: domain=comms
 │   └── shipping.yaml              # labels: domain=comms
 ├── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
+├── backoffice-rs.yaml             # rs-backoffice (standalone) — operator portal SPA
 ├── mockpay.yaml                   # standalone HelmRelease — mock payment provider (payment ns)
 ├── order-worker.yaml              # standalone HelmRelease — Temporal saga worker (order ns)
 └── checkout-worker.yaml           # standalone HelmRelease — checkout abandonment worker (checkout ns)
@@ -94,6 +95,7 @@ Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
 | `domains/*.yaml` | ResourceSet | Domain-scoped template rendering Namespace + HelmRelease per service |
 | `services/*.yaml` | ResourceSetInputProvider (Static) | Per-service configuration, discovered via label selector |
 | `frontend-rs.yaml` | ResourceSet | Frontend HelmRelease (standalone, different chart values, no DB) |
+| `backoffice-rs.yaml` | ResourceSet | Backoffice portal HelmRelease (standalone, no DB; RFC-0023) |
 
 ### Domain Mapping
 
@@ -104,6 +106,7 @@ Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
 | checkout | `rs-checkout` | cart, checkout, order, payment | product-db (CNPG), purchase flow |
 | comms | `rs-comms` | notification, shipping | platform-db (CNPG), auxiliary services |
 | frontend | `rs-frontend` | frontend | Standalone (React SPA, no DB) |
+| backoffice | `rs-backoffice` | admin-service | Standalone operator portal (React SPA, no DB); staff realm, own host |
 
 ### Label Convention
 
@@ -228,6 +231,7 @@ runtime effect.
    | Checkout | Checkout service pin **and** `kubernetes/apps/checkout-worker.yaml` |
    | Payment | Payment service pin **and** `kubernetes/apps/mockpay.yaml` |
    | Frontend | `kubernetes/apps/frontend-rs.yaml` |
+   | Backoffice portal | `kubernetes/apps/backoffice-rs.yaml` — the tag is only deployable if its build carried the cluster build args (see the file's comment) |
    | Order API | Order service pin; do not edit an existing versioned worker |
    | Order worker | Add a new `order-worker-<build-id>.yaml`, deploy it side by side, then activate it using [RFC-0021 cutover/rollback](../proposals/rfc/RFC-0021/cutover-rollback.md) |
 

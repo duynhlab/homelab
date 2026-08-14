@@ -187,6 +187,16 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # Same shape as `frontend`: a static Nginx bundle, not a domain service, so
+    # no app-tier label — the operator's browser talks to the services through
+    # the edge (ADR-048), never to anything in this namespace.
+  name: backoffice
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
   name: temporal
 ---
 apiVersion: v1

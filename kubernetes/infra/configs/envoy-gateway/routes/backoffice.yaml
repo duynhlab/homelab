@@ -1,0 +1,43 @@
+# Backoffice Admin Portal — https://backoffice.duynh.me (RFC-0023).
+#
+# A separate host from the customer SPA on purpose: the two are different
+# audiences with different identity providers (ADR-050 — this one signs in
+# against the `duynhlab-staff` realm), and one host per audience keeps their
+# cookies, CORS entries, and CIDR posture separable. Only static assets are
+# served here; every API call the operator makes goes to gateway.duynh.me and
+# is guarded there by `jwt-edge-staff` (ADR-047/048).
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backoffice
+  namespace: backoffice
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - backoffice.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: admin-service
+          port: 80

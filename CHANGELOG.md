@@ -117,7 +117,8 @@ Skeleton (copy what you need):
 #### Services
 
 - **The customer storefront is rebuilt on the Backoffice stack** (RFC-0025 /
-  ADR-052, `frontend` **3.0.0**): TanStack Router + Query, TypeScript strict,
+  ADR-052, `frontend` **3.0.0**; the catalog's route moved again in 3.1.0 —
+  see Feature below, and note the cluster is pinned straight to 3.1.0): TanStack Router + Query, TypeScript strict,
   Tailwind v4 + shadcn on Base UI. react-router, SWR, axios, react-hot-toast
   and **both** mock layers are gone — the in-app store and the Playwright
   route mocks — so every screen reads from the live services. Breaking for
@@ -190,6 +191,23 @@ Skeleton (copy what you need):
   requests per second, so a 429 during the audit is a finding, not a pacing error.
 
 ### Feature
+
+#### Services
+
+- **The storefront gets a home page** (`frontend` **3.1.0**, frontend#97). The
+  catalog moves to `/products`; `/` becomes a search box, the real category
+  buckets with real counts, and a way through to everything. It carries **no
+  product rail on purpose** — the platform has no featured flag, no bestseller
+  signal, no rating on a list item, and `created_at` is sortable but never
+  returned, so any such strip would be a label the data cannot support. The
+  category buckets are *derived* from one `?limit=100` read because the only
+  categories endpoint is `backoffice_admin`-gated; honest while the catalog
+  fits in one page, and the query says so.
+  This partly reverses the 3.0.0 route move above — **nothing 404s**: `/products`
+  links from 2.x are correct again and `/` still renders.
+  Also fixed: `/` no longer rewrites itself to `?page=1`. A `.default(1)` on the
+  search schema is not a fallback but a write — the router re-stringifies the
+  validated search and replaces the URL when it differs.
 
 #### Proposals
 

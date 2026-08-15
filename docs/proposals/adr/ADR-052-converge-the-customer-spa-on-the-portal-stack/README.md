@@ -225,7 +225,7 @@ a second migration later at full price.
 | No mocks anywhere | Repository grep: no `VITE_USE_MOCK`, no `page.route(`, no mock auth adapter; Playwright runs against compose |
 | Auth model unchanged | Audit Phase B: PKCE origin change, no JWT-shaped value in either web storage, logout is one GET to end-session with no POST to any service |
 | Contracts unchanged | Phase A A1–A20 pass without modification |
-| Accessibility | axe: no serious or critical violations on every route — catalog (which is now the home page), product detail, cart, checkout, orders, order detail, notifications, profile, login |
+| Accessibility | axe: no serious or critical violations on every route — home, catalog, product detail, cart, checkout, orders, order detail, notifications, profile, login |
 | Atomicity | `main` never contains a half-migrated state — one merge, one tag |
 | Documentation | `docs/api/microservices.md` and the platform docs match the as-built SPA |
 

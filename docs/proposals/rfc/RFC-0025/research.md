@@ -311,20 +311,39 @@ routers, two cache models and two form idioms.
 
 ## Open questions
 
-- [ ] **Toast primitive.** The 30/07 draft rules out Sonner explicitly. The current
-      shadcn registry may only ship a Sonner-backed toast under `base-nova`. If so,
-      the choice is: accept Sonner, hand-write a small toast on Base UI, or drop
-      toasts and use inline status regions. **Owner decision, not an implementation
-      detail.**
-- [ ] **Storefront IA.** Keep all 10 routes, or restructure? Specifically whether
-      the 4-step checkout stays one route with an internal FSM (356 lines today) or
-      becomes nested routes with the step in the URL.
-- [ ] **Dev port.** The repo's Vite dev server is `:3000` while compose publishes
-      the container on `:3001` and Playwright targets `:3000`. The realm allows both
-      as redirect origins. Pick one and make all three agree.
-- [ ] **Dark mode.** The storefront is dark-only today by accident of its
-      "API Test Harness" origins. The portal supports both. Does the redesigned
-      storefront ship light + dark, or commit to one?
+All resolved 2026-08-15 before the RFC opened. Recorded here because the reasoning
+matters more than the answers.
+
+- [x] **Toast primitive — resolved by the docs, not by a trade-off.** The worry was
+      that shadcn's current toast is Sonner-backed, which the owner's 30/07 draft
+      rules out. It is not, for this project: shadcn's composition rule is *"use the
+      project's base toast component for **Base UI** projects, or Sonner for Radix
+      and React Aria projects"* — `toast.add({ title })` from
+      `@/components/ui/toast`. The deprecation notice that pushes people to Sonner
+      lives in the **React Aria** docs. `base-nova` is Base UI, so the constraint is
+      satisfiable natively and no decision was needed. To be confirmed by actually
+      adding the component in R2.
+- [x] **Checkout URL — one route, `?step=` carries intent only.** The step is
+      *derived from `session.status`* (the server FSM), with a `stepOverride` in
+      component state for legally re-entering an earlier state. Putting the step in
+      the path would make the URL a second claim about where the session is, and
+      every one of four routes would need a `beforeLoad` redirect for deep links.
+      Instead `/checkout` stays one route and `?step=` (zod, `.catch()`) records
+      only *"I want to go back and edit the address"*. This also fixes a real bug:
+      the override is `useState` today, so a reload mid-edit loses your place.
+- [x] **Storefront IA — `/` becomes the catalog.** The current `/` is a 43-line hero
+      whose job is a button to `/products`. Merging removes a route, a page and a
+      chunk; `/products` stays as a redirect so existing links survive.
+- [x] **Dev port — 3000 for dev, 3001 for the container. Not a defect.** An earlier
+      draft of this file called the split an inconsistency; re-reading it, the two
+      numbers test two different things — Playwright drives the dev server (as the
+      portal does on :3009), while audit Phase B drives the built container. The
+      realm and the edge CORS already allow both origins. The reason gets written
+      into the repo's AGENTS.md so the next reader does not "fix" it.
+- [x] **Theme — light and dark, following `prefers-color-scheme`.** Tokens are
+      defined once in the portal's shape (`:root` light + `.dark`), with axe run
+      against both. The dark-only look today is an accident of the SPA's
+      "API Test Harness" origins, not a product decision.
 
 ---
 
@@ -382,6 +401,7 @@ costs the same rewrite plus the cost of running two of everything while it happe
 | Portal dependency versions quoted in this file | `admin-service/package.json` + `package-lock.json` | confirmed (locked versions, not ranges) |
 | Customer SPA inventory (files, lines, routes, mock surface) | `frontend/` working tree, 2026-08-15 | confirmed |
 | Edge/realm/compose facts said to be unchanged | `local-stack/compose.yaml`, `gateway/eg/securitypolicy.yaml`, realm twins, `kubernetes/apps/frontend-rs.yaml` | confirmed |
+| "shadcn's toast is Sonner-backed, so the no-Sonner constraint may be unsatisfiable" | Context7 `/shadcn-ui/ui` — composition rules + component docs | **corrected**: Base UI projects use `@/components/ui/toast` (`toast.add`); Sonner is the Radix/React Aria path, and the deprecation notice sits in the React Aria docs |
 
 ---
 

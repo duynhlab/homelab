@@ -180,8 +180,18 @@ choice. Two behaviours are *gained*: request cancellation (there is no
 - Audit Phase B must be rewritten because it asserts on SPA internals (nav labels,
   `/login?returnTo=`, the sign-in button's text, and a comment naming
   `src/api/client.js`). A stale Phase B blocks the release gate.
-- shadcn's toast under `base-nova` may be Sonner-backed, which the owner's earlier
-  draft rules out. Recorded as an open question, not decided here.
+- Local development now needs the compose stack running, because there is no mock
+  mode to fall back on. Already true for the Admin Portal.
+
+### Shape decisions taken with the owner before writing this RFC
+
+| Decision | Chosen | Why |
+|---|---|---|
+| Toast | shadcn's **Base UI** toast (`@/components/ui/toast`, `toast.add`) | Not a trade-off in the end: Sonner is shadcn's Radix/React Aria path; Base UI projects get their own toast, so the "no Sonner" constraint is satisfiable natively |
+| Checkout URL | one `/checkout` route; `?step=` carries **intent**, `session.status` stays the truth | Putting the step in the path makes the URL a second claim about the session and forces a `beforeLoad` redirect on four routes; `?step=` also fixes a live bug — the override is `useState` today, so a reload mid-edit loses your place |
+| Home | `/` becomes the catalog; `/products` redirects | Today's `/` is a 43-line hero whose only job is a button to the catalog |
+| Ports | `:3000` dev (Playwright), `:3001` container (audit Phase B) | The two numbers test two different artifacts — the portal does the same with `:3009`; both origins are already allowed by the realm and the edge CORS |
+| Theme | light + dark, following `prefers-color-scheme` | Tokens defined once in the portal's shape; the dark-only look today is an accident of the SPA's origins, not a product choice |
 
 ## Security considerations
 
@@ -243,6 +253,11 @@ rather than discovered.
 - 2026-08-15 — Research written and gated; RFC opened `provisional` with ADR-052 at
   `Proposed`. Owner decisions recorded up front: full stack (not UI-only), no mocks,
   redesign rather than re-skin, and design direction approved before UI code.
+- 2026-08-15 — All five open questions closed before implementation started (see
+  [research § Open questions](./research.md#open-questions) for the reasoning and
+  § Shape decisions above for the summary). One of them dissolved rather than being
+  decided: shadcn ships a Base UI toast, so the "no Sonner" constraint never
+  conflicted with the preset.
 
 ## Related
 

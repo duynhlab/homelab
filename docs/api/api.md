@@ -325,10 +325,10 @@ Common codes include:
 
 | HTTP | Codes | Meaning |
 |------|-------|---------|
-| `400` | `VALIDATION_ERROR`, `IDEMPOTENCY_KEY_REQUIRED`, `PROMO_INVALID` | Request is malformed or misses a required condition |
+| `400` | `VALIDATION_ERROR`, `IDEMPOTENCY_KEY_REQUIRED` | Request is malformed or misses a required condition |
 | `401` | `UNAUTHORIZED` | Authentication failed |
 | `403` | `FORBIDDEN` | Identity is known but not allowed |
-| `404` | `NOT_FOUND` | Resource does not exist or is intentionally hidden by owner scoping |
+| `404` | `NOT_FOUND`, `PROMO_INVALID` | Resource does not exist or is intentionally hidden by owner scoping |
 | `409` | `CONFLICT`, `INVALID_TRANSITION`, `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `PROMO_EXPIRED`, `PROMO_EXHAUSTED` | Current state conflicts with the requested change |
 | `410` | `SESSION_EXPIRED` | Checkout session existed but its TTL elapsed |
 | `422` | `PAYMENT_DECLINED` | Request is valid but the provider declined it |

@@ -149,7 +149,7 @@ All routes are `private` — the edge's `jwt-edge` SecurityPolicy is the coarse 
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/shipping` | `{"shipping_method": "standard"}` → `shipping_set`. The fee comes from shipping's `GetQuote` (method × destination region) and a flat tax (seeded `tax_rules`, basis points on subtotal + fee) composes the total — all in minor units, recomputed in SQL | `400 VALIDATION_ERROR` unknown method/region; `409 INVALID_TRANSITION` before an address exists; `500 INTERNAL_ERROR` on shipping outage (only create and confirm map upstream failures to `503` + `Retry-After` — a known asymmetry); `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
 | `PUT` | `/checkout/v1/private/checkout/sessions/:id/payment` | `{"payment_method_token": "tok_…"}` → `ready`. Opaque `tok_` references ONLY — PAN-shaped input is rejected **before** any persistence and never echoed (the order/payment rule) | `400 VALIDATION_ERROR` non-tok\_ input; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
 | `POST` | `/checkout/v1/private/checkout/sessions/:id/confirm` | The idempotent order handoff (below). Header `Idempotency-Key` REQUIRED (≤120 chars). **201** with the completed session incl. `order_id`; replays return the cached 201 | `400 IDEMPOTENCY_KEY_REQUIRED`; `409 PRICE_CHANGED` / `409 STOCK_UNAVAILABLE` (session requoted → `shipping_set`, **key not consumed** — re-review and confirm again with the same key); `409 CONFLICT` another confirm in flight; `409 IDEMPOTENCY_CONFLICT` same key, different session; `503` + `Retry-After` order/product transient OR checkout's own datastore unavailable (0.6.1) — retry with the SAME key; `503` + `Retry-After` **with the requoted session attached** when inventory does not track a SKU — the session is dropped back to `shipping_set` first, because that condition is persistent and `confirming` has no exit (see below) |
-| `POST` | `/checkout/v1/private/checkout/sessions/:id/promo` | `{"code"}` attaches a promo after a validated preview (see [Promo codes](#promo-codes-p4-implemented--apply-is-a-preview-confirm-is-the-ledger)) | `400`/`409` promo validation; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
+| `POST` | `/checkout/v1/private/checkout/sessions/:id/promo` | `{"code"}` attaches a promo after a validated preview (see [Promo codes](#promo-codes-p4-implemented--apply-is-a-preview-confirm-is-the-ledger)) | `404 PROMO_INVALID` unknown code; `409 PROMO_EXPIRED` / `409 PROMO_EXHAUSTED` (a spent global cap or per-user limit — `409` here since 0.7.1, matching the confirm gate; it answered `500` before); `409 INVALID_TRANSITION` from a terminal state; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id/promo` | Detach the promo | — |
 | `DELETE` | `/checkout/v1/private/checkout/sessions/:id` | Cancel (idempotent on cancelled AND on a session the timer just expired) | `409 INVALID_TRANSITION` on completed; `503` + `Retry-After: 2` datastore unavailable (0.6.1) |
 
@@ -200,6 +200,13 @@ The discount re-derives from the current components at every totals change
 total never goes negative) and rides `CreateOrder` so the charged total
 equals the session total.
 
+Every preview refusal is a status the shopper can act on: `404 PROMO_INVALID`
+for an unknown code, `409 PROMO_EXPIRED` past its date, `409 PROMO_EXHAUSTED`
+once a global cap or per-user limit is spent. That last one answered
+`500 INTERNAL_ERROR` until 0.7.1 — `respondSessionError` simply had no arm for
+it — so a shopper typing a used-up code was told the service was broken while
+the confirm gate worded the identical condition correctly.
+
 The **authoritative gate is the atomic redemption inside confirm**
 (ADR-022): one transaction, serialized per code (`FOR UPDATE`), with
 `UNIQUE (code, session_id)` as the idempotency anchor evaluated before any
@@ -208,7 +215,9 @@ arbitrary concurrency (race-tested), and an exhausted/expired code at the
 gate strips the promo to `shipping_set` with a `409 PROMO_EXHAUSTED` /
 `409 PROMO_EXPIRED` carrying the fresh session body. The Idempotency-Key
 survives every rejection. Watch `checkout_promo_redeemed_total` vs
-`checkout_promo_rejected_total{reason}`.
+`checkout_promo_rejected_total{reason}` — noting that the rejected counter is
+incremented **only at the confirm gate**, so preview refusals at apply do not
+appear in it and the ratio reads healthier than reality.
 
 ### The confirm flow (P2, implemented) — one order per key, no matter what dies
 

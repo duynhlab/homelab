@@ -18,7 +18,8 @@ feature has, and which technique implements it* — plus data ownership.
 ## 1. Platform shape
 
 11 Go backend services (Go 1.26; ten HTTP APIs plus the gRPC-only inventory
-service) and a React/Vite SPA,
+service) and two React SPAs — the customer storefront and the operator
+Backoffice, on one shared stack since RFC-0025 —
 fronted by **Envoy Gateway pass-through** in both environments; each service follows the
 3-layer `web → logic → core` model and the Variant A URL shape
 `/{service}/v1/{audience}/{resource…}`. The topology diagram and shared
@@ -255,13 +256,17 @@ in sync. **Status** ∈ `Implemented` / `Partial` / `Technical debt` / `No calle
 | **Reconciliation** | `POST /payment/v1/internal/payments/reconciliation/runs` (optional `from`/`through` backfill), `GET …/runs/:id` + 5-min ticker | detect-only ledger comparison **bounded to a time window** asked of both sides, with a completion-gated high-watermark; single-writer via an advisory lease (409 when held); auto-heal flag-gated (`RECON_HEAL_ENABLED`, lost-capture-response class only); hourly retention reaper (30 d) | mockpay ledger | Implemented | ADR-011/012, [ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/), [ADR-036](../proposals/adr/ADR-036-single-writer-lease/) |
 | **Unknown provider outcomes** | — (internal to the money paths) | an UNKNOWN answer parks the intent in `processing` and records the round-trip in `payment_attempts`; it **never triggers the semantic opposite** operation. Resolution re-asks under the ORIGINAL key, on the request path and on a 1-min sweep; callers see `Unavailable`/503 for doubt and `FailedPrecondition` for a decided rejection | mockpay; caller: order-worker | Implemented (RFC-0021 P6) | [ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/) |
 
-### frontend — React SPA
+### frontend — customer storefront SPA
 
-Calls only the gateway at `/{service}/v1/{public,private}/…`; JWT stored in
-`localStorage.authToken` and sent as `Authorization: Bearer`. Uses the
-server-side aggregation endpoints (`/product/v1/public/products/:id/details`,
+Calls only the gateway at `/{service}/v1/{public,private}/…`. **No token is
+stored by the app**: `keycloak-js` holds the access token in adapter memory and
+refreshes it before each call (RFC-0024 P3), and the E2E audit asserts that
+neither web storage holds a JWT-shaped value. Uses the server-side aggregation
+endpoints (`/product/v1/public/products/:id/details`,
 `/order/v1/private/orders/:id/details`) — no client-side orchestration. **gRPC
-is never browser-facing.**
+is never browser-facing.** Shares its stack with the Backoffice since RFC-0025
+(TanStack Router + Query, TypeScript, Tailwind + shadcn); there is no mock
+layer, so every screen reads from the live services.
 
 ---
 

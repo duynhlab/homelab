@@ -519,6 +519,21 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0025 + ADR-052 — converge the customer SPA on the portal stack.** The
+  platform runs two React SPAs whose conventions overlap in purpose and disagree in
+  every detail, and ADR-049 wrote that debt down with a revisit trigger for closing
+  it. This exercises the trigger: the storefront is rewritten onto the Admin
+  Portal's stack (TypeScript strict, TanStack Router/Query/Table/Form + zod,
+  Tailwind v4 + shadcn `base-nova` on Base UI, oxlint) in one cutover, with **both
+  mock layers deleted** and Playwright pointed at the live compose edge. Held still
+  on purpose: keycloak-js and the whole auth model (ADR-043 untouched), the serving
+  container, the four build ARGs, the realm client, the edge, and every backend
+  contract — so the blast radius is `frontend/src` plus `frontend/e2e`, and the
+  rollback is a tag revert. Recorded honestly: every screen is rewritten at once
+  with no unit tests underneath, audit Phase B must be rewritten because it asserts
+  on SPA internals, and deleting the mocks is a one-way door. ADR-049 gains a
+  History row; its decision is unchanged.
+
 - **ADR-051 — trust the operator; the audit trail is the control**: the safety
   review RFC-0023 deferred on 2026-08-10 is decided. An operator resolving a
   parked order acts on judgement the platform cannot check, because the evidence

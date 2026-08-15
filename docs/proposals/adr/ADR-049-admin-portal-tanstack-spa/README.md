@@ -183,6 +183,7 @@ decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Owner selected the TanStack stack during RFC-0023 review (as draft ADR-044, renumbered 049 on 2026-08-11) |
 | 2026-08-13 | Accepted / Not started | Accepted with RFC-0023 |
+| 2026-08-15 | Accepted / Partial | Revisit trigger *"the customer SPA completes a migration onto an overlapping stack"* is being exercised by [RFC-0025](../../rfc/RFC-0025/) / [ADR-052](../ADR-052-converge-the-customer-spa-on-the-portal-stack/). This decision is unchanged — it still governs the Admin Portal — but the negative consequence *"two frontend convention sets … until/unless the customer SPA converges"* is on a path to closing, and the standing "reuse the customer SPA stack" alternative is now moot in the other direction |
 
 ---
-_Last updated: 2026-08-13_
+_Last updated: 2026-08-15 — RFC-0025 exercises the convergence revisit trigger; the decision itself is untouched._

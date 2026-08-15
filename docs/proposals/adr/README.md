@@ -427,6 +427,7 @@ and extend Adoption instead.
 | [ADR-049](ADR-049-admin-portal-tanstack-spa/) | Build the Admin Portal as a separate React SPA on the TanStack stack | Accepted | Partial | [RFC-0023](../rfc/RFC-0023/) |
 | [ADR-050](ADR-050-separate-staff-identity-realm/) | Separate workforce identity from customer identity in a staff realm | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) / [RFC-0023](../rfc/RFC-0023/) |
 | [ADR-051](ADR-051-trusted-operator-resolution/) | Trust the operator and make the audit trail the control | Accepted | Complete | [RFC-0023](../rfc/RFC-0023/) |
+| [ADR-052](ADR-052-converge-the-customer-spa-on-the-portal-stack/) | Converge the customer SPA on the Admin Portal's stack | Proposed | Not started | [RFC-0025](../rfc/RFC-0025/) |
 
 Principles:
 
@@ -437,4 +438,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-14 — ADR-051 accepted (trust the operator; the audit trail is the control), closing the safety review RFC-0023 deferred. ADR-047 Adoption → **Complete** with slice B (product is the sixth and last service in its scope); ADR-048/049/050 stay Partial until the Kind gate verifies the cluster._
+_Last updated: 2026-08-15 — ADR-052 proposed with RFC-0025 (converge the customer SPA on the portal stack), exercising ADR-049's convergence revisit trigger. ADR-051 accepted (trust the operator; the audit trail is the control), closing the safety review RFC-0023 deferred. ADR-047 Adoption → **Complete** with slice B; ADR-048/049/050 stay Partial until the Kind gate verifies the cluster._

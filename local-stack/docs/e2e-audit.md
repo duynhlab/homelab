@@ -1064,7 +1064,9 @@ agent-browser $S --args "--no-sandbox" batch \
 # "Sign in" is a LINK to /login carrying ?redirect= for the page you were on.
 # Use the ref THAT snapshot gave it — read your own, they are per-snapshot:
 agent-browser $S batch "click @e8" "wait 1500" "get url" "snapshot -i"
-# want url http://localhost:3001/login?redirect=%2F and a "Continue to sign in"
+# want url http://localhost:3001/login?redirect=%2F%3Fpage%3D1 — the catalog
+# normalises `page` into its own URL, so the encoded return path carries the
+# search string too — and a "Continue to sign in"
 # button. Take its ref from the snapshot just printed:
 agent-browser $S batch "click @e11" "wait 3000" "get url" "snapshot -i"
 # ASSERTION 1 — the origin changed. `get url` must now be
@@ -1164,7 +1166,11 @@ import json,sys,urllib.parse
 d = json.load(sys.stdin)['data']
 print('B2 grant:', dict(urllib.parse.parse_qsl(d['postData'])).get('grant_type'))"
 done | sort | uniq -c
-agent-browser $S network requests --type xhr --json | python3 -c "
+# `--type fetch`, not xhr: the SPA calls the edge through `fetch` (src/lib/api.ts)
+# since RFC-0025 replaced axios. Filtering on xhr returns an EMPTY counter, and
+# an empty counter fails the check below rather than passing it quietly — but
+# the reason would look like "the API was never called".
+agent-browser $S network requests --type fetch --json | python3 -c "
 import json,sys,collections
 rs = json.load(sys.stdin)['data']['requests']
 api = collections.Counter(r.get('status') for r in rs if ':8080/' in r['url'])

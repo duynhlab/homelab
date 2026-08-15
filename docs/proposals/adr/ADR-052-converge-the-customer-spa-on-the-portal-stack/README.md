@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-15 |
 | **Owners** | `platform` |
 | **Deciders** | `platform owner` |
 | **Scope** | The customer SPA's application architecture: language, routing, server state, forms, styling system, and test truth |
@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0025 trains R1–R7 |
-| **Adoption** | Not started |
+| **Adoption** | Complete |
 
 ## Context
 

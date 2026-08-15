@@ -65,7 +65,12 @@ spec:
     # the token sub as a string UUID end to end (ADR-042), greenfield DB
     # reset per the identity-cutover runbook. Compose E2E audit passed on
     # this code before merge; first fleet deploy goes through the Kind gate.
-    image_tag: "0.7.0" # {"$imagepolicy": "flux-system:checkout:tag"}
+    image_tag: "0.7.1" # {"$imagepolicy": "flux-system:checkout:tag"}
+    # 0.7.1: a promo code whose cap is already spent answers 409 PROMO_EXHAUSTED
+    # at apply, matching the confirm gate; it answered 500 before, which the
+    # storefront could only render as "Service temporarily unavailable"
+    # (checkout-service#66). The local-stack audit's A10 promo-spent row asserts
+    # this, so it FAILS against 0.7.0.
     namespace: checkout
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

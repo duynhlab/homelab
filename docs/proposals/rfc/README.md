@@ -125,7 +125,7 @@ for its own sake.
 | [RFC-0022](RFC-0022/) | Adopt Keycloak as the platform identity provider; retire auth-service (supersedes the custom-issuer portions of [RFC-0009](RFC-0009/)) | platform-wide | P1 | Accepted — **implementation absorbed into [RFC-0024](RFC-0024/)** (design record stands) |
 | [RFC-0023](RFC-0023/) | Basic Backoffice portal (React + TanStack) and the first `protected` business APIs (depends on [RFC-0022](RFC-0022/)) | platform-wide | P2 | Accepted |
 | [RFC-0024](RFC-0024/) | Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover (executes [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | Accepted |
-| [RFC-0025](RFC-0025/) | Converge the customer SPA on the Admin Portal's stack — one cutover, no mocks (exercises [ADR-049](../adr/ADR-049-admin-portal-tanstack-spa/)'s convergence revisit trigger) | service:frontend | P2 | provisional |
+| [RFC-0025](RFC-0025/) | Converge the customer SPA on the Admin Portal's stack — one cutover, no mocks (exercises [ADR-049](../adr/ADR-049-admin-portal-tanstack-spa/)'s convergence revisit trigger) | service:frontend | P2 | implemented |
 
 ## Backlog — candidate RFCs
 
@@ -152,4 +152,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-15 — RFC-0025 opened `provisional` (converge the customer SPA on the portal stack) with ADR-052 at Proposed. RFC-0023 Accepted (Backoffice portal + first `protected` APIs); ADR-047..049 created at Accepted._
+_Last updated: 2026-08-15 — RFC-0025 `implemented`: the storefront cutover shipped as frontend v3.0.0 with ADR-052 Accepted / Adoption Complete. RFC-0023 Accepted (Backoffice portal + first `protected` APIs); ADR-047..049 created at Accepted._

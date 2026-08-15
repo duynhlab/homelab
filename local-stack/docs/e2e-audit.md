@@ -491,6 +491,23 @@ audit_curl -s -o /dev/null -w "A10 promo-bad:  %{http_code} (want 404 PROMO_INVA
 audit_curl -s -o /dev/null -w "A10 promo-exp:  %{http_code} (want 409 PROMO_EXPIRED)\n" \
   -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/promo \
   -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' -d '{"code":"EXPIRED1"}'
+#     A spent cap is a refusal the shopper can act on, so it must answer 409 with
+#     a code the SPA can word — not the 500 it gave until checkout 0.7.1, which
+#     rendered as "Service temporarily unavailable" in the promo field while the
+#     confirm gate worded the identical condition correctly. SCARCE is seeded
+#     with max_redemptions = 5; spending it by hand is deterministic and costs
+#     no extra funnel (apply never counts a use, so it cannot be exhausted
+#     through the API without five confirms). The 409 leaves the session's
+#     existing promo untouched, so the confirm below is unaffected.
+docker compose exec -T postgres psql -U postgres -d checkout -q -c \
+  "UPDATE promo_codes SET redeemed_count = max_redemptions WHERE code = 'SCARCE'"
+audit_curl -s -o /tmp/a10-spent.json \
+  -w "A10 promo-spent: %{http_code} (want 409 PROMO_EXHAUSTED)\n" \
+  -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/promo \
+  -H "Authorization: Bearer $AT0" -H 'Content-Type: application/json' -d '{"code":"SCARCE"}'
+grep -q PROMO_EXHAUSTED /tmp/a10-spent.json \
+  && echo "A10 promo-spent code: OK" \
+  || { echo "A10 promo-spent code: FAIL — $(cat /tmp/a10-spent.json)"; }
 KEY="a10-$(date +%s)"
 C_RAW=$(audit_curl -s -w '\n%{http_code}' -X POST $BASE/checkout/v1/private/checkout/sessions/$SID/confirm \
   -H "Authorization: Bearer $AT0" -H "Idempotency-Key: $KEY")
@@ -1032,22 +1049,26 @@ ref across a page load.
 ```bash
 S="--session audit"      # bash only — see Preconditions
 
-# B1. LOGIN THROUGH THE REALM. The SPA has no password field: LoginPage renders
-#     one button that calls keycloak.login({redirectUri}), which is a FULL-PAGE
-#     redirect to the realm. The credentials are typed on Keycloak's own page at
-#     localhost:8081, so the assertion is partly about the ORIGIN CHANGING.
+# B1. LOGIN THROUGH THE REALM. The SPA has no password field and cannot have
+#     one: the realm's `customer-spa` client has Direct Access Grants disabled.
+#     /login renders a single button that calls keycloak.login({redirectUri}),
+#     a FULL-PAGE redirect to the realm, so the credentials are typed on
+#     Keycloak's own page at localhost:8081 — which makes half of this
+#     assertion about the ORIGIN CHANGING.
 agent-browser $S --args "--no-sandbox" batch \
   "open http://localhost:3001" "wait 2500" "snapshot -i"
 # Compose gives `frontend` only `service_started` on the gateway, so on a freshly
 # recreated stack the SPA can load a few seconds before the edge accepts
 # requests. A first paint with failed API calls is a RETRY, not a failure:
-# reload and re-snapshot. Then click the nav "Login" link, using the ref THAT
-# snapshot gave it (it was @e5 on the run this was written from — read your own):
-agent-browser $S batch "click @e5" "wait 1500" "get url" "snapshot -i"
-# want url http://localhost:3001/login and a single "Sign in with Keycloak" button.
-# Take its ref from the snapshot just printed — it is a different element that
-# also happened to be @e5 here, which is exactly why refs must be re-read:
-agent-browser $S batch "click @e5" "wait 3000" "get url" "snapshot -i"
+# reload and re-snapshot. The landing page IS the catalog, and the header's
+# "Sign in" is a LINK to /login carrying ?redirect= for the page you were on.
+# Use the ref THAT snapshot gave it — read your own, they are per-snapshot:
+agent-browser $S batch "click @e8" "wait 1500" "get url" "snapshot -i"
+# want url http://localhost:3001/login?redirect=%2F%3Fpage%3D1 — the catalog
+# normalises `page` into its own URL, so the encoded return path carries the
+# search string too — and a "Continue to sign in"
+# button. Take its ref from the snapshot just printed:
+agent-browser $S batch "click @e11" "wait 3000" "get url" "snapshot -i"
 # ASSERTION 1 — the origin changed. `get url` must now be
 #   http://localhost:8081/realms/duynhlab/protocol/openid-connect/auth?...
 #   ...response_type=code&code_challenge_method=S256...
@@ -1055,15 +1076,19 @@ agent-browser $S batch "click @e5" "wait 3000" "get url" "snapshot -i"
 # "Password", "Sign In". A password field served from :3001 is a FAILED row.
 agent-browser $S batch "fill @e2 alice" "fill @e4 password123" "click @e3" \
   "wait 3000" "get url"
-# want: back on http://localhost:3001/ (the realm redirect_uri is the SPA root)
-agent-browser $S snapshot -i | grep -E 'Logout|Orders|Profile'
-# ASSERTION 2 — signed-in state: the nav carries Cart/Checkout/Orders/
-# Notifications/Profile/Logout instead of a Login link.
+# want: back on http://localhost:3001/ — the catalog, which is where the
+# ?redirect= said to return to.
+agent-browser $S snapshot -i | grep -E 'Sign out|Orders|Profile'
+# ASSERTION 2 — signed-in state: the header carries Orders, the cart and bell
+# badges, a Profile control (an icon button, aria-label "Profile (alice)") and
+# Sign out, instead of a Sign in link. Checkout appears only when the cart is
+# non-empty, so do not require it here.
 
 # ASSERTION 3 — NO TOKEN IN WEB STORAGE. Enumerate BOTH storages and assert that
-# nothing in either one is JWT-shaped. On this build both are entirely empty
-# after login; the assertion is written against the values, not against known key
-# names, because the point is that no key holds a token whatever it is called.
+# nothing in either one is JWT-shaped. localStorage legitimately holds a `theme`
+# preference, and during a checkout a `checkoutIdemKey:<session-id>` UUID; the
+# assertion is written against the VALUES, not against known key names, because
+# the point is that no key holds a token whatever it is called.
 agent-browser $S storage local get
 agent-browser $S storage session get
 agent-browser $S eval --stdin <<'EVALEOF'
@@ -1106,12 +1131,12 @@ assert 'refresh_token' in body, sorted(body)
 print('B1 OK grant=%s iss=%s sub=%s (str uuid); refresh_token stayed in the response body' \
       % (grant, c['iss'], c['sub']))"
 
-# B2. ADAPTER REFRESH. src/api/client.js calls updateToken(30) BEFORE every
-#     request, so the refresh is pre-emptive: there is no 401-then-retry shape to
-#     observe any more. To see a refresh inside a bounded window, make the access
-#     token short-lived for the duration of this row via a CLIENT-LEVEL override
-#     (the realm default is 900s), then restore it. The alternative is waiting
-#     ~14.5 minutes.
+# B2. ADAPTER REFRESH. src/lib/api.ts awaits auth.getToken(), which calls
+#     updateToken(30), BEFORE every request, so the refresh is pre-emptive:
+#     there is no 401-then-retry shape to observe any more. To see a refresh
+#     inside a bounded window, make the access token short-lived for the
+#     duration of this row via a CLIENT-LEVEL override (the realm default is
+#     900s), then restore it. The alternative is waiting ~14.5 minutes.
 KCA=http://localhost:8081
 ADM=$(curl -s -X POST $KCA/realms/master/protocol/openid-connect/token \
   -d client_id=admin-cli -d username=admin -d password=admin -d grant_type=password \
@@ -1141,7 +1166,11 @@ import json,sys,urllib.parse
 d = json.load(sys.stdin)['data']
 print('B2 grant:', dict(urllib.parse.parse_qsl(d['postData'])).get('grant_type'))"
 done | sort | uniq -c
-agent-browser $S network requests --type xhr --json | python3 -c "
+# `--type fetch`, not xhr: the SPA calls the edge through `fetch` (src/lib/api.ts)
+# since RFC-0025 replaced axios. Filtering on xhr returns an EMPTY counter, and
+# an empty counter fails the check below rather than passing it quietly — but
+# the reason would look like "the API was never called".
+agent-browser $S network requests --type fetch --json | python3 -c "
 import json,sys,collections
 rs = json.load(sys.stdin)['data']['requests']
 api = collections.Counter(r.get('status') for r in rs if ':8080/' in r['url'])
@@ -1183,8 +1212,8 @@ print('B2 override cleared: OK' if not v else 'B2 FAIL: lifespan still %r' % v)"
 #     redirect to the realm, not a POST to any service — no service participates
 #     in sign-out at all, which is the thing to verify.
 agent-browser $S network requests --clear
-agent-browser $S snapshot -i | grep -i 'button "Logout"'   # take the fresh ref
-agent-browser $S batch "click @e14" "wait 3500" "get url"
+agent-browser $S snapshot -i | grep -i 'button "Sign out"'   # take the fresh ref
+agent-browser $S batch "click @e10" "wait 3500" "get url"
 # want: back on http://localhost:3001/
 agent-browser $S network requests | grep 'openid-connect/logout'
 # want ONE line: GET http://localhost:8081/realms/duynhlab/protocol/openid-connect/logout
@@ -1193,12 +1222,18 @@ agent-browser $S network requests | grep 'openid-connect/logout'
 agent-browser $S network requests --method POST | grep -Ei 'logout|:8080/' \
   && echo "B3 FAIL: sign-out touched a service" \
   || echo "B3 OK: no POST to any service during logout"
-agent-browser $S snapshot -i | grep -E 'Login|Logout'
-# want a "Login" link and NO "Logout" button
+agent-browser $S snapshot -i | grep -E 'Sign in|Sign out'
+# want a "Sign in" link and NO "Sign out" button
 agent-browser $S batch "open http://localhost:3001/orders" "wait 3000" "get url"
-# want http://localhost:3001/login?returnTo=%2Forders — the guard redirects, and
-# the page must NOT render a stale order list from before the logout.
-agent-browser $S storage local get     # want: No storage entries
+agent-browser $S read | grep -Ei 'Sign in to see your orders|Order #'
+# ASSERTION — a private route after sign-out must not render what the previous
+# session could see. It answers with a sign-in prompt IN PLACE ("Sign in to see
+# your orders") and stays on /orders; it does not bounce to /login. That is a
+# deliberate change from the pre-RFC-0025 shell, which redirected: the property
+# being audited is that no stale order list survives the logout, and an
+# in-place prompt satisfies it without the redirect round-trip. A line matching
+# `Order #` here is a FAILED row.
+agent-browser $S storage local get     # want: only `theme`, if anything
 agent-browser $S storage session get   # want: No storage entries
 
 # B4. Cleanup
@@ -1678,9 +1713,9 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
 | A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
-| B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the nav shows signed-in state; **no JWT-shaped value in localStorage or sessionStorage** (both are empty on this build); the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
+| B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Orders, Profile, Sign out); **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
-| B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Login link, no Logout button); a private route afterwards redirects to `/login?returnTo=…` rather than rendering stale data; both storages empty |
+| B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |
 | B4 | Browser cleanup | the agent-browser session is closed, so a later run starts from a clean profile |
 | C1 | Collector | 0 export failures / error lines |
 | C2 | Edge span is the trace root | the discovery query returns exactly one non-application service name (`platform.envoy-gateway-system`, derived by Envoy Gateway from `<gateway>.<namespace>` — discovered, not assumed) and the ROOT span of the tagged request is the edge's `ingress` Server span; the `deployment.environment.name=local` customTag corroborates it |
@@ -1737,7 +1772,7 @@ evidence table too, not just service and `pkg` changes.
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A14 + A16 API contract | PASS / FAIL | |
+| A | A1–A14 + A16–A20 API contract | PASS / FAIL | |
 | A | A15 versioning drill | PASS / FAIL / N/A | |
 | B | B1–B4 real browser | PASS / FAIL | |
 | C | C1–C21 telemetry + engine-health loop | PASS / FAIL | |
@@ -1783,7 +1818,20 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-08-12 — makes a from-scratch stack recreation mandatory for
+_Last updated: 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
+RFC-0025: the catalog is the landing page, the header's "Sign in" is a link to
+`/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
+storage assertion now names the legitimate residents (`theme`, and a
+`checkoutIdemKey:<uuid>` during a checkout) while still failing on anything
+JWT-shaped. B3 changes what it asserts, not how strictly: a private route after
+sign-out renders a sign-in prompt **in place** rather than bouncing to `/login`,
+so the row now checks the property that mattered — that no order data from the
+previous session survives — instead of the redirect that used to carry it. A10
+gains a spent-cap row: a promo whose redemptions are used up answers `409
+PROMO_EXHAUSTED`, which it did not before checkout-service 0.7.1. The evidence
+table's Phase A line said `A1–A14 + A16`, three rows behind the audit itself._
+
+_Previously, 2026-08-12 — makes a from-scratch stack recreation mandatory for
 every run and rewrites the two phases that had drifted from reality. **Phase B**
 is rebuilt around the browser's real identity flow: the SPA has no credential
 form, so B1 asserts the redirect to the realm's own login page, that no

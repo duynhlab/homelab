@@ -137,7 +137,8 @@ flowchart TB
 
 Only the dashed node changes. The edge, the realm, the services and the serving
 container are the same before and after — which is what keeps the blast radius
-inside `frontend/src` and `frontend/e2e`.
+inside `frontend/src` and the Playwright suite (which moved from `frontend/e2e`
+to `frontend/tests` with the mocks it depended on).
 
 ## Design Details
 

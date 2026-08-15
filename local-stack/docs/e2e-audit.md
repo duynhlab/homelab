@@ -845,7 +845,10 @@ for cents in range(1000, 9999):
     total = round(sub + 3.0 + tax, 2)
     if round(total * 100) % 100 == 7:
         print('%.2f' % sub); break")
-A20_NAME="A20 Refund Trap $(date +%s)"
+# No digits beyond the timestamp: order refuses a product_name with 12+ total
+# digits as suspected card data (the same rule as the payment-token guard), and
+# an epoch already spends ten of them.
+A20_NAME="Refund Trap $(date +%s)"
 A20_PID=$(audit_curl -s -X POST http://localhost:8080/product/v1/protected/products \
   -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
   -d "{\"name\":\"$A20_NAME\",\"price\":$A20_PRICE,\"category\":\"Electronics\"}" \
@@ -859,8 +862,15 @@ audit_curl -s -o /dev/null -w "A20 stock receipt: %{http_code} (want 201)\n" -X 
   http://localhost:8080/inventory/v1/protected/receipts \
   -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json' \
   -d "{\"command_id\":\"a20-rcpt-$(date +%s)\",\"sku_id\":\"$A20_PID\",\"warehouse_id\":1,\"quantity\":5,\"reason\":\"a20 arm\"}"
-# One clean checkout on that product, as its own user so no session is adopted.
+# One clean checkout on that product, as its own user (carol) so A9/A10's alice
+# session is not adopted. Clear anything carol left behind for the same reason:
+# one active session per user is a partial unique index, so a leftover session
+# would be ADOPTED by the POST below and arrive already mid-confirm.
 AT20=$(USERNAME=carol $KCT)
+OLD20=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT20" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+[ -n "$OLD20" ] && audit_curl -s -o /dev/null -X DELETE \
+  $BASE/checkout/v1/private/checkout/sessions/$OLD20 -H "Authorization: Bearer $AT20"
 audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT20"
 audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT20" \
   -H 'Content-Type: application/json' \
@@ -881,8 +891,20 @@ audit_curl -s -o /dev/null -X PUT $BASE/checkout/v1/private/checkout/sessions/$S
 O20=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions/$S20/confirm \
   -H "Authorization: Bearer $AT20" -H "Idempotency-Key: a20-$(date +%s)" \
   | python3 -c "import json,sys;print(json.load(sys.stdin)['order_id'])")
-# Cancel: the refund is declined, so the compensation parks the order.
-audit_curl -s -o /dev/null -X POST "$BASE/order/v1/private/orders/$O20/cancel" -H "Authorization: Bearer $AT20"
+# Wait for the saga to reach a cancellable state. A USER may open a cancellation
+# episode from `confirmed` or `completed` only — NOT from `pending` — so
+# cancelling straight after the confirm races the saga and 409s.
+for _ in $(seq 1 20); do
+  A20_PRE=$(audit_curl -s -H "Authorization: Bearer $KCT_STAFF" \
+    "$BASE/order/v1/protected/orders/$O20" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])")
+  case "$A20_PRE" in confirmed|completed) break ;; esac
+  sleep 3
+done
+echo "A20 cancellable: $A20_PRE (want confirmed or completed)"
+# Cancel: the refund is declined, so the compensation parks the order. The status
+# code is asserted, not discarded — a refused cancel is why nothing would park.
+audit_curl -s -o /dev/null -w "A20 cancel: %{http_code} (want 202 — episode opened)\n" \
+  -X POST "$BASE/order/v1/private/orders/$O20/cancel" -H "Authorization: Bearer $AT20"
 for i in $(seq 1 40); do
   A20_STATUS=$(audit_curl -s -H "Authorization: Bearer $KCT_STAFF" \
     "$BASE/order/v1/protected/orders/$O20" | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])")
@@ -915,27 +937,34 @@ audit_curl -s -o /dev/null -w "A20 customer-token: %{http_code} (want 401 wrong-
 audit_curl -s -o /dev/null -w "A20 no note: %{http_code} (want 400)\n" \
   -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
   -H 'Content-Type: application/json' -d "{\"target\":\"cancelled\",\"version\":$A20_V,\"reason\":\"WRITTEN_OFF\",\"note\":\"\"}"
-audit_curl -s -w "  -> A20 foreign reason: %{http_code} (want 400 — CUSTOMER_REQUEST is not a resolution)\n" \
-  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
-  -H 'Content-Type: application/json' \
-  -d "{\"target\":\"cancelled\",\"version\":$A20_V,\"reason\":\"CUSTOMER_REQUEST\",\"note\":\"n\"}" | head -c 140; echo
-audit_curl -s -w "  -> A20 illegal target: %{http_code} (want 409 INVALID_TRANSITION)\n" \
-  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
-  -H 'Content-Type: application/json' \
-  -d "{\"target\":\"pending\",\"version\":$A20_V,\"reason\":\"WRITTEN_OFF\",\"note\":\"n\"}" | head -c 140; echo
+# One helper for the rest of the row. The status code goes LAST on its own line
+# and the body is parsed, never truncated: a `head -c` on the response drops the
+# curl -w marker whenever the body is long, which silently hides the assertion.
+a20_resolve() {  # $1 = label, $2 = want, $3 = json body, $4 = jq-ish field to show
+  local out code body
+  out=$(audit_curl -s -w '\n%{http_code}' -X POST \
+    "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
+    -H 'Content-Type: application/json' -d "$3")
+  code=$(printf '%s' "$out" | tail -1)
+  body=$(printf '%s' "$out" | sed '$d')
+  printf 'A20 %s: %s (want %s) %s\n' "$1" "$code" "$2" \
+    "$(printf '%s' "$body" | python3 -c "
+import json,sys
+try: d = json.load(sys.stdin)
+except Exception: print(''); raise SystemExit
+print(d.get('$4', ''))" 2>/dev/null)"
+}
+a20_resolve "foreign reason" "400 VALIDATION_ERROR (CUSTOMER_REQUEST is not a resolution)" \
+  "{\"target\":\"cancelled\",\"version\":$A20_V,\"reason\":\"CUSTOMER_REQUEST\",\"note\":\"n\"}" code
+a20_resolve "illegal target" "409 INVALID_TRANSITION" \
+  "{\"target\":\"pending\",\"version\":$A20_V,\"reason\":\"WRITTEN_OFF\",\"note\":\"n\"}" code
 # A version the order is not at is refused, not silently applied.
-audit_curl -s -w "  -> A20 stale version: %{http_code} (want 409 VERSION_CONFLICT)\n" \
-  -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
-  -H 'Content-Type: application/json' \
-  -d "{\"target\":\"cancelled\",\"version\":$((A20_V + 5)),\"reason\":\"WRITTEN_OFF\",\"note\":\"n\"}" | head -c 140; echo
+a20_resolve "stale version" "409 VERSION_CONFLICT" \
+  "{\"target\":\"cancelled\",\"version\":$((A20_V + 5)),\"reason\":\"WRITTEN_OFF\",\"note\":\"n\"}" code
 # The decision itself. The body names another actor on purpose: it must be ignored.
 A20_BODY="{\"target\":\"cancelled\",\"version\":$A20_V,\"reason\":\"WRITTEN_OFF\",\"note\":\"a20: refund permanently declined by the provider; closing\",\"actor_id\":\"ignored-by-design\"}"
-audit_curl -s -w "\n  -> A20 resolve: %{http_code} (want 201 applied:true)\n" -X POST \
-  "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
-  -H 'Content-Type: application/json' -d "$A20_BODY" | head -c 160
-audit_curl -s -w "\n  -> A20 replay: %{http_code} (want 200 applied:false)\n" -X POST \
-  "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \
-  -H 'Content-Type: application/json' -d "$A20_BODY" | head -c 160
+a20_resolve "resolve" "201 applied:true"  "$A20_BODY" applied
+a20_resolve "replay"  "200 applied:false" "$A20_BODY" applied
 # Terminal now, so the command is refused; and the trail says who decided.
 audit_curl -s -o /dev/null -w "A20 resolve again: %{http_code} (want 409 — no longer parked)\n" \
   -X POST "$BASE/order/v1/protected/orders/$O20/resolve" -H "Authorization: Bearer $KCT_STAFF" \

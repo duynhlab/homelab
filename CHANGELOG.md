@@ -996,6 +996,15 @@ Skeleton (copy what you need):
   The Kind gate would otherwise have passed a portal missing the whole of
   slice B.
 
+- **Train 7 pinned together: order `2.2.0` + Admin Portal `0.3.0`.** The portal's
+  case view reads `version` and `status_history`, which only the newer
+  order-service returns, so pinning the portal alone would ship a Resolve button
+  that sends an undefined version. **order-worker stays where it is**: nothing
+  under `internal/saga` or `internal/fulfillment` changed, the workflow
+  definition is byte-identical, and only operator commands take the new path.
+  Gated on the full compose E2E audit (A1–A20, B1–B4, C 0 FAIL, Playwright
+  18/18) run against this code before the tags were cut.
+
 - **Fleet pinned to the RFC-0024 identity cutover** (2026-08-13): the seven
   authmw consumers take a MAJOR — user/cart/review/notification/payment/order
   **2.0.0**, checkout **0.7.0** — because the release is breaking twice over:

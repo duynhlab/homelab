@@ -46,7 +46,10 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/admin-service/admin-service
-            tag: "0.2.0" # {"$imagepolicy": "flux-system:admin-service:tag"}
+            # 0.3.0 must not land before order 2.2.0: the case view reads
+            # `version` and `status_history`, which only the newer order-service
+            # returns. Both pins move in the same change for that reason.
+            tag: "0.3.0" # {"$imagepolicy": "flux-system:admin-service:tag"}
             pullPolicy: IfNotPresent
           # mop >=0.14: the HTTP port pair lives under service.http — this is
           # an Nginx image listening on 80, and the chart default 8080 would

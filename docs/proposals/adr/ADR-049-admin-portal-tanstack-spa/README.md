@@ -185,5 +185,7 @@ decision requires a new ADR that supersedes this one.
 | 2026-08-13 | Accepted / Not started | Accepted with RFC-0023 |
 | 2026-08-15 | Accepted / Partial | Revisit trigger *"the customer SPA completes a migration onto an overlapping stack"* is being exercised by [RFC-0025](../../rfc/RFC-0025/) / [ADR-052](../ADR-052-converge-the-customer-spa-on-the-portal-stack/). This decision is unchanged — it still governs the Admin Portal — but the negative consequence *"two frontend convention sets … until/unless the customer SPA converges"* is on a path to closing, and the standing "reuse the customer SPA stack" alternative is now moot in the other direction |
 
+| 2026-08-15 | Accepted / Complete | The convergence landed: the customer SPA shipped as `frontend` v3.0.0 on this stack ([RFC-0025](../../rfc/RFC-0025/) / [ADR-052](../ADR-052-converge-the-customer-spa-on-the-portal-stack/)). The negative consequence *"two frontend convention sets … until/unless the customer SPA converges"* is **closed** — there is one set now. The Alternatives text below still describes the customer SPA as react-router/SWR because that is what it was when this decision was made; it is a record, not a claim about today |
+
 ---
-_Last updated: 2026-08-15 — RFC-0025 exercises the convergence revisit trigger; the decision itself is untouched._
+_Last updated: 2026-08-15 — the customer SPA converged (frontend v3.0.0), closing this ADR's two-convention-sets consequence; the decision itself is untouched._

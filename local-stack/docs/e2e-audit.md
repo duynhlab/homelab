@@ -1060,14 +1060,16 @@ agent-browser $S --args "--no-sandbox" batch \
 # Compose gives `frontend` only `service_started` on the gateway, so on a freshly
 # recreated stack the SPA can load a few seconds before the edge accepts
 # requests. A first paint with failed API calls is a RETRY, not a failure:
-# reload and re-snapshot. The landing page IS the catalog, and the header's
-# "Sign in" is a LINK to /login carrying ?redirect= for the page you were on.
+# reload and re-snapshot. The landing page is the HOME page — a search box and
+# the category buckets, no product grid — and the header's "Sign in" is a LINK
+# to /login carrying ?redirect= for the page you were on.
 # Use the ref THAT snapshot gave it — read your own, they are per-snapshot:
 agent-browser $S batch "click @e8" "wait 1500" "get url" "snapshot -i"
-# want url http://localhost:3001/login?redirect=%2F%3Fpage%3D1 — the catalog
-# normalises `page` into its own URL, so the encoded return path carries the
-# search string too — and a "Continue to sign in"
-# button. Take its ref from the snapshot just printed:
+# want url http://localhost:3001/login?redirect=%2F — the home page writes no
+# search params, so the encoded return path is just the root. (A `page=1` here
+# would be the regression 3.1.0 fixed: a schema default that the router wrote
+# into the address bar before anyone had paged.) The snapshot must show a
+# "Continue to sign in" button — take its ref from the one just printed:
 agent-browser $S batch "click @e11" "wait 3000" "get url" "snapshot -i"
 # ASSERTION 1 — the origin changed. `get url` must now be
 #   http://localhost:8081/realms/duynhlab/protocol/openid-connect/auth?...
@@ -1076,7 +1078,7 @@ agent-browser $S batch "click @e11" "wait 3000" "get url" "snapshot -i"
 # "Password", "Sign In". A password field served from :3001 is a FAILED row.
 agent-browser $S batch "fill @e2 alice" "fill @e4 password123" "click @e3" \
   "wait 3000" "get url"
-# want: back on http://localhost:3001/ — the catalog, which is where the
+# want: back on http://localhost:3001/ — the home page, which is where the
 # ?redirect= said to return to.
 agent-browser $S snapshot -i | grep -E 'Sign out|Orders|Profile'
 # ASSERTION 2 — signed-in state: the header carries Orders, the cart and bell
@@ -1713,7 +1715,7 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
 | A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
-| B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Orders, Profile, Sign out); **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
+| B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |
 | B4 | Browser cleanup | the agent-browser session is closed, so a later run starts from a clean profile |
@@ -1819,7 +1821,7 @@ a passing decision, continue with the
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
 _Last updated: 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
-RFC-0025: the catalog is the landing page, the header's "Sign in" is a link to
+RFC-0025: the header's "Sign in" is a link to
 `/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
 storage assertion now names the legitimate residents (`theme`, and a
 `checkoutIdemKey:<uuid>` during a checkout) while still failing on anything

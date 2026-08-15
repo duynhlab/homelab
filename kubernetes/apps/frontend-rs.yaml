@@ -46,8 +46,22 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
-            tag: "2.0.0" # {"$imagepolicy": "flux-system:frontend:tag"}
-            # 1.2.1: one paced, jittered retry on 503 + Retry-After in the checkout funnel (frontend#84). Also picks up the 1.2.0 single-entry checkout that was released but never repinned.
+            tag: "3.1.0" # {"$imagepolicy": "flux-system:frontend:tag"}
+            # 3.0.0 converged the storefront on the Backoffice stack — TanStack
+            # Router + Query, TypeScript, Tailwind + shadcn, no mock layer at all
+            # (RFC-0025 / ADR-052, frontend#96). It is skipped here on purpose:
+            # this pin was still open when 3.1.0 landed, so no cluster ever ran
+            # 3.0.0 and there is nothing to step through.
+            #
+            # 3.1.0 gives the storefront a home page (frontend#97). The catalog
+            # moves to /products and / becomes a search box plus the category
+            # buckets; the address bar no longer carries ?page=1 on a plain
+            # visit. Nothing 404s in either direction: /products links from 2.x
+            # are correct again and / still renders.
+            #
+            # Serving is unchanged across both — same nginx image shape, same
+            # build args, same HTTPRoute PathPrefix: /.
+            # Rollback: repin 2.0.0; nothing else moves with it.
             pullPolicy: IfNotPresent
           # mop >=0.14 values schema: the HTTP port pair lives under
           # service.http (the old top-level port/targetPort/containerPort keys

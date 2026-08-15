@@ -61,6 +61,7 @@ Skeleton (copy what you need):
 - ...
 
 ### Bugfix
+
 #### <Component>
 - ...
 
@@ -114,6 +115,21 @@ Skeleton (copy what you need):
   rewritten for the split.
 
 #### Services
+
+- **The customer storefront is rebuilt on the Backoffice stack** (RFC-0025 /
+  ADR-052, `frontend` **3.0.0**; the catalog's route moved again in 3.1.0 —
+  see Feature below, and note the cluster is pinned straight to 3.1.0): TanStack Router + Query, TypeScript strict,
+  Tailwind v4 + shadcn on Base UI. react-router, SWR, axios, react-hot-toast
+  and **both** mock layers are gone — the in-app store and the Playwright
+  route mocks — so every screen reads from the live services. Breaking for
+  links: the catalog moved from `/products` to `/` (which redirects) and the
+  login redirect parameter is `?redirect=`, not `?returnTo=`. Serving is
+  unchanged: same nginx image shape, same build args, same HTTPRoute
+  `PathPrefix: /`; rollback is repinning 2.0.0 on its own. Fixed in passing:
+  `check.yml` used a `- parallel:` step key, which is not GitHub Actions
+  syntax, so Lint and Build had **never run on a frontend PR**, and the
+  Keycloak adapter imported the mock seed, shipping demo user data in every
+  production bundle.
 
 - **auth-service's cluster surface is deleted** (RFC-0024 P5): the app
   manifest (`apps/services/auth.yaml`), the `auth` namespace, the `auth`
@@ -175,6 +191,23 @@ Skeleton (copy what you need):
   requests per second, so a 429 during the audit is a finding, not a pacing error.
 
 ### Feature
+
+#### Services
+
+- **The storefront gets a home page** (`frontend` **3.1.0**, frontend#97). The
+  catalog moves to `/products`; `/` becomes a search box, the real category
+  buckets with real counts, and a way through to everything. It carries **no
+  product rail on purpose** — the platform has no featured flag, no bestseller
+  signal, no rating on a list item, and `created_at` is sortable but never
+  returned, so any such strip would be a label the data cannot support. The
+  category buckets are *derived* from one `?limit=100` read because the only
+  categories endpoint is `backoffice_admin`-gated; honest while the catalog
+  fits in one page, and the query says so.
+  This partly reverses the 3.0.0 route move above — **nothing 404s**: `/products`
+  links from 2.x are correct again and `/` still renders.
+  Also fixed: `/` no longer rewrites itself to `?page=1`. A `.default(1)` on the
+  search schema is not a fallback but a write — the router re-stringifies the
+  validated search and replaces the URL when it differs.
 
 #### Proposals
 
@@ -662,6 +695,29 @@ Skeleton (copy what you need):
   explicitly validates the chain-excluded `controllers/keycloak` overlay.
 
 ### Bugfix
+
+#### Services
+
+- **A spent promo code answers `409 PROMO_EXHAUSTED` at apply**, not `500`
+  (`checkout-service` **0.7.1**, checkout-service#66). `respondSessionError`
+  had arms for every other promo error, so an exhausted cap fell to the
+  default — while the confirm gate had always answered 409 for the identical
+  condition. The storefront could only render that 500 as "Service
+  temporarily unavailable" in the promo field. The HTTP layer had no
+  apply-promo coverage and could not have had: the test fake's promo carried
+  neither cap, so neither exhausted branch was reachable from a request.
+
+#### Docs
+
+- **`docs/api/` corrected against three verified runtime behaviours.**
+  `PROMO_INVALID` was filed under `400`; the service answers `404`, and the
+  E2E audit has asserted 404 since it was written. The apply-promo row
+  described its failures as "`400`/`409` promo validation", naming neither
+  the 404 nor the 500 that a spent cap produced. And `microservices.md` still
+  said the SPA keeps a JWT in `localStorage.authToken` — untrue since the
+  RFC-0024 identity cutover, and contradicted by audit row B1. Also noted:
+  `checkout_promo_rejected_total` counts only confirm-gate rejections, so the
+  ratio reads healthier than reality.
 
 #### GitOps
 

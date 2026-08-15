@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | service:frontend | [./research.md](./research.md) — gate passed 2026-08-15 | 2026-08-15 | 2026-08-15 |
+| implemented | service:frontend | [./research.md](./research.md) — gate passed 2026-08-15 | 2026-08-15 | 2026-08-15 |
 
 > **Every decision is a tradeoff.** This one buys a single frontend convention set
 > and pays for it by rewriting every screen of the storefront at once, with no unit
@@ -237,7 +237,7 @@ rather than discovered.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Converge the customer SPA on the Admin Portal's stack, in one cutover, with no mock layer | [ADR-052](../../adr/ADR-052-converge-the-customer-spa-on-the-portal-stack/) | Proposed |
+| Converge the customer SPA on the Admin Portal's stack, in one cutover, with no mock layer | [ADR-052](../../adr/ADR-052-converge-the-customer-spa-on-the-portal-stack/) | Accepted |
 
 ## Implementation History
 

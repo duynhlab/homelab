@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-15 |
 | **Owners** | `platform` |
 | **Deciders** | `platform owner` |
 | **Scope** | The customer SPA's application architecture: language, routing, server state, forms, styling system, and test truth |
@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0025 trains R1–R7 |
-| **Adoption** | Not started |
+| **Adoption** | Complete |
 
 ## Context
 
@@ -225,7 +225,7 @@ a second migration later at full price.
 | No mocks anywhere | Repository grep: no `VITE_USE_MOCK`, no `page.route(`, no mock auth adapter; Playwright runs against compose |
 | Auth model unchanged | Audit Phase B: PKCE origin change, no JWT-shaped value in either web storage, logout is one GET to end-session with no POST to any service |
 | Contracts unchanged | Phase A A1–A20 pass without modification |
-| Accessibility | axe: no serious or critical violations on every route — catalog (which is now the home page), product detail, cart, checkout, orders, order detail, notifications, profile, login |
+| Accessibility | axe: no serious or critical violations on every route — home, catalog, product detail, cart, checkout, orders, order detail, notifications, profile, login |
 | Atomicity | `main` never contains a half-migrated state — one merge, one tag |
 | Documentation | `docs/api/microservices.md` and the platform docs match the as-built SPA |
 

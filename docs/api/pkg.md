@@ -1,6 +1,6 @@
 # Shared Go Library (`pkg`)
 
-Thirteen independently tagged Go modules carrying the platform's middleware,
+Fourteen independently tagged Go modules carrying the platform's middleware,
 observability wiring, database helpers, and the versioned east-west protobuf
 contracts. A service pins only the modules it imports, and each moves on its own
 release line.
@@ -8,12 +8,12 @@ release line.
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **Repository** | [`duynhlab/pkg`](https://github.com/duynhlab/pkg) | — |
-| **Modules** | **13**, one per package — `github.com/duynhlab/pkg/<module>`. There is **no root `go.mod`**, and one must never be re-created | — |
-| **Newest tags** | `v0.37.0` for `authmw idempotency proto` (RFC-0024 P3 identity cutover) · `v0.36.1` for `dbx grpcx httpx migratex obsx temporalx` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` | — |
+| **Modules** | **14**, one per package — `github.com/duynhlab/pkg/<module>`. There is **no root `go.mod`**, and one must never be re-created | — |
+| **Newest tags** | `v0.37.1` for `obsx` (span helpers) · `v0.37.0` for `authmw idempotency proto` (RFC-0024 P3 identity cutover) · `v0.36.1` for `dbx grpcx httpx migratex temporalx` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` · `v0.1.0` for `httpmw`, which starts its own line | — |
 | **Single-module line** | Frozen at `v0.35.0` (2026-08-06). **No plain `v0.36.x` tag exists** | — |
 | **Consumers** | 11 Go services (the frontend SPA does not use it) | — |
 | **Bump mechanics** | Per module: `go get github.com/duynhlab/pkg/<module>@vX.Y.Z` | — |
-| **Design records** | — | [RFC-0014](../proposals/rfc/RFC-0014/) (obsx) · [RFC-0017](../proposals/rfc/RFC-0017/) (dbx, TraceContext) · [RFC-0021](../proposals/rfc/RFC-0021/) (flagx, inventory/product contracts) · [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) (layering, proposed `httpmw`) |
+| **Design records** | — | [RFC-0014](../proposals/rfc/RFC-0014/) (obsx) · [RFC-0017](../proposals/rfc/RFC-0017/) (dbx, TraceContext) · [RFC-0021](../proposals/rfc/RFC-0021/) (flagx, inventory/product contracts) · [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) (layering, `httpmw`) |
 
 ## Overview
 
@@ -45,7 +45,7 @@ they create hidden tag-ordering constraints.
 ```mermaid
 flowchart TD
   L2["<b>Layer 2 — terminal</b><br/>obsx · dbx · migratex · temporalx<br/><i>no module may import these</i>"]
-  L1["<b>Layer 1 — building blocks</b><br/>httpx · grpcx · authmw · idempotency"]
+  L1["<b>Layer 1 — building blocks</b><br/>httpx · grpcx · httpmw · authmw · idempotency"]
   L0["<b>Layer 0 — foundation</b><br/>proto · logger/zapx · logger/zerolog · logger/clog · flagx<br/><i>zero internal dependencies</i>"]
   L2 -->|may import| L1
   L1 -->|may import| L0
@@ -67,9 +67,10 @@ once broken.
 The rule that bites: **`obsx` is Layer 2, so no shared module can call it.** A
 shared HTTP middleware that wants trace context must build the field from the
 OpenTelemetry **API**, which Layer 1 may import. [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/)
-works that through for the proposed `httpmw`, and `grpcx` is already living the
-consequence — see the finding in
-[audit-2026-08-07](../observability/audit-2026-08-07.md).
+works that through, and both Layer 1 middleware now live the consequence:
+`grpcx` inlined its trace-id helper, and `httpmw` carries its own five-line copy
+of the trace-context field rather than opening the first cross-module edge — see
+the finding in [audit-2026-08-07](../observability/audit-2026-08-07.md).
 
 Authoritative per-package detail lives in the repo's own
 [`README`](https://github.com/duynhlab/pkg#packages) and `AGENTS.md`; this page is
@@ -83,11 +84,12 @@ the platform-side summary and the release ledger.
 | `dbx` | 2 | pgx pools pre-wired with OTel (otelpgx tracing + pool-stat metrics), transaction-pooler-safe defaults, password-file credential hot-reload. |
 | `flagx` | 0 | Startup-validated env flags for migration modes (RFC-0021): enum flags + bounded percent flag; values safe as metric labels. |
 | `grpcx` | 1 | East-west gRPC server/client helpers: OTel, panic recovery, health, reflection, keepalive, round-robin over headless Services, machine-readable error reasons, access-log interceptor (level follows the status class). |
+| `httpmw` | 1 | The shared Gin middleware pair every HTTP service mounts, in order: `Tracing(serviceName, extraSkipRoutes...)` (otelgin server span + `http.server.*` metrics) then `Logging(logger, extraSkipRoutes...)` (access log), plus `LoggerFrom`, `TraceID`, `LoggerWithTraceID`. One `DefaultSkipRoutes` map feeds both, so the trace and log skip lists cannot drift apart; matching is exact on the Gin route pattern (`c.FullPath()`), so a probe on a path nobody registered is traced as a 404 instead of vanishing. gin and otelgin are imported here and nowhere else in `pkg` (ADR-038). |
 | `httpx` | 1 | Shared HTTP envelope: additive error shape (`error` + stable `code`) and list pagination. |
 | `idempotency` | 1 | Postgres-backed idempotency store, Stripe-style: claim → first response replays verbatim → mismatch is a conflict; in-flight locks with stale-lock takeover. Caller owns the table. **v0.37.0:** `UserID` is `string` (Keycloak `sub`, ADR-042 — was `int64`). |
 | `logger/zapx` · `logger/zerolog` · `logger/clog` | 0 | Structured logger adapters with trace-ID injection. **Only `zapx` has consumers** — never add the other two to a service. |
 | `migratex` | 2 | Embedded golang-migrate runner (`Run(fsys, dir, dsn)`) — always against the DIRECT DB host, never a transaction pooler (DDL is unsafe through PgBouncer/PgDog). |
-| `obsx` | 2 | The single OTel SDK wiring point (RFC-0014 P0): traces/metrics/logs over OTLP, one `Shutdown`, zap tee, `TraceContext`, Pyroscope profiling. |
+| `obsx` | 2 | The single OTel SDK wiring point (RFC-0014 P0): traces/metrics/logs over OTLP, one `Shutdown`, zap tee, `TraceContext`, Pyroscope profiling. **v0.37.1:** also owns the span helpers services used to copy — `Tracer`, `StartSpan`, `AddSpanAttributes`, `AddSpanEvent`, `RecordError`, `SetSpanStatus`; the instrumentation `scope` they take is a package path (`github.com/duynhlab/user-service/internal/logic/v1`), never the service name, which already rides as `service.name` on the Resource. |
 | `temporalx` | 2 | Temporal client/worker bootstrap mirroring grpcx/obsx: OTel tracing interceptor, SDK RED metrics, Worker Deployment Versioning options. |
 | `proto/<svc>/v1` | 0 | Versioned contracts + committed stubs for `cart`, `inventory`, `notification`, `order`, `payment`, `product`, `review`, `shipping`. **v0.37.0:** `user_id` is `string` everywhere — notification (was `int32`) and payment (was `int64`) joined the already-string contracts (ADR-042). |
 
@@ -112,7 +114,8 @@ import, or imports one it does not require).
 | checkout | 10 | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | cart, inventory, order, product, shipping |
 
 `inventory` is the only service with **no `httpx`** — a useful counter-example to
-the assumption that every service shares one floor.
+the assumption that every service shares one floor. `httpmw` has no column yet;
+its adoption is still rolling (see below).
 
 ## Adoption
 
@@ -123,8 +126,10 @@ repo.
 | Modules | Pinned at |
 |---------|-----------|
 | `authmw idempotency proto` | `v0.37.0` |
-| `dbx grpcx httpx migratex obsx temporalx` | `v0.36.1` |
+| `dbx grpcx httpx migratex temporalx` | `v0.36.1` |
 | `flagx logger/zapx` | `v0.36.0` |
+| `obsx` | `v0.36.1`, except `inventory` on `v0.37.0` — the span-helper wave is still rolling |
+| `httpmw` | **Not adopted anywhere yet.** `v0.1.0` is tagged and all nine HTTP services have an open pull request pinning it; none is merged, so every service still carries its own `middleware/` copy. `inventory` is not in that count — it serves gRPC and mounts no Gin middleware |
 
 A service's own `go.mod` is the authority for which versions it pins; this table
 records the fleet-wide state, not a per-service guarantee.
@@ -134,7 +139,7 @@ records the fleet-wide state, not a per-service guarantee.
 - **Bumping:** `go get github.com/duynhlab/pkg/<module>@vX.Y.Z && go mod tidy`,
   build + tests, PR touching `go.mod` + `go.sum` only. Dependabot groups all
   `github.com/duynhlab/pkg/*` into one PR per service, so a fleet round is eleven
-  PRs, not eleven times thirteen.
+  PRs, not eleven times fourteen.
 - **A stale root require must be deleted, never version-edited.** Editing
   `require github.com/duynhlab/pkg v0.35.0` to a `v0.36.x` points at a tag that
   does not exist; mixing the root require with a per-module one fails immediately
@@ -162,6 +167,8 @@ per-module numbering continues from it, which is why the first per-module tag is
 
 | Tag line | Modules | Date | What it carried |
 |-----|---------|------|-----------------|
+| `v0.37.1` | `obsx` | 2026-08-16 | The tracer scope is the package path of the code creating the span, not the service name. |
+| `v0.1.0` + `v0.37.0` | `httpmw` `obsx` | 2026-08-16 | `httpmw` itself (ADR-038): the shared Gin `Tracing` + `Logging` pair lifted out of the per-service `middleware/` copies — one skip list behind both, exact matching on the Gin route pattern. `obsx` took the span helpers in the same release. Its `v0.37.0` is this wave, not the 2026-08-11 line below that carries the same number for other modules. |
 | `v0.37.0` | `authmw idempotency proto` | 2026-08-11 | RFC-0024 P3 identity cutover (ADR-041/042): authmw verifies the Keycloak realm via `Config` + `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL` (old `AUTH_JWKS_URL`/`JWT_*` names removed) and normalizes `realm_access.roles`; idempotency `UserID` → `string`; notification/payment protos `user_id` → `string`. |
 | `v0.36.1` | `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` | 2026-08-08 | gRPC and `golang.org/x` security bumps; test-coverage gaps closed. The four modules without those dependencies stayed at `v0.36.0`. |
 | `v0.36.0` | all 13 | 2026-08-07 | The split itself: one module per package, Go 1.26, per-module release tooling. `grpcx` inlined its trace-id helper to drop the `obsx` call the new layering forbids. |
@@ -221,8 +228,9 @@ sequence jumps `v0.12.0` → `v0.12.2`).
 
 - [`duynhlab/pkg`](https://github.com/duynhlab/pkg) — README (packages), `AGENTS.md` (layering), `docs/MIGRATION.md` (per-service runbook)
 - [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) — why a shared middleware module must build trace context from the OTel API, not `obsx`
+- [tracing.md § Request filtering](./tracing.md#request-filtering-automatic) — the skip-list contract `httpmw` enforces
 - [api.md § gRPC Runtime Model](./api.md#grpc-runtime-model) — how services use grpcx at runtime
 - [observability.md](./observability.md) — the obsx contract every service follows
 - Per-service contracts: [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-12 — v0.37.0 identity-cutover wave (RFC-0024 P3): authmw OIDC `Config`, idempotency string `UserID`, string `user_id` protos._
+_Last updated: 2026-08-16 — the shared HTTP middleware wave (ADR-038): new `httpmw` module at `v0.1.0`, `obsx v0.37.1` span helpers with package-path scopes._

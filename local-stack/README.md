@@ -59,15 +59,17 @@ delivery uses explicit semver pins; image automation is planned, not active.
   `docker compose` and works unchanged when podman's socket is exported as
   `DOCKER_HOST`.
 - All application repositories checked out beside `homelab/`, including the 11
-  service repositories, `frontend`, and shared `pkg` repository.
+  service repositories, the two SPAs (`frontend`, `admin-service`), and the
+  shared `pkg` repository.
 - Enough CPU, memory, and disk to build the full fleet and run its observability
   stack.
 - Outbound internet on the first gateway start: Envoy Gateway standalone fetches
   the Envoy binary at runtime and caches it in a named volume.
 - `agent-browser` for the mandatory real-browser phase.
 
-Build contexts resolve sibling repositories such as `../../auth-service` and
-`../../frontend`. A missing checkout fails before the application gate starts.
+Build contexts resolve sibling repositories such as `../../order-service`,
+`../../frontend`, and `../../admin-service`. A missing checkout fails before the
+application gate starts.
 
 Before a release audit, record the exact candidate commits. If a squash or merge
 changes a commit, rerun the audit against the commit that will be tagged.
@@ -105,9 +107,10 @@ browsed).
 
 | Component | URL | Notes |
 |-----------|-----|-------|
-| Frontend SPA | http://localhost:3001 | Demo login `alice` / `password123`, by username, against the realm |
+| Storefront SPA | http://localhost:3001 | Demo login `alice` / `password123`, by username, against the `duynhlab` realm |
+| Backoffice Portal | http://localhost:3009 | The staff SPA (RFC-0023). Operator `duyne` / `p@ss1234` against the **`duynhlab-staff`** realm; a store account cannot sign in here |
 | API gateway (Envoy) | http://localhost:8080 | Pass-through edge for the application services; the root path has no route, so `/` answers 404 by design |
-| Keycloak | http://localhost:8081 | Realm `duynhlab`; the origin the SPA logs in against and the `iss` in every token |
+| Keycloak | http://localhost:8081 | Two realms: `duynhlab` for customers and `duynhlab-staff` for operators (ADR-050). The origin both SPAs log in against and the `iss` in every token |
 | Temporal Web UI | http://localhost:8233 | Order and checkout workflows |
 | Grafana | http://localhost:3002 | RED, business, Temporal, and ClickHouse dashboards (incl. **ClickHouse Server / Engine**); Explore over VictoriaMetrics, VictoriaTraces, ClickHouse, and Pyroscope |
 | VictoriaTraces | http://localhost:10428 | Trace storage, Jaeger query API, and vmui |
@@ -182,8 +185,10 @@ controls.
 
 ```mermaid
 flowchart LR
-    SPA["React SPA<br/>:3001"] --> EDGE["Envoy Gateway standalone<br/>:8080"]
-    SPA -->|"login, PKCE"| KC["Keycloak<br/>realm duynhlab :8081"]
+    SPA["Storefront SPA<br/>:3001"] --> EDGE["Envoy Gateway standalone<br/>:8080"]
+    SPA -->|"login, PKCE<br/>realm duynhlab"| KC["Keycloak :8081<br/>realms duynhlab<br/>+ duynhlab-staff"]
+    PORTAL["Backoffice Portal<br/>:3009"] -->|"protected routes only"| EDGE
+    PORTAL -->|"login, PKCE<br/>realm duynhlab-staff"| KC
     EDGE -->|"JWKS, edge JWT"| KC
     EDGE --> SVC["10 HTTP services"]
     SVC -->|"verify realm token"| KC
@@ -227,7 +232,7 @@ flowchart LR
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class SPA,EDGE,KC,LEdge edge;
+    class SPA,PORTAL,EDGE,KC,LEdge edge;
     class SVC,INV,LService service;
     class TMP,OW,LWorker worker;
     class COL,VEC,TAILED,VT,VM,VL,GRAF,PYRO,LPlatform platform;

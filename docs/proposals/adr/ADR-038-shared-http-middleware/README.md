@@ -10,18 +10,18 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-16 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | The gin HTTP middleware chain of every Go API service: request tracing, the access log, and trace-context correlation. Not gRPC (`pkg/grpcx` already owns it), not workers |
-| **Affected components** | `duynhlab/pkg` (new module), all 11 `*-service` repos, `docs/api/observability.md` |
+| **Affected components** | `duynhlab/pkg` (`httpmw`, and span helpers in `obsx`), 10 `*-service` repos (auth retired), `docs/api/observability.md` |
 | **Related RFC** | [RFC-0014](../../rfc/RFC-0014/) |
 | **Related research** | [Telemetry audit 2026-08-07](../../../observability/audit-2026-08-07.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | Not started — this ADR decides the direction only |
-| **Adoption** | Not started |
+| **Implementation tracking** | `pkg` merged and tagged `httpmw/v0.1.0` + `obsx/v0.37.1`; `inventory-service` merged; the nine HTTP services have open pull requests awaiting the compose end-to-end gate |
+| **Adoption** | Partial |
 
 ## Context
 

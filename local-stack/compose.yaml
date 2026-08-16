@@ -1003,6 +1003,42 @@ services:
       # calls until it is refreshed.
       gateway: { condition: service_started }
 
+  # The Backoffice Portal (RFC-0023). Everything it needs was already here —
+  # the `duynhlab-staff` realm import, the `admin-portal` client with
+  # http://localhost:3009 as its redirect origin, the operator `duyne`, the CORS
+  # entry in gateway/eg/securitypolicy.yaml, and the staff-protected routes that
+  # Phase A17-A20 drive with curl. Only the SPA container was missing, so the
+  # whole protected surface was verified by request and never by browser.
+  #
+  # Port 3009 was reserved for running this SPA outside Compose (`npm run dev`),
+  # which is why the realm and the CORS policy already name it; serving the
+  # container on the same port keeps one origin for both ways of running it.
+  admin:
+    build:
+      context: ../../admin-service
+      args:
+        API_BASE_URL: http://localhost:8080
+        # Same build-arg contract as the storefront: the Dockerfile turns these
+        # into VITE_* at build time. Browser-facing origin, so localhost:8081.
+        KEYCLOAK_URL: http://localhost:8081
+        # The workforce realm (ADR-050), not the customer one. A customer-realm
+        # token is rejected at the edge as wrong-issuer, which is the fence this
+        # portal sits behind.
+        KEYCLOAK_REALM: duynhlab-staff
+        KEYCLOAK_CLIENT_ID: admin-portal
+    ports:
+      - "3009:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      # Same startup race as the storefront: the distroless gateway image cannot
+      # run a Compose healthcheck, so this can only wait for it to start.
+      gateway: { condition: service_started }
+
 volumes:
   envoy-gateway-data:
   victoria-traces-data:

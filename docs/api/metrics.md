@@ -52,7 +52,9 @@ a service author writes; a service only adds Business instruments.
 These are **not custom** — three HTTP metrics are emitted by `otelgin` itself
 (the same instrumentation the tracing middleware wraps), feeding the global
 MeterProvider that `pkg/obsx` installs. `obsx` sets the providers; it does not
-install the `otelgin` middleware — each service's `TracingMiddleware` does. All
+install the `otelgin` middleware — `httpmw.Tracing` (shared `pkg/httpmw`) does.
+Fleet migration off the per-service `<svc>-service/middleware/` copies is **in
+progress**; the shared package is the contract for new and migrated code. All
 three also carry the OTLP resource-attribute labels (`app`, `namespace`,
 `k8s_pod_name`, …); only the per-request semconv labels are listed below.
 
@@ -257,11 +259,18 @@ so all cluster-deployed services and order-worker instrument identically by cons
 service pinning a different `pkg/obsx` version or overriding a View is a defect
 even if it "works" (see RFC-0013 D3, RFC-0014 D-7).
 
-**Infrastructure-endpoint filtering** — `/health`, `/ready`, `/metrics`,
-`/readiness`, `/liveness` are excluded from HTTP RED instrumentation, so RED
-metrics reflect real user traffic with lower cardinality and accurate latency
-percentiles. Process/runtime metrics remain available and act as heartbeat
-signals.
+**Infrastructure-endpoint filtering** — routine probes are excluded from HTTP RED
+instrumentation, so RED metrics reflect real user traffic with lower cardinality
+and accurate latency percentiles. The list is `httpmw.DefaultSkipRoutes` in
+`pkg/httpmw` — one map read by both `httpmw.Tracing` and `httpmw.Logging`, so
+the metric and access-log skip lists cannot drift apart. Matching is **exact**
+against the Gin route pattern (`c.FullPath()`) via `otelgin.WithGinFilter`, and
+the filter runs before `otelgin` records, so a skipped route emits neither spans
+nor `http.server.*` metrics. Services register only `/health` and `/ready`, so a
+request aimed at a path no service registered (`/metrics`, `/healthz`,
+`/readyz`, `/livez`, `/favicon.ico`) matches no route and is now measured as a
+404 instead of vanishing — a misconfigured probe should be visible.
+Process/runtime metrics remain available and act as heartbeat signals.
 
 ## Go runtime metrics
 
@@ -578,5 +587,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-11 — the business catalog holds 63 instruments, and checkout's table gains `checkout.availability.check` — the signal that separates an inventory outage from a refused basket._
+_Last updated: 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`, and probe filtering is an exact match on the Gin route pattern via `httpmw.DefaultSkipRoutes`._
 

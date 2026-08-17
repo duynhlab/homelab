@@ -1,6 +1,6 @@
 {
   "uid": "clickhouse-traces-explorer",
-  "title": "OTel — Trace Explorer",
+  "title": "ClickHouse — Trace Explorer — Local",
   "description": "Request investigation over ClickHouse otel_traces: where did the request go and which span broke? Search traces, inspect the waterfall, and read its correlated logs in one place.",
   "tags": [
     "clickhouse",

@@ -2827,7 +2827,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2900,7 +2900,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2973,7 +2973,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "${datasource}"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -3101,7 +3101,7 @@
   "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {},
   "timezone": "browser",
-  "title": "Envoy Gateway Global",
+  "title": "Envoy — Gateway Global — Local",
   "uid": "bdn8lriao7myoa",
   "version": 1,
   "weekStart": ""

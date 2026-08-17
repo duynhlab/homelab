@@ -36,7 +36,7 @@ kubectl logs -n cart deployment/cart --tail=50
 Canonical access-log line (middleware-owned summary):
 
 ```json
-{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"middleware/logging.go:42","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"duration_seconds":0.042}
+{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"httpmw/logging.go:192","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"duration_seconds":0.042}
 ```
 
 The stdout line is what `kubectl logs` shows; the same record is also exported over OTLP to VictoriaLogs by the otelzap tee.
@@ -66,7 +66,7 @@ func New(level string) (*zap.Logger, error) {
 }
 ```
 
-`trace_id`/`span_id` are injected from the OpenTelemetry span context in the logging middleware, so a log line and its trace join on one id.
+`trace_id`/`span_id` are injected from the OpenTelemetry span context in `httpmw.Logging`, so a log line and its trace join on one id.
 
 ---
 
@@ -256,7 +256,8 @@ they are logging a separate domain event.
 > `method`/`path`/`status`/`duration`/`client_ip`/`user_agent` on HTTP and
 > `method`/`code`/`duration`/`peer` on gRPC (see
 > [tracing.md](./tracing.md) for the fields recorded today, and
-> [api.md](./api.md) for the probe-filtering gap). The rename to this schema —
+> [api.md § Deadlines, retries, and health](./api.md#deadlines-retries-and-health)
+> for probe filtering). The rename to this schema —
 > and dropping `client_ip`/`user_agent` per the
 > [data policy](./observability.md#cross-signal-data-and-privacy-policy) — is
 > the LOG-1 refactor.
@@ -276,8 +277,12 @@ messages are `gRPC request`.
 **Probe filtering (contract):** no routine successful health/readiness probe
 access logs on either transport; keep failed probes and readiness state
 transitions. gRPC enforces this in the `pkg/grpcx` access interceptor
-(`grpc.health.v1.Health` + reflection skipped); the HTTP logging middleware
-applies the same skip list as `TracingMiddleware`. Signal matrix:
+(`grpc.health.v1.Health` + reflection skipped); on HTTP, `httpmw.Logging` reads
+the same `httpmw.DefaultSkipRoutes` map as `httpmw.Tracing`, so the two skip
+lists cannot drift apart. Only a **successful** probe is skipped — a failing one
+is always logged. HTTP matching is **exact** against the Gin route pattern
+(`c.FullPath()`), so a probe aimed at a path the service never registered
+matches no route and is logged like any other 404. Signal matrix:
 [Application observability § Health filtering](./observability.md#health-readiness-and-reflection-filtering).
 
 ---
@@ -363,4 +368,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-11 — HTTP level policy is 500→error / 400–499→warn, and the status-class gRPC mapping is as-built on `pkg/grpcx v0.36.1`._
+_Last updated: 2026-08-17 — HTTP access logging and probe filtering re-documented against the shared `pkg/httpmw` pair (`httpmw.Logging` + `httpmw.DefaultSkipRoutes`, exact route match)._

@@ -6,7 +6,7 @@ Cross-cutting instrumentation contract for every Go service and worker in the pl
 |-----------|-------|-----------|
 | **Wiring** | One call: `obsx.SetupObservability(ctx, obsx.ConfigFromEnv())` in `main()` | — |
 | **Semconv** | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate `obsx` release | — |
-| **Middleware** | **Tracing → logging** (two middleware); RED metrics via `otelgin` inside tracing | — |
+| **Middleware** | **Tracing → logging** (two middleware) from `pkg/httpmw`; RED metrics via `otelgin` inside tracing | — |
 | **Export** | OTLP/HTTP `:4318` → OpenTelemetry Collector | — |
 | **Platform topology** | [OpenTelemetry (platform)](../observability/opentelemetry/README.md) · [Observability hub](../observability/README.md) | — |
 | **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) |
@@ -77,7 +77,6 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
    defer func() { _ = logger.Sync() }()
 
    otelCfg := obsx.ConfigFromEnv()
-   middleware.SetServiceName(otelCfg.ServiceName)
 
    var tp interface{ Shutdown(context.Context) error }
    obs, err := obsx.SetupObservability(context.Background(), otelCfg)
@@ -126,10 +125,10 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
 
 | Layer | Who imports it here |
 |---|---|
-| **API** (`go.opentelemetry.io/otel`, …) | `pkg/obsx`, `pkg/grpcx`, middleware |
+| **API** (`go.opentelemetry.io/otel`, …) | `pkg/obsx`, `pkg/grpcx`, `pkg/httpmw` |
 | **SDK** | **Only `pkg/obsx.SetupObservability`** |
 | **Exporters** | `pkg/obsx` only |
-| **Contrib** (`otelgin`, `otelgrpc`, `otelzap`, `runtime`) | Router middleware; rest via `pkg/obsx`/`pkg/grpcx` |
+| **Contrib** (`otelgin`, `otelgrpc`, `otelzap`, `runtime`) | `otelgin` in `pkg/httpmw` only; rest via `pkg/obsx`/`pkg/grpcx` |
 
 ---
 
@@ -139,19 +138,35 @@ The HTTP middleware chain is **tracing → logging** (two middleware only).
 
 | Order | Middleware | Emits |
 |-------|------------|-------|
-| 1 | **Tracing** (`otelgin` via `TracingMiddleware`) | Root span + **`http.server.*` metrics** via global MeterProvider |
-| 2 | **Logging** | Structured JSON + `trace_id` on stdout; otelzap tee when enabled |
+| 1 | **Tracing** (`otelgin` via `httpmw.Tracing`) | Root span + **`http.server.*` metrics** via global MeterProvider |
+| 2 | **Logging** (`httpmw.Logging`) | Structured JSON + `trace_id` on stdout; otelzap tee when enabled |
 
 There is **no separate metrics middleware**. RED HTTP metrics come from the same `otelgin` instrumentation that creates spans. gRPC RED + tracing come from `pkg/grpcx` `otelgrpc` handlers.
 
-Sharing status (as-built): providers (`pkg/obsx`), gRPC (`pkg/grpcx`), and DB (`pkg/dbx` + otelpgx) are shared libraries; the HTTP `TracingMiddleware`/`LoggingMiddleware` pair and the span helpers are **copied per service** under `<svc>-service/middleware/`, and the copies are drifting apart release by release. Promoting them into `pkg` is a target, not current reality.
+Sharing status (as-built): providers (`pkg/obsx`), gRPC (`pkg/grpcx`), and DB
+(`pkg/dbx` + otelpgx) are shared libraries, and the HTTP pair is shared too —
+`httpmw.Tracing(serviceName)` and `httpmw.Logging(logger)` in **`pkg/httpmw`**
+(`httpmw/v0.1.0`), with the `logic/v1` span helpers in **`pkg/obsx`**
+(`obsx/v0.37.1`). `httpmw` is a module of its own because `gin` and `otelgin` are
+imported there and nowhere else in `pkg`: a gRPC-only service such as
+inventory-service takes the span helpers without pulling in a web framework,
+which is what the `logic/v1` rule below ("must not depend on Gin/gRPC types")
+requires. The service name is a **parameter** of `httpmw.Tracing`, not package
+state written by a startup setter as the per-service copies had it.
+
+Fleet migration off the per-service `<svc>-service/middleware/` copies is **in
+progress**. Merged so far: `pkg` itself and inventory-service, which takes only
+the `obsx` span helpers because it serves gRPC and mounts no Gin middleware. All
+nine HTTP services have an open pull request and none is merged, so each still
+carries its own copy and pins an `obsx` release that predates the span helpers.
+The shared packages are the contract for new and migrated code.
 
 ```mermaid
 graph TD
     A["HTTP request"] --> B["Gin router"]
     B --> C["Middleware chain"]
-    C --> D["TracingMiddleware (otelgin)<br/>root span + http.server.* metrics"]
-    D --> E["LoggingMiddleware<br/>request log + trace_id"]
+    C --> D["httpmw.Tracing (otelgin)<br/>root span + http.server.* metrics"]
+    D --> E["httpmw.Logging<br/>request log + trace_id"]
     E --> H["Web layer web/v1"]
     H --> L["Logic layer logic/v1"]
     L --> O["Core layer"]
@@ -172,11 +187,22 @@ excluded from every request-scoped signal:
 
 | Signal | Contract | Enforced by |
 |--------|----------|-------------|
-| HTTP spans + `http.server.*` RED | Exclude `/health`, `/healthz`, `/ready`, `/readyz`, `/livez`, `/metrics`, `/favicon.ico` (prefix match) | `TracingMiddleware` skips before `otelgin` runs — no span, no metric |
+| HTTP spans + `http.server.*` RED | Exclude `/health`, `/healthz`, `/ready`, `/readyz`, `/livez`, `/metrics`, `/favicon.ico` — **exact match on the Gin route pattern** (`c.FullPath()`), not the raw request path | `httpmw.DefaultSkipRoutes` fed to `otelgin.WithGinFilter`; the filter runs before `otelgin` records — no span, no metric |
 | gRPC spans + RPC RED | Exclude `grpc.health.v1.Health` and `grpc.reflection.*` | `pkg/grpcx` `otelgrpc.WithFilter` |
 | gRPC access logs | Exclude the same health/reflection prefixes | `pkg/grpcx` access interceptor |
-| HTTP access logs | Exclude routine successful probes; keep failed probes and readiness transitions | Skip list in the logging middleware (same list as `TracingMiddleware`) |
+| HTTP access logs | Exclude routine successful probes; keep failed probes and readiness transitions | `httpmw.Logging` reads the same `httpmw.DefaultSkipRoutes` map, so the two skip lists cannot drift apart |
 | Startup/shutdown logs | Always retained | — |
+
+Because the HTTP match is on the route pattern, a request that matches **no**
+route has an empty `FullPath` and is therefore traced. Services register only
+`/health` and `/ready`, so a probe aimed at a path a service never registered —
+`/metrics`, `/healthz`, `/readyz`, `/livez`, `/favicon.ico` — now appears as a
+traced 404 instead of vanishing. That is intended: a misconfigured probe should
+be visible. The prefix match this replaced also swallowed anything that merely
+started with a listed value, which made a route such as `/healthy-users`
+untraceable. "No span, no metric" for genuinely skipped routes is preserved and
+pinned by a unit test in `pkg/httpmw`. A service adds its own exclusions by
+passing extra route patterns to both `httpmw.Tracing` and `httpmw.Logging`.
 
 ---
 
@@ -238,7 +264,7 @@ a trace:
 | SpanKind | Layer that owns it | Created by |
 |----------|--------------------|------------|
 | `SERVER` | HTTP/gRPC transport in | `otelgin` / `pkg/grpcx` (automatic) |
-| `INTERNAL` | `logic/v1` manual spans (the default kind) | `middleware.StartSpan` |
+| `INTERNAL` | `logic/v1` manual spans (the default kind) | `obsx.StartSpan` |
 | `CLIENT` | Core adapters calling out — DB, cache, gRPC client, provider | `otelpgx` / `pkg/grpcx` (automatic) |
 | `PRODUCER` / `CONSUMER` | Queue and worker boundaries (Temporal) | Supported SDK integration |
 
@@ -251,14 +277,17 @@ cost and noise without adding a meaningful duration or error boundary.
 
 ```go
 // logic/v1 — the otelgin/otelgrpc span is already active on ctx
-middleware.AddSpanAttributes(ctx,
+obsx.AddSpanAttributes(ctx,
     attribute.String("checkout.outcome", outcome),
 )
 ```
 
-All span helpers are gated on `span.IsRecording()`, so attribute enrichment
-on unsampled requests costs nothing — but keep expensive value computation
-behind your own check when it isn't a ready value.
+The enrichment helpers — `obsx.AddSpanAttributes`, `obsx.AddSpanEvent`,
+`obsx.RecordError`, `obsx.SetSpanStatus` — are all gated on
+`span.IsRecording()`, so attribute enrichment on unsampled requests costs
+nothing; keep expensive value computation behind your own check when it isn't a
+ready value. `obsx.RecordError` also sets the span status, so a recorded error
+never leaves the span green.
 
 ### Examples
 
@@ -268,7 +297,7 @@ generic request span:
 ```go
 func (h *Handler) CreateOrder(c *gin.Context) {
     ctx := c.Request.Context()
-    logger := middleware.GetLoggerFromGinContext(c)
+    logger := httpmw.LoggerFrom(c)
 
     var req CreateOrderRequest
     if err := c.ShouldBindJSON(&req); err != nil {
@@ -291,20 +320,26 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 }
 ```
 
-Logger retrieval is the fleet-majority pattern: the logging middleware stores
-the request logger with `c.Set("logger", …)` and handlers read it back with
-`middleware.GetLoggerFromGinContext(c)`. auth-service instead injects it into
-the request context (`zapx.WithContext`/`zapx.FromContext`) — same contract,
-different carrier. Error responses go through `httpx.RespondError`
-(`pkg/httpx`); there is no `httpx.ValidationError` helper.
+Logger retrieval is the fleet-majority pattern: `httpmw.Logging` stores the
+request logger with `c.Set("logger", …)` and handlers read it back with
+`httpmw.LoggerFrom(c)`, which falls back to a no-op logger when the middleware
+was not mounted rather than building a second, uncorrelated one.
+`httpmw.TraceID(c)` returns the request correlation id and
+`httpmw.LoggerWithTraceID(c, base)` binds it to another logger. auth-service
+instead injects the logger into the request context
+(`zapx.WithContext`/`zapx.FromContext`) — same contract, different carrier.
+Error responses go through `httpx.RespondError` (`pkg/httpx`); there is no
+`httpx.ValidationError` helper.
 
 Logic methods do not automatically receive one manual span each. Create a
 manual span only for a meaningful operation, failure boundary, or multi-step
 use case:
 
 ```go
+const tracerScope = "github.com/duynhlab/checkout-service/internal/logic/v1"
+
 func (s *CheckoutService) Confirm(ctx context.Context, sessionID string) (*Order, error) {
-    ctx, span := tracer.Start(ctx, "checkout.confirm")
+    ctx, span := obsx.StartSpan(ctx, tracerScope, "checkout.confirm")
     defer span.End()
 
     order, err := s.confirmSession(ctx, sessionID)
@@ -315,6 +350,17 @@ func (s *CheckoutService) Confirm(ctx context.Context, sessionID string) (*Order
     return order, nil
 }
 ```
+
+The `scope` argument to `obsx.Tracer`/`obsx.StartSpan` is the OpenTelemetry
+instrumentation scope and **MUST** be the package path of the code creating the
+span (`github.com/duynhlab/checkout-service/internal/logic/v1`), never the
+service name: deployment identity already travels as `service.name` on the
+Resource, and naming the scope after the service loses the one thing a scope is
+for — telling two instrumented packages inside one service apart. This is
+distinct from the `serviceName` argument to `httpmw.Tracing`, which `otelgin`
+uses as the (virtual) server handling the request — it feeds server attributes
+on spans and `ServerName` on `http.server.*` metrics, while `otelgin` fixes its
+own scope to its own package path.
 
 `core/domain` may contain pure aggregates, value objects, transitions, and
 invariants. It must not depend on Gin, gRPC transport types, OTel SDK/exporters,
@@ -328,8 +374,8 @@ shared instrumentation.
 
 ```mermaid
 graph LR
-    A["HTTP request traceparent"] --> B["TracingMiddleware"]
-    B --> C["LoggingMiddleware trace_id on logger"]
+    A["HTTP request traceparent"] --> B["httpmw.Tracing"]
+    B --> C["httpmw.Logging trace_id on logger"]
     C --> D["Web handler"]
     D --> E["Logic service"]
     E --> F["Structured logs with trace_id"]
@@ -486,7 +532,8 @@ A service or worker PR is observability-compliant only when:
 - [ ] The logger OTLP branch is gated on the same `LOG_LEVEL` as the stdout branch.
 - [ ] Access logs follow the semconv field schema in [logs.md](./logs.md#access-log-policy).
 - [ ] Exported log records carry the full [LogRecord mapping](./logs.md#otel-log-data-model) (trace context, resource, scope).
-- [ ] HTTP middleware order is tracing, then logging.
+- [ ] HTTP middleware order is tracing, then logging; new and migrated services mount `pkg/httpmw` rather than a per-service copy.
+- [ ] Manual span helpers come from `pkg/obsx`, with a package-path instrumentation scope.
 - [ ] gRPC servers and clients use `pkg/grpcx`.
 - [ ] Transport handlers propagate the incoming context into `logic/v1`.
 - [ ] HTTP and gRPC handlers do not create duplicate generic request spans.
@@ -522,4 +569,4 @@ A service or worker PR is observability-compliant only when:
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-07-29 — canonical cross-cutting observability contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-08-16 — canonical cross-cutting observability contract; as-built claims verified against `duynhlab/pkg` and the service repos._

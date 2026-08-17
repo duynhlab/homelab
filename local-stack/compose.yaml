@@ -184,11 +184,25 @@ services:
 
   temporal:
     image: temporalio/server:1.31.2
-    # on-failure: a restart can die FATALLY after ~50s when ringpop tries to
-    # rejoin its own stale membership entry ("join duration exceeded max 30s")
-    # — seen live in the 2026-08-13 audit: `restart temporal` (A14) answered
-    # the row, then exited(1) 90s later and stayed down, silently taking every
-    # timer with it. The retry starts clean once the stale entry has aged out.
+    # on-failure: a restart dies FATALLY after ~50s roughly half the time, when
+    # ringpop cannot bootstrap ("join duration of 50.6s exceeded max 30s"). Seen
+    # first in the 2026-08-13 audit: `restart temporal` (A14) answered the row,
+    # then exited(1) about 50s later — long after the row had reported PASS —
+    # silently taking every timer with it.
+    #
+    # Measured 2026-08-17 over eight restarts: FOUR crashed, four did not. The
+    # count of stale rows in `cluster_membership` does not predict it (12 clean,
+    # 16 crash, 20 crash, 24 clean), so the earlier note here — that the retry
+    # succeeds "once the stale entry has aged out" — was wrong twice over: the
+    # rows carry a two-DAY record_expiry and never age out inside a run, and
+    # they are not what decides the outcome. It is not resource starvation
+    # either: the container has no CPU or memory limit, has never been
+    # OOM-killed, and the podman VM has 8 vCPU / 16 GB. The mechanism is still
+    # open; what is established is the rate and that on-failure recovers it.
+    #
+    # CONSEQUENCE FOR THE AUDIT, not just for compose: any row that depends on a
+    # Temporal timer and runs AFTER A14 is racing a coin flip. A13 came back
+    # `expired|lazy` — inconclusive — on the run where the engine died.
     restart: on-failure:5
     environment:
       DB: postgres12
@@ -1001,6 +1015,42 @@ services:
       # service). The cost is a startup race — the SPA can be served before the
       # edge accepts requests, so a page loaded in that window shows failed API
       # calls until it is refreshed.
+      gateway: { condition: service_started }
+
+  # The Backoffice Portal (RFC-0023). Everything it needs was already here —
+  # the `duynhlab-staff` realm import, the `admin-portal` client with
+  # http://localhost:3009 as its redirect origin, the operator `duyne`, the CORS
+  # entry in gateway/eg/securitypolicy.yaml, and the staff-protected routes that
+  # Phase A17-A20 drive with curl. Only the SPA container was missing, so the
+  # whole protected surface was verified by request and never by browser.
+  #
+  # Port 3009 was reserved for running this SPA outside Compose (`npm run dev`),
+  # which is why the realm and the CORS policy already name it; serving the
+  # container on the same port keeps one origin for both ways of running it.
+  admin:
+    build:
+      context: ../../admin-service
+      args:
+        API_BASE_URL: http://localhost:8080
+        # Same build-arg contract as the storefront: the Dockerfile turns these
+        # into VITE_* at build time. Browser-facing origin, so localhost:8081.
+        KEYCLOAK_URL: http://localhost:8081
+        # The workforce realm (ADR-050), not the customer one. A customer-realm
+        # token is rejected at the edge as wrong-issuer, which is the fence this
+        # portal sits behind.
+        KEYCLOAK_REALM: duynhlab-staff
+        KEYCLOAK_CLIENT_ID: admin-portal
+    ports:
+      - "3009:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      # Same startup race as the storefront: the distroless gateway image cannot
+      # run a Compose healthcheck, so this can only wait for it to start.
       gateway: { condition: service_started }
 
 volumes:

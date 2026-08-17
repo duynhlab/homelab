@@ -1,6 +1,6 @@
 {
   "uid": "clickhouse-otel-sql",
-  "title": "ClickHouse — OTel logs+traces SQL",
+  "title": "ClickHouse — Logs + Traces SQL — Local",
   "description": "Long-retention (90d) SQL analytics over OpenTelemetry logs and traces stored in ClickHouse.",
   "tags": [
     "clickhouse",

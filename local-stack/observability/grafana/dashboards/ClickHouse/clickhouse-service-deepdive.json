@@ -1,6 +1,6 @@
 {
   "uid": "clickhouse-service-deepdive",
-  "title": "ClickHouse — Service deep dive",
+  "title": "ClickHouse — Service Deep Dive — Local",
   "description": "Per-service drill-down over OpenTelemetry logs and traces in ClickHouse. Fleet-wide view: 'ClickHouse — OTel logs+traces SQL'.",
   "tags": [
     "clickhouse",

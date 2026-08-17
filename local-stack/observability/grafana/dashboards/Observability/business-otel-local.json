@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "RFC-0017 business KPIs for the local-stack fleet \u2014 one row per domain, built off the exact OTel instruments each service ships.",
+  "description": "RFC-0017 business KPIs for the local-stack fleet — one row per domain, built off the exact OTel instruments each service ships.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -92,7 +92,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Microservices \u2014 Business KPIs (local)",
+  "title": "Microservices — Business KPIs — Local",
   "uid": "business-otel-local",
   "version": 1,
   "weekStart": "",
@@ -100,7 +100,7 @@
     {
       "id": 38,
       "type": "row",
-      "title": "\ud83d\udcb3 Payments",
+      "title": "💳 Payments",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -298,7 +298,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum by (op,result) (rate(payment_operation_total[$rate]))",
-          "legendFormat": "{{op}} \u00b7 {{result}}",
+          "legendFormat": "{{op}} · {{result}}",
           "refId": "A"
         }
       ]
@@ -410,7 +410,7 @@
     {
       "id": 40,
       "type": "row",
-      "title": "\ud83e\uddfe Orders / Saga",
+      "title": "🧾 Orders / Saga",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -480,7 +480,7 @@
       "id": 8,
       "type": "stat",
       "title": "Failed compensations (stuck money)",
-      "description": "Compensations that failed in the selected range \u2014 the money-stuck signal. Target 0.",
+      "description": "Compensations that failed in the selected range — the money-stuck signal. Target 0.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -541,7 +541,7 @@
       "id": 9,
       "type": "stat",
       "title": "Average order value",
-      "description": "AOV over the selected range = order_value_minor sum/count, minor units \u00f7100.",
+      "description": "AOV over the selected range = order_value_minor sum/count, minor units ÷100.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -598,7 +598,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Payment activity by op & result",
-      "description": "Order\u2192payment saga activity calls.",
+      "description": "Order→payment saga activity calls.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -641,7 +641,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum by (op,result) (rate(order_payment_activity_total[$rate]))",
-          "legendFormat": "{{op}} \u00b7 {{result}}",
+          "legendFormat": "{{op}} · {{result}}",
           "refId": "A"
         }
       ]
@@ -745,7 +745,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum by (step,result) (rate(order_saga_compensation_total[$rate]))",
-          "legendFormat": "{{step}} \u00b7 {{result}}",
+          "legendFormat": "{{step}} · {{result}}",
           "refId": "A"
         }
       ]
@@ -753,7 +753,7 @@
     {
       "id": 41,
       "type": "row",
-      "title": "\ud83d\udd10 Auth",
+      "title": "🔐 Auth",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -922,7 +922,7 @@
           "id": 16,
           "type": "timeseries",
           "title": "bcrypt latency p95",
-          "description": "hash (register) / compare (login) \u2014 the CPU cost inside auth latency.",
+          "description": "hash (register) / compare (login) — the CPU cost inside auth latency.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -979,7 +979,7 @@
     {
       "id": 42,
       "type": "row",
-      "title": "\ud83d\udce6 Product",
+      "title": "📦 Product",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -1161,7 +1161,7 @@
           "id": 50,
           "type": "timeseries",
           "title": "Cache pool usage (Valkey)",
-          "description": "redisotel go-redis pool: conns by state (idle/used). Old-semconv name \u2014 this is the CACHE pool, not Postgres.",
+          "description": "redisotel go-redis pool: conns by state (idle/used). Old-semconv name — this is the CACHE pool, not Postgres.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1270,7 +1270,7 @@
     {
       "id": 43,
       "type": "row",
-      "title": "\ud83d\uded2 Cart",
+      "title": "🛒 Cart",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -1283,7 +1283,7 @@
           "id": 20,
           "type": "timeseries",
           "title": "Items added by result",
-          "description": "Add-to-cart attempts by outcome (added vs rejected_invalid_qty) \u2014 top of the purchase funnel.",
+          "description": "Add-to-cart attempts by outcome (added vs rejected_invalid_qty) — top of the purchase funnel.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1444,7 +1444,7 @@
     {
       "id": 44,
       "type": "row",
-      "title": "\ud83d\ude9a Shipping",
+      "title": "🚚 Shipping",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -1457,7 +1457,7 @@
           "id": 23,
           "type": "timeseries",
           "title": "Shipments created by outcome",
-          "description": "CreateShipment outcomes \u2014 order-fulfillment saga step 2 (idempotent replays also return ok).",
+          "description": "CreateShipment outcomes — order-fulfillment saga step 2 (idempotent replays also return ok).",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1509,7 +1509,7 @@
           "id": 24,
           "type": "timeseries",
           "title": "Shipments cancelled by outcome",
-          "description": "CancelShipment outcomes \u2014 saga compensation frequency.",
+          "description": "CancelShipment outcomes — saga compensation frequency.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1604,7 +1604,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum by (kind,found) (rate(shipment_lookup_total[$rate]))",
-              "legendFormat": "{{kind}} \u00b7 found={{found}}",
+              "legendFormat": "{{kind}} · found={{found}}",
               "refId": "A"
             }
           ]
@@ -1618,7 +1618,7 @@
     {
       "id": 45,
       "type": "row",
-      "title": "\ud83d\udc64 User",
+      "title": "👤 User",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -1726,7 +1726,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum by (audience,found) (rate(user_profile_lookup_total[$rate]))",
-              "legendFormat": "{{audience}} \u00b7 found={{found}}",
+              "legendFormat": "{{audience}} · found={{found}}",
               "refId": "A"
             }
           ]
@@ -1740,7 +1740,7 @@
     {
       "id": 46,
       "type": "row",
-      "title": "\u2b50 Review",
+      "title": "⭐ Review",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -1753,7 +1753,7 @@
           "id": 28,
           "type": "heatmap",
           "title": "Rating distribution",
-          "description": "Star-rating distribution of newly created reviews (1\u20135).",
+          "description": "Star-rating distribution of newly created reviews (1–5).",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1921,7 +1921,7 @@
     {
       "id": 47,
       "type": "row",
-      "title": "\ud83d\udd14 Notification",
+      "title": "🔔 Notification",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -2043,7 +2043,7 @@
     {
       "id": 48,
       "type": "row",
-      "title": "\ud83e\uddee Checkout",
+      "title": "🧮 Checkout",
       "collapsed": true,
       "gridPos": {
         "x": 0,
@@ -2056,7 +2056,7 @@
           "id": 33,
           "type": "stat",
           "title": "Sessions confirmed",
-          "description": "Checkout sessions confirmed into an order in the selected range \u2014 the funnel exit.",
+          "description": "Checkout sessions confirmed into an order in the selected range — the funnel exit.",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -2237,7 +2237,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "expr": "sum by (reason) (rate(checkout_promo_rejected_total[$rate]))",
-              "legendFormat": "rejected \u00b7 {{reason}}",
+              "legendFormat": "rejected · {{reason}}",
               "refId": "B"
             }
           ]

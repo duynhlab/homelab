@@ -58,22 +58,42 @@ When a service receives a sampled remote parent, it **always honours** the paren
 
 ### Request filtering (automatic)
 
-These endpoints are **never traced**:
+These routes are **never traced**:
 
-| Path prefix | Reason |
-|-------------|--------|
-| `/health`, `/healthz`, `/ready`, `/readyz`, `/livez` | High frequency, low value |
-| `/metrics` | Legacy scrape path (retired for apps) |
-| `/favicon.ico` | Browser noise |
+| Route | Matches a route today | Reason |
+|-------|----------------------|--------|
+| `/health`, `/ready` | Yes — the only probe routes any service registers | High frequency, low value |
+| `/healthz`, `/readyz`, `/livez` | No — no service registers them | Legacy probe names kept in the list |
+| `/metrics` | No — retired for apps | Legacy scrape path |
+| `/favicon.ico` | No | Browser noise |
 
-The skip list is a **prefix** match in each service's `TracingMiddleware`
-(`shouldTrace`), applied before `otelgin` runs — so these paths emit neither
-spans nor `http.server.*` metrics. gRPC health and reflection RPCs are filtered
-by `pkg/grpcx`.
+The list is `httpmw.DefaultSkipRoutes` in `pkg/httpmw` — **one** map read by both
+`httpmw.Tracing` and `httpmw.Logging`, so the trace and access-log skip lists
+cannot drift apart. Matching is **exact** against the Gin route pattern
+(`c.FullPath()`) via `otelgin.WithGinFilter`, and the filter runs before the span
+starts, so a skipped route emits neither spans nor `http.server.*` metrics — a
+unit test in `pkg/httpmw` pins that pair. A service adds its own entries with
+`httpmw.Tracing(serviceName, "/extra")`, passing Gin route patterns, not request
+paths.
+
+Exact matching has one deliberate consequence: a request that matches no route
+has an empty `FullPath`, so the five entries above that no service registers are
+now **traced as 404s** rather than vanishing — a probe aimed at a path this
+service never registered should be visible. The prefix match this replaced also
+swallowed anything merely *starting* with a listed value (a route named
+`/healthy-users` was untraceable); that is gone.
+
+Adoption is in flight: `pkg/httpmw` is tagged `v0.1.0`, and all nine HTTP
+services have an open pull request pinning it, none merged. Until those land,
+every one of them still runs its own `middleware/tracing.go` copy with the old
+prefix match, so the exact-match behaviour described above is the contract this
+page states, not yet what the running fleet does.
+
+gRPC health and reflection RPCs are filtered by `pkg/grpcx`.
 
 ### Service identity
 
-`service.name` comes from **`OTEL_SERVICE_NAME`**, injected by every app ResourceSet — authoritative. Namespace and instance id ride via `OTEL_RESOURCE_ATTRIBUTES` (Downward API).
+`service.name` comes from **`OTEL_SERVICE_NAME`**, injected by every app ResourceSet — authoritative. Namespace and instance id ride via `OTEL_RESOURCE_ATTRIBUTES` (Downward API). The HTTP middleware takes that same name as an explicit argument (`httpmw.Tracing(serviceName)`) rather than package state written by a startup setter.
 
 ### Propagation
 
@@ -119,7 +139,7 @@ per-request header cost.
 
 Automatic spans — do not duplicate these with manual spans:
 
-- HTTP server span from `otelgin` (via `TracingMiddleware`);
+- HTTP server span from `otelgin` (via `httpmw.Tracing`);
 - gRPC server/client spans from `otelgrpc` (via `pkg/grpcx`);
 - DB spans from shared DB instrumentation (`otelpgx`);
 - supported external-client spans.
@@ -142,7 +162,7 @@ Do not add a second generic span around an already-instrumented request or RPC.
 The granularity ladder, in order of preference:
 
 1. **Attributes on the existing span** — business context the auto span is
-   missing (`middleware.AddSpanAttributes`).
+   missing (`obsx.AddSpanAttributes`).
 2. **A span event** — a milestone *inside* one operation ("provider
    contacted", "response received") that needs a timestamp but not its own
    duration.
@@ -167,30 +187,39 @@ high-cardinality attributes and are added only when operationally justified.
 
 ### Helper functions
 
-The helpers live in each service's own `middleware` package
-(`<svc>-service/middleware/tracing.go` — copied per service, not in `pkg`);
-signatures verified 2026-07-29:
+The helpers are `pkg/obsx` (`obsx/v0.37.1`) — they touch only the OTel API, so a
+gRPC-only service uses them without a web framework; signatures verified
+2026-08-16:
 
 ```go
-// Record unexpected failures
-middleware.RecordError(ctx, err)
+// The instrumentation scope is the PACKAGE PATH of the code creating the span,
+// never the service name — deployment identity already rides as service.name.
+const tracerScope = "github.com/duynhlab/<svc>-service/internal/logic/v1"
+
+// Record unexpected failures (records the error and sets Error status)
+obsx.RecordError(ctx, err)
 
 // Add business context (high-cardinality IDs — use sparingly)
-middleware.AddSpanAttributes(ctx,
+obsx.AddSpanAttributes(ctx,
     attribute.String("order.id", orderID),
 )
 
 // Mark important events
-middleware.AddSpanEvent(ctx, "payment.authorized")
+obsx.AddSpanEvent(ctx, "payment.authorized")
 
 // Create child spans for meaningful operations
-ctx, span := middleware.StartSpan(ctx, "inventory.reserve")
+ctx, span := obsx.StartSpan(ctx, tracerScope, "inventory.reserve")
 defer span.End()
 
 span.SetAttributes(
     attribute.String("inventory.outcome", outcome),
 )
 ```
+
+`obsx.Tracer(scope)` returns the tracer directly when a caller needs it, and
+`obsx.SetSpanStatus(ctx, code, description)` sets status without an error. Every
+helper is a no-op when the span is not recording, so an unsampled request costs
+nothing and callers do not guard at each site.
 
 **When to use:**
 
@@ -259,7 +288,7 @@ Full worker rules: [Application observability § Worker and Temporal instrumenta
 | Practice | Why | Implementation |
 |----------|-----|----------------|
 | ~10% sampling | Balance cost vs visibility | `OTEL_SAMPLE_RATE=0.1` |
-| Auto-filter health checks | Reduce noise 30–40% | Automatic (middleware) |
+| Auto-filter health checks | Reduce noise 30–40% | `httpmw.DefaultSkipRoutes` |
 | Distinguish business vs infra errors | Avoid alert noise | See error semantics above |
 | Graceful shutdown | Zero lost spans on rollout | Bounded `obs.Shutdown()` on exit |
 | Correlate with logs | Jump trace ↔ logs via `trace_id` | Tracing before logging middleware |
@@ -303,4 +332,4 @@ Grafana Explore → Tempo → search by Trace ID. Details: [Application logging]
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-07-29 — canonical app tracing contract; as-built claims verified against `duynhlab/pkg`, the service repos, and the edge config._
+_Last updated: 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`; as-built claims verified against `duynhlab/pkg`, the service repos, and the edge config._

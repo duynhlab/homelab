@@ -288,20 +288,22 @@ The middleware chain runs in a **fixed order** for every HTTP request across all
 ### The Fixed Order
 
 ```go
-r.Use(middleware.TracingMiddleware())     // 1st: otelgin — creates root span + trace_id,
-                                           //      and auto-records the HTTP semconv metrics
-r.Use(middleware.LoggingMiddleware(logger)) // 2nd: injects trace_id into logs
+r.Use(httpmw.Tracing(cfg.ServiceName)) // 1st: otelgin — creates root span + trace_id,
+                                       //      and auto-records the HTTP semconv metrics
+r.Use(httpmw.Logging(logger))          // 2nd: injects trace_id into logs
 ```
 
-There is **no separate metrics middleware** anymore. The old `client_golang` PrometheusMiddleware was deleted in the P3 cutover; the HTTP semconv metrics (`http_server_request_duration_seconds`, …) are now emitted automatically by **`otelgin`** instrumentation — the same instrumentation that installs the tracing middleware — via the global `MeterProvider` set up by `obsx.SetupObservability`.
+Both middleware come from the shared **`pkg/httpmw`** module (`httpmw/v0.1.0`), where `gin` and `otelgin` are imported and nowhere else in `pkg`; the `logic/v1` span helpers (`obsx.StartSpan`, `obsx.AddSpanAttributes`, …) live in **`pkg/obsx`** (`obsx/v0.37.1`) so a gRPC-only service can take them without a web framework. Migration off the per-service `<svc>-service/middleware/` copies is **in progress** — the shared packages are the contract for new and migrated code. The service name is a **parameter** of `httpmw.Tracing`, not package state written by a startup setter as the per-service copies had it.
+
+There is **no separate metrics middleware** anymore. The old `client_golang` PrometheusMiddleware was deleted in the P3 cutover; the HTTP semconv metrics (`http_server_request_duration_seconds`, …) are now emitted automatically by **`otelgin`** instrumentation — the same instrumentation `httpmw.Tracing` mounts — via the global `MeterProvider` set up by `obsx.SetupObservability`.
 
 ### Why Order Matters
 
 ```mermaid
 sequenceDiagram
     participant Req as HTTP Request
-    participant TM as TracingMiddleware (otelgin)
-    participant LM as LoggingMiddleware
+    participant TM as httpmw.Tracing (otelgin)
+    participant LM as httpmw.Logging
     participant H as Handler
 
     Req->>TM: Incoming request
@@ -322,14 +324,14 @@ sequenceDiagram
 
 | Middleware | Runs | Produces | Depends On |
 |-----------|------|----------|------------|
-| **TracingMiddleware** (`otelgin`) | First | Root span, `trace_id`, W3C `traceparent` header — **and** the `http_server_request_duration_seconds` histogram (OTLP, auto-recorded by otelgin) | Nothing (creates context) |
-| **LoggingMiddleware** | Second | Structured JSON logs with `trace_id` field | `trace_id` from TracingMiddleware |
+| **`httpmw.Tracing`** (`otelgin`) | First | Root span, `trace_id`, W3C `traceparent` header — **and** the `http_server_request_duration_seconds` histogram (OTLP, auto-recorded by otelgin) | Nothing (creates context) |
+| **`httpmw.Logging`** | Second | Structured JSON logs with `trace_id` field | `trace_id` from `httpmw.Tracing` |
 
-**If you reversed the order**: LoggingMiddleware would have no `trace_id` to inject, so logs could not be correlated with traces. (There is no separate metrics middleware — otelgin records the metrics; and metrics no longer carry exemplars — see [Correlation](#6-correlation-connecting-the-pillars).)
+**If you reversed the order**: `httpmw.Logging` would have no `trace_id` to inject, so logs could not be correlated with traces. (There is no separate metrics middleware — otelgin records the metrics; and metrics no longer carry exemplars — see [Correlation](#6-correlation-connecting-the-pillars).)
 
 ### What Each Middleware Produces
 
-**TracingMiddleware** (`otelgin`) outputs:
+**`httpmw.Tracing`** (`otelgin`) outputs:
 - Root span exported to OTel Collector -> all three trace backends (Tempo, Jaeger, and the VictoriaTraces pilot)
 - Child spans created by handler/logic layer
 - W3C Trace Context header for cross-service propagation
@@ -340,10 +342,10 @@ sequenceDiagram
   - `http_server_response_body_size_bytes` (histogram) -- TX bandwidth
   - No in-flight/active-request gauge -- `otelgin` v0.69 does not emit `http_server_active_requests` (saturation now comes from Go runtime metrics)
 
-**LoggingMiddleware** outputs:
+**`httpmw.Logging`** outputs:
 - Structured zap output, teed over OTLP to VictoriaLogs (Vector collects only non-instrumented pods)
-- Every log line includes: `trace_id`, `method`, `path`, `status`, `duration`, `client_ip`
-- ERROR-level for 4xx/5xx, INFO-level for successful requests
+- Every log line includes: `trace_id` (when a span is active), `method`, `path`, `status`, `duration`, `client_ip`, `user_agent`
+- ERROR-level for 5xx, WARN-level for 4xx, INFO-level for successful requests
 
 ### Label Strategy
 
@@ -354,7 +356,7 @@ Bounded cardinality:
 
 Route normalization uses the Gin route pattern (`http_route`, e.g. `/api/v1/products/:id`) instead of raw URLs, preventing cardinality explosion from dynamic path parameters.
 
-Infrastructure endpoints (`/health`, `/ready`, `/metrics`) are filtered out before metric collection, so metrics reflect actual user traffic only.
+Routine probes are filtered out before metric collection, so metrics reflect real user traffic only. The list is `httpmw.DefaultSkipRoutes` in `pkg/httpmw` — **one** map read by both `httpmw.Tracing` and `httpmw.Logging`, so the trace and access-log skip lists cannot drift apart. Matching is **exact** against the Gin route pattern (`c.FullPath()`) via `otelgin.WithGinFilter`, and the filter runs before the span starts, so a skipped route emits neither spans nor `http.server.*` metrics — a unit test in `pkg/httpmw` pins that pair. Services register only `/health` and `/ready`, so a request aimed at a path no service registered (`/metrics`, `/healthz`, `/readyz`, `/livez`, `/favicon.ico`) matches no route and is now traced and measured as a 404 instead of vanishing — that is intended, a misconfigured probe should be visible. For access logs only **successful** probes are skipped; a failing probe is always logged.
 
 ---
 
@@ -527,7 +529,7 @@ Exemplars -- the old direct "click a dot on the histogram, jump to the trace" li
 The bridge is now **`trace_id`** rather than exemplars. Every log line carries the `trace_id` field, which VictoriaLogs indexes (fixed in RFC-0014 P4), and Tempo's traces<->logs correlation links a trace to those logs both ways. So the metric->trace pivot becomes **metric spike -> VictoriaLogs (filter by `app` + time window, grab a `trace_id`) -> Tempo trace**. One extra hop through logs, but no data lost.
 
 **Prerequisites** (all already configured):
-1. TracingMiddleware runs **before** LoggingMiddleware, so every log line gets a `trace_id`
+1. `httpmw.Tracing` runs **before** `httpmw.Logging`, so every log line gets a `trace_id`
 2. VictoriaLogs indexes the `trace_id` field (queryable, P4)
 3. Grafana has the Tempo datasource with traces<->logs correlation configured
 
@@ -546,7 +548,7 @@ Use this framework for every interview question about observability. The **Befor
 **How**:
 - Single `http_server_request_duration_seconds` histogram (OTel semconv) covers all RED signals (Rate, Errors, Duration)
 - Go runtime metrics (`go_goroutine_count`, heap, GC) add saturation = all 4 Golden Signals
-- TracingMiddleware -> LoggingMiddleware order ensures `trace_id` is available for log correlation; otelgin (the tracing instrumentation) auto-records the HTTP metrics — no separate metrics middleware
+- `httpmw.Tracing` -> `httpmw.Logging` order ensures `trace_id` is available for log correlation; otelgin (the tracing instrumentation) auto-records the HTTP metrics — no separate metrics middleware
 - Services **push OTLP** metrics (SDK -> OTel Collector -> VMAgent OTLP ingest); no per-service scrape config, `app`/`namespace` derived from OTLP resource attributes via vmagent relabel
 - Sloth Operator generates multi-window multi-burn-rate SLO alerts from `PrometheusServiceLevel` CRDs
 - VMAgent ingests (OTLP) + remote-writes, VMSingle stores, VMAlert evaluates, VMAlertmanager routes
@@ -618,9 +620,9 @@ Use this framework for every interview question about observability. The **Befor
 **What you did**: Built automatic correlation between all 4 pillars using `trace_id` as the universal key.
 
 **How**:
-- **trace_id generation**: TracingMiddleware creates a root span with a unique `trace_id` for every request (W3C Trace Context standard)
+- **trace_id generation**: `httpmw.Tracing` creates a root span with a unique `trace_id` for every request (W3C Trace Context standard)
 - **Metrics -> Logs**: A metric spike identifies the `app` + time window; filter VictoriaLogs by the same `app` label to find the offending requests (VictoriaMetrics has no exemplars -- RFC-0014 D-14 -- so there is no direct metric->trace dot)
-- **Traces -> Logs**: LoggingMiddleware extracts `trace_id` from the span context and includes it in every JSON log line; Tempo's traces<->logs correlation pivots from a span to VictoriaLogs `trace_id:"..."`
+- **Traces -> Logs**: `httpmw.Logging` extracts `trace_id` from the span context and includes it in every JSON log line; Tempo's traces<->logs correlation pivots from a span to VictoriaLogs `trace_id:"..."`
 - **Logs -> Traces**: Grafana's "Query with Tempo" button on log entries with `trace_id` (VictoriaLogs indexes the field)
 - **Traces -> Profiles**: Filter Pyroscope by service name and time range matching the trace
 - **Middleware order is critical**: Tracing first (creates context, and otelgin auto-records the HTTP metrics), Logging second (injects `trace_id`) — only two middlewares since the P3 cutover
@@ -700,7 +702,7 @@ downtime_reduction = (before - after) / before
 
 - **OTLP push, no per-service scrape config**: Services export OTLP to the OTel Collector; VMAgent ingests centrally. `app`/`namespace` come from OTLP resource attributes via a single vmagent relabel rule -- no ServiceMonitor per service. (ServiceMonitor scrape is retained only for infra exporters.)
 - **Single VMSingle stores**: VMAgent ingests + remote-writes; 7-day retention, horizontal scaling possible with VMCluster when needed
-- **Standardized middleware**: Every service includes the same 2-middleware chain (otelgin tracing + logging). otelgin auto-records RED metrics; the chain adds traces + structured logs. No per-service instrumentation
+- **Standardized middleware**: Every service includes the same 2-middleware chain (otelgin tracing + logging), now shared code in `pkg/httpmw` rather than a copy per repo. otelgin auto-records RED metrics; the chain adds traces + structured logs. No per-service instrumentation
 - **GitOps onboarding**: Deploy a new service via Helm -> set `slo.enabled: true` -> it gets metrics, alerting, SLOs, dashboards, and log collection automatically. Zero additional configuration
 - **Bounded cardinality**: Route normalization (`http_route`) + bounded label set = predictable storage growth regardless of traffic volume
 
@@ -709,7 +711,7 @@ downtime_reduction = (before - after) / before
 - **Migration from Prometheus to VictoriaMetrics Operator**: Required understanding the dual CRD system (Prometheus CRDs for compatibility with third-party charts + VM CRDs for the operator-managed runtime). Had to keep `ServiceMonitor`, `PodMonitor`, `PrometheusRule` CRDs while replacing the Prometheus server with VMSingle/VMAgent/VMAlert. The VM Operator's auto-conversion feature (`disable_prometheus_converter: false`) bridges the two systems
 - **Storage format bugs**: The `VMSingle` `volumeClaimTemplate` spec had incorrect nesting that the operator silently ignored, causing pods to restart without persistent storage. Required reading the operator source code to debug
 - **Cardinality control**: Early iterations used raw URL paths as labels, causing unbounded cardinality growth. Switched to the Gin route pattern (`http_route`) for predictable series count
-- **Middleware ordering**: Log correlation silently broke when LoggingMiddleware ran before TracingMiddleware -- log lines had no `trace_id`. Required understanding the data dependency chain (tracing first, then logging; otelgin records the metrics off the tracing instrumentation)
+- **Middleware ordering**: Log correlation silently broke when the logging middleware ran before the tracing middleware -- log lines had no `trace_id`. Required understanding the data dependency chain (tracing first, then logging; otelgin records the metrics off the tracing instrumentation)
 - **Losing exemplars in the OTel cutover**: The Prometheus-era stack linked metrics->traces via exemplars; VictoriaMetrics does not support them (RFC-0014 D-14). Re-wiring the metric->trace pivot through `trace_id`-indexed logs + Tempo traces<->logs correlation kept the investigation path intact without exemplars
 
 ### Q6: "If you had to do it again, what would you change?"
@@ -848,4 +850,4 @@ For every answer, structure as:
 - [Profiling Guide](../profiling/README.md) -- Continuous profiling, flamegraphs
 
 ---
-_Last updated: 2026-08-13 — 4-pillar diagram's edge node re-documented as the Envoy Gateway edge (OTLP/gRPC spans only; the edge has no OTLP logs path)_
+_Last updated: 2026-08-17 — middleware chain re-documented as the shared `pkg/httpmw` pair (`httpmw.Tracing` / `httpmw.Logging`), with exact route-pattern probe filtering_

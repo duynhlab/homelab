@@ -1030,7 +1030,10 @@ print('A20 audit trail:', 'OK' if ok else 'FAIL', c['status'],
 > the seeded realm user `bob` instead of a freshly registered one, which is why
 > A13 now clears bob's leftover session before arming.
 
-## Phase B — real browser (agent-browser, ~5 min)
+## Phase B — real browser (agent-browser, ~8 min)
+
+Two SPAs, run in that order: the storefront (`:3001`, B1-B4) and the Backoffice
+Portal (`:3009`, B5-B8).
 
 What Phase B proves that Phase A cannot: the SPA holds **no token of its own**.
 keycloak-js owns the token lifecycle in adapter memory, the browser never sees an
@@ -1238,8 +1241,99 @@ agent-browser $S read | grep -Ei 'Sign in to see your orders|Order #'
 agent-browser $S storage local get     # want: only `theme`, if anything
 agent-browser $S storage session get   # want: No storage entries
 
-# B4. Cleanup
+# B4. Cleanup — the STOREFRONT session only. The portal rows below open their
+#     own, because a browser profile that already holds a customer-realm SSO
+#     cookie is the wrong starting state for B7.
 agent-browser $S close
+
+# ---------------------------------------------------------------------------
+# B5-B8: THE BACKOFFICE PORTAL (:3009). Rows A17-A20 already drive the same
+# protected surface with curl, so what these add is the half curl cannot see:
+# that the SPA in front of it holds no token either, that it renders the numbers
+# the API returns rather than placeholders, and that the realm split is a fence
+# a customer account hits in the browser — not only a 401 a script can read.
+# ---------------------------------------------------------------------------
+P="--session portal"
+
+# B5. SIGN IN THROUGH THE **STAFF** REALM. Same shape as B1 and the same
+#     property — the portal has no password field — but a different realm,
+#     client and operator: duynhlab-staff / admin-portal / duyne (ADR-050).
+agent-browser $P --args "--no-sandbox" batch \
+  "open http://localhost:3009" "wait 2500" "get url" "snapshot -i"
+# want url http://localhost:3009/login?redirect=%2F — an unauthenticated load of
+# any portal route lands on /login, which shows "duynhlab Backoffice" and a
+# single "Sign in with Keycloak" button. `admin` gets only `service_started` on
+# the gateway, exactly like `frontend`, so a first paint with failed API calls on
+# a freshly recreated stack is a RETRY, not a failure.
+agent-browser $P batch "click @e3" "wait 3000" "get url" "snapshot -i"
+# ASSERTION 1 — the origin changed AND the realm in the path is the STAFF one:
+#   http://localhost:8081/realms/duynhlab-staff/protocol/openid-connect/auth?...
+#   ...response_type=code&code_challenge_method=S256...
+# `realms/duynhlab` here (the customer realm) is a FAILED row — it would mean the
+# container was built with the storefront's KEYCLOAK_REALM build arg.
+agent-browser $P batch "fill @e2 duyne" "fill @e4 'p@ss1234'" "click @e3" \
+  "wait 3000" "get url" "snapshot -i"
+# want: back on http://localhost:3009/ with the shell rendered — the primary nav
+# carries Dashboard, Catalog, Inventory, Orders, Payments, Shipments, Customers,
+# and a "Sign out" icon button. Landing on /forbidden instead means the token is
+# valid but carries no `backoffice_admin` role, which is a different failure from
+# a rejected sign-in: read the row it lands on before calling this red.
+
+# ASSERTION 2 — NO TOKEN IN WEB STORAGE, same test as B1's assertion 3. The
+# portal runs the same keycloak-js adapter with check-sso + PKCE S256, so the
+# access token lives in adapter memory and neither storage may hold one.
+agent-browser $P eval --stdin <<'EVALEOF'
+(() => {
+  const jwtish = v => typeof v === 'string' && v.split('.').length === 3
+    && /^[A-Za-z0-9_-]{16,}$/.test(v.split('.')[0]);
+  const scan = s => Object.keys(s).filter(k => jwtish(s.getItem(k)));
+  return JSON.stringify({
+    local_keys: Object.keys(localStorage),
+    session_keys: Object.keys(sessionStorage),
+    local_jwtish: scan(localStorage),
+    session_jwtish: scan(sessionStorage)
+  });
+})()
+EVALEOF
+# want: local_jwtish [] and session_jwtish [].
+
+# B6. THE DASHBOARD READS REAL NUMBERS. Five cards, each backed by a protected
+#     endpoint A18-A20 already exercise: Low / out of stock, Manual review,
+#     Cancelling, Unresolved attempts, Recon discrepancies (latest run).
+agent-browser $P read | grep -E 'Low / out of stock|Manual review|Cancelling|Unresolved attempts|Recon discrepancies'
+# ASSERTION — every card title is present AND each carries a numeral, not a dash
+# or a spinner. Run Phase A FIRST: the numbers are whatever the driven flow left
+# behind, so a zero is a legitimate value and only a missing/blank card is red.
+agent-browser $P network requests --type fetch | grep ':8080/'
+# want: every portal API call 200. A 401 here with the shell still rendered means
+# the SPA authenticated but the edge rejected the token — check the staff
+# JWT policy, not the SPA.
+
+# B7. THE REALM SPLIT IS A FENCE IN THE BROWSER. `alice` exists in the customer
+#     realm and nowhere else, so a store account cannot get past the portal's
+#     own sign-in page — this is the browser-shaped twin of A17's edge 401.
+#     A THIRD session, not $P: B5 left a staff SSO cookie on that profile, so
+#     check-sso would sign duyne straight back in and the form would never
+#     appear. This one must start clean.
+N="--session portal-neg"
+agent-browser $N --args "--no-sandbox" batch \
+  "open http://localhost:3009/login" "wait 2500" "snapshot -i"
+agent-browser $N batch "click @e3" "wait 3000" "snapshot -i"
+# RE-SNAPSHOT BETWEEN THE CLICK AND THE FILL, and use the refs THAT snapshot
+# printed. Chaining them in one batch looks tidier and silently does nothing: the
+# click leaves :3009 for the realm, which invalidates every ref, so the fills
+# answer "Unknown ref" and the row submits an EMPTY form — which still shows
+# "Invalid username or password." and reads like a pass. Measured 2026-08-17.
+agent-browser $N batch "fill @e2 alice" "fill @e4 password123" "click @e3" \
+  "wait 3000" "get url" "snapshot -i"
+# ASSERTION — still on the realm's own page at localhost:8081 with an
+# "Invalid username or password." message, and NEVER back on :3009 with a shell.
+# A rendered portal after these credentials is a FAILED row and means the two
+# realms share a user store.
+
+# B8. Cleanup — both portal sessions.
+agent-browser $P close
+agent-browser $N close
 ```
 
 ## Phase C — telemetry sanity (curl + PromQL + LogsQL + SQL, ~6 min)
@@ -1441,7 +1535,11 @@ done
 # The `inventory` row carries weight beyond itself: inventory is gRPC-only with no
 # edge route, so `rpc_server_call_duration_seconds_count` is the ONLY metrics
 # evidence that it is instrumented at all. `go_goroutine_count` proves the runtime
-# instrumentation leg (12 series on a full stack = one per instrumented process).
+# instrumentation leg. **Eleven** series on a full stack, not twelve: the ten
+# application services plus `mockpay`. The two workers do not add series of their
+# own because compose gives them their service's identity
+# (`order-worker` → `OTEL_SERVICE_NAME=order`, `checkout-worker` → `checkout`),
+# so their runtime metrics share the service's series by design.
 
 # C9. Business counters move with the flow: the three ends of the saga should
 #     agree — confirmed = saga = authorized.
@@ -1621,6 +1719,34 @@ for d in microservices-otel-local business-otel-local temporal-worker-local red-
          heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa; do
   curl -s -o /dev/null -w "C18 $d: %{http_code} (want 200)\n" "$GRAF/api/dashboards/uid/$d"
 done
+# ...and every datasource REFERENCE inside them resolves. A 200 above only says
+# the object parses. A dashboard whose panels name `${DS_PROMETHEUS}` without
+# declaring that variable, or a uid no datasource carries, loads with a green
+# 200 and then renders "Datasource ... was not found" on every panel — which is
+# exactly how `clickhouse-server-engine` shipped: vendored from grafana.com with
+# its `__inputs` block intact, and provisioning does not process `__inputs`.
+# Found by opening the UI on 2026-08-17, not by this row, which is why the row
+# now exists.
+LIVE=$(curl -s "$GRAF/api/datasources" | python3 -c "import json,sys;print(','.join(d['uid'] for d in json.load(sys.stdin)))")
+for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
+         clickhouse-otel-sql clickhouse-service-deepdive \
+         clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer \
+         clickhouse-server-engine \
+         heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa; do
+  curl -s "$GRAF/api/dashboards/uid/$d" | LIVE="$LIVE" python3 -c "
+import json, os, re, sys
+live = set(os.environ['LIVE'].split(',')) | {'grafana', '-- Grafana --', '-- Mixed --', '-- Dashboard --'}
+d = json.load(sys.stdin)['dashboard']
+s = json.dumps(d)
+declared = {v['name'] for v in d.get('templating', {}).get('list', []) if v.get('type') == 'datasource'}
+used = {m for m in re.findall(r'\\\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?', s)
+        if m.upper().startswith('DS_') or m in ('ds', 'datasource')}
+lits = {u for u in re.findall(r'\"uid\": \"([^\"\$]+)\"', s)} - live - {d.get('uid')}
+bad = (used - declared) | lits
+print('C18 refs', 'OK  ' if not bad else 'FAIL', d['title'], '' if not bad else '-> ' + ','.join(sorted(bad)))"
+done
+# want every line OK. A FAIL names either an undeclared ${VAR} or a uid that no
+# datasource carries; both render as an error banner, never as "No data".
 
 # C19. PANELS RETURN DATA. C18 only proves the dashboard OBJECTS exist; a
 #      provisioned dashboard loads happily while every panel renders "No data".
@@ -1718,7 +1844,11 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |
-| B4 | Browser cleanup | the agent-browser session is closed, so a later run starts from a clean profile |
+| B4 | Browser cleanup (storefront) | the `audit` session is closed, so a later run starts from a clean profile |
+| B5 | Portal sign-in through the **staff** realm | an unauthenticated `:3009` load lands on `/login` with one "Sign in with Keycloak" button and no password field; the button changes the ORIGIN to `localhost:8081` **and the realm in the path is `duynhlab-staff`** — `realms/duynhlab` here means the container was built with the storefront's realm arg; after `duyne` signs in the shell renders with the seven primary nav items and a Sign out control (a landing on `/forbidden` is a role failure, not a sign-in failure); **no JWT-shaped value in either web storage** |
+| B6 | Portal dashboard reads real numbers | all five cards present — Low / out of stock, Manual review, Cancelling, Unresolved attempts, Recon discrepancies (latest run) — each showing a numeral rather than a dash or a spinner, and every `:8080` call behind them 200. Zero is a legitimate value; a blank or missing card is not. Requires Phase A to have run first |
+| B7 | The realm split is a fence in the browser | in a **clean** profile (`portal-neg`, so no staff SSO cookie), the customer account `alice` / `password123` typed on the portal's realm page stays on `localhost:8081` with "Invalid username or password."; a rendered portal shell after those credentials is a FAILED row and means the two realms share a user store |
+| B8 | Browser cleanup (portal) | both the `portal` and `portal-neg` sessions are closed |
 | C1 | Collector | 0 export failures / error lines |
 | C2 | Edge span is the trace root | the discovery query returns exactly one non-application service name (`platform.envoy-gateway-system`, derived by Envoy Gateway from `<gateway>.<namespace>` — discovered, not assumed) and the ROOT span of the tagged request is the edge's `ingress` Server span; the `deployment.environment.name=local` customTag corroborates it |
 | C3 | Trace continuity edge→service | one `TraceId` holds the edge **and** the service, with exactly one root and the service's Server span carrying a non-empty `ParentSpanId` |

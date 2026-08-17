@@ -24,7 +24,7 @@
       },
       "id": 100,
       "panels": [],
-      "title": "\ud83d\udcca Overview & Key Metrics",
+      "title": "📊 Overview & Key Metrics",
       "type": "row"
     },
     {
@@ -497,7 +497,7 @@
       ],
       "title": "Error Rate % (5xx)",
       "type": "stat",
-      "description": "Server-fault error ratio \u2014 matches the MicroserviceHighErrorRate alert and the availability SLO (both 5xx-only). Client 4xx are the service answering correctly; they stay visible in Error RPS (4xx/5xx), the status pie, and Client Errors (4xx)."
+      "description": "Server-fault error ratio — matches the MicroserviceHighErrorRate alert and the availability SLO (both 5xx-only). Client 4xx are the service answering correctly; they stay visible in Error RPS (4xx/5xx), the status pie, and Client Errors (4xx)."
     },
     {
       "datasource": {
@@ -629,7 +629,7 @@
       },
       "id": 101,
       "panels": [],
-      "title": "\ud83d\ude80 Traffic & Requests",
+      "title": "🚀 Traffic & Requests",
       "type": "row"
     },
     {
@@ -847,7 +847,7 @@
       },
       "id": 102,
       "panels": [],
-      "title": "\u26a0\ufe0f Errors & Performance",
+      "title": "⚠️ Errors & Performance",
       "type": "row"
     },
     {
@@ -1026,7 +1026,7 @@
       ],
       "title": "Server Error Rate by Method and Endpoint (5xx)",
       "type": "timeseries",
-      "description": "5xx ratio per method+route \u2014 continuous series (0 baseline) so legend means are honest. Client 4xx per endpoint live in the Client Errors (4xx) panel."
+      "description": "5xx ratio per method+route — continuous series (0 baseline) so legend means are honest. Client 4xx per endpoint live in the Client Errors (4xx) panel."
     },
     {
       "datasource": {
@@ -1485,7 +1485,7 @@
       },
       "id": 103,
       "panels": [],
-      "title": "\ud83d\udd27 Go Runtime & HTTP I/O (OTel)",
+      "title": "🔧 Go Runtime & HTTP I/O (OTel)",
       "type": "row"
     },
     {
@@ -1834,7 +1834,7 @@
       ],
       "title": "GC Pacing Pressure (used / goal)",
       "type": "timeseries",
-      "description": "Heap used vs the GC pacer goal from the OTel Go runtime. Sustained values near 1.0 mean the heap keeps hitting the GC goal \u2014 memory pressure / frequent GC cycles."
+      "description": "Heap used vs the GC pacer goal from the OTel Go runtime. Sustained values near 1.0 mean the heap keeps hitting the GC goal — memory pressure / frequent GC cycles."
     },
     {
       "datasource": {
@@ -1939,7 +1939,7 @@
       },
       "id": 105,
       "panels": [],
-      "title": "\ud83d\udd17 gRPC East-West (RED)",
+      "title": "🔗 gRPC East-West (RED)",
       "type": "row"
     },
     {
@@ -2104,7 +2104,7 @@
       "targets": [
         {
           "expr": "sum by (rpc_method, server_address) (rate(rpc_client_call_duration_seconds_count{service_name=~\"$app\", }[$rate]))",
-          "legendFormat": "{{rpc_method}} \u2192 {{server_address}}",
+          "legendFormat": "{{rpc_method}} → {{server_address}}",
           "refId": "A"
         }
       ],
@@ -2274,7 +2274,7 @@
       "targets": [
         {
           "expr": "sum by (rpc_method, server_address) (rate(rpc_client_call_duration_seconds_count{service_name=~\"$app\",  rpc_response_status_code!=\"OK\"}[$rate]))",
-          "legendFormat": "{{rpc_method}} \u2192 {{server_address}}",
+          "legendFormat": "{{rpc_method}} → {{server_address}}",
           "refId": "A"
         }
       ],
@@ -2444,7 +2444,7 @@
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum by (le, rpc_method, server_address) (rate(rpc_client_call_duration_seconds_bucket{service_name=~\"$app\", }[$rate])))",
-          "legendFormat": "{{rpc_method}} \u2192 {{server_address}}",
+          "legendFormat": "{{rpc_method}} → {{server_address}}",
           "refId": "A"
         }
       ],
@@ -2466,7 +2466,7 @@
       },
       "id": 106,
       "panels": [],
-      "title": "\ud83d\udd17 gRPC East-West (RED) \u2014 Per Callee",
+      "title": "🔗 gRPC East-West (RED) — Per Callee",
       "type": "row"
     },
     {
@@ -2727,7 +2727,7 @@
     {
       "id": 219,
       "type": "row",
-      "title": "\ud83d\uddc4\ufe0f Database (client \u2014 otelpgx)",
+      "title": "🗄️ Database (client — otelpgx)",
       "collapsed": false,
       "panels": [],
       "datasource": {
@@ -2797,7 +2797,7 @@
       "id": 221,
       "type": "timeseries",
       "title": "DB p95 by operation type",
-      "description": "query / batch / prepare / connect / acquire \u2014 split by op.",
+      "description": "query / batch / prepare / connect / acquire — split by op.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -2901,7 +2901,7 @@
       "id": 223,
       "type": "timeseries",
       "title": "Pool in-flight (acquired conns)",
-      "description": "Connections currently checked out \u2248 concurrent DB work in flight.",
+      "description": "Connections currently checked out ≈ concurrent DB work in flight.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -2953,7 +2953,7 @@
       "id": 224,
       "type": "timeseries",
       "title": "Pool saturation (acquired / max)",
-      "description": "Sustained \u226580% = acquires start queueing (PgxPoolNearExhaustion).",
+      "description": "Sustained ≥80% = acquires start queueing (PgxPoolNearExhaustion).",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -3007,7 +3007,7 @@
       "id": 225,
       "type": "timeseries",
       "title": "Pool contention (waiting acquires)",
-      "description": "Acquires that had to wait for a free conn \u2014 earliest saturation signal.",
+      "description": "Acquires that had to wait for a free conn — earliest saturation signal.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -3268,7 +3268,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Microservices (OTel) \u2014 local",
+  "title": "Microservices — OTel — Local",
   "uid": "microservices-otel-local",
   "version": 1,
   "weekStart": ""

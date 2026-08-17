@@ -147,8 +147,8 @@ graph TD
     A["HTTP request"] --> B["Gin router"]
     B --> C["Middleware chain"]
 
-    C --> D["TracingMiddleware (otelgin)<br/>root span + http.server.* metrics"]
-    D --> E["LoggingMiddleware<br/>request log + trace_id"]
+    C --> D["httpmw.Tracing (otelgin)<br/>root span + http.server.* metrics"]
+    D --> E["httpmw.Logging<br/>request log + trace_id"]
 
     E --> H["Web layer<br/>web/v1"]
     H --> J["Parse request<br/>validate input<br/>optional child span"]
@@ -167,6 +167,13 @@ graph TD
     class B,C,D,E,H,J,L,N,P,Q service;
     class O data;
 ```
+
+The middleware pair is shared code: `httpmw.Tracing(serviceName)` and
+`httpmw.Logging(logger)` in **`pkg/httpmw`** (`httpmw/v0.1.0`), with the
+`logic/v1` span helpers in **`pkg/obsx`** (`obsx/v0.37.1`). Migration off the
+per-service `<svc>-service/middleware/` copies is **in progress**; the shared
+packages are the contract for new and migrated code. Details:
+[Application observability § Middleware and interceptors](../api/observability.md#middleware-and-interceptors).
 
 ### End-to-End Request with APM
 
@@ -190,14 +197,14 @@ sequenceDiagram
     Client->>Gin: HTTP Request
     Gin->>MW: Route to handler
 
-    Note over MW: TracingMiddleware
+    Note over MW: httpmw.Tracing
     MW->>MW: Create root span
     MW->>OTel: Export span (OTLP HTTP :4318)
 
-    Note over MW: otelgin (in TracingMiddleware) records http.server.* metrics on response
+    Note over MW: otelgin (in httpmw.Tracing) records http.server.* metrics on response
     MW->>OTel: Metrics (OTLP HTTP :4318)
 
-    Note over MW: LoggingMiddleware
+    Note over MW: httpmw.Logging
     MW->>MW: Extract trace-id
     MW->>OTel: Log record (zap OTLP tee, request)
 
@@ -384,7 +391,7 @@ sequenceDiagram
 **Key correlation mechanisms:**
 
 - **Metrics → Traces**: exemplars are **not available** (VictoriaMetrics won't-fix, RFC-0014 D-14) — pivot from a metric to traces by service + time window, or via the `trace_id` field now carried on logs (below)
-- **Traces → Logs**: `trace_id` injected into every structured log line by LoggingMiddleware
+- **Traces → Logs**: `trace_id` injected into every structured log line by `httpmw.Logging`
 - **Logs → Traces**: VictoriaLogs datasource derived field extracts `trace_id` and links back to Tempo
 - **Traces → Profiles**: Pyroscope labels match service name for time-correlated flamegraphs
 
@@ -440,4 +447,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-08-13 — edge re-documented as Envoy Gateway (native `telemetry.tracing`, OTLP gRPC :4317 spans only, no OTLP logs path); added OTel fundamentals/collector/histograms docs; stack diagram now shows the live ClickHouse fan-out._
+_Last updated: 2026-08-17 — HTTP middleware diagrams name the shared `pkg/httpmw` pair (`httpmw.Tracing` / `httpmw.Logging`) instead of the retired per-service copies._

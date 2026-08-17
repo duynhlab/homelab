@@ -192,7 +192,33 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Local-stack
+
+- **The Backoffice Portal joins the compose stack** on `:3009`. Everything it
+  needed was already there — the `duynhlab-staff` realm import, the
+  `admin-portal` client with that origin, the operator `duyne`, the CORS entry
+  and the staff-protected routes that audit rows A17-A20 already drive with
+  curl. Only the SPA container was missing, so the whole protected surface was
+  verified by request and never by browser. The audit gains **B5-B8** for it:
+  sign-in against the staff realm with no token in web storage, the five
+  dashboard cards showing numerals rather than placeholders, and — from a clean
+  browser profile, because B5 leaves a staff SSO cookie — the customer account
+  `alice` failing at the portal's own sign-in page, which is the browser-shaped
+  twin of the edge 401 in A17.
+
 #### Services
+
+- **The HTTP tracing and logging middleware moves into `pkg`** (ADR-038,
+  `httpmw/v0.1.0` + `obsx/v0.37.1`). Every Go service carried its own copy of
+  `middleware/tracing.go` and `middleware/logging.go`; the tracing copies had
+  split into four variants and the logging copies into seven, so one fix was ten
+  PRs against ten shapes. `pkg/httpmw` now owns the pair and `pkg/obsx` the span
+  helpers. They are separate modules because `obsx` has no gin dependency, which
+  is what lets a gRPC-only service take the helpers while `docs/api/observability.md`
+  still forbids `logic/v1` from importing Gin types. Both middleware read one
+  `DefaultSkipRoutes` map, so the tracing and logging exclusions can no longer
+  drift apart. Adoption is in flight: `pkg` and `inventory-service` are merged,
+  the nine HTTP services await the compose gate.
 
 - **The storefront gets a home page** (`frontend` **3.1.0**, frontend#97). The
   catalog moves to `/products`; `/` becomes a search box, the real category

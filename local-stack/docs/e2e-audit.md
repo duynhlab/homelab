@@ -1318,9 +1318,14 @@ agent-browser $P network requests --type fetch | grep ':8080/'
 N="--session portal-neg"
 agent-browser $N --args "--no-sandbox" batch \
   "open http://localhost:3009/login" "wait 2500" "snapshot -i"
-agent-browser $N batch "click @e3" "wait 3000" \
-  "fill @e2 alice" "fill @e4 password123" "click @e3" "wait 3000" \
-  "get url" "snapshot -i"
+agent-browser $N batch "click @e3" "wait 3000" "snapshot -i"
+# RE-SNAPSHOT BETWEEN THE CLICK AND THE FILL, and use the refs THAT snapshot
+# printed. Chaining them in one batch looks tidier and silently does nothing: the
+# click leaves :3009 for the realm, which invalidates every ref, so the fills
+# answer "Unknown ref" and the row submits an EMPTY form — which still shows
+# "Invalid username or password." and reads like a pass. Measured 2026-08-17.
+agent-browser $N batch "fill @e2 alice" "fill @e4 password123" "click @e3" \
+  "wait 3000" "get url" "snapshot -i"
 # ASSERTION — still on the realm's own page at localhost:8081 with an
 # "Invalid username or password." message, and NEVER back on :3009 with a shell.
 # A rendered portal after these credentials is a FAILED row and means the two
@@ -1530,7 +1535,11 @@ done
 # The `inventory` row carries weight beyond itself: inventory is gRPC-only with no
 # edge route, so `rpc_server_call_duration_seconds_count` is the ONLY metrics
 # evidence that it is instrumented at all. `go_goroutine_count` proves the runtime
-# instrumentation leg (12 series on a full stack = one per instrumented process).
+# instrumentation leg. **Eleven** series on a full stack, not twelve: the ten
+# application services plus `mockpay`. The two workers do not add series of their
+# own because compose gives them their service's identity
+# (`order-worker` → `OTEL_SERVICE_NAME=order`, `checkout-worker` → `checkout`),
+# so their runtime metrics share the service's series by design.
 
 # C9. Business counters move with the flow: the three ends of the saga should
 #     agree — confirmed = saga = authorized.

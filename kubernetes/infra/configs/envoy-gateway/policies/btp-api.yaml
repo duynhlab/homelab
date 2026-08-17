@@ -3,10 +3,18 @@
 # per-domain resilience source values):
 #
 #   1. rateLimit.local sized as per-instance buckets (effective ceiling =
-#      configured x replicas — ADR-046 local-first decision): 2/Second
-#      (round of 2.5), 50/Minute, 1250/Hour. Envoy applies the STRICTEST
-#      matching rule, so all three windows are enforced together.
-#      X-RateLimit draft-03 headers enabled per rule (the CORS expose list
+#      configured x replicas — ADR-045 local-first decision): 2/Second
+#      (round of 2.5), so 4/s across replicaCount 2.
+#      ONE rule, and that is a hard constraint, not a preference: Envoy
+#      Gateway rejects a local rateLimit with more than one rule unless the
+#      extras carry clientSelectors, and clientSelectors match headers/CIDR —
+#      they cannot express "the same client, a second time window". The
+#      earlier 50/Minute + 1250/Hour rules were therefore not a stricter
+#      ceiling but an invalid policy, and EG fails closed on an invalid BTP by
+#      installing a 500 direct response on every route it targets. Adding a
+#      window back means adding a Rate Limit Service (ADR-045's recorded
+#      escape hatch), not another rule here.
+#      X-RateLimit draft-03 headers enabled on the rule (the CORS expose list
 #      matches accordingly). No Redis/Valkey at the edge: in-process buckets
 #      cannot fail open OR closed.
 #   2. requestBuffer 10Mi (413 over the limit).
@@ -55,14 +63,6 @@ spec:
             requests: 2
             unit: Second
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
   retry:
@@ -101,14 +101,6 @@ spec:
         - limit:
             requests: 2
             unit: Second
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
@@ -149,14 +141,6 @@ spec:
             requests: 2
             unit: Second
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
   retry:
@@ -195,14 +179,6 @@ spec:
         - limit:
             requests: 2
             unit: Second
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
@@ -246,14 +222,6 @@ spec:
             requests: 2
             unit: Second
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
   retry:
@@ -293,14 +261,6 @@ spec:
             requests: 2
             unit: Second
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
   retry:
@@ -339,14 +299,6 @@ spec:
         - limit:
             requests: 2
             unit: Second
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
@@ -390,14 +342,6 @@ spec:
             requests: 2
             unit: Second
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi
   retry:
@@ -436,14 +380,6 @@ spec:
         - limit:
             requests: 2
             unit: Second
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 50
-            unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 1250
-            unit: Hour
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
     limit: 10Mi

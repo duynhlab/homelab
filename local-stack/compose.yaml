@@ -184,11 +184,25 @@ services:
 
   temporal:
     image: temporalio/server:1.31.2
-    # on-failure: a restart can die FATALLY after ~50s when ringpop tries to
-    # rejoin its own stale membership entry ("join duration exceeded max 30s")
-    # — seen live in the 2026-08-13 audit: `restart temporal` (A14) answered
-    # the row, then exited(1) 90s later and stayed down, silently taking every
-    # timer with it. The retry starts clean once the stale entry has aged out.
+    # on-failure: a restart dies FATALLY after ~50s roughly half the time, when
+    # ringpop cannot bootstrap ("join duration of 50.6s exceeded max 30s"). Seen
+    # first in the 2026-08-13 audit: `restart temporal` (A14) answered the row,
+    # then exited(1) about 50s later — long after the row had reported PASS —
+    # silently taking every timer with it.
+    #
+    # Measured 2026-08-17 over eight restarts: FOUR crashed, four did not. The
+    # count of stale rows in `cluster_membership` does not predict it (12 clean,
+    # 16 crash, 20 crash, 24 clean), so the earlier note here — that the retry
+    # succeeds "once the stale entry has aged out" — was wrong twice over: the
+    # rows carry a two-DAY record_expiry and never age out inside a run, and
+    # they are not what decides the outcome. It is not resource starvation
+    # either: the container has no CPU or memory limit, has never been
+    # OOM-killed, and the podman VM has 8 vCPU / 16 GB. The mechanism is still
+    # open; what is established is the rate and that on-failure recovers it.
+    #
+    # CONSEQUENCE FOR THE AUDIT, not just for compose: any row that depends on a
+    # Temporal timer and runs AFTER A14 is racing a coin flip. A13 came back
+    # `expired|lazy` — inconclusive — on the run where the engine died.
     restart: on-failure:5
     environment:
       DB: postgres12

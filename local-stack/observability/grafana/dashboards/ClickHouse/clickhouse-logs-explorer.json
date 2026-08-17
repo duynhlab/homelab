@@ -1,6 +1,6 @@
 {
   "uid": "clickhouse-logs-explorer",
-  "title": "OTel — Logs Explorer",
+  "title": "ClickHouse — Logs Explorer — Local",
   "description": "Log investigation over ClickHouse otel_logs: what errors are happening? Every log line is trace-correlated — TraceId jumps to the Trace Explorer.",
   "tags": [
     "clickhouse",

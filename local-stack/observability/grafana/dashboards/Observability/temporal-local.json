@@ -664,7 +664,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Worker \u2192 server request error ratio",
+      "title": "Worker → server request error ratio",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -781,7 +781,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Temporal \u2014 Workflows & Activities (local)",
+  "title": "Temporal — Workflows & Activities — Local",
   "uid": "temporal-worker-local",
   "version": 1,
   "weekStart": ""

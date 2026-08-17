@@ -1,6 +1,6 @@
 {
   "uid": "clickhouse-otel-overview",
-  "title": "OTel — Overview",
+  "title": "ClickHouse — OTel Overview — Local",
   "description": "Triage landing page over ClickHouse OTel logs+traces: which service is in trouble? Drill into Logs Explorer / Trace Explorer / service deep dive.",
   "tags": [
     "clickhouse",

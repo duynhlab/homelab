@@ -1719,6 +1719,34 @@ for d in microservices-otel-local business-otel-local temporal-worker-local red-
          heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa; do
   curl -s -o /dev/null -w "C18 $d: %{http_code} (want 200)\n" "$GRAF/api/dashboards/uid/$d"
 done
+# ...and every datasource REFERENCE inside them resolves. A 200 above only says
+# the object parses. A dashboard whose panels name `${DS_PROMETHEUS}` without
+# declaring that variable, or a uid no datasource carries, loads with a green
+# 200 and then renders "Datasource ... was not found" on every panel — which is
+# exactly how `clickhouse-server-engine` shipped: vendored from grafana.com with
+# its `__inputs` block intact, and provisioning does not process `__inputs`.
+# Found by opening the UI on 2026-08-17, not by this row, which is why the row
+# now exists.
+LIVE=$(curl -s "$GRAF/api/datasources" | python3 -c "import json,sys;print(','.join(d['uid'] for d in json.load(sys.stdin)))")
+for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
+         clickhouse-otel-sql clickhouse-service-deepdive \
+         clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer \
+         clickhouse-server-engine \
+         heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa; do
+  curl -s "$GRAF/api/dashboards/uid/$d" | LIVE="$LIVE" python3 -c "
+import json, os, re, sys
+live = set(os.environ['LIVE'].split(',')) | {'grafana', '-- Grafana --', '-- Mixed --', '-- Dashboard --'}
+d = json.load(sys.stdin)['dashboard']
+s = json.dumps(d)
+declared = {v['name'] for v in d.get('templating', {}).get('list', []) if v.get('type') == 'datasource'}
+used = {m for m in re.findall(r'\\\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?', s)
+        if m.upper().startswith('DS_') or m in ('ds', 'datasource')}
+lits = {u for u in re.findall(r'\"uid\": \"([^\"\$]+)\"', s)} - live - {d.get('uid')}
+bad = (used - declared) | lits
+print('C18 refs', 'OK  ' if not bad else 'FAIL', d['title'], '' if not bad else '-> ' + ','.join(sorted(bad)))"
+done
+# want every line OK. A FAIL names either an undeclared ${VAR} or a uid that no
+# datasource carries; both render as an error banner, never as "No data".
 
 # C19. PANELS RETURN DATA. C18 only proves the dashboard OBJECTS exist; a
 #      provisioned dashboard loads happily while every panel renders "No data".

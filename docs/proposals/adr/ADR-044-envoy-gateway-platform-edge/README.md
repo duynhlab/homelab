@@ -232,6 +232,44 @@ survivor.
 | Telemetry | Trace continuity SPA→edge→service (ParentBased); rewritten alerts fired; probe-filter CEL proven by volume delta |
 | Documentation | `docs/api/api.md` edge exposure and `docs/platform/envoy-gateway.md` link this ADR |
 
+## Amendments
+
+### 2026-08-17 — CRD delivery moves from Helm to server-side apply
+
+The decision above is unchanged: Envoy Gateway is the edge, driven by Gateway
+API resources. What changes is **how its CRDs reach the cluster**.
+
+The first Kind bring-up of this layer proved the planned mechanism cannot work.
+The `gateway-crds-helm` chart ships CRDs in `templates/`, so Helm stores both
+the rendered manifest and the whole chart in the release Secret:
+
+| Delivery path | Measured | Ceiling | Result |
+|---------------|----------|---------|--------|
+| HelmRelease (planned) | release Secret ~2.06 MB | 1 MiB — `Secret` validation | rejected by the API server |
+| `kubectl apply`, client-side | `envoyproxies` CRD 1.35 MB | 256 KB — `last-applied-configuration` annotation | rejected |
+| **Server-side apply** (adopted) | 18 objects | — | applies |
+
+The ceiling is structural, not a misconfiguration: `channel: standard` still
+packages the unused experimental file, and removing it leaves ~1.63 MB; chart
+`v1.9.0` packages the same way and is larger still. Letting the controller
+chart install its own CRD subchart was measured at ~1.14 MB — under 10% below
+the same ceiling, so it was rejected as an unproven margin rather than a fix.
+
+**Amended decision:** `kubernetes/infra/controllers/gateway-api-crds/` holds the
+CRDs as vendored manifests, applied by the existing `gateway-api-crds-local`
+Flux Kustomization, which uses server-side apply. The controller HelmRelease
+keeps `crds: Skip` and additionally sets
+`crds.gatewayAPI.safeUpgradePolicy.enabled: false`, so the `safe-upgrades`
+ValidatingAdmissionPolicy has exactly one declared owner.
+
+**Accepted trade-off:** ~3.4 MB of generated YAML in git, and an Envoy Gateway
+upgrade now requires re-rendering that directory in the same change as the
+controller pin. The regeneration command is in
+[`gateway-api-crds/README.md`](../../../../kubernetes/infra/controllers/gateway-api-crds/README.md).
+
+**Obligation added:** the "Gateway API CRDs + EG HelmReleases in the Flux chain"
+row above is satisfied by the Kustomization, not by a second HelmRelease.
+
 ## Revisit triggers
 
 Re-open this decision when one or more of the following become true:
@@ -264,6 +302,7 @@ new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Proposed inside the RFC-0024 review |
 | 2026-08-11 | Accepted / Not started | Accepted with RFC-0024; numbering assigned 044–046 because ADR-039/040 were consumed by unrelated decisions (RFC text had said 045–047) |
+| 2026-08-17 | Accepted / Partial | Amended: CRD delivery moves from a HelmRelease to vendored manifests applied server-side, after the first Kind bring-up proved the Helm path exceeds the 1 MiB `Secret` limit |
 
 ---
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-17_

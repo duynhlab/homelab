@@ -2,6 +2,11 @@
 # envoy-gateway controller can dependsOn applied CRDs, and so a controller
 # rollback never prunes CRDs (prune: false — deleting Gateway API CRDs would
 # cascade-delete every HTTPRoute/policy).
+#
+# The CRDs are vendored manifests applied with server-side apply, NOT a
+# HelmRelease: the upstream gateway-crds-helm chart ships them in templates/,
+# so Helm's release Secret would need ~2.06 MB against a 1 MiB limit and the
+# install can never succeed. See controllers/gateway-api-crds/README.md.
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -19,11 +24,9 @@ spec:
     name: infrastructure-oci
   path: ./controllers/gateway-api-crds
   prune: false
+  # wait: true makes kustomize-controller wait for every applied object to
+  # become ready — for CRDs that is the Established condition — so no explicit
+  # healthChecks block is needed (the two are mutually exclusive in Flux).
   wait: true
   dependsOn:
     - name: controllers-local # `envoy-gateway` namespace (controllers/namespaces.yaml)
-  healthChecks:
-    - apiVersion: helm.toolkit.fluxcd.io/v2
-      kind: HelmRelease
-      name: gateway-api-crds
-      namespace: envoy-gateway

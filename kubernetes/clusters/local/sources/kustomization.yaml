@@ -14,7 +14,6 @@ resources:
   - oci/victoria-metrics-mcp-oci.yaml
   - oci/victoria-logs-mcp-oci.yaml
   - oci/flux-operator-mcp-oci.yaml
-  - oci/envoy-gateway-crds-oci.yaml
   - oci/envoy-gateway-oci.yaml
   
   # Helm Repositories

@@ -1,4 +1,4 @@
-# Envoy Gateway control plane (RFC-0024 P2, ADR-045) — replaces Kong as the
+# Envoy Gateway control plane (RFC-0024 P2, ADR-044) — replaces Kong as the
 # platform edge; Kong stays deployed until the P2 cutover PR (2.3) removes it.
 # Chart: envoyproxy/gateway-helm — the envoy-gateway controller Deployment
 # (xDS server + Gateway API reconciler). Data-plane Envoy Deployments are
@@ -9,9 +9,11 @@
 # not the upstream default envoy-gateway-system. Created in
 # controllers/namespaces.yaml.
 #
-# CRDs: crds Skip on install AND upgrade — the gateway-api-crds HelmRelease
-# (controllers/gateway-api-crds/) owns both the Gateway API standard-channel
-# CRDs and the EG extension CRDs.
+# CRDs: crds Skip on install AND upgrade — this chart carries them in its
+# `crds` subchart, but controllers/gateway-api-crds/ owns both the Gateway API
+# standard-channel CRDs and the EG extension CRDs as vendored manifests applied
+# with server-side apply (Helm cannot store a release this large; see that
+# directory's README).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -34,6 +36,14 @@ spec:
     remediation:
       retries: 3
   values:
+    # `crds: Skip` covers the subchart's crds/ directory but NOT its templated
+    # safe-upgrades ValidatingAdmissionPolicy, which would otherwise give that
+    # object two declared owners. controllers/gateway-api-crds/ ships it with
+    # the CRDs it guards, so turn it off here.
+    crds:
+      gatewayAPI:
+        safeUpgradePolicy:
+          enabled: false
     # Control-plane resources (homelab-friendly). The chart default is
     # unbounded; bound like the other operators. Data-plane (Envoy proxy)
     # resources are set in the EnvoyProxy CR, not here.

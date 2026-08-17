@@ -1070,6 +1070,21 @@ Skeleton (copy what you need):
 
 ### Dependency
 
+#### Services
+
+- **Pin the ADR-038 shared-middleware wave**: `cart` 2.1.0, `checkout` 0.8.0,
+  `notification` 2.1.0, `order` 2.3.0, `payment` 2.3.0, `product` 1.13.0,
+  `review` 2.1.0, `shipping` 1.6.0, `user` 2.2.0 — the nine services that moved
+  their HTTP middleware to `pkg/httpmw`. `inventory` stays at 0.5.0: it is
+  gRPC-only, mounts no Gin middleware, and took the `obsx` span helpers in its
+  own release, so it had nothing to migrate. `checkout-worker` moves with
+  `checkout` to 0.8.0 — it takes `pkg/httpmw` only for its own probes.
+  Two skews are intentional and stay: `mockpay` at 1.5.3 against `payment`
+  2.3.0 (it predates this wave, and closing it here would hide it), and
+  `order-worker` frozen at 1.13.2, whose `TEMPORAL_WORKER_BUILD_ID` must equal
+  its tag and the cutover CronJob's — a new build gets a new file and a
+  cutover, never a bump in place.
+
 #### Observability
 
 - Bump `altinity-clickhouse-operator` 0.27.1 → 0.27.3. Primary reason is the

@@ -52,7 +52,16 @@ spec:
       # replays without a non-determinism error. The delta is middleware/logging
       # only (telemetry audit F-1/F-2), which the worker uses for its own probe
       # endpoints.
-      tag: "0.6.3"
+      #
+      # 0.8.0 moves for the same reason: ADR-038 replaced the per-service
+      # middleware/ package with pkg/httpmw, and the worker only uses it for its
+      # own /health and /ready. No workflow or activity code changed, so no
+      # execution pinned to this build can hit a non-determinism error. This is
+      # not an argument from reading the diff — the Compose gate ran the worker
+      # on exactly this code: AbandonedCheckoutWorkflow fired its timer
+      # (expired|timer, not the lazy backstop) and the fulfillment saga
+      # completed.
+      tag: "0.8.0"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

@@ -65,7 +65,14 @@ spec:
     # the token sub as a string UUID end to end (ADR-042), greenfield DB
     # reset per the identity-cutover runbook. Compose E2E audit passed on
     # this code before merge; first fleet deploy goes through the Kind gate.
-    image_tag: "0.7.1" # {"$imagepolicy": "flux-system:checkout:tag"}
+    # 0.8.0: ADR-038 shared HTTP middleware. The per-service middleware/ package is
+    # gone; tracing and logging come from pkg/httpmw and the span helpers from
+    # pkg/obsx. One DefaultSkipRoutes map now feeds both, and matching is EXACT on
+    # the Gin route pattern instead of a prefix — a probe on a path nobody
+    # registered is traced and logged as an ordinary 404 rather than vanishing.
+    # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
+    # for /metrics and 0 for /health and /ready, unchanged.
+    image_tag: "0.8.0" # {"$imagepolicy": "flux-system:checkout:tag"}
     # 0.7.1: a promo code whose cap is already spent answers 409 PROMO_EXHAUSTED
     # at apply, matching the confirm gate; it answered 500 before, which the
     # storefront could only render as "Service temporarily unavailable"

@@ -1,0 +1,7 @@
+# Vendored CRD bundles rendered from the upstream Envoy Gateway chart. They are
+# generated output, not authored manifests — the regeneration command lives in
+# kubernetes/infra/controllers/gateway-api-crds/README.md. Marking them keeps a
+# chart bump from burying a pull request under ~53k lines of schema: GitHub
+# collapses them in the diff, and `git diff` skips their body.
+kubernetes/infra/controllers/gateway-api-crds/gatewayapi-standard-crds.yaml linguist-generated=true -diff
+kubernetes/infra/controllers/gateway-api-crds/envoy-gateway-crds.yaml       linguist-generated=true -diff

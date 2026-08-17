@@ -249,11 +249,27 @@ the rendered manifest and the whole chart in the release Secret:
 | `kubectl apply`, client-side | `envoyproxies` CRD 1.35 MB | 256 KB — `last-applied-configuration` annotation | rejected |
 | **Server-side apply** (adopted) | 18 objects | — | applies |
 
-The ceiling is structural, not a misconfiguration: `channel: standard` still
+The ceiling is structural, not a misconfiguration. Helm stores the parent
+chart's `templates/` plus the rendered manifest in the release Secret;
+subcharts are not stored (verified by decoding a live release: `dependencies`
+is empty). `gateway-crds-helm` puts the CRDs in the **parent** chart's
+`templates/`, so both copies land in the Secret. `channel: standard` still
 packages the unused experimental file, and removing it leaves ~1.63 MB; chart
-`v1.9.0` packages the same way and is larger still. Letting the controller
-chart install its own CRD subchart was measured at ~1.14 MB — under 10% below
-the same ceiling, so it was rejected as an unproven margin rather than a fix.
+`v1.9.0` packages the same way and is larger still.
+
+**This is a documented upstream limitation, and the fix here is upstream's own
+recommendation.** Envoy Gateway's install guide says to install the CRDs
+separately with `helm template … | kubectl apply --server-side -f -`
+"due to a Helm limitation with large CRDs", and to install the controller chart
+with `--skip-crds`. Applying a vendored render through a Flux Kustomization —
+which uses server-side apply — is the GitOps translation of exactly that
+command; the command itself is preserved in the directory's README.
+
+The alternative of letting the controller chart install its own CRD subchart
+was rejected on **channel**, not on size: that subchart's release Secret would
+stay in the tens of KB, but it ships the Gateway API **experimental** channel
+with no option to select standard, in `v1.8.3` and `v1.9.0` alike. This
+platform routes only HTTP and gRPC and deliberately runs the standard channel.
 
 **Amended decision:** `kubernetes/infra/controllers/gateway-api-crds/` holds the
 CRDs as vendored manifests, applied by the existing `gateway-api-crds-local`

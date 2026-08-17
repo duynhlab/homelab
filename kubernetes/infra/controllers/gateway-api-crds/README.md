@@ -23,11 +23,25 @@ Secret. Measured for `v1.8.3`:
 | `kubectl apply` (client-side) | `envoyproxies` CRD 1.35 MB | 256 KB (`last-applied-configuration` annotation) | rejected |
 | **Server-side apply** | 18 objects | — | **works** |
 
-The failure is structural, not a misconfiguration: dropping the unused
-experimental channel file still leaves ~1.63 MB, and `v1.9.0` packages the same
-way (4.9 MB chart, no `crds/` directory). Server-side apply stores no copy of
-the object, so the two size ceilings above do not apply — and it is what
-`kustomize-controller` already does for every other manifest in this repo.
+Helm stores the parent chart's `templates/` and the rendered manifest in that
+Secret; subcharts are not stored. `gateway-crds-helm` keeps its CRDs in the
+parent `templates/`, so both copies land there. Dropping the unused experimental
+channel file still leaves ~1.63 MB, and `v1.9.0` packages the same way.
+
+**Upstream says to do exactly this.** The Envoy Gateway install guide installs
+CRDs separately with `helm template … | kubectl apply --server-side -f -`
+"due to a Helm limitation with large CRDs", then installs the controller chart
+with `--skip-crds`. A Flux Kustomization applies server-side, so vendoring the
+render and letting Flux apply it is that command expressed as GitOps.
+
+### Why not let the controller chart install them
+
+`gateway-helm` carries the same CRDs in a `charts/crds` subchart, and subcharts
+never enter the release Secret — that path would stay in the tens of KB. It is
+rejected on **channel**, not size: the subchart ships the Gateway API
+**experimental** channel and exposes no way to pick standard, in `v1.8.3` and
+`v1.9.0` alike. This platform routes only HTTP and gRPC and runs the standard
+channel on purpose.
 
 ## Regenerating
 

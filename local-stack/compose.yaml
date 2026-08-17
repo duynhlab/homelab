@@ -785,7 +785,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: checkout
-      OTEL_SERVICE_NAME: checkout
+      OTEL_SERVICE_NAME: checkout-worker
       DB_NAME: checkout
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
@@ -886,7 +886,7 @@ services:
     environment:
       <<: *svc-env
       SERVICE_NAME: order
-      OTEL_SERVICE_NAME: order
+      OTEL_SERVICE_NAME: order-worker
       DB_NAME: order
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_GRPC_ADDR: dns:///shipping:9090

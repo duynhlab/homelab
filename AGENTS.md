@@ -311,7 +311,7 @@ Every manifest applied to the cluster must satisfy admission:
 - Image `ghcr.io/duynhlab/<repo>/<image>:<sha|vX.Y.Z>` — **never `:latest`**.
 - `resources.requests.{cpu,memory}` + `resources.limits.memory` on every container.
 - `livenessProbe` + `readinessProbe` on the main container.
-- PSS baseline (no `privileged`/`hostNetwork`/`hostPID`/`hostIPC`/`hostPath`); app namespaces also PSS restricted (`runAsNonRoot`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`, `seccompProfile.type: RuntimeDefault`).
+- PSS baseline (no `privileged`/`hostNetwork`/`hostPID`/`hostIPC`/`hostPath`). The stricter `pss-restricted-apps` policy is **disabled since 2026-08-17** — the Kind audit showed the platform cannot satisfy `runAsNonRoot` until the service images ship a non-root `USER`, so it only produced findings nobody could act on. Conditions for bringing it back are in the policy file's header.
 - Need an exception? PR under `kubernetes/infra/configs/kyverno/exceptions/` with `platform.duynhlab.dev/owner` + `expires-at`; update [`docs/security/policy-exceptions.md`](docs/security/policy-exceptions.md). Do **not** loosen the policy itself. Catalog: [`docs/security/policy-catalog.md`](docs/security/policy-catalog.md).
 
 ## Gotchas & non-obvious rules

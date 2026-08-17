@@ -6,12 +6,25 @@ Source manifests live in `kubernetes/infra/configs/kyverno/cluster-policies/`.
 | Policy | Tier | Mode (local) | Mode (prod) | failurePolicy | Scope |
 |--------|------|--------------|-------------|---------------|-------|
 | `pss-baseline` | 1 | Audit | Enforce | Ignore | All namespaces except platform |
-| `pss-restricted-apps` | 1 | Audit | Enforce | Ignore | App namespaces only (9) |
+| `pss-restricted-apps` | 1 | **Disabled** | **Disabled** | — | App namespaces only (9) — see note below |
 | `disallow-latest-tag` | 1 | Audit | Enforce | Ignore | All except platform |
 | `require-resources` | 1 | Audit | Enforce | Ignore | App namespaces only |
 | `require-probes` | 1 | Audit | Enforce | Ignore | App namespaces only |
 | `disallow-default-namespace` | 1 | **Enforce** | Enforce | Fail | All Pods |
 | `cleanup-completed-pods` | 4 | Enforce | Enforce | n/a | Cleanup, every 30m |
+
+> **`pss-restricted-apps` is disabled since 2026-08-17.** The first Kind bring-up
+> ran it against a real cluster and it reported all four restricted requirements
+> missing on all ten services. Three are a manifest change; the fourth,
+> `runAsNonRoot`, cannot be satisfied yet — the service images declare no
+> non-root `USER` and their binary is not world-executable, so a pod pinned to a
+> non-root uid dies at exec and the service CrashLoopBackOffs. Two further gaps
+> sit in charts this repo does not own (the `mop` chart's `migrate`
+> initContainer, and `pgdog`). Running in Audit, it blocked nothing and produced
+> 63 standing findings nobody could act on from here — which teaches readers to
+> ignore the report. The policy is commented out verbatim in
+> `cluster-policies/pss-restricted-apps.yaml`; its header records the two
+> conditions for uncommenting it. **`pss-baseline` is unaffected and still runs.**
 | `verify-images-cosign` | 2 | planned | planned | Ignore | `ghcr.io/duynhlab/*` |
 | `require-network-policy` | 2 | planned | planned | Ignore | App namespaces |
 | `default-deny-networkpolicy` | 3 | Generate | Generate | n/a | App-tier namespaces (`platform.duynhlab.dev/tier: app`) |

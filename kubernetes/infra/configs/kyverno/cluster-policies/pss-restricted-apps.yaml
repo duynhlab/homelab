@@ -1,45 +1,77 @@
 # Pod Security Standard — restricted profile (app namespaces only)
-# Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
 #
-# Mode: Audit. The 9 microservices are greenfield Go apps and should pass restricted
-# from day one. Flip to Enforce after 14 days of clean reports.
-# Scope: ONLY application namespaces; never apply to operator/database namespaces.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
-metadata:
-  name: pss-restricted-apps
-  annotations:
-    policies.kyverno.io/title: Pod Security Standard — Restricted (apps only)
-    policies.kyverno.io/category: Pod Security Standards (Restricted)
-    policies.kyverno.io/severity: high
-    policies.kyverno.io/subject: Pod
-    policies.kyverno.io/description: >-
-      Enforces the Pod Security Standard "restricted" profile on the 8
-      microservice namespaces only. Requires runAsNonRoot, drops ALL
-      capabilities, disallows privilege escalation and writable root FS.
-spec:
-  validationFailureAction: Audit
-  background: true
-  failurePolicy: Ignore
-  rules:
-    - name: restricted
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-              namespaces:
-                - auth
-                - user
-                - product
-                - cart
-                - order
-                - review
-                - notification
-                - shipping
-                - payment
-                - checkout
-      validate:
-        podSecurity:
-          level: restricted
-          version: latest
+# DISABLED 2026-08-17. The whole policy is commented out below, verbatim, so
+# re-enabling it is uncommenting rather than rewriting.
+#
+# WHY
+# The Kind audit ran this policy against a real cluster for the first time and
+# it reported all four restricted requirements missing on all ten services. Of
+# the four, three are a manifest change and were cheap. The fourth,
+# runAsNonRoot, is not available to this platform yet: the service images
+# declare no non-root USER and their binary is not world-executable, so a pod
+# pinned to a non-root uid dies at exec with "permission denied" and the
+# service CrashLoopBackOffs — measured, not predicted. Two further gaps are in
+# charts this repo does not own: the mop chart's migrate initContainer has no
+# securityContext hook, and the pgdog chart exposes none either.
+#
+# So the policy could only ever report a violation nobody could act on from
+# here. It ran in Audit, so it blocked nothing — it produced 63 standing
+# findings that trained readers to ignore the report, which is worse than not
+# running it.
+#
+# RE-ENABLE WHEN
+#   1. the service images ship a non-root USER with an executable binary
+#      (Dockerfile change in the service repos / wolfi-images), AND
+#   2. the mop chart templates a securityContext onto the migrate
+#      initContainer (duynhlab/helm-charts).
+# Then uncomment this file and its entry in kustomization.yaml, keep it in
+# Audit until the reports are clean, and only then consider Enforce.
+#
+# NOTE: pss-baseline is untouched and still runs. This disables the stricter
+# profile only.
+#
+# # Pod Security Standard — restricted profile (app namespaces only)
+# # Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
+# #
+# # Mode: Audit. The 9 microservices are greenfield Go apps and should pass restricted
+# # from day one. Flip to Enforce after 14 days of clean reports.
+# # Scope: ONLY application namespaces; never apply to operator/database namespaces.
+# apiVersion: kyverno.io/v1
+# kind: ClusterPolicy
+# metadata:
+#   name: pss-restricted-apps
+#   annotations:
+#     policies.kyverno.io/title: Pod Security Standard — Restricted (apps only)
+#     policies.kyverno.io/category: Pod Security Standards (Restricted)
+#     policies.kyverno.io/severity: high
+#     policies.kyverno.io/subject: Pod
+#     policies.kyverno.io/description: >-
+#       Enforces the Pod Security Standard "restricted" profile on the 8
+#       microservice namespaces only. Requires runAsNonRoot, drops ALL
+#       capabilities, disallows privilege escalation and writable root FS.
+# spec:
+#   validationFailureAction: Audit
+#   background: true
+#   failurePolicy: Ignore
+#   rules:
+#     - name: restricted
+#       match:
+#         any:
+#           - resources:
+#               kinds:
+#                 - Pod
+#               namespaces:
+#                 - auth
+#                 - user
+#                 - product
+#                 - cart
+#                 - order
+#                 - review
+#                 - notification
+#                 - shipping
+#                 - payment
+#                 - checkout
+#       validate:
+#         podSecurity:
+#           level: restricted
+#           version: latest

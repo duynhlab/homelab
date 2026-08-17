@@ -152,6 +152,24 @@ spec:
       - name: inventory
         database: inventory
 
+    # The chart ships both probes commented out, so the pooler ran with none
+    # and Kyverno's require-probes recorded a violation against it on every
+    # report — the policy is Audit, so nothing blocked. Without a readiness
+    # probe a pooler that is up but not yet accepting connections still gets
+    # traffic, which is the failure this pooler exists to absorb.
+    # TCP on the pooler port: pgdog serves the Postgres wire protocol, so
+    # there is no HTTP endpoint to GET.
+    livenessProbe:
+      tcpSocket:
+        port: 6432
+      initialDelaySeconds: 15
+      periodSeconds: 20
+    readinessProbe:
+      tcpSocket:
+        port: 6432
+      initialDelaySeconds: 5
+      periodSeconds: 10
+
     resources:
       requests:
         cpu: 50m

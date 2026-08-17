@@ -16,10 +16,20 @@ MARK_BEGIN="# >>> duynhlab homelab — managed by scripts/setup-hosts.sh"
 MARK_END="# <<< duynhlab homelab"
 HOSTS_FILE="/etc/hosts"
 
+# One entry per hostname that an HTTPRoute actually serves. The source of truth
+# is kubernetes/infra/configs/envoy-gateway/routes/*.yaml — every route carries an
+# explicit `hostnames:` list and the Gateway matches on the Host header, so a
+# hostname missing here is simply unreachable, with no error that points at this
+# file. Keep the two in step:
+#
+#   grep -rho 'hostnames:' -A2 kubernetes/infra/configs/envoy-gateway/routes/
 HOSTS=(
   duynh.me
-  local.duynh.me
-  gateway.duynh.me
+  local.duynh.me            # storefront SPA
+  backoffice.duynh.me       # Backoffice portal (RFC-0023)
+  gateway.duynh.me          # the API edge
+  id.duynh.me               # Keycloak — BOTH OIDC flows dead-end without it
+  temporal.duynh.me         # Temporal UI
   grafana.duynh.me
   vmui.duynh.me
   vmalert.duynh.me
@@ -32,7 +42,6 @@ HOSTS=(
   ui.duynh.me
   source.duynh.me
   openbao.duynh.me
-  pgui.duynh.me
   vm-mcp.duynh.me
   vl-mcp.duynh.me
   flux-mcp.duynh.me

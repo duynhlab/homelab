@@ -4,6 +4,14 @@
 # converges to this exact state (changes to an already-imported realm need a
 # DB wipe or manual admin action — greenfield rebuild contract, RFC-0022).
 #
+# THAT ONE-SHOT IMPORT IS WHY A MISSING redirectUri COSTS A WHOLE CLUSTER.
+# `customer-spa` shipped with only the localhost origins, so a storefront login
+# at https://local.duynh.me answered `invalid_redirect_uri` — and the fix could
+# not be reconciled in, because the realm already existed. Recovering meant
+# `make down && make up`. Both clients now carry their cluster origin next to
+# the dev one; keep it that way, and check this list before any bring-up that a
+# browser flow depends on.
+#
 # Encodes the owner-approved decisions verbatim (RFC-0022 Open questions #1-#4,
 # #10):
 #   * accessTokenLifespan 900 (15 min, both clients)
@@ -74,10 +82,12 @@ data:
             "pkce.code.challenge.method": "S256"
           },
           "redirectUris": [
+            "https://local.duynh.me/*",
             "http://localhost:3001/*",
             "http://localhost:3000/*"
           ],
           "webOrigins": [
+            "https://local.duynh.me",
             "http://localhost:3001",
             "http://localhost:3000"
           ],

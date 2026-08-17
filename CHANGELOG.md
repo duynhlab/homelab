@@ -578,6 +578,13 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-044 amended — CRD delivery moves from Helm to server-side apply.** The
+  edge decision itself is unchanged; only the mechanism that gets its CRDs onto
+  a cluster is, after the first Kind bring-up proved the planned HelmRelease
+  exceeds the 1 MiB `Secret` limit by ~2x. The amendment records the three
+  measured delivery paths and their ceilings, and rejects the
+  install-CRDs-with-the-controller-chart alternative on evidence: at ~1.14 MB it
+  sits under 10% below the same limit, which is a margin rather than a fix.
 - **RFC-0025 + ADR-052 — converge the customer SPA on the portal stack.** The
   platform runs two React SPAs whose conventions overlap in purpose and disagree in
   every detail, and ADR-049 wrote that debt down with a revisit trigger for closing
@@ -778,6 +785,22 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **The Gateway API CRDs could never install.** `gateway-api-crds` was a
+  HelmRelease on `gateway-crds-helm`, which ships its CRDs in `templates/`, so
+  Helm stores the rendered manifest *and* the whole chart in the release
+  Secret — 2.06 MB against Kubernetes' 1 MiB `Secret` limit. The install failed
+  on every retry, leaving 0 CRDs and taking `envoy-gateway-local` and
+  `envoy-gateway-config-local` down the dependency chain with it, so the entire
+  edge was unreachable. Not a misconfiguration: `channel: standard` still
+  packages the unused experimental file (removing it leaves 1.63 MB) and chart
+  `v1.9.0` packages the same way. The CRDs are now vendored manifests applied
+  by the existing Kustomization with **server-side apply**, which stores no copy
+  of the object and is what every other manifest in this repo already uses —
+  measured to apply all 18 objects, including the 1.35 MB `envoyproxies` CRD
+  that also exceeds `kubectl apply`'s 256 KB annotation limit. The controller
+  HelmRelease keeps `crds: Skip` and now also disables the chart's
+  `safe-upgrades` ValidatingAdmissionPolicy, which the CRD bundle ships, so that
+  object has one owner. Found by the first Kind bring-up of this layer.
 - The edge access log's `upstream_time` field carried `null` on every request in
   both environments. `%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%` sources a response
   header that Envoy Gateway disables by default, so the operator read a header

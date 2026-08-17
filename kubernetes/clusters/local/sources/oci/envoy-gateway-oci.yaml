@@ -1,8 +1,9 @@
 ---
 # OCIRepository for the Envoy Gateway control-plane chart (RFC-0024 P2).
 # Chart: oci://docker.io/envoyproxy/gateway-helm — the envoy-gateway
-# controller Deployment; CRDs come from gateway-crds-helm (envoy-gateway-crds-oci)
-# and are skipped on install (see controllers/envoy-gateway/helmrelease.yaml).
+# controller Deployment. The chart carries CRDs in its `crds` subchart; they
+# are skipped on install because controllers/gateway-api-crds/ owns the CRD
+# lifecycle as vendored manifests (see that directory's README).
 # Docs: https://gateway.envoyproxy.io/docs/install/install-helm/
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository

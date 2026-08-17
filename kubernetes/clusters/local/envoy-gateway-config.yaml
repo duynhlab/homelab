@@ -53,3 +53,29 @@ spec:
         - op: replace
           path: /spec/telemetry/tracing/samplingRate
           value: 100
+    # LOCAL-ONLY: pin the Envoy data plane to the control-plane node.
+    # The generated Service is a NodePort with externalTrafficPolicy: Local,
+    # which only answers on nodes that host a backing pod — while kind's
+    # extraPortMappings (80->30080, 443->30443, scripts/kind-up.sh) exist on
+    # the control-plane node alone. Scheduled anywhere else, the edge is
+    # healthy in-cluster and unreachable from the host, which reads as a TLS
+    # or routing fault. This honours the `ingress-ready=true` label kind-up.sh
+    # already sets and nothing else consumed; the toleration is required
+    # because the node carries node-role.kubernetes.io/control-plane:NoSchedule.
+    # Not a prod concern: prod fronts the Gateway with a real load balancer.
+    # externalTrafficPolicy stays Local on purpose — Cluster would SNAT the
+    # client address that security-admin-cidr.yaml's clientCIDRs fence reads.
+    - target:
+        kind: EnvoyProxy
+        name: platform
+        namespace: envoy-gateway
+      patch: |
+        - op: add
+          path: /spec/provider/kubernetes/envoyDeployment/pod
+          value:
+            nodeSelector:
+              ingress-ready: "true"
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule

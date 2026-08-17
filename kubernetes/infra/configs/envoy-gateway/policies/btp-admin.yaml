@@ -1,7 +1,13 @@
 # Admin-surface BackendTrafficPolicies — rateLimit.local sized as
-# per-instance buckets for replicaCount 2 (ADR-046): 600/Minute, 15000/Hour.
-# More generous than the API limit because dashboards (e.g. Grafana) fan out
-# many asset/API requests per view.
+# per-instance buckets for replicaCount 2 (ADR-045): 600/Minute, so 1200/min
+# across both replicas. More generous than the API limit because dashboards
+# (e.g. Grafana) fan out many asset/API requests per view.
+#
+# ONE rule only: Envoy Gateway rejects a local rateLimit carrying more than
+# one rule without clientSelectors, and fails closed by installing a 500
+# direct response on every targeted route. The former 15000/Hour companion
+# rule made these policies invalid rather than stricter. See btp-api.yaml for
+# the full reasoning.
 #
 # Targets exactly the admin surfaces that need it: the monitoring UIs, both
 # MCP servers in monitoring, flux-ui + flux-mcp, rustfs-console,
@@ -63,10 +69,6 @@ spec:
             requests: 600
             unit: Minute
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 15000
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
 ---
 # flux-system: Flux Web UI + Flux Operator MCP
 apiVersion: gateway.envoyproxy.io/v1alpha1
@@ -90,10 +92,6 @@ spec:
             requests: 600
             unit: Minute
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 15000
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
 ---
 # rustfs: RustFS console
 apiVersion: gateway.envoyproxy.io/v1alpha1
@@ -114,10 +112,6 @@ spec:
             requests: 600
             unit: Minute
           xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 15000
-            unit: Hour
-          xRateLimitHeaders: DraftVersion03
 ---
 # openbao: OpenBAO UI
 apiVersion: gateway.envoyproxy.io/v1alpha1
@@ -137,8 +131,4 @@ spec:
         - limit:
             requests: 600
             unit: Minute
-          xRateLimitHeaders: DraftVersion03
-        - limit:
-            requests: 15000
-            unit: Hour
           xRateLimitHeaders: DraftVersion03

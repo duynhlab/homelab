@@ -177,6 +177,18 @@ spec:
           - name: OIDC_JWKS_URL
             value: "http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs"
           <<- end >>
+        # PSS restricted fields — commented out 2026-08-17 together with the
+        # pss-restricted-apps policy itself (see that file's header for why and
+        # for the two conditions that bring both back). Left in place rather
+        # than deleted: these three cost nothing and apply cleanly to these
+        # images, so re-enabling is uncommenting.
+        # securityContext:
+        #   allowPrivilegeEscalation: false
+        #   capabilities:
+        #     drop:
+        #       - ALL
+        #   seccompProfile:
+        #     type: RuntimeDefault
         resources:
           requests:
             memory: "32Mi"

@@ -1535,11 +1535,17 @@ done
 # The `inventory` row carries weight beyond itself: inventory is gRPC-only with no
 # edge route, so `rpc_server_call_duration_seconds_count` is the ONLY metrics
 # evidence that it is instrumented at all. `go_goroutine_count` proves the runtime
-# instrumentation leg. **Eleven** series on a full stack, not twelve: the ten
-# application services plus `mockpay`. The two workers do not add series of their
-# own because compose gives them their service's identity
-# (`order-worker` → `OTEL_SERVICE_NAME=order`, `checkout-worker` → `checkout`),
-# so their runtime metrics share the service's series by design.
+# instrumentation leg. **Thirteen** series on a full stack: the ten application
+# services, `mockpay`, and the two workers, which carry their own identities
+# (`order-worker`, `checkout-worker`) exactly as they do in the cluster.
+#
+# This read eleven until 2026-08-17, when compose gave each worker its service's
+# `OTEL_SERVICE_NAME` and this note called that "sharing the series by design".
+# It was not sharing. Two processes exporting the same `service.name` with no
+# distinguishing resource attribute overwrite each other's samples, so the value
+# alternated between the API's and the worker's — the Kind audit caught it by
+# finding no such collision on the cluster, where the workers were already named
+# apart. Compose now matches.
 
 # C9. Business counters move with the flow: the three ends of the saga should
 #     agree — confirmed = saga = authorized.

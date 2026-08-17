@@ -38,6 +38,15 @@
 #   USERNAME      alice
 #   PASSWORD      password123
 #   KC_OUTPUT     token | json
+#   KC_CACERT     (unset)                    CA bundle to verify an HTTPS
+#                                            Keycloak against — needed on a
+#                                            cluster edge, whose cert comes
+#                                            from the self-signed homelab-ca
+#   KC_INSECURE   (unset)                    set to any value to skip TLS
+#                                            verification instead (curl -k)
+#
+# Cluster example (Kind), where KC_URL is HTTPS and the CA is self-signed:
+#   KC_URL=https://id.duynh.me KC_INSECURE=1 ./scripts/keycloak-token.sh
 #
 # Requires: bash, curl, openssl, python3.
 set -euo pipefail
@@ -49,6 +58,25 @@ KC_REDIRECT=${KC_REDIRECT:-http://localhost:3001/}
 USERNAME=${USERNAME:-alice}
 PASSWORD=${PASSWORD:-password123}
 KC_OUTPUT=${KC_OUTPUT:-token}
+
+# TLS trust. Compose serves Keycloak over plain HTTP, so neither of these is
+# needed there and both default to empty. A cluster edge serves it over HTTPS
+# with a certificate from the self-signed `homelab-ca`, which curl will not
+# verify out of the box — without one of these the very first request fails
+# and the whole PKCE flow dies before a code is ever issued.
+#   KC_CACERT=/path/ca.crt  verify against that CA (preferred)
+#   KC_INSECURE=1           skip verification entirely (curl -k)
+KC_CACERT=${KC_CACERT:-}
+KC_INSECURE=${KC_INSECURE:-}
+CURL_TLS=()
+if [[ -n "$KC_CACERT" ]]; then
+  CURL_TLS=(--cacert "$KC_CACERT")
+elif [[ -n "$KC_INSECURE" ]]; then
+  CURL_TLS=(-k)
+fi
+# Each curl below expands this as ${CURL_TLS[@]+"${CURL_TLS[@]}"} so an empty
+# array adds no argument — a bare "${CURL_TLS[@]}" aborts under `set -u` on
+# bash < 4.4.
 
 BASE="$KC_URL/realms/$KC_REALM/protocol/openid-connect"
 JAR=$(mktemp -t kc-cookies.XXXXXX)
@@ -71,7 +99,7 @@ STATE=$(openssl rand -hex 8)
 # 1. Authorization request. Answers 200 with the login page and sets the
 #    AUTH_SESSION_ID / KC_RESTART cookies the form POST needs. `--get
 #    --data-urlencode` lets curl build (and escape) the query string.
-curl -sS -c "$JAR" -o "$PAGE" --get "$BASE/auth" \
+curl -sS ${CURL_TLS[@]+"${CURL_TLS[@]}"} -c "$JAR" -o "$PAGE" --get "$BASE/auth" \
   --data-urlencode "client_id=$KC_CLIENT_ID" \
   --data-urlencode "redirect_uri=$KC_REDIRECT" \
   --data-urlencode "response_type=code" \
@@ -90,7 +118,7 @@ ACTION=$(grep -o 'action="[^"]*login-actions/authenticate[^"]*"' "$PAGE" \
 # 3. Submit the credentials. Success is a 302 to the redirect URI carrying the
 #    authorization code; a failure re-renders the form with 200, which is why
 #    this reads the Location header rather than the status.
-LOCATION=$(curl -sS -b "$JAR" -c "$JAR" -o /dev/null -D - "$ACTION" \
+LOCATION=$(curl -sS ${CURL_TLS[@]+"${CURL_TLS[@]}"} -b "$JAR" -c "$JAR" -o /dev/null -D - "$ACTION" \
   --data-urlencode "username=$USERNAME" \
   --data-urlencode "password=$PASSWORD" \
   --data-urlencode "credentialId=" \
@@ -102,7 +130,7 @@ CODE=$(printf '%s' "$LOCATION" | sed -n 's/.*[?&]code=\([^&]*\).*/\1/p')
 
 # 4. Exchange the code. A public client authenticates with the PKCE verifier
 #    alone — no client secret exists.
-RESP=$(curl -sS -X POST "$BASE/token" \
+RESP=$(curl -sS ${CURL_TLS[@]+"${CURL_TLS[@]}"} -X POST "$BASE/token" \
   --data-urlencode "grant_type=authorization_code" \
   --data-urlencode "client_id=$KC_CLIENT_ID" \
   --data-urlencode "redirect_uri=$KC_REDIRECT" \

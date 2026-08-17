@@ -20,7 +20,14 @@ spec:
     # 1.4.3: RFC-0024 wave (2026-08-13): pkg/proto v0.37.0 pin alignment
     # (string user_id in the notification/payment protos); no behaviour
     # change in this service beyond the shared-contract bump.
-    image_tag: "1.5.0" # {"$imagepolicy": "flux-system:shipping:tag"}
+    # 1.6.0: ADR-038 shared HTTP middleware. The per-service middleware/ package is
+    # gone; tracing and logging come from pkg/httpmw and the span helpers from
+    # pkg/obsx. One DefaultSkipRoutes map now feeds both, and matching is EXACT on
+    # the Gin route pattern instead of a prefix — a probe on a path nobody
+    # registered is traced and logged as an ordinary 404 rather than vanishing.
+    # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
+    # for /metrics and 0 for /health and /ready, unchanged.
+    image_tag: "1.6.0" # {"$imagepolicy": "flux-system:shipping:tag"}
     namespace: shipping
     grpc_server: true
     replicaCount: 1

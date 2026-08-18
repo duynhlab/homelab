@@ -1108,6 +1108,34 @@ Skeleton (copy what you need):
 
 ### Dependency
 
+#### Gateway
+
+- **Envoy Gateway v1.8.3 → v1.9.0, Gateway API CRDs v1.5.1 → v1.6.1.** The
+  bundle bump is mandatory, not cosmetic: v1.9.0 reconciles
+  `TCPRoute`/`UDPRoute` through `gateway.networking.k8s.io/v1` and *silently
+  skips* those routes if the v1.6 CRDs are absent. The vendored standard-channel
+  render goes from 18 to 20 objects (`tcproutes` + `udproutes` graduated), and
+  the `safe-upgrades` policy moves to `bundle-version: v1.6.1` — which its own
+  validation accepts, so it cannot deadlock its bundle bump. Security carries
+  the rest: Go 1.26.6, a read-only controller root filesystem, and a
+  `GatewayNamespaceMode` xDS auth-bypass fix. The HelmRelease adopts
+  `crds.enabled: false` to drop the CRD subchart as a dependency outright
+  (verified: 0 CRDs and 0 ValidatingAdmissionPolicy objects rendered, 19 KB
+  release manifest) while keeping `safeUpgradePolicy.enabled: false` and `crds:
+  Skip` as deliberate redundancy; the control-plane memory limit goes 512Mi →
+  768Mi because `EndpointSliceIndex` now defaults on. All 19 breaking changes
+  were checked against the deployed manifests, not assumed inert — the near-miss
+  is `mergeType`, now rejected on `Gateway` targets: our 19 `StrategicMerge`
+  policies all target `HTTPRoute`, and `cors-policy` targets the `Gateway` but
+  sets no `mergeType`. ADR-044 amendment 2026-08-18 records the upstream
+  evidence ([envoyproxy/gateway#6105](https://github.com/envoyproxy/gateway/issues/6105),
+  PRs #8850/#9024) and **confirms** — rather than corrects — the earlier
+  amendment's channel argument: the `channel` toggle belongs to the standalone
+  `gateway-crds-helm` chart (blocked on the 1 MiB Secret limit), while the
+  controller chart's `charts/crds` subchart ships experimental only and has no
+  `channel` key at all. The local standalone edge stays on v1.8.3; it bumps
+  separately behind the compose E2E audit.
+
 #### Services
 
 - **Pin the ADR-038 shared-middleware wave**: `cart` 2.1.0, `checkout` 0.8.0,

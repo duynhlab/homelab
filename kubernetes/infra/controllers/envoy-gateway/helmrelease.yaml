@@ -8,11 +8,13 @@
 # upstream default envoy-gateway-system. Created in
 # controllers/namespaces.yaml.
 #
-# CRDs: crds Skip on install AND upgrade — this chart carries them in its
-# `crds` subchart, but controllers/gateway-api-crds/ owns both the Gateway API
-# standard-channel CRDs and the EG extension CRDs as vendored manifests applied
-# with server-side apply (Helm cannot store a release this large; see that
-# directory's README).
+# CRDs: this chart carries them in a `crds` subchart, but
+# controllers/gateway-api-crds/ owns both the Gateway API standard-channel CRDs
+# and the EG extension CRDs as vendored manifests applied with server-side
+# apply. The subchart is rejected on channel — it ships only the Gateway API
+# *experimental* channel and exposes no channel toggle (see that directory's
+# README and ADR-044 amendment 2026-08-18). The subchart is disabled outright
+# via `crds.enabled: false`; `crds: Skip` stays as a second line of defence.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -35,11 +37,17 @@ spec:
     remediation:
       retries: 3
   values:
-    # `crds: Skip` covers the subchart's crds/ directory but NOT its templated
-    # safe-upgrades ValidatingAdmissionPolicy, which would otherwise give that
-    # object two declared owners. controllers/gateway-api-crds/ ships it with
-    # the CRDs it guards, so turn it off here.
+    # `crds.enabled: false` drops the whole `crds` subchart as a chart
+    # dependency (Chart.yaml `condition: crds.enabled`), which covers both its
+    # crds/ directory and its templated safe-upgrades
+    # ValidatingAdmissionPolicy. `safeUpgradePolicy.enabled: false` is kept
+    # deliberately redundant: it is the documented upstream switch for
+    # externally managed Gateway API CRDs, and it keeps the VAP suppressed even
+    # if the dependency is ever re-enabled. Either way that object has exactly
+    # one declared owner — controllers/gateway-api-crds/, which ships it with
+    # the CRDs it guards.
     crds:
+      enabled: false
       gatewayAPI:
         safeUpgradePolicy:
           enabled: false
@@ -53,7 +61,11 @@ spec:
             cpu: 50m
             memory: 128Mi
           limits:
-            memory: 512Mi
+            # 512Mi -> 768Mi for v1.9.0: the `EndpointSliceIndex` runtime flag
+            # now defaults on and indexes EndpointSlices in the controller,
+            # which upstream flags as a memory increase to budget for before
+            # upgrading (the alternative is runtimeFlags.disabled).
+            memory: 768Mi
     # No chart-native ServiceMonitor toggle exists (verified against the
     # gateway-helm values docs) — the control-plane scrape (metrics :19001)
     # is hand-rolled in

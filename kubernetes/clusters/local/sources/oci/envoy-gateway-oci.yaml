@@ -1,9 +1,10 @@
 ---
 # OCIRepository for the Envoy Gateway control-plane chart (RFC-0024 P2).
 # Chart: oci://docker.io/envoyproxy/gateway-helm — the envoy-gateway
-# controller Deployment. The chart carries CRDs in its `crds` subchart; they
-# are skipped on install because controllers/gateway-api-crds/ owns the CRD
-# lifecycle as vendored manifests (see that directory's README).
+# controller Deployment. The chart carries CRDs in its `crds` subchart; that
+# subchart is disabled outright (`crds.enabled: false`) because
+# controllers/gateway-api-crds/ owns the CRD lifecycle as vendored manifests
+# (see that directory's README).
 # Docs: https://gateway.envoyproxy.io/docs/install/install-helm/
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
@@ -17,6 +18,7 @@ spec:
   url: oci://docker.io/envoyproxy/gateway-helm
   ref:
     # Tag kept for human readability; the digest is the actual pin (when both
-    # are set, Flux resolves the digest). Verified 2026-08-11.
-    tag: v1.8.3
-    digest: sha256:cfb34ff4266c87a394cd6be5c13607a2dd47083aef771368302eaeaa99c4a0a9
+    # are set, Flux resolves the digest). Verified 2026-08-18 with
+    # `crane digest docker.io/envoyproxy/gateway-helm:v1.9.0`.
+    tag: v1.9.0
+    digest: sha256:06e7c26e50d40f0b98d6d1243a3c8dd094464c6099df727216876c19401ffe5f

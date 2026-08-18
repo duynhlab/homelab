@@ -286,6 +286,174 @@ controller pin. The regeneration command is in
 **Obligation added:** the "Gateway API CRDs + EG HelmReleases in the Flux chain"
 row above is satisfied by the Kustomization, not by a second HelmRelease.
 
+### 2026-08-18 — Envoy Gateway v1.9.0, and the CRD delivery argument re-verified at source
+
+The decision and the delivery mechanism are both unchanged. This amendment
+bumps the pin, adopts a cleaner switch for the same intent, and — because the
+previous amendment's reasoning was challenged in review — records the source
+evidence behind it so the next reader does not have to re-derive it.
+
+#### The subchart rejection is confirmed, not corrected
+
+A review argued that Amendment #1's claim — that the CRD subchart offers no way
+to select the standard channel — was false, on the grounds that
+`crds.gatewayAPI.channel: standard|experimental` demonstrably exists. Both
+chart packages were unpacked at `v1.8.3` and `v1.9.0` and compared directly.
+**Amendment #1 is confirmed.** The toggle is real, but it belongs to a
+different chart than the one Amendment #1 rejected:
+
+| Chart | Channel control | Where its CRDs live | Blocked by |
+|-------|-----------------|---------------------|------------|
+| `gateway-crds-helm` (standalone, CRD-only) | `crds.gatewayAPI.channel` | parent `templates/` | **size** — 1 MiB `Secret` |
+| `gateway-helm/charts/crds` (subchart of the controller chart) | none — `values.yaml` is three lines, no `channel` key | `crds/` + `crds/generated/` | **channel** — experimental only |
+
+The subchart's complete `values.yaml` is `gatewayAPI.safeUpgradePolicy.enabled`
+and nothing else, and every Gateway API CRD it ships carries
+`gateway.networking.k8s.io/channel: experimental` — 13 of 13 at `v1.9.0`, 12 of
+12 at `v1.8.3`. Selecting `standard` in the standalone chart does not rescue
+that chart either: the unused experimental bundle (1.40 MB) stays packaged
+regardless, and a full render — standard channel plus the Envoy Gateway
+extension CRDs, which is what one HelmRelease would have to carry — is 3.73 MB.
+
+So both rejections in Amendment #1 stand, and they are **not
+interchangeable** — the size ceiling applies to the standalone chart, the
+channel constraint to the subchart. Neither chart can deliver the standard
+channel inside a Helm release, which is why vendor + server-side apply remains
+the only path. The two charts are easy to conflate; the directory README now
+names both in full for that reason.
+
+#### Upstream evidence
+
+The ceiling is a known, open upstream limitation, not a local misconfiguration.
+[envoyproxy/gateway#6105](https://github.com/envoyproxy/gateway/issues/6105)
+("gateway-crds-helm v1.4.0 install fails – rendered release exceeds 1 MiB
+Secret size limit", open since 2025-05-18):
+
+- maintainer **arkodg** confirms it as a known issue and points at the official
+  [Installing CRDs separately](https://gateway.envoyproxy.io/docs/install/install-helm/#installing-crds-separately)
+  procedure — the `helm template … | kubectl apply --server-side` route this
+  directory implements as GitOps;
+- **hovvsoon** reports that splitting the CRDs across separate charts or
+  separate `HelmRelease` resources still breaches the limit, which closes off
+  the "just use two HelmReleases" alternative for Flux users specifically;
+- **98jan** shows a Flux setup that works only by bypassing Helm, and notes the
+  CRD files under `gateway-crds-helm/templates/` are Helm-templated and so are
+  not consumable as raw manifests — the reason this directory vendors a
+  *rendered* copy rather than pointing a `GitRepository` at upstream;
+- **aukevanleeuwen** posts the Terraform equivalent (`helm_template` +
+  `kubectl_manifest` with `server_side_apply = true`), independently arriving at
+  the same shape as this platform's Kustomization;
+- maintainer **zirain** attributes the size to too much having been packed into
+  a single CRD, and notes those APIs cannot simply be dropped without breaking
+  compatibility — so no near-term upstream fix should be assumed.
+
+#### Adopted: `crds.enabled: false`
+
+[PR #8850](https://github.com/envoyproxy/gateway/pull/8850) added a
+`crds.enabled` dependency toggle to `gateway-helm`, announced in the `v1.9.0`
+release notes. It is in fact already present and functional in the pinned
+`v1.8.3` chart (`Chart.yaml` carries `- condition: crds.enabled` and
+`values.yaml` `crds.enabled: true` in both packages) — so this is an
+availability correction, not a new capability, and the adoption is not gated on
+the bump.
+
+The HelmRelease now sets `crds.enabled: false`, which drops the subchart as a
+dependency outright. Verified by rendering `gateway-helm` `v1.9.0` both ways:
+with the flag off the release manifest is 19 KB and contains zero CRDs and zero
+`ValidatingAdmissionPolicy` objects; with it on, the `safe-upgrades` policy and
+its binding appear. `crds.gatewayAPI.safeUpgradePolicy.enabled: false` is kept
+deliberately redundant — it is the switch upstream documents for externally
+managed Gateway API CRDs, and it keeps that object single-owned even if the
+dependency is ever re-enabled. `crds: Skip` stays on install and upgrade as a
+third line of defence.
+
+[PR #9024](https://github.com/envoyproxy/gateway/pull/9024) is the reason the
+VAP needs handling at all: it moved those resources out of a `crds/` directory
+into chart templates precisely because **Flux treats everything under `crds/`
+as a CRD** ([#9015](https://github.com/envoyproxy/gateway/issues/9015)). The
+`v1.9.0` notes list it as a breaking change, but the layout is identical in the
+`v1.8.3` package already in use — which is why this repository has needed
+`safeUpgradePolicy.enabled: false` since Amendment #1 and sees no behavior
+change here.
+
+#### Bundle and version moves
+
+- **Envoy Gateway `v1.8.3` → `v1.9.0`** (chart digest
+  `sha256:06e7c26e50d40f0b98d6d1243a3c8dd094464c6099df727216876c19401ffe5f`,
+  published 2026-08-15). Security carries the bump on its own: Go 1.26.6, a
+  read-only container root filesystem, and a `GatewayNamespaceMode` bypass fix.
+- **Gateway API `v1.5.1` → `v1.6.1` is mandatory, not optional.** `v1.9.0`
+  reconciles `TCPRoute`/`UDPRoute` through `gateway.networking.k8s.io/v1`; if
+  the `v1.6` bundle is absent those routes are *silently skipped*. The standard
+  channel gains `tcproutes` and `udproutes`, taking this directory from 18 to
+  20 objects.
+- The vendored `safe-upgrades` policy moves to `bundle-version: v1.6.1`. Its own
+  validation rejects Gateway API CRDs annotated `v1.0`–`v1.4` and experimental
+  CRDs landing on standard ones; `v1.5.1` → `v1.6.1` standard passes both, so
+  the policy cannot deadlock its own bundle bump.
+- **Control-plane memory limit `512Mi` → `768Mi`.** The `EndpointSliceIndex`
+  runtime flag now defaults on and indexes EndpointSlices in the controller;
+  upstream explicitly asks operators to review and raise memory before
+  upgrading, or opt out via `runtimeFlags.disabled`. Raising the ceiling is
+  preferred to disabling an indexing improvement in a cluster this small.
+
+#### Breaking-change assessment against the deployed manifests
+
+`v1.9.0` carries 19 breaking changes. Each was checked against what this
+platform actually applies — 21 `SecurityPolicy`, 14 `BackendTrafficPolicy`, 57
+`HTTPRoute`, 2 `EnvoyProxy`, 11 `Backend`, across the cluster config and the
+local stack — rather than assumed inert.
+
+Two needed a real decision:
+
+- **`EndpointSliceIndex` defaults on** → control-plane memory limit raised (see
+  above).
+- **The Gateway API `v1.6` requirement** → the vendored bundle moves with the
+  controller (see above).
+
+One came close to blocking the upgrade and is worth recording, because the
+margin is thin. `SecurityPolicy.spec.mergeType` and
+`BackendTrafficPolicy.spec.mergeType` are now **rejected on `Gateway`, Gateway
+listener, and `ListenerSet` targets** and permitted only on xRoute targets.
+This platform uses `mergeType: StrategicMerge` in 19 places, and it does target
+a `Gateway` — but never both at once:
+
+| Policy | `mergeType` | Targets | Verdict |
+|--------|-------------|---------|---------|
+| `jwt-edge`, `jwt-edge-staff`, `admin-cidr-internal` | `StrategicMerge` | `HTTPRoute` only | allowed — xRoute |
+| `cors-policy` | none | `Gateway/platform` | allowed — no `mergeType` |
+| all 14 `BackendTrafficPolicy` | none | `HTTPRoute` only | allowed |
+
+So the gateway-wide CORS baseline is admissible only because it never needed
+`mergeType` — the per-route policies are the ones that merge onto it. **Adding
+`mergeType` to `cors-policy`, or re-targeting any merging policy at the
+`Gateway`, is now an admission failure** rather than a silently-ignored field.
+
+The remaining 16 are inert here, verified by absence rather than assumption: no
+`ClientTrafficPolicy` (so no `clientIPDetection`), no `apiKeyAuth`, no
+`wellKnownCACertificates: System` on any `Backend` or `BackendTLSPolicy`, no
+TCP/UDP/TLS route, no `sessionPersistence`, no Lua `EnvoyExtensionPolicy`, no
+SDS unix-socket URL, no shared-only global rate-limit rule, and — the reason
+several of them cannot reach us — **no `EnvoyPatchPolicy` and no extension
+server anywhere in the repository**, which is what the xDS-level renames
+(JWT provider names, `typedPerFilterConfig`, `system_ca_certificates`, the
+removed `use_eds_cache_for_ads` guard) require in order to bite. The
+`XRateLimitHeadersOptionDisabled` fix is documented upstream as affecting no
+existing manifest.
+
+One is easy to misread and so deserves naming: **tracing client sampling now
+defaults to 0% instead of 100%**. The new `clientSamplingFraction` field governs
+whether a *caller-forced* sampling decision is honored; it is distinct from
+`samplingRate`, which still exists on `EnvoyProxy` and still governs the
+sampling this platform relies on — `10` in the infra baseline, patched to `100`
+for local. The two remain mutually exclusive by CRD validation. Nothing here
+ever depended on client-forced tracing, so edge sampling behavior is unchanged.
+
+**Amended decision:** unchanged from 2026-08-17 in substance. The controller
+HelmRelease adds `crds.enabled: false` to the existing `crds: Skip` and
+`safeUpgradePolicy.enabled: false`, and the vendored bundle moves to Envoy
+Gateway `v1.9.0` with Gateway API `v1.6.1`.
+
 ## Revisit triggers
 
 Re-open this decision when one or more of the following become true:
@@ -311,6 +479,7 @@ new ADR that supersedes this one.
 - [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) / [ADR-003](../ADR-003-jwt-validation-in-services-not-kong/) — the superseded Kong-era decisions
 - [ADR-045](../ADR-045-local-first-edge-rate-limiting/) · [ADR-046](../ADR-046-e2e-gate-kind-fallback/) — sibling edge decisions
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — to be archived read-only
+- [envoyproxy/gateway#6105](https://github.com/envoyproxy/gateway/issues/6105) — the open upstream issue behind the CRD delivery amendments
 
 ## History
 
@@ -319,6 +488,7 @@ new ADR that supersedes this one.
 | 2026-08-10 | Proposed / Not started | Proposed inside the RFC-0024 review |
 | 2026-08-11 | Accepted / Not started | Accepted with RFC-0024; numbering assigned 044–046 because ADR-039/040 were consumed by unrelated decisions (RFC text had said 045–047) |
 | 2026-08-17 | Accepted / Partial | Amended: CRD delivery moves from a HelmRelease to vendored manifests applied server-side, after the first Kind bring-up proved the Helm path exceeds the 1 MiB `Secret` limit |
+| 2026-08-18 | Accepted / Partial | Amended: Envoy Gateway v1.8.3 → v1.9.0 with Gateway API v1.6.1 (mandatory for the TCPRoute/UDPRoute `v1` move); adopted `crds.enabled: false`; re-verified Amendment #1's subchart rejection against both chart packages and recorded the upstream evidence |
 
 ---
-_Last updated: 2026-08-17_
+_Last updated: 2026-08-18_

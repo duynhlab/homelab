@@ -146,7 +146,7 @@ See adr/README.md § RFC Resulting decisions.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| {one-line decision} | [ADR-NNN](../../adr/ADR-NNN-slug/) | Proposed |
+| {one-line decision} | `../../adr/ADR-NNN-slug/` | Proposed |
 
 ## Implementation History
 

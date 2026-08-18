@@ -5,7 +5,7 @@
 # Every other service gets its PrometheusServiceLevel from the `mop` chart
 # (`slo.enabled: true` in the domain ResourceSets). That template builds HTTP
 # SLIs from http_server_request_duration_seconds. inventory serves gRPC only:
-# no Kong route, no HTTP callers, and the health/ready endpoints are not
+# no HTTP edge route, no HTTP callers, and the health/ready endpoints are not
 # instrumented. So the three rendered SLOs measured a metric the service never
 # emits — 0/0, no SLI series, no error budget, no burn-rate alert that could
 # fire. The platform's sole stock authority, on the money path, had three green

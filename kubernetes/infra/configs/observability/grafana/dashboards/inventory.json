@@ -31,7 +31,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**inventory-service is the sole stock authority and has three live callers** since RFC-0021 phase 4: the order saga (reserve/commit/release), checkout (availability), and product `/details`. gRPC-only -- no Kong route -- so `:8080` carries only `/health` and `/ready` and every panel here reads the rpc_* RED metrics.\n\nA flat rate is therefore a **finding**, not the expected phase-1 reading it used to be. On a freshly rebuilt cluster it just means no traffic has run yet."
+        "content": "**inventory-service is the sole stock authority and has three live callers** since RFC-0021 phase 4: the order saga (reserve/commit/release), checkout (availability), and product `/details`. gRPC-only -- no HTTP edge route -- so `:8080` carries only `/health` and `/ready` and every panel here reads the rpc_* RED metrics.\n\nA flat rate is therefore a **finding**, not the expected phase-1 reading it used to be. On a freshly rebuilt cluster it just means no traffic has run yet."
       }
     },
     {

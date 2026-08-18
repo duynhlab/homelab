@@ -922,11 +922,6 @@ services:
   # Deployment). Read ./gateway/eg/standalone.yaml first — it explains the two
   # writable-path requirements below.
   #
-  # Why Kong is gone: after the RFC-0024 P3 identity cutover the fleet's tokens
-  # come from Keycloak, and Kong OSS can only verify a JWT against a STATIC
-  # public key matched by `iss` — it cannot fetch a JWKS. Every private route
-  # 401'd at the edge, which blocked the release gate itself (the E2E audit runs
-  # on Compose before Kind). Envoy fetches the realm JWKS itself.
   # The control plane refuses to start without its own xDS TLS material: it
   # serves xDS to its Envoy child over mTLS and self-signs that pair. In
   # Kubernetes a certgen Job writes those certs as Secrets before the
@@ -983,11 +978,9 @@ services:
       keycloak: { condition: service_healthy }
       # xDS certificates must exist before the control plane boots.
       gateway-certgen: { condition: service_completed_successfully }
-      # `cache` is intentionally NOT here any more. Kong's rate limiter used
-      # Valkey for a counter shared across replicas; Envoy's local rate limiter
-      # is an in-process token bucket (gateway/eg/backendtrafficpolicy.yaml),
-      # which cannot fail open or closed and needs no datastore. Valkey still
-      # serves product-service's cache.
+      # No shared rate-limit datastore is wired up: Envoy's local rate limiter
+      # is an in-process token bucket (gateway/eg/backendtrafficpolicy.yaml)
+      # and needs no counter store. Valkey still serves product-service's cache.
 
   # ---- Frontend (built with the gateway origin baked in) ----
   frontend:

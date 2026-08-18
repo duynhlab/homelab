@@ -49,10 +49,9 @@ spec:
         service:
           enabled: true
           type: ClusterIP
-          # Edge resilience now lives at the gateway: the resilience-default
+          # Edge resilience lives at the gateway: the resilience-default
           # BackendTrafficPolicy (configs/envoy-gateway/policies/btp-api.yaml)
-          # carries the timeouts/retries/health checks the KongUpstreamPolicy +
-          # konghq.com annotations used to (removed at the RFC-0024 P2.3 cutover).
+          # carries the timeouts, retries, and health checks.
           http:
             port: 8080
             containerPort: 8080

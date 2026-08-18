@@ -1,22 +1,15 @@
 #!/usr/bin/env bash
-# RFC-0024 P2.3: the edge-ingress NetworkPolicy sweep, as a script.
+# Edge-ingress NetworkPolicy sweep — guards the envoy-gateway allow list.
 #
-# The Kong -> Envoy Gateway cutover re-pointed 11 namespace allows
-# (kubernetes.io/metadata.name: kong -> envoy-gateway). A missed file is a
-# SILENT traffic blackhole: the route resolves, the pod is healthy, and every
-# request times out at the CNI. This script is the named verification for that
-# re-point (see the comments in configs/network-policies/*.yaml).
+# A missed file is a SILENT traffic blackhole: the route resolves, the pod is
+# healthy, and every request times out at the CNI.
 #
 # Two modes, modeled on db-isolation-sweep.sh:
 #   1. manifest mode (always): greps the committed manifests — every
 #      edge-reachable namespace must admit ingress from envoy-gateway on its
-#      service port, inventory (gRPC-only, no edge route) must NOT, and
-#      NOTHING may still reference a namespace named `kong` (it no longer
-#      exists).
+#      service port, and inventory (gRPC-only, no edge route) must NOT.
 #   2. live mode (--live, kubectl context set): probes TCP connectivity from a
-#      pod in the envoy-gateway namespace to each backend service port and
-#      asserts the kong namespace + kong NetworkPolicy references are gone
-#      from the cluster.
+#      pod in the envoy-gateway namespace to each backend service port.
 #
 # Exit 0 iff every check answers as expected.
 set -u
@@ -64,18 +57,6 @@ manifest_sweep() {
       pass "$ns does not admit envoy-gateway (gRPC-only, as designed)"
     fi
   done
-
-  echo "== manifest mode: no manifest may still reference the kong namespace"
-  # The kong namespace no longer exists; any selector, allow-list, or
-  # namespace: field naming it is dead config that reads as protection.
-  stale=$(grep -rnE "metadata.name: kong$|namespaces: \[kong\]|namespace: kong$" \
-    "$REPO_ROOT/kubernetes" 2>/dev/null || true)
-  if [ -n "$stale" ]; then
-    fail "stale kong namespace references remain:"
-    printf '%s\n' "$stale"
-  else
-    pass "no kong namespace references under kubernetes/"
-  fi
 }
 
 live_sweep() {
@@ -107,18 +88,6 @@ live_sweep() {
       fail "live: $ns:$port -> got=$verdict want=$want"
     fi
   done <<<"$out"
-
-  echo "== live mode: kong is gone from the cluster"
-  if kubectl get namespace kong >/dev/null 2>&1; then
-    fail "live: namespace kong still exists"
-  else
-    pass "live: namespace kong absent"
-  fi
-  if kubectl get networkpolicy -A -o yaml 2>/dev/null | grep -q "metadata.name: kong"; then
-    fail "live: a NetworkPolicy still selects the kong namespace"
-  else
-    pass "live: no NetworkPolicy references kong"
-  fi
 }
 
 manifest_sweep

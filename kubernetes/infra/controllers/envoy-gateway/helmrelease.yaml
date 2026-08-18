@@ -1,12 +1,11 @@
-# Envoy Gateway control plane (RFC-0024 P2, ADR-044) — replaces Kong as the
-# platform edge; Kong stays deployed until the P2 cutover PR (2.3) removes it.
+# Envoy Gateway control plane (RFC-0024 P2, ADR-044) — the platform edge.
 # Chart: envoyproxy/gateway-helm — the envoy-gateway controller Deployment
 # (xDS server + Gateway API reconciler). Data-plane Envoy Deployments are
 # created per Gateway by this controller, shaped by the EnvoyProxy CR in
 # configs/envoy-gateway/envoyproxy.yaml.
 #
-# Namespace: `envoy-gateway` (platform short-name convention, like `kong`),
-# not the upstream default envoy-gateway-system. Created in
+# Namespace: `envoy-gateway` (platform short-name convention), not the
+# upstream default envoy-gateway-system. Created in
 # controllers/namespaces.yaml.
 #
 # CRDs: crds Skip on install AND upgrade — this chart carries them in its

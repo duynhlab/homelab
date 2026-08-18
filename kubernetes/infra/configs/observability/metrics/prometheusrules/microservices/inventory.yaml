@@ -1,7 +1,8 @@
 # inventory-service recording rules + alerts. Landed at RFC-0021 phase 1, STEADY
 # STATE since phase 4.
 #
-# inventory is the platform's sole stock authority (gRPC-only, no Kong route), and
+# inventory is the platform's sole stock authority (gRPC-only, no HTTP edge route),
+# and
 # it now has three live callers: the order saga (reserve/commit/release), checkout
 # (availability), and product's `/details`. The "every rate reads ~0 until phase 2"
 # caveat that used to live here no longer applies — a flat rate is now a finding.

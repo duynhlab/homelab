@@ -1,7 +1,11 @@
 # RFC-NNNN Title
 
 <!-- The title must be short and descriptive. Copy this file ONLY after research.md
-     review gate passes and the owner approves "ready for RFC". -->
+     review gate passes and the owner approves "ready for RFC".
+     Template v2 (2026-08-18): added § Other solutions considered between
+     § Alternatives and § Architecture & Diagrams. RFCs authored from
+     RFC-0000/README.md before that date use template v1 — no backfill unless
+     the owner asks. -->
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
@@ -64,6 +68,22 @@ without yet diving into full API/implementation specifics (those go in Design De
 Decision alternatives — may be a shorter subset of research.md § Alternatives.
 Link research for the full plain-language analysis.
 -->
+
+## Other solutions considered
+
+<!--
+What other options exist? Why are they not a suitable or the best choice?
+One row per option — name it, sketch the shape, and state the concrete reason
+we rejected it (cost, ops burden, blast radius, missing capability, licence,
+lock-in, doesn't fit deployed reality). Complements § Alternatives above:
+Alternatives = decision-level tradeoffs on the chosen path; this section =
+every other option we looked at and ruled out.
+-->
+
+| Option | Shape | Why not chosen |
+|--------|-------|----------------|
+| `<option-A>` | <!-- one-line sketch --> | <!-- concrete rejection reason --> |
+| `<option-B>` | <!-- --> | <!-- --> |
 
 ## Architecture & Diagrams
 

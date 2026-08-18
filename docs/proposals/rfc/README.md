@@ -30,9 +30,9 @@ diagram *before* anyone builds it. Examples:
 
 | Artifact | File | Template | Question it answers |
 |----------|------|----------|---------------------|
-| **Template** | [`RFC-0000/`](RFC-0000/) | Copy source only — **never** a live proposal | — |
+| **Template** | [`RFC-0000/`](RFC-0000/) (v2) | Copy source only — **never** a live proposal | — |
 | **Research** | `RFC-NNNN/research.md` | [`RFC-0000/research.md`](RFC-0000/research.md) | What **real-world problem** are we solving, how does the tech work, and how does it compare to what we run? |
-| **RFC** | `RFC-NNNN/README.md` | [`RFC-0000/README.md`](RFC-0000/README.md) | What do we decide, target architecture, rollout? |
+| **RFC** | `RFC-NNNN/README.md` | [`RFC-0000/README.md`](RFC-0000/README.md) (v2) | What do we decide, target architecture, rollout? |
 | **Domain doc** (optional) | `docs/<area>/<topic>/README.md` | [`AGENTS.md`](../../../AGENTS.md) docs conventions | How does it work **in this platform**? |
 
 **Flow:** real-world problem in `research.md` → [research review gate](RFC-0000/research.md#research-review-gate)

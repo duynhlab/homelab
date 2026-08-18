@@ -48,7 +48,7 @@ flowchart LR
   VEC["Vector<br/>docker_logs → jsonline"]:::collector
 
   subgraph scrape["Scrape + rules"]
-    VMA["vmagent :8429<br/>clickhouse + otel-collector jobs"]:::collector
+    VMA["vmagent :8429<br/>5 jobs: clickhouse, otel-collector,<br/>envoy-gateway, envoy, temporal"]:::collector
     VMAL["vmalert :8880<br/>ported cluster rules"]:::platform
   end
 
@@ -74,8 +74,12 @@ flowchart LR
   OTEL -->|"native TCP :9000"| CH
   VEC --> VL
 
+  TMP["temporal :7233<br/>:8000 /metrics"]:::service
+
   VMA -->|"scrape :9363 + :8888"| CH
   VMA --> OTEL
+  VMA -->|"scrape :19001 + :19005"| EDGE
+  VMA -->|"scrape :8000"| TMP
   VMA -->|remote-write| VM
   VMAL -->|"query + record"| VM
 
@@ -97,7 +101,12 @@ Every signal has a home, and the collector fan-out matches the cluster
 The edge is a first-class span producer (its `ingress` span is the trace root —
 audit C2/C3) and contributes its JSON access log through Vector (C13). The
 scrape column is what makes `up` a real signal here: without it, a dead backend
-only ever showed up as somebody else's export failures.
+only ever showed up as somebody else's export failures. Five static jobs cover
+the engines that cannot push: ClickHouse (`:9363`), the collector's
+self-telemetry (`:8888`), both halves of the edge (`:19001` control plane,
+`:19005` `/stats/prometheus` data plane), and the Temporal server (`:8000`,
+the listener `PROMETHEUS_ENDPOINT` enables in `compose.yaml`) — which is what
+lets this stack validate the cluster's three server-side Temporal alerts.
 
 ## 3. Cluster vs local-stack — component parity matrix
 
@@ -118,11 +127,19 @@ only ever showed up as somebody else's export failures.
 | Operator metrics (`clickhouse_operator_*`) | ✅ `:8888/metrics` | N/A | cannot exist locally |
 | Metrics-exporter (`chi_clickhouse_*`) | ✅ `:8888/chi` | N/A | cannot exist locally |
 | Server built-in `/metrics` (`ClickHouseMetrics_*` …) | ❌ off at 1×1, by decision | ✅ `:9363` | the local engine view — see §5 |
-| Collector self-scrape (`otelcol_*`) | ✅ ServiceMonitor | ✅ vmagent job | identical series names |
+| Collector self-scrape (`otelcol_*`) | ✅ ServiceMonitor | ✅ vmagent job | identical series names; local board `otel-collector-health-local` |
+| Edge scrape (`envoy_*` + control plane) | ✅ ServiceMonitor + PodMonitor | ✅ vmagent jobs `envoy-gateway` + `envoy` | data plane via the bootstrap-merged `:19005` listener |
+| Temporal server metrics (`service_*`, `persistence_*`) | ✅ 4 chart ServiceMonitors | ✅ vmagent job `temporal` (`:8000`) | enabled by `PROMETHEUS_ENDPOINT` in compose; validates the 3 server alerts |
+| Temporal SDK metrics (`temporal_*`) | ✅ OTLP push | ✅ OTLP push | same pipeline as every app metric |
+| VictoriaLogs Grafana datasource | ✅ | ✅ | `victoriametrics-logs-datasource` 0.29.0 both stacks, uid `victorialogs` |
 | ClickHouse alerts | ✅ `clickhouse-alerts.yaml` (12 rules) | ✅ ported subset (11 rules) | same names; two operator rules have no local counterpart |
 | `clickhouse-server-engine` dashboard | ✅ | ✅ | **one dual-target JSON serves both** |
 | 5 OTel data-plane CH dashboards | ✅ | ✅ | — |
 | RED spanmetrics / business dashboards | ✅ | ✅ | — |
+| Envoy dashboards (3 of 4) | ✅ (envoyproxy/gateway v1.9.0) | ✅ same tag, Gateway folder | `resources-monitor` is cluster-only (cAdvisor series) |
+| Temporal dashboard | ✅ `temporal.json` (uid `temporal-worker`) | ✅ `temporal-local.json` (uid `temporal-worker-local`) | generated from one panel set; SDK + Server rows |
+| RFC-0021 boards (`inventory`, `rfc0021-baseline`) | ✅ | ✅ local copies + vendored recording rules | `app=` → `service_name=` rewrite, see rule file headers |
+| OTel Collector health board | ❌ (gap — collector alerts have no cluster board) | ✅ `otel-collector-health-local` | local-first; promote to the cluster when wanted |
 
 ## 4. Signal map — what each backend answers
 
@@ -165,10 +182,12 @@ Locally there is no operator, so this endpoint **is** the engine view.
 
 Two Compose services on the platform's VM version (`v1.147.0`):
 
-- **vmagent** (`:8429`) scrapes `clickhouse:9363` and `otel-collector:8888`,
-  remote-writes into VictoriaMetrics. It does **not** scrape the application
-  services — their metrics arrive over OTLP (RFC-0014 P3), and scraping them
-  too would double-ingest.
+- **vmagent** (`:8429`) scrapes five jobs — `clickhouse:9363`,
+  `otel-collector:8888`, the edge's two halves (`gateway:19001`,
+  `gateway:19005/stats/prometheus`), and `temporal:8000` — and remote-writes
+  into VictoriaMetrics. It does **not** scrape the application services —
+  their metrics arrive over OTLP (RFC-0014 P3), and scraping them too would
+  double-ingest.
 - **vmalert** (`:8880`) evaluates the rule files under
   `observability/vmalert/rules/` against VictoriaMetrics. No notifier: the
   UI/API is the validation surface.
@@ -194,6 +213,14 @@ so a runbook practised locally transfers. Different series by design:
 | OtelCollectorDown | `up{job=~".*otel-collector.*"}` | `up{job="otel-collector"}` |
 | ClickHouseOperatorDown / ReconcileErrors | operator series | **absent** — no operator in Compose |
 
+Beyond the ClickHouse slice, `rules/` also carries the vendored RFC-0021
+recording rules (`rfc0021-baseline.yaml`, `inventory.yaml` — 15 recording +
+3 inventory alerting rules) so the two RFC-0021 dashboards render locally;
+they materialize because vmalert runs with `-remoteWrite.url`. One mechanical
+rewrite applies: cluster series carry an `app` label, the local OTLP path
+promotes `service_name` — every `app=` matcher became `service_name=` (see
+the rule file headers).
+
 ### 5D. Dashboard — one JSON, both stacks
 
 `clickhouse-server-engine.json` is **dual-target**: every engine panel carries
@@ -212,6 +239,20 @@ design and says so in its title. (A single-target copy was considered and
 rejected: all 24 of the original panel series were exporter-shaped, so a plain
 copy rendered a fully empty board locally.)
 
+#### Gateway-folder boards — local divergences
+
+The three `Gateway/` boards are the upstream `envoyproxy/gateway` v1.9.0
+dashboards (same tag the cluster vendors). Three local-only edits, re-applied
+on every re-vendor because JSON carries no comments:
+
+- datasource variable `current` pinned to the local `victoriametrics` uid
+  (upstream ships an authoring-instance uid that resolves nowhere here);
+- `envoy-gateway-global.json`'s `Namespace` variable opened up
+  (`includeAll` + `allValue: .*`) — upstream pins `envoy-gateway-system`,
+  a label that does not exist on Compose series;
+- `envoy-clusters.json`'s two `kube_pod_container_resource_limits` secondary
+  targets stripped (no kube-state-metrics in Compose).
+
 ### 5E. Provisioning
 
 None needed — `provisioning/dashboards/dashboards.yaml` already loads every
@@ -222,7 +263,7 @@ in both stacks.
 
 | Task | Command |
 |---|---|
-| Confirm both scrape targets are up | `curl -s http://localhost:8429/api/v1/targets \| jq '[.data.activeTargets[] \| {job:.labels.job,health}]'` |
+| Confirm all five scrape targets are up | `curl -s http://localhost:8429/api/v1/targets \| jq '[.data.activeTargets[] \| {job:.labels.job,health}]'` |
 | List loaded/firing alerts | `curl -s http://localhost:8880/api/v1/alerts \| jq '.data.alerts[] \| {name:.labels.alertname,state}'` |
 | Rehearse `ClickHouseServerUnreachable` | `docker compose stop clickhouse` → firing within ~5m → `docker compose start clickhouse` |
 | Rehearse `ClickHouseExporterUnhealthy` | `docker compose pause clickhouse` → collector `send_failed_*` climbs → `unpause` |
@@ -249,7 +290,7 @@ full audit runs before the change merges.
 
 | Layer | Cluster path | local-stack path |
 |---|---|---|
-| Grafana dashboards | `kubernetes/infra/configs/observability/grafana/dashboards/*.json` | `local-stack/observability/grafana/dashboards/{ClickHouse,Observability}/*.json` |
+| Grafana dashboards | `kubernetes/infra/configs/observability/grafana/dashboards/*.json` | `local-stack/observability/grafana/dashboards/{ClickHouse,Gateway,Observability}/*.json` |
 | Datasources | `kubernetes/infra/configs/observability/grafana/datasource-*.yaml` | `local-stack/observability/grafana/provisioning/datasources/*.yaml` |
 | Alert rules | `…/metrics/prometheusrules/**/*.yaml` (PrometheusRule CRs) | `local-stack/observability/vmalert/rules/*.yaml` |
 | Scrape config | `…/metrics/{servicemonitors,podmonitors}/*.yaml` | `local-stack/observability/vmagent/prometheus.yml` |
@@ -266,5 +307,7 @@ full audit runs before the change merges.
   [`ADR-023`](../../docs/proposals/adr/ADR-023-clickhouse-observability-olap/)
 - [`local-stack/README.md`](../README.md) · [`e2e-audit.md`](e2e-audit.md)
 
-_Last updated: 2026-08-13 — engine-health slice shipped (metrics.xml, vmagent,
+_Last updated: 2026-08-18 — temporal server scrape, VictoriaLogs datasource,
+collector-health + RFC-0021 boards, Gateway-board divergences recorded;
+previously 2026-08-13 — engine-health slice shipped (metrics.xml, vmagent,
 vmalert, ported rules, dual-target dashboard, audit rows C20/C21)._

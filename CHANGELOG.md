@@ -340,6 +340,34 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Temporal, cert-manager, and the collector get their missing visual
+  surfaces — and every metric name on them is live-verified.** The Temporal
+  dashboard is vendored in-repo (`dashboards/temporal.json`, uid
+  `temporal-worker`) instead of runtime-fetched from the deprecated
+  `duynhlab/grafana-dashboards` repo's unpinned `main`, and grows from 8 to 21
+  panels: workflow-task schedule-to-start latency (the catalog's own top-gap
+  leading indicator), pollers, sticky cache, terminal states, and a **Server
+  row** (`service_requests`, `service_error_with_type`, `persistence_*`,
+  `approximate_backlog_count`) that closes the server-board follow-up open
+  since the chart migration. A **cert-manager** board lands in folder GitOps —
+  the component was scraped and carried three alerts but had zero
+  visualization; it adds the per-cert time-to-expiry and renewal-time tables
+  the alerts page for. Local-stack gains the same Temporal board (generated
+  from one panel set), an **OTel Collector health** board over the `otelcol_*`
+  self-telemetry that the two collector alerts had no surface for, RFC-0021
+  `inventory` + `rfc0021-baseline` parity copies backed by vendored recording
+  rules (`app=` → `service_name=`), a **VictoriaLogs Grafana datasource**
+  (plugin 0.29.0, closing "logs only via vmui"), and a **Temporal server
+  scrape** — `PROMETHEUS_ENDPOINT: 0.0.0.0:8000` on the compose server plus a
+  vmagent `temporal` job, which is what lets the compose stack validate all
+  three server-side Temporal alerts. The four Envoy Gateway boards re-vendor
+  from `envoyproxy/gateway` v1.9.0 (matching the chart pin; upstream adds a
+  TLS Certificate Expiry panel), with the three local copies' divergences
+  (datasource `current`, `Namespace` variable, kube-state secondary targets)
+  now recorded in `local-stack/docs/observability.md`. Audit rows
+  C10/C17/C18/C20/C21 updated for the new expectations (5 datasources, 16
+  dashboards, 5 scrape jobs, 14 alerting + 15 recording rules).
+
 - **The edge's eleven alerts finally have runbooks.** They shipped with the P4
   edge slice below — expressions, catalog rows, recording rules — and nothing
   linked them to an investigation, so an on-call page arrived carrying a
@@ -737,6 +765,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`TemporalServiceErrorRateHigh` could never fire** — its expression rated
+  `service_errors`, a series that does not exist on temporal server 1.31.2
+  (the real counter is `service_error_with_type`; verified against a live
+  `/metrics` dump on the compose stack, where the new server scrape made the
+  claim testable at all). Expression fixed, catalog row corrected, and the
+  same sweep confirmed the four SDK-side alert names are bare counters exactly
+  as their comment claims. Documentation drift fixed in the same change:
+  `docs/observability/grafana/README.md` listed 3 dashboards against the 31
+  shipping (inventory rewritten, `configMapGenerator` pattern documented,
+  datasource table completed), the hub's Documentation Map now links
+  `local-stack/docs/observability.md` and carries real runbook counts, the
+  e2e-audit's "nothing scrapes proxy stats locally" paragraph contradicted its
+  own C20 row, and the orphaned 107 KB `dashboards/vector.json` (referenced by
+  nothing since the CR moved to grafana.com) is deleted.
 - **Platform overview dashboard stops double-counting the edge.** The
   ClickHouse-Otel service RPS and P95 panels filtered `ServiceName != 'kong'`,
   a name no span carried after the edge cutover — the edge gateway's spans

@@ -1,5 +1,5 @@
 # Envoy Gateway first-party dashboard suite (RFC-0024 P4 edge slice) — the four
-# dashboards EG ships in envoyproxy/gateway v1.8.3
+# dashboards EG ships in envoyproxy/gateway v1.9.0
 # (charts/gateway-addons-helm/dashboards/), vendored as JSON under
 # ./envoy-gateway/ via the configMapGenerator entries in this directory's
 # kustomization (clickhouse-suite pattern):
@@ -18,8 +18,10 @@
 # prometheus-TYPE alias "VictoriaMetrics (Prometheus)"
 # (datasource-victoriametrics-prometheus.yaml) — the same mechanism the
 # upstream VictoriaMetrics dashboards use. One local patch is recorded in the
-# JSON: 4 panels in envoy-gateway-global.json had a hardcoded datasource uid
-# from the authoring instance, re-pointed to $datasource.
+# JSON: hardcoded datasource uids from the authoring instance are re-pointed to
+# $datasource — 4 spots in envoy-gateway-global.json, 1 in
+# envoy-proxy-global.json (new in v1.9.0, which also adds a TLS Certificate
+# Expiry panel; the other three dashboards are unchanged from v1.8.3).
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:

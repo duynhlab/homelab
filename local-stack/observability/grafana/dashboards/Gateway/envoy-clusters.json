@@ -283,20 +283,6 @@
           "legendFormat": "",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "sum(kube_pod_container_resource_limits{resource=\"memory\",container=\"envoy\"})",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "B"
         }
       ],
       "title": "Allocated Memory",
@@ -408,20 +394,6 @@
           "legendFormat": "",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "sum(kube_pod_container_resource_limits{resource=\"memory\",container=\"envoy\"})",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "B"
         }
       ],
       "title": "Heap Size",
@@ -2160,7 +2132,11 @@
   "templating": {
     "list": [
       {
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "VictoriaMetrics",
+          "value": "victoriametrics"
+        },
         "includeAll": false,
         "name": "datasource",
         "options": [],
@@ -2265,7 +2241,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Envoy — Clusters — Local",
+  "title": "Envoy \u2014 Clusters \u2014 Local",
   "uid": "8WkEOMnANKE6PW5hhpVv",
   "version": 40
 }

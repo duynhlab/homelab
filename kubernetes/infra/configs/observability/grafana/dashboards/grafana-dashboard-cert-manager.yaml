@@ -1,0 +1,35 @@
+# cert-manager — the visual surface for the three CertManager* alerts
+# (prometheusrules/gitops/cert-manager-alerts.yaml). Until this board landed,
+# cert-manager was the platform's clearest "scraped + alerted, zero dashboard"
+# gap: an operator paged by CertManagerCertExpiringSoon had no board to open.
+# Folder "GitOps" because that is where its alerts live in the catalog (§6,
+# Flux + cert-manager).
+#
+# Metrics: chart-native ServiceMonitor on :9402
+# (controllers/cert-manager/helmrelease.yaml, prometheus.servicemonitor) —
+# controller, webhook and cainjector all expose /metrics there. The
+# certmanager_* names are proven present by the live alert exprs; the ACME
+# panels sit empty by design under the local CA ClusterIssuer and only
+# populate for ACME issuers. The expiry/renewal timestamp panels go beyond
+# the upstream reference designs, which omit them despite the expiry alerts
+# being the component's most-paged signal.
+#
+# Datasource: DS_PROMETHEUS template variable with `query: prometheus`,
+# resolving against the prometheus-TYPE alias "VictoriaMetrics (Prometheus)"
+# (datasource-victoriametrics-prometheus.yaml) — same mechanism as the Envoy
+# Gateway and Temporal boards.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: cert-manager
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "GitOps"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-cert-manager
+    key: cert-manager.json

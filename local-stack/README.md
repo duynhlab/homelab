@@ -112,10 +112,10 @@ browsed).
 | API gateway (Envoy) | http://localhost:8080 | Pass-through edge for the application services; the root path has no route, so `/` answers 404 by design |
 | Keycloak | http://localhost:8081 | Two realms: `duynhlab` for customers and `duynhlab-staff` for operators (ADR-050). The origin both SPAs log in against and the `iss` in every token |
 | Temporal Web UI | http://localhost:8233 | Order and checkout workflows |
-| Grafana | http://localhost:3002 | RED, business, Temporal, and ClickHouse dashboards (incl. **ClickHouse Server / Engine**); Explore over VictoriaMetrics, VictoriaTraces, ClickHouse, and Pyroscope |
+| Grafana | http://localhost:3002 | 16 dashboards in three folders: Observability (RED, business, Temporal incl. server row, OTel Collector health, RFC-0021 inventory + baseline), Gateway (3 Envoy boards), ClickHouse (6, incl. **Server / Engine**); Explore over VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse, and Pyroscope |
 | VictoriaTraces | http://localhost:10428 | Trace storage, Jaeger query API, and vmui |
 | VictoriaMetrics | http://localhost:8428 | OTLP/remote-write metrics, PromQL, and vmui |
-| VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL, through its own vmui — there is no Grafana datasource for it |
+| VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL — via its own vmui or the Grafana `VictoriaLogs` datasource (plugin installed at container start, needs outbound internet once, like the gateway's Envoy image download) |
 | ClickHouse | http://localhost:8123 | SQL over `otel.otel_logs` and `otel.otel_traces`; credentials `default` / `otel` |
 | vmagent | http://localhost:8429 | Scrape-target UI + `/api/v1/targets` (audit C20) |
 | vmalert | http://localhost:8880 | Ported cluster alert rules; UI + `/api/v1/alerts` (audit C21) |
@@ -126,6 +126,7 @@ browsed).
 | ClickHouse Prometheus | http://localhost:9363/metrics | The engine's own metric families (`ClickHouseMetrics_*`, `ClickHouseProfileEvents_*`, …); scraped in-network by vmagent |
 | ClickHouse native protocol | localhost:9000 (TCP) | The collector's `clickhouse` exporter; also `clickhouse-client --port 9000` |
 | Temporal frontend gRPC | localhost:7233 (gRPC) | `temporal` CLI from the host; the audit uses `temporal-admintools` instead |
+| Temporal server metrics | temporal:8000 (in-network only) | `service_*` / `persistence_*` families via `PROMETHEUS_ENDPOINT`; scraped by vmagent's `temporal` job (audit C10/C20) |
 | OTLP HTTP receiver | http://localhost:4318 | Host-side `telemetrygen` smoke tests; the fleet sends in-network |
 | Gateway control plane | http://localhost:8099/readyz | Envoy Gateway standalone readiness — the data plane's readiness gate before Phase A |
 
@@ -208,11 +209,13 @@ flowchart LR
     TAILED["containers Vector still tails:<br/>infra + inventory, checkout,<br/>checkout-worker, mockpay"] -->|"container stdout"| VEC["Vector"]
     COL --> VT["VictoriaTraces<br/>:10428"]
     COL -->|"native + span metrics"| VM["VictoriaMetrics<br/>:8428"]
-    COL -->|"logs"| VL["VictoriaLogs :9428<br/>queried via its own vmui,<br/>no Grafana datasource"]
+    COL -->|"logs"| VL["VictoriaLogs<br/>:9428"]
     COL -->|"logs + traces SQL"| CH[("ClickHouse<br/>:8123")]
     VEC -->|"jsonline ingest"| VL
+    VMA["vmagent :8429<br/>+ vmalert :8880"] -->|"scrape: clickhouse, collector,<br/>edge ×2, temporal :8000"| VM
     VT --> GRAF["Grafana<br/>:3002"]
     VM --> GRAF
+    VL --> GRAF
     CH --> GRAF
     SVC -->|"pprof"| PYRO["Pyroscope<br/>:4040"]
     PYRO --> GRAF
@@ -235,7 +238,7 @@ flowchart LR
     class SPA,PORTAL,EDGE,KC,LEdge edge;
     class SVC,INV,LService service;
     class TMP,OW,LWorker worker;
-    class COL,VEC,TAILED,VT,VM,VL,GRAF,PYRO,LPlatform platform;
+    class COL,VEC,TAILED,VT,VM,VL,VMA,GRAF,PYRO,LPlatform platform;
     class PG,VALKEY,CH,LData data;
     class MP,LExternal external;
 ```
@@ -361,7 +364,10 @@ Passing one environment never implies that the other environment passes.
 - [Observability](../docs/observability/README.md)
 - [agent-browser CLI](https://github.com/vercel-labs/agent-browser)
 
-_Last updated: 2026-08-13 — the port table is now canonical and complete (17
+_Last updated: 2026-08-18 — Temporal server metrics scraped (in-network
+`:8000` via `PROMETHEUS_ENDPOINT`), VictoriaLogs Grafana datasource added, and
+the dashboard set grew to 16 (collector health, RFC-0021 parity copies);
+previously 2026-08-13 — the port table became canonical and complete (17
 published ports in two groups: browsable + machine surfaces), adding the
 engine-health slice: ClickHouse `:9363/metrics`, vmagent `:8429`, vmalert
 `:8880` (audit rows C20/C21; see `docs/observability.md`)._

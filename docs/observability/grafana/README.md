@@ -27,9 +27,12 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 | Datasource | Type | Default | URL | Purpose |
 |------------|------|---------|-----|---------|
 | VictoriaMetrics | `victoriametrics-metrics-datasource` | Yes | `vmsingle-victoria-metrics:8428` | Metrics (PromQL/MetricsQL), dashboards, Explore |
+| VictoriaMetrics (Prometheus) | `prometheus` | No | same VMSingle URL | prometheus-TYPE alias — what `query: prometheus` datasource variables (Envoy Gateway, Temporal, cert-manager, VM self-boards) resolve against |
 | VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), trace correlation, [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
+| VictoriaTraces | `jaeger` | No | `vtsingle…:10428/select/jaeger` | Trace queries against the VictoriaTraces pilot (Jaeger query API) |
 | Tempo | `tempo` | No | `tempo:3200` | Trace queries |
 | Jaeger | `jaeger` | No | `jaeger:16686` | Trace search (alternative UI) |
+| ClickHouse | `grafana-clickhouse-datasource` | No | `clickhouse…:9000` | SQL over `otel.otel_logs` / `otel.otel_traces` (RFC-0019) |
 | Pyroscope | `grafana-pyroscope-datasource` | No | `pyroscope:4040` | Flamegraphs |
 
 See [datasources.md](datasources.md) for metrics datasource details and Grafana Alerting UI notes.
@@ -40,10 +43,13 @@ See [datasources.md](datasources.md) for metrics datasource details and Grafana 
 
 ```
 kubernetes/infra/configs/observability/grafana/
-├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin (default metrics DS)
-├── datasource-victorialogs.yaml       # VictoriaLogs plugin
+├── datasource-victoriametrics.yaml             # VictoriaMetrics plugin (default metrics DS)
+├── datasource-victoriametrics-prometheus.yaml  # prometheus-TYPE alias (dashboards with `query: prometheus` variables)
+├── datasource-victorialogs.yaml                # VictoriaLogs plugin
+├── datasource-victoriatraces.yaml              # VictoriaTraces via the Jaeger query API
 ├── datasource-tempo.yaml
 ├── datasource-jaeger.yaml
+├── datasource-clickhouse.yaml                  # grafana-clickhouse-datasource (RFC-0019)
 └── datasource-pyroscope.yaml
 ```
 
@@ -71,13 +77,34 @@ spec:
 
 ## Dashboards
 
-Dashboards are managed as `GrafanaDashboard` CRDs or JSON ConfigMaps:
+**31 `GrafanaDashboard` CRs across 9 folders**, delivered three ways —
+`configMapRef` to a JSON vendored in this repo (preferred; auditable and
+pinned), `configMapRef` to a ConfigMap the `grafana-dashboards` HelmRelease
+renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), or `spec.url`
+(grafana.com and legacy external-repo boards):
 
-| Dashboard | Panels | Location |
-|-----------|--------|----------|
-| Microservices Observability | 8 rows / ~41 panels (RFC-0017 W3/W4) | [`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts) chart `grafana-dashboards` → ConfigMap → `GrafanaDashboard.configMapRef` |
-| Microservices — Business KPIs | 10 domain rows (RFC-0017) | same chart (`business-otel.json`) → `configMapRef` |
-| CloudNativePG Cluster Overview | Upstream CNPG cluster + operator metrics | `grafana-dashboards` repo, `dashboard/postgresql/cloudnative-pg-cluster.json` (`spec.url`) |
+| Folder | Boards | Source |
+|--------|--------|--------|
+| Observability | Microservices Observability (~41 panels), Business KPIs, RFC-0021 Baseline, RFC-0021 Inventory, **Temporal — Workflows & Activities** (SDK + Server rows), Tempo self-observability, K8s cluster overview, Vector | helm-charts ConfigMaps ×2 · in-repo JSON ×3 · `spec.url` ×3 |
+| ClickHouse | Server/Engine, OTel logs+traces SQL, Service deep dive, OTel Overview / Logs Explorer / Trace Explorer | in-repo JSON ×6 (RFC-0019 / ADR-023) |
+| API Gateway | Envoy Global, Envoy Clusters, Envoy Gateway Global, Resources Monitor | in-repo JSON ×4, vendored from `envoyproxy/gateway` v1.9.0 |
+| Databases | CloudNativePG, PG query performance, PG maintenance, PgDog | vendored/hand-rolled, external repo (`spec.url`) |
+| GitOps | **cert-manager** (expiry/renewal, controller, ACME, workqueue — the visual surface for the CertManager* alerts) | in-repo JSON |
+| VictoriaMetrics | VMSingle, VMAgent, VMAlert | grafana.com (`spec.url`) |
+| Flux | Flux cluster, Flux control plane | fluxcd/flux2-monitoring-example (`spec.url`) |
+| SLO | Sloth overview, Sloth detail | grafana.com (`spec.url`) |
+| Cache | Redis/Valkey | external repo (`spec.url`) |
+
+The **in-repo JSON** pattern (ClickHouse suite, Envoy Gateway, Temporal,
+cert-manager, RFC-0021): the JSON lives next to the CRs under `dashboards/`,
+a `configMapGenerator` entry in that directory's `kustomization.yaml` turns it
+into a stable-named ConfigMap (`disableNameSuffixHash`), and the CR consumes it
+via `configMapRef`. Boards whose datasource variable is `query: prometheus`
+resolve against the prometheus-TYPE alias datasource, not the default VM plugin
+DS. The local stack provisions file-based twins for the Observability, Gateway
+and ClickHouse folders — see
+[`local-stack/docs/observability.md`](../../../local-stack/docs/observability.md)
+for the parity matrix and the recorded local divergences.
 
 **Microservices Observability + Business KPIs** (RFC-0017): the JSONs live in
 the [`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts) repo
@@ -87,9 +114,10 @@ renders them as ConfigMaps and the `GrafanaDashboard` CRs consume them via
 `configMapRef`, mapping `DS_PROMETHEUS` → `VictoriaMetrics`. **Edit the boards
 in that repo and bump the chart** — the old
 [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards)
-repo is deprecated (its remaining legacy boards are still fetched via
-`spec.url` at their nested `dashboard/<area>/<name>.json` paths until they
-migrate).
+repo is deprecated (its remaining legacy boards — Tempo, K8s overview, the PG
+trio, Redis — are still fetched via `spec.url` at their nested
+`dashboard/<area>/<name>.json` paths until they migrate; **Temporal migrated
+in-repo on 2026-08-18** after living unpinned on that repo's `main`).
 
 **CloudNativePG**: JSON is vendored from [cloudnative-pg/grafana-dashboards](https://github.com/cloudnative-pg/grafana-dashboards) (`charts/cluster/grafana-dashboard.json`), adapted for the VictoriaMetrics plugin (same pattern as other JSON dashboards). `GrafanaDashboard` maps `DS_PROMETHEUS` → `VictoriaMetrics`. Cluster DB metrics use `PodMonitor` resources under [`kubernetes/infra/configs/databases/clusters/`](../../../kubernetes/infra/configs/databases/clusters/) (e.g. `product-db/monitoring/`); the CNPG **operator** `PodMonitor` is created when `monitoring.podMonitorEnabled` is true on the [`cloudnative-pg` HelmRelease](../../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml).
 
@@ -121,9 +149,17 @@ kubernetes/infra/configs/observability/grafana/
 ├── datasource-pyroscope.yaml
 ├── dashboards-chart.yaml              # HelmRelease → helm-charts grafana-dashboards chart (RFC-0017 boards as ConfigMaps)
 └── dashboards/
-    ├── grafana-dashboard-main.yaml     # Microservices Observability (configMapRef → chart ConfigMap)
-    ├── grafana-dashboard-business.yaml # Business KPIs (configMapRef → chart ConfigMap)
-    └── grafana-dashboard-*.yaml        # legacy boards (spec.url → grafana-dashboards repo nested paths, or grafana.com)
+    ├── kustomization.yaml               # CR list + configMapGenerator entries (stable names, no hash)
+    ├── grafana-dashboard-main.yaml      # Microservices Observability (configMapRef → chart ConfigMap)
+    ├── grafana-dashboard-business.yaml  # Business KPIs (configMapRef → chart ConfigMap)
+    ├── grafana-dashboard-temporal.yaml  # Temporal (configMapRef → temporal.json, vendored in-repo)
+    ├── grafana-dashboard-cert-manager.yaml  # cert-manager (configMapRef → cert-manager.json)
+    ├── grafana-dashboard-clickhouse*.yaml   # ClickHouse suite (configMapRef → clickhouse-*.json)
+    ├── grafana-dashboard-envoy-gateway.yaml # 4 CRs (configMapRef → envoy-gateway/*.json, vendored v1.9.0)
+    ├── grafana-dashboard-rfc0021-baseline.yaml · grafana-dashboard-inventory.yaml
+    ├── grafana-dashboard-*.yaml         # remaining boards (spec.url → grafana.com or legacy repo)
+    ├── temporal.json · cert-manager.json · clickhouse-*.json · rfc0021-baseline.json · inventory.json
+    └── envoy-gateway/*.json             # vendored envoyproxy/gateway v1.9.0 dashboards
 ```
 
 ## Related Documentation
@@ -137,4 +173,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-07-16 — RFC-0017 boards now delivered by the helm-charts `grafana-dashboards` chart (`configMapRef`); Business KPIs board added; legacy-board source notes corrected._
+_Last updated: 2026-08-18 — dashboard inventory rewritten to the real 31 CRs / 9 folders (it listed 3), the in-repo `configMapGenerator` pattern documented, Temporal vendored in-repo, cert-manager board added, and the datasource table/tree completed (prometheus alias, VictoriaTraces, ClickHouse)._

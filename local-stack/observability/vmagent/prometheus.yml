@@ -51,3 +51,12 @@ scrape_configs:
     metrics_path: /stats/prometheus
     static_configs:
       - targets: ["gateway:19005"]
+
+  # Temporal server — service_* / persistence_* families on the listener the
+  # PROMETHEUS_ENDPOINT env enables (compose.yaml, temporal service). Job name
+  # `temporal` so the cluster alert expr `up{job=~".*temporal.*"}` means the
+  # same thing on both stacks. SDK-side temporal_* metrics do NOT come from
+  # here — workers push those over OTLP like every app metric.
+  - job_name: temporal
+    static_configs:
+      - targets: ["temporal:8000"]

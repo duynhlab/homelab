@@ -4,19 +4,19 @@
 # single scrapeConfig-managed ServiceMonitor is gone with cluster.yaml
 # (ADR-030 revision); `job=~".*temporal.*"` still matches all of them.
 #
-# The error-rate metric names (service_requests/service_errors,
-# persistence_requests/persistence_error_with_type) are the Temporal server's documented
-# Prometheus metrics, taken from the official dashboards
-# (github.com/temporalio/dashboards, server/server-general.json). Ratios use
+# The error-rate metric names (service_requests/service_error_with_type,
+# persistence_requests/persistence_error_with_type) were verified against a
+# live server 1.31.2 /metrics dump (local-stack, 2026-08-18) — the official
+# dashboards' `service_errors` name does not exist there. Ratios use
 # clamp_min on the denominator so they never divide by zero / false-fire when
 # idle. Final population check is on `make up` (Kind, chart-scraped).
 #
 # Worker-side (SDK) workflow/activity RED metrics are emitted by pkg/temporalx
 # (OTel MetricsHandler) and arrive via OTLP push through the otel-collector
 # (the order-worker PodMonitor was retired at RFC-0014 P3); the
-# `temporal-worker` group below alerts on them. A Grafana dashboard adapted
-# from the official server-general.json is the remaining follow-up — see
-# docs/api/temporal-order-fulfillment.md.
+# `temporal-worker` group below alerts on them. The Temporal dashboard
+# (grafana-dashboard-temporal.yaml, vendored in-repo) carries a Server row
+# visualizing both alert groups — the server-general.json follow-up is closed.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -42,8 +42,12 @@ spec:
             description: "Temporal server target {{ $labels.instance }} (job {{ $labels.job }}) has been down for >5m — durable workflow execution is impaired."
 
         - alert: TemporalServiceErrorRateHigh
+          # service_error_with_type is the real counter — `service_errors` does
+          # not exist on temporal server 1.31.2 (verified against a live
+          # :8000/metrics dump on 2026-08-18; the bare name left this alert
+          # unable to fire since it landed).
           expr: |
-            sum(rate(service_errors[5m])) / clamp_min(sum(rate(service_requests[5m])), 1) > 0.05
+            sum(rate(service_error_with_type[5m])) / clamp_min(sum(rate(service_requests[5m])), 1) > 0.05
           for: 10m
           labels:
             severity: warning

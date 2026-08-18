@@ -1356,16 +1356,15 @@ Three things to hold in mind before the first query:
 - **The edge is the trace root now.** Envoy is the first span of every
   browser/curl-driven trace, so C2 and C3 are the rows that prove the trace
   actually starts where the request entered the platform.
-- **Two things are deliberately out of scope, and neither was forgotten.**
-  Envoy's own Prometheus endpoint and its admin interface are unreachable from
-  the host: the compose stack publishes only `8080` (proxy) and `8099` (control
-  plane `/readyz`), the admin listener binds inside the container, and nothing
-  scrapes proxy stats locally because there is no VMAgent here. The
-  `EnvoyProxy` CR's `metrics.prometheus: {}` records intent and keeps the local
-  and cluster CRs comparable — it is not a local signal. Likewise the
-  collector's OTLP **gRPC** receiver on `:4317` is not published; it is reachable
-  only from inside the compose network, which is exactly what the edge needs and
-  why no host-side generator can stand in for it.
+- **Two ports are deliberately host-unreachable, and neither was forgotten.**
+  Envoy's Prometheus endpoint and its admin interface are not published: the
+  compose stack exposes only `8080` (proxy) and `8099` (control plane
+  `/readyz`). Proxy stats ARE scraped — in-network, by vmagent's `envoy` job
+  against the bootstrap-merged `:19005` listener (C20 asserts it) — they are
+  just not a host-side surface. Likewise the collector's OTLP **gRPC**
+  receiver on `:4317` is not published; it is reachable only from inside the
+  compose network, which is exactly what the edge needs and why no host-side
+  generator can stand in for it.
 
 ```bash
 VM=http://localhost:8428/api/v1/query                     # VictoriaMetrics
@@ -1568,14 +1567,30 @@ done
 # realm performs authentication, so those series may legitimately never exist;
 # asserting them would fail a healthy stack.
 
-# C10. Temporal SDK metrics — the worker processes' own instrumentation, a leg
-#      that no other row touches. Absent series here means obsx wired the SDK
-#      without its metrics handler, which is invisible everywhere else.
+# C10. Temporal metrics, both halves. SDK first — the worker processes' own
+#      instrumentation, a leg that no other row touches. Absent series here
+#      means obsx wired the SDK without its metrics handler, which is invisible
+#      everywhere else. Note the SDK counters are BARE names (no _total):
+#      verified against live series 2026-08-18; temporal_workflow_failed and
+#      friends are failure-only and legitimately absent on a healthy run.
 for q in 'count(temporal_workflow_endtoend_latency_seconds_bucket)' \
-         'sum(temporal_activity_execution_latency_seconds_count)'; do
+         'sum(temporal_activity_execution_latency_seconds_count)' \
+         'sum(temporal_workflow_completed)' \
+         'sum(temporal_worker_task_slots_available)' \
+         'sum(temporal_num_pollers)'; do
   curl -s "$VM" --data-urlencode "query=$q" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
       print('C10', '$q', '=>', r[0]['value'][1] if r else 'NO SERIES — FAIL')"
+done
+# ... then the SERVER half — the :8000 listener PROMETHEUS_ENDPOINT enables,
+# scraped by vmagent's `temporal` job. The error counter is
+# service_error_with_type (service_errors does not exist on 1.31.2).
+for q in 'up{job="temporal"}' \
+         'sum(rate(service_requests[5m]))' \
+         'sum(rate(persistence_requests[5m]))'; do
+  curl -s "$VM" --data-urlencode "query=$q" \
+    | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
+      print('C10 server', '$q', '=>', r[0]['value'][1] if r else 'NO SERIES — FAIL')"
 done
 
 # C11. DB client telemetry sane (RFC-0017 W4 — needs pkg >= v0.24.0 in the
@@ -1693,22 +1708,27 @@ curl -s -X POST 'http://localhost:4040/querier.v1.QuerierService/LabelValues' \
 curl -s "$GRAF/api/datasources" | python3 -c "
 import json,sys
 want = {'victoriametrics':'prometheus','victoriatraces':'jaeger',
-        'clickhouse':'grafana-clickhouse-datasource','pyroscope':'grafana-pyroscope-datasource'}
+        'clickhouse':'grafana-clickhouse-datasource','pyroscope':'grafana-pyroscope-datasource',
+        'victorialogs':'victoriametrics-logs-datasource'}
 got = {d['uid']: d['type'] for d in json.load(sys.stdin)}
 print('C17 datasources:', 'OK' if got == want else f'FAIL got={got}')
 raise SystemExit(0 if got == want else 1)"
-for u in victoriametrics victoriatraces clickhouse pyroscope; do
+for u in victoriametrics victoriatraces clickhouse pyroscope victorialogs; do
   printf 'C17 %-16s ' "$u"
   curl -s "$GRAF/api/datasources/uid/$u/health" \
     | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['status'], '-', d['message'])"
 done
-# want status OK on all four.
+# want status OK on all five.
 
 # C18. The provisioned dashboard inventory is complete and every dashboard object
 #      still parses.
 curl -s "$GRAF/api/search?type=dash-db" | python3 -c "
 import json,sys
 want = {'microservices-otel-local','business-otel-local','temporal-worker-local','red-spanmetrics',
+        'otel-collector-health-local',
+        # RFC-0021 parity copies — cluster-twin uids, backed by the vendored
+        # recording rules under observability/vmalert/rules/:
+        'inventory-overview','rfc0021-baseline',
         'clickhouse-otel-sql','clickhouse-service-deepdive','clickhouse-otel-overview',
         'clickhouse-logs-explorer','clickhouse-traces-explorer',
         'clickhouse-server-engine',
@@ -1719,6 +1739,7 @@ got = {d['uid'] for d in json.load(sys.stdin)}
 print('C18 dashboards:', 'OK all ' + str(len(want)) + '' if got == want else f'FAIL missing={sorted(want-got)} extra={sorted(got-want)}')
 raise SystemExit(0 if got == want else 1)"
 for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
+         otel-collector-health-local inventory-overview rfc0021-baseline \
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer \
          clickhouse-server-engine \
@@ -1735,6 +1756,7 @@ done
 # now exists.
 LIVE=$(curl -s "$GRAF/api/datasources" | python3 -c "import json,sys;print(','.join(d['uid'] for d in json.load(sys.stdin)))")
 for d in microservices-otel-local business-otel-local temporal-worker-local red-spanmetrics \
+         otel-collector-health-local inventory-overview rfc0021-baseline \
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer \
          clickhouse-server-engine \
@@ -1783,29 +1805,38 @@ curl -s -X POST "$GRAF/api/ds/query" -H 'Content-Type: application/json' -d '{
 #      fire, which is invisible until the day they were needed. The two envoy
 #      jobs are the edge's halves: `envoy-gateway` is the control plane's own
 #      :19001 metrics, `envoy` is the proxy's native stats through the
-#      bootstrap-merged :19005 listener (gateway/eg/envoyproxy.yaml).
+#      bootstrap-merged :19005 listener (gateway/eg/envoyproxy.yaml). The
+#      `temporal` job is the server's :8000 listener (PROMETHEUS_ENDPOINT in
+#      compose.yaml) — service_*/persistence_* families, C10's server half.
 curl -s http://localhost:8429/api/v1/targets | python3 -c "
 import json, sys
 t = {x['labels']['job']: x['health'] for x in json.load(sys.stdin)['data']['activeTargets']}
-want = {'clickhouse', 'otel-collector', 'envoy-gateway', 'envoy'}
+want = {'clickhouse', 'otel-collector', 'envoy-gateway', 'envoy', 'temporal'}
 ok = want <= set(t) and all(t[j] == 'up' for j in want)
 print('C20', 'OK all targets up:' if ok else 'FAIL:', t)"
 # want: C20 OK all targets up: {'clickhouse': 'up', 'otel-collector': 'up',
-#       'envoy-gateway': 'up', 'envoy': 'up'}
+#       'envoy-gateway': 'up', 'envoy': 'up', 'temporal': 'up'}
 
 # C21. vmalert loaded the ported cluster rules and nothing is firing on a
-#      healthy stack. Eleven names are expected: nine ClickHouse engine rules
-#      (same names as the cluster catalog § 8b, minus the two operator rules
-#      that have no local counterpart) plus the two collector rules.
+#      healthy stack. 14 alerting rules are expected: nine ClickHouse engine
+#      rules (same names as the cluster catalog § 8b, minus the two operator
+#      rules that have no local counterpart), the two collector rules, and the
+#      three inventory alerts that travel with the vendored RFC-0021 recording
+#      rules. 15 recording rules ride along (rfc0021-baseline 10 + inventory 5)
+#      so the two RFC-0021 dashboards render — counted separately because a
+#      recording rule can never fire.
 curl -s http://localhost:8880/api/v1/rules | python3 -c "
 import json, sys
 gs = json.load(sys.stdin)['data']['groups']
 rules = [r for g in gs for r in g['rules']]
-firing = [r['name'] for r in rules if r.get('state') == 'firing']
-print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'none'))"
-# want: 11 rules, firing none. A missing rule file mounts silently — the count
-# is the tripwire. A firing rule on a fresh stack is a real finding: chase it
-# before calling the audit passed.
+alerting = [r for r in rules if r['type'] == 'alerting']
+recording = [r for r in rules if r['type'] == 'recording']
+firing = [r['name'] for r in alerting if r.get('state') == 'firing']
+print('C21 rules loaded: %d alerting (want 14) + %d recording (want 15); firing: %s'
+      % (len(alerting), len(recording), firing or 'none'))"
+# want: 14 alerting + 15 recording, firing none. A missing rule file mounts
+# silently — the counts are the tripwire. A firing rule on a fresh stack is a
+# real finding: chase it before calling the audit passed.
 
 #      Optional drill (NOT part of the pass bar — it takes ~6 minutes): stop
 #      clickhouse, wait out the 5m `for`, confirm ClickHouseServerUnreachable
@@ -1864,18 +1895,18 @@ print('C21 rules loaded: %d (want 11); firing: %s' % (len(rules), firing or 'non
 | C7 | spanmetrics / RED leg | `spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"}` > 0 and `spanmetrics_duration_milliseconds_bucket` present — proves the connector plus the remote-write path |
 | C8 | App semconv metrics leg | `http_server_request_duration_seconds_count`, `rpc_server_call_duration_seconds_count{service_name="inventory"}` (the only metrics evidence for gRPC-only inventory), and `go_goroutine_count` all have series |
 | C9 | Business counters | confirmed = saga = authorized for flows driven since the last process restart (after ~45s). A14/A15 reset the saga counter; then the durable evidence settles it — every `OrderFulfillmentWorkflow` `Completed`, every confirmed order `completed`. `auth_*` counters are **not** asserted |
-| C10 | Temporal SDK metrics | `temporal_workflow_endtoend_latency_seconds_bucket` and `temporal_activity_execution_latency_seconds_count` have series |
+| C10 | Temporal metrics, both halves | SDK: latency histograms + `temporal_workflow_completed`, worker slots, pollers have series (bare names, no `_total`); server: `up{job="temporal"}` is 1 and `service_requests` / `persistence_requests` rate — the :8000 listener `PROMETHEUS_ENDPOINT` enables |
 | C11 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
 | C12 | App logs (OTLP leg) | `_stream:{"service.name"="cart"}` non-empty in VictoriaLogs, and the stream-field enumeration lists every service Phase A drove |
 | C13 | Edge access logs (Vector leg) | `_stream:{service="gateway"}` filtered on `upstream_cluster:*` + `route_name:*` (the discriminator against the control plane's debug logs in the same stream) is non-empty, and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` (`host` never reaches VL — Vector's `del(.host)` cleanup eats it; as-built quirk) — not Envoy's built-in fallback names |
 | C14 | Vector infra tailing | a non-application container's logs are present, e.g. `_stream:{service="frontend"}`, and the stream enumeration covers the infra containers. C13 + C14 both empty = one failure (the Vector leg), not two |
 | C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
 | C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
-| C17 | Grafana datasources | `/api/datasources` returns exactly the four expected uid/type pairs and each `/api/datasources/uid/<uid>/health` answers `OK` |
-| C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 13 provisioned uids (incl. the three vendored Envoy Gateway dashboards under Gateway/) and each loads via `/api/dashboards/uid/…` with 200 |
+| C17 | Grafana datasources | `/api/datasources` returns exactly the five expected uid/type pairs (VictoriaLogs included) and each `/api/datasources/uid/<uid>/health` answers `OK` |
+| C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 16 provisioned uids (incl. the three vendored Envoy Gateway dashboards under Gateway/, the collector-health board, and the two RFC-0021 parity copies) and each loads via `/api/dashboards/uid/…` with 200 |
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
-| C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all four jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001) and `envoy` (proxy native stats :19005) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
-| C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **11** rules (9 ClickHouse engine + 2 collector) and zero `firing` on a healthy stack — the count is the tripwire for a silently unmounted rule file |
+| C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all five jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005) and `temporal` (server :8000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
+| C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **14 alerting** rules (9 ClickHouse engine + 2 collector + 3 inventory) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |
 
 Any failed row blocks the release tag. Two rows share one root cause and must be
 reported as such: **C13 + C14** both empty while C12 is healthy means the Vector

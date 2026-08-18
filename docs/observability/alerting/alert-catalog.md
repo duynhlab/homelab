@@ -279,6 +279,11 @@ Source: `prometheusrules/gitops/flux-alerts.yaml`, `prometheusrules/gitops/cert-
 | CertManagerCertExpiryCritical | critical | expiry <24h | Imminent TLS outage | 15m |
 | CertManagerCertNotReady | warning | ready=False | Issuance/renewal failed | 15m |
 
+The three CertManager* alerts now have a visual surface: the **cert-manager**
+dashboard (folder GitOps, `grafana-dashboard-cert-manager.yaml`) — per-cert
+time-to-expiry and renewal tables with thresholds mirroring the 7d/24h alert
+windows, controller sync errors, work queues.
+
 ## 7. VictoriaMetrics self-health
 
 Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watching itself** — if these fire, metrics/alerts themselves are unreliable.
@@ -343,8 +348,8 @@ Source: `prometheusrules/observability/tempo-alerts.yaml`, `prometheusrules/obse
 | TempoDown | warning | `up{tempo}==0` | Traces not ingested; request-path visibility lost | 5m |
 | PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m |
 | TemporalServerDown | critical | `up{temporal}==0` | Durable workflows halt — order fulfilment blocked | 5m |
-| TemporalServiceErrorRateHigh | warning | `service_errors`/`service_requests` >5% | Clients can't submit/query workflows | 10m |
-| TemporalPersistenceErrorRateHigh | warning | `persistence_errors`/`persistence_requests` >2% | Workflow state not persisting — data risk | 10m |
+| TemporalServiceErrorRateHigh | warning | `service_error_with_type`/`service_requests` >5% | Clients can't submit/query workflows | 10m |
+| TemporalPersistenceErrorRateHigh | warning | `persistence_error_with_type`/`persistence_requests` >2% | Workflow state not persisting — data risk | 10m |
 | TemporalWorkflowFailureRateHigh | warning | failed-workflow ratio >5% | Order-fulfilment saga compensating/rolling back | 10m |
 | TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m |
 | TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m |
@@ -354,7 +359,15 @@ Source: `prometheusrules/observability/tempo-alerts.yaml`, `prometheusrules/obse
 
 Temporal is now monitored at **both** the infra layer (server/service/persistence health) and
 the **work layer** (workflow/activity failure rates, worker→server RPC health, task-slot
-saturation). Pyroscope profiling-backend health is covered by `PyroscopeDown`.
+saturation). 2026-08-18 correction: `TemporalServiceErrorRateHigh` had been written against
+`service_errors`, a series that does not exist on temporal server 1.31.2 — the alert could
+never fire. Verified against a live `/metrics` dump and fixed to `service_error_with_type`.
+Both Temporal alert groups are visualized by the **Temporal — Workflows & Activities**
+dashboard (vendored in-repo, SDK + Server rows; local twin validates all of §8's server
+alerts on the compose stack via the `PROMETHEUS_ENDPOINT` scrape). `OtelCollectorDown` and
+the collector's exporter-failure signals have a local board (`otel-collector-health-local`);
+a cluster twin is a recorded gap. Pyroscope profiling-backend health is covered by
+`PyroscopeDown`.
 
 ---
 
@@ -541,7 +554,7 @@ implemented yet — they are recommendations.
 ### Top 5 highest-value additions
 
 1. **AlertmanagerFailedToSendAlerts** — Watchdog proves the pipeline *up to* Alertmanager; nothing proves AM can actually reach the receiver (Slack/PagerDuty/email). A silent receiver failure swallows every other alert. (`VMAlertAlertmanagerErrors` covers only vmalert→AM, not AM→receiver.)
-2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. The work layer is now covered for failure rates and task-slot saturation (§8), but these *latency/backlog* leading indicators are still missing.
+2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. The work layer is now covered for failure rates and task-slot saturation (§8), and both signals are now **visualized** (the Temporal dashboard's schedule-to-start and server-side `approximate_backlog_count` panels — the backlog is a server metric, not an SDK one) — the *alerts* on them are still missing.
 3. **ValkeyReplicationLinkDown** (`redis_master_link_up==0`) — the actual Valkey HA/durability failure mode; currently unmonitored.
 4. ~~**CNPGContinuousArchivingFailing**~~ ✅ **Addressed** by `CNPGWALArchiveFailing` (§4b) — WAL archiving can stall (breaking PITR) while the last base backup still looks "recent", so `PostgresBackupTooOld` alone is insufficient.
 5. **etcdDatabaseQuotaLowSpace** + **KubeStateMetricsListErrors** — the two classic cluster-wide *silent* failures: an etcd quota freeze (`mvcc: database space exceeded`), and a KSM outage that silently stops every KSM-sourced k8s alert from evaluating.
@@ -553,7 +566,7 @@ implemented yet — they are recommendations.
 | AlertmanagerFailedToSendAlerts | Alert pipeline | `rate(alertmanager_notifications_failed_total[5m])>0` by integration | critical | Silent receiver failure = total blind incident | general (kube-prometheus `alertmanager.rules`) |
 | AlertmanagerConfigInconsistent / MembersInconsistent | Alert pipeline | AM config-hash / cluster membership mismatch | warning | HA split config silently drops routes | general (kube-prometheus) |
 | TemporalScheduleToStartLatencyHigh | Temporal | `histogram_quantile(0.99, temporal_workflow_task_schedule_to_start_latency_seconds_bucket)` >0.2s | warning/critical | Leading indicator of unhealthy/under-provisioned workers | ✅ context7 `/temporalio/documentation` (worker-health) |
-| TemporalTaskQueueBacklogGrowing | Temporal | `temporal_approximate_backlog_count` rising | warning | Direct queue depth; consumers can't keep up | ✅ context7 `/temporalio/documentation` |
+| TemporalTaskQueueBacklogGrowing | Temporal | `approximate_backlog_count` rising (server metric — verified live 2026-08-18; the SDK emits no backlog series) | warning | Direct queue depth; consumers can't keep up | ✅ context7 `/temporalio/documentation` |
 | TemporalSyncMatchRateLow | Temporal | `poll_success_sync / poll_success < 0.95` | warning | Tasks not handed off synchronously → added latency | ✅ context7 `/temporalio/documentation` |
 | ValkeyReplicationLinkDown | Valkey | `redis_master_link_up==0` | critical | Replica link loss — data durability/HA failure | general (redis_exporter community) |
 | ~~CNPGContinuousArchivingFailing~~ ✅ shipped as `CNPGWALArchiveFailing` (§4b) | CNPG | archiver failed-count rising / `last_archived_wal` stalled | critical | PITR silently broken while backup-age looks healthy | ✅ context7 `/cloudnative-pg/cloudnative-pg` |
@@ -589,4 +602,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-08-12 — §2 replaced at the RFC-0024 P2.3 cutover: the 13 `kong_*` alerts retire, 11 EG-native alerts (9 data-plane + 2 control-plane) take over; the 2 Keycloak alerts (P1) join the summary breakdown they had been missing from._
+_Last updated: 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added (cert-manager, Temporal, collector), and gap #2 annotated now that both leading indicators are visualized; previously 2026-08-12 — §2 replaced at the RFC-0024 P2.3 cutover._

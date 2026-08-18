@@ -223,6 +223,13 @@ services:
       # below can use localhost.
       BIND_ON_IP: 0.0.0.0
       DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      # Server metrics (service_*, persistence_*) on :8000 — the image's config
+      # template only renders a global.metrics.prometheus listener when this
+      # env var is set. In-network only (vmagent job `temporal`); deliberately
+      # not published to the host, like every other scrape surface here. This
+      # is what lets the local stack validate the cluster's three server-side
+      # Temporal alerts (TemporalServerDown / ServiceErrorRate / Persistence).
+      PROMETHEUS_ENDPOINT: 0.0.0.0:8000
     # Required, not optional: the server refuses to start when
     # DYNAMIC_CONFIG_FILE_PATH does not resolve, and the image ships no such file.
     volumes:
@@ -455,7 +462,12 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
-      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.20.0 # RFC-0019 Phase B: SQL over otel_logs/otel_traces
+      # clickhouse: RFC-0019 Phase B (SQL over otel_logs/otel_traces).
+      # victoriametrics-logs: same version as the cluster datasource CR pins
+      # (datasource-victorialogs.yaml) — closes the "logs only via vmui" gap.
+      # Plugin install happens at container start and needs outbound internet
+      # once (cached in the grafana volume afterwards).
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.20.0,victoriametrics-logs-datasource 0.29.0
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro

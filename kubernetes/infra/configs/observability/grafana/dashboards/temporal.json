@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Temporal on the local stack, both halves: SDK/worker metrics (temporal_*) pushed over OTLP by order-worker and checkout-worker, and server metrics (service_*, persistence_*, approximate_backlog_*) scraped by vmagent from the PROMETHEUS_ENDPOINT listener (job=temporal). Every metric name on this board was verified against live series on 2026-08-18. The namespace variable defaults to mop, which keeps the temporal server's internal system workflows (namespace temporal_system) out of the SDK panels.",
+  "description": "Temporal on the cluster, both halves: SDK/worker metrics (temporal_*) pushed over OTLP by the workers through the collector, and server metrics (service_*, persistence_*, approximate_backlog_*) scraped via the four per-role ServiceMonitors the official temporalio chart renders (job=~\".*temporal.*\"). Metric names verified against a live temporal server 1.31.2 on the compose stack, 2026-08-18. The namespace variable defaults to mop, which keeps the server's internal system workflows (namespace temporal_system) out of the SDK panels. Local twin: local-stack/observability/grafana/dashboards/Observability/temporal-local.json (uid temporal-worker-local).",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -1731,17 +1731,12 @@
   "schemaVersion": 38,
   "style": "dark",
   "tags": [
-    "local-stack",
     "temporal"
   ],
   "templating": {
     "list": [
       {
-        "current": {
-          "selected": false,
-          "text": "VictoriaMetrics",
-          "value": "victoriametrics"
-        },
+        "current": {},
         "hide": 0,
         "includeAll": false,
         "multi": false,
@@ -1853,8 +1848,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Temporal — Workflows & Activities — Local",
-  "uid": "temporal-worker-local",
+  "title": "Temporal — Workflows & Activities",
+  "uid": "temporal-worker",
   "version": 1,
   "weekStart": ""
 }

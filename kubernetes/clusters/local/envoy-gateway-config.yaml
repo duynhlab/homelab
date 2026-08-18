@@ -31,8 +31,7 @@ spec:
     # LOCAL-ONLY: issue platform-edge-tls from the self-signed `homelab-ca`
     # instead of `letsencrypt-prod`. Kind has no real duynh.me DNS zone /
     # Cloudflare token, so LE DNS-01 can't complete. Prod keeps
-    # letsencrypt-prod. (Same shape the retired kong-proxy-tls patch had in
-    # cert-manager-config.yaml — debugs.md Bug 9.)
+    # letsencrypt-prod.
     - target:
         kind: Certificate
         name: platform-edge-tls
@@ -42,9 +41,8 @@ spec:
           path: /spec/issuerRef/name
           value: homelab-ca
     # LOCAL-ONLY: sample 100% of edge traces on Kind (base = 10% for the
-    # cluster, matching the Kong tracing_sampling_rate 0.1 model — EG's
-    # samplingRate is a PERCENT, 0-100). Local full sampling makes the E2E
-    # trace-continuity audit deterministic.
+    # cluster). EG's samplingRate is a PERCENT, 0-100. Local full sampling
+    # makes the E2E trace-continuity audit deterministic.
     - target:
         kind: EnvoyProxy
         name: platform

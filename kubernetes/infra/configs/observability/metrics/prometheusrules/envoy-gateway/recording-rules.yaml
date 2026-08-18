@@ -2,9 +2,8 @@
 # Source: proxy fleet /stats/prometheus, job="envoy-gateway"
 # (podmonitors/envoy-gateway-proxy.yaml, 15s interval).
 #
-# DELIBERATELY LEAN — 11 rules, not a port of the 20 kong_* rules. Only the
-# series the envoy-gateway alerts and the alert catalog actually consume are
-# pre-aggregated:
+# DELIBERATELY LEAN — 11 rules. Only the series the envoy-gateway alerts and
+# the alert catalog actually consume are pre-aggregated:
 #   - EG's first-party dashboards query raw envoy_* series with template
 #     variables (per-namespace, per-envoy_cluster_name) — pre-aggregating for
 #     them would duplicate, not accelerate.
@@ -12,9 +11,8 @@
 #     envoy_cluster_* keyed by envoy_cluster_name (httproute/<ns>/<name>/
 #     rule/<n>), recorded below only for the two shapes the catalog names
 #     (5xx, latency P95).
-#   - No nginx/Lua internals equivalents: they were Kong implementation
-#     details with no Envoy counterpart; Envoy server health panels
-#     (memory/uptime/live) read raw gauges.
+#   - Envoy server health panels (memory/uptime/live) read raw gauges — no
+#     recording rule needed.
 # Envoy request-time histograms are in MILLISECONDS.
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule

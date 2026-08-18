@@ -735,6 +735,15 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Observability
+
+- **Platform overview dashboard stops double-counting the edge.** The
+  ClickHouse-Otel service RPS and P95 panels filtered `ServiceName != 'kong'`,
+  a name no span carried after the edge cutover — the edge gateway's spans
+  (service.name `platform.envoy-gateway`, per Envoy Gateway's default
+  `<gw-name>.<gw-namespace>` rule) were being counted alongside every backend
+  hop, inflating totals. Filter now excludes the current edge service name.
+
 #### Services
 
 - **A spent promo code answers `409 PROMO_EXHAUSTED` at apply**, not `500`

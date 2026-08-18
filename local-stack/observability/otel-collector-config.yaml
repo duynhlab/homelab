@@ -10,8 +10,7 @@ receivers:
       # gRPC is here for the edge, not the services: Envoy Gateway's tracing
       # provider speaks OTLP gRPC only. The cluster collector has always
       # listened on both ports; local was HTTP-only because every Go service
-      # uses otlptracehttp, and adding this is what keeps the edge a span
-      # producer after the Kong → Envoy Gateway move.
+      # uses otlptracehttp, and adding this keeps the edge a span producer.
       grpc:
         endpoint: 0.0.0.0:4317
       http:
@@ -45,11 +44,11 @@ exporters:
     tls:
       insecure: true
     compression: gzip
-  # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee AND Kong's
-  # opentelemetry plugin post OTLP logs here; re-export to VictoriaLogs'
-  # OTLP ingest path. VL-Stream-Fields makes service.name a log-STREAM field
-  # (indexed stream identity) instead of a regular field — one stream per
-  # service, and trace_id stays a queryable regular field.
+  # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee posts OTLP
+  # logs here; re-export to VictoriaLogs' OTLP ingest path. VL-Stream-Fields
+  # makes service.name a log-STREAM field (indexed stream identity) instead of
+  # a regular field — one stream per service, and trace_id stays a queryable
+  # regular field.
   otlphttp/victorialogs:
     logs_endpoint: http://victoria-logs:9428/insert/opentelemetry/v1/logs
     headers:

@@ -65,7 +65,7 @@ spec:
     grpc_server: true
     # No chart-rendered SLO: the mop chart only knows how to build HTTP SLIs
     # (http_server_request_duration_seconds), and this service serves gRPC
-    # only — no Kong route, and the health/ready endpoints are not
+    # only — no HTTP edge route, and the health/ready endpoints are not
     # instrumented. All three rendered SLOs therefore had ZERO series behind
     # them: 0/0 SLI, no error budget, no burn-rate alert that could ever fire.
     # Verified on the cluster 2026-08-06:

@@ -1,7 +1,7 @@
 # Alert rules for the Envoy Gateway edge (RFC-0024 P4 edge slice).
 #
 # Designed from envoy_* metric semantics and Envoy Gateway's first-party
-# dashboards — NOT translated from the retired kong_* rules. Two scrape jobs:
+# dashboards. Two scrape jobs:
 #   job="envoy-gateway"            the proxy fleet (data plane), PodMonitor
 #                                  podmonitors/envoy-gateway-proxy.yaml
 #                                  (:19001 /stats/prometheus)

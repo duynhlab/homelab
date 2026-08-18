@@ -19,6 +19,5 @@ spec:
   dependsOn:
     - name: controllers-local
     - name: secrets-local
-  # The former kong-proxy-tls homelab-ca patch left with the Kong cutover
-  # (RFC-0024 P2.3). The edge cert (platform-edge-tls) carries its own LOCAL
-  # issuer patch in envoy-gateway-config.yaml (debugs.md Bug 9).
+  # The edge cert (platform-edge-tls) carries its own LOCAL issuer patch in
+  # envoy-gateway-config.yaml.

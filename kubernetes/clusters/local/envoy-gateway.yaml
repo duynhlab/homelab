@@ -1,4 +1,4 @@
-# Envoy Gateway control plane (RFC-0024 P2) — mirrors the retired kong-local's shape.
+# Envoy Gateway control plane (RFC-0024 P2) — local Kustomization.
 # Depends on gateway-api-crds-local (the controller crashes without the
 # Gateway API + EG CRDs, installed with crds: Skip here) and on
 # cert-manager-local so the platform-edge-tls Certificate CR

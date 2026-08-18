@@ -97,7 +97,7 @@ spec:
     db_sslmode: "disable"
     pool_max: "25"
     # No grpc_server: checkout is a gRPC CLIENT only (cart/product/order/
-    # shipping); its own API surface is HTTP behind Kong.
+    # shipping); its own API surface is HTTP behind Envoy Gateway.
     # All four upstream addresses are explicit: the service's config defaults
     # still say `<svc>-grpc.<ns>` but mop chart >=0.14 renders a single
     # multi-port Service named `<svc>` (the headless `<svc>-grpc` twin was

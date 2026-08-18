@@ -261,6 +261,12 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC template v2** — `docs/proposals/rfc/RFC-0000/README.md` gains an
+  **Other solutions considered** section between § Alternatives and
+  § Architecture & Diagrams, forcing every RFC to list the options it looked
+  at and ruled out with a concrete reason. Hubs (`docs/proposals/README.md`,
+  `docs/proposals/rfc/README.md`) label the copy source as v2; RFCs authored
+  before 2026-08-18 stay on v1 with no backfill.
 - **RFC-0023 slice A is built** — ADR-047/048/049/050 Adoption `Not started` →
   **Partial**, each carrying what is actually true: five services expose
   role-gated `/protected/` reads behind the staff issuer (product waits for

@@ -1,3 +1,24 @@
+# Temporal — Workflows & Activities. Both halves of the Temporal signal set:
+# SDK/worker RED (temporal_* via OTLP push from the workers) and the server
+# (service_*, persistence_*, approximate_backlog_* via the four per-role
+# ServiceMonitors the official temporalio chart renders). The Server row
+# closes the long-open follow-up for a board over the server alert group
+# (configs/temporal/prometheusrule.yaml).
+#
+# JSON is vendored in-repo (temporal.json, configMapGenerator in this
+# directory's kustomization) — it was previously fetched at runtime from
+# duynhlab/grafana-dashboards@main, an unpinned URL on a repo the docs mark
+# deprecated, which made the board unauditable. Every metric name in the JSON
+# was verified against live series (temporal server 1.31.2 + Go SDK workers on
+# the compose stack, 2026-08-18); notably the server error counter is
+# service_error_with_type — service_errors does not exist.
+#
+# Datasource: the board declares a DS_PROMETHEUS datasource template variable
+# with `query: prometheus`; it resolves against the prometheus-TYPE alias
+# "VictoriaMetrics (Prometheus)" (datasource-victoriametrics-prometheus.yaml) —
+# the same mechanism as the Envoy Gateway boards.
+# Local twin: local-stack/.../Observability/temporal-local.json
+# (uid temporal-worker-local), generated from the same panel set.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -10,8 +31,6 @@ spec:
   folder: "Observability"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
-  url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/observability/temporal.json"
-  contentCacheDuration: 48h
-  datasources:
-    - inputName: DS_PROMETHEUS
-      datasourceName: VictoriaMetrics
+  configMapRef:
+    name: grafana-dashboard-temporal
+    key: temporal.json

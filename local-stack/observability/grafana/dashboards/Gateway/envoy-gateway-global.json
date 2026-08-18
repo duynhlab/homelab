@@ -2827,7 +2827,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "$datasource"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2900,7 +2900,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "$datasource"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -2973,7 +2973,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${datasource}"
+            "uid": "$datasource"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -3018,8 +3018,8 @@
       {
         "current": {
           "selected": false,
-          "text": "Prometheus",
-          "value": "PBFA97CFB590B2093"
+          "text": "VictoriaMetrics",
+          "value": "victoriametrics"
         },
         "hide": 0,
         "includeAll": false,
@@ -3035,9 +3035,13 @@
       {
         "allValue": ".*",
         "current": {
-          "selected": false,
-          "text": "envoy-gateway-system",
-          "value": "envoy-gateway-system"
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -3045,7 +3049,7 @@
         },
         "definition": "label_values(watchable_depth,namespace)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "multi": false,
         "name": "Namespace",
         "options": [],
@@ -3101,7 +3105,7 @@
   "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {},
   "timezone": "browser",
-  "title": "Envoy — Gateway Global — Local",
+  "title": "Envoy \u2014 Gateway Global \u2014 Local",
   "uid": "bdn8lriao7myoa",
   "version": 1,
   "weekStart": ""

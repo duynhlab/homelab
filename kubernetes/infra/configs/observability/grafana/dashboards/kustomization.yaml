@@ -17,7 +17,7 @@ resources:
   - grafana-dashboard-redis.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml
   # Envoy Gateway first-party dashboards (RFC-0024 P4 edge slice) — JSON vendored
-  # from envoyproxy/gateway v1.8.3 via configMapGenerator below
+  # from envoyproxy/gateway v1.9.0 via configMapGenerator below
   - grafana-dashboard-envoy-gateway.yaml
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
@@ -37,6 +37,8 @@ resources:
   - grafana-dashboard-rfc0021-baseline.yaml
   # RFC-0021 P1-9 inventory-service overview
   - grafana-dashboard-inventory.yaml
+  # cert-manager — visual surface for the CertManager* alerts (JSON via configMapGenerator below)
+  - grafana-dashboard-cert-manager.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
@@ -65,7 +67,15 @@ configMapGenerator:
   - name: grafana-dashboard-inventory
     files:
       - inventory.json
-  # Envoy Gateway first-party dashboards (envoyproxy/gateway v1.8.3,
+  # Temporal — vendored in-repo (was a runtime URL fetch from the deprecated
+  # duynhlab/grafana-dashboards repo); see grafana-dashboard-temporal.yaml
+  - name: grafana-dashboard-temporal
+    files:
+      - temporal.json
+  - name: grafana-dashboard-cert-manager
+    files:
+      - cert-manager.json
+  # Envoy Gateway first-party dashboards (envoyproxy/gateway v1.9.0,
   # charts/gateway-addons-helm/dashboards/) — see grafana-dashboard-envoy-gateway.yaml
   - name: grafana-dashboard-envoy-proxy-global
     files:

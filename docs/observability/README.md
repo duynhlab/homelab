@@ -274,6 +274,7 @@ docs/observability/
 ├── metrics/                      # Pillar 1: Metrics collection & storage
 │   ├── README.md                 # Hub: fundamentals, stack, architecture, coverage
 │   ├── metrics-apps.md           # Platform view: alert map, dashboards, ops (authoring → api/metrics.md)
+│   ├── metrics-catalog.md        # Metric family catalog
 │   ├── metrics-infra.md          # Cluster / infrastructure metrics (USE)
 │   ├── victoriametrics.md        # VictoriaMetrics Operator stack (incl. VMAuth planned)
 │   ├── promql-guide.md           # PromQL reference
@@ -302,7 +303,7 @@ docs/observability/
 │   └── README.md                 # MergeTree, deployed architecture, ops, playground
 │
 ├── grafana/                      # Visualization layer
-│   ├── README.md                 # Grafana overview + plugin management
+│   ├── README.md                 # Grafana overview: 31 dashboards / 9 folders, delivery patterns, plugins
 │   ├── rbac-multi-team.md        # Org roles, Teams, anonymous vs named users
 │   ├── datasources.md            # Dual datasource strategy (case study)
 │   ├── dashboard-reference.md    # Microservices dashboard (40 panels, 6 rows)
@@ -310,7 +311,7 @@ docs/observability/
 │
 ├── alerting/                     # Alerting rules
 │   ├── README.md                 # 2-layer alerting strategy
-│   ├── alert-catalog.md          # Full alert reference (149 rules) + coverage gaps
+│   ├── alert-catalog.md          # Full alert reference (198 static + 64 SLO burn-rate) + coverage gaps
 │   ├── slo-burn-rate-alerts.md   # SLO burn-rate methodology + config
 │   └── dashboard-comparison.md   # Alerting/dashboard tooling comparison
 │
@@ -327,9 +328,17 @@ docs/observability/
     ├── observability-deep-dive.md  # Theory + interview prep
     ├── infrastructure-alerts.md    # Infra/platform alert investigation guide
     ├── microservices-alerts.md     # Workflows, tuning hub
-    ├── microservices/              # Per-alert runbooks (19 files)
-    └── postgresql/                 # CNPG per-alert runbooks (33 files)
+    ├── victorialogs-kubernetes-logs-debug.md  # VictoriaLogs K8s log debugging
+    ├── envoy-gateway/              # Edge per-alert runbooks (10 files)
+    ├── microservices/              # Per-alert runbooks (52 files)
+    └── postgresql/                 # CNPG per-alert runbooks (35 files)
 ```
+
+The compose stack has its own observability plane — vmagent/vmalert, the
+ClickHouse engine-health slice, the Temporal server scrape, and file-provisioned
+dashboard twins. It is documented in
+[`local-stack/docs/observability.md`](../../local-stack/docs/observability.md)
+(cluster ↔ local parity matrix included), not in this tree.
 
 ## Component Inventory
 
@@ -447,4 +456,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-08-17 — HTTP middleware diagrams name the shared `pkg/httpmw` pair (`httpmw.Tracing` / `httpmw.Logging`) instead of the retired per-service copies._
+_Last updated: 2026-08-18 — Documentation Map corrected to the real tree (runbook counts, envoy-gateway/ + missing files, alert totals) and the local-stack observability doc is now linked from the map; previously 2026-08-17 — HTTP middleware diagrams name the shared `pkg/httpmw` pair._

@@ -1,0 +1,86 @@
+# RFC-0021 baseline recording rules — vendored from the cluster
+# (kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/rfc0021-baseline.yaml)
+# so the rfc0021-baseline dashboard renders on this stack too. One mechanical
+# rewrite: the cluster series carry an `app` label (VM operator relabeling);
+# the local OTLP path promotes service.name as `service_name`, so every
+# app= matcher becomes service_name=. Recording rules materialize because
+# vmalert runs with -remoteWrite.url (compose.yaml).
+groups:
+  - name: rfc0021-baseline-5m
+    interval: 30s
+    rules:
+      # --- Checkout confirm (track 1 read-path gate) -------------------
+      # Confirmed sessions/sec — the program-level success signal.
+      - record: rfc0021:checkout_confirm_success:rate5m
+        expr: sum(rate(checkout_sessions_confirmed_total[5m]))
+
+      # Confirms bounced by re-validation (PRICE_CHANGED / STOCK_UNAVAILABLE):
+      # the population the availability-source cutover must not grow.
+      - record: rfc0021:checkout_confirm_bounce:rate5m
+        expr: sum(rate(checkout_price_changed_total[5m]))
+
+      # Confirm handler latency p95 — budget for the extra Inventory hop.
+      - record: rfc0021:checkout_confirm_duration:p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(checkout_confirm_duration_seconds_bucket[5m])))
+
+      # --- Product stock surface (what phases 2-4 replace) -------------
+      # The product-side ReserveStock view was DELETED with the surface it
+      # recorded: product 1.7.0 removed the stock RPCs and nothing emits
+      # product_stock_reservations_total any more. A recorded series that can
+      # only ever be empty looks like a signal, which is the same reason the
+      # dashboard panel was relabelled RETIRED. The saga-side view
+      # (rfc0021:order_stock_reservation:rate5m, below) is the live one.
+      #
+      # Product gRPC checkout-facing RPC latency p95 per method. The regex is
+      # deliberately a wildcard over the service, so it followed
+      # GetProducts -> BatchGetCurrentPrices without an edit.
+      - record: rfc0021:product_rpc_duration:p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, rpc_method) (rate(
+              rpc_server_call_duration_seconds_bucket{
+                service_name="product",
+                rpc_method=~"product.v1.ProductService/.+"}[5m])))
+
+      # Product gRPC error ratio (non-OK / all) per method.
+      - record: rfc0021:product_rpc_error:ratio5m
+        expr: |
+          sum by (rpc_method) (rate(
+            rpc_server_call_duration_seconds_count{
+              service_name="product",
+              rpc_method=~"product.v1.ProductService/.+",
+              rpc_response_status_code!="OK"}[5m]))
+          /
+          sum by (rpc_method) (rate(
+            rpc_server_call_duration_seconds_count{
+              service_name="product",
+              rpc_method=~"product.v1.ProductService/.+"}[5m]))
+
+      # --- Order saga (track 2 baseline, phase-3 cutover gate) ---------
+      # Terminal outcomes/sec: confirmed | failed | compensated.
+      - record: rfc0021:order_saga_outcome:rate5m
+        expr: sum by (outcome) (rate(order_saga_outcome_total[5m]))
+
+      # Compensation runs by step and result — result="failed" is the
+      # stuck-money population; its baseline should be zero.
+      - record: rfc0021:order_saga_compensation:rate5m
+        expr: sum by (step, result) (rate(order_saga_compensation_total[5m]))
+
+      # Saga-side ReserveStock view (order's counter, distinct from
+      # product's): the series the phase-3 flip rehomes onto inventory.
+      - record: rfc0021:order_stock_reservation:rate5m
+        expr: sum by (result) (rate(order_stock_reservation_total[5m]))
+
+      # --- Payment money hop (track 3 baseline) -------------------------
+      # Provider latency p95 per operation (charge/capture/void/refund).
+      - record: rfc0021:payment_provider_duration:p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, op) (rate(
+              payment_provider_request_duration_seconds_bucket[5m])))
+
+      # Authorization outcomes/sec (authorized | declined | error).
+      - record: rfc0021:payment_authorization:rate5m
+        expr: sum by (result) (rate(payment_authorization_total[5m]))

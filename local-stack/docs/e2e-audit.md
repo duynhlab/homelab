@@ -1398,12 +1398,17 @@ docker compose logs --since 10m otel-collector 2>&1 \
 #     which for gateway/eg/gateway.yaml plus the file provider's default namespace
 #     is `platform.envoy-gateway-system`. DISCOVER it rather than trusting this
 #     line: the derivation is upstream behaviour and a rename of the Gateway
-#     changes it.
+#     changes it. The NOT-IN list must name every OTHER span producer including
+#     the two workers (own identities since 2026-08-17, the C8 fix) — a name
+#     missing here multiplies into FOUND, and the tr strips the newlines, so C2
+#     prints a concatenated blob and C6 inherits it through $EDGE. Found the
+#     hard way on the 2026-08-18 run.
 FOUND=$(curl -s "$CH" -u default:otel --data-binary "
   SELECT DISTINCT ServiceName FROM otel.otel_traces
   WHERE Timestamp > now() - INTERVAL 45 MINUTE
     AND ServiceName NOT IN ('user','product','inventory','cart','order','review',
-                            'shipping','notification','payment','checkout','mockpay')
+                            'shipping','notification','payment','checkout','mockpay',
+                            'order-worker','checkout-worker')
   FORMAT TSV" | tr -d '[:space:]')
 echo "C2 discovered edge service.name: '${FOUND:-<none>}' (expected '$EDGE')"
 [ -n "$FOUND" ] || echo "C2 FAIL: the edge is emitting no spans — run the isolation steps below"

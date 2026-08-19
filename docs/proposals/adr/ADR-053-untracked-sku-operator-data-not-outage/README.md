@@ -6,10 +6,12 @@
 > change checkout to answer a basket holding an untracked SKU with
 > `409 ITEM_NOT_ORDERABLE` on a requoted session instead of a retryable `503`,
 > because a condition that outlasts every retry is a conflict with the catalog's
-> current state, not an availability blip. We accept a breaking status-code
-> change for that one case, and that an unbuyable ACTIVE product remains
-> *possible* (warned, not gated), in exchange for a bootstrap path an operator
-> can actually reach and a wire contract the storefront can finally word.
+> current state, not an availability blip. We accept that checkout and the
+> storefront cut over together (the platform is pre-deployment — no
+> compatibility window exists or is needed), and that an unbuyable ACTIVE
+> product remains *possible* (warned, not gated), in exchange for a bootstrap
+> path an operator can actually reach and a wire contract the storefront can
+> finally word.
 
 | Attribute | Value |
 |-----------|-------|
@@ -23,7 +25,7 @@
 | **Related research** | [RFC-0023 research](../../rfc/RFC-0023/research.md) ("fixing commands … with zero callers"); the 2026-08-18 products/35 live investigation (evidence on [homelab#800](https://github.com/duynhlab/homelab/pull/800)) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | to be filed: admin-service (bootstrap affordance + publish warning), checkout-service (409 mapping), frontend (error copy) |
+| **Implementation tracking** | the [microservices.md known-gaps row](../../../api/microservices.md#6-known-gaps--ongoing-work) (no repo issues by owner convention); work lands directly in admin-service / checkout-service / frontend |
 | **Adoption** | Not started |
 
 ## Context
@@ -97,7 +99,7 @@ decision leaves nobody able to act on what it now says.
 | 2 | The fix path must be reachable by the person who owns it | The receipt command exists, is idempotent and audited (ADR-047), and has **zero** operator-reachable callers for an untracked SKU |
 | 3 | Service boundaries stay as decided | ADR-027 (sole stock authority) and RFC-0023's "Product changes Product; Inventory changes Inventory" are load-bearing; no new coupling |
 | 4 | Wire semantics should match RFC 9110 | 409 "indicates that the request conflicts with the current state of the target resource"; 503 is defined by "a temporary overload or scheduled maintenance" — a permanent data gap sits outside 503's defining characteristic |
-| 5 | Smallest breaking surface | Only one error case changes status; the requote shape it adopts is one clients already handle for `409 STOCK_UNAVAILABLE` |
+| 5 | Smallest change surface | Only one error case changes status; the requote shape it adopts is one clients already handle for `409 STOCK_UNAVAILABLE` |
 
 ## Decision
 
@@ -127,7 +129,14 @@ The **operator owns the untracked SKU**, and the **wire calls it a conflict**:
 | Read path | The portal reads `BatchGetAvailability` (read-only) to warn at publish when no balance exists. |
 | Boundary | product-service never calls inventory on a lifecycle transition; publish is never gated on stock. |
 | Failure behavior | Untracked SKU at session create or confirm → `409 ITEM_NOT_ORDERABLE`, session requoted to `shipping_set`, key not consumed. Transient upstream failure → `503` + `Retry-After`, retry with the same key. SKU ids stay in the log and span, never the body. |
-| Compatibility | `ITEM_NOT_ORDERABLE` is a new stable code (v1-safe per [api.md § Versioning](../../../api/api.md#versioning-and-compatibility)); the 503→409 status change for this one case is breaking and lands as one train: checkout-service + frontend together, docs tagged **planned** until then. |
+| Compatibility | The platform is pre-deployment: `docs/api/` specifies the 409 contract directly and the services cut over to match it — no compatibility window, no dual behavior. checkout-service and frontend land together so the SPA never sees a code it cannot word. Until the cutover, the shipped 503 is an implementation-conformance gap, tracked in the microservices.md known-gaps row. |
+
+The three layers name this condition differently on purpose: inventory's gRPC
+surface says `SKU_NOT_FOUND` (Reserve) and the saga records
+`failure_code=UNKNOWN_SKU` — operator-facing vocabulary — while the HTTP code
+says `ITEM_NOT_ORDERABLE`, because the shopper's client must not learn that
+"SKU tracking" exists (the same rule that keeps SKU ids out of the response
+body). Do not unify these names.
 
 ### Decision view
 
@@ -158,7 +167,7 @@ flowchart LR
 | **B — Gate publish on a balance row** | No unbuyable ACTIVE product can exist | Couples product→inventory at the lifecycle transition, inverting RFC-0023's "Product changes Product; Inventory changes Inventory"; publish then fails when inventory is down — a new availability dependency on the catalog's own state machine | Rejected |
 | **C — Auto-create a zero balance on create** | `UNKNOWN` disappears | Destroys the untracked-vs-out-of-stock distinction inventory.md calls "the point"; every draft or mistaken create writes ledger state; the operator still has to receive real stock anyway | Rejected |
 | **D — Do nothing (status quo)** | Zero work | The recorded gap became a daily hazard when slice B shipped create; the portal manufactures unbuyable products and the SPA advertises retries that cannot succeed | Rejected |
-| **E — Operator bootstrap + publish warning + 409 conflict** | Fix path reachable by its owner; wire tells the truth; boundaries intact; breaking surface = one error case that adopts an already-handled shape | One case's status code changes (coordinated train); unbuyable ACTIVE products remain possible, warned rather than prevented | **Selected** |
+| **E — Operator bootstrap + publish warning + 409 conflict** | Fix path reachable by its owner; wire tells the truth; boundaries intact; change surface = one error case that adopts an already-handled shape | checkout + storefront cut over together (trivially cheap pre-deployment); unbuyable ACTIVE products remain possible, warned rather than prevented | **Selected** |
 
 ### Why the selected option won
 
@@ -201,9 +210,10 @@ code inside their retry-on-5xx logic.
 
 ### Negative consequences and accepted trade-offs
 
-- **Breaking for one case:** clients that special-cased the unknown-SKU 503
-  (none known beyond the SPA's generic fallback) see a 409 after the train
-  lands. checkout-service and frontend must ship together.
+- **Contract leads code until the cutover:** `docs/api/` states the 409 while
+  checkout still ships the 503 — a deliberate, recorded conformance gap
+  (pre-deployment; the mismatch table's "implementation violates the contract"
+  class). checkout-service and frontend must ship together.
 - **Unbuyable ACTIVE products remain possible.** The warning surfaces the state
   at publish; it does not prevent it. Accepted deliberately — prevention costs
   a cross-service coupling (option B).
@@ -227,7 +237,7 @@ code inside their retry-on-5xx logic.
 | Portal: publish-time warning when no balance row exists | admin-service | to file | Publishing an untracked product shows the warning; the E2E portal flow proves it |
 | Checkout: map `ErrAvailabilityUnknown` → `409 ITEM_NOT_ORDERABLE` + requote, key not consumed; drop `Retry-After` for this case | checkout-service | to file | Contract tests + the audit row below |
 | Storefront: word `ITEM_NOT_ORDERABLE` distinctly (no retry affordance) | frontend | to file | Error-copy entry exists; lands in the same train as checkout |
-| docs/api sync: flip the **planned** markers in `api.md`, `checkout.md`; refresh `microservices.md` row and the runbook | homelab | this ADR | Adoption flips to Complete |
+| docs refresh at cutover: runbook symptoms move to the 409, microservices.md row flips to resolved, Adoption → Complete | homelab | the known-gaps row | Adoption flips to Complete |
 | e2e-audit: unknown-SKU row asserting 409 + requoted session | homelab | at adoption | Audit row green on the train's compose gate |
 
 ## Validation and compliance

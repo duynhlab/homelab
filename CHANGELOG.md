@@ -251,11 +251,13 @@ Skeleton (copy what you need):
   state, not a temporary condition). Rejected: keep-503-with-new-code (every
   5xx-generic client keeps retrying), gate-publish-on-balance (couples
   product→inventory at the transition), auto-zero-balance (destroys the
-  untracked-vs-out-of-stock distinction). Contracts carry **planned** markers
-  (`api.md` envelope row, `checkout.md`, `inventory.md`, `microservices.md`
-  known-gaps row, the `CheckoutAvailabilityUnknownSKU` runbook); RFC-0023's
-  Implementation History records the slice-B gap as decided. Adoption pending
-  in admin-service / checkout-service / frontend.
+  untracked-vs-out-of-stock distinction). The platform is pre-deployment, so
+  `docs/api/` states the 409 contract directly — no compatibility window, no
+  planned markers — and the services cut over to match it (`api.md` envelope
+  row + confirm sequence diagram, `checkout.md`, `inventory.md`); the
+  `microservices.md` known-gaps row is the adoption tracker (no repo issues by
+  convention), the runbook keeps the as-built 503 symptoms until the cutover,
+  and RFC-0023's Implementation History records the slice-B gap as decided.
 - **ADR-047 Adoption → Complete** — product is the sixth and last service in
   its scope, so the `protected` audience is now real everywhere the decision
   claimed it would be. RFC-0023 gains the slice B history entry: the catalog

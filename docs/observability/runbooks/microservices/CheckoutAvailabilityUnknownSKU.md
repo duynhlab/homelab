@@ -12,11 +12,11 @@
 Inventory answered, and said it does **not track** one or more of the basket's SKUs —
 there is no balance row for them in any warehouse. Checkout **fails closed** on that:
 a `503` with `Retry-After`, never *"no longer available"*.
-(**Planned** — [ADR-053](../../../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/):
-this answer moves to `409 ITEM_NOT_ORDERABLE` with the requoted session, and the
-Backoffice gains the bootstrap affordance this runbook's mitigation currently
-does by raw API call. Symptoms below describe the as-built 503 until that
-train lands.)
+(Contract note — [ADR-053](../../../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/):
+the contracted answer is `409 ITEM_NOT_ORDERABLE` with the requoted session, and
+the Backoffice owns the bootstrap this runbook's mitigation currently does by
+raw API call. checkout still ships the 503 below until the cutover — runbooks
+operate as-built, so the symptoms stay accurate until then.)
 
 This is a **data** problem, not demand. It is also **persistent**: it lasts until
 somebody puts the row there.

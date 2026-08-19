@@ -313,7 +313,7 @@ templates.
 
 | Item | Service(s) | Status |
 |------|------------|--------|
-| Catalog SKU with no inventory balance row (new products are unbuyable until an operator receives stock) | product / inventory / checkout | **Decided** ([ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/)) — operator bootstraps via the portal's receipts flow, publish warns, checkout moves to `409 ITEM_NOT_ORDERABLE`; adoption pending in admin-service / checkout-service / frontend |
+| Catalog SKU with no inventory balance row (new products are unbuyable until an operator receives stock) | product / inventory / checkout | **Decided** ([ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/)) — operator bootstraps via the portal's receipts flow, publish warns, checkout answers `409 ITEM_NOT_ORDERABLE`; **this row is the adoption tracker**: code cutover pending in admin-service / checkout-service / frontend (no compatibility window — the platform is pre-deployment, services cut over directly) |
 | Committed-stock restock on cancellation (`RESTOCK_SKIPPED`) | order / inventory | **Accepted shrinkage** — inventory.v1 has no `Return` RPC; revisit trigger in [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | ~~Legacy order→cart REST pricing on direct create~~ | order | **Gone** — it died with the legacy REST create (RFC-0021 P5); checkout/product own price authority |
 | gRPC mTLS east-west | platform | **Planned** (RFC-0020); NetworkPolicy remains the fence until then |

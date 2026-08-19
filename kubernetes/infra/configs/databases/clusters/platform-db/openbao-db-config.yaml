@@ -42,7 +42,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: db-config
-          image: openbao/openbao:2.5.3
+          image: openbao/openbao:2.6.2
           env:
             - name: HOME
               value: /tmp

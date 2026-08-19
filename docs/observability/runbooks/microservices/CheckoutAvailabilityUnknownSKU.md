@@ -6,17 +6,16 @@
 | **Category** | correctness (data) |
 | **Manifest** | [`checkout-availability.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/checkout-availability.yaml) |
 | **Metrics** | `checkout_availability_check_total{result="unknown_sku"}` |
-| **Applies to** | checkout **0.6.0+** · inventory **0.4.0+** (pkg `v0.35.0` added `unknown_sku_ids`) |
+| **Applies to** | checkout **0.9.0+** (0.6.0–0.8.0 answered a retryable 503 here) · inventory **0.4.0+** (pkg `v0.35.0` added `unknown_sku_ids`) |
 
 ## Meaning
 Inventory answered, and said it does **not track** one or more of the basket's SKUs —
 there is no balance row for them in any warehouse. Checkout **fails closed** on that:
-a `503` with `Retry-After`, never *"no longer available"*.
-(Contract note — [ADR-053](../../../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/):
-the contracted answer is `409 ITEM_NOT_ORDERABLE` with the requoted session, and
-the Backoffice owns the bootstrap this runbook's mitigation currently does by
-raw API call. checkout still ships the 503 below until the cutover — runbooks
-operate as-built, so the symptoms stay accurate until then.)
+a `409 ITEM_NOT_ORDERABLE` — flat at session create (no session exists yet to
+requote), with the requoted session attached at confirm, no `Retry-After` —
+never *"no longer available"* and never a retryable 503
+([ADR-053](../../../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/),
+shipped in checkout 0.9.0 / frontend 3.2.0).
 
 This is a **data** problem, not demand. It is also **persistent**: it lasts until
 somebody puts the row there.
@@ -38,7 +37,7 @@ make — and the shopper was told the item was gone. The contract can say
 lands here.
 
 ## Impact
-Every basket touching an untracked SKU is refused with a 503. The items may well be
+Every basket touching an untracked SKU is refused with a 409 the storefront words precisely (no retry affordance). The items may well be
 in stock. Revenue loss with no error rate at inventory to show for it.
 
 ## Diagnosis
@@ -98,4 +97,4 @@ outage — inventory is healthy and answering correctly.
 - [RFC-0021](../../../proposals/rfc/RFC-0021/)
 
 ---
-_Last updated: 2026-08-19 — ADR-053 planned-change note; as-built behavior unchanged_
+_Last updated: 2026-08-19 — ADR-053 shipped: symptoms are the 409, the portal bootstrap is the mitigation_

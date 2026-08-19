@@ -1018,10 +1018,10 @@ audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization:
 
 # Arm 1 — session create: flat 409 ITEM_NOT_ORDERABLE, no Retry-After (nothing
 # to requote — no session exists yet), and the body stays opaque about SKUs.
-A21_CREATE=$(audit_curl -s -w '\n%{http_code}\t%{header{retry-after}}'   -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT21")
+A21_CREATE=$(audit_curl -s -w '\n%{http_code}\t%header{retry-after}'   -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT21")
 echo "$A21_CREATE" | python3 -c "
 import sys
-body, tail = sys.stdin.read().rsplit('\n', 1)
+body, tail = sys.stdin.read().rstrip('\n').rsplit('\n', 1)
 code, retry = (tail.split('\t') + [''])[:2]
 ok = code == '409' and 'ITEM_NOT_ORDERABLE' in body and not retry.strip() \
      and 'does not track' not in body

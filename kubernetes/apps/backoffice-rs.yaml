@@ -49,7 +49,11 @@ spec:
             # 0.3.0 must not land before order 2.2.0: the case view reads
             # `version` and `status_history`, which only the newer order-service
             # returns. Both pins move in the same change for that reason.
-            tag: "0.3.0" # {"$imagepolicy": "flux-system:admin-service:tag"}
+            # 0.4.0: ADR-053 — page-level Receive-first-stock bootstrap for
+            # untracked SKUs and the warn-never-gate publish notice (protected
+            # balances read). gha-workflows pins aligned to e321897. Compose
+            # gate 2026-08-19; Playwright bootstrap + publish-warning rows pass.
+            tag: "0.4.0" # {"$imagepolicy": "flux-system:admin-service:tag"}
             pullPolicy: IfNotPresent
           # mop >=0.14: the HTTP port pair lives under service.http — this is
           # an Nginx image listening on 80, and the chart default 8080 would

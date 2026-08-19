@@ -26,7 +26,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | the [microservices.md known-gaps row](../../../api/microservices.md#6-known-gaps--ongoing-work) (no repo issues by owner convention); work lands directly in admin-service / checkout-service / frontend |
-| **Adoption** | Not started |
+| **Adoption** | Partial — shipped and compose-verified (checkout 0.9.0, frontend 3.2.0, admin 0.4.0; audit row A21); the cluster deployment is pinned but unverified until the Kind gate |
 
 ## Context
 
@@ -292,6 +292,7 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-19 | Accepted / Not started | Decided from the 2026-08-18 products/35 investigation; owner selected operator bootstrap + publish warning + the 409 contract over keep-503, publish-gate, and auto-zero-balance |
 | 2026-08-19 | Accepted / Not started | Errata during adoption: the publish-warning read is the protected balances HTTP route (`BatchGetAvailability` is gRPC-only, unreachable from the SPA), and session create answers a flat 409 — no session exists yet to requote. Decision unchanged |
+| 2026-08-19 | Accepted / **Partial** | The train shipped: httpx v0.37.0, checkout 0.9.0 (409 both arms), frontend 3.2.0 (copy, no retry), admin 0.4.0 (bootstrap + publish warning); full compose gate green incl. the new A21/B9/B10 rows; pins bumped. Complete waits on the Kind gate |
 
 ---
-_Last updated: 2026-08-19 — adoption errata: balances read, flat-409-at-create_
+_Last updated: 2026-08-19 — Adoption → Partial: the train shipped and passed the compose gate_

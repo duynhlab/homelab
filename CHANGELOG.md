@@ -1217,6 +1217,21 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **The ADR-053 train ships: checkout 0.9.0, frontend 3.2.0, admin-service
+  0.4.0 (+ pkg httpx v0.37.0).** An untracked SKU stops masquerading as an
+  outage: checkout answers `409 ITEM_NOT_ORDERABLE` (flat at session create,
+  requoted session at confirm, key released, no `Retry-After`), the storefront
+  words it with no retry affordance, and the Backoffice gains the page-level
+  Receive-first-stock bootstrap plus the warn-never-gate publish notice.
+  `checkout-worker` moves to 0.9.0 in lockstep (transport-only change, no
+  workflow code — the pair rule), and **mockpay re-aligns 1.5.3 → 2.3.0**, the
+  drift its own pin comment exists to prevent, closed before the first Kind
+  bring-up because the saga charges through it. Gate: full compose audit on
+  the merged mains (owner flow merge → gate → tag), all green including the
+  new A21/B9/B10 rows; A20 needed one isolated re-run after temporal's
+  documented post-A14 restart coin flip (hit twice this run — the A13 timer
+  survived both). ADR-053 Adoption → **Partial**; Complete waits on the Kind
+  gate, which is the train's deliberate last step.
 - **Pin the ADR-038 shared-middleware wave**: `cart` 2.1.0, `checkout` 0.8.0,
   `notification` 2.1.0, `order` 2.3.0, `payment` 2.3.0, `product` 1.13.0,
   `review` 2.1.0, `shipping` 1.6.0, `user` 2.2.0 — the nine services that moved

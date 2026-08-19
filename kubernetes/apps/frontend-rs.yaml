@@ -46,7 +46,11 @@ spec:
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
-            tag: "3.1.0" # {"$imagepolicy": "flux-system:frontend:tag"}
+            # 3.2.0: ADR-053 — words ITEM_NOT_ORDERABLE (persistent conflict,
+            # no retry affordance) and drops the dead 503-with-session handling.
+            # Same train as checkout 0.9.0. Compose gate 2026-08-19; Playwright
+            # 22/22 on the audited stack.
+            tag: "3.2.0" # {"$imagepolicy": "flux-system:frontend:tag"}
             # 3.0.0 converged the storefront on the Backoffice stack — TanStack
             # Router + Query, TypeScript, Tailwind + shadcn, no mock layer at all
             # (RFC-0025 / ADR-052, frontend#96). It is skipped here on purpose:

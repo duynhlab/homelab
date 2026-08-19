@@ -284,10 +284,10 @@ platform-wide call graph is in
   pages with the SKU ids. Nothing prevents the state, but its ownership is
   **decided** ([ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/)):
   the operator bootstraps the first balance through this service's receipts
-  command, the Admin Portal makes that reachable for untracked SKUs and warns at
-  publish, and checkout answers `409 ITEM_NOT_ORDERABLE`. Code cutover pending in
-  admin-service / checkout-service / frontend (tracked in the
-  [microservices.md known-gaps row](./microservices.md#6-known-gaps--ongoing-work)).
+  command, the Admin Portal makes that reachable for untracked SKUs (0.4.0's
+  Receive-first-stock dialog) and warns at publish, and checkout answers
+  `409 ITEM_NOT_ORDERABLE` (0.9.0). Shipped 2026-08-19; the compose audit's A21
+  row asserts the wire.
 - **No reservation auto-expiry (v1).** `expires_at` is observability-only; nothing
   transitions a reservation to `EXPIRED`. What shipped in phase 3 is the
   **order-domain reconciler** (live): it repairs stranded `RESERVED` holds through

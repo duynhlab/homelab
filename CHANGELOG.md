@@ -1285,6 +1285,28 @@ Skeleton (copy what you need):
   closed too — the one-minute doubt sweep is tested, and the provider-unknown
   counter's park/resolve ambiguity is fixed.
 
+#### CI
+
+- **The repo publishing the CI/CD policy no longer violates it, and the docs
+  stop contradicting their own templates.** `ci.yml`'s three `fluxcd/pkg`
+  actions ran on a mutable `@main` ref — the exact vector `cicd.md` §
+  supply-chain forbids — now full-SHA pinned (dependabot's github-actions
+  manager maintains them); `renovate.yml` gets the deny-all permissions
+  baseline (write scopes were top-level), a SHA-pinned checkout with
+  `persist-credentials: false`, and a pinned renovatebot action. The reference
+  `build_template.yml` drops its `docker-db-init` job — it contradicted
+  AGENTS.md and cicd.md ("migrations ship inside the app image; no second
+  image") — and the Trivy gate becomes CRITICAL-only-blocks
+  (`scan-severity: 'CRITICAL'`), matching the documented policy while
+  trivy-report keeps CRITICAL,HIGH,MEDIUM visible non-blocking. `cicd.md` /
+  `gitflow.md` / `sonarcloud.md` / `ruleset-automation.md` reconciled with
+  reality: auth-service examples replaced (multi-level image paths), homelab
+  required-checks list names the jobs that exist, the 2-vs-1 approvals
+  contradiction settles on 1, dev/uat promotion consistently marked target,
+  the gitflow ASCII quick-reference becomes Mermaid, third-party blog links
+  synthesized out, and gh-patcher's actual coverage (Base ruleset only)
+  stated plainly.
+
 ### Dependency
 
 #### Gateway

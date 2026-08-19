@@ -1,6 +1,6 @@
 # CI/CD Pipeline Documentation
 
-This document describes the CI/CD pipeline for all microservices (`auth`, `user`, `product`, `cart`, `checkout`, `order`, `review`, `notification`, `shipping`, `payment`) and the `frontend` in a **polyrepo** setup. Services use **Go 1.26** (`GOTOOLCHAIN=auto` in CI).
+This document describes the CI/CD pipeline for all microservices (`user`, `product`, `inventory`, `cart`, `checkout`, `order`, `review`, `notification`, `shipping`, `payment`) and the `frontend` in a **polyrepo** setup. Services use **Go 1.26** (`GOTOOLCHAIN=auto` in CI).
 
 > This page covers **both** the pipeline *how-to* (below) and the org-wide *standard/policy* —
 > action SHA-pinning, least-privilege permissions, image signing/verification, the required-checks
@@ -35,7 +35,7 @@ This split ensures GitHub does not append `(pull_request)` or `(push)` suffixes 
 
 ## Image Security: Scan Before Push
 
-**Critical design**: Images are scanned with Trivy **before** being pushed to GHCR. The gate is **calibrated** (see [§7 Image security](#7-image-security)): only **CRITICAL** blocks the push; **HIGH** is reported in the job summary + Security tab but does **not** block — so a freshly-disclosed base-image HIGH with no upstream fix yet can't hold every service hostage.
+**Critical design**: Images are scanned with Trivy **before** being pushed to GHCR. The gate is **calibrated** (see [§7 Image security](#7-image-security)): only **CRITICAL** blocks the push; **HIGH/MEDIUM** are reported after the push by the non-blocking `trivy-report` job (SARIF → Security tab) but do **not** block — so a freshly-disclosed base-image HIGH with no upstream fix yet can't hold every service hostage.
 
 ```mermaid
 flowchart LR
@@ -47,14 +47,14 @@ flowchart LR
     end
 
     BUILD --> SCAN
-    SCAN -->|"no CRITICAL<br/>(HIGH reported)"| PUSH --> SIGN
+    SCAN -->|"no CRITICAL"| PUSH --> SIGN
     SCAN -->|"CRITICAL found"| STOP["Image never pushed"]
 
     style STOP fill:#ef4444,color:#fff
     style SIGN fill:#22c55e,color:#fff
 ```
 
-The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this via `scan-before-push` (default `true`); the block set is `scan-block-severity` (default `CRITICAL`) and the report set is `scan-severity` (default `CRITICAL,HIGH`). The pre-push scan writes a severity-count table + CVE list to the job summary. Accept a specific CVE only via a time-boxed `.trivyignore.yaml`. See [§7 Image security](#7-image-security) for the full policy.
+The `docker-build-go.yml` (and `docker-build-node.yml`) workflows handle this via `scan-before-push` (default `true`). The gate is the `docker-build` job itself: the reference [`build_template.yml`](build_template.yml) passes `scan-severity: 'CRITICAL'` + `scan-exit-code: '1'`, so the pre-push scan fails the job — and the image is never pushed — only on **CRITICAL** findings. **HIGH/MEDIUM** visibility comes from the separate `trivy-report` job (`trivy-scan.yml` with `severity: 'CRITICAL,HIGH,MEDIUM'`, `exit-code: '0'` — non-blocking, after the push). Accept a specific CVE only via a time-boxed `.trivyignore.yaml`. See [§7 Image security](#7-image-security) for the full policy.
 
 ## Shared Workflows
 
@@ -198,7 +198,7 @@ flowchart TD
 
 ### 5. Build & Delivery Flow (Push to dev / uat / main)
 
-On push to any persistent branch (`dev`, `uat`, `main`), the full build pipeline runs. Images are **scanned before push** — the calibrated gate blocks on **CRITICAL** CVEs (HIGH is reported, not blocking); a blocked image is never pushed to the registry and the pipeline fails.
+On push to any persistent branch (`dev`, `uat`, `main`), the full build pipeline runs. Images are **scanned before push** — the calibrated gate blocks on **CRITICAL** CVEs (HIGH/MEDIUM are reported post-push by `trivy-report`, not blocking); a blocked image is never pushed to the registry and the pipeline fails.
 
 After each deployment, **post-deploy verification** runs automatically: smoke tests on all environments, plus integration/regression tests on uat. See [`gitflow.md` section 6.2](gitflow.md#62-post-deploy-verification) for the full verification matrix.
 
@@ -340,6 +340,7 @@ flowchart TD
 
 ### 1. Flow: Pull Request (Validation)
 **Trigger:** Developer opens or updates a Pull Request targeting `dev`, `uat`, or `main`.
+*(`dev`/`uat` promotion is the Gitflow **target** — see the callout above; today every repo works branch → PR → squash-merge to `main`.)*
 **Goal:** Verify code quality, security, and functionality **before** merging.
 
 | Step | Job Name | Trigger Condition | Action & Responsibility |
@@ -356,6 +357,7 @@ flowchart TD
 
 ### 2. Flow: Push to Persistent Branch (Delivery)
 **Trigger:** PR is merged into `dev`, `uat`, or `main`.
+*(`dev`/`uat` promotion is the Gitflow **target** — see the callout above; today only pushes to `main` and `v*` tags are wired.)*
 **Goal:** Build an immutable artifact, scan it **before pushing**, sign it, and deploy to the corresponding environment.
 
 | Step | Job Name | Trigger Condition | Action & Responsibility |
@@ -363,7 +365,7 @@ flowchart TD
 | **1** | `go-check` | **Always** | **Regression Check**: re-runs tests and uploads fresh `coverage-report` artifact. (Lint is PR-only.) |
 | **1b** | `gitleaks` | **Always** | **Secret Scanning**: scans git history for secrets in parallel with `go-check`. |
 | **2** | `sonar` | **Always** | **Analysis Update**: updates SonarCloud branch analysis based on the coverage artifact. |
-| **3** | `docker-build` | **Push to dev/uat/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy (blocks on CRITICAL; HIGH reported). **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
+| **3** | `docker-build` | **Push to dev/uat/main** | **Build + Scan + Push**: builds image locally (`--load`), scans with Trivy (gate: CRITICAL only). **Only pushes to GHCR if scan passes.** Outputs `tags`, `digest`, and `scan-status`. |
 | **4** | `trivy-report` | **After build (optional)** | **Vulnerability Reporting**: detailed scan with SARIF upload to GitHub Security tab and Google Sheets. Non-blocking (`exit-code: '0'`). |
 | **5** | `docker-sign` | **After build passes** | **Image Signing**: signs the image with Cosign keyless (OIDC). Only runs if build (including scan) succeeded. |
 | **6** | `notify` | **Always** | **Reporting**: posts final pipeline status to Slack and Google Sheets. |
@@ -457,12 +459,12 @@ act push -W .github/workflows/build.yml --detect-event
 
 ## Docker Image Naming Convention
 
-Images are **multi-level**: `ghcr.io/duynhlab/<repo>/<image>` — the builder workflow publishes under the repository path (`ghcr.io/${{ github.repository }}/<image>`), and the `mop` chart consumes `<name>-service/<name>-service`. Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image.
+Images are **multi-level**: `ghcr.io/duynhlab/<repo>/<image>` — the builder workflow publishes under the repository path (`ghcr.io/${{ github.repository }}/<image>`), and the `mop` chart consumes `<name>-service/<name>-service`. Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image. The reference [`build_template.yml`](build_template.yml) agrees: its former `docker-db-init` job was removed (2026-08-19); a comment in the template records that migrations ship in the app image.
 
 | GitHub Repo | GHCR Image (app) |
 |---|---|
 | `product-service` | `ghcr.io/duynhlab/product-service/product-service` |
-| `auth-service` | `ghcr.io/duynhlab/auth-service/auth-service` |
+| `inventory-service` | `ghcr.io/duynhlab/inventory-service/inventory-service` |
 | `payment-service` | `ghcr.io/duynhlab/payment-service/payment-service` (+ the same image runs the `mockpay` deployment) |
 | `frontend` | `ghcr.io/duynhlab/frontend/frontend` |
 
@@ -580,7 +582,14 @@ not excluded.
 ### CI wiring (shared workflows in `gha-workflows`)
 
 `go-check.yml` and `sonarqube.yml` support the integration + merged-coverage flow.
-Each service wires it in **both** `build.yml` (push) and `check.yml` (PR):
+
+> **Status:** the `integration` / `integration-command` / `integration-coverage` inputs below are
+> `gha-workflows` capabilities. The in-repo reference templates
+> ([`build_template.yml`](build_template.yml) / [`check_template.yml`](check_template.yml)) do
+> **not** wire them — a service opts in by adding these inputs to its own `check.yml`/`build.yml`;
+> per-repo adoption is not verifiable from homelab.
+
+A service that adopts the flow wires it in **both** `build.yml` (push) and `check.yml` (PR):
 
 ```yaml
 go-check:
@@ -655,7 +664,8 @@ golangci-lint run --timeout=5m --config=.golangci.yml ./...
 - **Quality gate: ≥ 80% coverage on new code** (configured in SonarCloud — see
   [`sonarcloud.md`](sonarcloud.md)).
 - **Coverage exclusions** (counted-against-% only; still analyzed for issues),
-  via the `coverage-exclusions` input of `sonarqube.yml`:
+  via the `coverage-exclusions` input of `sonarqube.yml` (a `gha-workflows` capability —
+  not passed by the in-repo reference templates):
   `**/cmd/**`, `**/internal/core/database.go`, `**/db/migrations/**`,
   `**/mocks/**`, `**/*_mock.go` — bootstrap/wiring/migrations/generated code.
 - The repository layer is **NOT excluded** — it is integration-tested and merged
@@ -771,7 +781,7 @@ Add `sbom: true` to the builder workflow call in your service `build.yml`:
 docker-build:
   uses: duynhlab/gha-workflows/.github/workflows/docker-build-go.yml@main
   with:
-    image-name: 'auth-service'
+    image-name: 'inventory-service'
     push: true
     sbom: true     # <-- just add this
 ```
@@ -784,13 +794,13 @@ After the image is pushed, anyone with read access can inspect the SBOM:
 
 ```bash
 # BuildKit native
-docker buildx imagetools inspect ghcr.io/duynhlab/auth-service:1.0.0
+docker buildx imagetools inspect ghcr.io/duynhlab/inventory-service/inventory-service:1.0.0
 
 # Cosign (verify SBOM attestation)
-cosign verify-attestation --type spdx ghcr.io/duynhlab/auth-service:1.0.0
+cosign verify-attestation --type spdx ghcr.io/duynhlab/inventory-service/inventory-service:1.0.0
 
 # Trivy (scan SBOM for CVEs without pulling full image)
-trivy image --sbom ghcr.io/duynhlab/auth-service:1.0.0
+trivy image --sbom ghcr.io/duynhlab/inventory-service/inventory-service:1.0.0
 ```
 
 ### Why Use SBOM?
@@ -889,7 +899,7 @@ SBOM support is **wired up but off by default** (`sbom: false`). To enable it fo
 
 ---
 
-# CI/CD Standard & Policy
+## CI/CD Standard & Policy
 
 > **Audience:** every repo owner in the `duynhlab` org.
 > **Status:** the baseline a repository must meet to be considered production-grade.
@@ -919,7 +929,9 @@ Composite actions: `.github/actions/{gitleaks,slack-notification}`.
 
 - **Third-party actions → full 40-char commit SHA**, with a trailing `# vX.Y.Z` comment:
   `uses: docker/build-push-action@<sha> # v7`. A mutable tag (`@v4`) is a remote-code-execution
-  vector if the action is compromised. Renovate keeps SHAs current (§9), so pinning ≠ staleness.
+  vector if the action is compromised. Renovate/Dependabot keeps SHAs current (§9), so pinning ≠
+  staleness. `homelab` complies: every third-party action in its workflows (incl. the `fluxcd/pkg`
+  setup actions in `ci.yml`) is SHA-pinned, and Dependabot maintains the pins.
 - **First-party reusable workflows → `@main` today.** Be honest about the tradeoff: `@main` is
   **mutable** — a careless/compromised merge to `gha-workflows` changes CI/CD for *all*
   consumers with no consumer PR. The **only immutable** ref is a SHA; a future `@v1` major tag
@@ -930,11 +942,12 @@ Composite actions: `.github/actions/{gitleaks,slack-notification}`.
 ### 4. Least-privilege permissions
 
 Set `permissions:` at the **caller** (top level = deny-all baseline, widen per job). Reusable
-workflows declare the scope their job needs.
+workflows declare the scope their job needs. (`homelab`'s `renovate.yml` follows this shape:
+`permissions: {}` at the top, `contents: write` + `pull-requests: write` on the job.)
 
 | Job / workflow | Required permissions |
 |----------------|----------------------|
-| go-check, tf-lint, pr-checks (validate) | `contents: read` |
+| go-check, pr-checks, homelab `validate` / `markdown-links` | `contents: read` |
 | gitleaks, trivy-scan | `contents: read`, `security-events: write`, **`actions: read`** (SARIF upload in private repos) |
 | sonarqube | `contents: read`, `pull-requests: read` |
 | docker-build-* | `contents: read`, `packages: write` |
@@ -976,6 +989,9 @@ concurrency:
 - **Build → push → sign must not be cancellable mid-chain.** A cancel after `push` but before
   `docker-sign` leaves an **unsigned** image in GHCR. Keep push+sign in one `needs` chain guarded
   so signing always runs for a pushed digest (or sign in the same job).
+- **Adoption gap (homelab):** this repo's three workflows (`ci.yml`, `renovate.yml`,
+  `sync-labels.yml`) declare no `concurrency:` block yet — the policy above is not yet applied
+  here.
 
 ### 7. Image security
 
@@ -1010,7 +1026,7 @@ are **per repo type** — `go-check / Test` is meaningless on the Node frontend 
 |-----------|------------------------------------------|
 | Go service / Go library | `go-check / Test`, `gitleaks`, `sonarqube` (gate enforced) |
 | Node frontend | node lint+build, `gitleaks`, `sonarqube` |
-| Kubernetes / IaC (`homelab`) | manifest `validate`, `tf-lint`, `gitleaks` |
+| Kubernetes / IaC (`homelab`) | `validate` (manifest dry-run), `markdown-links`, `pr-checks` — the jobs wired in `.github/workflows/ci.yml`. A `tf-lint` job and a homelab `gitleaks` job are **planned**, not yet wired. |
 
 All `main`: 1 approval + CODEOWNERS, linear history, signed commits, no force-push. `v*` tags:
 restrict create/delete/**update** (prevents tag retargeting → immutable releases).
@@ -1026,7 +1042,10 @@ Caveats:
 ### 9. Supply-chain automation
 
 - **Renovate/Dependabot** on every repo: Go modules, Dockerfiles, **and `github-actions`** (so
-  SHA pins auto-bump). `homelab` already runs Renovate; extend the same config to all repos.
+  SHA pins auto-bump). In `homelab` the split is: **Renovate** (`.renovaterc.json5`, run by
+  `renovate.yml` nightly) manages `kubernetes/**.yaml` manifests (flux / helm-values / kubernetes
+  managers); **Dependabot** (`.github/dependabot.yml`, `github-actions` ecosystem, daily)
+  maintains the workflow action SHA pins. Service repos wire their own equivalents.
 - Base images updated on a schedule; Trivy gates regressions on the next build.
 
 ### 10. Reusable-workflow versioning (target)
@@ -1054,7 +1073,8 @@ VictoriaMetrics (see [observability](../observability/README.md)).
 ### 13. Additional hardening
 
 - **Checkout in privileged jobs:** `persist-credentials: false` so the job token isn't left in
-  local git config for build scripts / compromised tools.
+  local git config for build scripts / compromised tools. (Applied in this repo's `renovate.yml`
+  checkout.)
 - **Runners:** GitHub-hosted only. If self-hosted is ever introduced, untrusted PR code must
   never run on it (persistent-compromise / cross-job risk).
 - **Cache/artifact trust boundary:** a PR-controlled cache or artifact must not be consumed by a
@@ -1071,7 +1091,7 @@ VictoriaMetrics (see [observability](../observability/README.md)).
 - [ ] `permissions:` per §4; privileged jobs gated to trusted refs; concurrency per §6.
 - [ ] `.github/CODEOWNERS` present; Rulesets applied per §8 (per repo type).
 - [ ] Renovate enabled (Go + Docker + github-actions).
-- [ ] Images multi-level named, scanned + signed (incl. `-init`); prod pins **digest**;
+- [ ] Images multi-level named, scanned + signed; prod pins **digest**;
       admission verifies signatures.
 - [ ] Secrets via Secrets/OpenBAO; signing via OIDC; prod jobs declare `environment:`.
 
@@ -1084,10 +1104,12 @@ VictoriaMetrics (see [observability](../observability/README.md)).
   signing is unverified.
 - Add `actions: read` to the gitleaks/trivy reusable-workflow jobs (private-repo SARIF).
 - Gate `packages:`/`id-token: write` jobs on trusted refs in the shared workflows (§4).
-- Normalize consumer drift: SonarCloud `project-key` (dynamic vs hardcoded) and Trivy severity
-  thresholds (build vs check). Prefer named secrets over `secrets: inherit`.
+- Normalize consumer drift: SonarCloud `project-key` (dynamic vs hardcoded). The Trivy severity
+  drift (build vs check) is fixed as of 2026-08-19 — the reference template gates on
+  `scan-severity: 'CRITICAL'` and reports `CRITICAL,HIGH,MEDIUM` non-blocking via `trivy-report`.
+  Prefer named secrets over `secrets: inherit`.
 - Remove the dead `go-version` input from `sonarqube.yml` (unused; next interface bump).
 
 ---
 
-_Last updated: 2026-07-22 — checkout-service in scope; Go 1.26 note._
+_Last updated: 2026-08-19 — synced to the fixed workflows/template (SHA pins, CRITICAL-only gate, no -init image), auth-service examples replaced, homelab required-checks corrected, dev/uat marked target; previously 2026-07-22._

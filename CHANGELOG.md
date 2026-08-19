@@ -1110,6 +1110,27 @@ Skeleton (copy what you need):
   matrix row and reported a false FAIL on its first live run; only `PAIR`-tagged
   lines are verdicts now (85/85 pairs pass, exit 0).
 
+#### Secrets
+
+- **docs/secrets synced to the deployed platform, two files dissolved.**
+  `production-hardening.md` folds into README § Current boundaries — its
+  Status table claimed Shamir-CronJob unseal (ADR-024 shipped awskms/floci
+  auto-unseal with a revoked root token) and KV-only DB credentials (ADR-025
+  shipped the database-engine static-role pilot for notification); the
+  aspirational use-case transcripts are dropped. `trust-distribution.md` folds
+  into `cert-manager.md` §11 (deduped; the nonexistent `auth` namespace leaves
+  the opt-in table — only `monitoring` carries `needs-trust`). `openbao.md`
+  loses the auth-service JWT section (resources deleted in #760), gains the
+  deployed reality README missed (`openbao-db` ClusterSecretStore, keycloak /
+  checkout / inventory / rustfs / clickhouse / tempo / pyroscope secrets), and
+  drops two documented-but-nonexistent resources (`pgdog-cnpg-credentials`,
+  `platform-db-secret`). All 9 runbooks corrected: unseal + initial-setup
+  rewritten off the Shamir world onto the floci Job flow, inert-root-token
+  contradictions fixed with the generate-root ceremony, dynamic-cred runbooks
+  updated from "planned" to the ADR-025 pilot, the missing
+  `add-secret-live-cluster.md` indexed, and the ESO alert-threshold table
+  labeled as proposed (no PrometheusRule exists — recorded gap).
+
 #### Security
 
 - Four `docs/api/` service contracts documented their edge NetworkPolicy ingress

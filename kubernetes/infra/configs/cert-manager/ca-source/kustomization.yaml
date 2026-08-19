@@ -1,7 +1,7 @@
 # Static copy of the homelab-ca root certificate, committed to git on purpose.
 # Decouples the trust-manager Bundle from cert-manager-issued Secret rotation
 # so CA rollover can be staged via PR (add new CA -> migrate -> remove old).
-# Public CA cert only — never commit tls.key. See docs/security/trust-distribution.md.
+# Public CA cert only — never commit tls.key. See docs/secrets/cert-manager.md §11.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: cert-manager

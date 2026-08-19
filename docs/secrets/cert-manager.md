@@ -21,7 +21,7 @@ This guide documents how cert-manager is wired into Flux in this repo: **two Clu
 | Platform edge Certificate | [`kubernetes/infra/configs/envoy-gateway/certificate.yaml`](../../kubernetes/infra/configs/envoy-gateway/certificate.yaml) |
 | trust-manager Bundle | [`kubernetes/infra/configs/cert-manager/bundles.yaml`](../../kubernetes/infra/configs/cert-manager/bundles.yaml) |
 | Committed CA PEM (Bundle source) | [`kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt`](../../kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt) |
-| CA bundle distribution deep-dive | [`./trust-distribution.md`](./trust-distribution.md) |
+| Static CA copy source dir | [`kubernetes/infra/configs/cert-manager/ca-source/`](../../kubernetes/infra/configs/cert-manager/ca-source/) |
 | Cloudflare API token ExternalSecret | [`kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`](../../kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml) |
 | Flux `Kustomization` (configs) | [`kubernetes/clusters/local/cert-manager-config.yaml`](../../kubernetes/clusters/local/cert-manager-config.yaml) |
 
@@ -174,6 +174,13 @@ spec:
         limits:
           cpu: 100m
           memory: 256Mi
+    # Chart-native metrics scrape — controller/webhook/cainjector expose
+    # /metrics on :9402; backs the CertManager* alerts and the GitOps board.
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: true
+        interval: 60s
 ```
 
 **Include** `kubernetes/infra/controllers/cert-manager/kustomization.yaml`:
@@ -452,9 +459,177 @@ flux reconcile kustomization cert-manager-local --with-source
 
 ## 11. trust-manager — distributing the homelab CA bundle
 
-cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace. Workloads in other namespaces that need to validate TLS connections signed by the homelab CA use trust-manager to receive a cluster-scoped `Bundle` synced as a per-namespace ConfigMap.
+cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace.
+Workloads in other namespaces that need to **verify** TLS connections signed by
+the homelab CA — load-test runners against the edge on local Kind, Vector
+pushing to an HTTPS sink, future private endpoints — would otherwise resort to
+`InsecureSkipVerify=true` or hand-copied CA files. trust-manager solves this: a
+cluster-scoped `Bundle` synced as a per-namespace ConfigMap.
 
-**Full deep-dive (architecture, opt-in label, rotation runbook):** [`./trust-distribution.md`](./trust-distribution.md).
+Why trust-manager over reflector / kubernetes-replicator:
+
+- **CA-only, no private keys**: the `Bundle` API never touches `tls.key` — you
+  cannot accidentally fan a private key out across namespaces.
+- **Combine sources**: one Bundle merges Mozilla CAs (`useDefaultCAs: true`) +
+  the homelab CA into a single `ca-bundle.pem` per workload.
+- **Same upstream as cert-manager**: identical release cadence, GitOps flow,
+  Helm chart, security review.
+- **Output formats**: PEM by default; JKS / PKCS#12 exist but stay disabled
+  here (Go uses PEM only).
+
+Client-trust implications of the two PKIs (§1's table): a pod calling the edge
+on **prod** does not need the bundle — the cert is Let's Encrypt and Mozilla
+roots already cover it. On **local Kind** the edge cert is `homelab-ca`-issued
+(planned), so an in-cluster client verifying it does need the bundle. Opt a
+namespace in only when it consumes a **homelab-CA-signed** endpoint; adding a
+browser-facing host means adding a SAN to `platform-edge-tls` (§6), never
+issuing a separate homelab-ca leaf for the same SNI.
+
+### 11.1 Bundle architecture
+
+```mermaid
+flowchart LR
+  subgraph cm["cert-manager namespace (trust namespace)"]
+    Issuer[ClusterIssuer<br/>homelab-ca]
+    CA[Certificate<br/>homelab-ca]
+    Secret[Secret<br/>homelab-ca-secret<br/>tls.crt + tls.key]
+    Copy[ConfigMap<br/>homelab-ca-source<br/>ca.crt only<br/>committed to git]
+    Bundle[Bundle<br/>homelab-ca-bundle<br/>cluster-scoped]
+    Default[useDefaultCAs<br/>Mozilla via Debian Bookworm]
+  end
+
+  subgraph workloads["Labeled namespaces"]
+    direction TB
+    NS1[ConfigMap<br/>homelab-ca-bundle<br/>ns: monitoring]
+    NS2[...]
+  end
+
+  Issuer --> CA
+  CA --> Secret
+  Secret -. one-time export .-> Copy
+  Copy --> Bundle
+  Default --> Bundle
+  Bundle -->|namespaceSelector<br/>needs-trust=true| NS1
+  Bundle -->|namespaceSelector| NS2
+```
+
+**Why the static `homelab-ca-source` ConfigMap?** trust-manager could read
+`homelab-ca-secret` directly. We deliberately do not — rotation (§11.4)
+requires a window where both old and new CA are trusted, so the Bundle reads a
+git-committed PEM the platform controls, not a Secret cert-manager could
+rotate underneath us.
+
+### 11.2 Opting a namespace in
+
+Add the label to the `Namespace` resource (managed in
+[`kubernetes/infra/controllers/namespaces.yaml`](../../kubernetes/infra/controllers/namespaces.yaml)):
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: my-namespace
+  labels:
+    platform.duynhlab.dev/needs-trust: "true"
+```
+
+trust-manager reconciles within ~10s and creates `ConfigMap/homelab-ca-bundle`
+(`ca-bundle.pem` = Mozilla roots + `homelab-ca`). Verify:
+
+```bash
+kubectl get bundles
+kubectl get cm homelab-ca-bundle -A
+kubectl get cm homelab-ca-bundle -n my-namespace -o jsonpath='{.data.ca-bundle\.pem}' | grep -c BEGIN
+```
+
+**Currently labeled:** only `monitoring` (future Vector / Grafana outbound
+HTTPS to homelab-CA-signed targets). `gateway.duynh.me` is **not** a reason to
+opt in — it is trusted via the Mozilla roots already in the bundle and in
+every container's system store.
+
+### 11.3 Mounting the bundle in a workload
+
+```yaml
+spec:
+  containers:
+    - name: app
+      env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-bundle.pem
+      volumeMounts:
+        - name: trust
+          mountPath: /etc/ssl/certs/ca-bundle.pem
+          subPath: ca-bundle.pem
+          readOnly: true
+  volumes:
+    - name: trust
+      configMap:
+        name: homelab-ca-bundle
+```
+
+For Go workloads, `SSL_CERT_FILE` makes `crypto/tls` use the bundle as its
+**only** trust store. To merge with the system root pool instead, mount at
+`/etc/ssl/certs/homelab-ca.crt` (subPath) and let Go combine them.
+
+### 11.4 CA rotation
+
+The fundamental rule: **never overwrite a trust store atomically with a
+different CA** — workloads holding a leaf signed by the old CA fail
+verification the moment peers serve the new one. Every rotation needs a window
+where **both** CAs are trusted; each step below is its own PR with its own
+rollback:
+
+```bash
+# 1. Add homelab-ca-v2 Certificate + ClusterIssuer alongside the old ones in
+#    kubernetes/infra/configs/cert-manager/clusterissuers.yaml.
+
+# 2. After Flux reconciles, export the new CA cert:
+kubectl get secret homelab-ca-v2-secret -n cert-manager \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d \
+  > kubernetes/infra/configs/cert-manager/ca-source/homelab-ca-v2.crt
+
+# 3. configMapGenerator in ca-source/kustomization.yaml bundles BOTH PEMs —
+#    trust-manager combines all keys from the source.
+
+# 4. PR + merge: every labeled namespace now trusts old AND new.
+
+# 5. Switch leaf Certificates (platform-edge-tls, future ones) issuerRef to
+#    homelab-ca-v2; wait for reissue (kubectl get certificate -A).
+
+# 6. PR removing homelab-ca.crt from the generator + deleting the file.
+
+# 7. Eventually delete the old homelab-ca Certificate + ClusterIssuer.
+```
+
+### 11.5 Bootstrap (fresh cluster)
+
+`ca-source/homelab-ca.crt` is committed for the current cluster's CA. A fresh
+cluster generates a new CA key, so re-export once cert-manager has issued
+`homelab-ca-secret`:
+
+```bash
+kubectl get secret homelab-ca-secret -n cert-manager \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d \
+  > kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt
+# kustomization.yaml already references the file. Commit the .crt —
+# CA certs are public; only tls.key is sensitive.
+```
+
+### 11.6 Bundle troubleshooting
+
+General pod/Flux dialect is §10; Bundle-specific symptoms:
+
+```bash
+kubectl -n cert-manager logs deploy/trust-manager -f
+kubectl describe bundle homelab-ca-bundle
+```
+
+| Symptom | Check |
+|---|---|
+| Bundle status `False` | `kubectl describe bundle homelab-ca-bundle` — usually missing source ConfigMap or wrong key |
+| ConfigMap not appearing in target ns | Namespace missing `platform.duynhlab.dev/needs-trust=true` |
+| ConfigMap exists but is empty | trust-manager pod logs — most often the Mozilla pkg image failed to pull |
+| Old CA still in bundle after rotation | Rebuild not triggered — `flux reconcile kustomization cert-manager-local --with-source` |
 
 ---
 
@@ -463,7 +638,9 @@ cert-manager creates `homelab-ca-secret` only in the `cert-manager` namespace. W
 - [cert-manager — Installation (Helm)](https://cert-manager.io/docs/installation/helm/)
 - [Flux — HelmRelease](https://fluxcd.io/flux/components/helm/helmreleases/)
 - [Let's Encrypt — Staging](https://letsencrypt.org/docs/staging-environment/)
+- [trust-manager docs](https://cert-manager.io/docs/trust/trust-manager/) · [API reference](https://cert-manager.io/docs/trust/trust-manager/api-reference/) (`trust.cert-manager.io/v1alpha1`)
+- [trust-manager — Preparing for Production](https://cert-manager.io/docs/trust/trust-manager/#preparing-for-production) — why the static CA copy beats reading the Secret directly
 
 ---
 
-_Last updated: 2026-08-13 — the edge Certificate is `platform-edge-tls` in namespace `envoy-gateway` (`configs/envoy-gateway/certificate.yaml`), terminated on the `platform` Gateway's `https` listener via Gateway API — no per-route TLS. cert-manager + Let's Encrypt (DNS-01 via Cloudflare) issue the wildcard on prod; local Kind issues it from the self-signed `homelab-ca` (overlay patch in `envoy-gateway-config.yaml`, planned — not yet reconciled on Kind). SANs `duynh.me`, `*.duynh.me`. `cloudflare-api-token` is a dev placeholder on local (bootstrap-seeded), operator-supplied on prod._
+_Last updated: 2026-08-19 — trust-distribution.md dissolved into §11 (architecture, opt-in, mounting, CA rotation, bootstrap, troubleshooting; the stale `auth` namespace row dropped — only `monitoring` carries `needs-trust`); inline HelmRelease copy synced with the deployed `prometheus.servicemonitor` block. Previously 2026-08-13 — edge Certificate `platform-edge-tls` (ns `envoy-gateway`), LE DNS-01 on prod / `homelab-ca` on local Kind (planned)._

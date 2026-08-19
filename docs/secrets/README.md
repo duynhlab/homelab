@@ -13,7 +13,7 @@ Secrets — they never call OpenBAO directly.
 | Topic | Current local Kind state | Production target |
 |---|---|---|
 | Secret store | OpenBAO HA, 3 Raft pods, PVC-backed | Same HA shape, production seal/TLS hardening |
-| App secret delivery | ESO reads OpenBAO KV v2 and writes Kubernetes Secrets | Same, plus dynamic DB credentials |
+| App secret delivery | ESO reads OpenBAO KV v2; the notification service reads the **database engine static role** instead ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) pilot) | Extend database-engine credentials beyond the pilot |
 | OpenBAO endpoint | Plain HTTP in-cluster (`tlsDisable: true`) | TLS via cert-manager |
 | OpenBAO unseal | `awskms` auto-unseal via the floci KMS emulator (pods self-unseal at boot); `openbao-init-keys` holds only a break-glass recovery key; root token revoked ([ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap floci `endpoint`) |
 | TLS issuer split | Local `platform-edge-tls` is signed by `homelab-ca` (planned — not yet reconciled on Kind) | Prod `platform-edge-tls` is Let's Encrypt via Cloudflare DNS-01 |
@@ -27,10 +27,9 @@ Secrets — they never call OpenBAO directly.
 | Understand the whole homelab secrets/TLS/trust chain | This file |
 | Understand OpenBAO internals: HA/Raft, seal, auth, engines, policies | [OpenBAO Architecture](./openbao.md) |
 | Add, rotate, or troubleshoot an ESO-managed secret | [Runbooks](./runbooks/) |
-| Understand/rotate the RS256 JWT signing key (auth-service's own signing key; the edge verifies via Keycloak `remoteJWKS` instead) | [OpenBAO — JWT signing key](./openbao.md#jwt-signing-key-auth-service) |
 | Understand cert-manager, Let's Encrypt DNS-01, and `platform-edge-tls` | [cert-manager + Let's Encrypt](./cert-manager.md) |
-| Understand `homelab-ca-bundle`, namespace opt-in, and CA rotation | [Trust Distribution](./trust-distribution.md) |
-| Study production hardening targets | [Production Hardening](./production-hardening.md) and [RFC-0008](../proposals/rfc/RFC-0008/) |
+| Understand `homelab-ca-bundle`, namespace opt-in, and CA rotation | [cert-manager §11 — trust-manager](./cert-manager.md#11-trust-manager--distributing-the-homelab-ca-bundle) |
+| Study production hardening targets | [§ Current boundaries & hardening](#current-boundaries--production-hardening) and [RFC-0008](../proposals/rfc/RFC-0008/) |
 | Review accepted decisions | [ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) and [ADR-005](../proposals/adr/ADR-005-openbao-ha-raft/) |
 
 ## Overview
@@ -147,7 +146,7 @@ classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 |-----------|---------|-----------|---------|
 | OpenBAO (HA) | Secret storage (3-node Raft) | `openbao` | 2.5.x |
 | External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.9.0** |
-| ClusterSecretStore | OpenBAO connection config | cluster-scoped | `openbao` |
+| ClusterSecretStore | OpenBAO connection config | cluster-scoped | `openbao` (KV v2) + `openbao-db` (database engine, KV v1 read — ADR-025) |
 | ClusterExternalSecret | Shared secrets across namespaces | cluster-scoped | Backup creds |
 | ExternalSecret | Per-secret definition | app namespaces | Creates K8s Secrets |
 
@@ -194,7 +193,7 @@ secret/{environment}/{category}/{service-or-component}/{resource}
 |-------|--------|---------|
 | `{environment}` | `local`, `staging`, `prod` | Environment isolation; same paths across envs |
 | `{category}` | `databases`, `services`, `infra` | Top-level grouping; maps to policy templates |
-| `{service-or-component}` | `auth`, `product`, `pgdog-cnpg`, `rustfs` | Specific service or infra component |
+| `{service-or-component}` | `product`, `keycloak`, `clickhouse`, `rustfs` | Specific service or infra component |
 | `{resource}` | `credentials`, `jwt-signing-key`, `api-keys`, `backup-credentials` | Type of secret |
 
 For the **full canonical KV catalog** (all paths currently seeded plus
@@ -217,32 +216,38 @@ OpenBAO-backed secrets. No `-vault` suffix is used.
 
 | K8s Secret | Namespace | Source |
 |------------|-----------|--------|
-| `platform-db-secret` | auth, platform | `secret/data/local/databases/auth-db/auth` (compat) |
 | `platform-db-user-secret` | user, platform | `secret/data/local/databases/shared-db/user` (compat) |
-| `platform-db-notification-secret` | notification, platform | `secret/data/local/databases/shared-db/notification` (compat) |
+| `platform-db-notification-secret` | notification | `database/static-creds/notification` via store `openbao-db` (ADR-025 static role, 720h rotation) |
 | `platform-db-shipping-secret` | shipping, platform | `secret/data/local/databases/shared-db/shipping` (compat) |
 | `platform-db-review-secret` | review, platform | `secret/data/local/databases/shared-db/review` (compat) |
 | `platform-db-temporal-secret` | temporal, platform | `secret/data/local/databases/platform-db/temporal` |
+| `platform-db-keycloak-secret` | identity | `secret/data/local/databases/platform-db/keycloak` |
 | `product-db-secret` | product | `secret/data/local/databases/product-db/product` |
 | `product-db-cart-secret` | cart | `secret/data/local/databases/product-db/cart` |
 | `product-db-order-secret` | order | `secret/data/local/databases/product-db/order` |
-| `product-db-payment-secret` | product, payment | `secret/data/local/databases/product-db/payment` |
+| `product-db-inventory-secret` | inventory | `secret/data/local/databases/product-db/inventory` |
+| `product-db-checkout-secret` | checkout | `secret/data/local/databases/product-db/checkout` |
+| `product-db-payment-secret` | payment | `secret/data/local/databases/product-db/payment` |
 
-The `product-db-payment-secret` is materialised in **both** `product` (where the
-`payment` database/owner is created on `product-db`) and `payment` (where the
-payment service consumes it to connect direct-TLS to `product-db-rw`).
+The `product-db-payment-secret` ExternalSecret materialises in `payment` (the
+service connects direct-TLS to `product-db-rw`); the product-side owner secret
+comes from the RFC-0012 triplet in
+`configs/databases/clusters/product-db/services/payment.yaml`.
 
-#### Backup secrets (ClusterExternalSecret)
+#### Shared secrets (ClusterExternalSecret)
 
-Backup credentials use **ClusterExternalSecret** with namespace labels to
-auto-deploy to all namespaces that need them:
+Namespace-label-selected **ClusterExternalSecrets** auto-deploy shared
+credentials to every namespace that opts in:
 
-| ClusterExternalSecret | Label Selector | Target Namespaces | Key Format |
-|----------------------|----------------|-------------------|------------|
+| ClusterExternalSecret | Label Selector | Currently matched | Purpose |
+|----------------------|----------------|-------------------|---------|
 | `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | platform, product | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
+| `clickhouse-credentials` | `platform.duynhlab/clickhouse: "true"` | monitoring | ClickHouse admin login |
+| `tempo-rustfs` | `platform.duynhlab/s3: "tempo"` | monitoring | Tempo S3 (RustFS) credentials |
+| `pyroscope-rustfs` | `platform.duynhlab/s3-pyroscope: "true"` | monitoring | Pyroscope S3 (RustFS) credentials |
 
 Since the Zalando→CNPG migration every cluster backs up via Barman, so `cnpg` is
-the only backup label (the old WAL-G `pg-backup-rustfs-walg` / `backup: walg`
+the only **backup** label (the old WAL-G `pg-backup-rustfs-walg` / `backup: walg`
 mapping was removed).
 
 **Adding backup credentials to a new namespace**: add the label to the namespace
@@ -264,39 +269,29 @@ created. Keep the label in the ResourceSet `Namespace` block (now `cnpg`
 fleet-wide — set via `platform_backup_label` in the ResourceSetInputProvider
 where the domain hosts a CNPG cluster).
 
-#### Pooler secrets
-
-| K8s Secret | Namespace | Source | Status |
-|------------|-----------|--------|--------|
-| `pgdog-cnpg-credentials` | product | `secret/data/local/databases/pgdog-cnpg/credentials` | Available (not consumed) |
-
-Pooler charts don't currently support `secretRef`. Secrets are created for future
-use.
-
 #### Infrastructure ExternalSecrets (per-namespace)
 
-| K8s Secret | Namespace | Source path (OpenBAO) | Source key | K8s key |
-|------------|-----------|-----------------------|------------|---------|
-| `cloudflare-api-token` | `cert-manager` | `secret/data/local/infra/cloudflare/api-token` | `api_token` | `api-token` |
-| `payment-webhook-hmac` | `payment` | `secret/data/local/services/payment/webhook-hmac` | `secret` | `secret` |
-
-Defined at
-`kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` (kind
-`ExternalSecret`, despite the directory name — the cert-manager ClusterIssuer
-only needs the Secret in one namespace). `payment-webhook-hmac` is defined at
-`kubernetes/infra/configs/secrets/payment-webhook-external-secrets.yaml` — the
-shared HMAC key mockpay signs webhooks with and payment verifies.
+| K8s Secret | Namespace | Source path (OpenBAO) | Defined at |
+|------------|-----------|-----------------------|------------|
+| `cloudflare-api-token` | `cert-manager` | `secret/data/local/infra/cloudflare/api-token` | `configs/secrets/cluster-external-secrets/cloudflare.yaml` (kind `ExternalSecret` despite the directory — the ClusterIssuer needs it in one namespace) |
+| `payment-webhook-hmac` | `payment` | `secret/data/local/services/payment/webhook-hmac` | `configs/secrets/payment-webhook-external-secrets.yaml` — the HMAC key mockpay signs webhooks with and payment verifies |
+| `keycloak-bootstrap-admin` | `identity` | `secret/data/local/infra/keycloak/admin` | `controllers/keycloak/external-secret.yaml` |
+| `rustfs-credentials` | `rustfs` | `secret/data/local/infra/rustfs/root` | `controllers/storage/rustfs/external-secret.yaml` |
 
 ## Monitoring
 
 External Secrets Operator exposes Prometheus metrics, scraped by the
 `external-secrets` ServiceMonitor in the `monitoring` namespace.
 
-| Metric | Description | Alert Threshold |
-|--------|-------------|-----------------|
+| Metric | Description | Proposed threshold |
+|--------|-------------|--------------------|
 | `externalsecret_sync_calls_error_total` | Total sync failures | Any increase |
 | `externalsecret_status_condition{condition="Ready",status="False"}` | Unhealthy ExternalSecrets | Any value > 0 |
 | `externalsecret_reconcile_duration` | Reconcile latency | p99 > 30s |
+
+> The thresholds above are **proposed — no PrometheusRule implements them yet**
+> (a recorded gap; no OpenBAO/ESO alerts exist, consistent with the
+> [runbooks index gap note](../observability/runbooks/README.md)).
 
 Verify ESO sync status:
 
@@ -306,34 +301,59 @@ kubectl get clusterexternalsecret
 kubectl get clustersecretstore
 ```
 
-## Current boundaries
+## Current boundaries & production hardening
 
 | Current | Planned / not yet deployed |
 |---|---|
-| KV v2 static secrets | OpenBAO database secrets engine for dynamic PostgreSQL users |
+| KV v2 static secrets + database engine **static-role pilot** (notification, 720h rotation — [ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)) | Extend database-engine credentials to the remaining services; per-request dynamic roles |
 | Kubernetes auth for ESO | OIDC for humans and AppRole for CI/CD |
 | Best-effort audit to stdout | Durable, fail-closed audit storage |
-| Local floci KMS emulator (`awskms` auto-unseal) | Real cloud KMS (swap `endpoint`) |
+| Local floci KMS emulator (`awskms` auto-unseal, root token revoked — [ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap `endpoint`) |
 | HTTP in-cluster OpenBAO listener | TLS listener and ESO `caBundle` |
 | Dev placeholder Cloudflare token on local | Operator-supplied production token outside Git |
 | PgDog inline pooler passwords (dev-only) | Pooler `secretRef` or initContainer config rendering |
 
-**Pooler inline passwords:** The PgDog Helm chart doesn't support
-`secretRef`. Inline passwords remain in HelmRelease/ConfigMap (dev-only). OpenBAO
-already materialises `pgdog-cnpg-credentials` in the `product` namespace for
-future use. See [Production Hardening](./production-hardening.md) and
+**Pooler inline passwords:** The PgDog Helm chart doesn't support `secretRef`,
+so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
 [RFC-0008](../proposals/rfc/RFC-0008/) for the production target.
+
+### Hardening workstreams
+
+| Workstream | Why it matters | Source of truth |
+|---|---|---|
+| TLS for OpenBAO | Prevent plaintext OpenBAO traffic and allow ESO `caBundle` validation | [RFC-0008](../proposals/rfc/RFC-0008/) |
+| Real cloud KMS | Swap the floci emulator's `endpoint` for a managed KMS (auto-unseal itself shipped — ADR-024) | [RFC-0008](../proposals/rfc/RFC-0008/) |
+| Database-engine credentials fleet-wide | Replace the remaining long-lived KV passwords with rotated/leased users (pilot shipped — ADR-025) | [OpenBAO §5.2](./openbao.md#52-database-secrets-engine--dynamic-credentials) |
+| OIDC human access | Remove day-to-day break-glass ceremony use | [OpenBAO Architecture](./openbao.md) |
+| Durable audit | Make secret access reconstructable after incidents | [ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) |
+| Cloudflare token handling | Keep production DNS-01 token outside Git and re-seed fresh clusters safely | [Seed bootstrap-only token](./runbooks/openbao-initial-setup.md) |
+
+### Rotation schedule
+
+| Credential | Type | Rotation today | Target |
+|-----------|------|----------------|--------|
+| Notification DB creds | Database-engine static role | Automatic, `rotation_period=720h` | Same, fleet-wide |
+| Other service DB creds (KV) | Static | Manual — [rotate-static-secret](./runbooks/rotate-static-secret.md) | Database-engine roles |
+| ESO OpenBAO token | Kubernetes-auth service token | Auto (auth TTL) | Same |
+| S3/backup creds (KV) | Static | Manual (`bao kv put` via ceremony) | Static roles where supported |
+| Break-glass root token | Generated per ceremony | Revoked after each use | Same |
+
+### Doc wording guardrail
+
+When editing secrets docs, keep current and planned behavior separate:
+**Deployed today** (verified against `kubernetes/` manifests) · **Local Kind
+only** (fine for learning, unsafe for production) · **Planned** (RFC-0008 /
+ADR target) · **Rejected** (historical alternative — keep the rationale, never
+present as active).
 
 ## Related documentation
 
 - [OpenBAO Architecture](./openbao.md) — OpenBAO internals and learning notes.
 - [Runbooks](./runbooks/) — add, rotate, bootstrap, and troubleshoot secrets.
-- [cert-manager + Let's Encrypt](./cert-manager.md) — TLS issuance for `platform-edge-tls`.
-- [Trust Distribution](./trust-distribution.md) — CA bundle distribution with trust-manager.
-- [Production Hardening](./production-hardening.md) — planned production target and guardrails.
+- [cert-manager + Let's Encrypt + trust-manager](./cert-manager.md) — TLS issuance for `platform-edge-tls` and CA bundle distribution (§11).
 - [OpenBAO file reference](./openbao.md#16-file-reference) — canonical manifest paths.
 - [RFC-0008](../proposals/rfc/RFC-0008/) — production secrets hardening and parity matrix.
 
 ---
 
-_Last updated: 2026-08-13 — edge Certificate references updated to `platform-edge-tls` (namespace `envoy-gateway`); JWT signing key link points to auth-service's own key, the edge verifies via Keycloak `remoteJWKS` instead._
+_Last updated: 2026-08-19 — production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._

@@ -721,7 +721,7 @@ Kong terminates TLS with a wildcard cert (`*.duynh.me`). On **prod** this is a p
 Full pipeline (OpenBAO → ESO → cert-manager → Kong), DNS-01 prerequisites, the dual-PKI split (Let's Encrypt vs `homelab-ca`), and troubleshooting are documented in:
 
 - [`docs/secrets/cert-manager.md`](../secrets/cert-manager.md) — controller, ClusterIssuers, `kong-proxy-tls` Certificate, deployment runbook
-- [`docs/secrets/trust-distribution.md`](../secrets/trust-distribution.md) — trust-manager `homelab-ca-bundle`, two-PKI rationale
+- [`docs/secrets/cert-manager.md` §11](../secrets/cert-manager.md#11-trust-manager--distributing-the-homelab-ca-bundle) — trust-manager `homelab-ca-bundle`, two-PKI rationale
 
 On prod, to switch the wildcard to LE staging while iterating (avoid prod rate limits), change `kong-proxy-tls.issuerRef` to `letsencrypt-staging`. (Local Kind already overrides this to `homelab-ca`.)
 

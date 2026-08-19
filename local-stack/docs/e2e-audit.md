@@ -999,6 +999,62 @@ print('A20 audit trail:', 'OK' if ok else 'FAIL', c['status'],
       [(r['from_status'], r['to_status'], r['actor_type']) for r in c['status_history']])"
 ```
 
+```bash
+# A21. THE UNTRACKED SKU IS A CONFLICT, NOT AN OUTAGE (ADR-053). Mirrors A20's
+#      arming minus one step: create + publish a product and deliberately SKIP
+#      the receipt, so the SKU has no balance row. Runs as `david` — its own
+#      user, because one active session per user is a partial unique index and
+#      every other Phase A row's user would adopt this row's session.
+A21_NAME="Untracked Widget $(date +%s)"
+A21_PID=$(audit_curl -s -X POST http://localhost:8080/product/v1/protected/products   -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json'   -d "{\"name\":\"$A21_NAME\",\"price\":12.5,\"category\":\"Electronics\"}"   | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+audit_curl -s -o /dev/null -X POST "http://localhost:8080/product/v1/protected/products/$A21_PID/publish"   -H "Authorization: Bearer $KCT_STAFF"
+# NO receipt here — that omission is the row.
+
+AT21=$(USERNAME=david $KCT)
+OLD21=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT21"   | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+[ -n "$OLD21" ] && audit_curl -s -o /dev/null -X DELETE   $BASE/checkout/v1/private/checkout/sessions/$OLD21 -H "Authorization: Bearer $AT21"
+audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT21"
+audit_curl -s -o /dev/null -X POST $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT21"   -H 'Content-Type: application/json'   -d "{\"product_id\":\"$A21_PID\",\"product_name\":\"$A21_NAME\",\"product_price\":12.5,\"quantity\":1}"
+
+# Arm 1 — session create: flat 409 ITEM_NOT_ORDERABLE, no Retry-After (nothing
+# to requote — no session exists yet), and the body stays opaque about SKUs.
+A21_CREATE=$(audit_curl -s -w '\n%{http_code}\t%{header{retry-after}}'   -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT21")
+echo "$A21_CREATE" | python3 -c "
+import sys
+body, tail = sys.stdin.read().rsplit('\n', 1)
+code, retry = (tail.split('\t') + [''])[:2]
+ok = code == '409' and 'ITEM_NOT_ORDERABLE' in body and not retry.strip() \
+     and 'does not track' not in body
+print('A21 create:', 'OK 409 no-retry-after opaque' if ok else f'FAIL code={code} retry={retry!r} body={body[:160]}')"
+
+# Give it stock (the operator fix this row exists to prove), then the same
+# basket quotes cleanly — recovery is part of the assertion.
+audit_curl -s -o /dev/null -w "A21 receipt: %{http_code} (want 201)\n" -X POST   http://localhost:8080/inventory/v1/protected/receipts   -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json'   -d "{\"command_id\":\"a21-rcpt-$(date +%s)\",\"sku_id\":\"$A21_PID\",\"warehouse_id\":1,\"quantity\":5,\"reason\":\"a21 recovery\"}"
+S21=$(audit_curl -s -X POST $BASE/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT21"   | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+echo "A21 recovery: session $S21 created after the receipt (want a session id)"
+
+# Arm 2 — confirm: park the SAME basket back into the untracked state by
+# revoking the balance? No such command exists (receipts only add), so the
+# confirm arm uses a SECOND untracked product added to the now-open session's
+# cart... which a session snapshot ignores. Instead: prove the confirm arm on
+# a FRESH untracked product with a full funnel.
+A21B_NAME="Untracked Confirm $(date +%s)"
+A21B_PID=$(audit_curl -s -X POST http://localhost:8080/product/v1/protected/products   -H "Authorization: Bearer $KCT_STAFF" -H 'Content-Type: application/json'   -d "{\"name\":\"$A21B_NAME\",\"price\":9.75,\"category\":\"Electronics\"}"   | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+audit_curl -s -o /dev/null -X POST "http://localhost:8080/product/v1/protected/products/$A21B_PID/publish"   -H "Authorization: Bearer $KCT_STAFF"
+# The confirm-time gap needs the session to EXIST first, so the SKU must be
+# tracked at create and untracked at confirm. Inventory has no "untrack"
+# command — by design — so the confirm arm rides the create-time session
+# adoption instead: receive stock, build the session to ready, and note that
+# CheckAvailability runs at BOTH create and confirm; the unit tests in
+# checkout-service pin the confirm arm's 409-with-requote shape directly
+# (TestConfirm_UnknownSKUIs409WithRequotedSession). This row therefore asserts
+# the WIRE truth end-to-end where the platform can produce it (create) and
+# the recovery loop; the confirm arm's envelope is covered by the service's
+# own contract tests, which the release CI runs on the same commit.
+audit_curl -s -o /dev/null -X DELETE $BASE/checkout/v1/private/checkout/sessions/$S21 -H "Authorization: Bearer $AT21"
+audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT21"
+```
+
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
 > row cannot reach the limit, so a 429 means either the policy was tightened or
 > something is looping. Investigate before re-running.
@@ -1334,6 +1390,35 @@ agent-browser $N batch "fill @e2 alice" "fill @e4 password123" "click @e3" \
 # B8. Cleanup — both portal sessions.
 agent-browser $P close
 agent-browser $N close
+
+# ---------------------------------------------------------------------------
+# B9-B10: THE ADR-053 PORTAL AFFORDANCES. A17/A21 prove the receipts API and
+# the wire answer with curl; these prove the operator can actually reach them.
+# Both need a signed-in staff session — reuse the B5 flow in a fresh session.
+# ---------------------------------------------------------------------------
+Q="--session portal-adr053"
+
+# B9. RECEIVE FIRST STOCK reaches an untracked SKU. The page-level dialog is
+#     the whole point: the row-scoped Receive cannot see a SKU with no row.
+agent-browser $Q --args "--no-sandbox" batch \
+  "open http://localhost:3009/inventory" "wait 2500" "snapshot -i"
+# (sign in via the realm form as in B5 if the login page appears, then
+#  re-open /inventory and re-snapshot. Use the refs YOUR snapshot prints.)
+agent-browser $Q batch "click <ref of 'Receive first stock'>" "wait 800" "snapshot -i"
+# Fill a SKU id that has no balance row (b9-<epoch> is untracked by
+# construction), warehouse 1, quantity 4 — and BEFORE submitting, the advisory
+# line must read "No balance row yet — this receipt creates it."
+# After Receive: "Stock received." Then filter the balances table by that SKU
+# and assert the new row exists with on-hand 4, and the movements ledger shows
+# RECEIVE with duyne's subject (d0e00000-0000-4000-8000-000000000001).
+
+# B10. THE PUBLISH WARNING fires and does not gate. Create a draft in the
+#      Catalog (fresh products are untracked by construction), click publish,
+#      and in the confirm dialog assert BOTH:
+#        - the amber notice "No inventory balance row exists for SKU …"
+#        - the Publish button is still ENABLED (warn, never gate)
+#      then Publish and assert the row reads ACTIVE.
+agent-browser $Q close
 ```
 
 ## Phase C — telemetry sanity (curl + PromQL + LogsQL + SQL, ~6 min)
@@ -1883,6 +1968,7 @@ print('C21 rules loaded: %d alerting (want 14) + %d recording (want 15); firing:
 | A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
 | A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
+| A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |
@@ -1891,6 +1977,8 @@ print('C21 rules loaded: %d alerting (want 14) + %d recording (want 15); firing:
 | B6 | Portal dashboard reads real numbers | all five cards present — Low / out of stock, Manual review, Cancelling, Unresolved attempts, Recon discrepancies (latest run) — each showing a numeral rather than a dash or a spinner, and every `:8080` call behind them 200. Zero is a legitimate value; a blank or missing card is not. Requires Phase A to have run first |
 | B7 | The realm split is a fence in the browser | in a **clean** profile (`portal-neg`, so no staff SSO cookie), the customer account `alice` / `password123` typed on the portal's realm page stays on `localhost:8081` with "Invalid username or password."; a rendered portal shell after those credentials is a FAILED row and means the two realms share a user store |
 | B8 | Browser cleanup (portal) | both the `portal` and `portal-neg` sessions are closed |
+| B9 | Portal bootstrap reaches an untracked SKU (ADR-053) | the page-level **Receive first stock** dialog accepts a free-entry SKU id with no balance row; the advisory line reads "No balance row yet — this receipt creates it." before submit; after Receive the balances table shows the new row and the ledger carries the `RECEIVE` with duyne's staff subject |
+| B10 | Publish warns, never gates (ADR-053) | publishing a fresh (untracked-by-construction) draft shows the amber "No inventory balance row exists for SKU …" notice inside the confirm dialog while the **Publish button stays enabled**, and the publish succeeds |
 | C1 | Collector | 0 export failures / error lines |
 | C2 | Edge span is the trace root | the discovery query returns exactly one non-application service name (`platform.envoy-gateway-system`, derived by Envoy Gateway from `<gateway>.<namespace>` — discovered, not assumed) and the ROOT span of the tagged request is the edge's `ingress` Server span; the `deployment.environment.name=local` customTag corroborates it |
 | C3 | Trace continuity edge→service | one `TraceId` holds the edge **and** the service, with exactly one root and the service's Server span carrying a non-empty `ParentSpanId` |
@@ -1946,9 +2034,9 @@ evidence table too, not just service and `pkg` changes.
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A14 + A16–A20 API contract | PASS / FAIL | |
+| A | A1–A14 + A16–A21 API contract | PASS / FAIL | |
 | A | A15 versioning drill | PASS / FAIL / N/A | |
-| B | B1–B4 real browser | PASS / FAIL | |
+| B | B1–B10 real browser | PASS / FAIL | |
 | C | C1–C21 telemetry + engine-health loop | PASS / FAIL | |
 
 Decision: ELIGIBLE FOR TAG / BLOCKED

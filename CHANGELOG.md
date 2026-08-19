@@ -194,6 +194,22 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **The compose gate learns the ADR-053 rows, and the local edge catches up to
+  the cluster.** The audit gains A21 (a published product with no balance row
+  answers a flat `409 ITEM_NOT_ORDERABLE` at session create — no `Retry-After`,
+  opaque body — and quotes cleanly after an operator receipt; the confirm
+  envelope is pinned by checkout-service's contract tests) and B9/B10 (the
+  portal's Receive-first-stock bootstrap and the warn-never-gate publish
+  notice); the release-evidence lines catch up (`A16–A21`, and the Phase B line
+  had been stale at `B1–B4` since B5–B8 landed). The local standalone Envoy
+  Gateway moves v1.8.3 → v1.9.0 (digest-pinned), closing the version skew with
+  the cluster pin so the gate exercises the edge the cluster will run —
+  `samplingRate: 100` is explicit locally, so v1.9.0's client-sampling default
+  change is inert. ADR-053 carries two adoption errata (recorded in History,
+  decision unchanged): the publish-warning read is the protected balances HTTP
+  route (`BatchGetAvailability` is gRPC-only, unreachable from the SPA), and
+  session create answers a flat 409 because no session exists yet to requote;
+  `checkout.md`'s create row now documents that flat 409.
 - **The Backoffice Portal joins the compose stack** on `:3009`. Everything it
   needed was already there — the `duynhlab-staff` realm import, the
   `admin-portal` client with that origin, the operator `duyne`, the CORS entry

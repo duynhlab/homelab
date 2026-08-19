@@ -94,7 +94,7 @@ flowchart LR
 | checkout-worker | `:8080` health | — | `checkout` | — | Temporal (`AbandonedCheckoutWorkflow`; DB-only activities) |
 | mockpay | `:8080` | — | — | — | called by payment; webhooks → gateway → payment public route |
 | temporal | — (`7233` gRPC, `8233` UI) | — | `temporal`, `temporal_visibility` | — | callers: order, checkout, both workers; CLI via `temporal-admintools` |
-| gateway (Envoy Gateway v1.8.3, standalone provider) | `8000` → host `8080` | — | — | — (in-process local rate limit, no shared store) | ten HTTP services + cache; inventory remains east-west only; callers: frontend, browser, mockpay webhooks |
+| gateway (Envoy Gateway v1.9.0, standalone provider) | `8000` → host `8080` | — | — | — (in-process local rate limit, no shared store) | ten HTTP services + cache; inventory remains east-west only; callers: frontend, browser, mockpay webhooks |
 | frontend | `80` → host `3001` | — | — | — | gateway only |
 
 > **In-cluster differences (production):** `platform-db` (CloudNativePG behind **`platform-db-pooler-rw.platform.svc.cluster.local:5432`** — auth/user/notification/shipping/review; Temporal connects **direct** to `platform-db-rw.platform:5432`);

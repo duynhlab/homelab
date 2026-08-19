@@ -31,7 +31,7 @@ spec:
     networkPolicy:
       create: true
       ingress:
-        # mcp.duynh.me HTTPRoute is served by the Envoy proxy fleet in
+        # flux-mcp.duynh.me HTTPRoute is served by the Envoy proxy fleet in
         # envoy-gateway.
         namespaces: [envoy-gateway]
 

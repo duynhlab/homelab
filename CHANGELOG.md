@@ -882,6 +882,19 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The MCP doc stops describing a plan that already shipped — and the
+  committed client config stops pointing at a domain that doesn't exist.**
+  `.crush.json` targeted `vm-mcp.duynhne.me` / `vl-mcp.duynhne.me` /
+  `flux-mcp.duynhne.me` — the platform serves `*.duynh.me`; the config
+  resolved nowhere. `mcp-servers.md` is rewritten from implementation-plan
+  voice to the deployed reality: delivery is the `mcp-local` Flux
+  Kustomization (not a controllers/kustomization.yaml edit), access is the
+  three gateway hostnames behind the admin-CIDR fence + rate limit
+  (port-forward demoted to fallback; client configs match .crush.json), the
+  values blocks match the manifests — including `scrape.enabled: false` and
+  the VMAgentScrapePoolHasNoTargets story the doc used to recommend the
+  opposite of — and the operator-machine "crush info" snapshot section is
+  gone. The docs index stops crediting a Grafana MCP that never existed.
 - **Root README caught up to the deployed platform.** The overview and
   topology diagram still described the Kong-era layout: Kong as the edge, "10
   microservices · Web → Logic → Core", three PgDog poolers, and an

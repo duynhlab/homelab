@@ -2,169 +2,311 @@
 
 ## Overview
 
-MCP (Model Context Protocol) servers expose observability data and GitOps operational capabilities to AI assistants. This enables AI agents to query metrics, logs, reconcile Flux resources, and assist engineers with debugging/troubleshooting directly from their IDE or CLI.
+MCP (Model Context Protocol) servers expose observability data and GitOps
+operational capabilities to AI assistants. This lets AI agents query metrics,
+search logs, reconcile Flux resources, and assist with debugging directly from
+an IDE or CLI — against live cluster data, not stale copies.
 
-This document covers deploying **3 MCP servers** in the homelab cluster:
+The homelab cluster runs **3 MCP servers**, delivered by the Flux `mcp-local`
+Kustomization and reachable through the Envoy Gateway edge:
 
-| MCP Server | Purpose | Connects To | Chart Version |
-|---|---|---|---|
-| **victoria-metrics-mcp** | Query metrics, alerts, cardinality, rules | VMSingle | `0.3.0` |
-| **victoria-logs-mcp** | Query logs, streams, fields | VLSingle | `0.1.0` |
-| **flux-operator-mcp** | Flux resources, reconciliation, logs | Kubernetes API | `*` (floating OCI semver) |
+| MCP Server | Purpose | Connects To | Chart | Namespace | Hostname |
+|---|---|---|---|---|---|
+| **victoria-metrics-mcp** | Query metrics, alerts, cardinality, rules | VMSingle | `0.3.0` | `monitoring` | `vm-mcp.duynh.me` |
+| **victoria-logs-mcp** | Query logs, streams, fields | VLSingle | `0.1.0` | `monitoring` | `vl-mcp.duynh.me` |
+| **flux-operator-mcp** | Flux resources, reconciliation, logs | Kubernetes API | `*` (floating OCI semver) | `flux-system` | `flux-mcp.duynh.me` |
 
 ```mermaid
 flowchart TD
-    AI[AI Assistant<br/>Claude / Cursor / VS Code] -->|MCP Protocol| VMMCP[victoria-metrics-mcp<br/>:8080]
-    AI -->|MCP Protocol| VLMCP[victoria-logs-mcp<br/>:8080]
-    AI -->|MCP Protocol| FMCP[flux-operator-mcp<br/>:9090]
+    AI["AI client<br/>Crush / Claude / VS Code"] -->|"MCP Streamable HTTP"| GW["Envoy Gateway<br/>platform (https listener)"]
+    GW --> FENCE["SecurityPolicy admin-cidr-internal<br/>deny by default, private CIDRs only"]
+    FENCE --> BTP["BackendTrafficPolicy btp-admin<br/>600 req/min per proxy replica"]
 
-    VMMCP -->|MetricsQL API| VMS[VMSingle<br/>vmsingle-victoria-metrics:8428]
-    VLMCP -->|LogsQL API| VLS[VLSingle<br/>vlsingle-victoria-logs:9428]
-    FMCP -->|Kubernetes API| K8S[kube-apiserver]
+    BTP -->|"vm-mcp.duynh.me"| VMMCP["victoria-metrics-mcp-vmm<br/>:8080"]
+    BTP -->|"vl-mcp.duynh.me"| VLMCP["victoria-logs-mcp-vlm<br/>:8080"]
+    BTP -->|"flux-mcp.duynh.me"| FMCP["flux-operator-mcp<br/>:9090"]
+
+    VMMCP -->|"MetricsQL API"| VMS[("VMSingle<br/>vmsingle-victoria-metrics:8428")]
+    VLMCP -->|"LogsQL API"| VLS[("VLSingle<br/>vlsingle-victoria-logs:9428")]
+    FMCP -->|"Kubernetes API"| K8S["kube-apiserver"]
 
     subgraph monitoring["monitoring namespace"]
-        VMS
-        VLS
         VMMCP
         VLMCP
+        VMS
+        VLS
     end
 
-    subgraph flux-system["flux-system namespace"]
+    subgraph fluxsystem["flux-system namespace"]
         FMCP
-        K8S
     end
+
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    class GW,FENCE,BTP edge;
+    class VMMCP,VLMCP,FMCP platform;
+    class VMS,VLS data;
+    class AI,K8S external;
 ```
+
+---
+
+## Access model
+
+### Primary: gateway hostnames
+
+Each MCP server has an HTTPRoute on the `platform` Gateway (`https` listener)
+in `kubernetes/infra/configs/envoy-gateway/routes/mcp.yaml`:
+
+| Hostname | HTTPRoute (namespace) | Backend Service | Port |
+|---|---|---|---|
+| `vm-mcp.duynh.me` | `victoria-metrics-mcp` (monitoring) | `victoria-metrics-mcp-vmm` | 8080 |
+| `vl-mcp.duynh.me` | `victoria-logs-mcp` (monitoring) | `victoria-logs-mcp-vlm` | 8080 |
+| `flux-mcp.duynh.me` | `flux-operator-mcp` (flux-system) | `flux-operator-mcp` | 9090 |
+
+The hostnames resolve locally via the managed `/etc/hosts` block —
+`sudo scripts/setup-hosts.sh` provisions all three alongside the other
+`*.duynh.me` entries. Plain `http://` requests hit the gateway's
+`https-redirect` route (301) and clients follow to the `https` listener.
+
+Two edge policies fence these routes:
+
+- **CIDR fence** (`kubernetes/infra/configs/envoy-gateway/policies/security-admin-cidr.yaml`):
+  SecurityPolicy `admin-cidr-internal` per namespace with
+  `defaultAction: Deny` and one Allow rule for private/in-cluster networks —
+  `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.1/32`, `::1/128`,
+  `fc00::/7`. Any other client address gets **403**. Behind the Kind
+  port-forward the client address Envoy sees depends on forwarded-header
+  trust, so the fence is defense-in-depth, not authentication.
+- **Rate limit** (`kubernetes/infra/configs/envoy-gateway/policies/btp-admin.yaml`):
+  BackendTrafficPolicy `btp-admin` applies a local rate limit of
+  **600 requests/minute per proxy replica** (1200/min across the 2-replica
+  fleet, ADR-045), with `X-RateLimit-*` headers (draft v03).
+
+### Fallback: port-forward
+
+When the gateway is down (or you are debugging it), port-forward the Services
+directly:
+
+```bash
+kubectl port-forward -n monitoring svc/victoria-metrics-mcp-vmm 18080:8080 &
+kubectl port-forward -n monitoring svc/victoria-logs-mcp-vlm 18081:8080 &
+kubectl port-forward -n flux-system svc/flux-operator-mcp 19090:9090 &
+```
+
+Then point clients at `http://localhost:18080/mcp` etc. Note the flux MCP
+NetworkPolicy only allows ingress from the `envoy-gateway` namespace —
+`kubectl port-forward` still works because it tunnels through the kubelet,
+not pod-network ingress.
+
+---
+
+## AI assistant configuration
+
+### Crush (CLI agent — primary)
+
+The repo-root [`.crush.json`](../../.crush.json) is committed and points at
+the gateway hostnames — Crush picks it up automatically in this project:
+
+```json
+{
+  "$schema": "https://charm.land/crush.json",
+  "mcp": {
+    "victoria-metrics": {
+      "type": "http",
+      "url": "http://vm-mcp.duynh.me/mcp",
+      "timeout": 30
+    },
+    "victoria-logs": {
+      "type": "http",
+      "url": "http://vl-mcp.duynh.me/mcp",
+      "timeout": 30
+    },
+    "flux-operator": {
+      "type": "http",
+      "url": "http://flux-mcp.duynh.me/mcp",
+      "timeout": 30
+    }
+  }
+}
+```
+
+> Project-local config merges with `~/.local/share/crush/crush.json`, so
+> globally configured MCPs remain available.
+
+Verify inside Crush with `/info` — all three servers should show
+`connected (N tools, 0 resources)`.
+
+Usage examples:
+
+```bash
+# Metrics
+> "Show me top 10 metrics by cardinality"
+> "List all active alerts and their severity"
+> "Explain this query: rate(http_requests_total{namespace='auth'}[5m])"
+
+# Logs
+> "Show me error logs from the auth namespace in the last hour"
+> "Search logs for 'connection refused' across all namespaces"
+
+# Flux
+> "Show me all failed HelmReleases"
+> "Reconcile the infrastructure-local Kustomization"
+```
+
+### VS Code / Cursor
+
+Add to `.vscode/settings.json` or Cursor settings (same hostnames):
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "victoria-metrics": { "type": "http", "url": "http://vm-mcp.duynh.me/mcp" },
+      "victoria-logs": { "type": "http", "url": "http://vl-mcp.duynh.me/mcp" },
+      "flux-operator": { "type": "http", "url": "http://flux-mcp.duynh.me/mcp" }
+    }
+  },
+  "chat.mcp.enabled": true
+}
+```
+
+> For VS Code: enable **Agent mode** in GitHub Copilot Chat to access MCP tools.
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`
+(macOS) or `~/.config/claude/claude_desktop_config.json` (Linux):
+
+```json
+{
+  "mcpServers": {
+    "victoria-metrics": { "type": "http", "url": "http://vm-mcp.duynh.me/mcp" },
+    "victoria-logs": { "type": "http", "url": "http://vl-mcp.duynh.me/mcp" },
+    "flux-operator": { "type": "http", "url": "http://flux-mcp.duynh.me/mcp" }
+  }
+}
+```
+
+---
+
+## Delivery mechanism
+
+The servers are reconciled by the dedicated Flux Kustomization **`mcp-local`**
+(`kubernetes/clusters/local/mcp.yaml`): `path: ./controllers/mcp`,
+`dependsOn: monitoring-local` (the MCP servers need VMSingle/VLSingle up),
+`prune: true`, `wait: false`, interval 10m.
+
+Charts come from three OCIRepositories in
+`kubernetes/clusters/local/sources/oci/` (all `interval: 10m`):
+
+| OCIRepository | Chart URL | Pin |
+|---|---|---|
+| `victoria-metrics-mcp-oci` | `oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-mcp` | `semver: "0.3.0"` |
+| `victoria-logs-mcp-oci` | `oci://ghcr.io/victoriametrics/helm-charts/victoria-logs-mcp` | `semver: "0.1.0"` |
+| `flux-operator-mcp-oci` | `oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator-mcp` | `semver: "*"` (floating) |
+
+The HelmReleases live in `kubernetes/infra/controllers/mcp/` and are listed in
+that directory's own `kustomization.yaml` — adding a fourth server means a new
+HelmRelease there plus an OCIRepository under `clusters/local/sources/oci/`,
+not an edit to `controllers/kustomization.yaml`.
 
 ---
 
 ## 1. VictoriaMetrics MCP Server
 
-### What It Does
+### What it does
 
-Exposes VictoriaMetrics metrics data to AI assistants via MCP protocol. Capabilities:
+Exposes VictoriaMetrics metrics data to AI assistants:
 
-- **Query metrics** using MetricsQL (with graph rendering if client supports it)
+- **Query metrics** using MetricsQL (with graph rendering if the client supports it)
 - **List/export** available metrics, labels, label values, entire time series
 - **Analyze alerting/recording rules** and active alerts
 - **Explore cardinality** and metrics usage statistics
 - **Debug** relabeling rules, downsampling, retention policy configurations
 - **Trace/explain queries** for optimization
 
-### Helm Chart Values
+### Deployed values
+
+Load-bearing values — full HelmRelease in
+`kubernetes/infra/controllers/mcp/victoria-metrics-mcp.yaml`:
 
 ```yaml
-# victoria-metrics-mcp HelmRelease values
-# Chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-mcp
-# Version: 0.3.0
-
+# HelmRelease victoria-metrics-mcp (ns monitoring)
+# spec: interval 30m, timeout 10m, install.remediation.retries 5
 nameOverride: vmm
-
 mcp:
-  mode: http           # http (streamable) or sse (legacy)
-  heartbeatInterval: 30s
-  disable:
-    tools: []           # list of tool names to disable
-    resources: false    # disable MCP resources (docs tool still works)
-  passthroughHeaders: []
-
+  mode: http                # Streamable HTTP
 vm:
-  type: single          # single or cluster
+  type: single
   entrypoint: "http://vmsingle-victoria-metrics.monitoring.svc:8428"
-  bearerToken: ""       # auth token (not needed for in-cluster)
-  cloudAPIKey: ""       # only for VictoriaMetrics Cloud
-  headers: []
-
 service:
   type: ClusterIP
   port: 8080
-
 resources:
-  requests:
-    cpu: 10m
-    memory: 32Mi
-  limits:
-    cpu: 200m
-    memory: 128Mi
-
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { cpu: 1000m, memory: 1Gi }
+livenessProbe:
+  httpGet: { path: /health/liveness, port: http }
+readinessProbe:
+  httpGet: { path: /health/readiness, port: http }
 scrape:
-  enabled: true         # enable self-monitoring VMServiceScrape
+  enabled: false            # see callout below
 ```
 
-### Key Configuration Notes
-
-| Parameter | Description | Our Value |
-|---|---|---|
-| `vm.type` | `single` for VMSingle, `cluster` for vmselect | `single` |
-| `vm.entrypoint` | Root URL of VMSingle (not `/api/v1/query`) | `http://vmsingle-victoria-metrics.monitoring.svc:8428` |
-| `mcp.mode` | `http` = Streamable HTTP (recommended), `sse` = legacy SSE | `http` |
-| `mcp.disable.tools` | Disable specific tools by name | `[]` (all enabled) |
-| `scrape.enabled` | Auto-create VMServiceScrape for self-monitoring | `true` |
+> **Why `scrape.enabled: false`:** in `mcp.mode: http` the server exposes no
+> Prometheus `/metrics` endpoint on `:8080`, so the chart's auto-created
+> VMServiceScrape matched nothing and `VMAgentScrapePoolHasNoTargets` fired
+> forever. The alert-ruler audit removed the scrape rather than silencing the
+> alert — a scrape object with no possible target is config debt, not
+> monitoring.
 
 ---
 
 ## 2. VictoriaLogs MCP Server
 
-### What It Does
+### What it does
 
-Exposes VictoriaLogs log data to AI assistants. Capabilities:
+Exposes VictoriaLogs log data to AI assistants:
 
 - **Query logs** using LogsQL
 - **List streams, fields, field values** for log exploration
 - **Show VictoriaLogs instance parameters**
 - **Query statistics** for logs-as-metrics analysis
 
-### Helm Chart Values
+### Deployed values
+
+Load-bearing values — full HelmRelease in
+`kubernetes/infra/controllers/mcp/victoria-logs-mcp.yaml`:
 
 ```yaml
-# victoria-logs-mcp HelmRelease values
-# Chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-logs-mcp
-# Version: 0.1.0
-
+# HelmRelease victoria-logs-mcp (ns monitoring)
+# spec: interval 30m, timeout 5m, install.remediation.retries 3
 nameOverride: vlm
-
 mcp:
   mode: http
-  heartbeatInterval: 30s
-  disable:
-    tools: []
-    resources: false
-  passthroughHeaders: []
-
 vl:
   entrypoint: "http://vlsingle-victoria-logs.monitoring.svc:9428"
-  bearerToken: ""
-  headers: []
-
 service:
   type: ClusterIP
   port: 8080
-
 resources:
-  requests:
-    cpu: 10m
-    memory: 32Mi
-  limits:
-    cpu: 200m
-    memory: 128Mi
-
+  requests: { cpu: 10m, memory: 32Mi }
+  limits: { cpu: 200m, memory: 128Mi }
 scrape:
   enabled: true
 ```
-
-### Key Configuration Notes
-
-| Parameter | Description | Our Value |
-|---|---|---|
-| `vl.entrypoint` | Root URL of VLSingle | `http://vlsingle-victoria-logs.monitoring.svc:9428` |
-| `mcp.mode` | `http` recommended over `sse` | `http` |
 
 ---
 
 ## 3. Flux Operator MCP Server
 
-### What It Does
+### What it does
 
-Enables AI assistants to interact with Flux-managed Kubernetes clusters. Tools grouped by category:
+Enables AI assistants to interact with the Flux-managed cluster. Tools grouped
+by category:
 
 **Reporting** (read-only):
 - `get_flux_instance` — Flux installation details, component status
@@ -190,430 +332,92 @@ Enables AI assistants to interact with Flux-managed Kubernetes clusters. Tools g
 **Documentation**:
 - `search_flux_docs` — Search Flux documentation
 
-### Helm Chart Values
+### Deployed values
+
+Load-bearing values — full HelmRelease in
+`kubernetes/infra/controllers/mcp/flux-operator-mcp.yaml`:
 
 ```yaml
-# flux-operator-mcp HelmRelease values
-# Chart: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator-mcp
-# Version: latest
-
-transport: http         # http (streamable) or sse (legacy)
-readonly: false         # true in prod to disable write tools
-
+# HelmRelease flux-operator-mcp (ns flux-system)
+# spec: interval 30m, timeout 5m, serviceAccountName: flux-operator
+transport: http
+readonly: false             # write tools enabled (local dev cluster)
 networkPolicy:
   create: true
   ingress:
-    namespaces: []      # namespaces allowed to access MCP server
-
+    namespaces: [envoy-gateway]   # flux-mcp.duynh.me HTTPRoute is served
+                                  # by the Envoy proxy fleet
 rbac:
-  create: true          # grants cluster-admin to flux-operator-mcp SA
-
+  create: true                    # cluster-admin for the MCP SA
 resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 10m
-    memory: 64Mi
-
+  requests: { cpu: 10m, memory: 64Mi }
+  limits: { cpu: 500m, memory: 512Mi }
 securityContext:
   runAsNonRoot: true
   readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
-  capabilities:
-    drop: ["ALL"]
-  seccompProfile:
-    type: "RuntimeDefault"
+  capabilities: { drop: ["ALL"] }
+  seccompProfile: { type: "RuntimeDefault" }
 ```
 
-### Key Configuration Notes
+The HelmRelease reconciles as ServiceAccount `flux-operator`
+(`spec.serviceAccountName`), and the NetworkPolicy allow-list means only the
+Envoy proxy fleet can reach the pod over the pod network — in-cluster clients
+in other namespaces are denied.
 
-| Parameter | Description | Our Value |
-|---|---|---|
-| `transport` | `http` (recommended) or `sse` (legacy) | `http` |
-| `readonly` | Disable write operations (reconcile, apply, delete) | `false` (local dev) |
-| `rbac.create` | Grants `cluster-admin` — required for full Flux access | `true` |
-| `networkPolicy.create` | Restrict ingress to specific namespaces | `true` |
+### Security posture
 
-### Security Considerations
-
-- **Read-only mode** (`readonly: true`): Disables reconcile, suspend, resume, apply, delete tools
-- **Secret masking**: Enabled by default (masks Secret values)
-- **Service Account impersonation**: Can restrict to specific SA permissions via `--kube-as`
-- In-cluster deployment: kubeconfig context switching is disabled (single cluster only)
+- **Write tools are on** (`readonly: false`) — this is a local dev cluster; set
+  `readonly: true` to disable reconcile/suspend/apply/delete tools.
+- **Secret masking** is enabled by default (masks Secret values in responses).
+- The gateway path adds the admin CIDR fence + rate limit on top of the
+  NetworkPolicy.
+- In-cluster deployment: kubeconfig context switching is disabled (single
+  cluster only).
 
 ---
 
-## Implementation Plan
+## History
 
-| Phase | Scope | Files |
-|---|---|---|
-| **1** | Deploy VM MCP + VL MCP | `kubernetes/infra/controllers/mcp/victoria-metrics-mcp.yaml`, `victoria-logs-mcp.yaml` |
-| **2** | Deploy Flux Operator MCP | `kubernetes/infra/controllers/mcp/flux-operator-mcp.yaml` |
-| **3** | Wire into Flux Kustomization | `kubernetes/infra/controllers/kustomization.yaml` |
-| **4** | Port-forward MCP servers | `kubectl port-forward` commands |
-| **5** | Configure AI assistants (Crush, VS Code, Claude) | `.crush.json`, `.vscode/settings.json` |
-
-### Phase 1: Deploy VictoriaMetrics MCP + VictoriaLogs MCP
-
-**Files to create:**
-
-```
-kubernetes/infra/controllers/mcp/
-├── kustomization.yaml
-├── victoria-metrics-mcp.yaml    # HelmRelease
-└── victoria-logs-mcp.yaml       # HelmRelease
-```
-
-**Deployment pattern** (matching existing OCI-based HelmRelease pattern):
-
-```yaml
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: OCIRepository
-metadata:
-  name: victoria-metrics-mcp-oci
-  namespace: flux-system
-spec:
-  interval: 60m
-  url: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-mcp
-  ref:
-    semver: "0.3.0"
-  layerSelector:
-    mediaType: "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
-    operation: copy
----
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: victoria-metrics-mcp
-  namespace: monitoring
-spec:
-  interval: 30m
-  chartRef:
-    kind: OCIRepository
-    name: victoria-metrics-mcp-oci
-    namespace: flux-system
-  values:
-    nameOverride: vmm
-    mcp:
-      mode: http
-    vm:
-      type: single
-      entrypoint: "http://vmsingle-victoria-metrics.monitoring.svc:8428"
-    resources:
-      requests:
-        cpu: 10m
-        memory: 32Mi
-      limits:
-        cpu: 200m
-        memory: 128Mi
-    scrape:
-      enabled: true
-```
-
-### Phase 2: Deploy Flux Operator MCP
-
-**Files to create:**
-
-```
-kubernetes/infra/controllers/mcp/
-└── flux-operator-mcp.yaml       # HelmRelease
-```
-
-```yaml
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: OCIRepository
-metadata:
-  name: flux-operator-mcp-oci
-  namespace: flux-system
-spec:
-  interval: 60m
-  url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator-mcp
-  ref:
-    semver: "*"
-  layerSelector:
-    mediaType: "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
-    operation: copy
----
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: flux-operator-mcp
-  namespace: flux-system
-spec:
-  interval: 30m
-  chartRef:
-    kind: OCIRepository
-    name: flux-operator-mcp-oci
-    namespace: flux-system
-  values:
-    transport: http
-    readonly: false
-    networkPolicy:
-      create: true
-    resources:
-      requests:
-        cpu: 10m
-        memory: 64Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
-```
-
-### Phase 3: Wire into Kustomization
-
-Add `mcp/` to `kubernetes/infra/controllers/kustomization.yaml`:
-
-```yaml
-resources:
-  # ... existing controllers ...
-  - mcp/
-```
-
-### Phase 4: Port-Forward MCP Servers
-
-After Flux reconciles, port-forward the MCP servers to localhost:
-
-```bash
-# Port-forward MCP servers
-kubectl port-forward -n monitoring svc/vmm-victoria-metrics-mcp 8080:8080 &
-kubectl port-forward -n monitoring svc/vlm-victoria-logs-mcp 8081:8080 &
-kubectl port-forward -n flux-system svc/flux-operator-mcp 9090:9090 &
-```
-
-### Phase 5: Configure AI Assistants
-
-Configure your AI assistant to connect to the MCP servers. Each tool has a different config format.
-
----
-
-## AI Assistant Configuration
-
-### Crush (CLI Agent — Primary)
-
-We use [Crush](https://crush.ai) as the primary AI CLI agent. Crush supports MCP servers via `crush.json` (project-local or global).
-
-**Current setup** (from `crush info`):
-
-| Setting | Value |
-|---|---|
-| Model | `claude-opus-4.6` via GitHub Copilot |
-| Existing MCPs | `hyper-mcp` (stdio), `drawio` (stdio) |
-| Config file | `~/.local/share/crush/crush.json` |
-| Skills | `gitops-cluster-debug`, `gitops-knowledge`, `gitops-repo-audit`, `postgres` |
-
-#### Option A: Project-local config (recommended)
-
-Create `.crush.json` in the repo root to add MCP servers scoped to this project only:
-
-```json
-{
-  "$schema": "https://charm.land/crush.json",
-  "mcp": {
-    "victoria-metrics": {
-      "type": "http",
-      "url": "http://localhost:8080/mcp",
-      "timeout": 30
-    },
-    "victoria-logs": {
-      "type": "http",
-      "url": "http://localhost:8081/mcp",
-      "timeout": 30
-    },
-    "flux-operator": {
-      "type": "http",
-      "url": "http://localhost:9090/mcp",
-      "timeout": 30
-    }
-  }
-}
-```
-
-> **Note**: Project-local config merges with global config. Existing MCPs (`hyper-mcp`, `drawio`) from global config will still be available.
-
-#### Option B: Global config
-
-Add to `~/.local/share/crush/crush.json` under the `"mcp"` key (alongside existing `hyper-mcp` and `drawio`):
-
-```json
-{
-  "mcp": {
-    "hyper-mcp": { "..." : "existing" },
-    "drawio": { "..." : "existing" },
-    "victoria-metrics": {
-      "type": "http",
-      "url": "http://localhost:8080/mcp",
-      "timeout": 30
-    },
-    "victoria-logs": {
-      "type": "http",
-      "url": "http://localhost:8081/mcp",
-      "timeout": 30
-    },
-    "flux-operator": {
-      "type": "http",
-      "url": "http://localhost:9090/mcp",
-      "timeout": 30
-    }
-  }
-}
-```
-
-#### Verify Crush MCP Connection
-
-After configuring, restart Crush and verify:
-
-```bash
-# Start Crush in the project directory
-crush
-
-# Inside Crush, check MCP status
-> /info
-# Should show:
-# [mcp]
-# victoria-metrics = connected (N tools, 0 resources)
-# victoria-logs = connected (N tools, 0 resources)
-# flux-operator = connected (N tools, 0 resources)
-# hyper-mcp = connected (8 tools, 0 resources)
-# drawio = connected (3 tools, 0 resources)
-```
-
-#### Crush Usage Examples
-
-Once connected, you can use natural language in Crush to interact with the MCP servers:
-
-```bash
-# Metrics queries
-> "Show me top 10 metrics by cardinality"
-> "List all active alerts and their severity"
-> "Explain this query: rate(http_requests_total{namespace='auth'}[5m])"
-> "Debug my relabeling config for vmagent"
-
-# Log queries
-> "Show me error logs from the auth namespace in the last hour"
-> "What log streams are available?"
-> "Search logs for 'connection refused' across all namespaces"
-
-# Flux operations
-> "What version of Flux is running?"
-> "Show me all failed HelmReleases"
-> "Reconcile infrastructure-local Kustomization"
-> "Get logs from the flux-system source-controller pod"
-```
-
-#### Crush + Skills Synergy
-
-The MCP servers complement existing Crush skills for a complete DevOps workflow:
-
-```mermaid
-flowchart LR
-    subgraph CRUSH["Crush CLI Agent"]
-        direction TB
-        SKILLS["Skills<br/>(repo knowledge)"]
-        MCP["MCP Servers<br/>(live cluster data)"]
-    end
-
-    subgraph SKILLS_DETAIL["Existing Skills"]
-        GK["gitops-knowledge<br/>Flux CRD generation"]
-        GD["gitops-cluster-debug<br/>Flux troubleshooting"]
-        GA["gitops-repo-audit<br/>Repo validation"]
-        PG["postgres<br/>DB best practices"]
-    end
-
-    subgraph MCP_DETAIL["New MCP Servers"]
-        VM["victoria-metrics-mcp<br/>Live metrics & alerts"]
-        VL["victoria-logs-mcp<br/>Live log queries"]
-        FO["flux-operator-mcp<br/>Live Flux status & reconcile"]
-    end
-
-    SKILLS --> SKILLS_DETAIL
-    MCP --> MCP_DETAIL
-
-    GD -.->|"combines with"| FO
-    PG -.->|"debug with"| VL
-```
-
-| Workflow | Skill | MCP Server | Combined Capability |
-|---|---|---|---|
-| Flux debugging | `gitops-cluster-debug` | `flux-operator` | Skill provides CRD knowledge + MCP queries live status |
-| Alert investigation | — | `victoria-metrics` | AI queries MetricsQL, explains alerts, checks cardinality |
-| Log analysis | — | `victoria-logs` | AI searches LogsQL, correlates with metrics |
-| DB troubleshooting | `postgres` | `victoria-logs` + `victoria-metrics` | Skill guides queries + MCP fetches PG logs & metrics |
-| Manifest generation | `gitops-knowledge` | `flux-operator` | Skill generates YAML + MCP validates live state |
-
----
-
-### VS Code / Cursor
-
-Add to `.vscode/settings.json` or Cursor settings:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "victoria-metrics": {
-        "type": "http",
-        "url": "http://localhost:8080/mcp"
-      },
-      "victoria-logs": {
-        "type": "http",
-        "url": "http://localhost:8081/mcp"
-      },
-      "flux-operator": {
-        "type": "http",
-        "url": "http://localhost:9090/mcp"
-      }
-    }
-  },
-  "chat.mcp.enabled": true
-}
-```
-
-> For VS Code: Enable **Agent mode** in GitHub Copilot Chat to access MCP tools.
-
-### Claude Desktop
-
-Add to `~/.config/claude/claude_desktop_config.json` (Linux) or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
-
-```json
-{
-  "mcpServers": {
-    "victoria-metrics": {
-      "type": "http",
-      "url": "http://localhost:8080/mcp"
-    },
-    "victoria-logs": {
-      "type": "http",
-      "url": "http://localhost:8081/mcp"
-    },
-    "flux-operator": {
-      "type": "http",
-      "url": "http://localhost:9090/mcp"
-    }
-  }
-}
-```
+Shipped 2026-04-15 (v0.84.0): all three HelmReleases, the `mcp-local`
+Kustomization, and the OCIRepositories landed together. 2026-07-17 (#540):
+the alert-ruler audit set VM MCP `scrape.enabled: false` and right-sized
+resources/probes. 2026-08-12/13 (#751, #753): access moved from
+port-forwards to the Envoy Gateway hostnames behind the admin CIDR fence,
+and `.crush.json` switched to them.
 
 ---
 
 ## Verification
 
-After deployment and AI assistant configuration, test with these prompts:
+### Gateway path smoke test
 
-### VictoriaMetrics MCP
-- "What metrics are available in the monitoring namespace?"
+From a machine with the `setup-hosts.sh` entries (client address inside the
+allowed CIDRs):
+
+```bash
+curl -sk -o /dev/null -w '%{http_code}\n' https://vm-mcp.duynh.me/health/readiness   # 200
+curl -sk -o /dev/null -w '%{http_code}\n' https://vl-mcp.duynh.me/health/readiness   # 200
+curl -sk -o /dev/null -w '%{http_code}\n' https://flux-mcp.duynh.me/mcp              # non-403 = fence passed
+```
+
+A client outside the allow-listed CIDRs gets **403** from the
+`admin-cidr-internal` SecurityPolicy; hammering past 600 req/min per proxy
+replica returns **429** with `X-RateLimit-*` headers.
+
+### Prompt-level checks
+
+**VictoriaMetrics MCP**
 - "Show me the top 10 metrics by cardinality"
 - "List all active alerts"
 - "Explain this query: `rate(http_requests_total[5m])`"
 
-### VictoriaLogs MCP
+**VictoriaLogs MCP**
 - "Show me recent error logs from the auth namespace"
 - "What log streams are available?"
-- "Search for logs containing 'connection refused' in the last hour"
 
-### Flux Operator MCP
+**Flux Operator MCP**
 - "What version of Flux is running?"
-- "Show me all HelmReleases and their status"
 - "Are there any failed Kustomizations?"
 - "Reconcile the infrastructure-local Kustomization"
 
@@ -621,41 +425,41 @@ After deployment and AI assistant configuration, test with these prompts:
 
 ## Troubleshooting
 
-### MCP Server Not Connecting
+### MCP server not connecting
 
 ```bash
-# Check pods are running
+# Flux delivery chain
+flux get kustomization mcp-local -n flux-system
+kubectl get helmrelease -n monitoring victoria-metrics-mcp victoria-logs-mcp
+kubectl get helmrelease -n flux-system flux-operator-mcp
+
+# Pods
 kubectl get pods -n monitoring -l app.kubernetes.io/name=victoria-metrics-mcp
 kubectl get pods -n monitoring -l app.kubernetes.io/name=victoria-logs-mcp
 kubectl get pods -n flux-system -l app.kubernetes.io/name=flux-operator-mcp
 
-# Check HelmRelease status
-kubectl get helmrelease -n monitoring victoria-metrics-mcp
-kubectl get helmrelease -n monitoring victoria-logs-mcp
-kubectl get helmrelease -n flux-system flux-operator-mcp
-
-# Check MCP server health
-curl http://localhost:8080/health/readiness   # VM MCP
-curl http://localhost:8081/health/readiness   # VL MCP
-curl http://localhost:9090/health             # Flux MCP
+# Gateway routes accepted?
+kubectl get httproute -n monitoring victoria-metrics-mcp victoria-logs-mcp
+kubectl get httproute -n flux-system flux-operator-mcp
 ```
 
-### Crush Shows "disconnected"
+### Crush shows "disconnected"
 
-1. Verify port-forward is running: `ps aux | grep port-forward`
-2. Test MCP endpoint: `curl http://localhost:8080/mcp`
-3. Restart Crush: exit and re-enter the CLI
-4. Check `crush info` output for MCP section errors
+1. Hostname resolves? `getent hosts vm-mcp.duynh.me` (or `dscacheutil -q host -a name vm-mcp.duynh.me` on macOS) — re-run `sudo scripts/setup-hosts.sh` if missing.
+2. Fence passing? `curl -sk -o /dev/null -w '%{http_code}\n' https://vm-mcp.duynh.me/mcp` — a 403 means your client address is outside the allowed CIDRs.
+3. Restart Crush and check `/info` output for MCP section errors.
 
-### VM MCP Can't Query Metrics
+### VM MCP can't query metrics
 
-- Verify `vm.entrypoint` matches your VMSingle service: `kubectl get svc -n monitoring | grep vmsingle`
-- Check network connectivity from MCP pod: `kubectl exec -n monitoring <mcp-pod> -- wget -qO- http://vmsingle-victoria-metrics.monitoring.svc:8428/health`
+- Verify `vm.entrypoint` matches the VMSingle service: `kubectl get svc -n monitoring | grep vmsingle`
+- Check connectivity from the MCP pod: `kubectl exec -n monitoring <mcp-pod> -- wget -qO- http://vmsingle-victoria-metrics.monitoring.svc:8428/health`
 
-### Flux MCP Permission Errors
+### Flux MCP permission or network errors
 
-- Verify RBAC: `kubectl get clusterrolebinding | grep flux-operator-mcp`
-- Check ServiceAccount: `kubectl get sa -n flux-system flux-operator-mcp`
+- RBAC: `kubectl get clusterrolebinding | grep flux-operator-mcp`
+- NetworkPolicy: remember pod-network ingress is limited to the
+  `envoy-gateway` namespace — test through the hostname or a port-forward,
+  not from an arbitrary pod.
 
 ---
 
@@ -676,4 +480,4 @@ curl http://localhost:9090/health             # Flux MCP
 | VM Agent Skills | https://github.com/VictoriaMetrics/skills |
 
 ---
-_Last updated: 2026-07-22 — VM MCP chart 0.3.0 in overview table; flux-operator-mcp OCI semver `*`._
+_Last updated: 2026-08-19 — rewritten from implementation-plan voice to the deployed reality: mcp-local Kustomization delivery, gateway-hostname access model behind the admin CIDR fence (.crush.json matches), scrape.enabled=false story, real resources/probes; chart pins unchanged._

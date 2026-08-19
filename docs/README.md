@@ -462,7 +462,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Identity Cutover Runbook](./platform/identity-cutover-runbook.md) - RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm)
 - [Graceful Shutdown](./api/graceful-shutdown.md) - Cross-service shutdown contract: readiness drain + signal handling (moved to `docs/api/`)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
-- [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics/Logs, Flux, Grafana)
+- [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics, VictoriaLogs, Flux Operator) behind the edge
 - [Ruleset Automation](./platform/ruleset-automation.md) - GitHub repo ruleset provisioning
 
 ### Secrets

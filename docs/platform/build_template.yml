@@ -90,7 +90,10 @@ jobs:
       image-name: ${{ github.event.repository.name }}
       push: true
       scan-before-push: true
-      scan-severity: 'CRITICAL,HIGH'
+      # Gate: only CRITICAL blocks the push (cicd.md § image security).
+      # HIGH/MEDIUM are still visible — trivy-report below reports them
+      # non-blocking after the push.
+      scan-severity: 'CRITICAL'
       scan-exit-code: '1'
     secrets: inherit
     permissions:
@@ -133,26 +136,10 @@ jobs:
       packages: write
       id-token: write
 
-  # ──────────────────────────────────────────────────
-  # 3d. Build Migration Image (optional)
-  # Also scanned before push.
-  # ──────────────────────────────────────────────────
-  docker-db-init:
-    needs: [go-check, sonar]
-    uses: duynhlab/gha-workflows/.github/workflows/docker-build-go.yml@main
-    with:
-      image-name: '${{ github.event.repository.name }}-init'
-      dockerfile: 'db/migrations/Dockerfile'
-      context: 'db/migrations'
-      push: true
-      scan-before-push: true
-      scan-severity: 'CRITICAL,HIGH'
-      scan-exit-code: '1'
-    secrets: inherit
-    permissions:
-      contents: read
-      packages: write
-      actions: read
+  # NOTE: there is deliberately NO separate migration image job. Migrations
+  # ship inside the app image (golang-migrate via the `migrate` subcommand,
+  # run as an init container by the mop chart) — one image per service
+  # (AGENTS.md § image naming; cicd.md § migrations).
 
   # ──────────────────────────────────────────────────
   # 3e. Binary Release (GoReleaser, keyless-signed) — v* tags only
@@ -173,7 +160,7 @@ jobs:
   # ──────────────────────────────────────────────────
   notify:
     if: always()
-    needs: [go-check, gitleaks, sonar, docker-build, trivy-report, docker-sign, docker-db-init, release-binary]
+    needs: [go-check, gitleaks, sonar, docker-build, trivy-report, docker-sign, release-binary]
     uses: duynhlab/gha-workflows/.github/workflows/status.yml@main
     with:
       slack_channel_id: "{{SLACK_CHANNEL_ID}}"

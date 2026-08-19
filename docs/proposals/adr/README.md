@@ -428,6 +428,7 @@ and extend Adoption instead.
 | [ADR-050](ADR-050-separate-staff-identity-realm/) | Separate workforce identity from customer identity in a staff realm | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) / [RFC-0023](../rfc/RFC-0023/) |
 | [ADR-051](ADR-051-trusted-operator-resolution/) | Trust the operator and make the audit trail the control | Accepted | Complete | [RFC-0023](../rfc/RFC-0023/) |
 | [ADR-052](ADR-052-converge-the-customer-spa-on-the-portal-stack/) | Converge the customer SPA on the Admin Portal's stack | Accepted | Complete | [RFC-0025](../rfc/RFC-0025/) |
+| [ADR-053](ADR-053-untracked-sku-operator-data-not-outage/) | Treat the untracked SKU as operator data, not an outage | Accepted | Not started | — |
 
 Principles:
 
@@ -438,4 +439,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-15 — ADR-052 Accepted / Adoption **Complete**: the storefront cutover shipped as frontend v3.0.0, closing ADR-049's two-convention-sets consequence. ADR-051 accepted (trust the operator; the audit trail is the control), closing the safety review RFC-0023 deferred. ADR-047 Adoption → **Complete** with slice B; ADR-048/049/050 stay Partial until the Kind gate verifies the cluster._
+_Last updated: 2026-08-19 — ADR-053 recorded (untracked-SKU bootstrap ownership + 409 contract)_

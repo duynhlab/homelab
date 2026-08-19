@@ -666,6 +666,17 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   Still open: `manual_review` resolve remains a Future command, the portal does
   not yet surface the audit history the API now returns, and the cluster is
   unverified until the Kind gate.
+- 2026-08-19 — **The slice-B stock gap is decided.** Slice B shipped catalog
+  create with no initial-stock step, which turned the recorded "manual fix"
+  (research.md: receipts implemented "with zero callers") into a daily hazard —
+  the portal could manufacture unbuyable ACTIVE products, and its Receive
+  dialog, being row-scoped, could not reach a SKU with no balance row.
+  [ADR-053](../../adr/ADR-053-untracked-sku-operator-data-not-outage/) decides
+  it: the operator owns balance bootstrap through the receipts command, the
+  portal must expose it for untracked SKUs and warn at publish (no gate — the
+  product/inventory write boundary this RFC set stays intact), and checkout's
+  untracked-SKU answer moves from a retryable 503 to `409 ITEM_NOT_ORDERABLE`.
+  Adoption pending in admin-service / checkout-service / frontend.
 - 2026-08-14 — **The flagship Future command shipped.** The safety review this
   RFC deferred on 2026-08-10 is decided in
   [ADR-051](../../adr/ADR-051-trusted-operator-resolution/): the operator is
@@ -707,4 +718,4 @@ When Status → implemented, confirm:
 - [OrderManualReviewBacklog runbook](../../../observability/runbooks/microservices/OrderManualReviewBacklog.md) — the raw-SQL path this RFC retired to break-glass
 
 ---
-_Last updated: 2026-08-14_
+_Last updated: 2026-08-19 — ADR-053 decides the slice-B stock-bootstrap gap_

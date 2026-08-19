@@ -237,6 +237,27 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-053 — treat the untracked SKU as operator data, not an outage**: the
+  products/35 investigation (2026-08-18) showed the two halves of one hole —
+  Backoffice slice B creates products nothing can sell (no balance row, and the
+  row-scoped Receive dialog cannot reach an untracked SKU), while checkout
+  answers that persistent state with the same retryable 503 + `Retry-After` as
+  a transient blip, so the storefront advertises retries that cannot succeed.
+  Decided: the operator owns balance bootstrap through the existing receipts
+  command — the portal must expose it for untracked SKUs and warn at publish
+  (no gate; the product/inventory write boundary stays) — and checkout's answer
+  moves to `409 ITEM_NOT_ORDERABLE` on a requoted session, the shape clients
+  already handle for `STOCK_UNAVAILABLE` (RFC 9110: a conflict with current
+  state, not a temporary condition). Rejected: keep-503-with-new-code (every
+  5xx-generic client keeps retrying), gate-publish-on-balance (couples
+  product→inventory at the transition), auto-zero-balance (destroys the
+  untracked-vs-out-of-stock distinction). The platform is pre-deployment, so
+  `docs/api/` states the 409 contract directly — no compatibility window, no
+  planned markers — and the services cut over to match it (`api.md` envelope
+  row + confirm sequence diagram, `checkout.md`, `inventory.md`); the
+  `microservices.md` known-gaps row is the adoption tracker (no repo issues by
+  convention), the runbook keeps the as-built 503 symptoms until the cutover,
+  and RFC-0023's Implementation History records the slice-B gap as decided.
 - **ADR-047 Adoption → Complete** — product is the sixth and last service in
   its scope, so the `protected` audience is now real everywhere the decision
   claimed it would be. RFC-0023 gains the slice B history entry: the catalog

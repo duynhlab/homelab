@@ -12,10 +12,10 @@
 > | Capability | Deployed now (local Kind) | Planned for prod |
 > |---|---|---|
 > | Storage / HA | ✅ OpenBAO HA, 3-node Raft, PVC | same |
-> | App secret delivery | ✅ ESO + **KV v2 static** secrets (`refreshInterval: 1h`) | + dynamic DB creds |
+> | App secret delivery | ✅ ESO + **KV v2 static** secrets (`refreshInterval: 1h`) for most services; **notification reads a DB-engine static role** via the `openbao-db` store | per-request dynamic DB creds |
 > | Auth (ESO) | ✅ Kubernetes auth, least-privilege `eso-read` policy | + OIDC for humans |
 > | Audit | ⚠ `file → stdout` **best-effort** (enablement is not fail-closed; `auditStorage` off) | durable, fail-closed |
-> | **Database secrets engine / dynamic creds** | ❌ **not enabled** — §5.2, §6, §10, §14 describe the *planned* design | enable DB engine |
+> | **Database secrets engine** | ✅ **enabled — pattern-A pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)): static role `notification` on `platform-db` (`rotation_period` 720h), read through the dedicated `openbao-db` ClusterSecretStore. Per-request dynamic roles and other services: §5.2, §6, §10 — still *planned* | per-request dynamic roles, more services |
 > | Unseal | ⚠️ **awskms auto-unseal via the floci KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot; `openbao-init-keys` holds only a break-glass recovery key; **root token revoked**. floci is a loose, zero-auth emulator (parity/rehearsal, not real crypto) | Real cloud KMS (`awskms`/`gcpckms`, IRSA/Workload Identity) |
 > | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager |
 > | Credentials | ❌ dev passwords **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
@@ -23,8 +23,8 @@
 >
 > **These local-only choices are unsafe for production.** The hardening path and a
 > local-vs-prod parity/testing matrix live in [RFC-0008](../proposals/rfc/RFC-0008/).
-> Any section below describing dynamic credentials, leases, OIDC, or auto-unseal is
-> **planned**, not deployed.
+> The database engine's **static-role pilot is deployed** (§5.2); any section below
+> describing *per-request dynamic* credentials, leases, or OIDC is **planned**, not deployed.
 
 ---
 
@@ -67,9 +67,10 @@ workload, and how the HA store stays available.** Three Raft peers (PVC-backed)
 form the quorum behind the in-cluster service; External Secrets Operator (ESO)
 logs in with a Kubernetes service account, reads the KV engine, and materializes
 Kubernetes Secrets that pods consume. **Auto-unseal is deployed on Kind via the floci
-KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot. Dashed **(planned)**
-nodes/edges are designed but not yet deployed (dynamic DB creds, OIDC/AppRole, real
-cloud KMS); everything else is live on local Kind.
+KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot. The database engine
+is live with one **static role** (`notification`, ADR-025 pilot). Dashed **(planned)**
+nodes/edges are designed but not yet deployed (per-request dynamic DB creds,
+OIDC/AppRole, real cloud KMS); everything else is live on local Kind.
 
 ### High-Level Overview
 
@@ -78,7 +79,7 @@ flowchart TD
     subgraph consumers["Consumers"]
         operators["Operators<br/>human login"]:::external
         cicd["CI/CD pipelines"]:::external
-        eso["External Secrets Operator<br/>ClusterSecretStore openbao"]:::platform
+        eso["External Secrets Operator<br/>ClusterSecretStores openbao + openbao-db"]:::platform
         pods["App / infra / DB pods<br/>read env + volumes"]:::service
     end
 
@@ -91,7 +92,8 @@ flowchart TD
         end
         subgraph engines["Secret engines"]
             kv["KV v2 · secret/<br/>static creds"]:::platform
-            db["Database · database/<br/>dynamic PG creds (planned)"]:::planned
+            db["Database · database/<br/>static role notification (720h)"]:::platform
+            dyn["Database · per-request<br/>dynamic creds (planned)"]:::planned
             transit["Transit · transit/<br/>(planned, unused)"]:::planned
         end
         subgraph authm["Auth methods"]
@@ -116,7 +118,8 @@ flowchart TD
     floci -->|"unwrap root key (awskms)"| raft
     operators -.->|"planned"| oidc
     cicd -.->|"planned"| approle
-    db -.->|"dynamic creds (planned)"| cnpg
+    db -->|"rotate notification password"| cnpg
+    dyn -.->|"per-request creds (planned)"| cnpg
     kms -.->|"replaces floci in prod (planned)"| raft
 
     subgraph legend["Legend"]
@@ -280,7 +283,7 @@ flowchart TD
     end
 
     subgraph policies["Policies Issued"]
-        p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/creds/*"]
+        p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/static-creds/notification"]
         p_dev_rw["dev-team-rw\nread/write dev KV\ndynamic DB creds (rw)"]
         p_data_ro["data-team-ro\ndynamic DB creds (ro only)"]
         p_admin["devops-admin\nfull access"]
@@ -367,91 +370,87 @@ secret/{environment}/{category}/{service}/{resource}
 
 | Path | Keys | Consumer |
 |------|------|---------|
-| `secret/local/databases/auth-db/auth` | `username`, `password` | platform-db auth owner (compat path) |
 | `secret/local/databases/shared-db/user` | `username`, `password` | platform-db user owner (compat path) |
-| `secret/local/databases/shared-db/notification` | `username`, `password` | platform-db notification owner (compat path) |
+| `secret/local/databases/shared-db/notification` | `username`, `password` | **superseded** — still seeded, now unused: the live Secret comes from `database/static-creds/notification` (ADR-025 pilot, §5.2) |
 | `secret/local/databases/shared-db/shipping` | `username`, `password` | platform-db shipping owner (compat path) |
 | `secret/local/databases/shared-db/review` | `username`, `password` | platform-db review owner (compat path) |
 | `secret/local/databases/platform-db/temporal` | `username`, `password` | platform-db temporal owner (Temporal server) |
+| `secret/local/databases/platform-db/keycloak` | `username`, `password` | Keycloak persistence role — RFC-0012 triplet in ns `platform` (`platform-db/services/keycloak.yaml`) + copy in ns `identity` (`platform-db-keycloak-secret-identity-ns.yaml`) |
 | `secret/local/databases/product-db/product` | `username`, `password` | CNPG bootstrap owner |
 | `secret/local/databases/product-db/cart` | `username`, `password` | CNPG cart owner |
 | `secret/local/databases/product-db/order` | `username`, `password` | CNPG order owner |
-| `secret/local/databases/product-db/payment` | `username`, `password` | CNPG payment owner (consumed in `product` + `payment` ns) |
-| `secret/local/databases/pgdog-cnpg/credentials` | `username`, `password` | PgDog pooler admin |
-| `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) |
-| `secret/local/auth/jwt-signing` | `private_key`, `public_key` | RS256 keypair for auth-service's own access tokens (private → ns `auth`, `JWT_PRIVATE_KEY_PEM`); the edge does not consume this secret — see [JWT signing key](#jwt-signing-key-auth-service) |
-| `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (all CloudNativePG clusters — bucket `pg-backups-cnpg`) |
+| `secret/local/databases/product-db/payment` | `username`, `password` | CNPG payment owner — materialised in ns `payment` only (`product-db-payment-secret-payment-ns.yaml`); the product-side secret comes from the RFC-0012 triplet (`product-db/services/payment.yaml`) |
+| `secret/local/databases/product-db/inventory` | `username`, `password` | CNPG inventory owner — RFC-0012 triplet (`product-db/services/inventory.yaml`) + copy in ns `inventory` (`product-db-inventory-secret-inventory-ns.yaml`) |
+| `secret/local/databases/product-db/checkout` | `username`, `password` | CNPG checkout owner — RFC-0012 triplet (`product-db/services/checkout.yaml`) + copy in ns `checkout` (`product-db-checkout-secret-checkout-ns.yaml`) |
+| `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) — `payment-webhook-hmac` ExternalSecret, ns `payment` only (both workloads run there) |
+| `secret/local/auth/jwt-signing` | `private_key`, `public_key` | **orphaned** — zero consumers since auth-service retired (see note below); recorded cleanup candidate |
+| `secret/local/infra/rustfs/root` | `access_key`, `secret_key` | RustFS root creds — `rustfs-credentials` Secret in ns `rustfs` (`controllers/storage/rustfs/external-secret.yaml`) |
+| `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (all CloudNativePG clusters — bucket `pg-backups-cnpg`) + Tempo/Pyroscope S3 (`cluster-external-secrets/{pg-backup-rustfs-cnpg,tempo-rustfs,pyroscope-rustfs}.yaml`) |
+| `secret/local/infra/clickhouse/admin` | `username`, `password` | ClickHouse `default` user + Collector exporter + Grafana datasource (`cluster-external-secrets/clickhouse.yaml`) |
+| `secret/local/infra/keycloak/admin` | `username`, `password` | Keycloak bootstrap admin — `keycloak-bootstrap-admin` ExternalSecret, ns `identity` (`controllers/keycloak/external-secret.yaml`) |
 | `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) — **prod only**; on local Kind `platform-edge-tls` is `homelab-ca`-issued |
 
 > **Note — `secret/local/services/payment/webhook-hmac`**: follows the standard 4-level `secret/{env}/{category}/{service}/{resource}` structure and is covered by the existing `eso-read` `local/services/*` grant. (It was briefly seeded at the 3-level `secret/local/payment/webhook-hmac`, which sat outside every `eso-read` prefix; renaming it into `local/services/*` fixed both the convention and the RBAC scope.)
 
 > ⚠️ **Local vs prod**: on **local Kind** `openbao-bootstrap` **now seeds a dev placeholder** (`dev-cloudflare-placeholder`) so the `cloudflare-api-token` ExternalSecret syncs and doesn't block `secrets-local` (DNS-01 fails locally, which is fine — `platform-edge-tls` is `homelab-ca`-issued, planned). On **prod** the real token is **operator-supplied** and **not** in Git — re-seed after every fresh cluster — see [OpenBAO initial setup](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
 
-#### JWT signing key (auth-service)
-
-`secret/local/auth/jwt-signing` (`private_key` + `public_key`) is auth-service's
-own RS256 signing keypair. ESO syncs only the private half to auth itself — the
-edge does not consume this secret at all:
-
-```mermaid
-flowchart LR
-  KV[("OpenBAO<br/>secret/local/auth/jwt-signing<br/>private_key (+ public_key, unused)")]
-  ES1["ExternalSecret auth-jwt-signing<br/>(ns auth · private_key)"]
-  AUTH["auth<br/>JWT_PRIVATE_KEY_PEM<br/>signs iss/aud/kid"]
-  KC[("Keycloak realm<br/>duynhlab")]
-  EDGE["Envoy Gateway<br/>SecurityPolicy jwt-edge<br/>remoteJWKS"]
-  KV --> ES1 --> AUTH
-  KC -->|"GET /realms/duynhlab/protocol/openid-connect/certs"| EDGE
-
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  class KV,KC external; class ES1,AUTH service; class EDGE edge;
-```
-
-| ExternalSecret | Namespace | Property | Consumer |
-|---|---|---|---|
-| `auth-jwt-signing` | `auth` | `private_key` | auth env `JWT_PRIVATE_KEY_PEM` — signs access tokens (`iss=https://gateway.duynh.me`, `aud=duynhlab-platform`, `kid`) |
-
-The `auth-issuer-jwt` ExternalSecret (`public_key`) is **deleted** — see the
-header comment in
-[`kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml`](../../kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml).
-The edge provisions **zero key material**: Envoy Gateway's `SecurityPolicy`
-fetches the Keycloak realm's JWKS itself over `remoteJWKS`
-([`kubernetes/infra/configs/envoy-gateway/policies/security-jwt.yaml`](../../kubernetes/infra/configs/envoy-gateway/policies/security-jwt.yaml)),
-so there is nothing to rotate at the edge and no edge rotation step. This
-`auth-jwt-signing` ExternalSecret itself retires with auth-service in RFC-0024
-P5 — until then, auth-service keeps signing and serving its own tokens for the
-routes it still owns (see [routes/api.yaml](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) `api-auth-public`).
-
-**Verification today is two independent trust anchors.** Envoy Gateway's edge
-`SecurityPolicy` validates Keycloak-issued tokens against the realm's live
-JWKS — no provisioned key, no edge rotation step. Separately, each service's
-`pkg/authmw` verifies auth-service's own tokens against auth's cached JWKS
-(`/auth/v1/public/auth/jwks`) and is authoritative for those. Contract detail:
-[auth service API](../api/auth.md); edge detail:
-[Envoy Gateway](../platform/envoy-gateway.md).
-
-**Rotation.** Only auth-service's own signing key needs rotating — there is no
-edge credential to update in step with it:
-
-1. Write a new keypair to `secret/local/auth/jwt-signing` (`private_key` + `public_key`).
-2. The `auth-jwt-signing` ExternalSecret re-syncs (`refreshInterval: 1h`); force with `kubectl annotate externalsecret auth-jwt-signing -n auth force-sync=$(date +%s)` if needed.
-3. **Restart auth** so it loads the new `JWT_PRIVATE_KEY_PEM`.
-4. Overlap window: tokens signed by the old key keep validating in each service's `pkg/authmw` until their `exp`, bounded by the 300s JWKS cache — no edge-side overlap concern since the edge never held a provisioned key.
-
-> Path note: this ships at `secret/local/auth/jwt-signing`; [RFC-0009](../proposals/rfc/RFC-0009/) references a pre-implementation `secret/data/<env>/apps/auth/jwt-signing` — the deployed path is the one above.
+> **Note — `secret/local/auth/jwt-signing`**: the bootstrap still seeds this RS256
+> keypair, but auth-service is retired and its `auth-jwt-signing` ExternalSecret was
+> deleted (PR #760) — the path has **zero consumers** today. Edge JWT verification is
+> Keycloak `remoteJWKS` (no provisioned key material). Removing the seed is a recorded
+> cleanup candidate.
 
 ### 5.2 Database Secrets Engine — Dynamic Credentials
 
-> **⚠ Planned — not yet deployed.** The bootstrap enables only KV v2, Kubernetes
-> auth, and audit; the database secrets engine is **not** enabled. Application
-> credentials today are **static KV v2** values. This section describes the
-> production design (tracked in [RFC-0008](../proposals/rfc/RFC-0008/)).
+> **✅ Deployed — pattern-A static-role pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) records the pattern choice; [RFC-0008](../proposals/rfc/RFC-0008/) the roadmap).
+> The database secrets engine is **enabled** and serving one pilot role. Everything
+> below describing *per-request dynamic* roles or other services is still **planned** —
+> those services stay on KV v2 static credentials.
 
-The **database secrets engine** would generate short-lived, unique PostgreSQL credentials on demand, so no static application passwords need exist.
+**What is deployed today.** The engine rotates the password of one *fixed* PostgreSQL
+role instead of minting per-request users:
 
-#### How It Works
+- The bootstrap pre-provisions the pieces the engine needs without root: the
+  `db-configurator` policy + Kubernetes-auth role (bound to SA
+  `openbao-db-configurator`, ns `platform`) and an `eso-read` grant on
+  `database/static-creds/notification` (`openbao-bootstrap/configmap.yaml`).
+- The `openbao-db-config` Job (`configs/databases/clusters/platform-db/openbao-db-config.yaml`)
+  runs in the **databases wave** — after `platform-db` is up, because
+  `database/config` validates the live PG connection, which the bootstrap (secrets
+  wave) cannot. It logs in via Kubernetes auth (no root token), enables the engine,
+  writes `database/config/platform-db` (postgresql plugin, `allowed_roles=notification`),
+  and creates static role `notification` with `rotation_period=720h`.
+- ESO reads the rotated credential through a **second ClusterSecretStore `openbao-db`**
+  (`configs/secrets/cluster-secret-store-db.yaml`): the default `openbao` store is
+  pinned to the KV v2 mount, so this store uses `version: "v1"` with no `path` to read
+  the raw engine path `database/static-creds/notification` verbatim (KV-v2 semantics
+  would insert `/data/` and 403).
+- The `platform-db-notification-secret` ExternalSecret (ns `notification`,
+  `refreshInterval: 1m`) materialises it for the service.
+
+```mermaid
+flowchart LR
+    job["openbao-db-config Job<br/>(databases wave, k8s auth<br/>db-configurator — no root)"]:::platform
+    eng["database/config/platform-db<br/>static role notification<br/>rotation_period 720h"]:::platform
+    pg[("platform-db (CNPG)<br/>role notification")]:::data
+    store["ClusterSecretStore openbao-db<br/>(v1 — raw engine paths)"]:::platform
+    es["ExternalSecret<br/>platform-db-notification-secret<br/>(ns notification, 1m)"]:::service
+
+    job -->|"enable + configure"| eng
+    eng -->|"ALTER ROLE ... PASSWORD (720h)"| pg
+    store -->|"read database/static-creds/notification"| eng
+    es --> store
+
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+```
+
+The rest of this section is the **planned** end-state: the engine generating
+short-lived, unique PostgreSQL credentials on demand, so no static application
+passwords need exist.
+
+#### How It Works (per-request dynamic creds — planned)
 
 ```mermaid
 sequenceDiagram
@@ -545,7 +544,8 @@ DROP ROLE IF EXISTS "{{name}}";
 > creds exists but is effectively **bypassed** — the same password is duplicated in
 > Git, so it is not a single source of truth and rotating it in OpenBAO would not
 > change the DB user. The "OpenBAO Solution" column below is the **planned** target;
-> dynamic application users are not yet enabled.
+> per-request dynamic application users are not yet enabled — the deployed exception
+> is the `notification` static-role pilot (§5.2), whose password OpenBAO rotates.
 
 ### 6.1 Current State Problems
 
@@ -663,13 +663,13 @@ credential secrets to reconcile against.
 > **Historical:** the retired Zalando operator managed its own K8s secrets
 > (`{user}.{cluster}.credentials.postgresql.acid.zalan.do`). The former `auth-db`,
 > `shared-db`, and `temporal-db` clusters were consolidated into **`platform-db`**
-> (RFC-0018). OpenBAO keeps **compat paths** `auth-db/*` and `shared-db/*` for app
-> credentials; Temporal uses the new path `platform-db/temporal`.
+> (RFC-0018). OpenBAO keeps **compat paths** `shared-db/*` for app credentials
+> (the `auth-db/*` seeds retired with auth-service); Temporal uses the new path
+> `platform-db/temporal`.
 
 ```mermaid
 flowchart LR
     subgraph cnpg_platform["platform-db (CloudNativePG)"]
-        p_auth["auth owner\n(compat: auth-db/auth)"]
         p_shared["user / notification /\nshipping / review owners\n(compat: shared-db/*)"]
         p_temporal["temporal owner\n(platform-db/temporal)"]
         p_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
@@ -685,7 +685,7 @@ flowchart LR
         cnpg_op["CloudNativePG Operator\napplies Database + DatabaseRole CRDs"]
     end
 
-    eso_mgr --> p_auth & p_shared & p_temporal & prod_owners
+    eso_mgr --> p_shared & p_temporal & prod_owners
     cnpg_op --> p_roles & prod_roles
 ```
 
@@ -793,7 +793,7 @@ flowchart TD
     end
 
     subgraph service["Service Policies"]
-        eso_read["eso-read\nRead secret/{data,metadata}/local/{databases,infra,services,auth}/*\nRead database/creds/*-app-rw\nUsed by: ESO K8s auth role"]
+        eso_read["eso-read\nRead secret/{data,metadata}/local/{databases,infra,services,auth}/*\nRead database/static-creds/notification\nUsed by: ESO K8s auth role"]
         svc_product["service-product\nRead database/creds/product-app-rw\nUsed by: product SA (future direct auth)"]
     end
 
@@ -827,15 +827,15 @@ path "secret/data/local/services/*" {
 path "secret/metadata/local/services/*" {
   capabilities = ["read", "list"]
 }
-# auth/* — auth JWT signing-key ExternalSecrets (RFC-0009 Phase 4 edge JWT)
+# auth/* — grant remains, but the seeded jwt-signing path is orphaned (auth-service retired)
 path "secret/data/local/auth/*" {
   capabilities = ["read", "list"]
 }
 path "secret/metadata/local/auth/*" {
   capabilities = ["read", "list"]
 }
-# Dynamic DB credentials (planned — DB engine not yet enabled)
-path "database/creds/*-app-rw" {
+# Database engine static-role pilot (ADR-025) — the only database/ grant today
+path "database/static-creds/notification" {
   capabilities = ["read"]
 }
 
@@ -980,10 +980,14 @@ Operational commands are kept out of this architecture document so the learning 
 
 | File | Purpose |
 |------|---------|
-| `kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml` | OpenBAO HA Helm chart |
+| `kubernetes/infra/controllers/secrets/openbao/helmrelease.yaml` | OpenBAO HA Helm chart (awskms seal via floci) |
+| `kubernetes/infra/controllers/secrets/floci/` | floci KMS emulator — Deployment, `floci-kms-init` Job, NetworkPolicy |
 | `kubernetes/infra/controllers/secrets/external-secrets/helmrelease.yaml` | ESO HelmRelease |
 | `kubernetes/infra/configs/secrets/openbao-bootstrap/` | Init scripts (phased) |
-| `kubernetes/infra/configs/secrets/cluster-secret-store.yaml` | ClusterSecretStore (openbao) |
+| `kubernetes/infra/configs/secrets/cluster-secret-store.yaml` | ClusterSecretStore (openbao — KV v2 mount) |
+| `kubernetes/infra/configs/secrets/cluster-secret-store-db.yaml` | ClusterSecretStore (openbao-db — raw `database/` engine paths, v1 semantics) |
+| `kubernetes/infra/configs/secrets/payment-webhook-external-secrets.yaml` | `payment-webhook-hmac` ExternalSecret (ns payment) |
+| `kubernetes/infra/configs/databases/clusters/platform-db/openbao-db-config.yaml` | `openbao-db-config` Job — enables DB engine + static role `notification` (ADR-025 pilot) |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/` | ClusterExternalSecret definitions |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` | `ExternalSecret` (per-namespace) for cert-manager DNS-01 — file lives in CES dir but is `kind: ExternalSecret` since cert-manager only needs the Secret in one namespace |
 | `kubernetes/infra/configs/databases/clusters/*/secrets/` | Per-cluster ExternalSecret definitions |
@@ -1035,7 +1039,7 @@ gantt
 - [RFC-0008 — Production secrets hardening](../proposals/rfc/RFC-0008/) (+ [research.md](../proposals/rfc/RFC-0008/research.md) — deep dive, auto-unseal PoC, DB redesign)
 - [Secrets hub](./README.md#secret-organization) — ESO patterns, path conventions, secret catalog
 - [cert-manager](./cert-manager.md) — Certificate issuers and `platform-edge-tls` wildcard pipeline
-- [Trust Distribution](./trust-distribution.md) — trust-manager `homelab-ca-bundle` distribution
+- [Trust Distribution](./cert-manager.md#11-trust-manager--distributing-the-homelab-ca-bundle) — trust-manager `homelab-ca-bundle` distribution
 - [Secrets proposals](../proposals/) — ADR-004/005 (audit, HA) + RFC backlog (rotation, PushSecret, hardening)
 - [OpenBAO Documentation](https://openbao.org/docs)
 - [OpenBAO Helm Chart](https://openbao.org/docs/platform/k8s/helm)
@@ -1044,4 +1048,4 @@ gantt
 
 ---
 
-_Last updated: 2026-08-13 — JWT signing key section reflects the edge's `remoteJWKS` verification against the Keycloak realm (zero provisioned key material); `auth-jwt-signing` is the only surviving ExternalSecret from that KV secret, retiring with auth-service in RFC-0024 P5._
+_Last updated: 2026-08-19 — synced to ADR-024 (awskms/floci) + ADR-025 (database engine pilot) reality; auth-service section removed_

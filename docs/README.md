@@ -139,10 +139,8 @@ docs/
 │   ├── README.md                 # Homelab secrets/TLS/trust hub
 │   ├── openbao.md                # OpenBAO HA/Raft architecture and learning notes
 │   ├── runbooks/                 # Add, rotate, bootstrap, troubleshoot secrets
-│   ├── production-hardening.md   # Planned production target and guardrails
-│   ├── cert-manager.md           # cert-manager + Let's Encrypt + Flux (Helm, Ingress, TLS)
-│   └── trust-distribution.md     # trust-manager Bundle (homelab-ca-bundle), dual-PKI
-│                                 # (production hardening → docs/proposals/rfc/RFC-0008/)
+│   └── cert-manager.md           # cert-manager + Let's Encrypt + trust-manager (§11 CA bundle)
+│                                 # (production hardening → README § Current boundaries + RFC-0008)
 └── security/                     # Admission control & network segmentation
     ├── policy-catalog.md         # Kyverno ClusterPolicy catalog (tiers, modes, NetworkPolicy generate)
     ├── policy-exceptions.md      # PolicyException register (owner + TTL)
@@ -455,8 +453,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Platform hub](./platform/README.md) - Deployed vs planned, doc map, Flux summary
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
-- [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress, trust-manager
-- [Trust Distribution (trust-manager)](./secrets/trust-distribution.md) - CA bundle distribution to namespaces via trust-manager Bundle CRD
+- [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, and trust-manager CA bundle distribution (§11)
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
@@ -474,9 +471,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Secrets hub](./secrets/README.md) - Homelab-wide OpenBAO → ESO → cert-manager → trust-manager flow, secret catalog, and runbook index
 - [OpenBAO Architecture](./secrets/openbao.md) - OpenBAO HA/Raft internals, auth, engines, policies
 - [Secrets runbooks](./secrets/runbooks/) - OpenBAO/ESO troubleshooting and recovery
-- [Secrets Production Hardening](./secrets/production-hardening.md) - Planned TLS, KMS/Transit, OIDC, AppRole, and dynamic DB credentials
-- [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, Ingress
-- [Trust Distribution](./secrets/trust-distribution.md) - trust-manager `homelab-ca-bundle` and the LE / homelab-CA dual-PKI split
+- [Secrets hardening & boundaries](./secrets/README.md#current-boundaries--production-hardening) - Deployed vs planned: TLS, KMS, OIDC, AppRole, database-engine credentials
+- [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, and trust-manager `homelab-ca-bundle` (§11, dual-PKI split)
 - [Secrets decisions & hardening](./proposals/) - ADR-004 (audit) + ADR-005 (OpenBAO HA); [RFC-0008](./proposals/rfc/RFC-0008/) production hardening + parity/testing matrix; RFC backlog for rotation / PushSecret
 
 ### Security

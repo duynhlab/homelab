@@ -10,7 +10,7 @@ sync from OpenBAO KV v2 into a Kubernetes Secret.
 
 ## 1. Add to OpenBAO bootstrap script
 
-Edit `kubernetes/infra/configs/openbao/openbao-bootstrap/configmap.yaml`:
+Edit `kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml`:
 
 ```bash
 # Follow path convention: secret/{env}/{category}/{service}/{resource}
@@ -19,7 +19,7 @@ bao kv put secret/local/services/my-service/credentials key1="value1" key2="valu
 
 For **prod-only operator-supplied secrets** (not in Git), seed after cluster
 create — see
-[OpenBAO initial setup § Step 7](./openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
+[OpenBAO initial setup § Step 6](./openbao-initial-setup.md#step-6--seed-bootstrap-only-cloudflare-token-operator).
 
 ## 2. Create ExternalSecret (namespace-specific)
 
@@ -97,4 +97,4 @@ If the ExternalSecret is not Ready, see [ESO sync failure](./eso-sync-failure.md
 
 ---
 
-_Last updated: 2026-07-19 — Split from the retired `secrets-management.md` during the secrets docs merge._
+_Last updated: 2026-08-19 — Fixed the bootstrap configmap path (`configs/secrets/openbao-bootstrap/`, not `configs/openbao/`)._

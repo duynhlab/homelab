@@ -2,82 +2,102 @@
 
 Use this when OpenBAO pods are sealed, `ClusterSecretStore/openbao` returns 503, or Flux `secrets-local` is stuck.
 
+| Fact | Value |
+|---|---|
+| Seal type | `awskms` auto-unseal via the in-cluster floci KMS emulator (ADR-024) |
+| KMS endpoint | `http://floci.openbao.svc.cluster.local:4566`, key `alias/openbao-unseal` |
+| Manual unseal | **Does not exist** — there is no Shamir unseal key on this platform |
+| `openbao-init-keys` | Holds `recovery_key` (break-glass) + an **inert, revoked** `root_token` |
+
+Pods self-unseal **at boot** by unwrapping the root key through floci. A pod
+stuck sealed therefore means OpenBAO **could not reach floci (or the KMS
+alias) when it started** — the fix is to repair the floci path and restart the
+pods so they retry auto-unseal, not to type an unseal key.
+
+The `recovery_key` is **not an unseal key**. It cannot unseal anything; its
+only use is driving the `bao operator generate-root` ceremony for day-2 admin
+access — see
+[Add or write a KV secret on a live cluster](./add-secret-live-cluster.md).
+
 ```mermaid
 sequenceDiagram
     autonumber
     participant Operator
+    participant Floci as floci (KMS shim)
     participant BAO as OpenBAO Pods
     participant CSS as ClusterSecretStore
     participant Flux
 
-    Operator->>BAO: Check seal status on openbao-0..2
-    Operator->>BAO: Unseal sealed pods with local Kind key
-    Operator->>Flux: Delete stuck bootstrap Job if needed
-    Operator->>Flux: Reconcile secrets-local
+    Operator->>BAO: bao status on openbao-0..2 (Sealed?)
+    Operator->>Floci: Check Deployment, logs, Service :4566, NetworkPolicy
+    Operator->>BAO: Restart sealed pods
+    BAO->>Floci: Decrypt root key (alias/openbao-unseal)
+    Floci-->>BAO: Unwrapped key → auto-unseal
+    Operator->>Flux: Delete stuck bootstrap Job, reconcile secrets-local
     Flux->>CSS: Re-evaluate OpenBAO readiness
     CSS-->>Operator: Ready=True
 ```
 
-```bash
-# Check seal status on all nodes
-for i in 0 1 2; do
-  echo "openbao-$i:"
-  kubectl exec -n openbao openbao-$i -- bao status 2>/dev/null | grep -E "Sealed|HA Mode"
-done
+## Procedure
 
-# Unseal sealed nodes (only needed if auto-unseal is NOT configured)
-kubectl exec -n openbao openbao-0 -- bao operator unseal <unseal-key>
-```
-
-## OpenBAO Node Sealed
-
-```bash
-# Check all nodes
-kubectl get pods -n openbao -o wide
-
-# Check seal status
-kubectl exec -n openbao openbao-0 -- bao status | grep Sealed
-
-# Unseal (if auto-unseal not configured)
-kubectl exec -n openbao openbao-0 -- bao operator unseal <key>
-
-# Check auto-unseal connectivity (Transit)
-kubectl logs -n openbao openbao-0 | grep -i "unseal\|transit\|seal"
-```
-
-## Flux `secrets-local` stuck / `ClusterSecretStore` 503 / Job hangs
-
-**Symptoms:** `flux get ks` shows `secrets-local` Unknown or HealthCheckFailed; `ClusterSecretStore` events show **503 Vault is sealed**; Job `openbao/openbao-bootstrap` log stops at **Waiting for sealed:false on openbao-0** / **Waiting for service…** or runs for hours.
-
-**Cause (common):** OpenBAO **Raft nodes are sealed** after restart, or the bootstrap script used a **health URL without `sealedcode=200`**, so `wget` got **503** with no JSON and the wait loop never matched `sealed:false` (fixed in GitOps bootstrap script).
-
-**Cause (cold start / script):** After unseal, all nodes can be unsealed while the **ClusterIP Service** still has **no Ready endpoints** for a short time (readinessProbe). The bootstrap script now **waits for `sealed:false` on `openbao-0` first** (same DNS as Phase 1), uses a **grep** that allows JSON whitespace around `sealed`, then **optionally** confirms the Service URL; on Service timeout it logs a **warning** and truncated health (Phase 4 uses `$BAO_ADDR` — check `kubectl get endpoints -n openbao openbao` if login fails).
-
-**Recover (operations):**
-
-1. **Confirm seal state**
+1. **Confirm seal state on every node**
 
    ```bash
-   kubectl exec -n openbao openbao-0 -- bao status
-   ```
-
-2. **Unseal** using the key stored in Secret `openbao/openbao-init-keys` (keys `unseal_key`, `root_token` — base64 in the Secret; decode for the unseal key). Run on **each** node if needed:
-
-   ```bash
-   UNSEAL_KEY='<plaintext-unseal-key>'
    for i in 0 1 2; do
-     kubectl exec -n openbao openbao-$i -- env BAO_ADDR="http://127.0.0.1:8200" bao operator unseal "$UNSEAL_KEY"
+     echo "openbao-$i:"
+     kubectl exec -n openbao openbao-$i -- bao status 2>/dev/null | grep -E "Seal Type|Sealed|HA Mode"
    done
-   kubectl exec -n openbao openbao-0 -- bao status
    ```
 
-3. **Delete the stuck Job** so a new pod can run the updated script (after GitOps push) or finish Phase 4:
+   `Seal Type awskms` + `Sealed true` means auto-unseal failed at boot →
+   continue. (`Sealed false` everywhere → skip to step 5.)
+
+2. **Check the floci KMS shim** — the usual root cause:
+
+   ```bash
+   # Deployment / pod up?
+   kubectl get deploy,pods -n openbao -l app.kubernetes.io/name=floci
+
+   # Logs (crash loops, storage errors on the floci-data PVC)
+   kubectl logs -n openbao deploy/floci --tail=50
+
+   # Service answering on 4566?
+   kubectl get svc -n openbao floci
+
+   # NetworkPolicy fencing floci — only openbao-namespace pods may connect
+   kubectl describe networkpolicy -n openbao floci-allow-openbao
+   ```
+
+   If the `alias/openbao-unseal` KMS alias itself is suspect (fresh cluster,
+   TTL-reaped init Job), check the `floci-kms-init` Job in
+   `kubernetes/infra/controllers/secrets/floci/floci-kms-init.yaml` — it is
+   idempotent and re-creates the alias.
+
+3. **Check the OpenBAO pod logs for seal errors**
+
+   ```bash
+   kubectl logs -n openbao openbao-0 | grep -iE "seal|kms|unseal" | tail -20
+   ```
+
+   Typical failure: connection refused / DNS errors against
+   `floci.openbao.svc.cluster.local:4566`, or `DescribeKey` failing on the alias.
+
+4. **Restart the sealed pods to retry auto-unseal** (once floci is healthy):
+
+   ```bash
+   kubectl delete pod -n openbao openbao-0 openbao-1 openbao-2
+   # Wait, then re-check:
+   kubectl exec -n openbao openbao-0 -- bao status | grep Sealed
+   ```
+
+5. **Delete a stuck bootstrap Job** (if `openbao-bootstrap` is hanging on
+   "Waiting for sealed:false") so Flux re-creates it:
 
    ```bash
    kubectl delete job openbao-bootstrap -n openbao
    ```
 
-4. **Reconcile Flux** (order matters for `dependsOn`):
+6. **Reconcile Flux** (order matters for `dependsOn`):
 
    ```bash
    flux reconcile kustomization secrets-local -n flux-system --with-source
@@ -85,10 +105,22 @@ kubectl logs -n openbao openbao-0 | grep -i "unseal\|transit\|seal"
    flux reconcile kustomization apps-local -n flux-system --with-source
    ```
 
-5. **Verify** `kubectl get clustersecretstore openbao` → Ready=True; `flux get ks -A` → `secrets-local` True.
+7. **Verify**: `kubectl get clustersecretstore openbao` → Ready=True;
+   `flux get ks -A` → `secrets-local` True.
 
-**Homelab only:** plaintext unseal key in Kubernetes Secret — do not use this pattern in production without KMS auto-unseal.
+## Cold-start notes
+
+- Right after all pods unseal, the ClusterIP Service can briefly have **no
+  Ready endpoints** (readinessProbe lag). The bootstrap script waits for
+  `sealed:false` on `openbao-0` first, then optionally confirms the Service —
+  if a login later fails, check `kubectl get endpoints -n openbao openbao`.
+- Health checks must use `sealedcode=200&standbycode=200&uninitcode=200`
+  query params (OpenBAO returns 503/429 otherwise and BusyBox `wget` treats
+  any non-2xx as failure).
+
+**Homelab only:** floci is a zero-auth KMS emulator fenced by NetworkPolicy —
+production points the same `seal "awskms"` stanza at a real cloud KMS.
 
 ---
 
-_Last updated: 2026-07-14 - Split from `docs/secrets/README.md` during the runbook refactor._
+_Last updated: 2026-08-19 — Rewritten for awskms auto-unseal via floci (ADR-024); the manual Shamir unseal procedure never applied to this platform._

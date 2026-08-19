@@ -329,7 +329,7 @@ Common codes include:
 | `401` | `UNAUTHORIZED` | Authentication failed |
 | `403` | `FORBIDDEN` | Identity is known but not allowed |
 | `404` | `NOT_FOUND`, `PROMO_INVALID` | Resource does not exist or is intentionally hidden by owner scoping |
-| `409` | `CONFLICT`, `INVALID_TRANSITION`, `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `PROMO_EXPIRED`, `PROMO_EXHAUSTED` | Current state conflicts with the requested change |
+| `409` | `CONFLICT`, `INVALID_TRANSITION`, `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `PROMO_EXPIRED`, `PROMO_EXHAUSTED`, `ITEM_NOT_ORDERABLE` | Current state conflicts with the requested change. `ITEM_NOT_ORDERABLE` is **planned** ([ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/)): a basket item's SKU has no inventory balance row — persistent until an operator receives stock, unlike `STOCK_UNAVAILABLE`'s wait-for-restock |
 | `410` | `SESSION_EXPIRED` | Checkout session existed but its TTL elapsed |
 | `422` | `PAYMENT_DECLINED` | Request is valid but the provider declined it |
 | `500` | `INTERNAL_ERROR` | Unexpected server failure without leaked internals |

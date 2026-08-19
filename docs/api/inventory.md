@@ -38,7 +38,7 @@ elsewhere.
 | **Cache** | None | — |
 | **Sensitive data** | None (no PII; SKU/warehouse/quantity only) | — |
 | **Contract sources** | gRPC `pkg/proto/inventory/v1/inventory.proto`; HTTP health only | — |
-| **Design records** | — | [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) |
+| **Design records** | — | [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) · [ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/) (balance bootstrap ownership, planned) |
 
 ## Temporal participation
 
@@ -281,7 +281,12 @@ platform-wide call graph is in
   `unknown_sku_ids` (pkg `v0.35.0`) says it explicitly instead of leaking out as a
   zero-ATP shortage, checkout fails closed on it, and
   [`CheckoutAvailabilityUnknownSKU`](../observability/runbooks/microservices/CheckoutAvailabilityUnknownSKU.md)
-  pages with the SKU ids. What remains is that **nothing prevents** the state.
+  pages with the SKU ids. Nothing prevents the state, but its ownership is now
+  **decided** ([ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/)):
+  the operator bootstraps the first balance through this service's receipts
+  command, the Admin Portal must make that reachable for untracked SKUs and warn
+  at publish, and checkout's answer moves to `409 ITEM_NOT_ORDERABLE` — adoption
+  pending in admin-service / checkout-service / frontend.
 - **No reservation auto-expiry (v1).** `expires_at` is observability-only; nothing
   transitions a reservation to `EXPIRED`. What shipped in phase 3 is the
   **order-domain reconciler** (live): it repairs stranded `RESERVED` holds through

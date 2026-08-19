@@ -72,7 +72,12 @@ spec:
     # registered is traced and logged as an ordinary 404 rather than vanishing.
     # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
     # for /metrics and 0 for /health and /ready, unchanged.
-    image_tag: "0.8.0" # {"$imagepolicy": "flux-system:checkout:tag"}
+    # 0.9.0: ADR-053 — an untracked SKU answers 409 ITEM_NOT_ORDERABLE instead
+    # of a retryable 503 (flat at create, requoted session at confirm, key
+    # released, no Retry-After); transient 503 arms unchanged; httpx v0.37.0.
+    # Lands in the same train as frontend 3.2.0 — the SPA must never meet a
+    # code it cannot word. Compose gate 2026-08-19 (A21 asserts the new wire).
+    image_tag: "0.9.0" # {"$imagepolicy": "flux-system:checkout:tag"}
     # 0.7.1: a promo code whose cap is already spent answers 409 PROMO_EXHAUSTED
     # at apply, matching the confirm gate; it answered 500 before, which the
     # storefront could only render as "Service temporarily unavailable"

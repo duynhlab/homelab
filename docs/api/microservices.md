@@ -313,7 +313,7 @@ templates.
 
 | Item | Service(s) | Status |
 |------|------------|--------|
-| Catalog SKU with no inventory balance row (new products are unbuyable until an operator receives stock) | product / inventory / checkout | **Decided** ([ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/)) — operator bootstraps via the portal's receipts flow, publish warns, checkout answers `409 ITEM_NOT_ORDERABLE`; **this row is the adoption tracker**: code cutover pending in admin-service / checkout-service / frontend (no compatibility window — the platform is pre-deployment, services cut over directly) |
+| ~~Catalog SKU with no inventory balance row~~ | product / inventory / checkout | **Resolved** ([ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/)) — shipped in admin-service 0.4.0 (Receive-first-stock bootstrap + publish warning), checkout 0.9.0 (`409 ITEM_NOT_ORDERABLE`) and frontend 3.2.0 (copy, no retry affordance); compose gate 2026-08-19 (audit row A21) |
 | Committed-stock restock on cancellation (`RESTOCK_SKIPPED`) | order / inventory | **Accepted shrinkage** — inventory.v1 has no `Return` RPC; revisit trigger in [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) |
 | ~~Legacy order→cart REST pricing on direct create~~ | order | **Gone** — it died with the legacy REST create (RFC-0021 P5); checkout/product own price authority |
 | gRPC mTLS east-west | platform | **Planned** (RFC-0020); NetworkPolicy remains the fence until then |
@@ -327,4 +327,4 @@ templates.
 
 *Run the whole platform locally for verification: `cd local-stack && docker compose up -d --build` → SPA at http://localhost:3001, edge gateway at http://localhost:8080 (demo login `alice` / `password123`).*
 
-_Last updated: 2026-08-19 — known-gaps gains the missing-balance row the 2026-08-18 products/35 investigation surfaced; decided by ADR-053_id`); user's internal create is replaced by JIT provisioning; auth's tokens are unconsumed pending P5._
+_Last updated: 2026-08-19 — the missing-balance row flips to Resolved: the ADR-053 train shipped (checkout 0.9.0, frontend 3.2.0, admin 0.4.0)_id`); user's internal create is replaced by JIT provisioning; auth's tokens are unconsumed pending P5._

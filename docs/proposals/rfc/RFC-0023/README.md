@@ -676,7 +676,7 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   portal must expose it for untracked SKUs and warn at publish (no gate — the
   product/inventory write boundary this RFC set stays intact), and checkout's
   untracked-SKU answer moves from a retryable 503 to `409 ITEM_NOT_ORDERABLE`.
-  Adoption pending in admin-service / checkout-service / frontend.
+  Shipped 2026-08-19: admin-service 0.4.0, checkout-service 0.9.0, frontend 3.2.0 (compose gate, audit row A21).
 - 2026-08-14 — **The flagship Future command shipped.** The safety review this
   RFC deferred on 2026-08-10 is decided in
   [ADR-051](../../adr/ADR-051-trusted-operator-resolution/): the operator is

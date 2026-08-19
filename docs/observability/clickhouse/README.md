@@ -340,7 +340,7 @@ The collector's exporter owns the DDL, and its shape changed at contrib
 | Schema | Exporter | `otel_logs` shape |
 |--------|----------|-------------------|
 | 1.2.9 | contrib < 0.151.0 | has `TimestampTime` |
-| **1.3.0** | contrib ≥ 0.151.0 | no `TimestampTime` — what both environments write (contrib `0.152.0`) |
+| **1.3.0** | contrib ≥ 0.151.0 | no `TimestampTime` — what both environments write (contrib `0.159.0`) |
 
 Plugin ≥ 4.20.0 **auto-detects the logs schema from the table's columns** when
 the version selector is on auto (latest); our provisioning deliberately does not

@@ -9,7 +9,7 @@
 | | |
 |---|---|
 | **Manifest** | `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml` (HelmRelease, ns `monitoring`) |
-| **Distribution** | `otel/opentelemetry-collector-contrib:0.152.0` |
+| **Distribution** | `otel/opentelemetry-collector-contrib:0.159.0` |
 | **Mode** | Gateway — `deployment`, 1 replica (SPOF — single replica accepted for the homelab) |
 | **Receivers** | OTLP only — gRPC `:4317`, HTTP `:4318` |
 | **Pipelines** | `traces`, `logs`, `metrics` — see [table below](#the-deployed-pipelines) |
@@ -196,7 +196,7 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 | Log: `Memory usage is above soft limit`, clients see refusals | `memory_limiter` backpressure — collector or a backend is overloaded | Check exporter queue metrics for the slow backend; raise limits/replicas only after the backend is healthy. Never reorder the limiter later in the chain |
 | Export errors: `context deadline exceeded` | Backend unreachable or too slow before the exporter timeout | Verify endpoint/NetworkPolicy; exporters buffer + retry with backoff, so transient blips self-heal — persistent ones need the backend fixed or `timeout` raised |
 | `tls: first record does not look like a TLS handshake` | Exporter speaks TLS to a plaintext endpoint (or vice versa) | Match the exporter `tls.insecure` setting to the backend — in-cluster hops here are plaintext |
-| Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.152.0` |
+| Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.159.0` |
 | Collector crash-loops at startup, ClickHouse also down | `create_schema` DDL coupling (above) | Restore ClickHouse first (or temporarily remove the exporter from both pipelines) |
 
 ## References

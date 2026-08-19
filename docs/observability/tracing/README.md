@@ -14,7 +14,7 @@ Track requests as they flow through multiple microservices to understand perform
 
 **Technologies:**
 - **OpenTelemetry**: Industry-standard tracing instrumentation
-- **Grafana Tempo**: primary tracing backend (v2.10.5; metrics-generator configured but inert — `remote_write: []`) — durable on **RustFS S3** (`tempo-traces` bucket, **7-day** block retention)
+- **Grafana Tempo**: primary tracing backend (v2.10.8; metrics-generator configured but inert — `remote_write: []`) — durable on **RustFS S3** (`tempo-traces` bucket, **7-day** block retention)
 - **Jaeger**: secondary UI (Helm chart, all-in-one) — **in-memory / ephemeral** (lost on restart)
 - **VictoriaTraces**: pilot 3rd backend (`v0.9.4`, VM-operator-managed, VictoriaLogs engine) — same OTel fan-out; see [victoriatraces.md](victoriatraces.md)
 - **W3C Trace Context**: Standard for trace propagation between services
@@ -277,7 +277,7 @@ attribute.String("db.table", "users")
 
 ---
 
-**Last Updated**: 2026-07-14 — metrics-generator noted configured-but-inert (`remote_write: []`); collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.5 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.9.4 (pilot)
+**Last Updated**: 2026-07-14 — metrics-generator noted configured-but-inert (`remote_write: []`); collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.8 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.9.4 (pilot)
 
 ---
 _Last updated: 2026-08-13 — trace root re-documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, no plugin)_

@@ -7,7 +7,7 @@ Grafana is the unified visualization layer for all 4 observability pillars. It c
 Grafana is deployed via the **Grafana Operator** using a `Grafana` CR:
 
 - **CR**: `kubernetes/infra/configs/observability/grafana/grafana.yaml`
-- **Image**: `grafana/grafana:13.1.0`
+- **Image**: `grafana/grafana:13.2.0`
 - **Namespace**: `monitoring`
 - **Access**: anonymous login with Admin role (dev mode)
 

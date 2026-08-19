@@ -55,4 +55,22 @@ the proxy's stats had to be published on a bootstrap-added listener rather than
 the port a PodMonitor would select. Substitute accordingly when reproducing an
 alert locally.
 
-_Last updated: 2026-08-14 — created with the nine edge runbooks (the alerts had shipped with the P4 edge slice; nothing linked them to an investigation)._
+## Template
+
+New runbooks follow the canonical [`../_TEMPLATE.md`](../_TEMPLATE.md) — one
+template for every runbooks folder; the rows and dialect below are this
+domain's additions.
+
+## Domain specifics
+
+- **Two scrape jobs, two planes:** `job="envoy-gateway"` is the data plane
+  (proxy stats), `job="envoy-gateway-controller"` the control plane — a query
+  against the wrong job silently returns nothing.
+- **Histogram units trap:** `envoy_http_downstream_rq_time` buckets are
+  **milliseconds**, unlike the seconds-based `http_request_duration_seconds`
+  the services expose — never mix them in one panel or ratio.
+- **Local-stack:** job names differ (see the section above) but every query
+  ports once the job label is substituted.
+
+---
+_Last updated: 2026-08-19 — template pointer added (canonical template lives at the runbooks parent)_

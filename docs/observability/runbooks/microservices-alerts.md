@@ -19,8 +19,7 @@
 3. [Saturation Alerts (retired)](#3-saturation-alerts-retired)
 4. [Investigation Workflows](#4-investigation-workflows)
 5. [Threshold Tuning Guide](#5-threshold-tuning-guide)
-6. [Future Expansion](#6-future-expansion)
-7. [Interview Reference](#7-interview-reference)
+6. [Expansion Status](#6-expansion-status)
 
 ---
 
@@ -105,9 +104,11 @@ Per-alert files: [`microservices/README.md`](microservices/README.md).
 
 ## 2. Per-Alert Runbooks
 
-All **19 active** alerts have dedicated runbooks under
-[`microservices/`](microservices/README.md). Alertmanager `runbook_url` annotations
-point to the matching `<AlertName>.md` file.
+The **19 core RED/runtime/database alerts** from `alerts.yaml` are grouped
+below. The folder holds **50 runbooks in total** — the rest cover inventory
+stock authority, checkout availability, and the RFC-0021 phases; see the
+[folder index](microservices/README.md) for the full list. Every alert with a
+runbook carries a `runbook_url` annotation pointing at its `<AlertName>.md`.
 
 | Group | Alerts |
 |-------|--------|
@@ -363,114 +364,19 @@ Set thresholds at **2-3x the normal peak** for warning and **5x** for critical.
 
 ---
 
-## 6. Future Expansion
+## 6. Expansion Status
 
-### Phase 2: Database Connection Alerts (from Application Side)
+The original five-phase expansion plan is complete except for one phase; the
+shipped phases have real alert groups and runbook folders, so their design
+sketches are no longer kept here.
 
-> **✅ Realized (RFC-0017 W4)** as `DBClientQueryP95High` / `DBClientErrorRate` /
-> `PgxPoolNearExhaustion` / `PgxPoolAcquireWaitHigh` on the real otelpgx metric
-> names — see [DB client runbooks](microservices/README.md#index). The sketch below is
-> kept as the original design note (its hypothetical metric names never existed).
-
-Add alerts for application-side database health signals:
-
-```yaml
-# Connection pool exhaustion (if exposed via metrics)
-- alert: MicroserviceDBConnectionPoolExhausted
-  expr: db_pool_active_connections / db_pool_max_connections > 0.9
-  for: 5m
-
-# Slow query rate (if SQL duration histogram exposed)
-- alert: MicroserviceSlowQueries
-  expr: rate(db_query_duration_seconds_count{le="+Inf"}[5m]) - rate(db_query_duration_seconds_count{le="1"}[5m]) > 0.1
-  for: 10m
-```
-
-### Phase 3: Caching Alerts (Valkey/Redis)
-
-```yaml
-# Cache hit rate too low
-- alert: MicroserviceLowCacheHitRate
-  expr: cache_hit_total / (cache_hit_total + cache_miss_total) < 0.7
-  for: 15m
-
-# Cache latency high
-- alert: MicroserviceCacheLatencyHigh
-  expr: histogram_quantile(0.95, rate(cache_duration_seconds_bucket[5m])) > 0.01
-  for: 10m
-```
-
-### Phase 4: Cross-Service Dependency Alerts
-
-```yaml
-# Downstream service call failure rate
-- alert: MicroserviceDownstreamFailureRate
-  expr: rate(http_client_requests_total{status=~"5.."}[5m]) / rate(http_client_requests_total[5m]) > 0.1
-  for: 5m
-
-# Circuit breaker open
-- alert: MicroserviceCircuitBreakerOpen
-  expr: circuit_breaker_state == 1
-  for: 1m
-```
-
-### Phase 5: Kubernetes Infrastructure Alerts
-
-```yaml
-# Node not ready
-- alert: KubernetesNodeNotReady
-  expr: kube_node_status_condition{condition="Ready", status="true"} == 0
-  for: 5m
-
-# PVC almost full
-- alert: PersistentVolumeAlmostFull
-  expr: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.9
-  for: 15m
-```
-
-### Expansion Checklist
-
-| Phase | What | Depends On | Effort |
-|-------|------|-----------|--------|
-| Phase 1 (done) | Application RED/Golden alerts | `http_server_request_duration_seconds` | This PR |
-| Phase 2 | DB connection pool from app side | Application-level DB metrics | Medium |
-| Phase 3 | Valkey cache alerts | Cache metrics in product service | Medium |
-| Phase 4 | Cross-service dependency alerts | HTTP client instrumentation | High |
-| Phase 5 | Kubernetes infrastructure alerts | kube-state-metrics | Low |
-
----
-
-## 7. Interview Reference
-
-### Mapping Alerts to Frameworks
-
-| Framework | Signal | Alerts Covering It |
-|-----------|--------|-------------------|
-| **RED** | Rate | `MicroserviceNoTraffic` |
-| **RED** | Errors | `MicroserviceHighErrorRate`, `MicroserviceErrorRateCritical`, `MicroserviceNoSuccessfulRequests`, `GrpcServerHighErrorRate` |
-| **RED** | Duration | `MicroserviceHighLatencyP95`, `MicroserviceHighLatencyP99`, `MicroserviceLatencyCritical`, `MicroserviceApdexCritical`, `GrpcServerHighLatencyP95` |
-| **USE** | Utilization | `MicroserviceHighMemoryUsage` |
-| **USE** | Saturation | `MicroserviceHighRequestsInFlight`, `MicroserviceRequestsInFlightCritical` (retired — otelgin gap), `MicroserviceGoroutineLeak`, `MicroserviceGCThrash` |
-| **USE** | Errors | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `KubePodCrashLooping` |
-| **Golden** | Latency | All RED Duration alerts |
-| **Golden** | Traffic | `MicroserviceNoTraffic` |
-| **Golden** | Errors | All RED Errors alerts + Availability alerts |
-| **Golden** | Saturation | All USE Saturation alerts |
-
-### Interview Answer: "How do you design alerting for microservices?"
-
-**Before**: No application-level alerts. Only SLO burn-rate alerts from Sloth. When a service crashed, we relied on SLO burn-rate which could take 30-60 minutes to detect a sudden failure.
-
-**What you did**: Added Layer 1 threshold alerts to complement Layer 2 SLO alerts. Designed 5 active alert groups covering RED/Golden Signals plus Go runtime health; retained the retired saturation design as reference.
-
-**How**:
-- 19 active alert rules in 6 groups: availability, errors, latency, traffic, runtime, database client
-- Recording rules pre-aggregate common queries (5 groups, ~15 rules) for fast evaluation
-- Thresholds aligned with Grafana dashboard thresholds but more conservative to reduce noise
-- Every alert has `runbook_url` annotation pointing to investigation steps
-- Two-layer approach: Layer 1 (threshold, 1-10 min detection) + Layer 2 (SLO burn-rate, 5-60 min detection)
-
-**Result**: Complete-outage detection now follows VictoriaMetrics staleness plus the 2-minute alert hold, typically about 5-7 minutes instead of waiting for a slow SLO burn. Layer 1 catches obvious failures; Layer 2 catches sustained degradation with higher signal quality. Four-pillar correlation (`trace_id` in logs -> trace -> profile; no exemplars, RFC-0014 D-14) then guides the investigation.
+| Phase | What | Status |
+|-------|------|--------|
+| 1 | Application RED/Golden alerts | ✅ Shipped — this document's alert set |
+| 2 | DB client alerts (otelpgx) | ✅ Shipped (RFC-0017 W4) — `DBClient*` / `PgxPool*`, see [DB client runbooks](microservices/README.md#index) |
+| 3 | Valkey cache alerts | ✅ Shipped — server-side via redis_exporter, see [`valkey/`](valkey/README.md) + [catalog §3](../alerting/alert-catalog.md#3-valkey-cache) |
+| 4 | Cross-service dependency alerts (HTTP client instrumentation, circuit breaker) | ⏳ Open — no `http_client_*` metrics emitted yet |
+| 5 | Kubernetes infrastructure alerts | ✅ Shipped — see [`kubernetes/`](kubernetes/README.md) + [catalog §5](../alerting/alert-catalog.md#5-kubernetes) |
 
 ---
 
@@ -478,7 +384,7 @@ Add alerts for application-side database health signals:
 ## Related Documentation
 
 - [Microservices runbook index](microservices/README.md)
-- [Observability Deep Dive Runbook](observability-deep-dive.md) — RED/USE/Golden theory, middleware chain
+- [Observability hub](../README.md) — 4-pillar architecture, middleware chain
 - [SLO Documentation](../slo/README.md)
 - [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md)
 - [PostgreSQL runbooks](postgresql/README.md) — server-side CNPG alerts
@@ -486,4 +392,4 @@ Add alerts for application-side database health signals:
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md)
 
 ---
-_Last updated: 2026-07-18_
+_Last updated: 2026-08-19 — runbook counts corrected (19 core → 50 total), shipped expansion phases condensed to a status table, interview material removed from the repo_

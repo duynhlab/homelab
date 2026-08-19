@@ -119,15 +119,17 @@ the first-party **Envoy Global** dashboard.
 
 Source: `prometheusrules/valkey/alerts.yaml`. Base metrics: `redis_*` (redis_exporter).
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| ValkeyDown | critical | `redis_up==0` | All cache ops fail → DB load spike + latency | 1m |
-| ValkeyMemorySaturation | warning | `used/max>0.9` | Evictions starting; hit-ratio degrading | 5m |
-| ValkeyMemorySaturationCritical | critical | `used/max>0.95` | Active evictions; working set collapsing | 2m |
-| ValkeyHighEvictionRate | warning | `rate(redis_evicted_keys_total[5m])>100` | Working set discarded; repeated DB fetches | 10m |
-| ValkeyHighMissRatio | warning | miss/(hit+miss) >50% | Cache ineffective → DB load + latency | 10m |
-| ValkeyHighClientConnections | warning | `redis_connected_clients>100` | Possible connection leak | 5m |
-| ValkeyRejectedConnections | critical | `increase(redis_rejected_connections_total[5m])>0` | Cache refusing clients — effectively unavailable | 0m |
+Per-alert runbooks: [`runbooks/valkey/README.md`](../runbooks/valkey/README.md).
+
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| ValkeyDown | critical | `redis_up==0` | All cache ops fail → DB load spike + latency | 1m | [ValkeyDown](../runbooks/valkey/ValkeyDown.md) |
+| ValkeyMemorySaturation | warning | `used/max>0.9` | Evictions starting; hit-ratio degrading | 5m | [ValkeyMemorySaturation](../runbooks/valkey/ValkeyMemorySaturation.md) |
+| ValkeyMemorySaturationCritical | critical | `used/max>0.95` | Active evictions; working set collapsing | 2m | [ValkeyMemorySaturationCritical](../runbooks/valkey/ValkeyMemorySaturationCritical.md) |
+| ValkeyHighEvictionRate | warning | `rate(redis_evicted_keys_total[5m])>100` | Working set discarded; repeated DB fetches | 10m | [ValkeyHighEvictionRate](../runbooks/valkey/ValkeyHighEvictionRate.md) |
+| ValkeyHighMissRatio | warning | miss/(hit+miss) >50% | Cache ineffective → DB load + latency | 10m | [ValkeyHighMissRatio](../runbooks/valkey/ValkeyHighMissRatio.md) |
+| ValkeyHighClientConnections | warning | `redis_connected_clients>100` | Possible connection leak | 5m | [ValkeyHighClientConnections](../runbooks/valkey/ValkeyHighClientConnections.md) |
+| ValkeyRejectedConnections | critical | `increase(redis_rejected_connections_total[5m])>0` | Cache refusing clients — effectively unavailable | 0m | [ValkeyRejectedConnections](../runbooks/valkey/ValkeyRejectedConnections.md) |
 
 ## 4. PostgreSQL — CloudNativePG
 
@@ -202,66 +204,69 @@ ignore (locks, deadlocks, autovacuum, cache, temp, checkpoints, wraparound, WAL 
 
 Source: `prometheusrules/kubernetes/*.yaml`. Most rules source from `kube-state-metrics` + `kubelet` + node-exporter.
 
+Per-alert runbooks: [`runbooks/kubernetes/README.md`](../runbooks/kubernetes/README.md)
+(the control-plane/etcd/DNS group has no runbooks yet — a recorded gap).
+
 **Nodes** (`node-alerts.yaml`)
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| KubeNodeNotReady | critical | `kube_node_status_condition{Ready}==0` | Pods evicted; stateful disruption | 5m |
-| KubeNodeMemoryPressure | warning | MemoryPressure==1 | Kubelet evicting pods | 5m |
-| KubeNodeDiskPressure | warning | DiskPressure==1 | Evictions + image GC; data risk | 5m |
-| KubeNodePIDPressure | warning | PIDPressure==1 | No new processes; node unstable | 5m |
-| KubeNodeUnschedulable | warning | `kube_node_spec_unschedulable==1` | Cordoned; capacity reduced | 5m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| KubeNodeNotReady | critical | `kube_node_status_condition{Ready}==0` | Pods evicted; stateful disruption | 5m | [KubeNodeNotReady](../runbooks/kubernetes/KubeNodeNotReady.md) |
+| KubeNodeMemoryPressure | warning | MemoryPressure==1 | Kubelet evicting pods | 5m | [KubeNodeMemoryPressure](../runbooks/kubernetes/KubeNodeMemoryPressure.md) |
+| KubeNodeDiskPressure | warning | DiskPressure==1 | Evictions + image GC; data risk | 5m | [KubeNodeDiskPressure](../runbooks/kubernetes/KubeNodeDiskPressure.md) |
+| KubeNodePIDPressure | warning | PIDPressure==1 | No new processes; node unstable | 5m | [KubeNodePIDPressure](../runbooks/kubernetes/KubeNodePIDPressure.md) |
+| KubeNodeUnschedulable | warning | `kube_node_spec_unschedulable==1` | Cordoned; capacity reduced | 5m | [KubeNodeUnschedulable](../runbooks/kubernetes/KubeNodeUnschedulable.md) |
 
 **Workloads & storage** (`workload-alerts.yaml`)
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| KubeDeploymentReplicasMismatch | warning | spec ≠ ready replicas | Service degraded; can't scale | 15m |
-| KubeStatefulSetReplicasMismatch | warning | spec ≠ ready replicas | Data-consistency risk | 15m |
-| KubeJobFailed | warning | `kube_job_status_failed>0` | Batch/backup task failed | 5m |
-| KubeHPAMaxedOut | warning | current == max replicas | Can't elastically absorb load | 15m |
-| KubePersistentVolumeFillingUp 💤 *inactive on Kind — local-path CSI reports no kubelet VolumeStats* | warning | PVC free <15% | Write failures imminent | 10m |
-| KubePersistentVolumeFillingUpCritical 💤 *inactive on Kind (same)* | critical | PVC free <5% | Immediate data-loss risk | 5m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| KubeDeploymentReplicasMismatch | warning | spec ≠ ready replicas | Service degraded; can't scale | 15m | [KubeDeploymentReplicasMismatch](../runbooks/kubernetes/KubeDeploymentReplicasMismatch.md) |
+| KubeStatefulSetReplicasMismatch | warning | spec ≠ ready replicas | Data-consistency risk | 15m | [KubeStatefulSetReplicasMismatch](../runbooks/kubernetes/KubeStatefulSetReplicasMismatch.md) |
+| KubeJobFailed | warning | `kube_job_status_failed>0` | Batch/backup task failed | 5m | [KubeJobFailed](../runbooks/kubernetes/KubeJobFailed.md) |
+| KubeHPAMaxedOut | warning | current == max replicas | Can't elastically absorb load | 15m | [KubeHPAMaxedOut](../runbooks/kubernetes/KubeHPAMaxedOut.md) |
+| KubePersistentVolumeFillingUp 💤 *inactive on Kind — local-path CSI reports no kubelet VolumeStats* | warning | PVC free <15% | Write failures imminent | 10m | [KubePersistentVolumeFillingUp](../runbooks/kubernetes/KubePersistentVolumeFillingUp.md) |
+| KubePersistentVolumeFillingUpCritical 💤 *inactive on Kind (same)* | critical | PVC free <5% | Immediate data-loss risk | 5m | [KubePersistentVolumeFillingUpCritical](../runbooks/kubernetes/KubePersistentVolumeFillingUpCritical.md) |
 
 **Pod resources** (`pod-resources-alerts.yaml`)
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| KubePodCPUThrottlingHigh | warning | CFS throttled >25% | Latency up; SLA risk | 15m |
-| KubePodMemoryNearLimit | warning | working set >90% of limit | OOMKill imminent | 15m |
-| KubePodOOMKilled | critical | OOMKilled in last 15m | Crash + possible data corruption | 0m |
-| KubePodCrashLooping | critical | CrashLoopBackOff | Service unavailable | 10m |
-| KubePodNotReady | warning | Pending/Unknown phase | Workload can't run | 15m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| KubePodCPUThrottlingHigh | warning | CFS throttled >25% | Latency up; SLA risk | 15m | [KubePodCPUThrottlingHigh](../runbooks/kubernetes/KubePodCPUThrottlingHigh.md) |
+| KubePodMemoryNearLimit | warning | working set >90% of limit | OOMKill imminent | 15m | [KubePodMemoryNearLimit](../runbooks/kubernetes/KubePodMemoryNearLimit.md) |
+| KubePodOOMKilled | critical | OOMKilled in last 15m | Crash + possible data corruption | 0m | [KubePodOOMKilled](../runbooks/kubernetes/KubePodOOMKilled.md) |
+| KubePodCrashLooping | critical | CrashLoopBackOff | Service unavailable | 10m | [KubePodCrashLooping](../runbooks/kubernetes/KubePodCrashLooping.md) |
+| KubePodNotReady | warning | Pending/Unknown phase | Workload can't run | 15m | [KubePodNotReady](../runbooks/kubernetes/KubePodNotReady.md) |
 
 **API server** (`apiserver-alerts.yaml`)
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| KubeAPIServerDown | critical | `absent(up{job="apiserver"}==1)` | Control plane down — cluster unmanageable | 5m |
-| KubeAPIServerHighLatency | warning | request P99 >1s | Controllers/CLI timeout; reconcile lag | 10m |
-| KubeAPIServerErrorRate | warning | 5xx >3% | Reconcile + ops break | 10m |
-| KubeAPIServerHighInflight | warning | inflight >200 | Control plane saturated | 5m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| KubeAPIServerDown | critical | `absent(up{job="apiserver"}==1)` | Control plane down — cluster unmanageable | 5m | [KubeAPIServerDown](../runbooks/kubernetes/KubeAPIServerDown.md) |
+| KubeAPIServerHighLatency | warning | request P99 >1s | Controllers/CLI timeout; reconcile lag | 10m | [KubeAPIServerHighLatency](../runbooks/kubernetes/KubeAPIServerHighLatency.md) |
+| KubeAPIServerErrorRate | warning | 5xx >3% | Reconcile + ops break | 10m | [KubeAPIServerErrorRate](../runbooks/kubernetes/KubeAPIServerErrorRate.md) |
+| KubeAPIServerHighInflight | warning | inflight >200 | Control plane saturated | 5m | [KubeAPIServerHighInflight](../runbooks/kubernetes/KubeAPIServerHighInflight.md) |
 
 **Control plane / etcd / DNS** (`controlplane-alerts.yaml`)
 
 > 💤 etcd rows: **inactive on Kind** — the control-plane static-pod etcd is not scraped (no cert-mounted scrape target); they arm on a cluster where etcd metrics are collected.
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| EtcdMembersDown 💤 | critical | `up{etcd}==0` | Quorum / split-brain risk; state at risk | 3m |
-| EtcdHighFsyncDurations 💤 | warning | WAL fsync P99 >0.5s | Leader instability | 10m |
-| EtcdHighCommitDurations 💤 | warning | commit P99 >0.25s | API/controller latency | 10m |
-| EtcdHighNumberOfLeaderChanges 💤 | warning | >3 elections/1h | Cluster instability | 5m |
-| CoreDNSDown | critical | `absent(up{kube-dns}==1)` | All DNS fails — cluster networking broken | 5m |
-| CoreDNSHighErrorRate | warning | SERVFAIL >3% | Service discovery failing | 10m |
-| KubeletDown | critical | `absent(up{kubelet}==1)` | Pod lifecycle unmanageable | 5m |
-| KubeletTooManyPods | warning | running/capacity >90% | Scheduling will fail | 15m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| EtcdMembersDown 💤 | critical | `up{etcd}==0` | Quorum / split-brain risk; state at risk | 3m | — |
+| EtcdHighFsyncDurations 💤 | warning | WAL fsync P99 >0.5s | Leader instability | 10m | — |
+| EtcdHighCommitDurations 💤 | warning | commit P99 >0.25s | API/controller latency | 10m | — |
+| EtcdHighNumberOfLeaderChanges 💤 | warning | >3 elections/1h | Cluster instability | 5m | — |
+| CoreDNSDown | critical | `absent(up{kube-dns}==1)` | All DNS fails — cluster networking broken | 5m | — |
+| CoreDNSHighErrorRate | warning | SERVFAIL >3% | Service discovery failing | 10m | — |
+| KubeletDown | critical | `absent(up{kubelet}==1)` | Pod lifecycle unmanageable | 5m | — |
+| KubeletTooManyPods | warning | running/capacity >90% | Scheduling will fail | 15m | — |
 
 **Network** (`network-rules.yaml`)
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| KubeContainerNetworkErrors | warning | rx+tx errors >1/s | Packet loss; unreliable comms | 10m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| KubeContainerNetworkErrors | warning | rx+tx errors >1/s | Packet loss; unreliable comms | 10m | [KubeContainerNetworkErrors](../runbooks/kubernetes/KubeContainerNetworkErrors.md) |
 
 ## 6. GitOps (Flux + cert-manager)
 
@@ -602,4 +607,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added (cert-manager, Temporal, collector), and gap #2 annotated now that both leading indicators are visualized; previously 2026-08-12 — §2 replaced at the RFC-0024 P2.3 cutover._
+_Last updated: 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._

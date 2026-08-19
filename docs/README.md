@@ -113,12 +113,14 @@ docs/
 │   │   └── annotation-driven-slo-controller.md
 │   └── runbooks/                 # Operational runbooks
 │       ├── README.md             # Runbook index
-│       ├── observability-deep-dive.md   # Theory + interview prep
-│       ├── infrastructure-alerts.md     # Infra alert investigation guide
+│       ├── _TEMPLATE.md          # Canonical per-alert runbook template
 │       ├── microservices-alerts.md      # Workflows, tuning hub
 │       ├── victorialogs-kubernetes-logs-debug.md  # Blank Grafana logs / VictoriaLogs ingest
-│       ├── microservices/               # Per-alert runbooks (19 files)
-│       └── postgresql/                  # Per-alert CNPG runbooks
+│       ├── envoy-gateway/               # Edge per-alert runbooks
+│       ├── microservices/               # Per-alert runbooks (50 alerts)
+│       ├── postgresql/                  # Per-alert CNPG runbooks
+│       ├── kubernetes/                  # K8s infra per-alert runbooks
+│       └── valkey/                      # Cache per-alert runbooks
 ├── caching/                     # Valkey cache: Cache-Aside, eviction policies, distributed-cache concept
 │   └── README.md                 # Valkey platform hub (eviction, ops)
 ├── platform/                     # Platform/deployment documentation

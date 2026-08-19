@@ -168,8 +168,7 @@ What this design does well at scale, and the upgrade path:
 
 > This homelab runs 10 services + 2 workers + infra today; the above is the scale-up path, not
 > something stress-tested here. The 1000+ framing follows the same large-scale
-> references the platform uses elsewhere (Uber M3, Grab/Shopee) — see
-> [observability deep-dive](../runbooks/observability-deep-dive.md).
+> references (Uber M3, Grab/Shopee) the platform's alerting strategy draws on.
 
 ## Querying & correlation
 

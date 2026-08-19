@@ -325,13 +325,14 @@ docs/observability/
 │
 └── runbooks/                     # Operational runbooks
     ├── README.md                 # Runbook index
-    ├── observability-deep-dive.md  # Theory + interview prep
-    ├── infrastructure-alerts.md    # Infra/platform alert investigation guide
+    ├── _TEMPLATE.md              # Canonical per-alert runbook template
     ├── microservices-alerts.md     # Workflows, tuning hub
     ├── victorialogs-kubernetes-logs-debug.md  # VictoriaLogs K8s log debugging
     ├── envoy-gateway/              # Edge per-alert runbooks (10 files)
-    ├── microservices/              # Per-alert runbooks (52 files)
-    └── postgresql/                 # CNPG per-alert runbooks (35 files)
+    ├── microservices/              # Per-alert runbooks (51 files)
+    ├── postgresql/                 # CNPG per-alert runbooks (34 files)
+    ├── kubernetes/                 # K8s infra per-alert runbooks (22 files)
+    └── valkey/                     # Cache per-alert runbooks (8 files)
 ```
 
 The compose stack has its own observability plane — vmagent/vmalert, the
@@ -450,7 +451,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [Telemetry audit 2026-08-07](audit-2026-08-07.md) -- findings log: the `api/observability.md` contract measured against the deployed platform (5 findings, 3 falsified suspicions)
 - [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
-- [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers
 - [ClickHouse OTel logs+traces OLAP](clickhouse/README.md) -- deployed supplementary OLAP; long-retention SQL + trace_id JOIN ([RFC-0019](../proposals/rfc/RFC-0019/) · [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/))
 - [Grafana on ClickHouse](clickhouse/README.md#grafana) -- datasource OTel mapping, Explore + trace-log linking, dashboard grammar, and the standard suite (Overview → Logs Explorer → Trace Explorer with in-dashboard waterfall)
 

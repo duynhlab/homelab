@@ -22,7 +22,7 @@ spec:
           annotations:
             summary: "Valkey instance down ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey instance {{ $labels.instance }} has been unreachable for more than 1 minute."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeydown"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/valkey/ValkeyDown.md"
 
     # --- Memory Saturation (USE: Saturation) ---
     - name: valkey-memory
@@ -39,7 +39,7 @@ spec:
           annotations:
             summary: "Valkey memory saturation ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey is using {{ $value | humanizePercentage }} of maxmemory. Evictions may start soon."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemorysaturation"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/valkey/ValkeyMemorySaturation.md"
 
         - alert: ValkeyMemorySaturationCritical
           expr: |
@@ -52,7 +52,7 @@ spec:
           annotations:
             summary: "Valkey memory critical ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey is using {{ $value | humanizePercentage }} of maxmemory. Evictions are likely active."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeymemorysaturationcritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/valkey/ValkeyMemorySaturationCritical.md"
 
         - alert: ValkeyHighEvictionRate
           expr: |
@@ -64,7 +64,7 @@ spec:
           annotations:
             summary: "High Valkey eviction rate ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey is evicting {{ $value | humanize }} keys/sec. Cache is under memory pressure; consider increasing maxmemory or reviewing key TTLs."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyhighevictionrate"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/valkey/ValkeyHighEvictionRate.md"
 
     # --- Cache Effectiveness (RED: Errors) ---
     - name: valkey-effectiveness
@@ -82,7 +82,7 @@ spec:
           annotations:
             summary: "High Valkey cache miss ratio ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey cache miss ratio is {{ $value | humanizePercentage }}. More than half of requests are cache misses. Check cache warming, key TTLs, and access patterns."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyhighmissratio"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/valkey/ValkeyHighMissRatio.md"
 
     # --- Connection Saturation (USE: Saturation) ---
     - name: valkey-connections
@@ -97,7 +97,7 @@ spec:
           annotations:
             summary: "High Valkey client connections ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey has {{ $value | humanize }} connected clients (threshold: 100). Check for connection leaks in application code."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyhighclientconnections"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/valkey/ValkeyHighClientConnections.md"
 
         - alert: ValkeyRejectedConnections
           expr: |
@@ -109,4 +109,4 @@ spec:
           annotations:
             summary: "Valkey rejecting connections ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Valkey has rejected {{ $value | humanize }} connections in the last 5 minutes. Max client limit reached."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#valkeyrejectedconnections"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/valkey/ValkeyRejectedConnections.md"

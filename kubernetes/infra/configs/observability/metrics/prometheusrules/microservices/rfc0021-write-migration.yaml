@@ -128,7 +128,7 @@ spec:
               At least one terminal order's stock has not been confirmed to agree
               with its outcome for 15m. Stock is either held against an order that
               will never ship or consumed for one that did not happen.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerBacklogNotDraining.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerBacklogNotDraining.md"
 
         # The paired absent() alert — see the header. A vanished backlog series
         # is NOT good news: it means every reporter failed to read the table, and
@@ -150,7 +150,7 @@ spec:
               that read fails, so absence means the backlog is unknown — not zero.
               Both the order API and the worker report it, so this is not a single
               pod restarting.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerBacklogUnreadable.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerBacklogUnreadable.md"
 
         # A breach is an inconsistency no valid transition can repair (a failed
         # order whose stock is COMMITTED, a confirmed order whose stock went
@@ -173,7 +173,7 @@ spec:
               no valid transition fixes. Money and stock are inconsistent for at
               least one order and a human must resolve it — the row is left
               unsettled on purpose so it stays in the backlog.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerInvariantBreach.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerInvariantBreach.md"
 
         # The reconciler could not READ an order's state (inventory or the
         # Temporal frontend unreachable). Distinct from a breach: nothing is
@@ -202,7 +202,7 @@ spec:
               the Temporal frontend for at least one candidate. It defers rather
               than guessing, so repairs have stopped even though the backlog gauge
               may still read low.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerDependencyUnreadable.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerDependencyUnreadable.md"
 
         # A truncated pass did not see its whole window, which makes the backlog
         # gauge a FLOOR rather than a count. Rare by construction: the scan
@@ -220,7 +220,7 @@ spec:
               A reconciler pass returned a full batch, so it did not examine every
               unsettled order in its window. Treat order_reconciler_backlog as a
               lower bound until this clears.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerPassTruncated.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderReconcilerPassTruncated.md"
 
         # CommitInventory is mandatory-forward: after the pivot a confirmed order
         # must converge to COMMITTED. Lag is measured from the pivot, so this
@@ -243,7 +243,7 @@ spec:
               committed. The saga retries with an elapsed bound; orders that
               exhaust it stop appearing in this histogram entirely and surface as
               reconciler backlog instead.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderInventoryCommitLagHigh.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderInventoryCommitLagHigh.md"
 
         # The outbox's real signal is AGE, not count: a pending row is normal for
         # milliseconds (the inline start marks it dispatched), so a row waiting
@@ -261,7 +261,7 @@ spec:
               An order committed but its saga has not started for over 10 minutes.
               The customer sees a created order that is not progressing, and the
               row holds a payment token whose authorization window is finite.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/FulfillmentStartOutboxStalled.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/FulfillmentStartOutboxStalled.md"
 
         # A FAILED row is terminal and nothing retries it: the dispatcher gave up
         # after its attempt cap, so the order is stuck `pending` until a human
@@ -279,7 +279,7 @@ spec:
               action. Nothing retries a FAILED row by design — the payment token
               has been cleared, so the honest recovery is usually to fail the order
               and let the customer retry.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/FulfillmentStartOutboxFailed.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/FulfillmentStartOutboxFailed.md"
 
         # Compensations are the saga's undo path. When one fails after its
         # retries, the order is left inconsistent in a way the reconciler can only
@@ -307,7 +307,7 @@ spec:
               A compensation step has been erroring for 15m. Compensations retry
               harder than forward steps, so a sustained error rate means orders are
               being left with stock, money, or shipments in an unwound state.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaCompensationFailing.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaCompensationFailing.md"
 
         # An order holding an inventory reservation its own outbox row does not
         # account for. One cause only: a saga start that resolved its stock branch
@@ -331,7 +331,7 @@ spec:
               otherwise. Stop the cutover rollout: until every replica resolves the
               branch from the order, the reconciler's product-path vs lost-reserve
               judgement is being made on wrong data.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderParticipantDisagreement.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderParticipantDisagreement.md"
 
         # A saga start found a participant value no build understands and fell back
         # to its flag. The column is CHECK-constrained, so the reachable path is a
@@ -350,7 +350,7 @@ spec:
               A start read a participant it did not recognise and used this
               process's ORDER_STOCK_PARTICIPANT instead, so that order's branch was
               chosen by the flag rather than by its own record.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderStartParticipantUnrecognised.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderStartParticipantUnrecognised.md"
 
         # The saga's liveness, measured end to end: starts are happening but
         # nothing is reaching a terminal outcome. The cause this exists for is a
@@ -376,4 +376,4 @@ spec:
               First suspect: the order-fulfillment Worker Deployment's Current
               version has no pollers — check `temporal worker deployment describe`
               against the running order-worker deployments before anything else.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaNotCompleting.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderSagaNotCompleting.md"

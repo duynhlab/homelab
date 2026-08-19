@@ -24,7 +24,7 @@ spec:
           annotations:
             summary: "Deployment replicas mismatch ({{ $labels.namespace }}/{{ $labels.deployment }})"
             description: "Deployment {{ $labels.deployment }} in {{ $labels.namespace }} has {{ $value }} unavailable replicas for more than 15 minutes. Check pod events and resource constraints."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubedeploymentreplicasmismatch"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeDeploymentReplicasMismatch.md"
 
         - alert: KubeStatefulSetReplicasMismatch
           expr: |
@@ -37,7 +37,7 @@ spec:
           annotations:
             summary: "StatefulSet replicas mismatch ({{ $labels.namespace }}/{{ $labels.statefulset }})"
             description: "StatefulSet {{ $labels.statefulset }} in {{ $labels.namespace }} has not reached desired replica count for more than 15 minutes."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubestatefulsetreplicasmismatch"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeStatefulSetReplicasMismatch.md"
 
         - alert: KubeJobFailed
           expr: |
@@ -49,7 +49,7 @@ spec:
           annotations:
             summary: "Job failed ({{ $labels.namespace }}/{{ $labels.job_name }})"
             description: "Job {{ $labels.job_name }} in {{ $labels.namespace }} has failed. Check job logs: kubectl logs -n {{ $labels.namespace }} job/{{ $labels.job_name }}"
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubejobfailed"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeJobFailed.md"
 
     # --- Autoscaling Saturation ---
     - name: kubernetes-autoscaling
@@ -66,7 +66,7 @@ spec:
           annotations:
             summary: "HPA at max replicas ({{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }})"
             description: "HPA {{ $labels.horizontalpodautoscaler }} in {{ $labels.namespace }} is running at maximum replicas ({{ $value }}). Service may not be able to handle additional load."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubehpamaxedout"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeHPAMaxedOut.md"
 
     # --- Storage (USE: Utilization) ---
     - name: kubernetes-storage
@@ -85,7 +85,7 @@ spec:
           annotations:
             summary: "PVC filling up ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})"
             description: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} has less than 15% free space ({{ $value | humanizePercentage }} remaining)."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepersistentvolumefillingup"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubePersistentVolumeFillingUp.md"
 
         - alert: KubePersistentVolumeFillingUpCritical
           expr: |
@@ -100,4 +100,4 @@ spec:
           annotations:
             summary: "PVC critically full ({{ $labels.namespace }}/{{ $labels.persistentvolumeclaim }})"
             description: "PVC {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} has less than 5% free space. Immediate action required to prevent data loss."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepersistentvolumefillingupcritical"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubePersistentVolumeFillingUpCritical.md"

@@ -192,6 +192,29 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Observability
+
+- **Runbooks reorganized: one folder per alert domain, one canonical template.**
+  `infrastructure-alerts.md` (28 alerts, 6 domains lumped) is split into
+  `runbooks/kubernetes/` (21 files) and `runbooks/valkey/` (7), each normalized
+  to the new parent `runbooks/_TEMPLATE.md` (pinned quick-facts keys incl.
+  Status/Dashboard rows, mandatory Escalation with the page-vs-ticket call —
+  synthesized from Google SRE playbook-per-alert + GitLab playbook standards);
+  the two drifted per-domain templates are deleted, domain deltas live in each
+  folder README's "Domain specifics" block. Every alert whose runbook exists now
+  carries a `runbook_url`: 28 rewritten to the new paths, 37 added
+  (envoy-gateway 11, RFC-0021 write-migration/phase5/phase6 23 — the three
+  files' bare `runbook:` keys standardized to `runbook_url:` — and
+  checkout-availability 3), and 4 CNPG logical-replication Critical alerts
+  re-pointed to their Critical runbooks (both cluster dirs). Ride-alongs:
+  alert-catalog §3/§5 gain Runbook columns, 5 orphaned microservices runbooks
+  are indexed (new Inventory stock-authority section), the microservices hub's
+  stale counts/shipped-phase sketches are condensed, and 5 stub runbooks
+  (`PgxPoolAcquireWaitHigh`,
+  `DBClientErrorRate`, `MicroserviceErrorRateCritical`,
+  `MicroserviceHighLatencyP99`, `GrpcServerHighLatencyP95`) are rewritten to
+  full template shape grounded in their live exprs.
+
 #### Local-stack
 
 - **The compose gate learns the ADR-053 rows, and the local edge catches up to
@@ -802,6 +825,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`observability-deep-dive.md` removed** — the file was personal
+  interview/CV prep material ("Interview Answers", "CV Deep Dive: Defending
+  Your Numbers") pushed to the repo by mistake; its platform-relevant content
+  (4-pillar architecture, `pkg/httpmw` middleware chain, correlation workflow)
+  already lives in the observability hub, so all nine inbound links were
+  re-pointed or dropped rather than preserved.
 - **`TemporalServiceErrorRateHigh` could never fire** — its expression rated
   `service_errors`, a series that does not exist on temporal server 1.31.2
   (the real counter is `service_error_with_type`; verified against a live

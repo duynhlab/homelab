@@ -23,7 +23,7 @@ spec:
           annotations:
             summary: "Kubernetes API server is unreachable"
             description: "The Kubernetes API server has been unreachable for more than 5 minutes. Cluster control plane is degraded."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiserverdown"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeAPIServerDown.md"
 
         # Golden Signal: Latency
         # CONNECT is excluded like LIST|WATCH: exec/port-forward/attach are
@@ -42,7 +42,7 @@ spec:
           annotations:
             summary: "API server high P99 latency ({{ $labels.verb }} {{ $labels.resource }})"
             description: "API server P99 latency for {{ $labels.verb }} {{ $labels.resource }} is {{ $value | humanizeDuration }} (threshold: 1s)."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiserverhighlatency"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeAPIServerHighLatency.md"
 
         # Golden Signal: Errors
         - alert: KubeAPIServerErrorRate
@@ -57,7 +57,7 @@ spec:
           annotations:
             summary: "API server high error rate"
             description: "Kubernetes API server 5xx error rate is {{ $value | humanizePercentage }} (threshold: 3%). Check API server logs and webhook configurations."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiservererrorrate"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeAPIServerErrorRate.md"
 
         # Golden Signal: Saturation
         - alert: KubeAPIServerHighInflight
@@ -70,4 +70,4 @@ spec:
           annotations:
             summary: "API server high inflight requests"
             description: "API server has {{ $value | humanize }} concurrent inflight requests (threshold: 200). Control plane may be overloaded."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubeapiserverhighinflight"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeAPIServerHighInflight.md"

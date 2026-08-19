@@ -29,7 +29,7 @@ spec:
           annotations:
             summary: "High CPU throttling ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
             description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is being throttled {{ $value | humanizePercentage }} of the time. Consider increasing CPU limits or optimizing CPU usage."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodcputhrottlinghigh"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubePodCPUThrottlingHigh.md"
 
     # --- Memory Saturation ---
     - name: kubernetes-pod-memory
@@ -57,7 +57,7 @@ spec:
           annotations:
             summary: "Memory near limit ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
             description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of its memory limit. Risk of OOMKill."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodmemorynearlimit"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubePodMemoryNearLimit.md"
 
         - alert: KubePodOOMKilled
           expr: |
@@ -69,7 +69,7 @@ spec:
           annotations:
             summary: "OOMKilled ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
             description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was OOMKilled. Increase memory limits or investigate memory leaks via Pyroscope heap profiles."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodoomkilled"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubePodOOMKilled.md"
 
     # --- Pod Health ---
     - name: kubernetes-pod-health
@@ -85,7 +85,7 @@ spec:
           annotations:
             summary: "CrashLoopBackOff ({{ $labels.namespace }}/{{ $labels.pod }}/{{ $labels.container }})"
             description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is in CrashLoopBackOff. Check container logs: kubectl logs -n {{ $labels.namespace }} {{ $labels.pod }} -c {{ $labels.container }} --previous"
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodcrashlooping"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubePodCrashLooping.md"
 
         - alert: KubePodNotReady
           expr: |
@@ -99,4 +99,4 @@ spec:
           annotations:
             summary: "Pod not ready ({{ $labels.namespace }}/{{ $labels.pod }})"
             description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in a non-ready state for more than 15 minutes. Check events: kubectl describe pod -n {{ $labels.namespace }} {{ $labels.pod }}"
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/infrastructure-alerts.md#kubepodnotready"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubePodNotReady.md"

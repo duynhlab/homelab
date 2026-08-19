@@ -319,7 +319,7 @@ services:
       clickhouse: { condition: service_healthy }
 
   victoria-traces:
-    image: victoriametrics/victoria-traces:v0.9.4
+    image: victoriametrics/victoria-traces:v0.11.0
     command:
       - "-httpListenAddr=:10428"
       - "-storageDataPath=/victoria-traces-data"

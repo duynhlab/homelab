@@ -513,14 +513,13 @@ confirmed order drives the saga in flow 4.
 
 ### 1. Register / login → JWT
 
-Owner: [auth.md](./auth.md). **Historical since RFC-0024 P3:** the SPA now
-logs in against the Keycloak realm (`keycloak-js` PKCE,
+Owner: [§ Authentication](#authentication) — the SPA logs in against the
+Keycloak realm (`keycloak-js` PKCE,
 [ADR-043](../proposals/adr/ADR-043-oidc-browser-workload-trust/)) and services
-verify realm tokens only — the flow below still runs on the not-yet-retired
-auth-service, but nothing consumes its tokens; it is decommissioned in P5. The
-diagram reflects the cluster, where `api-auth-public` still routes to
-auth-service; local-stack carries no `/auth/v1/` route at all, so this flow
-cannot be driven there.
+verify realm tokens only. **The diagram below is historical** (auth-service,
+retired by RFC-0024 P5 — no `/auth/v1/*` route exists at either edge; the
+archived contract stays readable in [auth.md](./auth.md)); it is kept because
+the token-rotation shape it teaches carried over to the realm flow.
 
 ```mermaid
 sequenceDiagram

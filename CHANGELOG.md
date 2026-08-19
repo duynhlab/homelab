@@ -624,6 +624,20 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The retired auth-service and Kong stop speaking in live voice.** AGENTS.md
+  — the operative contract — still said "11 services", "Kong DB-less gateway"
+  in the local-stack line, four ResourceSet domains, and a dead
+  `ingress-api.yaml` routing target; all corrected (10 services + Keycloak,
+  standalone Envoy Gateway, five domains incl. `fulfillment`, real
+  routes/network-policies paths, and the `dependsOn` chain rebuilt from the
+  22 actual Kustomizations — it had omitted `network-policies-local`, which
+  `databases-local` depends on). The two deliberately-kept learning docs get
+  stronger frozen-history banners (`docs/platform/kong-gateway.md` — its
+  "arriving with P6" clause was stale; `docs/api/auth.md`), per the
+  banner-in-place convention (filenames kept for link stability, as recorded
+  at the original archiving). `docs/api/api.md`'s journey 1 no longer claims
+  auth-service is "not-yet-retired" with a live `api-auth-public` route; the
+  archived service's live CI badges are dropped from both index tables.
 - **The `manual_review` runbook leads with the portal, not psql.** Diagnosis
   starts at the order case view (the three external truths read live, plus the
   transition history); recovery step 2 is the Resolve button or its endpoint, with

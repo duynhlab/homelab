@@ -6,11 +6,11 @@ external request passes through before it reaches a service.
 
 | Fact | Value |
 |------|-------|
-| Control plane | Envoy Gateway v1.9.0 in the cluster (chart digest-pinned); the local standalone edge is still on v1.8.3 |
+| Control plane | Envoy Gateway v1.9.0 — cluster (chart digest-pinned) and the local standalone edge (compose image digest-pinned), skew closed 2026-08-19 |
 | Data plane | Envoy proxy, configured over xDS by the control plane |
 | API surface | Gateway API standard channel, bundle-version `v1.6.1` (`GatewayClass`, `Gateway`, `HTTPRoute`) + Envoy Gateway extensions (`Backend`, `EnvoyProxy`, `SecurityPolicy`, `BackendTrafficPolicy`) |
 | Cluster config | `kubernetes/infra/configs/envoy-gateway/` — Kubernetes provider, 2 replicas, NodePort 30080/30443 |
-| Local config | `local-stack/gateway/eg/` — standalone provider, one Envoy child process, published on `:8080`; `envoyproxy/gateway:v1.8.3`, bumped separately because it gates on the compose E2E audit |
+| Local config | `local-stack/gateway/eg/` — standalone provider, one Envoy child process, published on `:8080`; `envoyproxy/gateway:v1.9.0` (bumps ride the compose E2E audit) |
 | Edge authentication | `SecurityPolicy.jwt` with `remoteJWKS` against the `duynhlab` realm; no key material in git |
 | Edge telemetry | OTLP **gRPC** traces, JSON access log on stdout, Prometheus stats endpoint |
 | Edge `service.name` in traces | Derived as `<gateway>.<namespace>` — locally `platform.envoy-gateway-system` |
@@ -290,4 +290,4 @@ validation.
 - [Envoy Gateway documentation](https://gateway.envoyproxy.io/docs/) — upstream
 - [Gateway API](https://gateway-api.sigs.k8s.io/) — the portable API this builds on
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-08-19 — local standalone edge bumped to v1.9.0 with the ADR-053 train, closing the cluster/local version skew_

@@ -111,7 +111,7 @@ The **operator owns the untracked SKU**, and the **wire calls it a conflict**:
    bootstrap and obliges the portal to expose it for SKUs that have no balance
    row yet (an explicit "receive first stock" affordance, not a row action).
 2. The portal **warns at publish** when the product being published has no
-   balance row (a read-only `BatchGetAvailability` check). Publishing stays
+   balance row (a read-only protected balances check). Publishing stays
    allowed — the warning makes the state visible at the moment it is created,
    without coupling product's lifecycle to inventory.
 3. Checkout answers a basket holding an untracked SKU with
@@ -126,9 +126,9 @@ The **operator owns the untracked SKU**, and the **wire calls it a conflict**:
 |------|-------------------|
 | Ownership | The operator owns balance bootstrap, through inventory's receipts command. No automated path creates balances. |
 | Write path | `POST /inventory/v1/protected/receipts` accepts any `sku_id`, tracked or not (as built); the Admin Portal must offer it for untracked SKUs. |
-| Read path | The portal reads `BatchGetAvailability` (read-only) to warn at publish when no balance exists. |
+| Read path | The portal warns at publish via the protected balances read (`GET /inventory/v1/protected/balances?sku_id=…`, read-only; `total_items == 0` ⇔ untracked). `BatchGetAvailability` — named here originally — is gRPC-only and unreachable from a browser SPA (ADR-048: no BFF). |
 | Boundary | product-service never calls inventory on a lifecycle transition; publish is never gated on stock. |
-| Failure behavior | Untracked SKU at session create or confirm → `409 ITEM_NOT_ORDERABLE`, session requoted to `shipping_set`, key not consumed. Transient upstream failure → `503` + `Retry-After`, retry with the same key. SKU ids stay in the log and span, never the body. |
+| Failure behavior | Untracked SKU at confirm → `409 ITEM_NOT_ORDERABLE` with the session requoted to `shipping_set`, key not consumed; at session create → a flat `409 ITEM_NOT_ORDERABLE` (no session exists yet to requote). Neither carries `Retry-After`. Transient upstream failure → `503` + `Retry-After`, retry with the same key. SKU ids stay in the log and span, never the body. |
 | Compatibility | The platform is pre-deployment: `docs/api/` specifies the 409 contract directly and the services cut over to match it — no compatibility window, no dual behavior. checkout-service and frontend land together so the SPA never sees a code it cannot word. Until the cutover, the shipped 503 is an implementation-conformance gap, tracked in the microservices.md known-gaps row. |
 
 The three layers name this condition differently on purpose: inventory's gRPC
@@ -150,7 +150,7 @@ flowchart LR
 
   OP --> PORTAL
   PORTAL -->|"POST /protected/receipts<br/>(bootstrap, idempotent)"| INV
-  PORTAL -.->|"BatchGetAvailability<br/>(warn at publish, read-only)"| INV
+  PORTAL -.->|"protected balances read<br/>(warn at publish, read-only)"| INV
   CK -->|"CheckAvailability<br/>unknown_sku_ids"| INV
   CK -->|"409 ITEM_NOT_ORDERABLE<br/>requoted session, key kept"| SPA
 
@@ -244,7 +244,7 @@ code inside their retry-on-5xx logic.
 
 | Requirement | Verification |
 |-------------|--------------|
-| Untracked SKU answers 409 with requoted session, key not consumed | e2e-audit row (added at adoption): drive a basket with a receipt-less SKU, assert status/body/session state, then confirm again with the same key after a receipt |
+| Untracked SKU answers 409 (flat at create; with the requoted session at confirm), key not consumed | e2e-audit A21: drive a basket with a receipt-less SKU, assert the flat 409 at create and the recovery after a receipt; the confirm envelope is pinned by checkout-service's contract tests |
 | Portal bootstrap works for a SKU with no balance row | Portal E2E (B-phase) step at adoption |
 | Publish warning fires | Portal E2E step at adoption |
 | Transient 503 unchanged | Existing confirm rows keep asserting `503` + `Retry-After` on upstream outage |
@@ -291,6 +291,7 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-19 | Accepted / Not started | Decided from the 2026-08-18 products/35 investigation; owner selected operator bootstrap + publish warning + the 409 contract over keep-503, publish-gate, and auto-zero-balance |
+| 2026-08-19 | Accepted / Not started | Errata during adoption: the publish-warning read is the protected balances HTTP route (`BatchGetAvailability` is gRPC-only, unreachable from the SPA), and session create answers a flat 409 — no session exists yet to requote. Decision unchanged |
 
 ---
-_Last updated: 2026-08-19_
+_Last updated: 2026-08-19 — adoption errata: balances read, flat-409-at-create_

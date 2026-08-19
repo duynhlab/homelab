@@ -1,11 +1,14 @@
 # Kong API Gateway
 
-> **Archived (RFC-0024, 2026-08-12).** This documents the retired Kong OSS
-> edge, kept as history — the live edge is Envoy Gateway
-> (`docs/platform/envoy-gateway.md`, arriving with P6; until then see
-> [`kubernetes/infra/configs/envoy-gateway/`](../../kubernetes/infra/configs/envoy-gateway/)).
-> The body below is **not** updated — it describes the platform as it was
-> while Kong served the edge.
+> **Archived (RFC-0024, 2026-08-12) — kept deliberately as learning
+> material.** This documents the retired Kong OSS edge: how a DB-less
+> declarative gateway was configured, what worked, and the § "Why we left"
+> problems that drove the migration. The live edge is
+> [**Envoy Gateway**](envoy-gateway.md)
+> ([`kubernetes/infra/configs/envoy-gateway/`](../../kubernetes/infra/configs/envoy-gateway/)).
+> The body below is **frozen history** — never updated; it describes the
+> platform as it was while Kong served the edge, and its commands/routes no
+> longer work anywhere.
 
 ## Why we left (known problems)
 
@@ -1155,4 +1158,4 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 
 ---
 
-_Last updated: 2026-07-22 — 10 microservices; checkout `/checkout/v1/private/` route; Flux chain decoupled from apps-local._
+_Last updated: 2026-08-19 — archive banner strengthened (kept-for-learning framing; the "arriving with P6" clause was stale — envoy-gateway.md is live). Body frozen since 2026-07-22._

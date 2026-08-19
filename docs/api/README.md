@@ -158,7 +158,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 
 | Component | Local | Cluster | Status | CI |
 |-----------|:-----:|:-------:|--------|-----|
-| [auth API](./auth.md) | — | — | **Archived** — RFC-0024 P5 executed: the whole surface is deleted; the realm is the only issuer. Contract kept as history | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) |
+| [auth API](./auth.md) | — | — | **Archived** — RFC-0024 P5 executed: the whole surface is deleted; the realm is the only issuer. Contract kept as history | — (repo archived) |
 | [user API](./user.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/user-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/user-service/actions) |
 | [product API + gRPC](./product.md) | ✓ | ✓ | Implemented | [![CI](https://github.com/duynhlab/product-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/product-service/actions) |
 | [inventory gRPC](./inventory.md) | ✓ | ✓ | Implemented — the sole stock authority; callers: order saga, checkout, product /details | [![CI](https://github.com/duynhlab/inventory-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/inventory-service/actions) |
@@ -177,7 +177,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 
 | Service | One-line responsibility | Contract |
 |---------|-------------------------|----------|
-| Auth | Credentials, JWTs, refresh rotation, and JWKS | [auth.md](./auth.md) |
+| Auth (**Archived** — Keycloak realm is the issuer) | Credentials, JWTs, refresh rotation, and JWKS — retired contract kept for learning | [auth.md](./auth.md) |
 | User | Public and owner-scoped profiles | [user.md](./user.md) |
 | Product | Catalog, price, and review aggregation (**no stock** since RFC-0021 phase 4) | [product.md](./product.md) |
 | Inventory | Warehouse balances, reservations, and movement ledger — the **sole** stock authority, called by checkout, product `/details`, and the order saga | [inventory.md](./inventory.md) |

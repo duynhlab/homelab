@@ -189,7 +189,7 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 
 | Service | Repository | Contract | Image | CI |
 |---------|------------|----------|-------|-----|
-| Auth | [auth-service](https://github.com/duynhlab/auth-service) | [auth.md](./api/auth.md) | `ghcr.io/duynhlab/auth-service/auth-service` | [![CI](https://github.com/duynhlab/auth-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/auth-service/actions) |
+| Auth (**Archived**) | [auth-service](https://github.com/duynhlab/auth-service) (archived) | [auth.md](./api/auth.md) | — (retired RFC-0024 P5) | — |
 | User | [user-service](https://github.com/duynhlab/user-service) | [user.md](./api/user.md) | `ghcr.io/duynhlab/user-service/user-service` | [![CI](https://github.com/duynhlab/user-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/user-service/actions) |
 | Product | [product-service](https://github.com/duynhlab/product-service) | [product.md](./api/product.md) | `ghcr.io/duynhlab/product-service/product-service` | [![CI](https://github.com/duynhlab/product-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/product-service/actions) |
 | Inventory | [inventory-service](https://github.com/duynhlab/inventory-service) | [inventory.md](./api/inventory.md) | `ghcr.io/duynhlab/inventory-service/inventory-service` | [![CI](https://github.com/duynhlab/inventory-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/inventory-service/actions) |

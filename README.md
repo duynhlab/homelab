@@ -31,9 +31,11 @@
 ## Overview
 
 Platform delivery hub: Kubernetes manifests (Flux + Kustomize + OCI), observability
-stack, database and secrets infra, and Kyverno policies. Deploys **11 Go microservices**
-and a React frontend on **Kind** locally. Application source lives in separate
-repositories.
+stack, database and secrets infra, and Kyverno policies. Deploys **10 Go
+microservices** across five domains (identity, catalog, checkout, fulfillment,
+comms), **two Temporal workers**, a React storefront, and a back-office portal
+on **Kind** — with **Keycloak** for identity and **Envoy Gateway** as the only
+edge. Application source lives in separate repositories.
 
 ---
 
@@ -41,74 +43,61 @@ repositories.
 
 ```mermaid
 flowchart TD
-    classDef frontend fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#fff,rx:8px,ry:8px
-    classDef layer    fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef cache    fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef pooler   fill:#8b5cf6,stroke:#5b21b6,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef database fill:#ef4444,stroke:#b91c1c,stroke-width:2px,color:#fff
-    classDef obs      fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef obsGroup fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray:5 5,rx:10px,ry:10px
-    classDef secret   fill:#ec4899,stroke:#be185d,stroke-width:2px,color:#fff,rx:5px,ry:5px
-    classDef servicebox fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,stroke-dasharray:5 5,rx:10px,ry:10px
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
 
-    FE["Frontend<br/>local.duynh.me"]:::frontend
-    Kong["Kong Ingress<br/>gateway.duynh.me<br/>(TLS, CORS, rate-limit)"]:::layer
+    Browser["Browser"]:::external
+    EG["Envoy Gateway<br/>gateway.duynh.me<br/>(TLS, JWT, CORS, rate-limit)"]:::edge
+    KC["Keycloak<br/>id.duynh.me (OIDC)"]:::platform
 
-    subgraph Microservices ["10 microservices · Web → Logic → Core"]
-        WebLayer["Web<br/>(HTTP, validation, aggregation)"]:::layer
-        LogicLayer["Logic<br/>(business rules, Cache-Aside)"]:::layer
-        CoreLayer["Core<br/>(domain models, repositories)"]:::layer
-        WebLayer --> LogicLayer --> CoreLayer
+    subgraph Apps ["Applications"]
+        SPA["Storefront SPA<br/>local.duynh.me"]:::service
+        BO["Back-office portal<br/>backoffice.duynh.me"]:::service
+        SVC["10 Go services<br/>identity · catalog · checkout<br/>· fulfillment · comms"]:::service
+        TMP["Temporal server"]:::platform
+        WK["Temporal workers<br/>checkout-worker · order-worker"]:::worker
     end
 
-    subgraph Observability ["Observability stack"]
+    subgraph Data ["Data"]
+        valkey[("Valkey cache")]:::data
+        pgdog["PgDog pooler"]:::data
+        pgb["CNPG pooler<br/>(PgBouncer)"]:::data
+        productdb[("product-db<br/>CNPG HA + DR replica")]:::data
+        platformdb[("platform-db<br/>CNPG HA")]:::data
+    end
+
+    subgraph Obs ["Observability"]
         direction LR
-        prom["VictoriaMetrics"]:::obs
-        tempo["Tempo + OTel"]:::obs
-        vlogs["VictoriaLogs + Vector"]:::obs
-        pyro["Pyroscope"]:::obs
-        grafana["Grafana"]:::obs
-        prom & tempo & vlogs & pyro --> grafana
+        otel["OTel Collector<br/>+ vmagent · Vector"]:::platform
+        backends["VictoriaMetrics · VictoriaLogs<br/>Tempo · Pyroscope · ClickHouse"]:::platform
+        grafana["Grafana<br/>+ Sloth SLOs"]:::platform
+        otel --> backends --> grafana
     end
 
-    subgraph CoreInfra ["Core infrastructure"]
-        direction LR
-        valkey["Valkey cache"]:::cache
-        subgraph SecretsDev ["Secrets"]
-            openbao["OpenBAO (HA Raft)"]:::secret
-            eso["External Secrets Operator"]:::secret
-            openbao --> eso
-        end
+    subgraph Sec ["Secrets"]
+        openbao["OpenBAO (HA Raft)"]:::platform
+        eso["External Secrets Operator"]:::platform
+        openbao --> eso
     end
 
-    subgraph Poolers ["Connection poolers (PgDog)"]
-        pdog_product["pgdog-product"]:::pooler
-        pdog_auth["pgdog-auth"]:::pooler
-        pdog_shared["pgdog-shared"]:::pooler
-    end
-
-    subgraph Databases ["PostgreSQL (CloudNativePG, HA)"]
-        db_product[("product-db<br/>CNPG (+ DR replica)")]:::database
-        db_auth[("auth-db<br/>CNPG")]:::database
-        db_shared[("shared-db<br/>CNPG")]:::database
-        db_temporal[("temporal-db<br/>CNPG")]:::database
-    end
-
-    FE -->|HTTPS| Kong --> WebLayer
-    WebLayer & LogicLayer & CoreLayer -.->|telemetry| Observability
-    LogicLayer -->|Cache-Aside| valkey
-    eso -.->|secrets| Databases
-    eso -.->|secrets| CoreLayer
-    CoreLayer -->|SQL product/cart/order/payment| pdog_product
-    CoreLayer -->|SQL auth| pdog_auth
-    CoreLayer -->|SQL user/review/shipping/notification| pdog_shared
-    pdog_product ==> db_product
-    pdog_auth ==> db_auth
-    pdog_shared ==> db_shared
-
-    class Microservices,SecretsDev servicebox
-    class Observability obsGroup
+    Browser -->|HTTPS| EG
+    EG --> SPA & BO & SVC
+    EG -.->|"JWKS"| KC
+    SVC -->|"Cache-Aside"| valkey
+    SVC --> TMP --> WK
+    SVC -->|"catalog/checkout SQL"| pgdog ==> productdb
+    SVC -->|"identity/comms SQL"| pgb ==> platformdb
+    KC & TMP -->|"direct SQL"| platformdb
+    SVC & WK -.->|"OTLP"| otel
+    eso -.->|"secrets"| SVC
 ```
+
+Colors follow the house palette: blue = edge, cyan = services, amber = workers,
+purple = platform components, green = data stores, gray = external.
 
 ---
 
@@ -117,7 +106,7 @@ flowchart TD
 | Path | Role |
 |------|------|
 | `kubernetes/clusters/` | Flux bootstrap + per-cluster `Kustomization` dependency chain |
-| `kubernetes/infra/` | Controllers and configs — monitoring, databases, secrets, Kong, Kyverno |
+| `kubernetes/infra/` | Controllers and configs — monitoring, databases, secrets, Envoy Gateway, Kyverno |
 | `kubernetes/apps/` | Domain ResourceSets and per-service InputProviders |
 | `terraform/` | OpenTofu bootstrap of Flux Operator + `FluxInstance` |
 | `local-stack/` | Docker Compose e2e stack (no cluster required) |
@@ -160,14 +149,18 @@ Other targets: `make validate`, `make sync`, `make down`, `make help`.
 
 ## Local access
 
-Kind maps host `80`/`443` to Kong. TLS is a wildcard `*.duynh.me` cert — self-signed
-`homelab-ca` on local Kind (browser warning); Let's Encrypt on prod.
+Kind maps host `80`/`443` to the Envoy Gateway NodePorts (`30080`/`30443`).
+TLS is a wildcard `*.duynh.me` cert — self-signed `homelab-ca` on local Kind
+(browser warning); Let's Encrypt on prod.
 
 | URL | Purpose |
 |-----|---------|
-| https://local.duynh.me | Frontend SPA |
+| https://local.duynh.me | Storefront SPA |
 | https://gateway.duynh.me | API gateway |
+| https://id.duynh.me | Keycloak (OIDC) |
+| https://backoffice.duynh.me | Back-office portal |
 | https://grafana.duynh.me | Dashboards |
+| https://temporal.duynh.me | Temporal UI |
 | https://ui.duynh.me | Flux UI |
 
 Demo login: `alice` / `password123` (by username).

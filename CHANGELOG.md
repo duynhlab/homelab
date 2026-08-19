@@ -882,6 +882,17 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Root README caught up to the deployed platform.** The overview and
+  topology diagram still described the Kong-era layout: Kong as the edge, "10
+  microservices · Web → Logic → Core", three PgDog poolers, and an
+  `auth-db`/`shared-db`/`temporal-db` cluster list that never matched the
+  deployed `product-db`/`platform-db` pair. Redrawn against the manifests in
+  the house palette: Envoy Gateway edge (NodePorts 30080/30443) with Keycloak
+  JWKS, storefront + back-office + 10 services across the five domains, the
+  Temporal server/worker pair, PgDog (product-db) vs CNPG PgBouncer
+  (platform-db) pooling with Keycloak/Temporal direct connections, and the
+  OTLP observability plane incl. ClickHouse. Local-access table gains
+  id/backoffice/temporal hosts; the infra layout row drops Kong.
 - **`docs/api/` corrected against three verified runtime behaviours.**
   `PROMO_INVALID` was filed under `400`; the service answers `404`, and the
   E2E audit has asserted 404 since it was written. The apply-promo row

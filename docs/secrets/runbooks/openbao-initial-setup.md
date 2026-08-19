@@ -56,7 +56,7 @@ fresh cluster (`make up`) seeds the full script.
 
 ## Step 6 — Seed bootstrap-only Cloudflare token (operator)
 
-**Local Kind:** nothing to do — `openbao-bootstrap` seeds a **dev placeholder** (`api_token="dev-cloudflare-placeholder"`) so the ExternalSecret syncs. Local `platform-edge-tls` is `homelab-ca`-issued (planned — not yet reconciled on Kind), so the (failing) DNS-01 challenge is irrelevant.
+**Local Kind:** nothing to do — `openbao-bootstrap` seeds a **dev placeholder** (`api_token="dev-cloudflare-placeholder"`) so the ExternalSecret syncs. Local `platform-edge-tls` is `homelab-ca`-issued (reconciled on Kind with the RFC-0024 bring-up), so the (failing) DNS-01 challenge is irrelevant.
 
 **Prod:** the real Cloudflare API token used by cert-manager DNS-01 is **operator-supplied** — **not** in Git. The stored `root_token` is inert, so mint a
 temporary root first via the

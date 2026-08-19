@@ -16,7 +16,7 @@ Secrets — they never call OpenBAO directly.
 | App secret delivery | ESO reads OpenBAO KV v2; the notification service reads the **database engine static role** instead ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) pilot) | Extend database-engine credentials beyond the pilot |
 | OpenBAO endpoint | Plain HTTP in-cluster (`tlsDisable: true`) | TLS via cert-manager |
 | OpenBAO unseal | `awskms` auto-unseal via the floci KMS emulator (pods self-unseal at boot); `openbao-init-keys` holds only a break-glass recovery key; root token revoked ([ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap floci `endpoint`) |
-| TLS issuer split | Local `platform-edge-tls` is signed by `homelab-ca` (planned — not yet reconciled on Kind) | Prod `platform-edge-tls` is Let's Encrypt via Cloudflare DNS-01 |
+| TLS issuer split | Local `platform-edge-tls` is signed by `homelab-ca` (reconciled on Kind — RFC-0024 bring-up; K-row gate pass pending) | Prod `platform-edge-tls` is Let's Encrypt via Cloudflare DNS-01 |
 | Trust distribution | trust-manager distributes `homelab-ca-bundle` to labeled namespaces | Same, with rotation runbooks |
 | Unsafe local choices | Dev placeholders, root token persistence, plaintext listener | Remove before production; tracked by RFC-0008 |
 
@@ -165,7 +165,7 @@ root token revoked; production target is a real cloud KMS. See
 | 2 | OpenBAO bootstrap | Ensures the floci KMS alias, initializes OpenBAO (**awskms auto-unseal** — pods self-unseal), enables KV v2, Kubernetes auth, policies, seeds learning secrets, then **revokes the root token** |
 | 3 | ClusterSecretStore | Points ESO at `http://openbao.openbao.svc.cluster.local:8200` with Kubernetes auth role `eso-reader` |
 | 4 | ESO | Reads OpenBAO paths and materializes Kubernetes Secrets with `refreshInterval: 1h` |
-| 5 | cert-manager | Uses `cloudflare-api-token` only for prod Let's Encrypt DNS-01; local Kind patches `platform-edge-tls` to `homelab-ca` (planned — the patch lives in `envoy-gateway-config.yaml`, not yet reconciled on Kind) |
+| 5 | cert-manager | Uses `cloudflare-api-token` only for prod Let's Encrypt DNS-01; local Kind patches `platform-edge-tls` to `homelab-ca` (the patch in `envoy-gateway-config.yaml` has reconciled on Kind — RFC-0024 bring-up) |
 | 6 | trust-manager | Combines Mozilla CAs and the committed `homelab-ca` PEM into `homelab-ca-bundle` ConfigMaps |
 | 7 | Workloads | Consume Kubernetes Secrets or mount trust bundles; they do not call OpenBAO directly |
 

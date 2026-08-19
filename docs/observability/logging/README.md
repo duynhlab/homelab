@@ -206,10 +206,9 @@ kubectl get pods -n kube-system -l app.kubernetes.io/name=vector
 kubectl get vlsingle -n monitoring
 ```
 
-Vector self-monitoring (its own throughput/error/buffer metrics, alerts, and
-full backend troubleshooting are in [Troubleshooting](#troubleshooting) below. For
-symptom-driven on-call (blank Grafana logs panel), see
-[`victorialogs-kubernetes-logs-debug.md`](../runbooks/victorialogs-kubernetes-logs-debug.md).
+Vector self-monitoring (its own throughput/error/buffer metrics, alerts) and
+full pipeline troubleshooting — including the blank-Grafana-panel case — are
+in [Troubleshooting](#troubleshooting) below.
 
 ## Platform pipeline
 
@@ -431,6 +430,24 @@ curl -G 'http://localhost:9428/select/logsql/query' \
    -- Connect to product-db (product, cart, order, or payment database)
    SELECT pg_sleep(1);
    ```
+
+### Logs Ingested but Blank in Grafana
+
+Logs answer on VictoriaLogs' own API but the Grafana panel/Explore is empty:
+
+1. **Verify VictoriaLogs is reachable from the Grafana pod**:
+   ```bash
+   kubectl exec -n monitoring deploy/grafana -- \
+     wget -qO- --timeout=5 http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/health
+   ```
+2. **Check the datasource** — plugin `victoriametrics-logs-datasource`, UID
+   `victorialogs`, provisioned by
+   `kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml`;
+   Connections → Data sources → VictoriaLogs → Save & Test.
+3. **Widen the time range** (retention is 7d — an empty "Last 15 minutes" is
+   often just a quiet window), and query stream fields via `_stream:{...}`
+   only — a non-stream field there matches nothing; use a word/phrase filter
+   instead.
 
 ### High Memory Usage in Vector
 

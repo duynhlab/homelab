@@ -17,7 +17,6 @@
 | **Scope** | The gin HTTP middleware chain of every Go API service: request tracing, the access log, and trace-context correlation. Not gRPC (`pkg/grpcx` already owns it), not workers |
 | **Affected components** | `duynhlab/pkg` (`httpmw`, and span helpers in `obsx`), 10 `*-service` repos (auth retired), `docs/api/observability.md` |
 | **Related RFC** | [RFC-0014](../../rfc/RFC-0014/) |
-| **Related research** | [Telemetry audit 2026-08-07](../../../observability/audit-2026-08-07.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | `pkg` merged and tagged `httpmw/v0.1.0` + `obsx/v0.37.1`; `inventory-service` merged; the nine HTTP services have open pull requests awaiting the compose end-to-end gate |
@@ -222,7 +221,18 @@ tracing→logging order stops being a per-repo convention.
 
 ## References
 
-- [Telemetry audit 2026-08-07](../../../observability/audit-2026-08-07.md) — findings F-1 and F-2, with the measurements
+- Telemetry audit 2026-08-07 — findings F-1 and F-2 (the audit log has since
+  been removed from the repo; the measurements, preserved): **F-1** — access-log
+  trace correlation worked in 1 of 10 HTTP services. Measured on ClickHouse,
+  33 348 log rows carried a `trace_id` string attribute but only 21 a native
+  LogRecord `TraceId`; at full sampling on local-stack only `cart` emitted the
+  field (9 837/9 837), because 8 copies built `loggerWithTrace` and then logged
+  from the base `logger` (a one-word defect), `auth` never bound the context,
+  and `GetTraceID` fabricated a random id when no span existed. **F-2** — probe
+  noise: 3 395 of `auth`'s 3 401 access-log rows were successful probes (every
+  service in the same band); the skip list existed in `TracingMiddleware` but
+  not `LoggingMiddleware`. Exactly the copied-middleware failure class this ADR
+  removes.
 - [`docs/api/observability.md`](../../../api/observability.md) — the normative contract, `:147` and `:178`
 - [`docs/api/logs.md`](../../../api/logs.md) — access-log field schema
 - [RFC-0014](../../rfc/RFC-0014/) — the instrumentation policy this serves

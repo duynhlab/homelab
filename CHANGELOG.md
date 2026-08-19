@@ -472,7 +472,9 @@ Skeleton (copy what you need):
   `clickhouse-server` endpoint stays deliberately off at 1×1 — recorded as
   the thing to enable with the first extra replica.
 - Telemetry audit findings log added at
-  [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
+  `docs/observability/audit-2026-08-07.md` (since deleted in this same
+  release — see Bugfix › Observability; the cited measurements live on in
+  ADR-038's References)
   — the `api/observability.md` contract measured against the deployed platform.
   Six findings, four falsified suspicions (one of them my own bad test), and an
   explicit compliant list so the next audit can diff instead of re-deriving.
@@ -825,6 +827,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Observability docs cleanup: the microservices hub dissolved, three pushed
+  session artifacts deleted.** `runbooks/microservices-alerts.md` is gone — its
+  unique content (4 cross-signal investigation workflows, threshold-tuning
+  guide, retired-alert context) moved into `runbooks/microservices/README.md`;
+  its duplicated sections (two-layer strategy, alert summary, per-alert table)
+  already lived in `alerting/README.md`, the catalog, and the folder index; the
+  one live fact from its expansion table (phase 4 cross-service dependency
+  alerts still open — no `http_client_*` metrics) is now a catalog
+  coverage-gap row. Also deleted: `runbooks/victorialogs-kubernetes-logs-debug.md`
+  (a pushed debug session; logging README's Troubleshooting already covered it
+  and absorbed its one missing check — "logs ingested but blank in Grafana"),
+  `audit-2026-08-07.md` (dated Kong-era findings log; the F-1/F-2 measurements
+  ADR-038 cited are inlined into that ADR's References), and `stack-review.md`
+  (point-in-time review, 2026-07-19; its gap list already lives in ADR-023).
+  All inbound links re-pointed or unlinked.
 - **`observability-deep-dive.md` removed** — the file was personal
   interview/CV prep material ("Interview Answers", "CV Deep Dive: Defending
   Your Numbers") pushed to the repo by mistake; its platform-relevant content

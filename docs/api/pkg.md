@@ -69,8 +69,10 @@ shared HTTP middleware that wants trace context must build the field from the
 OpenTelemetry **API**, which Layer 1 may import. [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/)
 works that through, and both Layer 1 middleware now live the consequence:
 `grpcx` inlined its trace-id helper, and `httpmw` carries its own five-line copy
-of the trace-context field rather than opening the first cross-module edge — see
-the finding in [audit-2026-08-07](../observability/audit-2026-08-07.md).
+of the trace-context field rather than opening the first cross-module edge —
+the 2026-08-07 telemetry audit measured the failure class this prevents:
+per-repo middleware copies got trace binding wrong in 9 of 10 HTTP services
+(details preserved in [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) § References).
 
 Authoritative per-package detail lives in the repo's own
 [`README`](https://github.com/duynhlab/pkg#packages) and `AGENTS.md`; this page is

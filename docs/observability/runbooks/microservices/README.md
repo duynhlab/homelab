@@ -9,7 +9,8 @@ Per-alert investigation guides for OTLP-based RED/Golden Signal alerts on the
 | Recording rules | [`prometheusrules/microservices/recording-rules.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml) |
 | Metrics reference | [`metrics-apps.md`](../../metrics/metrics-apps.md) |
 | Alert catalog | [§1 Microservices](../../alerting/alert-catalog.md#1-microservices-red-metrics) |
-| Hub (workflows, tuning) | [`../microservices-alerts.md`](../microservices-alerts.md) |
+| Recording rules | [`prometheusrules/microservices/recording-rules.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/recording-rules.yaml) |
+| Alerting strategy | [2-layer architecture](../../alerting/README.md) (threshold + SLO burn-rate) |
 
 ## Index
 
@@ -116,11 +117,200 @@ automatic resolution paths are working.
 | PaymentDoubtSweepFailing | warning | availability | [PaymentDoubtSweepFailing.md](PaymentDoubtSweepFailing.md) |
 | PaymentProviderUnknownRate | warning | availability | [PaymentProviderUnknownRate.md](PaymentProviderUnknownRate.md) |
 
+## Investigation workflows
+
+Cross-signal triage for when a single per-alert file is not enough — which
+signal to pivot to next, and where the fix usually lands.
+
+### "Service is returning 5xx"
+
+```mermaid
+flowchart TD
+    Start["Alert: MicroserviceHighErrorRate\nor MicroserviceErrorRateCritical"] --> CheckDashboard["Check Grafana:\nRow 3 - Server Errors 5xx\nRow 3 - Error Rate by Endpoint"]
+
+    CheckDashboard --> IdentifyEndpoint["Identify failing endpoint\nfrom per-endpoint error rate"]
+
+    IdentifyEndpoint --> CheckExemplar["Find the request in VictoriaLogs\n-> open its trace_id in Tempo\n(no exemplars, D-14)"]
+
+    CheckExemplar --> ReadTrace["Read trace waterfall:\nWhich span has error status?"]
+
+    ReadTrace --> IsDB{"Is the error<br/>in a DB span?"}
+    IsDB -->|Yes| CheckPostgres["Check PostgreSQL alerts:\nPostgresDown, ConnectionSaturation"]
+    IsDB -->|No| IsDownstream{"Is the error<br/>in a downstream call?"}
+
+    IsDownstream -->|Yes| CheckDownstream["Check downstream service:\nup metric, error rate, latency"]
+    IsDownstream -->|No| CheckLogs["Search VictoriaLogs by trace_id:\nGet stack trace / error message"]
+
+    CheckLogs --> FixCode["Fix application code\nor configuration"]
+    CheckPostgres --> FixDB["Fix database issue\n(connection pool, query, index)"]
+    CheckDownstream --> FixDownstream["Fix downstream service\nor add circuit breaker"]
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Start,CheckDashboard metric;
+    class CheckExemplar,CheckLogs log;
+    class ReadTrace trace;
+    class CheckPostgres,FixDB data;
+    class IdentifyEndpoint,IsDB,IsDownstream,CheckDownstream,FixCode,FixDownstream platform;
+```
+
+### "Service is slow"
+
+```mermaid
+flowchart TD
+    Start["Alert: MicroserviceHighLatencyP95\nor MicroserviceLatencyCritical"] --> CheckP95["Check Grafana:\nRow 3 - Response time P95 by endpoint"]
+
+    CheckP95 --> IdentifyEndpoint["Find slowest endpoint"]
+
+
+    IdentifyEndpoint --> CheckExemplar["Find the slow request in VictoriaLogs\n-> open its trace_id in Tempo\n(no exemplars, D-14)"]
+
+    CheckExemplar --> ReadTrace["Read trace waterfall:\nWhich span is slowest?"]
+
+    ReadTrace --> IsDB{"Slowest span<br/>is DB query?"}
+    IsDB -->|Yes| CheckDBMetrics["Check:\n- PostgresConnectionSaturation\n- PostgresLockContention\n- Query plan (EXPLAIN)"]
+    IsDB -->|No| IsGC{"GC thrash?"}
+
+    IsGC -->|Yes| CheckRuntime["Check Go Runtime alerts:\nGC Thrash, Memory, Goroutines"]
+    IsGC -->|No| IsSaturation{"High in-flight?"}
+
+    IsSaturation -->|Yes| ScaleUp["Scale up replicas\nor add rate limiting"]
+    IsSaturation -->|No| CheckPyroscope["Check Pyroscope CPU profile\nfor the service and time range"]
+
+    CheckDBMetrics --> OptimizeDB["Add index / optimize query\n/ increase connection pool"]
+    CheckRuntime --> OptimizeRuntime["Increase GOGC / fix leak\n/ reduce allocations"]
+    CheckPyroscope --> OptimizeCode["Optimize hot functions\nidentified in flamegraph"]
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Start,CheckP95 metric;
+    class CheckExemplar log;
+    class ReadTrace trace;
+    class CheckPyroscope profile;
+    class CheckDBMetrics,OptimizeDB data;
+    class IdentifyEndpoint,IsDB,IsGC,IsSaturation,CheckRuntime,ScaleUp,OptimizeRuntime,OptimizeCode platform;
+```
+
+### "Service has no traffic"
+
+```mermaid
+flowchart TD
+    Start["Alert: MicroserviceNoTraffic"] --> IsUp{"Service still<br/>emitting metrics?<br/>heartbeat D-4"}
+
+    IsUp -->|No| FollowDown["Follow MicroserviceDown\nrunbook"]
+    IsUp -->|Yes| CheckEndpoints["Check Service endpoints:\nkubectl get endpoints -n NS APP"]
+
+
+    CheckEndpoints --> HasEndpoints{"Endpoints exist?"}
+    HasEndpoints -->|No| CheckService["Check Service selector\nmatches pod labels"]
+    HasEndpoints -->|Yes| CheckUpstream["Check upstream services:\nAre they running?\nAre they routing correctly?"]
+
+    CheckService --> FixSelector["Fix Service selector\nor pod labels"]
+    CheckUpstream --> IsUpstreamDown{"Upstream service down?"}
+
+    IsUpstreamDown -->|Yes| FixUpstream["Fix upstream service first"]
+    IsUpstreamDown -->|No| CheckIngress["Check Ingress / routing\nconfiguration"]
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    class Start metric;
+    class IsUp,CheckEndpoints,HasEndpoints,CheckUpstream,IsUpstreamDown,CheckIngress platform;
+    class FollowDown,CheckService,FixSelector,FixUpstream service;
+```
+
+### "Go runtime issue"
+
+```mermaid
+flowchart TD
+    Start["Alert: Goroutine Leak\nor High Memory\nor GC Pressure"] --> CheckGrafana["Check Grafana Row 4:\nGoroutines, Heap, RSS, GC"]
+
+    CheckGrafana --> IsGoroutine{"Goroutines increasing?"}
+    IsGoroutine -->|Yes| CheckGoroutineProfile["Pyroscope goroutine profile:\nFind stuck goroutines"]
+    IsGoroutine -->|No| IsHeap{"Heap growing after GC?"}
+
+    IsHeap -->|Yes| CheckHeapProfile["Pyroscope heap profile:\nFind growing allocations"]
+    IsHeap -->|No| IsGCHigh{"Heap riding its GC goal?"}
+
+    IsGCHigh -->|Yes| CheckAllocProfile["Pyroscope alloc_objects profile:\nFind top allocators"]
+    IsGCHigh -->|No| StableState["System is stable\nAlert may auto-resolve"]
+
+    CheckGoroutineProfile --> FixGoroutine["Fix: defer cancel(),\nclose channels,\nadd timeouts"]
+    CheckHeapProfile --> FixMemory["Fix: evict cache,\nclose resources,\nbound data structures"]
+    CheckAllocProfile --> FixAlloc["Fix: sync.Pool,\nreduce allocations,\nincrease GOGC"]
+
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    class Start,CheckGrafana metric;
+    class CheckGoroutineProfile,CheckHeapProfile,CheckAllocProfile profile;
+    class IsGoroutine,IsHeap,IsGCHigh,StableState platform;
+    class FixGoroutine,FixMemory,FixAlloc service;
+```
+
+## Threshold tuning
+
+Alert thresholds are intentionally conservative — looser than the dashboard
+thresholds so the pager stays quiet under brief spikes. Tune per service when
+its normal range is known.
+
+| Alert | Alert Threshold | Dashboard Yellow | Dashboard Red | Notes |
+|-------|----------------|-----------------|---------------|-------|
+| Error Rate | warning: 5%, critical: 15% | 1% | 5% | Alert is looser than dashboard red to reduce noise |
+| P95 Latency | warning: 1s, critical: 2s | 0.3s | 0.5s | Alert uses higher thresholds for fewer false positives |
+| P99 Latency | warning: 2s | 0.5s | 1s | Tail latency is naturally more variable |
+| Apdex | warning: 0.5 | 0.5 | -- | Aligned with dashboard red threshold |
+| Memory RSS | warning: 512Mi | -- | -- | Tune based on container resource limits |
+| Goroutines | warning: 1000 + increasing | -- | -- | Tune based on service's normal range |
+
+**Per-service override** — a service that needs different thresholds gets its
+own PrometheusRule with a label-scoped expression:
+
+```yaml
+- alert: ProductServiceHighLatencyP95
+  expr: |
+    histogram_quantile(0.95,
+      sum by (le) (rate(http_server_request_duration_seconds_bucket{app="product"}[5m]))
+    ) > 0.5
+  for: 10m
+  labels:
+    severity: warning
+```
+
+**Finding the right threshold** — measure the normal range first:
+
+```promql
+# Historical P95 range for a service
+histogram_quantile(0.95,
+  sum by (le) (rate(http_server_request_duration_seconds_bucket{app="$APP"}[5m]))
+)
+
+# Historical error rate range
+app:http_server_request_duration_seconds:error_ratio5m{app="$APP"}
+
+# Normal goroutine count range
+go_goroutine_count{app="$APP"}
+```
+
+Set thresholds at **2-3x the normal peak** for warning and **5x** for critical.
+
 ## Retired alerts (reference only)
 
-Documented in [`../microservices-alerts.md`](../microservices-alerts.md): in-flight
-saturation (`MicroserviceHighRequestsInFlight`), `MicroserviceGCThrash`,
-`MicroserviceHighRestartRate` (use `KubePodCrashLooping`).
+Retired under RFC-0014: the in-flight saturation pair
+(`MicroserviceHighRequestsInFlight` warning >50 / `MicroserviceRequestsInFlightCritical`
+critical >100) rated `requests_in_flight`, which is no longer emitted — otelgin
+exposes no `http_server_active_requests` equivalent, so the alerts and the
+`app:requests_in_flight:sum` recording rule were removed; latency + traffic
+rate are the stated saturation proxy. Also retired: `MicroserviceGCThrash`
+(same RFC) and `MicroserviceHighRestartRate` (use `KubePodCrashLooping`).
 
 ## Template
 
@@ -139,4 +329,4 @@ domain's additions.
   funnel board for order-path alerts.
 
 ---
-_Last updated: 2026-08-19 — template moved to the runbooks parent_
+_Last updated: 2026-08-19 — absorbed the investigation workflows, threshold tuning, and retired-alert context from the dissolved microservices-alerts.md hub_

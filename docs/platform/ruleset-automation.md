@@ -2,7 +2,7 @@
 
 ## What is gh-patcher?
 
-[gh-patcher](https://github.com/duynhlab/gh-patcher) is a CLI tool that batch-applies GitHub branch rulesets across an entire organization via the GitHub REST API. It replaces the need to manually configure branch protection rules on every repository.
+`duynhlab/gh-patcher` (a private repo in the org) is a CLI tool that batch-applies GitHub branch rulesets across an entire organization via the GitHub REST API. It replaces the need to manually configure branch protection rules on every repository.
 
 ## Why is it needed?
 
@@ -65,8 +65,8 @@ Splitting into two files keeps concerns separated:
 
 | File | Trigger | Purpose |
 |------|---------|---------|
-| `check.yml` | `pull_request` only | Tests, lint, SonarCloud |
-| `build.yml` | `push` only | Docker build, scan, sign |
+| `check.yml` | `pull_request` (dev/uat/main) | Tests, lint, SonarCloud |
+| `build.yml` | `push` (dev/uat/main) **+ tags `v*`** | Docker build, scan, sign; a `v*` tag also runs the versioned release build + `release-binary` |
 
 The ruleset-required check is: **`go-check / Test`**
 
@@ -79,9 +79,14 @@ The ruleset-required check is: **`go-check / Test`**
 | `GITHUB_TOKEN` | Fine-grained PAT with org admin + repo access | (stored as `GH_PATCHER_TOKEN` secret) |
 | `GITHUB_ORG` | Target GitHub organization | `duynhlab` |
 | `REPO_PATTERN` | Regex to match repos (space-separated alternatives = OR) | `.*-service frontend pkg` |
-| `REPO_EXCLUDE_PATTERN` | Regex to exclude repos | `^$` |
+| `REPO_EXCLUDE_PATTERN` | Regex to exclude repos (e.g. the archived `auth-service`, which `.*-service` would otherwise match) | `^auth-service$` |
 | `STATUS_CHECK_CONTEXTS` | Comma-separated required check names | `go-check / Test` |
 | `DRY_RUN` | Preview mode (no writes) — defaults to `true` | `false` |
+
+> `homelab` itself is governed too, but with different required checks (manifest
+> `validate`, `markdown-links`, `pr-checks` — see [`cicd.md`](cicd.md); `tf-lint`
+> and `gitleaks` are planned there) rather than the Go-service `go-check / Test`
+> context this pattern targets.
 
 ### Setting up `GH_PATCHER_TOKEN`
 
@@ -109,14 +114,21 @@ The standard branch ruleset (`gh-standard-branch-ruleset`) enforces:
 - **Required status checks** — configurable via `STATUS_CHECK_CONTEXTS`
 - **Required pull request reviews** — at least 1 approval, dismiss stale reviews
 
+> **Coverage:** gh-patcher provisions **only this one ruleset** — the equivalent
+> of gitflow.md section 7's *Base Protection*. The *Production Gate* and *Release
+> Tags* rulesets defined there are **manual/planned**: they are not automated by
+> gh-patcher today and must be created per repo (UI or the `gh api` commands in
+> gitflow.md). The gh-patcher repo's internals are not verifiable from homelab —
+> treat its exact rule payload as owned by that repo.
+
 See [gitflow.md](gitflow.md) section 7 for the full ruleset specification.
 
 ## Links
 
-- [gh-patcher repository](https://github.com/duynhlab/gh-patcher)
+- `duynhlab/gh-patcher` — the tool's repository (private; not link-checkable)
 - [Gitflow standard](gitflow.md)
 - [CI/CD documentation](cicd.md)
 - [Check template](check_template.yml) / [Build template](build_template.yml)
 
 ---
-_Last updated: 2026-07-22_
+_Last updated: 2026-08-19 — build.yml trigger row includes `v*` tags; gh-patcher scope clarified (Base Protection only; Production Gate + Release Tags manual/planned); exclude example for archived auth-service; homelab governance note._

@@ -72,7 +72,7 @@ Platform mindset — complements the behavioral guidelines below:
 5. **Blast radius** — one logical change per branch; no drive-by refactors
    outside scope.
 6. **Validation before done** — `make validate`; e2e audit when touching
-   local-stack, Kong, or gateway config (see Build section). Phase B: read the
+   local-stack or gateway config (see Build section). Phase B: read the
    **agent-browser** skill from the agent IDE (see [Engineering skills workflow](#engineering-skills-workflow)),
    then follow the [`local-stack` E2E release audit](local-stack/docs/e2e-audit.md).
 7. **Escalate design** — substantial or contested changes →
@@ -166,7 +166,7 @@ Complements `browser-testing-with-devtools` in the Verify phase where applicable
 1. **Role + repo scope** — confirm the work belongs in homelab (see Agent role);
    if not, redirect via [`docs/api/README.md`](docs/api/README.md) and
    [`docs/README.md` § Repositories](docs/README.md#repositories).
-1b. **API-facing homelab work** — if the task touches routes, Kong,
+1b. **API-facing homelab work** — if the task touches routes, the gateway,
    NetworkPolicy, or service manifests, read the relevant
    `docs/api/{service}.md` and hub rollup before editing.
 2. **Domain** — pick the primary row from Platform domains; read that hub and
@@ -199,9 +199,9 @@ Reduce common LLM coding mistakes. Bias toward caution over speed; use judgment 
 
 ## Project overview
 
-- **`duynhlab` microservices platform** — 11 Go microservice repositories + a React frontend. All 11 services run in local-stack and the cluster; checkout P5 shipped (API + checkout-worker).
+- **`duynhlab` microservices platform** — **10 deployed Go microservices** + a React storefront + a back-office portal, with Keycloak as the identity provider (auth-service retired, RFC-0024 P5). All 10 run in local-stack and the cluster; checkout P5 shipped (API + checkout-worker).
 - **This repo (`homelab`):** GitOps (Flux Operator + Kustomize + OCI), observability, databases/secrets infra, and docs. No application source here.
-- **Service repos:** `auth-service`, `user-service`, `product-service`, `inventory-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend`; shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
+- **Service repos:** `user-service`, `product-service`, `inventory-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend` (`auth-service` is archived — Keycloak replaced it); shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
 - Full index: [`docs/README.md` § Repositories](docs/README.md#repositories), [`docs/api/README.md`](docs/api/README.md).
 
 ## Repository layout
@@ -213,7 +213,7 @@ kubernetes/
   apps/       # Domain ResourceSets + per-service InputProviders + frontend
 scripts/      # Kind/Flux helpers (called by the Makefile)
 terraform/    # OpenTofu root: Flux Operator + FluxInstance bootstrap (flux-operator-bootstrap module)
-local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 11 services + mockpay + Kong DB-less gateway + SPA)
+local-stack/  # Docker Compose e2e stack (Postgres + Valkey + 10 services + mockpay + standalone Envoy Gateway + Keycloak + SPA)
 docs/         # Documentation (start at docs/README.md)
 ```
 
@@ -237,7 +237,7 @@ make flux-sync    # force reconciliation
 
 - **e2e:** `cd local-stack && docker compose up -d --build` → SPA at `:3001`, API gateway at `:8080`. Demo login `alice` / `password123` (by **username**).
   **Mandatory before tagging** any change touching a service repo, **any `pkg` module**,
-  Kong/gateway
+  gateway
   config, `compose.yaml`, or the SPA: run the **full E2E release audit** (API contract + real
   browser + telemetry sanity) in [`local-stack/docs/e2e-audit.md`](local-stack/docs/e2e-audit.md).
   All A/B/C rows must pass; paste the evidence table into the PR or release record.
@@ -260,7 +260,7 @@ to work and **what** you need to know. Do not implement app code in homelab.
 
 ### Trusted API documentation (`docs/api/`)
 
-Homelab agents **trust `docs/api/`** as the canonical source for all 11
+Homelab agents **trust `docs/api/`** as the canonical source for all 10
 microservice API contracts and shared platform API behavior. Service-repo
 README/AGENTS files are implementation hints only — when they disagree with
 homelab, **`docs/api/` wins** (file a drift fix in homelab or the service repo).
@@ -279,7 +279,7 @@ homelab, **`docs/api/` wins** (file a drift fix in homelab or the service repo).
 [`docs/README.md` § Repositories](docs/README.md#repositories). GitOps domain
 labels → [`application-delivery.md`](docs/platform/application-delivery.md) +
 manifests. **Frontend** has no contract file — gateway-facing behavior is in
-platform/Kong docs + the service repo.
+platform/gateway docs + the service repo.
 
 **Routing:**
 
@@ -289,17 +289,17 @@ platform/Kong docs + the service repo.
 | Shared Go libraries | `duynhlab/pkg` |
 | `mop` chart / Helm templates | `duynhlab/helm-charts` |
 | Reusable CI workflows | `duynhlab/gha-workflows` |
-| Cluster manifest, GitOps pin, ingress, NetworkPolicy, observability for a service | **homelab** — `kubernetes/apps/services/<name>.yaml`, `ingress-api.yaml`, etc. |
+| Cluster manifest, GitOps pin, ingress, NetworkPolicy, observability for a service | **homelab** — `kubernetes/apps/services/<name>.yaml`, `kubernetes/infra/configs/envoy-gateway/routes/`, `kubernetes/infra/configs/network-policies/` |
 
 **Platform-facing app facts (reference only):**
 
 - Read [`docs/api/README.md` learning path](docs/api/README.md#recommended-learning-path) before API-facing homelab edits.
-- Kong/NetworkPolicy/ingress changes → verify against the owning [`docs/api/{service}.md`](docs/api/README.md#service-contracts) + [`api.md` edge exposure](docs/api/api.md#edge-exposure).
+- Gateway/NetworkPolicy/ingress changes → verify against the owning [`docs/api/{service}.md`](docs/api/README.md#service-contracts) + [`api.md` edge exposure](docs/api/api.md#edge-exposure) + [`docs/security/network-policies.md`](docs/security/network-policies.md).
 - Cross-service topology → [`api.md` call graph](docs/api/api.md#current-east-west-call-graph) only (not duplicated in `microservices.md` for graph ownership).
 - Caching app contract → [`docs/api/caching.md`](docs/api/caching.md); platform ops → [`docs/caching/README.md`](docs/caching/README.md).
 
 **Domain labels in homelab:** ResourceSet domains are `identity`, `catalog`,
-`checkout`, and `comms` (`platform.duynhlab.dev/domain` on
+`checkout`, `fulfillment`, and `comms` (`platform.duynhlab.dev/domain` on
 `kubernetes/apps/services/*.yaml`). Map services to domains via
 [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md)
 and those manifests — do not duplicate that table here.
@@ -318,13 +318,20 @@ Every manifest applied to the cluster must satisfy admission:
 
 - **Flux enforces deployment order via `dependsOn`** — apps won't start until infra is ready. Chain (in `kubernetes/clusters/local/`):
   ```
-  flux-system → controllers-local → {cert-manager → gateway-api-crds →
-  envoy-gateway → envoy-gateway-config (also after keycloak), secrets,
-  cnpg-barman-plugin, caching, storage} → databases → databases-cnpg-dr
-  monitoring-local → kyverno-policies, mcp
-  temporal-local → temporal-config-local
-  apps-local (depends: databases + monitoring + temporal-local)
+  flux-system → controllers-local → {secrets, monitoring, network-policies,
+  gateway-api-crds, ...}
+  secrets → {cert-manager, clickhouse, storage, tracing, profiling}
+  cert-manager → {envoy-gateway (also after gateway-api-crds),
+  cnpg-barman-plugin}
+  databases (after secrets + monitoring + cnpg-barman-plugin + storage +
+  network-policies) → {databases-cnpg-dr, keycloak, temporal}
+  envoy-gateway-config (after envoy-gateway + cert-manager + keycloak)
+  monitoring → {kyverno-policies, mcp, caching}
+  temporal → temporal-config
+  apps-local (depends: databases + monitoring + temporal)
   ```
+  (22 Kustomization CRs total — full graph in
+  [`docs/platform/setup.md`](docs/platform/setup.md).)
 - **CHANGELOG.** Entries grouped **`### Category` → `#### Component`** per the hidden template comment at the top of `CHANGELOG.md` (categories, fixed order: `Breaking Change`/`Feature`/`Bugfix`/`Performance`/`Dependency`/`Deprecation`; components: GitOps, Gateway, Observability, Databases, Secrets, Security, Services, Temporal, Local-stack, Docs, Proposals, CI). New entries go at the **top** of the matching group in `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history (older releases keep the format they shipped with). Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` under the template comment.
 - **Image naming:** `ghcr.io/duynhlab/<repo>/<image>` (multi-level). The `mop` chart renders `<name>-service/<name>-service`; migrations reuse that same image, so there is no second image per service.
 - **Add a service:** create `kubernetes/apps/services/<name>.yaml` (`ResourceSetInputProvider`, label `platform.duynhlab.dev/domain: <domain>`); the domain ResourceSet auto-discovers it. `make validate && make sync`. Guide: [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md).

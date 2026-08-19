@@ -2,15 +2,18 @@
 
 Auth turns credentials into short-lived RS256 access tokens and rotating refresh-token families.
 
-> **Archived — RFC-0024 P5 executed.** This service no longer exists anywhere:
+> **Archived — RFC-0024 P5 executed. Kept deliberately as learning
+> material.** This service no longer exists anywhere:
 > the identity cutover (P3) moved every consumer to the Keycloak realm
 > (`OIDC_*`, [api.md § Authentication](./api.md#authentication)), and P5
 > deleted the entire cluster surface — app manifest, `auth` namespace, the
 > `auth` database triplet on platform-db, the `auth-jwt-signing`
 > ExternalSecret, the NetworkPolicy, and the `api-auth-public` edge route.
 > `/auth/v1/*` matches nothing at either environment's edge. This document is
-> the retired contract, kept for history; the repository itself is archived
-> separately by the owner. It describes nothing deployed.
+> the retired contract, frozen as history: read it to study how a hand-rolled
+> RS256 issuer (refresh-token families, JWKS publication, rotation) was
+> designed — and compare with the realm that replaced it. The repository
+> itself is archived separately by the owner. It describes nothing deployed.
 
 | Dimension | Value | Status |
 |-----------|-------|--------|

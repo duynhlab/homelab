@@ -7,9 +7,9 @@ SonarCloud provides static code analysis, code quality checks, and security scan
 | Property | Value |
 |----------|-------|
 | **Platform** | [SonarCloud](https://sonarcloud.io) (Free Plan) |
-| **Project Key** | per-repository: `duynhlab_<repo>` (e.g. `duynhlab_auth-service`, `duynhlab_order-service`) |
+| **Project Key** | per-repository: `duynhlab_<repo>` (e.g. `duynhlab_inventory-service`, `duynhlab_order-service`) |
 | **Organization** | `duynhlab` |
-| **Workflow** | `.github/workflows/sonarqube.yml` |
+| **Workflow** | `duynhlab/gha-workflows/.github/workflows/sonarqube.yml` (shared reusable workflow — cross-repo; homelab has no such file) |
 
 ## CI/CD Flow
 
@@ -21,8 +21,8 @@ flowchart LR
     D --> E[SonarQube Scan]
     E --> F[Quality Gate Check]
     F --> G{Pass?}
-    G -->|Yes| H[✅ PR Approved]
-    G -->|No| I[❌ PR Blocked]
+    G -->|Yes| H[Gate green in SonarCloud]
+    G -->|No| I[Gate red - visible, non-blocking today]
 ```
 
 ## Configuration
@@ -39,22 +39,31 @@ In each service repo CI, the Sonar step is wired via shared workflows. Example (
 
 ```yaml
 sonar:
-  needs: go-check
+  needs: [go-check, gitleaks]
   uses: duynhlab/gha-workflows/.github/workflows/sonarqube.yml@main
   with:
-    project-key: 'duynhlab_cart-service'
+    project-key: 'duynhlab_${{ github.event.repository.name }}'
     organization: 'duynhlab'
     fail-on-quality-gate: false
   secrets:
     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 ```
 
+This matches [`check_template.yml`](check_template.yml) / [`build_template.yml`](build_template.yml): the dynamic project key keeps the file identical across all service repos.
+
 ## Quality Gate (new-code coverage ≥ 80%)
 
-Each Go service repo enforces SonarCloud's Quality Gate with a **≥ 80% coverage on new code**
+Each Go service repo configures SonarCloud's Quality Gate with a **≥ 80% coverage on new code**
 condition (plus the default reliability/security/duplication conditions). "New code" = lines
 changed in the PR / since the previous version, so the gate pushes coverage **forward** without
 demanding the whole legacy codebase be backfilled.
+
+> **Adoption gap — the gate is measured, not enforced.** Both in-repo templates
+> ([`check_template.yml`](check_template.yml) and [`build_template.yml`](build_template.yml))
+> hardcode `fail-on-quality-gate: false`, so a red gate never fails CI or blocks a merge.
+> The "`sonarqube` (gate enforced)" required check that [`cicd.md`](cicd.md) targets does not
+> exist yet; flipping to `fail-on-quality-gate: true` (and making the check required) is the
+> outstanding step.
 
 - The condition is configured **in SonarCloud** (Quality Gate), not in the workflow. When adding
   new conditionals, cover **both** branches or the gate fails the PR / `main` analysis.
@@ -64,8 +73,9 @@ demanding the whole legacy codebase be backfilled.
   The **repository (DB) layer is NOT excluded** — it is integration-tested with testcontainers and
   its coverage is **merged** into the Sonar report via `integration-coverage: true`
   (`coverage.out` + `coverage-integration.out`). See [Testing & Coverage](cicd.md#testing--coverage).
-- The PR workflow may run with `fail-on-quality-gate: false` (non-blocking on the PR job), but the
-  **branch analysis still records the gate** — a red `main` gate is the signal to fix coverage.
+- Today every workflow runs with `fail-on-quality-gate: false` (non-blocking everywhere — see the
+  adoption gap above), but the **branch analysis still records the gate** — a red `main` gate in
+  the SonarCloud UI is the signal to fix coverage.
 
 ## Coverage
 
@@ -91,9 +101,9 @@ Coverage is generated per-repository during `go test -race -coverprofile=coverag
 
 ## Links
 
-- SonarCloud projects are per-repository (e.g. `duynhlab_auth-service`, `duynhlab_cart-service`, `duynhlab_checkout-service`)
+- SonarCloud projects are per-repository (e.g. `duynhlab_inventory-service`, `duynhlab_cart-service`, `duynhlab_checkout-service`)
 - [SonarCloud Test Coverage Docs](https://docs.sonarsource.com/sonarqube-cloud/enriching/test-coverage/overview/)
 - Shared workflow: `duynhlab/gha-workflows/.github/workflows/sonarqube.yml`
 
 ---
-_Last updated: 2026-07-22 — checkout-service project-key example._
+_Last updated: 2026-08-19 — cross-repo workflow label; example synced to templates (dynamic project key, `needs: [go-check, gitleaks]`); gate marked measured-not-enforced (adoption gap)._

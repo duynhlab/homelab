@@ -5,8 +5,8 @@ day-2 platform patterns for the duynhlab homelab.
 
 | | |
 |---|---|
-| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (20 Flux Kustomizations) |
-| **Applications** | 10 Go microservices + React frontend + Temporal workers (`order-worker`, `checkout-worker`) + `mockpay` |
+| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (22 Flux Kustomizations) |
+| **Applications** | 10 Go microservices + React frontend + back-office portal + Temporal workers (`order-worker-1-13-2`, `checkout-worker`) + `mockpay` |
 | **GitOps** | Flux Operator + OCI artifacts + Kustomize — [`setup.md`](setup.md) |
 | **App onboarding** | Domain ResourceSets + InputProviders — [`application-delivery.md`](application-delivery.md) |
 | **Edge** | Envoy Gateway on the Gateway API — [`envoy-gateway.md`](envoy-gateway.md) |
@@ -61,6 +61,7 @@ flowchart TD
     keycloak --> edge
     databases --> keycloak
     secrets --> keycloak
+    monitoring --> keycloak
     controllers --> storage
     secrets --> storage
     controllers --> clickhouse
@@ -77,6 +78,9 @@ flowchart TD
     temporal --> apps
 ```
 
+This diagram is a summary — the full numbered graph of all 22 Kustomization CRs
+lives in [`setup.md`](setup.md#project-architecture).
+
 `make flux-sync` (inside `make sync`) reconciles only a **subset** of Kustomizations
 — see [`setup.md`](setup.md) for the caveat. After infra-only changes, reconcile the
 specific Kustomization or run `make sync`.
@@ -92,7 +96,6 @@ specific Kustomization or run `make sync`.
 | [`envoy-gateway.md`](envoy-gateway.md) | The edge: resource model, policy attachment, both provider modes, failure modes |
 | [`kong-gateway.md`](kong-gateway.md) | **Archived** — the previous gateway's guide, kept for reference |
 | [`identity-cutover-runbook.md`](identity-cutover-runbook.md) | RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm) |
-| [`graceful-shutdown.md`](graceful-shutdown.md) | Go shutdown pattern, probe tuning per HTTP service |
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |
 | [`gitflow.md`](gitflow.md) | Branching and release policy (**target** — prod cluster TBD) |
 | [`kyverno.md`](kyverno.md) | Admission policy tiers, Audit→Enforce, PolicyExceptions |
@@ -112,4 +115,4 @@ Workflow templates (not prose docs): `build_template.yml`, `check_template.yml`.
 - [`kubernetes/apps/`](../../kubernetes/apps/) — ResourceSets and InputProviders
 - [`terraform/README.md`](../../terraform/README.md) — Flux Operator bootstrap
 
-_Last updated: 2026-08-13 — platform hub; edge is Envoy Gateway + Keycloak realm in the Flux graph._
+_Last updated: 2026-08-19 — synced to the deployed platform (22 Kustomizations, back-office portal, `order-worker-1-13-2`, keycloak → monitoring edge)._

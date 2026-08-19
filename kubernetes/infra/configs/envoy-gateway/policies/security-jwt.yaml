@@ -3,10 +3,12 @@
 # Zero provisioned key material: Envoy fetches and refreshes the realm JWKS
 # itself, so key rotation needs no edge action.
 #
-# Targets EXACTLY the seven /private/ API surfaces that require
-# authentication: user-private, cart, order, review-private, notification,
-# payment-private, checkout. One SecurityPolicy per namespace because
-# targetRefs only resolve same-namespace objects.
+# 13 SecurityPolicies: seven `jwt-edge` (customer realm `duynhlab`) on the
+# /private/ surfaces — user-private, cart, order, review-private,
+# notification, payment-private, checkout — plus six `jwt-edge-staff`
+# (workforce realm `duynhlab-staff`, ADR-050) on the /protected/ Backoffice
+# surfaces. One SecurityPolicy per namespace because targetRefs only resolve
+# same-namespace objects.
 #
 # `mergeType: StrategicMerge` keeps the gateway-level CORS baseline
 # (policies/security-cors.yaml) applied to these routes — without it a

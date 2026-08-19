@@ -11,7 +11,7 @@ This document defines the **production-ready branching strategy** for all micros
 
 **Model**: Hybrid Enterprise Flow (environment-aligned branch promotion + immutable tagging).
 
-**References**: [nvie/GitFlow](https://nvie.com/posts/a-successful-git-branching-model/), [Shopify Git workflow](https://shopify.engineering/how-we-use-git-at-shopify), [DataCamp branching guide](https://www.datacamp.com/tutorial/git-branching-strategy-guide), [Atlassian trunk-based development](https://www.atlassian.com/continuous-delivery/continuous-integration/trunk-based-development).
+**Lineage**: the model synthesizes three industry practices — classic GitFlow's dedicated release/hotfix discipline, the large-monorepo habit of short-lived branches merged into a single protected trunk, and trunk-based development's emphasis on small, frequently integrated changes — adapted here into environment-aligned branch promotion with immutable tags.
 
 ---
 
@@ -86,6 +86,12 @@ git push origin feature/ABC-123
 
 This section is the definitive step-by-step guide for moving code from feature branch to production. Every step specifies **who** does it, **where** they do it, and **what CI does automatically**.
 
+> **Target flow — not how code moves today.** No repo has `dev`/`uat` branches or
+> namespaces yet (see the callout at the top). Today's real flow is: feature branch
+> (`feat/` `fix/` `chore/` `docs/` `refactor/` `ci/` prefix) → PR → squash-merge to
+> `main` → tag `v*`. The steps below describe the promotion pipeline this standard
+> is building toward.
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -108,7 +114,7 @@ sequenceDiagram
         Note over UAT: uat namespace updated
     end
 
-    Dev->>Main: open MR -> main (2 approvals)
+    Dev->>Main: open MR -> main (1 approval)
     Main->>GHCR: CI builds sha-abc123
     Dev->>Main: git tag -s v1.2.0
     Main->>GHCR: tag pipeline builds versioned image v1.2.0 (full build, scan, sign)
@@ -174,7 +180,7 @@ This is the critical path. Source is `uat` (if used) or `dev` (if uat is skipped
 | Step | Who | Where | Action | CI auto-trigger |
 |------|-----|-------|--------|-----------------|
 | 1 | Tech lead | GitHub UI | Open MR: `uat` -> `main` (or `dev` -> `main`) | `pull_request`: test, lint, sonar |
-| 2 | Tech lead + QA | GitHub UI | Review + approve (**2 approvals required**: tech lead + QA) | -- |
+| 2 | Tech lead | GitHub UI | Review + approve (**1 approval required**, per the section 7 rulesets; scale-up target: 2 — tech lead + QA) | -- |
 | 3 | Tech lead | GitHub UI | Merge MR | `push main`: build, scan, sign -> image `sha-abc123` |
 | 4 | Tech lead | **Local terminal** | Create signed release tag (commands below) | -- |
 | 5 | (automatic) | CI | Tag `v*` push detected -> full build + scan + sign -> versioned image `v1.2.0` | Release pipeline |
@@ -225,9 +231,10 @@ git push origin uat
 # Check CI release pipeline completed
 gh run list --workflow=ci.yml | head -5
 
-# Check image tag exists in GHCR
+# Check image tag exists in GHCR — image paths are multi-level:
+# ghcr.io/duynhlab/<repo>/<image>, e.g. ghcr.io/duynhlab/cart-service/cart-service
 # (requires crane: go install github.com/google/go-containerregistry/cmd/crane@latest)
-crane ls ghcr.io/duynhlab/<service-name> | grep v1.2.0
+crane ls ghcr.io/duynhlab/<repo>/<image> | grep v1.2.0
 
 # Check Flux reconciliation
 flux get kustomizations
@@ -340,7 +347,16 @@ CI and post-deploy verification are separated into two phases: **pre-merge check
 
 See [`check_template.yml`](check_template.yml) (PR-only checks) and [`build_template.yml`](build_template.yml) (push-only build & delivery) for the reference workflows.
 
+> **Status:** the templates already declare all five triggers, but only the
+> `pull_request` and `push` `main` / `tags/v*` rows fire in practice — the `dev`
+> and `uat` rows are **target design; no repo has those branches today**.
+
 ### 6.2 Post-Deploy Verification
+
+> **Target design — nothing implements this today.** No smoke-test jobs, Slack
+> alerts, Lighthouse CI runs, or SLO validation hooks exist in any repo's CI, and
+> the dev/uat/prod environments this matrix verifies are not deployed. This
+> subsection specifies the verification the platform is building toward.
 
 After each deployment, automated verification runs against the live environment. This catches issues that unit tests and static analysis cannot: misconfigured env vars, missing secrets, broken connectivity, performance regressions.
 
@@ -395,7 +411,7 @@ flowchart LR
 
 Branch enforcement uses **GitHub Rulesets** instead of legacy Branch Protection rules. Rulesets are GitHub's successor to Branch Protection with significant advantages for governance at scale.
 
-**References**: [GitHub Rulesets docs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets), [Swissquote: GitHub Rulesets at 3000 repos](https://medium.com/swissquote-engineering/github-rulesets-because-two-reviewers-are-better-than-a-hotfix-9f03124f1110).
+**References**: [GitHub Rulesets docs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets). The layered-rulesets approach below follows a pattern proven by engineering orgs running rulesets across thousands of repos: several small, stacked rulesets (base + gate + tags) instead of one monolithic rule, with the most restrictive layer winning.
 
 ### Why Rulesets over Branch Protection
 
@@ -423,7 +439,7 @@ GitHub Rulesets availability depends on your organization's billing plan:
 
 ### Layered Rulesets (3 per repository)
 
-Following the [Swissquote pattern](https://medium.com/swissquote-engineering/github-rulesets-because-two-reviewers-are-better-than-a-hotfix-9f03124f1110) of layered rulesets where rules are cumulative (all must pass), define 3 rulesets per service repo:
+Following the layered-rulesets pattern where rules are cumulative (all must pass), define 3 rulesets per service repo:
 
 ```mermaid
 flowchart TD
@@ -455,7 +471,7 @@ flowchart TD
 | Require status checks to pass | `go-check / Test` |
 | Require branches to be up to date before merging | Enabled (strict mode) |
 
-**Bypass list**: GitHub Apps (CI bots) with "Always allow".
+**Bypass list**: Repository admins (`RepositoryRole` actor id 5) with "Always allow" — matching the API JSON below. Add GitHub Apps (CI bots) as separate bypass actors only if a bot must push directly.
 
 #### Ruleset 2: Production Gate
 
@@ -522,7 +538,7 @@ db/         @duynhlab/platform-team
 
 For environments with many repositories (especially on the Free/Team plan without Org-level rulesets), configuring rulesets manually in the UI is tedious and error-prone. Use the GitHub REST API to automate creation.
 
-> **Recommended**: Use [gh-patcher](https://github.com/duynhlab/gh-patcher) to automate ruleset creation across all repos in the org. It runs daily via GitHub Actions and handles create-or-update idempotently. See [`ruleset-automation.md`](ruleset-automation.md) for setup details.
+> **Recommended**: Use `duynhlab/gh-patcher` (private repo) to automate ruleset creation across all repos in the org. It runs daily via GitHub Actions and handles create-or-update idempotently. See [`ruleset-automation.md`](ruleset-automation.md) for setup details.
 
 **Prerequisites**:
 - Install `gh` CLI and authenticate: `gh auth login`
@@ -610,7 +626,8 @@ gh api \
     {"type": "creation"},
     {"type": "deletion"},
     {"type": "non_fast_forward"},
-    {"type": "update"}
+    {"type": "update"},
+    {"type": "required_signatures"}
   ]
 }
 EOF
@@ -708,9 +725,9 @@ flowchart LR
 |------|-------------|-----------------|
 | **Free** (current) | Repo-level rulesets on public repos. Manually configure per repo. | Sufficient for < 20 public repos. |
 | **Team** | Same rulesets on private repos. GitHub org features. | When you have private repos or need org-level teams for CODEOWNERS. |
-| **Enterprise** | Org-level rulesets that auto-apply to all repos. Custom properties for ruleset targeting (Swissquote pattern). Push rulesets for file restrictions. | At 100+ repos, manual per-repo setup becomes unsustainable. Org rulesets + custom properties (e.g. `protection-level`, `domain`) enable automated governance. |
+| **Enterprise** | Org-level rulesets that auto-apply to all repos. Custom properties for ruleset targeting (see the custom-properties pattern below). Push rulesets for file restrictions. | At 100+ repos, manual per-repo setup becomes unsustainable. Org rulesets + custom properties (e.g. `protection-level`, `domain`) enable automated governance. |
 
-At Enterprise scale (1000 repos), adopt the [Swissquote pattern](https://medium.com/swissquote-engineering/github-rulesets-because-two-reviewers-are-better-than-a-hotfix-9f03124f1110):
+At Enterprise scale (1000 repos), adopt the custom-properties pattern proven by large GitHub Enterprise orgs:
 - Define org-level rulesets that target repos via **custom properties** (e.g. `protection-level: standard`, `domain: identity`).
 - Use a GitHub App to compute custom property values from repo metadata.
 - Use an exclusion property (`ruleset-excluded: true`) managed via GitOps for exceptions.
@@ -729,7 +746,7 @@ At Enterprise scale (1000 repos), adopt the [Swissquote pattern](https://medium.
 |------|----|-----------|----------|
 | `feature/*` | `dev` | Any team member (1 approval) | Yes (CI builds on push to dev) |
 | `dev` | `uat` | Tech lead (1 approval) | Yes (CI builds on push to uat) |
-| `uat` | `main` | Tech lead + QA (2 approvals) | Yes (CI builds on push to main) |
+| `uat` | `main` | Tech lead (1 approval; scale-up target: 2 incl. QA) | Yes (CI builds on push to main) |
 | `main` + tag `v*` | Production | Release manager (tag push) | Yes (full versioned build + scan + sign on the tag) |
 | `hotfix/*` | `main` | Tech lead (expedited, 1 approval min) | Yes (CI builds on push to main) |
 
@@ -780,13 +797,16 @@ flowchart LR
 
 ## Quick Reference
 
-```
-feature/ABC-123   -->  MR  -->  dev  -->  MR  -->  uat  -->  MR  -->  main  -->  tag v1.2.0
-                                                   (optional)
-
-hotfix/PROD-456   -->  MR  -->  main  -->  tag v1.2.1
-                       |
-                       +--->  back-merge to dev (and uat)
+```mermaid
+flowchart LR
+    feature["feature/ABC-123"] -->|"MR"| dev["dev"]
+    dev -->|"MR"| uat["uat (optional)"]
+    uat -->|"MR"| main["main"]
+    main -->|"tag"| rel["v1.2.0"]
+    hotfix["hotfix/PROD-456"] -->|"MR"| main
+    main -->|"tag"| patch["v1.2.1"]
+    main -.->|"back-merge"| dev
+    main -.->|"back-merge"| uat
 ```
 
 | Question | Answer |
@@ -798,4 +818,4 @@ hotfix/PROD-456   -->  MR  -->  main  -->  tag v1.2.1
 | How do I rollback? | Redeploy previous `vX.Y.Z` tag |
 
 ---
-_Last updated: 2026-07-22 — 10 services; deployed-vs-target callout (Kind local only; prod stub)._
+_Last updated: 2026-08-19 — 10 deployed services (inventory in, auth archived); approvals aligned to 1 (rulesets); dev/uat sections marked target design; third-party links synthesized in-house; Quick Reference to Mermaid._

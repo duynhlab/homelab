@@ -624,6 +624,20 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The retired auth-service and Kong stop speaking in live voice.** AGENTS.md
+  — the operative contract — still said "11 services", "Kong DB-less gateway"
+  in the local-stack line, four ResourceSet domains, and a dead
+  `ingress-api.yaml` routing target; all corrected (10 services + Keycloak,
+  standalone Envoy Gateway, five domains incl. `fulfillment`, real
+  routes/network-policies paths, and the `dependsOn` chain rebuilt from the
+  22 actual Kustomizations — it had omitted `network-policies-local`, which
+  `databases-local` depends on). The two deliberately-kept learning docs get
+  stronger frozen-history banners (`docs/platform/kong-gateway.md` — its
+  "arriving with P6" clause was stale; `docs/api/auth.md`), per the
+  banner-in-place convention (filenames kept for link stability, as recorded
+  at the original archiving). `docs/api/api.md`'s journey 1 no longer claims
+  auth-service is "not-yet-retired" with a live `api-auth-public` route; the
+  archived service's live CI badges are dropped from both index tables.
 - **The `manual_review` runbook leads with the portal, not psql.** Diagnosis
   starts at the order case view (the three external truths read live, plus the
   transition history); recovery step 2 is the Resolve button or its endpoint, with
@@ -895,6 +909,17 @@ Skeleton (copy what you need):
   the VMAgentScrapePoolHasNoTargets story the doc used to recommend the
   opposite of — and the operator-machine "crush info" snapshot section is
   gone. The docs index stops crediting a Grafana MCP that never existed.
+- **`graceful-shutdown.md` moves to `docs/api/` as the cross-service shutdown
+  contract** (owner call — it is app-behavior guidance, a sibling of the
+  instrumentation policy, not platform manifests). Corrected on the way: the
+  per-service Helm-values table asserted deployed configuration that no
+  homelab manifest backs (and still carried a retired-auth row while missing
+  inventory) — replaced by the uniform-defaults contract statement; the
+  "removed from EndpointSlices immediately" claim contradicted the doc's own
+  drain-delay premise (removal propagates asynchronously — that window is why
+  the delay exists); machine-local `~/Working/...` paths and dead
+  `-n auth` verification commands removed; workers/mockpay/SPA scoped out as
+  recorded gaps; indexes re-pointed (docs/api ownership row added).
 - **Root README caught up to the deployed platform.** The overview and
   topology diagram still described the Kong-era layout: Kong as the edge, "10
   microservices · Web → Logic → Core", three PgDog poolers, and an
@@ -915,6 +940,26 @@ Skeleton (copy what you need):
   RFC-0024 identity cutover, and contradicted by audit row B1. Also noted:
   `checkout_promo_rejected_total` counts only confirm-gate rejections, so the
   ratio reads healthier than reality.
+- **Core delivery docs synced to the deployed platform.** `setup.md` told
+  operators to fetch a JWT from `/auth/v1/public/auth/login` (no such route —
+  Keycloak is the issuer) and log into Grafana with `admin/admin` (no login
+  form exists — anonymous Admin); both actionable instructions now match the
+  cluster, along with 22 (not 20) Flux Kustomizations, 7 (not 5) ResourceSets,
+  the realm-import seed story with fixed UUIDs (ADR-042), and the
+  id/backoffice/temporal hostnames. `envoy-gateway.md`'s "Planned — has not
+  yet run on Kind" status contradicted the repo's own history (#791 fixed two
+  runtime defects against the live edge): corrected to "reconciled on Kind,
+  K-row gate pass pending" and the same stale claim swept out of five
+  docs/secrets locations that cited it; the resource model recounted (38
+  HTTPRoutes, 13 JWT policies across the two ADR-050 realms, admin-CIDR +
+  btp-admin, Backend marked compose-only) and the security-jwt.yaml header
+  comment fixed. `application-delivery.md` learns the `fulfillment` domain
+  (the "change all 4 domain files" instruction would have silently skipped
+  `fulfillment-rs.yaml`), the honest Audit-mode status of the `:latest` ban,
+  and payment's direct-TLS no-PgDog exception. `kyverno.md` drops the
+  "wait for K8s 1.32" VAP blocker (cluster runs v1.34.3) and stops calling
+  the undeployed Policy Reporter UI "✅". `identity-cutover-runbook.md` splits
+  executed (local-stack, #752) from pending (Kind) and verifies both realms.
 
 #### GitOps
 
@@ -1297,6 +1342,28 @@ Skeleton (copy what you need):
   two orders); the reconciler verifies its window. Gameday follow-ups (b) and (c)
   closed too — the one-minute doubt sweep is tested, and the provider-unknown
   counter's park/resolve ambiguity is fixed.
+
+#### CI
+
+- **The repo publishing the CI/CD policy no longer violates it, and the docs
+  stop contradicting their own templates.** `ci.yml`'s three `fluxcd/pkg`
+  actions ran on a mutable `@main` ref — the exact vector `cicd.md` §
+  supply-chain forbids — now full-SHA pinned (dependabot's github-actions
+  manager maintains them); `renovate.yml` gets the deny-all permissions
+  baseline (write scopes were top-level), a SHA-pinned checkout with
+  `persist-credentials: false`, and a pinned renovatebot action. The reference
+  `build_template.yml` drops its `docker-db-init` job — it contradicted
+  AGENTS.md and cicd.md ("migrations ship inside the app image; no second
+  image") — and the Trivy gate becomes CRITICAL-only-blocks
+  (`scan-severity: 'CRITICAL'`), matching the documented policy while
+  trivy-report keeps CRITICAL,HIGH,MEDIUM visible non-blocking. `cicd.md` /
+  `gitflow.md` / `sonarcloud.md` / `ruleset-automation.md` reconciled with
+  reality: auth-service examples replaced (multi-level image paths), homelab
+  required-checks list names the jobs that exist, the 2-vs-1 approvals
+  contradiction settles on 1, dev/uat promotion consistently marked target,
+  the gitflow ASCII quick-reference becomes Mermaid, third-party blog links
+  synthesized out, and gh-patcher's actual coverage (Base ruleset only)
+  stated plainly.
 
 ### Dependency
 

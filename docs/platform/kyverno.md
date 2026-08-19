@@ -62,7 +62,7 @@ flowchart LR
 ```
 kubernetes/
   infra/
-    controllers/kyverno/         # HelmRelease (Kyverno chart 3.8.1)
+    controllers/kyverno/         # HelmRelease (Kyverno chart 3.8.2)
     configs/kyverno/
       cluster-policies/          # ClusterPolicy resources
       exceptions/                # PolicyException resources
@@ -172,4 +172,4 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
 
 ---
 
-_Last updated: 2026-07-10 — chart pin 3.8.1; rollout table annotated with the current Audit-mode reality._
+_Last updated: 2026-08-19 — chart pin 3.8.2; rollout table annotated with the current Audit-mode reality._

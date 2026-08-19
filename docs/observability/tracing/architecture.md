@@ -97,7 +97,7 @@ behavior that makes this reliable.
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
-**3. Tempo (Primary Backend)** — `grafana/tempo:2.10.5`
+**3. Tempo (Primary Backend)** — `grafana/tempo:2.10.8`
 - **Purpose**: Durable tracing backend
 - **Storage**: **RustFS S3** (`tempo-traces` bucket), **7-day** block retention
 - **Query**: Via Grafana (TraceQL)

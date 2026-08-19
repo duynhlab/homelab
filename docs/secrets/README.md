@@ -146,7 +146,7 @@ classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 | Component | Purpose | Namespace | Version |
 |-----------|---------|-----------|---------|
 | OpenBAO (HA) | Secret storage (3-node Raft) | `openbao` | 2.5.x |
-| External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.5.0** |
+| External Secrets Operator | Sync secrets to K8s | `external-secrets-system` | **v2.9.0** |
 | ClusterSecretStore | OpenBAO connection config | cluster-scoped | `openbao` |
 | ClusterExternalSecret | Shared secrets across namespaces | cluster-scoped | Backup creds |
 | ExternalSecret | Per-secret definition | app namespaces | Creates K8s Secrets |

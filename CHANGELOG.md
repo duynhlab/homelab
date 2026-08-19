@@ -1304,6 +1304,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Renovate safe-batch (2026-08-19), observability half** — merged after review
+  of every upstream changelog; the three compose-touching bumps were gated on a
+  full E2E audit (A 20/20 + A13 timer, B 10/10, C 21/21, evidence on the PRs):
+  `grafana/tempo` 2.10.5 → **2.10.8** (Go 1.26.5 CVE rebuild; config untouched),
+  tempo community chart 2.2.3 → **2.2.4** (chart-default tag only — the
+  HelmRelease still pins `tempo.tag: 2.10.7`, so the parallel ADR-040 install
+  is unchanged), `otel/opentelemetry-collector-contrib` 0.152.0 → **0.159.0**
+  (Snappy gRPC memory-corruption fix; five component-rename alias warnings at
+  startup — `otlphttp`/`spanmetrics`/`deltatocumulative`/`prometheusremotewrite`
+  — cosmetic until a config-key rename; ClickHouse `otel_logs` gains
+  `__otel_materialized_*` MATERIALIZED columns, Map-column 1.3.0 schema and
+  dashboards unaffected), `grafana/grafana` 13.1.3 → **13.2.0** (VM/VL/ClickHouse
+  datasource plugins verified healthy), and vector chart 0.52.0 → **0.57.0**
+  (app 0.57: env-interpolation off and sink-template confinement — this config
+  uses neither).
 - Bump `altinity-clickhouse-operator` 0.27.1 → 0.27.3. Primary reason is the
   security pair: Go stdlib 1.26.5 + `x/net`/`x/text` CVE bumps (two of them
   `govulncheck`-reachable in the operator/exporter), and 0.27.2's removal of
@@ -1315,6 +1330,23 @@ Skeleton (copy what you need):
   affect this HelmRelease — the key was never set. `upgrade.crds:
   CreateReplace` picks up the CRD delta; the CHI itself does not restart on
   an operator upgrade.
+
+#### Secrets
+
+- **Renovate safe-batch (2026-08-19), secrets half**: `external-secrets`
+  chart 2.5.0 → **2.9.0** (no CRD/API breaking change in 2.6–2.9; Go 1.26.5 +
+  grpc-go CVE bumps; repo stays on `external-secrets.io/v1`) and `cert-manager`
+  v1.20.2 → **v1.21.1** (all three 1.21 breaking changes verified inert here:
+  removed Helm keys unused, metrics port rename rides the chart-native
+  ServiceMonitor, no Vault-issuer tokenrequest; .1 over .0 for the controller
+  panic fix).
+
+#### Security
+
+- Bump `kyverno` chart 3.8.1 → **3.8.2** (app v1.18.2): security fix
+  enforcing the namespace boundary in `generate.apply()` (GHSA-79gf-7frw-68m9)
+  — hardens the repo's one generate-type policy — plus admission-controller
+  RBAC tightened (PolicyException `delete` removed).
 
 #### Services
 
@@ -1372,6 +1404,16 @@ Skeleton (copy what you need):
   propagates infrastructure errors on the confirm-binding read so the
   abandonment activity retries instead of abandoning the session forever
   (checkout-service #48 — the two review follow-ups from #47).
+
+#### Local-stack
+
+- `temporalio/ui` 2.53.1 → **2.53.3** (routine UI patches; compose-only, gated
+  with the batch's E2E audit run).
+
+#### CI
+
+- `renovatebot/github-action` 46.1.18 → **46.2.2** (workflow wrapper only,
+  same inputs).
 
 ## [0.110.0] - 2026-08-07
 

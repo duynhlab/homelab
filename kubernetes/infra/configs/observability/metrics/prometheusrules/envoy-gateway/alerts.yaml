@@ -42,6 +42,7 @@ spec:
           annotations:
             summary: "Envoy Gateway edge proxy down or not scraped"
             description: "An Envoy proxy instance is unreachable (or the whole job='envoy-gateway' scrape is absent). The edge is the single entry point — all API and SPA traffic may be affected."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeDown.md"
 
     # --- Errors ---
     - name: envoy-gateway-errors
@@ -56,6 +57,7 @@ spec:
           annotations:
             summary: "Edge 5xx ratio above 5%"
             description: "{{ $value | humanizePercentage }} of downstream responses at the edge are 5xx (threshold 5%). Includes upstream failures AND Envoy-generated 5xx (no healthy upstream, UF/UO response flags) — check per-cluster 5xx on the Envoy Clusters dashboard."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/Edge5xxRatio.md"
 
         - alert: Edge5xxRatioCritical
           expr: edge:rq_5xx_ratio:rate5m > 0.15
@@ -66,6 +68,7 @@ spec:
           annotations:
             summary: "Edge 5xx ratio above 15%"
             description: "{{ $value | humanizePercentage }} of downstream responses at the edge are 5xx. The majority of platform traffic is failing."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/Edge5xxRatio.md"
 
     # --- Latency ---
     - name: envoy-gateway-latency
@@ -80,6 +83,7 @@ spec:
           annotations:
             summary: "Edge P95 downstream request time above 1s"
             description: "P95 downstream request time is {{ $value | humanize }}ms (threshold 1000ms). envoy_http_downstream_rq_time measures the full request (edge overhead + upstream) — compare against envoy_cluster_upstream_rq_time per cluster to locate the slow hop."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeLatencyP95.md"
 
         - alert: EdgeLatencyP95Critical
           expr: edge:latency_ms:p95_5m > 2000
@@ -90,6 +94,7 @@ spec:
           annotations:
             summary: "Edge P95 downstream request time above 2s"
             description: "P95 downstream request time is {{ $value | humanize }}ms — client-timeout territory for most API requests."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeLatencyP95.md"
 
     # --- Traffic ---
     - name: envoy-gateway-traffic
@@ -110,6 +115,7 @@ spec:
           annotations:
             summary: "Envoy Gateway edge receiving no traffic"
             description: "The edge served zero downstream requests in the last 10 minutes but had traffic in the prior hour, while the proxy fleet is up — routing to or through the Gateway is broken."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeNoTraffic.md"
 
         - alert: Edge429RatioHigh
           # Local rate-limit pressure (ADR-045: per-replica token buckets).
@@ -123,6 +129,7 @@ spec:
           annotations:
             summary: "More than 5% of edge requests are locally rate-limited (429)"
             description: "{{ $value | humanizePercentage }} of downstream requests are being rejected by the BackendTrafficPolicy local rate limits. Check per-client behavior in the access logs and re-derive bucket sizes if legitimate traffic is being clipped."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/Edge429RatioHigh.md"
 
     # --- Upstream health ---
     - name: envoy-gateway-upstreams
@@ -145,6 +152,7 @@ spec:
           annotations:
             summary: "Envoy cluster {{ $labels.envoy_cluster_name }} has unhealthy endpoints"
             description: "One or more endpoints of {{ $labels.envoy_cluster_name }} were ejected by health checking or outlier detection. The route degrades to fewer replicas; if all endpoints eject, requests answer 503/UH."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeUpstreamUnhealthy.md"
 
     # --- Edge auth (SecurityPolicy JWT via Keycloak remoteJWKS) ---
     - name: envoy-gateway-auth
@@ -171,6 +179,7 @@ spec:
           annotations:
             summary: "Envoy Gateway cannot refresh the Keycloak JWKS"
             description: "jwks_fetch_failed is increasing: the edge cannot reach http://keycloak.identity:8080/realms/duynhlab JWKS. Cached keys serve until expiry, then every JWT-protected route starts answering 401. Check Keycloak health and the identity NetworkPolicy."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeJWKSFetchFailing.md"
 
     # --- Control plane (job="envoy-gateway-controller") ---
     - name: envoy-gateway-control-plane
@@ -187,6 +196,7 @@ spec:
           annotations:
             summary: "Envoy Gateway controller down or not scraped"
             description: "The EG control plane is unreachable. Running proxies keep serving their last xDS config, but no Gateway API change reconciles, and a restarted proxy pod cannot fetch configuration — a data-plane outage one pod restart away."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EnvoyGatewayControllerDown.md"
 
         - alert: EnvoyGatewayReconcileErrors
           # The controller's own failure counters, status="failure" verified
@@ -207,3 +217,4 @@ spec:
           annotations:
             summary: "Envoy Gateway controller reconcile/xDS failures"
             description: "The EG controller is failing status updates or xDS snapshot operations. Gateway API changes (routes, policies, certs) may not be reaching the proxy fleet — the running config silently drifts from git. Check the controller logs and the Envoy Gateway Global dashboard."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EnvoyGatewayReconcileErrors.md"

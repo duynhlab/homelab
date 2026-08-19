@@ -185,7 +185,7 @@ removed (2026-07-18) as redundant (they shadowed a superset built-in):
 ## Writing a runbook from a custom query
 
 Use this checklist when adding a new custom query or promoting a dashboard signal
-to an alert. Template: [`../../runbooks/postgresql/_TEMPLATE.md`](../../runbooks/postgresql/_TEMPLATE.md).
+to an alert. Template: [`../../runbooks/_TEMPLATE.md`](../../runbooks/_TEMPLATE.md).
 
 1. **Meaning** — state the SQL source view, metric name, threshold, and `for` duration.
 2. **Impact** — what breaks for users (latency, errors, data risk).

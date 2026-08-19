@@ -55,7 +55,20 @@ alerts, and operator health. One file per alert name — each file covers both
 
 ## Template
 
-New runbooks follow [`_TEMPLATE.md`](_TEMPLATE.md) (CNPG Meaning → Impact → Diagnosis → Mitigation).
+New runbooks follow the canonical [`../_TEMPLATE.md`](../_TEMPLATE.md) — one
+template for every runbooks folder; the rows and dialect below are this
+domain's additions.
+
+## Domain specifics
+
+- **Extra quick-facts rows:** `Clusters` (which of `platform-db` / `product-db`
+  the alert can fire on) and `Custom queries` (the
+  [custom-metrics.md](../../metrics/postgresql/custom-metrics.md) query behind a
+  deep-signal metric).
+- **Diagnosis dialect:** SQL-first — `kubectl exec` into the primary and query
+  `pg_stat_*`; `auto_explain` and `pgaudit` output lands in VictoriaLogs when a
+  query, not a metric, is the suspect.
+- **Dashboards:** Databases folder (CloudNativePG board per cluster).
 
 ---
-_Last updated: 2026-07-18_
+_Last updated: 2026-08-19 — template moved to the runbooks parent_

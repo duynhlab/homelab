@@ -99,6 +99,7 @@ spec:
               checkout namespace) and INVENTORY_GRPC_ADDR on the checkout pods.
               A wiring mistake looks identical to an outage here, which is why
               checkout startup-validates the address and panics on a nil client.
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/CheckoutAvailabilityErrors.md"
 
         # Inventory refusing essentially every basket. A shortage is a legitimate
         # business answer, so nothing else complains — but "everything is short"
@@ -136,6 +137,7 @@ spec:
               covers that and names the SKUs. Rows present at zero means real
               balances: check whether safety_stock is at or above on_hand
               (available-to-promise is then zero by policy, not by shortage).
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/CheckoutAvailabilityRefusingEverything.md"
 
         # A SKU with no balance row anywhere. Not a ratio and no `for` grace at
         # all: every one of these is a customer who got a 503 on a basket
@@ -177,3 +179,4 @@ spec:
               normal write path so on_hand == SUM(on_hand_delta) holds. Never
               copy product's old numbers: they stopped moving at the W7 write
               cutover and the column was dropped in phase 4.
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/CheckoutAvailabilityUnknownSKU.md"

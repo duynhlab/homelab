@@ -834,9 +834,46 @@ For every answer, structure as:
 
 ---
 
+## Interview Reference: Alerting
+
+Moved here from the microservices alerts hub — framework mapping for the
+application alert set, and the worked design answer.
+
+### Mapping Alerts to Frameworks
+
+| Framework | Signal | Alerts Covering It |
+|-----------|--------|-------------------|
+| **RED** | Rate | `MicroserviceNoTraffic` |
+| **RED** | Errors | `MicroserviceHighErrorRate`, `MicroserviceErrorRateCritical`, `MicroserviceNoSuccessfulRequests`, `GrpcServerHighErrorRate` |
+| **RED** | Duration | `MicroserviceHighLatencyP95`, `MicroserviceHighLatencyP99`, `MicroserviceLatencyCritical`, `MicroserviceApdexCritical`, `GrpcServerHighLatencyP95` |
+| **USE** | Utilization | `MicroserviceHighMemoryUsage` |
+| **USE** | Saturation | `MicroserviceHighRequestsInFlight`, `MicroserviceRequestsInFlightCritical` (retired — otelgin gap), `MicroserviceGoroutineLeak`, `MicroserviceGCThrash` |
+| **USE** | Errors | `MicroserviceDown`, `MicroserviceAllInstancesDown`, `KubePodCrashLooping` |
+| **Golden** | Latency | All RED Duration alerts |
+| **Golden** | Traffic | `MicroserviceNoTraffic` |
+| **Golden** | Errors | All RED Errors alerts + Availability alerts |
+| **Golden** | Saturation | All USE Saturation alerts |
+
+### Interview Answer: "How do you design alerting for microservices?"
+
+**Before**: No application-level alerts. Only SLO burn-rate alerts from Sloth. When a service crashed, we relied on SLO burn-rate which could take 30-60 minutes to detect a sudden failure.
+
+**What you did**: Added Layer 1 threshold alerts to complement Layer 2 SLO alerts. Designed 5 active alert groups covering RED/Golden Signals plus Go runtime health; retained the retired saturation design as reference.
+
+**How**:
+- 19 active alert rules in 6 groups: availability, errors, latency, traffic, runtime, database client
+- Recording rules pre-aggregate common queries (5 groups, ~15 rules) for fast evaluation
+- Thresholds aligned with Grafana dashboard thresholds but more conservative to reduce noise
+- Every alert has `runbook_url` annotation pointing to investigation steps
+- Two-layer approach: Layer 1 (threshold, 1-10 min detection) + Layer 2 (SLO burn-rate, 5-60 min detection)
+
+**Result**: Complete-outage detection now follows VictoriaMetrics staleness plus the 2-minute alert hold, typically about 5-7 minutes instead of waiting for a slow SLO burn. Layer 1 catches obvious failures; Layer 2 catches sustained degradation with higher signal quality. Four-pillar correlation (`trace_id` in logs -> trace -> profile; no exemplars, RFC-0014 D-14) then guides the investigation.
+
+---
+
 ## Related Documentation
 
-- [Microservices Alerts Runbook](microservices-alerts.md) -- Per-alert investigation guide, workflows, threshold tuning, future expansion
+- [Microservices Alerts Runbook](microservices-alerts.md) -- Per-alert investigation guide, workflows, threshold tuning, expansion status
 - [Observability Overview](../README.md) -- Master index, 4-pillar architecture
 - [Observability Architecture](../README.md#3-layer-service-architecture--apm-integration) -- 3-layer architecture & middleware chain
 - [Metrics Reference](../metrics/README.md) -- RED method, label strategy, cardinality
@@ -850,4 +887,4 @@ For every answer, structure as:
 - [Profiling Guide](../profiling/README.md) -- Continuous profiling, flamegraphs
 
 ---
-_Last updated: 2026-08-17 — middleware chain re-documented as the shared `pkg/httpmw` pair (`httpmw.Tracing` / `httpmw.Logging`), with exact route-pattern probe filtering_
+_Last updated: 2026-08-19 — alerting interview reference moved in from microservices-alerts.md; previously 2026-08-17 — middleware chain re-documented as the shared `pkg/httpmw` pair_

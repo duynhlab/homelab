@@ -325,13 +325,15 @@ docs/observability/
 │
 └── runbooks/                     # Operational runbooks
     ├── README.md                 # Runbook index
+    ├── _TEMPLATE.md              # Canonical per-alert runbook template
     ├── observability-deep-dive.md  # Theory + interview prep
-    ├── infrastructure-alerts.md    # Infra/platform alert investigation guide
     ├── microservices-alerts.md     # Workflows, tuning hub
     ├── victorialogs-kubernetes-logs-debug.md  # VictoriaLogs K8s log debugging
     ├── envoy-gateway/              # Edge per-alert runbooks (10 files)
-    ├── microservices/              # Per-alert runbooks (52 files)
-    └── postgresql/                 # CNPG per-alert runbooks (35 files)
+    ├── microservices/              # Per-alert runbooks (51 files)
+    ├── postgresql/                 # CNPG per-alert runbooks (34 files)
+    ├── kubernetes/                 # K8s infra per-alert runbooks (22 files)
+    └── valkey/                     # Cache per-alert runbooks (8 files)
 ```
 
 The compose stack has its own observability plane — vmagent/vmalert, the

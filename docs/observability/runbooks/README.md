@@ -1,18 +1,26 @@
 # Operational Runbooks
 
 Runbooks for investigating, troubleshooting, and resolving incidents in the observability stack.
+One folder per alert domain, one file per alert name; every alert that has a
+runbook links it via its `runbook_url` annotation.
 
 ## Runbook Index
 
 | Runbook | Purpose | When to Use |
 |---------|---------|-------------|
 | [Observability Deep Dive](observability-deep-dive.md) | RED/USE/Golden Signals theory, 4-pillar stack architecture, middleware chain, correlation workflow, interview preparation | Learning, onboarding, interview prep |
-| [Infrastructure Alerts](infrastructure-alerts.md) | Per-alert investigation guide for infrastructure/platform alerts (nodes, control plane, Flux, cert-manager, VictoriaMetrics) | On-call, when an infrastructure alert fires |
 | [Microservices Alerts](microservices-alerts.md) | Workflows, tuning, and design context for application alerts | Learning, cross-signal triage |
-| [Microservices runbooks](microservices/README.md) | Per-alert investigation (21 files) | On-call, when an application alert fires |
+| [Microservices runbooks](microservices/README.md) | Per-alert investigation (50 files) | On-call, when an application alert fires |
 | [Envoy Gateway runbooks](envoy-gateway/README.md) | Per-alert investigation for the edge (9 files covering 11 `Edge*` / `EnvoyGateway*` alerts) | On-call, when an edge alert fires |
-| [PostgreSQL Alerts](postgresql/README.md) | Per-alert CNPG runbooks (chart + deep-signal), one file per alert name | On-call, when a PostgreSQL/CNPG alert fires |
+| [PostgreSQL runbooks](postgresql/README.md) | Per-alert CNPG runbooks (chart + deep-signal), 33 files | On-call, when a PostgreSQL/CNPG alert fires |
+| [Kubernetes runbooks](kubernetes/README.md) | Per-alert investigation for pods, workloads, storage, nodes, API server, network (21 files) | On-call, when a Kubernetes infra alert fires |
+| [Valkey runbooks](valkey/README.md) | Per-alert investigation for the cache (7 files) | On-call, when a Valkey alert fires |
 | [VictoriaLogs Kubernetes Logs Debug](victorialogs-kubernetes-logs-debug.md) | Blank Grafana logs panel / empty Explore against VictoriaLogs | On-call, when Kubernetes logs are missing in Grafana |
+
+Not yet covered by per-alert runbooks (a recorded gap): Flux/GitOps,
+cert-manager, Keycloak, and observability-stack self-monitoring alerts — they
+carry no `runbook_url`; the [alert catalog](../alerting/alert-catalog.md)
+documents their severity and impact.
 
 ## Runbook placement
 
@@ -21,13 +29,18 @@ Runbooks live **next to their domain hub** (`databases/runbooks/`, `secrets/runb
 
 ## Runbook Structure
 
-Each alert runbook follows a consistent format (CNPG upstream style for PostgreSQL):
+Every per-alert runbook follows [`_TEMPLATE.md`](_TEMPLATE.md) — the one
+canonical template for all domain folders:
 
-1. **Meaning** — what fires and when
-2. **Impact** — operational consequence
-3. **Diagnosis** — PromQL, Grafana, kubectl/psql
-4. **Mitigation** — resolution actions
-5. **Escalation** — optional homelab extension
+1. **Quick facts** — severity, category, source manifest, metrics, status, dashboard
+2. **Meaning** — what fires and when
+3. **Impact** — operational consequence
+4. **Diagnosis** — PromQL, Grafana, kubectl/logs, VictoriaLogs/traces
+5. **Mitigation** — resolution actions, cheapest first
+6. **Escalation** — page-vs-ticket call and what not to do
+
+Domain-specific rows and diagnosis dialects live in each folder README's
+"Domain specifics" section, never in a forked template.
 
 ## Related Documentation
 
@@ -39,4 +52,4 @@ Each alert runbook follows a consistent format (CNPG upstream style for PostgreS
 - [Prepared Databases](../../databases/runbooks/prepared-databases.md) -- preparedDatabases issue runbook
 
 ---
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-19 — infrastructure-alerts.md split into kubernetes/ + valkey/; one canonical template_

@@ -51,6 +51,7 @@ can disagree while every service reports perfectly healthy.
 | FulfillmentStartOutboxFailed | critical | correctness | [FulfillmentStartOutboxFailed.md](FulfillmentStartOutboxFailed.md) |
 | CheckoutAvailabilityErrors | critical | availability | [CheckoutAvailabilityErrors.md](CheckoutAvailabilityErrors.md) |
 | CheckoutAvailabilityRefusingEverything | warning | correctness | [CheckoutAvailabilityRefusingEverything.md](CheckoutAvailabilityRefusingEverything.md) |
+| CheckoutAvailabilityUnknownSKU | critical | correctness (operator data gap — ADR-053) | [CheckoutAvailabilityUnknownSKU.md](CheckoutAvailabilityUnknownSKU.md) |
 | OrderSagaCompensationFailing | critical | correctness | [OrderSagaCompensationFailing.md](OrderSagaCompensationFailing.md) |
 | OrderSagaNotCompleting | critical | availability | [OrderSagaNotCompleting.md](OrderSagaNotCompleting.md) |
 | OrderReconcilerBacklogNotDraining | warning | database | [OrderReconcilerBacklogNotDraining.md](OrderReconcilerBacklogNotDraining.md) |
@@ -60,6 +61,19 @@ can disagree while every service reports perfectly healthy.
 | OrderParticipantDisagreement | warning | correctness | [OrderParticipantDisagreement.md](OrderParticipantDisagreement.md) |
 | OrderStartParticipantUnrecognised | warning | correctness | [OrderStartParticipantUnrecognised.md](OrderStartParticipantUnrecognised.md) |
 | OrderInventoryCommitLagHigh | warning | latency | [OrderInventoryCommitLagHigh.md](OrderInventoryCommitLagHigh.md) |
+
+### Inventory stock authority
+
+Rules: [`prometheusrules/microservices/inventory.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/microservices/inventory.yaml)
+
+Inventory is the stock authority on the money path — these watch its
+reservation outcomes and gRPC surface directly.
+
+| Alert | Sev | Category | Runbook |
+|-------|-----|----------|---------|
+| InventoryReserveUnknownSKU | critical | errors | [InventoryReserveUnknownSKU.md](InventoryReserveUnknownSKU.md) |
+| InventoryReservationInfraErrors | warning | errors | [InventoryReservationInfraErrors.md](InventoryReservationInfraErrors.md) |
+| InventoryGrpcErrorRatio | warning | errors | [InventoryGrpcErrorRatio.md](InventoryGrpcErrorRatio.md) |
 
 ### RFC-0021 phase 5 (order aggregate)
 
@@ -97,6 +111,7 @@ automatic resolution paths are working.
 | PaymentAttemptEvidenceLost | critical | correctness | [PaymentAttemptEvidenceLost.md](PaymentAttemptEvidenceLost.md) |
 | PaymentReconciliationDiscrepancy | critical | correctness | [PaymentReconciliationDiscrepancy.md](PaymentReconciliationDiscrepancy.md) |
 | PaymentReconciliationStale | critical | observability | [PaymentReconciliationStale.md](PaymentReconciliationStale.md) |
+| PaymentReconciliationWindowViolation | warning | errors | [PaymentReconciliationWindowViolation.md](PaymentReconciliationWindowViolation.md) |
 | PaymentDoubtBacklogGrowing | warning | correctness | [PaymentDoubtBacklogGrowing.md](PaymentDoubtBacklogGrowing.md) |
 | PaymentDoubtSweepFailing | warning | availability | [PaymentDoubtSweepFailing.md](PaymentDoubtSweepFailing.md) |
 | PaymentProviderUnknownRate | warning | availability | [PaymentProviderUnknownRate.md](PaymentProviderUnknownRate.md) |
@@ -107,5 +122,21 @@ Documented in [`../microservices-alerts.md`](../microservices-alerts.md): in-fli
 saturation (`MicroserviceHighRequestsInFlight`), `MicroserviceGCThrash`,
 `MicroserviceHighRestartRate` (use `KubePodCrashLooping`).
 
+## Template
+
+New runbooks follow the canonical [`../_TEMPLATE.md`](../_TEMPLATE.md) — one
+template for every runbooks folder; the rows and dialect below are this
+domain's additions.
+
+## Domain specifics
+
+- **Extra quick-facts rows:** `Applies to` (which of the 11 services the alert
+  can select) when the expr is label-scoped rather than fleet-wide.
+- **Diagnosis dialect:** start from the alert's `app` label — `$APP` in every
+  query; pivot metric → trace via exemplar `trace_id` into Tempo, and
+  metric → log via `{app="$APP"} | trace_id` in VictoriaLogs.
+- **Dashboards:** Microservices folder (RED per service) plus the Checkout
+  funnel board for order-path alerts.
+
 ---
-_Last updated: 2026-08-05_
+_Last updated: 2026-08-19 — template moved to the runbooks parent_

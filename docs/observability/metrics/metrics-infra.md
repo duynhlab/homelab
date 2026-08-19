@@ -103,8 +103,9 @@ production impact) is the [Alert Catalog](../alerting/alert-catalog.md):
 
 Database manifests are indexed in the
 [databases layer](postgresql/README.md); application RED manifests in
-[metrics-apps.md](metrics-apps.md#manifest-index). Runbook:
-[`infrastructure-alerts.md`](../runbooks/infrastructure-alerts.md).
+[metrics-apps.md](metrics-apps.md#manifest-index). Runbooks:
+[`runbooks/kubernetes/`](../runbooks/kubernetes/README.md) and
+[`runbooks/valkey/`](../runbooks/valkey/README.md).
 
 ## References
 

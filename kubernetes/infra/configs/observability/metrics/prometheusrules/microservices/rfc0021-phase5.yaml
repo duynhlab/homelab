@@ -62,7 +62,7 @@ spec:
               order_cancelling_backlog counts orders in `cancelling` older than
               15 minutes; with the 10m hold this fires ~25 minutes after the
               cancel was accepted. The customer is owed a refund decision.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderStuckCancelling.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderStuckCancelling.md"
 
         # A parked order IS a worklist item: only an operator command can move
         # it, and the whole point of manual_review is that money or stock is
@@ -80,7 +80,7 @@ spec:
               not converge (an unrefunded capture, an unreleased hold, an
               ambiguous pivot). Resolve via the documented operator path; the
               order's projection row and status history say what stopped.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderManualReviewBacklog.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderManualReviewBacklog.md"
 
         # Mirrors FulfillmentStartOutboxStalled: an accepted cancel whose
         # workflow has not started. Less urgent than the fulfillment twin
@@ -97,7 +97,7 @@ spec:
               The inline start failed and the dispatcher has not managed to
               start the CancellationWorkflow either. Usually Temporal or the
               worker; OrderStuckCancelling escalates if this persists.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderCancellationOutboxStalled.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderCancellationOutboxStalled.md"
 
         # Terminal rows: the dispatcher gave up (cap 60). Nothing retries
         # them; the order stays `cancelling` until a human re-arms or resolves.
@@ -113,7 +113,7 @@ spec:
               A FAILED cancellation-outbox row is a worklist item. Re-arm by
               cancelling again (a new episode re-arms the row) once the
               underlying Temporal/worker problem is fixed.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderCancellationOutboxStalled.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderCancellationOutboxStalled.md"
 
         # Complete is best-effort bookkeeping (confirmed → completed) and a
         # legal mid-tail cancellation is deliberately NOT counted here — this
@@ -129,7 +129,7 @@ spec:
               Orders finish their fulfillment tail but cannot record
               `completed`; they stay `confirmed`, which is settlement-correct
               but means the status ladder is silently degrading.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderProjectionWritesFailing.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderProjectionWritesFailing.md"
 
         # One lost projection write self-heals at the next boundary; a steady
         # rate means /details is rendering a stale or missing processing block
@@ -145,4 +145,4 @@ spec:
               The stage projection (order_processing_projection) is not
               accepting writes. UX-only — orders.status stays authoritative —
               but the SPA's progress rendering is dark while this fires.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderProjectionWritesFailing.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/OrderProjectionWritesFailing.md"

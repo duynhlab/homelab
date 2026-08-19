@@ -61,7 +61,7 @@ spec:
               means neither is converging: the provider is still silent, the
               attempt carries no key to replay under, or the row cannot be
               loaded. Money is unaccounted for until someone asks.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtStale.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtStale.md"
 
         # Doubt is being created faster than it is settled. Each open entry is
         # one payment whose fate is unknown, so a standing backlog is a
@@ -83,7 +83,7 @@ spec:
               not caught yet. Compare payment_provider_unknown_total (doubt
               created) against payment_attempt_resolution_total (doubt
               settled).
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtBacklogGrowing.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtBacklogGrowing.md"
 
         # The attempt log is what makes an unknown outcome resolvable. When it
         # refuses a write, the service deliberately does NOT park — so a
@@ -104,7 +104,7 @@ spec:
               pre-park state stands and asserts something the provider never
               confirmed. Check the payments table against the provider by hand
               for the window in question — the automatic path did not run.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentAttemptEvidenceLost.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentAttemptEvidenceLost.md"
 
         # The sweep could not act on a worklist entry at all — distinct from a
         # resolution that ran and learned nothing, which is progress. This
@@ -123,7 +123,7 @@ spec:
               skipped entirely: the payment or refund would not load, or the
               row carries no idempotency key to replay under. Those entries
               have no automatic escape and will age into PaymentDoubtStale.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtSweepFailing.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentDoubtSweepFailing.md"
 
         # Ledger-vs-provider drift. Reconciliation exists to find money the
         # books and the provider disagree about, and until now it found it and
@@ -143,7 +143,7 @@ spec:
               excluded from the report by design — their doubt is the attempt
               log's worklist — so anything counted here is real drift between
               what we believe and what the provider holds.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md"
 
         # A detector that has stopped is worse than one that finds nothing, because
         # it looks identical: the discrepancy counter reads zero either way. Only
@@ -192,7 +192,7 @@ spec:
               has stopped — and while that is true, ledger-vs-provider drift is
               neither detected nor alerted on. Expect a healthy value under ~600s
               (a 5-minute settlement lag plus the 5-minute interval).
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationStale.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentReconciliationStale.md"
 
         # Doubt is being CREATED at a rate. This is the leading indicator: it
         # fires while the backlog is still small, and it points at the
@@ -212,4 +212,4 @@ spec:
               key — but the customer-facing path is answering 503 and the
               worklist is filling. Check the provider's own health before
               treating this as a payment-service fault.
-            runbook: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentProviderUnknownRate.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/PaymentProviderUnknownRate.md"

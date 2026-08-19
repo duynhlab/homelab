@@ -11,7 +11,7 @@ Migrating from a traditional GitOps approach (Kustomize + Helm) to **Flux Operat
 - **Absolute DRY**: A shared `resourcesTemplate` replaces 8-10 near-identical HelmRelease files. Standard updates (OTel endpoints, common labels) happen in one place per domain.
 - **Decoupled Inputs**: Each service defines its own `ResourceSetInputProvider` (Static), enabling teams to manage config independently without merge conflicts.
 - **Template-Based Flexibility**: Go templating provides `if/else` and `range` logic directly in manifests for complex requirements (e.g., enabling caching only for specific services).
-- **Domain Isolation**: Domain-scoped ResourceSets limit blast radius to ~25% of backend services per failure.
+- **Domain Isolation**: Domain-scoped ResourceSets limit blast radius to one domain per failure — between 10% and 40% of the 10 backend services, depending on the domain (see §7).
 - **Self-Service Onboarding**: Adding a new microservice requires creating one small InputProvider file (~15 lines) with the correct domain label.
 
 ## 2. Architectural Overview
@@ -26,6 +26,7 @@ flowchart TD
         cartIP["rsip-cart<br/>domain: checkout"]
         orderIP["rsip-order<br/>domain: checkout"]
         paymentIP["rsip-payment<br/>domain: checkout"]
+        inventoryIP["rsip-inventory<br/>domain: fulfillment"]
         notifIP["rsip-notification<br/>domain: comms"]
         shipIP["rsip-shipping<br/>domain: comms"]
     end
@@ -34,14 +35,23 @@ flowchart TD
         rsIdentity["rs-identity"]
         rsCatalog["rs-catalog"]
         rsCheckout["rs-checkout"]
+        rsFulfillment["rs-fulfillment"]
         rsComms["rs-comms"]
+    end
+
+    subgraph standalone [Standalone ResourceSets - inline inputs]
+        rsFrontend["rs-frontend"]
+        rsBackoffice["rs-backoffice"]
     end
 
     subgraph output [Generated Resources]
         hrIdentity["NS + HR: user"]
         hrCatalog["NS + HR: product, review"]
         hrCheckout["NS + HR: cart, checkout, order, payment"]
+        hrFulfillment["NS + HR: inventory"]
         hrComms["NS + HR: notification, shipping"]
+        hrFrontend["NS + HR: frontend"]
+        hrBackoffice["NS + HR: backoffice"]
     end
 
     userIP -->|"label selector"| rsIdentity
@@ -51,13 +61,17 @@ flowchart TD
     checkoutIP -->|"label selector"| rsCheckout
     orderIP -->|"label selector"| rsCheckout
     paymentIP -->|"label selector"| rsCheckout
+    inventoryIP -->|"label selector"| rsFulfillment
     notifIP -->|"label selector"| rsComms
     shipIP -->|"label selector"| rsComms
 
     rsIdentity --> hrIdentity
     rsCatalog --> hrCatalog
     rsCheckout --> hrCheckout
+    rsFulfillment --> hrFulfillment
     rsComms --> hrComms
+    rsFrontend --> hrFrontend
+    rsBackoffice --> hrBackoffice
 ```
 
 ## 3. File Layout
@@ -68,6 +82,7 @@ kubernetes/apps/
 │   ├── identity-rs.yaml           # rs-identity: user
 │   ├── catalog-rs.yaml            # rs-catalog: product, review
 │   ├── checkout-rs.yaml           # rs-checkout: cart, checkout, order, payment
+│   ├── fulfillment-rs.yaml        # rs-fulfillment: inventory
 │   └── comms-rs.yaml              # rs-comms: notification, shipping
 ├── services/                      # Per-service InputProviders (Static)
 │   ├── user.yaml                  # labels: domain=identity
@@ -77,12 +92,13 @@ kubernetes/apps/
 │   ├── checkout.yaml              # labels: domain=checkout
 │   ├── order.yaml                 # labels: domain=checkout
 │   ├── payment.yaml               # labels: domain=checkout
+│   ├── inventory.yaml             # labels: domain=fulfillment
 │   ├── notification.yaml          # labels: domain=comms
 │   └── shipping.yaml              # labels: domain=comms
 ├── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
 ├── backoffice-rs.yaml             # rs-backoffice (standalone) — operator portal SPA
 ├── mockpay.yaml                   # standalone HelmRelease — mock payment provider (payment ns)
-├── order-worker.yaml              # standalone HelmRelease — Temporal saga worker (order ns)
+├── order-worker-1-13-2.yaml       # standalone HelmRelease — versioned Temporal saga worker (order ns)
 └── checkout-worker.yaml           # standalone HelmRelease — checkout abandonment worker (checkout ns)
 ```
 
@@ -101,9 +117,10 @@ Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
 
 | Domain | ResourceSet | Services | Rationale |
 |--------|------------|----------|-----------|
-| identity | `rs-identity` | auth, user | platform-db (auth, user) on CNPG, identity boundary |
+| identity | `rs-identity` | user | platform-db (CNPG), identity boundary |
 | catalog | `rs-catalog` | product, review | product-db (product) + platform-db (review) on CNPG, shared read patterns |
 | checkout | `rs-checkout` | cart, checkout, order, payment | product-db (CNPG), purchase flow |
+| fulfillment | `rs-fulfillment` | inventory | product-db (CNPG) via PgDog, stock/availability boundary |
 | comms | `rs-comms` | notification, shipping | platform-db (CNPG), auxiliary services |
 | frontend | `rs-frontend` | frontend | Standalone (React SPA, no DB) |
 | backoffice | `rs-backoffice` | admin-service | Standalone operator portal (React SPA, no DB); staff realm, own host |
@@ -116,7 +133,7 @@ Each InputProvider uses two labels for selector matching:
 metadata:
   labels:
     app.kubernetes.io/part-of: backend-services
-    platform.duynhlab.dev/domain: identity  # identity | catalog | checkout | comms
+    platform.duynhlab.dev/domain: identity  # identity | catalog | checkout | fulfillment | comms
 ```
 
 Each domain ResourceSet selects by domain:
@@ -134,10 +151,10 @@ spec:
 
 | Resource type | Pattern | Example |
 |---------------|---------|---------|
-| ResourceSet | `rs-<domain>` | `rs-identity`, `rs-catalog` |
-| ResourceSetInputProvider | `rsip-<service>` | `rsip-auth`, `rsip-product` |
+| ResourceSet | `rs-<domain>` | `rs-identity`, `rs-fulfillment` |
+| ResourceSetInputProvider | `rsip-<service>` | `rsip-user`, `rsip-product` |
 | Domain RS file | `<domain>-rs.yaml` | `identity-rs.yaml` |
-| Service input file | `<service>.yaml` | `auth.yaml` |
+| Service input file | `<service>.yaml` | `user.yaml` |
 
 ## 4. Template Contract (Mandatory Rules)
 
@@ -202,13 +219,13 @@ Global defaults (registry URL, OTel endpoint, log level) are embedded as `index`
 
 ### 4.5 Template Duplication
 
-All 4 domain ResourceSets share the same `resourcesTemplate`. This is duplicated across 4 files. When updating the template, change all 4 domain files. This is the accepted tradeoff for blast radius isolation.
+All 5 domain ResourceSets share the same `resourcesTemplate`. This is duplicated across 5 files. When updating the template, change all 5 domain files. This is the accepted tradeoff for blast radius isolation.
 
 ## 5. Image Tag Strategy
 
 ### Pinned Tags (Current Default)
 
-Each service's `ResourceSetInputProvider` supplies an explicit `image_tag` input that the domain ResourceSet renders into the HelmRelease (`tag: "<< inputs.image_tag >>"`). Tags are pinned to a specific `sha` or `vX.Y.Z` per service — `:latest` is **banned by Kyverno admission** and never used.
+Each service's `ResourceSetInputProvider` supplies an explicit `image_tag` input that the domain ResourceSet renders into the HelmRelease (`tag: "<< inputs.image_tag >>"`). Tags are pinned to a specific `sha` or `vX.Y.Z` per service — `:latest` is banned as a **platform rule** (AGENTS.md admission rules) and never used. Note the Kyverno `disallow-latest-tag` ClusterPolicy currently runs in **Audit** mode (`validationFailureAction: Audit`): a `:latest` tag would be reported in PolicyReports, not blocked at admission. Flipping it to Enforce is planned per the [Kyverno rollout strategy](kyverno.md#rollout-strategy).
 
 ### Promote a validated release to local Kind
 
@@ -296,9 +313,14 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
        # Identity/comms (platform-db):
        db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
        db_migration_host: "platform-db-rw.platform.svc.cluster.local"
-       # Catalog/checkout on product-db (product, cart, checkout, order, payment):
+       # Catalog/checkout/fulfillment on product-db
+       # (product, cart, checkout, order, payment, inventory):
        # db_host: "pgdog-product.product.svc.cluster.local"
        # db_migration_host: "product-db-rw.product.svc.cluster.local"
+       # Exception — payment: connects DIRECT to CNPG over TLS, not via PgDog
+       # (db_host: "product-db-rw.product.svc.cluster.local" + db_sslmode: "require");
+       # payment refuses cleartext DB and PgDog terminates no TLS yet — see the
+       # comment in kubernetes/apps/services/payment.yaml.
        db_secret: "<name>-db-credentials"
        pool_max: "10"
    ```
@@ -320,10 +342,10 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 
 | Metric | Value |
 |--------|-------|
-| **Blast radius** | ~25% (one domain) |
+| **Blast radius** | One domain: 10–40% of the 10 backend services. `rs-checkout` carries 4 of 10 (40%) — a known concentration above the < 30% target (see §8.3) |
 | **Merge conflicts** | None (1 file per service) |
 | **Onboarding time** | < 5 min (create InputProvider + push) |
-| **Health granularity** | 1 check per domain (5 total); `mockpay`, `order-worker`, and `checkout-worker` are standalone HelmReleases outside the domain checks |
+| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay`, `order-worker-1-13-2`, and `checkout-worker` are standalone HelmReleases outside the ResourceSet checks |
 | **Team autonomy** | Full (each service owns its InputProvider) |
 
 ### Beyond 50 Services: Further Scaling
@@ -380,7 +402,7 @@ flux reconcile kustomization apps-local -n flux-system
 
 | Metric | Definition | Target |
 |--------|-----------|--------|
-| **Blast radius** | % of services affected by one ResourceSet failure | < 30% (domain-scoped) |
+| **Blast radius** | % of services affected by one ResourceSet failure | < 30% (domain-scoped). **Known gap**: `rs-checkout` bundles cart, checkout, order, payment — 40% of the fleet in one domain; splitting it is the lever if the target must hold |
 | **MTTR** | Time from alert to identifying the failing service | < 5 minutes |
 | **Reconcile scope** | Number of HelmReleases re-rendered per change | Only services in affected domain |
 | **Onboarding time** | Time to add a new service to an existing domain | < 5 minutes (create InputProvider + push) |
@@ -391,4 +413,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-08-07 — explicit local-stack → semver → pinned Kind promotion; versioned order-worker exception._
+_Last updated: 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._

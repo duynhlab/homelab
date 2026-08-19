@@ -11,11 +11,11 @@ external request passes through before it reaches a service.
 | API surface | Gateway API standard channel, bundle-version `v1.6.1` (`GatewayClass`, `Gateway`, `HTTPRoute`) + Envoy Gateway extensions (`Backend`, `EnvoyProxy`, `SecurityPolicy`, `BackendTrafficPolicy`) |
 | Cluster config | `kubernetes/infra/configs/envoy-gateway/` — Kubernetes provider, 2 replicas, NodePort 30080/30443 |
 | Local config | `local-stack/gateway/eg/` — standalone provider, one Envoy child process, published on `:8080`; `envoyproxy/gateway:v1.9.0` (bumps ride the compose E2E audit) |
-| Edge authentication | `SecurityPolicy.jwt` with `remoteJWKS` against the `duynhlab` realm; no key material in git |
+| Edge authentication | `SecurityPolicy.jwt` with `remoteJWKS` against **two realms**: `duynhlab` (customer `/private/` surfaces) and `duynhlab-staff` (Backoffice `/protected/` surfaces, ADR-050); no key material in git |
 | Edge telemetry | OTLP **gRPC** traces, JSON access log on stdout, Prometheus stats endpoint |
 | Edge `service.name` in traces | Derived as `<gateway>.<namespace>` — locally `platform.envoy-gateway-system` |
 | Verified | Local edge end-to-end on 2026-08-12: root span, trace continuity, access log field set, edge JWT 401/200 |
-| Cluster status | **Planned** — the manifests are written and validate; they have not yet run on Kind |
+| Cluster status | **Reconciled on Kind** during the RFC-0024 bring-up — #791 fixed two runtime defects against the live edge (CRD delivery, data-plane node placement); the full end-to-end Kind gate pass (K-rows) is still pending |
 
 ## Why an edge control plane at all
 
@@ -49,11 +49,12 @@ flowchart TD
   ep["EnvoyProxy: platform-edge<br/>infrastructure + telemetry"]
   gw["Gateway: platform<br/>listeners"]
   cors["SecurityPolicy: cors-policy<br/>CORS baseline"]
-  hr["HTTPRoute × 12<br/>path matches"]
-  jwt["SecurityPolicy: jwt-edge<br/>edge JWT, 7 private routes"]
-  btp["BackendTrafficPolicy: btp-api<br/>rate limit + body cap"]
-  be["Backend × 10<br/>FQDN endpoints"]
-  svc["10 application services"]
+  hr["HTTPRoute × 38<br/>path matches (api 18, monitoring 10,<br/>mcp 3, infra 3, spa/backoffice/idp/temporal 4)"]
+  jwt["SecurityPolicy: jwt-edge × 7 + jwt-edge-staff × 6<br/>edge JWT, two realms (ADR-050)"]
+  cidr["SecurityPolicy: admin-cidr-internal<br/>admin-surface client-CIDR fence"]
+  btp["BackendTrafficPolicy: btp-api + btp-admin<br/>rate limit + body cap"]
+  be["Service backendRefs (cluster)<br/>Backend × 11 FQDN (compose only)"]
+  svc["10 application services + platform UIs"]
 
   gc -->|"parametersRef<br/>namespace load-bearing"| ep
   gw -->|gatewayClassName| gc
@@ -62,13 +63,14 @@ flowchart TD
   be --> svc
   cors -->|targetRefs| gw
   jwt -->|targetRefs| hr
+  cidr -->|targetRefs| hr
   btp -->|targetRefs| hr
 
   classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
   classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
   class gc,gw,hr edge
-  class ep,be,cors,jwt,btp platform
+  class ep,be,cors,jwt,cidr,btp platform
   class svc service
 ```
 
@@ -290,4 +292,4 @@ validation.
 - [Envoy Gateway documentation](https://gateway.envoyproxy.io/docs/) — upstream
 - [Gateway API](https://gateway-api.sigs.k8s.io/) — the portable API this builds on
 
-_Last updated: 2026-08-19 — local standalone edge bumped to v1.9.0 with the ADR-053 train, closing the cluster/local version skew_
+_Last updated: 2026-08-19 — cluster status corrected to "reconciled on Kind" (#791 fixed two runtime defects live; only the K-row gate pass remains), resource model recounted (38 HTTPRoutes, 13 JWT policies across two realms, admin-CIDR + btp-admin added, Backend marked compose-only); earlier same day: local edge bumped to v1.9.0 with the ADR-053 train_

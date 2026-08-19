@@ -1,6 +1,6 @@
 # Documentation Index
 
-Documentation for the **duynhlab microservices platform** — 11 Go services + a React SPA, with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
+Documentation for the **duynhlab microservices platform** — 10 Go services + a React storefront + a back-office portal (Keycloak as the identity provider), with GitOps (Flux Operator), observability, databases, secrets, and the RFC/ADR design record.
 
 ---
 
@@ -288,8 +288,6 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 5. **[Temporal workflows](./api/temporal.md)** - all three workflows as built, saga vs 2PC theory, infrastructure, and operations
 
 6. **[RFCs — research then decide](./proposals/rfc/)** — owner approves next `RFC-NNNN` → `research.md` (plain-language + Context7) → `README.md` → optional `docs/<area>/` spin-off
-
-7. **[GKE internal and private DNS](./platform/gke-internal-dns.md)** - In-cluster DNS and Cloud DNS private zones
 
 ### Databases
 

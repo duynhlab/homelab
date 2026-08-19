@@ -5,8 +5,8 @@ day-2 platform patterns for the duynhlab homelab.
 
 | | |
 |---|---|
-| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (20 Flux Kustomizations) |
-| **Applications** | 10 Go microservices + React frontend + Temporal workers (`order-worker`, `checkout-worker`) + `mockpay` |
+| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (22 Flux Kustomizations) |
+| **Applications** | 10 Go microservices + React frontend + back-office portal + Temporal workers (`order-worker-1-13-2`, `checkout-worker`) + `mockpay` |
 | **GitOps** | Flux Operator + OCI artifacts + Kustomize — [`setup.md`](setup.md) |
 | **App onboarding** | Domain ResourceSets + InputProviders — [`application-delivery.md`](application-delivery.md) |
 | **Edge** | Envoy Gateway on the Gateway API — [`envoy-gateway.md`](envoy-gateway.md) |
@@ -61,6 +61,7 @@ flowchart TD
     keycloak --> edge
     databases --> keycloak
     secrets --> keycloak
+    monitoring --> keycloak
     controllers --> storage
     secrets --> storage
     controllers --> clickhouse
@@ -76,6 +77,9 @@ flowchart TD
     monitoring --> apps
     temporal --> apps
 ```
+
+This diagram is a summary — the full numbered graph of all 22 Kustomization CRs
+lives in [`setup.md`](setup.md#project-architecture).
 
 `make flux-sync` (inside `make sync`) reconciles only a **subset** of Kustomizations
 — see [`setup.md`](setup.md) for the caveat. After infra-only changes, reconcile the
@@ -112,4 +116,4 @@ Workflow templates (not prose docs): `build_template.yml`, `check_template.yml`.
 - [`kubernetes/apps/`](../../kubernetes/apps/) — ResourceSets and InputProviders
 - [`terraform/README.md`](../../terraform/README.md) — Flux Operator bootstrap
 
-_Last updated: 2026-08-13 — platform hub; edge is Envoy Gateway + Keycloak realm in the Flux graph._
+_Last updated: 2026-08-19 — synced to the deployed platform (22 Kustomizations, back-office portal, `order-worker-1-13-2`, keycloak → monitoring edge)._

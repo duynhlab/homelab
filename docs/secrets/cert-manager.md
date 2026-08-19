@@ -3,12 +3,12 @@
 This guide documents how cert-manager is wired into Flux in this repo: **two ClusterIssuer families** (internal `homelab-ca` + public `letsencrypt-{staging,prod}`), a **single `platform-edge-tls` wildcard cert** issued via **Cloudflare DNS-01** on prod (the local Kind overlay patches it to the self-signed **`homelab-ca`** instead), and **trust-manager** distributing the homelab CA bundle.
 
 > **Cluster status:** the `envoy-gateway-config-local` Kustomization that owns
-> this Certificate is **planned** — the manifests are written and validate but
-> have not yet reconciled on this Kind cluster (see the status table in
-> [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)). The
-> ClusterIssuers, `homelab-ca` Certificate, and trust-manager Bundle described
-> below are already live; §6 and §9's steps 3–6 describe the edge
-> Certificate's target behavior once Envoy Gateway reconciles.
+> this Certificate **has reconciled on Kind** during the RFC-0024 bring-up
+> (#791; see the status table in
+> [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)) — the full
+> end-to-end Kind gate pass (K-rows) is still pending. The ClusterIssuers,
+> `homelab-ca` Certificate, and trust-manager Bundle described below are live;
+> §6 and §9's steps 3–6 describe the edge Certificate's behavior.
 
 **Repository paths (implemented in this repo):**
 
@@ -59,7 +59,7 @@ flowchart LR
   K --> SS --> CA --> HCA
   Bao --> ES --> Sec --> LES & LEP
   LEP -->|prod| EdgeCert
-  HCA -->|local Kind overlay patch, planned| EdgeCert
+  HCA -->|local Kind overlay patch| EdgeCert
   CA -. one-time export .-> CACOPY --> Bundle --> OUT
   LE[Let's Encrypt ACME] <-->|DNS-01 TXT on duynh.me zone| LEP
   LE <-->|staging| LES
@@ -70,10 +70,10 @@ flowchart LR
 
 | PKI | Issuer chain | Used by | Trusted by |
 |---|---|---|---|
-| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Webhooks, future internal mTLS, **and `platform-edge-tls` on local Kind** (via the overlay patch, planned) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
+| Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Webhooks, future internal mTLS, **and `platform-edge-tls` on local Kind** (via the overlay patch — reconciled with the RFC-0024 bring-up) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
 | Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `platform-edge-tls` (browser-facing wildcard) **on prod** | Browsers (Mozilla bundle covers LE roots) |
 
-> **Local vs prod:** on the local Kind cluster the `platform-edge-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it is Let's Encrypt via Cloudflare DNS-01. The switch is a `spec.patches` override in [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) (not `cert-manager-config.yaml` — the edge Certificate lives in the `envoy-gateway` Kustomization, not the `cert-manager` one); prod has no such patch. This patch is **planned** along with the rest of the Envoy Gateway rollout on Kind.
+> **Local vs prod:** on the local Kind cluster the `platform-edge-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it is Let's Encrypt via Cloudflare DNS-01. The switch is a `spec.patches` override in [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) (not `cert-manager-config.yaml` — the edge Certificate lives in the `envoy-gateway` Kustomization, not the `cert-manager` one); prod has no such patch. The patch reconciled on Kind with the RFC-0024 bring-up (#791); the end-to-end Kind gate pass is still pending.
 
 ---
 
@@ -279,7 +279,7 @@ spec:
           dnsZones: [duynh.me]
 ```
 
-**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`). On **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** value so the ExternalSecret syncs and does not block `secrets-local` — the local `platform-edge-tls` is `homelab-ca`-signed (planned), so the (failing) DNS-01 solver never uses this token. On **prod** the token is **operator-supplied** — a real Cloudflare token, not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [OpenBAO initial setup § Step 7](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
+**Pre-requisite Secret — `cloudflare-api-token`** (`cert-manager` namespace, key `api-token`) is synced from OpenBAO by the ExternalSecret in `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml`. The OpenBAO path is `secret/local/infra/cloudflare/api-token` (key `api_token`). On **local Kind** the `openbao-bootstrap` Job seeds a **dev placeholder** value so the ExternalSecret syncs and does not block `secrets-local` — the local `platform-edge-tls` is `homelab-ca`-signed, so the (failing) DNS-01 solver never uses this token. On **prod** the token is **operator-supplied** — a real Cloudflare token, not in Git — and must be re-seeded after every cluster recreate (`bao kv put …`). Operator runbook: [OpenBAO initial setup § Step 7](./runbooks/openbao-initial-setup.md#step-7--seed-bootstrap-only-cloudflare-token-operator).
 
 ---
 
@@ -320,7 +320,7 @@ spec:
     - "*.duynh.me"
 ```
 
-> **Local overlay:** the base manifest above uses `letsencrypt-prod`, but [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) patches `issuerRef.name` → `homelab-ca` on the local Kind cluster (self-signed; no ACME). Only prod issues this cert from Let's Encrypt. **This patch is planned** — the `envoy-gateway-config-local` Kustomization has not yet reconciled on this Kind cluster (see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
+> **Local overlay:** the base manifest above uses `letsencrypt-prod`, but [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) patches `issuerRef.name` → `homelab-ca` on the local Kind cluster (self-signed; no ACME). Only prod issues this cert from Let's Encrypt. The `envoy-gateway-config-local` Kustomization carrying this patch has reconciled on Kind (RFC-0024 bring-up, #791); the full Kind gate pass is still pending (see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
 
 On prod, switch `letsencrypt-prod` → `letsencrypt-staging` while iterating to avoid LE prod rate limits.
 
@@ -395,10 +395,11 @@ spec:
 
 ## 9. Deployment (step-by-step)
 
-> **Planned on Kind:** steps 3–6 describe the target behavior of the
-> `envoy-gateway-config-local` Kustomization, which has not yet reconciled on
-> this cluster (see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
-> Steps 1–2 (ClusterIssuers + `cloudflare-api-token`) are already live.
+> **Kind status:** steps 3–6 are owned by the `envoy-gateway-config-local`
+> Kustomization, which has reconciled on Kind (RFC-0024 bring-up, #791); the
+> end-to-end Kind gate pass is still pending (see
+> [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
+> Steps 1–2 (ClusterIssuers + `cloudflare-api-token`) predate it and are live.
 
 1. **Seed Cloudflare API token in OpenBAO** (host setup, runs once per fresh cluster):
    ```bash
@@ -479,8 +480,8 @@ Why trust-manager over reflector / kubernetes-replicator:
 
 Client-trust implications of the two PKIs (§1's table): a pod calling the edge
 on **prod** does not need the bundle — the cert is Let's Encrypt and Mozilla
-roots already cover it. On **local Kind** the edge cert is `homelab-ca`-issued
-(planned), so an in-cluster client verifying it does need the bundle. Opt a
+roots already cover it. On **local Kind** the edge cert is `homelab-ca`-issued,
+so an in-cluster client verifying it does need the bundle. Opt a
 namespace in only when it consumes a **homelab-CA-signed** endpoint; adding a
 browser-facing host means adding a SAN to `platform-edge-tls` (§6), never
 issuing a separate homelab-ca leaf for the same SNI.
@@ -643,4 +644,4 @@ kubectl describe bundle homelab-ca-bundle
 
 ---
 
-_Last updated: 2026-08-19 — trust-distribution.md dissolved into §11 (architecture, opt-in, mounting, CA rotation, bootstrap, troubleshooting; the stale `auth` namespace row dropped — only `monitoring` carries `needs-trust`); inline HelmRelease copy synced with the deployed `prometheus.servicemonitor` block. Previously 2026-08-13 — edge Certificate `platform-edge-tls` (ns `envoy-gateway`), LE DNS-01 on prod / `homelab-ca` on local Kind (planned)._
+_Last updated: 2026-08-19 — edge-Certificate status corrected: `envoy-gateway-config-local` reconciled on Kind with the RFC-0024 bring-up (#791), K-row gate pass pending; earlier same day: trust-distribution.md dissolved into §11 (architecture, opt-in, mounting, CA rotation, bootstrap, troubleshooting; the stale `auth` namespace row dropped — only `monitoring` carries `needs-trust`); inline HelmRelease copy synced with the deployed `prometheus.servicemonitor` block. Previously 2026-08-13 — edge Certificate `platform-edge-tls` (ns `envoy-gateway`), LE DNS-01 on prod / `homelab-ca` on local Kind (planned)._

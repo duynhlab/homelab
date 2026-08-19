@@ -916,6 +916,26 @@ Skeleton (copy what you need):
   RFC-0024 identity cutover, and contradicted by audit row B1. Also noted:
   `checkout_promo_rejected_total` counts only confirm-gate rejections, so the
   ratio reads healthier than reality.
+- **Core delivery docs synced to the deployed platform.** `setup.md` told
+  operators to fetch a JWT from `/auth/v1/public/auth/login` (no such route —
+  Keycloak is the issuer) and log into Grafana with `admin/admin` (no login
+  form exists — anonymous Admin); both actionable instructions now match the
+  cluster, along with 22 (not 20) Flux Kustomizations, 7 (not 5) ResourceSets,
+  the realm-import seed story with fixed UUIDs (ADR-042), and the
+  id/backoffice/temporal hostnames. `envoy-gateway.md`'s "Planned — has not
+  yet run on Kind" status contradicted the repo's own history (#791 fixed two
+  runtime defects against the live edge): corrected to "reconciled on Kind,
+  K-row gate pass pending" and the same stale claim swept out of five
+  docs/secrets locations that cited it; the resource model recounted (38
+  HTTPRoutes, 13 JWT policies across the two ADR-050 realms, admin-CIDR +
+  btp-admin, Backend marked compose-only) and the security-jwt.yaml header
+  comment fixed. `application-delivery.md` learns the `fulfillment` domain
+  (the "change all 4 domain files" instruction would have silently skipped
+  `fulfillment-rs.yaml`), the honest Audit-mode status of the `:latest` ban,
+  and payment's direct-TLS no-PgDog exception. `kyverno.md` drops the
+  "wait for K8s 1.32" VAP blocker (cluster runs v1.34.3) and stops calling
+  the undeployed Policy Reporter UI "✅". `identity-cutover-runbook.md` splits
+  executed (local-stack, #752) from pending (Kind) and verifies both realms.
 
 #### GitOps
 

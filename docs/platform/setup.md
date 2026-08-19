@@ -44,7 +44,7 @@ git clone https://github.com/duynhlab/gha-workflows.git
 git clone https://github.com/duynhlab/pkg.git
 
 # Microservices Repositories
-for service in auth user product cart order review notification shipping payment checkout; do
+for service in user product inventory cart order review notification shipping payment checkout; do
   git clone https://github.com/duynhlab/${service}-service.git
 done
 
@@ -139,7 +139,7 @@ make flux-up
   - **Phase 1: Foundation** — `controllers-local`: namespaces + operators (cert-manager, CNPG, VictoriaMetrics/Grafana operators, OpenBAO + ESO, Kyverno, ClickHouse operator).
   - **Phase 2: Security & configs** — `secrets-local` (bootstrap Job + ClusterSecretStore + ExternalSecrets), `cert-manager-local`, `monitoring-local` (observability configs + Sloth SLO CRs).
   - **Phase 3: Platform services** — Envoy Gateway, Keycloak, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
-  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workers (`order-worker`, `checkout-worker`, `mockpay`).
+  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workers (`order-worker-1-13-2`, `checkout-worker`, `mockpay`).
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
 > with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
@@ -175,9 +175,9 @@ kubectl get prometheusservicelevel -n monitoring
 ```
 
 **Expected State:**
-- Namespaces for every domain provisioned (auth, user, product, cart, **checkout**, order, review, notification, shipping, payment, frontend, **platform**, **product**, **cache-system**, **rustfs**, envoy-gateway, identity, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, flux-system, **temporal**, …).
-- 5 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-comms`, `rs-frontend`) successfully reconciled.
-- HelmReleases for the **10 microservices** + frontend, plus **`mockpay`**, **`order-worker`**, and **`checkout-worker`** (in the `payment` / `order` / `checkout` namespaces), in `Ready` state.
+- Namespaces for every domain provisioned (user, product, **inventory**, cart, **checkout**, order, review, notification, shipping, payment, frontend, **backoffice**, **identity**, **platform**, **cache-system**, **rustfs**, envoy-gateway, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, **temporal** — source of truth: `kubernetes/infra/controllers/namespaces.yaml`; `flux-system` is created by the bootstrap).
+- 7 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-fulfillment`, `rs-comms`, `rs-frontend`, `rs-backoffice`) successfully reconciled.
+- HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`**, **`order-worker-1-13-2`**, and **`checkout-worker`** (in the `payment` / `order` / `checkout` namespaces), in `Ready` state.
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `platform-edge-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
@@ -189,9 +189,12 @@ All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on 
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| Frontend (React SPA) | https://local.duynh.me | alice / password123 |
-| API Gateway | https://gateway.duynh.me | JWT from `/auth/v1/public/auth/login` |
-| Grafana | https://grafana.duynh.me | admin / admin |
+| Frontend (React SPA) | https://local.duynh.me | alice / password123 (Keycloak login) |
+| Back-office portal | https://backoffice.duynh.me | duyne / p@ss1234 (`duynhlab-staff` realm, dev-only placeholder) |
+| API Gateway | https://gateway.duynh.me | Keycloak realm token — `local-stack/scripts/keycloak-token.sh` or sign in through the SPA |
+| Keycloak (issuer) | https://id.duynh.me | realm `duynhlab` — demo users below |
+| Temporal UI | https://temporal.duynh.me | - |
+| Grafana | https://grafana.duynh.me | anonymous (Admin org role — login form disabled) |
 | VictoriaMetrics UI | https://vmui.duynh.me | - |
 | Jaeger UI | https://jaeger.duynh.me | - |
 | VictoriaTraces UI | https://victoriatraces.duynh.me | - |
@@ -199,7 +202,7 @@ All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on 
 | Flux UI | https://ui.duynh.me | - |
 | OpenBAO UI | https://openbao.duynh.me | root token from `openbao-init-keys` secret |
 
-The full host inventory lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
+This table is a selection — the full host inventory (22 hostnames) lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
 
 ---
 
@@ -232,9 +235,9 @@ KC_URL=https://id.duynh.me USERNAME=alice PASSWORD=password123 \
   ./local-stack/scripts/keycloak-token.sh
 ```
 
-> **Planned:** the cluster half of this flow has not run on Kind yet; it is the
-> first thing the Kind gate proves. On local-stack the same flow is verified
-> end to end (`KC_URL` defaults to `http://localhost:8081`).
+> The edge layer has reconciled on Kind during the RFC-0024 bring-up (#791);
+> the full end-to-end Kind gate pass is still pending. On local-stack the same
+> flow is verified end to end (`KC_URL` defaults to `http://localhost:8081`).
 
 ### Seeded Data Summary
 
@@ -242,7 +245,7 @@ KC_URL=https://id.duynh.me USERNAME=alice PASSWORD=password123 \
 |---------|-------|---------|-------------|
 | **Product** | `products` | 8 | Electronics, peripherals, accessories |
 | **Product** | `categories` | 4 | Electronics, Computers, Accessories, Peripherals |
-| **Auth** | `users` | 5 | Demo users with bcrypt-hashed passwords |
+| **Identity** | Keycloak realm import | 5 | Demo users, fixed UUIDs `a11ce000-0000-4000-8000-00000000000N` (ADR-042) |
 | **User** | `user_profiles` | 5 | Complete profiles with addresses |
 | **Cart** | `cart_items` | 5 | Alice (3 items), Bob (2 items) |
 | **Order** | `orders` | 5 | Mix of pending/completed/shipped |
@@ -257,7 +260,7 @@ Cross-service references use fixed IDs for consistency:
 
 ```mermaid
 flowchart TD
-    AuthUsers["auth.users (IDs: 1-5)"]
+    RealmUsers["Keycloak duynhlab realm<br/>(5 demo users, sub = a11ce000-0000-4000-8000-00000000000N)"]
     ProductProducts["product.products (IDs: 1-8)"]
 
     UserProfiles["user.user_profiles"]
@@ -269,12 +272,12 @@ flowchart TD
     OrderItems["order.order_items"]
     Shipments["shipping.shipments"]
 
-    %% Top-down: sources -> consumers
-    AuthUsers -->|user_id| UserProfiles
-    AuthUsers -->|user_id| CartItems
-    AuthUsers -->|user_id| Orders
-    AuthUsers -->|user_id| Reviews
-    AuthUsers -->|user_id| Notifications
+    %% Top-down: sources -> consumers (services store the realm sub as string user_id)
+    RealmUsers -->|user_id = sub| UserProfiles
+    RealmUsers -->|user_id = sub| CartItems
+    RealmUsers -->|user_id = sub| Orders
+    RealmUsers -->|user_id = sub| Reviews
+    RealmUsers -->|user_id = sub| Notifications
 
     ProductProducts -->|product_id| CartItems
     ProductProducts -->|product_id| Reviews
@@ -302,7 +305,7 @@ flowchart TD
 
 ```json
 {
-  "user_id": 1,
+  "user_id": "a11ce000-0000-4000-8000-000000000001",
   "items": [
     {"product_id": 1, "product_name": "Wireless Mouse", "quantity": 2, "price": 29.99},
     {"product_id": 2, "product_name": "Mechanical Keyboard", "quantity": 1, "price": 79.99},
@@ -393,12 +396,12 @@ homelab/
 │   │   └── kustomization.yaml
 │   ├── apps/                           # Application definitions (Hybrid ResourceSet)
 │   │   ├── domains/                    # Domain ResourceSets (template + inputsFrom selector)
-│   │   │   ├── identity-rs.yaml        # rs-identity: auth, user
+│   │   │   ├── identity-rs.yaml        # rs-identity: user
 │   │   │   ├── catalog-rs.yaml         # rs-catalog: product, review
 │   │   │   ├── checkout-rs.yaml        # rs-checkout: cart, checkout, order, payment
+│   │   │   ├── fulfillment-rs.yaml     # rs-fulfillment: inventory
 │   │   │   └── comms-rs.yaml           # rs-comms: notification, shipping
 │   │   ├── services/                   # Per-service InputProviders (Static)
-│   │   │   ├── auth.yaml               # domain=identity
 │   │   │   ├── user.yaml               # domain=identity
 │   │   │   ├── product.yaml            # domain=catalog
 │   │   │   ├── review.yaml             # domain=catalog
@@ -406,26 +409,28 @@ homelab/
 │   │   │   ├── checkout.yaml           # domain=checkout
 │   │   │   ├── order.yaml              # domain=checkout
 │   │   │   ├── payment.yaml            # domain=checkout
+│   │   │   ├── inventory.yaml          # domain=fulfillment
 │   │   │   ├── notification.yaml       # domain=comms
 │   │   │   └── shipping.yaml           # domain=comms
 │   │   ├── mockpay.yaml                # mockpay HelmRelease (payment ns)
-│   │   ├── order-worker.yaml           # order-worker HelmRelease (order ns, Temporal saga)
+│   │   ├── order-worker-1-13-2.yaml    # order-worker-1-13-2 HelmRelease (order ns, Temporal saga)
 │   │   ├── checkout-worker.yaml        # checkout-worker HelmRelease (checkout ns)
-│   │   └── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
+│   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
+│   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind local environment (20 Kustomization CRs — see kustomization.yaml)
+│       └── local/                      # Kind local environment (22 Kustomization CRs — see kustomization.yaml)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration
 │           ├── secrets.yaml            # Secrets bootstrap configs
-│           ├── cert-manager-config.yaml
+│           ├── cert-manager-config.yaml / cnpg-barman-plugin.yaml
 │           ├── gateway-api-crds.yaml / envoy-gateway.yaml / envoy-gateway-config.yaml
 │           ├── keycloak.yaml
 │           ├── caching.yaml / storage.yaml
 │           ├── clickhouse.yaml / tracing.yaml / profiling.yaml
 │           ├── databases.yaml / databases-cnpg-dr.yaml
 │           ├── monitoring.yaml / kyverno.yaml / network-policies.yaml
-│           ├── mcp.yaml / temporal.yaml / apps.yaml
+│           ├── mcp.yaml / temporal.yaml / temporal-config.yaml / apps.yaml
 │           └── kustomization.yaml
 ├── Makefile                            # Centralized automation entrypoint
 └── scripts/                            # Implementation logic for automation tasks
@@ -435,7 +440,7 @@ homelab/
 1. `controllers-local`: Provisions namespaces and operators (cert-manager, CNPG, VictoriaMetrics/Grafana/Sloth, OpenBAO + ESO **HelmReleases**, Kyverno, ClickHouse operator). The Temporal operator was retired (ADR-030) — Temporal now ships as a HelmRelease in `temporal-local`. **Does not** install the edge or Tempo/Pyroscope (those are separate Kustomizations to avoid deadlocks).
 2. `secrets-local`: Applies `./configs/secrets` — OpenBAO bootstrap Job, ClusterSecretStore, ExternalSecrets (depends on `controllers-local` for the OpenBAO/ESO operators).
 3. `cert-manager-local`: ClusterIssuers (`selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod`), trust-manager Bundle (depends on `controllers-local`, `secrets-local` — needs the synced `cloudflare-api-token` Secret on prod).
-3a. `keycloak-local`: the `duynhlab` realm — Keycloak on `platform-db` with the deterministic realm import (depends on `controllers-local`, `databases-local`, `secrets-local`).
+3a. `keycloak-local`: the `duynhlab` realm — Keycloak on `platform-db` with the deterministic realm import (depends on `controllers-local`, `databases-local`, `secrets-local`, `monitoring-local` — the keycloak scrape needs the ServiceMonitor CRD).
 4. `gateway-api-crds-local`: Gateway API CRDs chart (depends on `controllers-local`).
 5. `envoy-gateway-local`: the Envoy Gateway controller (depends on `gateway-api-crds-local`, `cert-manager-local`).
 5a. `envoy-gateway-config-local`: GatewayClass + Gateway + HTTPRoutes + SecurityPolicies + BackendTrafficPolicies + the `platform-edge-tls` Certificate, with the local `homelab-ca` issuer patch (depends on `envoy-gateway-local`, `cert-manager-local`, `keycloak-local` — the JWT SecurityPolicy's `remoteJWKS` endpoint must resolve).
@@ -450,6 +455,7 @@ homelab/
 12. `databases-local`: CNPG `platform-db` and `product-db` clusters (depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
 13. `databases-cnpg-dr-local`: CNPG DR replica (depends on `databases-local`, `secrets-local`).
 14. `temporal-local`: Temporal server via the official `temporalio` HelmRelease (server 1.31.2 — ADR-030), `mop` namespace created by the chart's namespace Job, persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `databases-local`, `monitoring-local`).
+14a. `temporal-config-local`: the Temporal config half (`./configs/temporal` — server alerts; the Web UI HTTPRoute lives in `configs/envoy-gateway/routes/temporal.yaml`) (depends on `temporal-local`).
 15. `kyverno-policies-local`: Admission policies (depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
 15a. `mcp-local`: MCP servers (depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
 16. `apps-local`: Business logic — ResourceSets + workers (`dependsOn` `databases-local`, `monitoring-local`, `temporal-local`; workers dial Temporal at startup).
@@ -468,4 +474,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-08-13 — Envoy Gateway edge + Keycloak realm in the Flux graph and access instructions; realm-token login examples (PKCE, no password grant); cluster half marked planned until the Kind gate._
+_Last updated: 2026-08-19 — synced to the deployed platform (Keycloak login flow, anonymous Grafana, 22 Kustomizations, 7 ResourceSets, inventory; auth-service rows removed)._

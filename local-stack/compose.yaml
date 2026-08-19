@@ -289,7 +289,7 @@ services:
       temporal: { condition: service_healthy }
 
   temporal-ui:
-    image: temporalio/ui:2.53.1
+    image: temporalio/ui:2.53.3
     environment:
       TEMPORAL_ADDRESS: temporal:7233
     ports:

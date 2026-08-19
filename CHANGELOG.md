@@ -472,7 +472,9 @@ Skeleton (copy what you need):
   `clickhouse-server` endpoint stays deliberately off at 1×1 — recorded as
   the thing to enable with the first extra replica.
 - Telemetry audit findings log added at
-  [`docs/observability/audit-2026-08-07.md`](docs/observability/audit-2026-08-07.md)
+  `docs/observability/audit-2026-08-07.md` (since deleted in this same
+  release — see Bugfix › Observability; the cited measurements live on in
+  ADR-038's References)
   — the `api/observability.md` contract measured against the deployed platform.
   Six findings, four falsified suspicions (one of them my own bad test), and an
   explicit compliant list so the next audit can diff instead of re-deriving.

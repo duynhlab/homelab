@@ -364,7 +364,7 @@ services:
   # contributes only path 1: Envoy Gateway standalone writes its JSON access
   # log to stdout and has no OTLP logs path of its own.
   victoria-logs:
-    image: victoriametrics/victoria-logs:v1.51.0
+    image: victoriametrics/victoria-logs:v1.52.0
     command:
       - "-httpListenAddr=:9428"
       - "-storageDataPath=/victoria-logs-data"

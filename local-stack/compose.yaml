@@ -941,14 +941,14 @@ services:
   # It is a separate service because the image is distroless — no shell, so
   # `certgen && server` cannot be chained inside one container.
   gateway-certgen:
-    image: envoyproxy/gateway:v1.8.3@sha256:e7a8c70537628bf996e5dec5c4c835704b4b9f4f715a74cf361bea30608c49ac
+    image: envoyproxy/gateway:v1.9.0@sha256:6f40c7b218b4ff1c4cb481923ed2c9a7634580365913434dd5dda9e954c0114b
     command: ["certgen", "--local", "--overwrite", "--config-home", "/var/lib/eg"]
     volumes:
       - envoy-gateway-data:/var/lib/eg
     restart: "no"
 
   gateway:
-    image: envoyproxy/gateway:v1.8.3@sha256:e7a8c70537628bf996e5dec5c4c835704b4b9f4f715a74cf361bea30608c49ac
+    image: envoyproxy/gateway:v1.9.0@sha256:6f40c7b218b4ff1c4cb481923ed2c9a7634580365913434dd5dda9e954c0114b
     # The image ENTRYPOINT is /usr/local/bin/envoy-gateway, so `command` is just
     # its arguments.
     command: ["server", "--config-path", "/config/standalone.yaml"]

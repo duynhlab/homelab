@@ -22,6 +22,7 @@ docs/
 │   ├── shipping.md               # Tracking, quotes, shipment gRPC contract
 │   ├── checkout.md               # P1-P5 checkout subsystem; P6 planned
 │   ├── payments.md               # Payment contract, ledger, reconciliation
+│   ├── graceful-shutdown.md      # Cross-service shutdown contract (drain, timeouts)
 │   └── temporal.md # 3 Temporal workflows as built + saga vs 2PC + ops
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
@@ -124,7 +125,6 @@ docs/
 ├── platform/                     # Platform/deployment documentation
 │   ├── README.md                 # Platform hub — deployed vs planned, doc map, Flux summary
 │   ├── setup.md                  # GitOps deployment guide (+ seed data & demo accounts)
-│   ├── graceful-shutdown.md      # Graceful shutdown pattern (drain, readiness, timeouts)
 │   ├── gke-internal-dns.md       # GKE cluster.local, Cloud DNS private zones, multi-environment
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines + standard/policy (pinning, permissions, signing, GoReleaser)
@@ -460,7 +460,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Kong API Gateway](./platform/kong-gateway.md) - **Archived.** The platform's previous API gateway, kept for reference
 - [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
 - [Identity Cutover Runbook](./platform/identity-cutover-runbook.md) - RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm)
-- [Graceful Shutdown](./platform/graceful-shutdown.md) - Readiness-drain + signal handling pattern (all 11 services)
+- [Graceful Shutdown](./api/graceful-shutdown.md) - Cross-service shutdown contract: readiness drain + signal handling (moved to `docs/api/`)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
 - [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics/Logs, Flux, Grafana)
 - [Ruleset Automation](./platform/ruleset-automation.md) - GitHub repo ruleset provisioning

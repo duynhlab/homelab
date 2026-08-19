@@ -128,6 +128,7 @@ doc has no owning RFC or ADR. Legacy v1 contracts may still say **Design record*
 | Tracing spans, sampling, span helpers | [tracing.md](./tracing.md) |
 | Profiling client (`obsx.SetupProfiling`, env) | [profiling.md](./profiling.md) |
 | Cache-Aside pattern, keys, stampede lock, env, invalidation boundaries | [caching.md](./caching.md) |
+| Graceful-shutdown contract: readiness drain, `SHUTDOWN_TIMEOUT`, cleanup order | [graceful-shutdown.md](./graceful-shutdown.md) |
 | East-west call graph and edge exposure rules | [api.md](./api.md) |
 | One service's routes, RPCs, payloads, and business constraints | That service's file (At a glance **Deployment** row for local/cluster) |
 | Platform deployment rollup and status vocabulary | This page § [Service contracts](#service-contracts) |

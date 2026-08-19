@@ -1,7 +1,16 @@
 # Graceful Shutdown
 
-> **Document Status:** Production  
-> **Last Updated:** 2026-07-22 (checkout added to config table; workers called out separately)
+The cross-service shutdown contract: how every Go HTTP service drains,
+cleans up, and exits when Kubernetes (or compose) says stop. A sibling of
+[observability.md](observability.md)'s instrumentation policy — the code
+lives in the service repos; this page owns the shared behavior.
+
+| | |
+|---|---|
+| **Applies to** | The 10 Go HTTP services (workers follow a Temporal-specific lifecycle — a recorded gap below) |
+| **Contract env vars** | `READINESS_DRAIN_DELAY` (default 5s) · `SHUTDOWN_TIMEOUT` (default 10s) |
+| **Pod budget** | `terminationGracePeriodSeconds` — defaults come from the `mop` chart (`duynhlab/helm-charts`); homelab pins none per-service |
+| **Ordering** | fail `/ready` → drain delay → HTTP server → DB → tracer flush |
 
 ---
 
@@ -204,7 +213,7 @@ gantt
 ```
 
 **Key Points:**
-- Pod is removed from EndpointSlices immediately when marked "Terminating" (traffic stops)
+- Endpoint removal is **not instantaneous**: the pod is marked Terminating and EndpointSlice consumers (kube-proxy, the gateway) converge asynchronously — this propagation window is exactly why the readiness-drain delay exists (§ above)
 - Our graceful shutdown implementation handles the SIGTERM → GracefulShutdown → Cleanup flow
 - If shutdown exceeds `terminationGracePeriodSeconds` (30s), Kubernetes sends SIGKILL
 - Our configurable shutdown timeout (default 10s) ensures we complete well within the grace period
@@ -244,22 +253,18 @@ spec:
 
 ### Current Configuration
 
-All **HTTP microservices** use consistent settings via Helm values. **Temporal workers**
-(`order-worker`, `checkout-worker`) follow worker-specific lifecycle — not covered by this
-table.
+The contract values are **uniform defaults, not per-service pins**:
+`READINESS_DRAIN_DELAY=5s` and `SHUTDOWN_TIMEOUT=10s` are the services' own
+defaults, and `terminationGracePeriodSeconds` comes from the `mop` chart in
+`duynhlab/helm-charts` — **no homelab manifest overrides any of the three**
+(nothing in `kubernetes/apps/` or `local-stack/compose.yaml` sets them; a
+service that needs different numbers owns that override in its repo/chart
+values). The budget rule above is what a reviewer checks, not a table.
 
-| Service | `READINESS_DRAIN_DELAY` | `SHUTDOWN_TIMEOUT` | `terminationGracePeriodSeconds` |
-|---------|--------------------------|--------------------|---------------------------------|
-| auth | 5s | 10s | 30 |
-| user | 5s | 10s | 30 |
-| product | 5s | 10s | 30 |
-| cart | 5s | 10s | 30 |
-| checkout | 5s | 10s | 30 |
-| order | 5s | 10s | 30 |
-| review | 5s | 10s | 30 |
-| notification | 5s | 10s | 30 |
-| shipping | 5s | 10s | 30 |
-| payment | 5s | 10s | 30 |
+**Recorded gaps:** the **Temporal workers** (`checkout-worker`,
+`order-worker-1-13-2`) follow a worker-specific lifecycle (task-slot draining,
+not HTTP draining) that this contract does not yet describe; `mockpay`, the
+SPA, and the back-office portal are likewise out of scope here.
 
 ---
 
@@ -267,7 +272,7 @@ table.
 
 ### Code Pattern
 
-All services follow this pattern in each service repository (example: `~/Working/duynhlab/auth-service/cmd/main.go`):
+All services follow this pattern in each service repository (`<service>-service/cmd/main.go`):
 
 ```go
 var isShuttingDown atomic.Bool
@@ -364,8 +369,8 @@ The cleanup sequence is **critical**:
 ### Manual Testing
 
 ```bash
-# 1. Run service locally
-cd ~/Working/duynhlab/auth-service
+# 1. Run the service locally (any service repo)
+cd user-service
 go run cmd/main.go
 
 # 2. Send SIGTERM (simulates Kubernetes)
@@ -384,13 +389,13 @@ kill -SIGTERM $(pgrep -f "cmd/main.go")
 
 ```bash
 # Watch pod termination
-kubectl get pods -n auth -w
+kubectl get pods -n user -w
 
 # Trigger rolling update
-kubectl rollout restart deployment auth -n auth
+kubectl rollout restart deployment user -n user
 
 # Check events (should NOT see SIGKILL)
-kubectl describe pod <pod-name> -n auth | grep -i kill
+kubectl describe pod <pod-name> -n user | grep -i kill
 ```
 
 ---
@@ -398,7 +403,6 @@ kubectl describe pod <pod-name> -n auth | grep -i kill
 ## References
 
 - [Graceful Shutdown in Go (VictoriaMetrics)](https://victoriametrics.com/blog/go-graceful-shutdown/) – readiness drain and propagation delay pattern (primary reference)
-- [Mastering Graceful Shutdowns in Go (HackerNoon)](https://hackernoon.com/mastering-graceful-shutdowns-in-go-a-comprehensive-guide-for-kubernetes)
 - [Go signal.NotifyContext Documentation](https://pkg.go.dev/os/signal#NotifyContext)
 - [Kubernetes Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
 - [Kubernetes EndpointSlices Documentation](https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/)
@@ -408,9 +412,9 @@ kubectl describe pod <pod-name> -n auth | grep -i kill
 
 ## Related Documentation
 
-- [API Reference](../api/api.md) - Service endpoints and architecture
-- [Application logging](../api/logs.md) - JSON log format and levels
+- [API Reference](./api.md) - Service endpoints and architecture
+- [Application logging](./logs.md) - JSON log format and levels
 - [Tracing Architecture](../observability/tracing/architecture.md) - OpenTelemetry integration
 
 ---
-_Last updated: 2026-07-22 — checkout service row; Temporal workers footnote._
+_Last updated: 2026-08-19 — moved from docs/platform/ to docs/api/ as the cross-service shutdown contract; the per-service config table (unbacked by any homelab manifest, incl. a retired-auth row) replaced by the uniform-defaults contract; EndpointSlice wording fixed (removal is not instantaneous — the drain delay exists because of the propagation window); machine-local paths and dead-namespace commands removed._

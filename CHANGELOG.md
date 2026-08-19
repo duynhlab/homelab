@@ -882,6 +882,17 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`graceful-shutdown.md` moves to `docs/api/` as the cross-service shutdown
+  contract** (owner call — it is app-behavior guidance, a sibling of the
+  instrumentation policy, not platform manifests). Corrected on the way: the
+  per-service Helm-values table asserted deployed configuration that no
+  homelab manifest backs (and still carried a retired-auth row while missing
+  inventory) — replaced by the uniform-defaults contract statement; the
+  "removed from EndpointSlices immediately" claim contradicted the doc's own
+  drain-delay premise (removal propagates asynchronously — that window is why
+  the delay exists); machine-local `~/Working/...` paths and dead
+  `-n auth` verification commands removed; workers/mockpay/SPA scoped out as
+  recorded gaps; indexes re-pointed (docs/api ownership row added).
 - **Root README caught up to the deployed platform.** The overview and
   topology diagram still described the Kong-era layout: Kong as the edge, "10
   microservices · Web → Logic → Core", three PgDog poolers, and an

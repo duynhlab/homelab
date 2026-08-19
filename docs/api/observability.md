@@ -94,7 +94,8 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
    }
    ```
 
-   Shutdown is the **last step of the ordered graceful-shutdown sequence**
+   Shutdown is the **last step of the ordered
+   [graceful-shutdown sequence](./graceful-shutdown.md)**
    (after the HTTP/gRPC servers stop), bounded by the shutdown context —
    `cfg.ShutdownTimeout` is an `int` of seconds behind
    `cfg.GetShutdownTimeoutDuration()`. Workers follow the same rule: every

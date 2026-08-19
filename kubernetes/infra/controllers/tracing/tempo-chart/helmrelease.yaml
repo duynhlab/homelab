@@ -19,7 +19,7 @@ spec:
         kind: HelmRepository
         name: grafana-community
         namespace: flux-system
-      version: '2.2.3'
+      version: '2.2.4'
   interval: 10m
   releaseName: tempo-chart
   timeout: 10m

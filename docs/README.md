@@ -114,8 +114,6 @@ docs/
 │   └── runbooks/                 # Operational runbooks
 │       ├── README.md             # Runbook index
 │       ├── _TEMPLATE.md          # Canonical per-alert runbook template
-│       ├── microservices-alerts.md      # Workflows, tuning hub
-│       ├── victorialogs-kubernetes-logs-debug.md  # Blank Grafana logs / VictoriaLogs ingest
 │       ├── envoy-gateway/               # Edge per-alert runbooks
 │       ├── microservices/               # Per-alert runbooks (50 alerts)
 │       ├── postgresql/                  # Per-alert CNPG runbooks
@@ -227,7 +225,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (33 files)
 
-4b. **[Microservices alert runbooks](./observability/runbooks/microservices/README.md)** - Per-alert RED/Golden investigation (19 files); hub [`microservices-alerts.md`](./observability/runbooks/microservices-alerts.md)
+4b. **[Microservices alert runbooks](./observability/runbooks/microservices/README.md)** - Per-alert RED/Golden investigation (50 files) + cross-signal workflows and threshold tuning
 
 5. **[Variables & Regex](./observability/grafana/variables.md)** - Dashboard variable patterns
    - Filter configurations
@@ -332,7 +330,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 ### Runbooks & Troubleshooting
 
 1. **[PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md)** - Backup and restore procedures (CNPG Barman)
-2. **[VictoriaLogs Log Debugging](./observability/runbooks/victorialogs-kubernetes-logs-debug.md)** - Kubernetes log debugging with VictoriaLogs
+2. **[Logging troubleshooting](./observability/logging/README.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
 5. **[Pooler operations](./databases/runbooks/pgdog-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
@@ -490,7 +488,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 ### Runbooks
 
 - [PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md) - Backup and restore procedures
-- [VictoriaLogs Log Debugging](./observability/runbooks/victorialogs-kubernetes-logs-debug.md) - Kubernetes log debugging with VictoriaLogs
+- [Logging troubleshooting](./observability/logging/README.md#troubleshooting) - Missing/blank Kubernetes logs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
 - [Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
 

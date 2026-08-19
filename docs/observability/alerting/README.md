@@ -295,8 +295,7 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 - [Application metrics (RED)](../metrics/metrics-apps.md) -- the metrics these alerts fire on + the microservices OTLP push pipeline
 - [Infrastructure metrics (USE)](../metrics/metrics-infra.md) -- the USE coverage these Kubernetes/Valkey alerts back
 - [Alert Dashboard Comparison](dashboard-comparison.md) -- deep-dive tool comparison (Karma, Alerta, UAR, Siren, Grafana)
-- [Microservices runbooks](../runbooks/microservices/README.md) — per-alert investigation (19 files)
-- [Microservices hub](../runbooks/microservices-alerts.md) — workflows, threshold tuning, retired-alert context
+- [Microservices runbooks](../runbooks/microservices/README.md) — per-alert investigation (50 files) + investigation workflows, threshold tuning, retired-alert context
 - [SLO System](../slo/README.md) -- Sloth Operator, SLO targets, error budgets
 - [SLO Burn-Rate Alerts](./slo-burn-rate-alerts.md) -- burn-rate methodology details
 - [SLO Fundamentals](../slo/fundamentals.md) -- SLA/SLO/SLI/Error Budget primer

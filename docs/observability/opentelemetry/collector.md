@@ -10,7 +10,7 @@
 |---|---|
 | **Manifest** | `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml` (HelmRelease, ns `monitoring`) |
 | **Distribution** | `otel/opentelemetry-collector-contrib:0.152.0` |
-| **Mode** | Gateway — `deployment`, 1 replica (SPOF, accepted — see [stack review](../stack-review.md)) |
+| **Mode** | Gateway — `deployment`, 1 replica (SPOF — single replica accepted for the homelab) |
 | **Receivers** | OTLP only — gRPC `:4317`, HTTP `:4318` |
 | **Pipelines** | `traces`, `logs`, `metrics` — see [table below](#the-deployed-pipelines) |
 | **Self-telemetry** | `:8888` (scraped) · health `:13133` · zpages `:55679` |

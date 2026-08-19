@@ -16,8 +16,7 @@ stack, and the other layers, start at the [metrics hub](README.md).
 | **Provenance** | `app` / `namespace` from OTLP resource attributes + vmagent relabel |
 | **Correlation** | `trace_id` field in VictoriaLogs + Tempo (exemplars lost — [D-14](../../proposals/rfc/RFC-0014/README.md)) |
 | **Dashboard** | Microservices dashboard (see [§ Dashboard](#dashboard)) |
-| **Runbooks** | [`../runbooks/microservices/README.md`](../runbooks/microservices/README.md) (one file per alert) |
-| **Hub** | Workflows & tuning: [`../runbooks/microservices-alerts.md`](../runbooks/microservices-alerts.md) |
+| **Runbooks** | [`../runbooks/microservices/README.md`](../runbooks/microservices/README.md) (one file per alert + workflows & tuning) |
 
 ---
 
@@ -27,7 +26,7 @@ stack, and the other layers, start at the [metrics hub](README.md).
 2. **East-west gRPC** — [Application metrics § gRPC](../../api/metrics.md) (authoring); alert map below for on-call.
 3. **Runtime USE** — [Availability heartbeat](#availability--the-heartbeat-not-up) + [Memory leak & GC](#memory-leak--gc-diagnosis) (platform ops).
 4. **App-side DB** — [Application metrics § Database client](../../api/metrics.md); server-side [PostgreSQL runbooks](../runbooks/postgresql/README.md).
-5. **When an alert fires** — open the matching file in [`runbooks/microservices/`](../runbooks/microservices/README.md); use [workflows in the hub](../runbooks/microservices-alerts.md#4-investigation-workflows) for cross-signal triage.
+5. **When an alert fires** — open the matching file in [`runbooks/microservices/`](../runbooks/microservices/README.md); use its [investigation workflows](../runbooks/microservices/README.md#investigation-workflows) for cross-signal triage.
 
 ## Signal → alert map
 
@@ -176,7 +175,7 @@ live with the [OpenTelemetry](../opentelemetry/README.md) setup. There is no app
 - **SLOs** — rendered per service by the `mop` chart (not a repo path) and
   expanded by Sloth into burn-rate alerts. See [SLO docs](../slo/README.md).
 
-Runbooks: [`runbooks/microservices/README.md`](../runbooks/microservices/README.md) (per alert) · hub [`microservices-alerts.md`](../runbooks/microservices-alerts.md).
+Runbooks: [`runbooks/microservices/README.md`](../runbooks/microservices/README.md) (per alert, plus workflows & tuning).
 
 ## References
 

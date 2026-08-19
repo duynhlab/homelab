@@ -75,4 +75,4 @@ no app change; an upstream-standard exporter; ops primaries untouched.
 
 - [RFC-0019](../../rfc/RFC-0019/) · [research.md](../../rfc/RFC-0019/research.md)
 - [clickhouse/README.md](../../../observability/clickhouse/README.md) (operational guide)
-- [stack-review.md](../../../observability/stack-review.md) (the gaps this closes)
+- Observability stack review 2026-07-19 (the gaps this closes; the point-in-time review has since been removed from the repo)

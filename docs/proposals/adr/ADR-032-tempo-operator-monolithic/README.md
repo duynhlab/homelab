@@ -465,7 +465,6 @@ requires a new ADR that supersedes this one.
 - [`grafana-community/helm-charts` — `tempo-distributed` chart](https://github.com/grafana-community/helm-charts/tree/main/charts/tempo-distributed) — microservices Helm chart, appVersion 3.0.x (community-maintained)
 - [Tracing hub](../../../observability/tracing/README.md)
 - [Trace backends comparison](../../../observability/tracing/backends-comparison.md) — reserves backend consolidation for a future ADR
-- [Observability stack review](../../../observability/stack-review.md)
 - [ADR-023](../ADR-023-clickhouse-observability-olap/) — ClickHouse as supplementary OLAP; Tempo remains day-to-day primary
 - [ADR-002](../ADR-002-deploy-temporal-via-operator/) / [ADR-030](../ADR-030-temporal-workflow-versioning/) — prior operator-delivery precedents
 

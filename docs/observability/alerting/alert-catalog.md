@@ -569,6 +569,7 @@ implemented yet — they are recommendations.
 | Proposed alert | Domain | Metric / expr basis | Sev | Why it matters | Source |
 |----------------|--------|---------------------|-----|----------------|--------|
 | AlertmanagerFailedToSendAlerts | Alert pipeline | `rate(alertmanager_notifications_failed_total[5m])>0` by integration | critical | Silent receiver failure = total blind incident | general (kube-prometheus `alertmanager.rules`) |
+| Cross-service dependency alerts (downstream failure ratio, circuit-breaker state) | Microservices | needs `http_client_*` client-side instrumentation — no service emits it yet | warning | Caller-side view of a failing dependency; today only the callee's server-side RED alerts see it | phase 4 of the original application-alert expansion plan (the one phase not shipped) |
 | AlertmanagerConfigInconsistent / MembersInconsistent | Alert pipeline | AM config-hash / cluster membership mismatch | warning | HA split config silently drops routes | general (kube-prometheus) |
 | TemporalScheduleToStartLatencyHigh | Temporal | `histogram_quantile(0.99, temporal_workflow_task_schedule_to_start_latency_seconds_bucket)` >0.2s | warning/critical | Leading indicator of unhealthy/under-provisioned workers | ✅ context7 `/temporalio/documentation` (worker-health) |
 | TemporalTaskQueueBacklogGrowing | Temporal | `approximate_backlog_count` rising (server metric — verified live 2026-08-18; the SDK emits no backlog series) | warning | Direct queue depth; consumers can't keep up | ✅ context7 `/temporalio/documentation` |

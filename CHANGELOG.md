@@ -825,6 +825,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Observability docs cleanup: the microservices hub dissolved, three pushed
+  session artifacts deleted.** `runbooks/microservices-alerts.md` is gone — its
+  unique content (4 cross-signal investigation workflows, threshold-tuning
+  guide, retired-alert context) moved into `runbooks/microservices/README.md`;
+  its duplicated sections (two-layer strategy, alert summary, per-alert table)
+  already lived in `alerting/README.md`, the catalog, and the folder index; the
+  one live fact from its expansion table (phase 4 cross-service dependency
+  alerts still open — no `http_client_*` metrics) is now a catalog
+  coverage-gap row. Also deleted: `runbooks/victorialogs-kubernetes-logs-debug.md`
+  (a pushed debug session; logging README's Troubleshooting already covered it
+  and absorbed its one missing check — "logs ingested but blank in Grafana"),
+  `audit-2026-08-07.md` (dated Kong-era findings log; the F-1/F-2 measurements
+  ADR-038 cited are inlined into that ADR's References), and `stack-review.md`
+  (point-in-time review, 2026-07-19; its gap list already lives in ADR-023).
+  All inbound links re-pointed or unlinked.
 - **`observability-deep-dive.md` removed** — the file was personal
   interview/CV prep material ("Interview Answers", "CV Deep Dive: Defending
   Your Numbers") pushed to the repo by mistake; its platform-relevant content

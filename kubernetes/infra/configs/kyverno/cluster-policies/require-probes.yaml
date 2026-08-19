@@ -24,7 +24,7 @@ spec:
           - resources:
               kinds: [Pod]
               namespaces:
-                - auth
+                - inventory
                 - user
                 - product
                 - cart

@@ -28,12 +28,11 @@ spec:
           kinds:
             - Pod
           namespaces:
+            # Only namespaces that actually host a CNPG Cluster (platform-db,
+            # product-db + DR replica) plus the operator's own namespace.
             - cloudnative-pg
-            - database
-            - auth
-            - user
+            - platform
             - product
-            - temporal
           selector:
             matchExpressions:
               - key: application

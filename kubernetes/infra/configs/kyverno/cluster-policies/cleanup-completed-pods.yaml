@@ -22,8 +22,14 @@ spec:
             - flux-system
             - kyverno
   conditions:
-    any:
+    all:
       - key: "{{ target.status.phase }}"
         operator: AnyIn
         value: [Succeeded, Failed]
+      # Age gate — without it every completed migration/backup Job pod was
+      # deleted at the next 30-minute tick, despite this file's own ">24h"
+      # header. time_diff returns a duration; both sides parse as durations.
+      - key: "{{ time_diff('{{ target.metadata.creationTimestamp }}','{{ time_now_utc() }}') }}"
+        operator: GreaterThan
+        value: "24h"
   schedule: "*/30 * * * *"

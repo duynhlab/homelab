@@ -24,7 +24,7 @@ so the highest-value Kyverno features are:
 | 5 | Cleanup Policies | ✅ | 4 | Completed/Evicted Pods > 24h |
 | 6 | PolicyException | ✅ required | — | Only sanctioned way to whitelist |
 | 7 | ValidatingAdmissionPolicy (CEL/VAP) | ❌ | — | Wait for K8s 1.32 GA |
-| 8 | Pod Security Standards | ✅ | 1 | Baseline cluster-wide, restricted on apps |
+| 8 | Pod Security Standards | ✅ | 1 | Baseline cluster-wide; restricted-on-apps **disabled 2026-08-17** ([catalog — known gaps](../security/policy-catalog.md#known-gaps--history)) |
 | 9 | PolicyReport CRD | ✅ | 1 | Auto, no config |
 | 10 | Policy Reporter UI | ✅ planned | 2 | `kyverno.duynh.me` |
 | 11 | Background scan | ✅ | 1 | Catches pre-Kyverno resources |

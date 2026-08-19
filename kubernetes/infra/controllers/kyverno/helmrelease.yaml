@@ -31,6 +31,13 @@ spec:
     remediation:
       retries: 3
   values:
+    # PolicyExceptions accepted ONLY from the kyverno namespace (where the
+    # registry-tracked exceptions live) — pinned explicitly rather than
+    # relying on the chart default; "*" would let any namespace waive policy.
+    features:
+      policyExceptions:
+        enabled: true
+        namespace: kyverno
     # Single-replica admission for KinD; bump to 3 for production HA
     admissionController:
       replicas: 1

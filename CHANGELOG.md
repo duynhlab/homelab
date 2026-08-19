@@ -1133,6 +1133,28 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **docs/security synced to the deployed fences; the review fixed six manifest
+  defects it exposed.** `require-probes` + `require-resources` matched the
+  retired `auth` namespace and silently omitted live `inventory` (now listed);
+  the `postgres-operators` PolicyException matched `auth` plus three
+  cluster-less namespaces while missing `platform`, where platform-db actually
+  runs (rescoped to `cloudnative-pg`/`platform`/`product`); the inert
+  `vector-hostpath` exception (targeted `monitoring`; Vector deploys into
+  baseline-excluded `kube-system`) is deleted; `cleanup-completed-pods` gains
+  the >24h age gate its own header promised (`time_diff` condition — it was
+  deleting every completed Job pod at the next 30-minute tick);
+  `edge-isolation-sweep.sh` drops dead `auth:8080`, adds `inventory:8080`
+  (RFC-0023 edge route), and its deny check is now port-aware; the floci
+  NetworkPolicy comment claiming "inert on kindnet" is corrected (kindnet
+  enforces). PolicyExceptions are now explicitly pinned to the `kyverno`
+  namespace in the HelmRelease (Kyverno best practice, was chart-default).
+  Docs: `policy-catalog.md`'s table un-split (a mid-table blockquote had
+  hidden the Tier 2/3 rows) with scopes corrected and prod modes marked
+  planned; `network-policies.md` rebuilt row-by-row against the 12 policy
+  files (auth residue gone, checkout/inventory/identity added, pod-scoped
+  policy shape documented, ADR-026 pooler swap reflected — 30/30 manifest
+  allow-tuples covered exactly once); `policy-exceptions.md` registry synced;
+  new `docs/security/README.md` hub (the last docs area without one).
 - Four `docs/api/` service contracts documented their edge NetworkPolicy ingress
   as arriving from a namespace that no longer exists. All eleven policies admit
   `envoy-gateway`; the docs now match the manifests, and the comments in the

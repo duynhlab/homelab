@@ -52,7 +52,7 @@ must state rollout order and respect the Flux dependency chain.
 | Observability | `kubernetes/infra/configs/observability/` | [`docs/observability/README.md`](docs/observability/README.md) |
 | Databases | `kubernetes/infra/configs/databases/` | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
 | Secrets / TLS | `kubernetes/infra/controllers/secrets/` | [`docs/secrets/README.md`](docs/secrets/README.md) |
-| Security / policy | Kyverno, NetworkPolicy | [`docs/security/policy-catalog.md`](docs/security/policy-catalog.md) |
+| Security / policy | Kyverno, NetworkPolicy | [`docs/security/README.md`](docs/security/README.md) |
 | Bootstrap | `terraform/` | [`terraform/README.md`](terraform/README.md) |
 | Local e2e | `local-stack/` | [`local-stack/README.md`](local-stack/README.md) |
 | Design record | `docs/proposals/` | [`docs/proposals/README.md`](docs/proposals/README.md) |

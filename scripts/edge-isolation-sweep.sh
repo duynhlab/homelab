@@ -7,7 +7,9 @@
 # Two modes, modeled on db-isolation-sweep.sh:
 #   1. manifest mode (always): greps the committed manifests — every
 #      edge-reachable namespace must admit ingress from envoy-gateway on its
-#      service port, and inventory (gRPC-only, no edge route) must NOT.
+#      service port, and no namespace may admit the edge on a port without an
+#      edge route (inventory: :8080 is edge-routed since RFC-0023, :9090 gRPC
+#      must stay closed to the edge).
 #   2. live mode (--live, kubectl context set): probes TCP connectivity from a
 #      pod in the envoy-gateway namespace to each backend service port.
 #
@@ -21,7 +23,7 @@ FAIL=0
 # namespace:port pairs the edge must reach (matches configs/network-policies/
 # and the HTTPRoutes in configs/envoy-gateway/routes/) — update BOTH when a
 # service is added.
-EDGE_ALLOWS="auth:8080 cart:8080 checkout:8080 notification:8080 order:8080 \
+EDGE_ALLOWS="cart:8080 checkout:8080 inventory:8080 notification:8080 order:8080 \
 payment:8080 product:8080 review:8080 shipping:8080 user:8080 identity:8080"
 # namespace:port pairs the edge must NOT reach (no edge route exists).
 EDGE_DENIES="inventory:9090"
@@ -50,11 +52,15 @@ manifest_sweep() {
   done
 
   for pair in $EDGE_DENIES; do
-    ns="${pair%%:*}" f="$NP_DIR/$ns.yaml"
-    if grep -q "kubernetes.io/metadata.name: envoy-gateway" "$f"; then
-      fail "$ns: admits envoy-gateway but has no edge route — remove the allow"
+    ns="${pair%%:*}" port="${pair##*:}" f="$NP_DIR/$ns.yaml"
+    # Port-aware: a namespace may legitimately admit the edge on another port
+    # (inventory :8080, RFC-0023) — only an envoy-gateway allow carrying the
+    # denied port in the SAME policy document is a violation.
+    if awk -v RS='---' -v pat="port: $port" \
+        '/kubernetes.io\/metadata.name: envoy-gateway/ && $0 ~ pat {found=1} END{exit !found}' "$f"; then
+      fail "$ns: admits envoy-gateway on :$port but no edge route exists — remove the allow"
     else
-      pass "$ns does not admit envoy-gateway (gRPC-only, as designed)"
+      pass "$ns does not admit envoy-gateway on :$port (not edge-exposed, as designed)"
     fi
   done
 }

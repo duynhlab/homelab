@@ -142,6 +142,7 @@ docs/
 │   └── cert-manager.md           # cert-manager + Let's Encrypt + trust-manager (§11 CA bundle)
 │                                 # (production hardening → README § Current boundaries + RFC-0008)
 └── security/                     # Admission control & network segmentation
+    ├── README.md                 # Security hub: the two fences (admission + network)
     ├── policy-catalog.md         # Kyverno ClusterPolicy catalog (tiers, modes, NetworkPolicy generate)
     ├── policy-exceptions.md      # PolicyException register (owner + TTL)
     └── network-policies.md       # East-west NetworkPolicy caller matrix + topology diagram
@@ -477,6 +478,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Security
 
+- [Security hub](./security/README.md) - Admission (Kyverno) + segmentation (NetworkPolicy) in one map
 - [Policy Catalog](./security/policy-catalog.md) - Kyverno ClusterPolicy catalog (tiers, modes, acceptance criteria)
 - [Policy Exceptions](./security/policy-exceptions.md) - PolicyException register (owner + TTL)
 - [Network Policies](./security/network-policies.md) - East-west NetworkPolicy caller matrix + topology

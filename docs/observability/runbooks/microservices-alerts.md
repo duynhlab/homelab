@@ -378,16 +378,13 @@ sketches are no longer kept here.
 | 4 | Cross-service dependency alerts (HTTP client instrumentation, circuit breaker) | ⏳ Open — no `http_client_*` metrics emitted yet |
 | 5 | Kubernetes infrastructure alerts | ✅ Shipped — see [`kubernetes/`](kubernetes/README.md) + [catalog §5](../alerting/alert-catalog.md#5-kubernetes) |
 
-Interview-prep material (framework mapping, the alerting design answer) moved
-to the [Observability Deep Dive](observability-deep-dive.md#interview-reference-alerting).
-
 ---
 
 
 ## Related Documentation
 
 - [Microservices runbook index](microservices/README.md)
-- [Observability Deep Dive Runbook](observability-deep-dive.md) — RED/USE/Golden theory, middleware chain
+- [Observability hub](../README.md) — 4-pillar architecture, middleware chain
 - [SLO Documentation](../slo/README.md)
 - [SLO Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md)
 - [PostgreSQL runbooks](postgresql/README.md) — server-side CNPG alerts
@@ -395,4 +392,4 @@ to the [Observability Deep Dive](observability-deep-dive.md#interview-reference-
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md)
 
 ---
-_Last updated: 2026-08-19 — runbook counts corrected (19 core → 50 total), shipped expansion phases condensed to a status table, interview reference moved to observability-deep-dive.md_
+_Last updated: 2026-08-19 — runbook counts corrected (19 core → 50 total), shipped expansion phases condensed to a status table, interview material removed from the repo_

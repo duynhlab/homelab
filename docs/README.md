@@ -114,7 +114,6 @@ docs/
 │   └── runbooks/                 # Operational runbooks
 │       ├── README.md             # Runbook index
 │       ├── _TEMPLATE.md          # Canonical per-alert runbook template
-│       ├── observability-deep-dive.md   # Theory + interview prep
 │       ├── microservices-alerts.md      # Workflows, tuning hub
 │       ├── victorialogs-kubernetes-logs-debug.md  # Blank Grafana logs / VictoriaLogs ingest
 │       ├── envoy-gateway/               # Edge per-alert runbooks

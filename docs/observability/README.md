@@ -326,7 +326,6 @@ docs/observability/
 └── runbooks/                     # Operational runbooks
     ├── README.md                 # Runbook index
     ├── _TEMPLATE.md              # Canonical per-alert runbook template
-    ├── observability-deep-dive.md  # Theory + interview prep
     ├── microservices-alerts.md     # Workflows, tuning hub
     ├── victorialogs-kubernetes-logs-debug.md  # VictoriaLogs K8s log debugging
     ├── envoy-gateway/              # Edge per-alert runbooks (10 files)
@@ -452,7 +451,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [Telemetry audit 2026-08-07](audit-2026-08-07.md) -- findings log: the `api/observability.md` contract measured against the deployed platform (5 findings, 3 falsified suspicions)
 - [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
-- [Interview Prep](runbooks/observability-deep-dive.md) -- RED/USE/Golden Signals theory + structured answers
 - [ClickHouse OTel logs+traces OLAP](clickhouse/README.md) -- deployed supplementary OLAP; long-retention SQL + trace_id JOIN ([RFC-0019](../proposals/rfc/RFC-0019/) · [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/))
 - [Grafana on ClickHouse](clickhouse/README.md#grafana) -- datasource OTel mapping, Explore + trace-log linking, dashboard grammar, and the standard suite (Overview → Logs Explorer → Trace Explorer with in-dashboard waterfall)
 

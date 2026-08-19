@@ -8,7 +8,6 @@ runbook links it via its `runbook_url` annotation.
 
 | Runbook | Purpose | When to Use |
 |---------|---------|-------------|
-| [Observability Deep Dive](observability-deep-dive.md) | RED/USE/Golden Signals theory, 4-pillar stack architecture, middleware chain, correlation workflow, interview preparation | Learning, onboarding, interview prep |
 | [Microservices Alerts](microservices-alerts.md) | Workflows, tuning, and design context for application alerts | Learning, cross-signal triage |
 | [Microservices runbooks](microservices/README.md) | Per-alert investigation (50 files) | On-call, when an application alert fires |
 | [Envoy Gateway runbooks](envoy-gateway/README.md) | Per-alert investigation for the edge (9 files covering 11 `Edge*` / `EnvoyGateway*` alerts) | On-call, when an edge alert fires |

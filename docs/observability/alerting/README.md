@@ -301,7 +301,6 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 - [SLO Burn-Rate Alerts](./slo-burn-rate-alerts.md) -- burn-rate methodology details
 - [SLO Fundamentals](../slo/fundamentals.md) -- SLA/SLO/SLI/Error Budget primer
 - [Grafana Datasources](../grafana/datasources.md) -- how read-only rules display works
-- [Observability Deep Dive](../runbooks/observability-deep-dive.md) -- theory and interview prep
 
 ---
 

@@ -24,4 +24,5 @@ sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points[5m]))
 
 ## Resolution
 
-Fix collector → vmagent connectivity; see [observability-deep-dive.md](../observability-deep-dive.md).
+Fix collector → vmagent connectivity; the pipeline topology is in the
+[observability hub](../../README.md) (4-pillar architecture).

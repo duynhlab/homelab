@@ -2,7 +2,7 @@
 
 ## What is gh-patcher?
 
-[gh-patcher](https://github.com/duynhlab/gh-patcher) is a CLI tool that batch-applies GitHub branch rulesets across an entire organization via the GitHub REST API. It replaces the need to manually configure branch protection rules on every repository.
+`duynhlab/gh-patcher` (a private repo in the org) is a CLI tool that batch-applies GitHub branch rulesets across an entire organization via the GitHub REST API. It replaces the need to manually configure branch protection rules on every repository.
 
 ## Why is it needed?
 
@@ -125,7 +125,7 @@ See [gitflow.md](gitflow.md) section 7 for the full ruleset specification.
 
 ## Links
 
-- [gh-patcher repository](https://github.com/duynhlab/gh-patcher)
+- `duynhlab/gh-patcher` — the tool's repository (private; not link-checkable)
 - [Gitflow standard](gitflow.md)
 - [CI/CD documentation](cicd.md)
 - [Check template](check_template.yml) / [Build template](build_template.yml)

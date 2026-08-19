@@ -538,7 +538,7 @@ db/         @duynhlab/platform-team
 
 For environments with many repositories (especially on the Free/Team plan without Org-level rulesets), configuring rulesets manually in the UI is tedious and error-prone. Use the GitHub REST API to automate creation.
 
-> **Recommended**: Use [gh-patcher](https://github.com/duynhlab/gh-patcher) to automate ruleset creation across all repos in the org. It runs daily via GitHub Actions and handles create-or-update idempotently. See [`ruleset-automation.md`](ruleset-automation.md) for setup details.
+> **Recommended**: Use `duynhlab/gh-patcher` (private repo) to automate ruleset creation across all repos in the org. It runs daily via GitHub Actions and handles create-or-update idempotently. See [`ruleset-automation.md`](ruleset-automation.md) for setup details.
 
 **Prerequisites**:
 - Install `gh` CLI and authenticate: `gh auth login`

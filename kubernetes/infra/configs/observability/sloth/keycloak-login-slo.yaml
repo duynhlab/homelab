@@ -1,0 +1,200 @@
+# Keycloak identity SLOs — hand-written because Keycloak is not a mop-chart
+# service.
+#
+# WHY THIS FILE EXISTS
+#
+# Every Go service gets its PrometheusServiceLevel from the `mop` chart
+# (`slo.enabled: true` in the domain ResourceSets). Keycloak is platform
+# infrastructure deployed from kubernetes/infra/controllers/keycloak — no
+# chart, no rendered SLO. The identity observability slice (RFC-0022 signals,
+# shipped as the §2b threshold alerts + the Keycloak Identity dashboard) left
+# exactly one recorded gap in the alert catalog: "Keycloak login SLO" — login
+# success had no error budget, so the burn-rate page layer stopped at the
+# edge. This file closes that row.
+#
+# THE ERROR LABEL IS THE SLI. Keycloak has NO login_error event: a failed
+# login is the SAME event="login" sample carrying a non-empty `error` label
+# (verified live on the compose stack 2026-08-20:
+# error="invalid_user_credentials", "user_not_found"). The availability SLI
+# is therefore a ratio inside one metric family —
+# {event="login",error!=""} over {event="login"} — the same shape the
+# KeycloakLoginFailureRatioHigh threshold alert uses
+# (prometheusrules/keycloak/alerts.yaml).
+#
+# TARGETS: fresh service, no historical baseline needed. Keycloak entered the
+# platform with RFC-0024 P3, so there is no 30-day history to calibrate
+# against and none is required — the targets are set from the availability
+# model, not from observed behavior:
+#   - login-availability 99.9%: Keycloak gates every NEW login and refresh
+#     (already-issued tokens verify locally until expiry — RFC-0022). A failed
+#     login event that isn't the user's own doing is a shopper who cannot
+#     enter the platform at all, the identity analogue of inventory's 99.9%
+#     checkout gate.
+#   - auth-latency 95% < 250 ms: the realm endpoints (login page, token,
+#     userinfo) sit inside interactive browser flows; 250 ms is a real
+#     boundary of the Quarkus http_server_requests_seconds histogram
+#     (0.01/0.05/0.25/0.5/1/2.5 — verified live). A bucket that does not
+#     exist yields no series and a blind SLO, so le="0.25" may not be changed
+#     without checking count by (le)
+#     (http_server_requests_seconds_bucket{job="keycloak"}).
+#
+# NAMESPACE IS LOAD-BEARING: the Sloth controller runs with
+# `values.sloth.namespace: "monitoring"`, so a PrometheusServiceLevel anywhere
+# else is silently ignored — no error, no rules, no SLO. Applied by the
+# `monitoring-local` Kustomization (path ./configs/observability).
+#
+# ABSENT ≠ BROKEN. Sloth renders `(errorQuery) / (totalQuery)` with no
+# `or on() vector(0)`, so slo:sli_error:ratio_rate5m{sloth_service="keycloak"}
+# has no sample while nobody is logging in or nothing is failing. To tell
+# idle from blind, run the totalQuery: series with traffic and no ratio means
+# "nothing failed"; no series at all under load means the SLI names a metric
+# Keycloak does not emit.
+#
+# SLO vs THRESHOLD ALERT, deliberately both. KeycloakLoginFailureRatioHigh
+# (20% for 10m) is the fast diagnostic layer; these burn-rate alerts are the
+# error-budget layer that catches a slow bleed the threshold never trips.
+# Same SLI, different windows, different purpose — not a double-page.
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: keycloak-login
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: slo
+    platform.duynhlab.dev/domain: identity
+spec:
+  # sloth_service="keycloak" — new identity in the Grafana SLO dashboards and
+  # the Sloth UI, alongside the 11 Go services.
+  service: keycloak
+  labels:
+    env: monitoring
+    namespace: identity
+    service: keycloak
+    team: platform
+  slos:
+    # ---------------------------------------------------------------------
+    # New logins must SUCCEED. A login event with a non-empty error label is
+    # a person who could not enter the platform — there is no cached-token
+    # fallback for a first login. 99.9% mirrors the platform's strictest
+    # tier (inventory grpc-availability): identity is a synchronous gate in
+    # front of every session, so it cannot be looser than the flows it gates.
+    #
+    # Caveat this SLI carries on purpose: user-caused failures (wrong
+    # password) burn the budget too. At normal traffic they are a small,
+    # stable background rate; a credential-stuffing run or a broken SPA auth
+    # flow makes them spike — and both of those ARE incidents worth paging
+    # on. Excluding them (error!~"invalid_user_credentials|user_not_found")
+    # would also blind the SLO to brute-force storms, so they stay in.
+    # ---------------------------------------------------------------------
+    - name: login-availability
+      objective: 99.9
+      description: >-
+        Ratio of Keycloak login events that completed without an error label.
+        Keycloak has no login_error event — failures are event="login" with a
+        non-empty error label.
+      sli:
+        events:
+          errorQuery: |
+            sum(rate(keycloak_user_events_total{
+              job="keycloak",
+              event="login",
+              error!=""
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(keycloak_user_events_total{
+              job="keycloak",
+              event="login"
+            }[{{.window}}]))
+      alerting:
+        name: KeycloakLoginHighErrorRate
+        labels:
+          category: availability
+          service: keycloak
+          severity: critical
+        annotations:
+          summary: "Keycloak logins are failing — new sessions cannot start"
+          description: >-
+            Login events are carrying error labels fast enough to burn the
+            99.9% availability budget. Already-issued tokens keep verifying
+            locally, so authenticated users look fine while every NEW login
+            and refresh is at risk — this burn is invisible to the RED alerts
+            of the Go services.
+          runbook: >-
+            Split the failures first —
+            sum by (error, client_id)
+            (rate(keycloak_user_events_total{event="login", error!=""}[5m])) —
+            then read it as: invalid_user_credentials/user_not_found at high
+            volume is credential stuffing or a broken SPA login form;
+            anything else points at Keycloak itself — check KeycloakDown,
+            KeycloakDbPoolExhausted (agroal_awaiting_count) and platform-db
+            before the realm config.
+        pageAlert:
+          labels:
+            channel: '#alerts'
+            severity: page
+        ticketAlert:
+          labels:
+            channel: '#incidents'
+            severity: ticket
+
+    # ---------------------------------------------------------------------
+    # Realm endpoints < 250 ms for 95% of requests. Everything under
+    # /realms/* (login page, token, userinfo, JWKS) runs inside a browser
+    # login flow or a service's token refresh; the budget is interactive.
+    # le="0.25" is a real bucket boundary of the Quarkus histogram (see
+    # header) — a missing bucket means a blind SLO.
+    # ---------------------------------------------------------------------
+    - name: auth-latency
+      objective: 95
+      description: >-
+        Ratio of Keycloak realm-endpoint requests (uri=~"/realms/.*") served
+        faster than 250 ms, measured on the Quarkus server histogram.
+      sli:
+        events:
+          # error = total - fast.
+          errorQuery: |
+            sum(rate(http_server_requests_seconds_count{
+              job="keycloak",
+              uri=~"/realms/.*"
+            }[{{.window}}]))
+            -
+            sum(rate(http_server_requests_seconds_bucket{
+              job="keycloak",
+              uri=~"/realms/.*",
+              le="0.25"
+            }[{{.window}}]))
+          totalQuery: |
+            sum(rate(http_server_requests_seconds_count{
+              job="keycloak",
+              uri=~"/realms/.*"
+            }[{{.window}}]))
+      alerting:
+        name: KeycloakAuthHighLatency
+        labels:
+          category: latency
+          service: keycloak
+          severity: warning
+        annotations:
+          summary: "Keycloak realm endpoints slower than 250ms for >5% of requests"
+          description: >-
+            The /realms/* endpoints are burning their latency budget. Logins
+            and token refreshes feel slow platform-wide before anything
+            errors — this is the leading edge of a Keycloak saturation
+            incident.
+          runbook: >-
+            The #1 cause is DB connection-pool saturation — check
+            KeycloakDbPoolExhausted and agroal_awaiting_count first, then
+            split by endpoint: histogram_quantile(0.99, sum by (le, uri)
+            (rate(http_server_requests_seconds_bucket{job="keycloak",
+            uri=~"/realms/.*"}[5m]))). Token endpoint slow with pool healthy
+            points at platform-db latency or JVM pressure (jvm_* on the same
+            scrape).
+        pageAlert:
+          labels:
+            channel: '#alerts'
+            severity: page
+        ticketAlert:
+          labels:
+            channel: '#incidents'
+            severity: ticket

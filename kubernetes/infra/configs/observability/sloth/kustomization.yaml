@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - sloth-ui.yaml
   - inventory-grpc-slo.yaml
+  - keycloak-login-slo.yaml

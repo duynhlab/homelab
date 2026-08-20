@@ -194,6 +194,14 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Keycloak login SLO** — the last recorded identity-observability gap closes:
+  hand-written `PrometheusServiceLevel` `keycloak-login`
+  (`sloth/keycloak-login-slo.yaml`) adds `login-availability` (99.9%, login
+  events with a non-empty `error` label — Keycloak has no login_error event)
+  and `auth-latency` (95% of `/realms/*` requests < 250 ms), 2 SLOs × 2
+  burn-rate alerts (`KeycloakLoginHighErrorRate`, `KeycloakAuthHighLatency`);
+  platform total 32 → 34 SLOs / 64 → 68 alerts. SLI exprs dry-run against the
+  live compose stack (Sloth renders the rules on the cluster only).
 - **Keycloak observability, gói 2 — the signals get consumers.** New
   dashboard **"Keycloak — Identity"** (uid `keycloak-identity`, 22 panels ×
   5 rows: overview KPIs, auth-endpoint latency incl. token p95/p99, auth

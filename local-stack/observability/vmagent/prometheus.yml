@@ -60,3 +60,14 @@ scrape_configs:
   - job_name: temporal
     static_configs:
       - targets: ["temporal:8000"]
+
+  # Keycloak management interface :9000 — micrometer families the identity
+  # KPIs read: keycloak_user_events_total (login/token outcomes, tags
+  # realm+clientId), http_server_requests_seconds_* (SLO buckets), agroal_*
+  # (DB pool), jvm_*. In-network only, deliberately not published to the host
+  # (host :9000 is ClickHouse native anyway). Job name `keycloak` so the
+  # cluster alert expr `up{job="keycloak"}` (KeycloakDown) means the same
+  # thing on both stacks — this is what lets those alerts be rehearsed here.
+  - job_name: keycloak
+    static_configs:
+      - targets: ["keycloak:9000"]

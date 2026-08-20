@@ -1484,16 +1484,17 @@ docker compose logs --since 10m otel-collector 2>&1 \
 #     is `platform.envoy-gateway-system`. DISCOVER it rather than trusting this
 #     line: the derivation is upstream behaviour and a rename of the Gateway
 #     changes it. The NOT-IN list must name every OTHER span producer including
-#     the two workers (own identities since 2026-08-17, the C8 fix) — a name
+#     the two workers (own identities since 2026-08-17, the C8 fix) and
+#     keycloak (a span producer since its tracing enablement) — a name
 #     missing here multiplies into FOUND, and the tr strips the newlines, so C2
 #     prints a concatenated blob and C6 inherits it through $EDGE. Found the
-#     hard way on the 2026-08-18 run.
+#     hard way on the 2026-08-18 run, and again with keycloak on 2026-08-20.
 FOUND=$(curl -s "$CH" -u default:otel --data-binary "
   SELECT DISTINCT ServiceName FROM otel.otel_traces
   WHERE Timestamp > now() - INTERVAL 45 MINUTE
     AND ServiceName NOT IN ('user','product','inventory','cart','order','review',
                             'shipping','notification','payment','checkout','mockpay',
-                            'order-worker','checkout-worker')
+                            'order-worker','checkout-worker','keycloak')
   FORMAT TSV" | tr -d '[:space:]')
 echo "C2 discovered edge service.name: '${FOUND:-<none>}' (expected '$EDGE')"
 [ -n "$FOUND" ] || echo "C2 FAIL: the edge is emitting no spans — run the isolation steps below"
@@ -1902,10 +1903,14 @@ curl -s -X POST "$GRAF/api/ds/query" -H 'Content-Type: application/json' -d '{
 #      bootstrap-merged :19005 listener (gateway/eg/envoyproxy.yaml). The
 #      `temporal` job is the server's :8000 listener (PROMETHEUS_ENDPOINT in
 #      compose.yaml) — service_*/persistence_* families, C10's server half.
+#      `keycloak` is the management interface :9000 — the micrometer families
+#      the identity KPIs read (keycloak_user_events_total, agroal_*,
+#      http_server_requests_seconds_*); same job name as the cluster so
+#      KeycloakDown's `up{job="keycloak"}` can be rehearsed here.
 curl -s http://localhost:8429/api/v1/targets | python3 -c "
 import json, sys
 t = {x['labels']['job']: x['health'] for x in json.load(sys.stdin)['data']['activeTargets']}
-want = {'clickhouse', 'otel-collector', 'envoy-gateway', 'envoy', 'temporal'}
+want = {'clickhouse', 'otel-collector', 'envoy-gateway', 'envoy', 'temporal', 'keycloak'}
 ok = want <= set(t) and all(t[j] == 'up' for j in want)
 print('C20', 'OK all targets up:' if ok else 'FAIL:', t)"
 # want: C20 OK all targets up: {'clickhouse': 'up', 'otel-collector': 'up',
@@ -2002,7 +2007,7 @@ print('C21 rules loaded: %d alerting (want 14) + %d recording (want 15); firing:
 | C17 | Grafana datasources | `/api/datasources` returns exactly the five expected uid/type pairs (VictoriaLogs included) and each `/api/datasources/uid/<uid>/health` answers `OK` |
 | C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 17 provisioned uids (incl. the three vendored Envoy Gateway dashboards plus the hand-authored Edge Overview board under Gateway/, the collector-health board, and the two RFC-0021-era parity copies) and each loads via `/api/dashboards/uid/…` with 200 |
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
-| C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all five jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005) and `temporal` (server :8000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
+| C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all six jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005), `temporal` (server :8000) and `keycloak` (management :9000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **14 alerting** rules (9 ClickHouse engine + 2 collector + 3 inventory) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |
 
 Any failed row blocks the release tag. Two rows share one root cause and must be

@@ -48,7 +48,7 @@ flowchart LR
   VEC["Vector<br/>docker_logs → jsonline"]:::collector
 
   subgraph scrape["Scrape + rules"]
-    VMA["vmagent :8429<br/>5 jobs: clickhouse, otel-collector,<br/>envoy-gateway, envoy, temporal"]:::collector
+    VMA["vmagent :8429<br/>6 jobs: clickhouse, otel-collector,<br/>envoy-gateway, envoy, temporal, keycloak"]:::collector
     VMAL["vmalert :8880<br/>ported cluster rules"]:::platform
   end
 
@@ -182,9 +182,11 @@ Locally there is no operator, so this endpoint **is** the engine view.
 
 Two Compose services on the platform's VM version (`v1.147.0`):
 
-- **vmagent** (`:8429`) scrapes five jobs — `clickhouse:9363`,
+- **vmagent** (`:8429`) scrapes six jobs — `clickhouse:9363`,
   `otel-collector:8888`, the edge's two halves (`gateway:19001`,
-  `gateway:19005/stats/prometheus`), and `temporal:8000` — and remote-writes
+  `gateway:19005/stats/prometheus`), `temporal:8000`, and `keycloak:9000`
+  (management interface: keycloak_user_events_total, agroal_*,
+  http_server_requests_seconds_*) — and remote-writes
   into VictoriaMetrics. It does **not** scrape the application services —
   their metrics arrive over OTLP (RFC-0014 P3), and scraping them too would
   double-ingest.
@@ -263,7 +265,7 @@ in both stacks.
 
 | Task | Command |
 |---|---|
-| Confirm all five scrape targets are up | `curl -s http://localhost:8429/api/v1/targets \| jq '[.data.activeTargets[] \| {job:.labels.job,health}]'` |
+| Confirm all six scrape targets are up | `curl -s http://localhost:8429/api/v1/targets \| jq '[.data.activeTargets[] \| {job:.labels.job,health}]'` |
 | List loaded/firing alerts | `curl -s http://localhost:8880/api/v1/alerts \| jq '.data.alerts[] \| {name:.labels.alertname,state}'` |
 | Rehearse `ClickHouseServerUnreachable` | `docker compose stop clickhouse` → firing within ~5m → `docker compose start clickhouse` |
 | Rehearse `ClickHouseExporterUnhealthy` | `docker compose pause clickhouse` → collector `send_failed_*` climbs → `unpause` |

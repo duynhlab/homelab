@@ -117,6 +117,29 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true" # health lives on the management port :9000
       KC_HTTP_PORT: "8080"
+      # Observability (mirrors the cluster Deployment; vmagent job `keycloak`
+      # scrapes :9000 in-network — deliberately not published, like temporal).
+      KC_METRICS_ENABLED: "true"
+      # keycloak_user_events_total (LOGIN/LOGIN_ERROR/...) — the login-KPI
+      # counter. Tags: default is realm-only to cap cardinality; clientId is
+      # safe here (2 clients per realm) and needed to split SPA vs portal.
+      KC_EVENT_METRICS_USER_ENABLED: "true"
+      KC_EVENT_METRICS_USER_TAGS: "realm,clientId"
+      # Histograms + SLO buckets (ms) make http_server_requests_seconds_bucket
+      # quantile-queryable (p95 target <250ms).
+      KC_HTTP_METRICS_HISTOGRAMS_ENABLED: "true"
+      KC_HTTP_METRICS_SLOS: "10,50,250,500,1000,2500"
+      # OpenTelemetry tracing (GA since KC 26.1): OTLP gRPC to the collector.
+      # The browser reaches Keycloak directly (not via the edge), so these
+      # spans are their own trace roots. JDBC spans ride along by default.
+      KC_TRACING_ENABLED: "true"
+      KC_TRACING_ENDPOINT: http://otel-collector:4317
+      KC_TRACING_SAMPLER_TYPE: parentbased_traceidratio
+      KC_TRACING_SAMPLER_RATIO: "1.0" # sample everything locally (prod 0.1)
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=local # vmagent promote allowlist
+      # JSON console logs: Vector's parse_json merge makes level/loggerName/
+      # event fields queryable in VictoriaLogs instead of raw Quarkus text.
+      KC_LOG_CONSOLE_OUTPUT: json
     volumes:
       - ./keycloak/duynhlab-realm.json:/opt/keycloak/data/import/duynhlab-realm.json:ro
       - ./keycloak/duynhlab-staff-realm.json:/opt/keycloak/data/import/duynhlab-staff-realm.json:ro

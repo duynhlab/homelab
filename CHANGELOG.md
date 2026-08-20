@@ -194,6 +194,25 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Keycloak signals switched on, both stacks (gói 1 of the identity
+  observability program).** Metrics beyond liveness: `event-metrics-user`
+  (the `keycloak_user_events_total` login/token-KPI counter, tags
+  realm+clientId — cardinality-safe at 2 clients/realm) and HTTP histograms
+  with SLO buckets 10–2500 ms, so p95/p99 on auth endpoints is finally
+  queryable; local-stack gains `KC_METRICS_ENABLED` plus a vmagent `keycloak`
+  job (management :9000, in-network), making `up{job="keycloak"}` — and every
+  future Keycloak alert — rehearsable locally (audit C20 grows to six jobs).
+  OpenTelemetry tracing (GA since KC 26.1) enabled: OTLP gRPC to the
+  collector, `parentbased_traceidratio` (local 1.0, cluster 0.1),
+  `deployment.environment.name` resource attr on the vmagent promote
+  allowlist; spans are their own trace roots because browsers reach Keycloak
+  directly. Console logs go JSON — Vector's local parse-merge makes
+  `level`/`loggerName`/event fields queryable in VictoriaLogs, and the pod
+  gains a bare `app: keycloak` label so the cluster log stream stops churning
+  per rollout. Remaining for gói 2 (recorded in the Keycloak gap-map): the
+  Identity dashboard, login/token/pool alerts + catalog rows + runbook, the
+  `EdgeJWKSFetchFailing` metric-name verification, and cluster Vector
+  field-merge parity.
 - **New dashboard: "Envoy Gateway — Edge Overview"** (uid `eg-edge`, built for the SRE/on-call audience;
   local `— Local` copy + cluster `GrafanaDashboard` CR in folder API Gateway).
   Four rows — Edge Overview (RPS · 5xx rate · p99 · availability), Data Plane

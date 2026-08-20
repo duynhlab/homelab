@@ -1824,7 +1824,11 @@ want = {'microservices-otel-local','business-otel-local','temporal-worker-local'
         'clickhouse-server-engine',
         # Gateway/ — Envoy Gateway's own dashboards, vendored verbatim from
         # charts/gateway-addons-helm at the pinned EG tag, uids upstream's:
-        'heHhNSFf6Na8vIZWRs8H','8WkEOMnANKE6PW5hhpVv','bdn8lriao7myoa'}
+        'heHhNSFf6Na8vIZWRs8H','8WkEOMnANKE6PW5hhpVv','bdn8lriao7myoa',
+        # Gateway/ — hand-authored edge SRE overview (golden signals + EG
+        # control plane + process infra), cluster twin under
+        # kubernetes/infra/configs/observability/grafana/dashboards/:
+        'eg-edge'}
 got = {d['uid'] for d in json.load(sys.stdin)}
 print('C18 dashboards:', 'OK all ' + str(len(want)) + '' if got == want else f'FAIL missing={sorted(want-got)} extra={sorted(got-want)}')
 raise SystemExit(0 if got == want else 1)"
@@ -1833,7 +1837,7 @@ for d in microservices-otel-local business-otel-local temporal-worker-local red-
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer \
          clickhouse-server-engine \
-         heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa; do
+         heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa eg-edge; do
   curl -s -o /dev/null -w "C18 $d: %{http_code} (want 200)\n" "$GRAF/api/dashboards/uid/$d"
 done
 # ...and every datasource REFERENCE inside them resolves. A 200 above only says
@@ -1850,7 +1854,7 @@ for d in microservices-otel-local business-otel-local temporal-worker-local red-
          clickhouse-otel-sql clickhouse-service-deepdive \
          clickhouse-otel-overview clickhouse-logs-explorer clickhouse-traces-explorer \
          clickhouse-server-engine \
-         heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa; do
+         heHhNSFf6Na8vIZWRs8H 8WkEOMnANKE6PW5hhpVv bdn8lriao7myoa eg-edge; do
   curl -s "$GRAF/api/dashboards/uid/$d" | LIVE="$LIVE" python3 -c "
 import json, os, re, sys
 live = set(os.environ['LIVE'].split(',')) | {'grafana', '-- Grafana --', '-- Mixed --', '-- Dashboard --'}
@@ -1996,7 +2000,7 @@ print('C21 rules loaded: %d alerting (want 14) + %d recording (want 15); firing:
 | C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
 | C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
 | C17 | Grafana datasources | `/api/datasources` returns exactly the five expected uid/type pairs (VictoriaLogs included) and each `/api/datasources/uid/<uid>/health` answers `OK` |
-| C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 16 provisioned uids (incl. the three vendored Envoy Gateway dashboards under Gateway/, the collector-health board, and the two RFC-0021 parity copies) and each loads via `/api/dashboards/uid/…` with 200 |
+| C18 | Dashboard inventory | `/api/search?type=dash-db` returns exactly the 17 provisioned uids (incl. the three vendored Envoy Gateway dashboards plus the hand-authored Edge Overview board under Gateway/, the collector-health board, and the two RFC-0021-era parity copies) and each loads via `/api/dashboards/uid/…` with 200 |
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
 | C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all five jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005) and `temporal` (server :8000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **14 alerting** rules (9 ClickHouse engine + 2 collector + 3 inventory) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |

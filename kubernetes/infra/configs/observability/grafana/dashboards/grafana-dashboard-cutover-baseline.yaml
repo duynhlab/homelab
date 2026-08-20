@@ -1,7 +1,7 @@
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
-  name: rfc0021-baseline
+  name: cutover-baseline
 spec:
   instanceSelector:
     matchLabels:
@@ -13,8 +13,8 @@ spec:
   # is judged against (CP-0: 7 days of data before any read/write cutover).
   # Queries read the rfc0021:* recording rules (prometheusrules/microservices).
   configMapRef:
-    name: grafana-dashboard-rfc0021-baseline
-    key: rfc0021-baseline.json
+    name: grafana-dashboard-cutover-baseline
+    key: cutover-baseline.json
   datasources:
     - inputName: DS_PROMETHEUS
       datasourceName: VictoriaMetrics

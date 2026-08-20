@@ -204,7 +204,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (rpc_method) (rate(rpc_server_call_duration_seconds_count{service_name=\"inventory\", rpc_method=~\"inventory.v1.InventoryService/.+\"}[5m]))",
+          "expr": "sum by (rpc_method) (rate(rpc_server_call_duration_seconds_count{service_name=\"inventory\", rpc_method=~\"inventory.v1.InventoryService/.+\"}[$__rate_interval]))",
           "legendFormat": "{{rpc_method}}",
           "refId": "A"
         }
@@ -406,7 +406,7 @@
     "to": "now"
   },
   "timezone": "browser",
-  "title": "RFC-0021 — Inventory — Local",
+  "title": "Inventory Service — Stock Authority — Local",
   "uid": "inventory-overview",
   "version": 1,
   "weekStart": ""

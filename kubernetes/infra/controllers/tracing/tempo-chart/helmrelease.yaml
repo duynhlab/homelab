@@ -33,7 +33,9 @@ spec:
     replicas: 1
     tempo:
       # Pin explicit tag — Renovate bumps via chart version + this tag.
-      tag: "2.10.7"
+      # 2.10.8 = the raw Deployment's image (#737), keeping the ADR-040
+      # parallel-run comparison image-identical.
+      tag: "2.10.8"
       resources:
         requests:
           cpu: "100m"

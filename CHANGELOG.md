@@ -1463,6 +1463,24 @@ Skeleton (copy what you need):
 
 ### Dependency
 
+#### GitOps
+
+- **RustFS chart 0.8.0 → 0.12.0 (app 1.0.0-beta.8 → beta.12).** The review
+  blocker was verified against the artifacts, not release notes: the chart's
+  new fail-closed guard (`templates/secret.yaml` `fail`s on default/empty
+  `secret.rustfs.*` keys) only applies when the chart renders its own Secret —
+  our `secret.existingSecret: rustfs-credentials` path bypasses it entirely.
+  The app-level guard (beta.10+, `resolve_rpc_secret`) refuses RPC only when
+  `RUSTFS_RPC_SECRET` is unset AND either credential equals `rustfsadmin`;
+  otherwise it derives the RPC secret from the access/secret pair
+  (HMAC-SHA256) — the upstream-documented path. Our OpenBAO-seeded creds
+  (`rustfs_root` / non-default secret) satisfy derivation, so no new secret
+  key is added. 0.8→0.12 values changes are additive (drivesPerNode, pools,
+  scanner tunables) and don't touch our standalone values block; `helm
+  template` with our exact values renders clean. Supersedes Renovate #688.
+  Kind bring-up must verify: rustfs pod starts, Tempo trace write, Pyroscope
+  profile push, Barman WAL upload.
+
 #### Gateway
 
 - **Envoy Gateway v1.8.3 → v1.9.0, Gateway API CRDs v1.5.1 → v1.6.1.** The

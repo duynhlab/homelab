@@ -41,6 +41,8 @@ resources:
   - grafana-dashboard-inventory.yaml
   # cert-manager — visual surface for the CertManager* alerts (JSON via configMapGenerator below)
   - grafana-dashboard-cert-manager.yaml
+  # Keycloak — Identity (hand-authored; JSON via configMapGenerator below)
+  - grafana-dashboard-keycloak-identity.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
@@ -91,6 +93,9 @@ configMapGenerator:
   - name: grafana-dashboard-eg-edge
     files:
       - eg-edge.json
+  - name: grafana-dashboard-keycloak-identity
+    files:
+      - keycloak-identity.json
   - name: grafana-dashboard-envoy-resources-monitor
     files:
       - envoy-gateway/resources-monitor.gen.json

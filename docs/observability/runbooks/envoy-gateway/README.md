@@ -1,7 +1,7 @@
 # Envoy Gateway Edge Alert Runbooks
 
-Per-alert investigation guides for the platform edge (ADR-044). Nine files cover
-eleven alerts: the paired High/Critical severities share one runbook, because
+Per-alert investigation guides for the platform edge (ADR-044). Ten files cover
+twelve alerts: the paired High/Critical severities share one runbook, because
 the investigation is identical and only the urgency differs.
 
 | Quick facts | |
@@ -39,6 +39,7 @@ are in seconds — the single most common misreading of an edge dashboard.
 | `Edge429RatioHigh` | [Edge429RatioHigh](Edge429RatioHigh.md) | Abusive client contained, or real users clipped? |
 | `EdgeUpstreamUnhealthy` | [EdgeUpstreamUnhealthy](EdgeUpstreamUnhealthy.md) | Does Kubernetes agree the endpoints are unhealthy? |
 | `EdgeJWKSFetchFailing` | [EdgeJWKSFetchFailing](EdgeJWKSFetchFailing.md) | How long until cached keys expire and everything 401s? |
+| `EdgeAuthDeniedRatioHigh` | [EdgeAuthDeniedRatioHigh](EdgeAuthDeniedRatioHigh.md) | Mass 401s — expired keys, a broken realm, or an attack? |
 | `EnvoyGatewayControllerDown` | [EnvoyGatewayControllerDown](EnvoyGatewayControllerDown.md) | What breaks next, given traffic is still fine? |
 | `EnvoyGatewayReconcileErrors` | [EnvoyGatewayReconcileErrors](EnvoyGatewayReconcileErrors.md) | Which resource failed to reach the fleet? |
 

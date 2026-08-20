@@ -19,11 +19,13 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**198 statically-defined alerts** across 9 domains (re-derive with
+**202 statically-defined alerts** across 9 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
 — by domain: postgres 53, microservices 52, victoriametrics 31, kubernetes 29,
-envoy-gateway 11, gitops 9, valkey 7, observability 3, keycloak 2, + the
-watchdog; the total is unchanged from the last count only by coincidence — the
+envoy-gateway 12, gitops 9, valkey 7, observability 3, keycloak 5, + the
+watchdog; up 4 from the previous 198 — the identity observability slice grew
+keycloak 2 → 5 (§2b) and envoy-gateway 11 → 12 (`EdgeAuthDeniedRatioHigh`). At
+the prior count the total was unchanged only by coincidence — the
 RFC-0024 P2.3 cutover retired kong's 13 for envoy-gateway's 11, and the 2
 keycloak alerts from P1 were missing from the previous breakdown), plus **64 Sloth-generated** SLO
 burn-rate alerts (2 × 32 SLOs). The 32 SLOs cover all 11 Go services: 30 rendered
@@ -41,7 +43,8 @@ had been deployed but never listed here.
 | Domain | Count | Protects |
 |--------|-------|----------|
 | [Microservices (RED)](#1-microservices-red-metrics) | 19 | The 10 Go services; workers also contribute runtime heartbeat series. Incl. 4 app-side DB-client alerts (RFC-0017 W4) |
-| [Envoy Gateway edge](#2-envoy-gateway-edge) | 11 | The single API ingress for the whole platform — proxy fleet + control plane |
+| [Envoy Gateway edge](#2-envoy-gateway-edge) | 12 | The single API ingress for the whole platform — proxy fleet + control plane |
+| [Keycloak identity](#2b-keycloak-identity) | 5 | The identity provider — new logins and token refreshes, and the DB pool + token endpoint behind them |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 51 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
@@ -104,7 +107,8 @@ histograms are in **milliseconds**.
 | EdgeNoTraffic | warning | downstream rq `rate[10m]==0`, had traffic in 1h, fleet up | Listener/route regression — routing broken while pods look healthy | 10m | [EdgeNoTraffic](../runbooks/envoy-gateway/EdgeNoTraffic.md) |
 | Edge429RatioHigh | warning | `edge:rq_429_ratio:rate5m` >5% (local rate-limit `rate_limited` counter) | ADR-045 local buckets clipping traffic: abusive client or mis-sized halved budgets | 10m | [Edge429RatioHigh](../runbooks/envoy-gateway/Edge429RatioHigh.md) |
 | EdgeUpstreamUnhealthy | warning | per-`envoy_cluster_name`: `membership_healthy < membership_total` | Endpoints ejected by health check / outlier detection; route degrades, then 503/UH | 2m | [EdgeUpstreamUnhealthy](../runbooks/envoy-gateway/EdgeUpstreamUnhealthy.md) |
-| EdgeJWKSFetchFailing | warning | `rate(envoy_http_jwt_authn_jwks_fetch_failed[5m])>0` | Edge can't refresh the Keycloak JWKS — cached keys serve until expiry, then every private/protected route 401s | 10m | [EdgeJWKSFetchFailing](../runbooks/envoy-gateway/EdgeJWKSFetchFailing.md) |
+| EdgeJWKSFetchFailing | warning | `rate(envoy_http_jwt_authn_jwks_fetch_failed[5m])>0` (metric verified live 2026-08-20) | Edge can't refresh the Keycloak JWKS — cached keys serve until expiry, then every private/protected route 401s | 10m | [EdgeJWKSFetchFailing](../runbooks/envoy-gateway/EdgeJWKSFetchFailing.md) |
+| EdgeAuthDeniedRatioHigh | warning | `jwt_authn denied / (denied+allowed)` >50%, with a >0.05 req/s min-traffic guard | The JWKS-outage symptom: mass 401s at the edge while every service stays green — without this, a JWKS cache expiry converts to a silent platform-wide auth outage | 10m | [EdgeAuthDeniedRatioHigh](../runbooks/envoy-gateway/EdgeAuthDeniedRatioHigh.md) |
 | EnvoyGatewayControllerDown | critical | `up{job="envoy-gateway-controller"}==0` or absent | xDS frozen: no Gateway API change reconciles; a restarted proxy gets no config | 5m | [EnvoyGatewayControllerDown](../runbooks/envoy-gateway/EnvoyGatewayControllerDown.md) |
 | EnvoyGatewayReconcileErrors | warning | `status_update_total{status="failure"}` + `xds_snapshot_{create,update}_total{status="failure"}` rate >0 | Config changes silently not reaching the fleet — running config drifts from git | 10m | [EnvoyGatewayReconcileErrors](../runbooks/envoy-gateway/EnvoyGatewayReconcileErrors.md) |
 
@@ -114,6 +118,29 @@ from the two Envoy histograms instead), `KongHighNginxConnections`,
 `KongSharedMemoryHigh/Critical` (Lua shared dicts don't exist; local rate-limit
 state is per-process token buckets). Envoy server memory/liveness panels live on
 the first-party **Envoy Global** dashboard.
+
+## 2b. Keycloak identity
+
+Source: `prometheusrules/keycloak/alerts.yaml` (RFC-0022 / RFC-0024 P1 shipped
+the two availability rules; the identity observability slice added the three
+signal rules). Scraped from the management interface (`:9000`,
+`KC_METRICS_ENABLED`) as `job="keycloak"` — **identical labels on both stacks**,
+so the local-stack vendored copy
+(`local-stack/observability/vmalert/rules/keycloak.yaml`) carries the exprs
+byte-identical. Base metrics: `keycloak_user_events_total{event,realm,client_id,error}`
+(failures are the *same* event with a non-empty `error` label — there is **no**
+`login_error` event), Quarkus `http_server_requests_seconds` (templated `uri`),
+and Agroal pool gauges (`agroal_*{datasource="default"}`). Availability model:
+Keycloak is on the hot path of **new** logins/refreshes only — issued tokens
+keep verifying at the edge until expiry.
+
+| Alert | Sev | Metric & trigger | Impact — why it must alert | for | Runbook |
+|-------|-----|------------------|----------------------------|-----|---------|
+| KeycloakDown | critical | `up{job="keycloak"}==0` **or** `absent(up{...})` | New logins and token refreshes fail platform-wide; issued tokens survive until expiry (15 min) — a countdown, not a grace period | 5m | [KeycloakDown](../runbooks/keycloak/KeycloakDown.md) |
+| KeycloakRestartLoop | warning | `increase(kube_pod_container_status_restarts_total{container="keycloak"}[15m])>2` | Crash-looping identity: DB connectivity, realm import, or memory limits — degrading toward KeycloakDown | 0m | [KeycloakRestartLoop](../runbooks/keycloak/KeycloakRestartLoop.md) |
+| KeycloakLoginFailureRatioHigh | warning | failed/all `login` events >20%, guarded by >0.05 logins/s so an idle realm can't page on one failure | Brute-force / credential stuffing, a broken SPA auth flow, or a misconfigured client — split by `error` + `client_id` | 10m | [KeycloakLoginFailureRatioHigh](../runbooks/keycloak/KeycloakLoginFailureRatioHigh.md) |
+| KeycloakTokenLatencyHigh | warning | p99 of `http_server_requests_seconds{uri=~".*/token"}` >1s | Every SPA login/refresh feels slow platform-wide; #1 cause is DB pool saturation (check KeycloakDbPoolExhausted first) | 10m | [KeycloakTokenLatencyHigh](../runbooks/keycloak/KeycloakTokenLatencyHigh.md) |
+| KeycloakDbPoolExhausted | critical | `agroal_awaiting_count>0` — threads blocked waiting for a pooled connection | The unambiguous pool-exhaustion signal; sustained waiting becomes token-endpoint timeouts, then login failures | 2m | [KeycloakDbPoolExhausted](../runbooks/keycloak/KeycloakDbPoolExhausted.md) |
 
 ## 3. Valkey cache
 
@@ -584,6 +611,7 @@ implemented yet — they are recommendations.
 | KubeContainerWaiting | Kubernetes | `kube_pod_container_status_waiting_reason>0` >1h | warning | `ImagePullBackOff` (wrong SHA) never crash-loops → unalerted | general (k8s mixin) |
 | ~~KongRateLimitExceeded / Kong4xxSurge~~ ✅ superseded by `Edge429RatioHigh` (§2, RFC-0024 cutover) | Edge | local rate-limit `rate_limited` ratio | warning | Abusive client / misfiring rate-limit now alerts at the Envoy edge | ✅ shipped |
 | KubeStateMetricsListErrors / KSM TargetDown | Meta | KSM watch/list error rate; `up{kube-state-metrics}==0` | warning | KSM down → all KSM-sourced k8s alerts silently stop | general (KSM mixin) |
+| Keycloak login SLO | Identity | `keycloak_user_events_total` — the §2b alerts and the Keycloak Identity dashboard shipped with the identity observability slice, but no Sloth SLO covers the identity provider yet | — | Login success has no error budget; the burn-rate page layer stops at the edge | identity observability slice |
 
 ### Already-tracked DB gaps (from the DR review)
 

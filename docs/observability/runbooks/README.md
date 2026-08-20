@@ -13,10 +13,11 @@ runbook links it via its `runbook_url` annotation.
 | [PostgreSQL runbooks](postgresql/README.md) | Per-alert CNPG runbooks (chart + deep-signal), 33 files | On-call, when a PostgreSQL/CNPG alert fires |
 | [Kubernetes runbooks](kubernetes/README.md) | Per-alert investigation for pods, workloads, storage, nodes, API server, network (21 files) | On-call, when a Kubernetes infra alert fires |
 | [Valkey runbooks](valkey/README.md) | Per-alert investigation for the cache (7 files) | On-call, when a Valkey alert fires |
+| [Keycloak runbooks](keycloak/) | Per-alert investigation for the identity provider (5 files, no folder README yet) | On-call, when a Keycloak alert fires |
 | [Logging troubleshooting](../logging/README.md#troubleshooting) | Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana) | On-call, when logs are missing in Grafana |
 
 Not yet covered by per-alert runbooks (a recorded gap): Flux/GitOps,
-cert-manager, Keycloak, and observability-stack self-monitoring alerts — they
+cert-manager, and observability-stack self-monitoring alerts — they
 carry no `runbook_url`; the [alert catalog](../alerting/alert-catalog.md)
 documents their severity and impact.
 

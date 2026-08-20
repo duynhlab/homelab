@@ -194,6 +194,26 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Keycloak observability, gói 2 — the signals get consumers.** New
+  dashboard **"Keycloak — Identity"** (uid `keycloak-identity`, 22 panels ×
+  5 rows: overview KPIs, auth-endpoint latency incl. token p95/p99, auth
+  events by error/realm/client, agroal/JVM/hashing infra) — local copy +
+  cluster `GrafanaDashboard` CR with identical queries (the `keycloak` scrape
+  job is label-identical on both stacks). Three KPI alerts join
+  `KeycloakDown`/`KeycloakRestartLoop`: `KeycloakLoginFailureRatioHigh`
+  (matches `error!=""` — Keycloak 26.5 has no login_error event, with a
+  min-traffic guard verified live against a driven failure burst),
+  `KeycloakTokenLatencyHigh` (p99 > 1 s), `KeycloakDbPoolExhausted`
+  (`agroal_awaiting_count > 0` — blocked waiters, not available==0). The
+  local vmalert vendors 4 of the 5 (RestartLoop is kube-state-only); audit
+  C18 grows to 18 boards and C21 to 18 alerting rules. The ADR-041 debt is
+  paid: all five alerts get catalog rows and per-alert runbooks
+  (`runbooks/keycloak/`), each carrying a `runbook_url`. Edge side:
+  `EdgeJWKSFetchFailing`'s "metric name to verify" is resolved — the metric
+  exists live — and the new `EdgeAuthDeniedRatioHigh`
+  (`jwt_authn_denied/(denied+allowed) > 0.5`, min-traffic guard) closes the
+  "JWKS outage converts to mass 401s and nothing fires" gap, with its own
+  runbook and catalog row.
 - **Keycloak signals switched on, both stacks (gói 1 of the identity
   observability program).** Metrics beyond liveness: `event-metrics-user`
   (the `keycloak_user_events_total` login/token-KPI counter, tags

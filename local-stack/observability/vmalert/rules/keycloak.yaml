@@ -1,0 +1,89 @@
+# Keycloak alerts — vendored from the cluster
+# (kubernetes/infra/configs/observability/metrics/prometheusrules/keycloak/alerts.yaml)
+# so the identity alert expressions are exercised here BEFORE they matter in
+# the cluster. NO label rewrite is needed: the vmagent scrape job is
+# job="keycloak" against the management interface (:9000) on BOTH stacks, with
+# identical metric/label shapes — the exprs below are byte-identical to the
+# cluster rules. KeycloakRestartLoop is deliberately NOT vendored: it reads
+# kube-state-metrics (kube_pod_container_status_restarts_total), which does
+# not exist on this compose stack. 4 alerting rules, 0 recording rules.
+groups:
+  - name: keycloak-availability
+    interval: 1m
+    rules:
+      - alert: KeycloakDown
+        # absent() covers the target disappearing entirely (container gone,
+        # scrape config drift), which `up == 0` alone would miss.
+        expr: up{job="keycloak"} == 0 or absent(up{job="keycloak"})
+        for: 5m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Keycloak identity provider down"
+          description: "Keycloak has been unreachable for more than 5 minutes. New logins and token refreshes fail; already-issued access tokens keep verifying until expiry (15 min)."
+          runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keycloak/KeycloakDown.md"
+
+  - name: keycloak-auth
+    interval: 1m
+    rules:
+      - alert: KeycloakLoginFailureRatioHigh
+        # Keycloak has NO login_error event: failures are event="login" with a
+        # non-empty error label (verified live 2026-08-20). The `and` arm
+        # guards the denominator so an idle realm can't page on 1 failure / ~0
+        # attempts — the ratio only counts above 0.05 login events/s (~3/min).
+        expr: |
+          (
+            sum(rate(keycloak_user_events_total{event="login", error!=""}[5m]))
+            /
+            sum(rate(keycloak_user_events_total{event="login"}[5m]))
+          ) > 0.2
+          and
+          sum(rate(keycloak_user_events_total{event="login"}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          category: errors
+        annotations:
+          summary: "More than 20% of Keycloak logins are failing"
+          description: "{{ $value | humanizePercentage }} of login events carry an error (threshold 20% for 10m with real login traffic). A brute-force/credential-stuffing run, a broken SPA auth flow, or a misconfigured client — split by error and client_id on keycloak_user_events_total to tell which."
+          runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keycloak/KeycloakLoginFailureRatioHigh.md"
+
+  - name: keycloak-latency
+    interval: 1m
+    rules:
+      - alert: KeycloakTokenLatencyHigh
+        # Token endpoint p99 — the hot path for every SPA session. uri is
+        # templated (/realms/{realm}/protocol/{protocol}/token); buckets top
+        # out at 2.5s, so the 1s threshold sits inside the resolvable range.
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le) (rate(http_server_requests_seconds_bucket{job="keycloak", uri=~".*/token"}[5m]))
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          category: latency
+        annotations:
+          summary: "Keycloak token endpoint p99 above 1s"
+          description: "p99 latency on /realms/{realm}/protocol/{protocol}/token is {{ $value | humanize }}s (threshold 1s for 10m). Logins and refreshes feel slow platform-wide. The #1 cause is DB connection-pool saturation — check KeycloakDbPoolExhausted and agroal_available_count first."
+          runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keycloak/KeycloakTokenLatencyHigh.md"
+
+  - name: keycloak-database
+    interval: 1m
+    rules:
+      - alert: KeycloakDbPoolExhausted
+        # agroal_awaiting_count > 0 means request threads are BLOCKED waiting
+        # for a connection — the unambiguous exhaustion signal (verified live
+        # 2026-08-20; available_count==0 alone can be a healthy pool at full
+        # utilization). Pool saturation is the #1 cause of Keycloak latency
+        # spikes; sustained waiting turns into token-endpoint timeouts.
+        expr: agroal_awaiting_count{job="keycloak"} > 0
+        for: 2m
+        labels:
+          severity: critical
+          category: saturation
+        annotations:
+          summary: "Keycloak DB connection pool exhausted (threads waiting)"
+          description: "{{ $value | humanize }} thread(s) have been waiting for a pooled DB connection for 2 minutes (datasource {{ $labels.datasource }}). Every login/refresh queues behind the pool — check the platform DB health, long-running transactions, and the pool max size before Keycloak starts timing out."
+          runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keycloak/KeycloakDbPoolExhausted.md"

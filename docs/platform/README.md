@@ -92,6 +92,7 @@ specific Kustomization or run `make sync`.
 | Doc | When to read |
 |-----|----------------|
 | [`setup.md`](setup.md) | First bring-up, Makefile commands, hosts, seed data, full Flux graph, project tree |
+| [`kind-e2e-audit.md`](kind-e2e-audit.md) | **The Kind cluster gate** — K0–K6 runbook proving Flux delivered the pinned images, admission, the real edge, and cluster-only telemetry. Twin of the [Compose E2E audit](../../local-stack/docs/e2e-audit.md) |
 | [`application-delivery.md`](application-delivery.md) | Add a service, ResourceSet contract, image pins, domain labels |
 | [`envoy-gateway.md`](envoy-gateway.md) | The edge: resource model, policy attachment, both provider modes, failure modes |
 | [`kong-gateway.md`](kong-gateway.md) | **Archived** — the previous gateway's guide, kept for reference |
@@ -115,4 +116,4 @@ Workflow templates (not prose docs): `build_template.yml`, `check_template.yml`.
 - [`kubernetes/apps/`](../../kubernetes/apps/) — ResourceSets and InputProviders
 - [`terraform/README.md`](../../terraform/README.md) — Flux Operator bootstrap
 
-_Last updated: 2026-08-19 — synced to the deployed platform (22 Kustomizations, back-office portal, `order-worker-1-13-2`, keycloak → monitoring edge)._
+_Last updated: 2026-08-21 — added the Kind E2E audit runbook to the doc map. Previously 2026-08-19 — synced to the deployed platform (22 Kustomizations, back-office portal, `order-worker-1-13-2`, keycloak → monitoring edge)._

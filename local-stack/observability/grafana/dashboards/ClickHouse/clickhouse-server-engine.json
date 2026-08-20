@@ -5,7 +5,21 @@
   "description": "ClickHouse server/engine health from the Altinity metrics-exporter (/chi) and operator (/metrics) — the engine-side complement of the OTel data-plane dashboards, which query the data over the SQL datasource instead.",
   "editable": true,
   "graphTooltip": 1,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "clickhouse"
+      ],
+      "targetBlank": false,
+      "title": "ClickHouse suite",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "panels": [
     {
       "type": "row",
@@ -17,11 +31,12 @@
         "x": 0,
         "y": 0
       },
-      "panels": []
+      "panels": [],
+      "id": 1
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "stat",
@@ -35,7 +50,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "1 - clamp_max(chi_clickhouse_metric_fetch_errors, 1)",
@@ -43,7 +58,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "up{job=\"clickhouse\"}",
@@ -51,7 +66,21 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -63,11 +92,12 @@
           ]
         }
       },
-      "description": "Cluster: 1 = the Altinity exporter fetched system tables on the last scrape. Local: a genuine scrape of the server's own endpoint."
+      "description": "Cluster: 1 = the Altinity exporter fetched system tables on the last scrape. Local: a genuine scrape of the server's own endpoint.",
+      "id": 2
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "stat",
@@ -81,7 +111,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_Uptime",
@@ -89,7 +119,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseAsyncMetrics_Uptime",
@@ -110,11 +140,12 @@
             "lastNotNull"
           ]
         }
-      }
+      },
+      "id": 3
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "stat",
@@ -128,7 +159,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_Query",
@@ -136,7 +167,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseMetrics_Query",
@@ -155,11 +186,12 @@
             "lastNotNull"
           ]
         }
-      }
+      },
+      "id": 4
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "stat",
@@ -173,7 +205,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_TCPConnection",
@@ -181,7 +213,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseMetrics_TCPConnection",
@@ -200,7 +232,8 @@
             "lastNotNull"
           ]
         }
-      }
+      },
+      "id": 5
     },
     {
       "type": "row",
@@ -212,11 +245,12 @@
         "x": 0,
         "y": 5
       },
-      "panels": []
+      "panels": [],
+      "id": 6
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -230,7 +264,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_Query[5m])",
@@ -239,7 +273,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_SelectQuery[5m])",
@@ -248,7 +282,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_InsertQuery[5m])",
@@ -257,7 +291,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_Query[5m])",
@@ -266,7 +300,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_SelectQuery[5m])",
@@ -275,7 +309,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_InsertQuery[5m])",
@@ -297,11 +331,12 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "id": 7
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -315,7 +350,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_InsertedRows[5m])",
@@ -324,7 +359,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_InsertedBytes[5m])",
@@ -333,7 +368,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_InsertedRows[5m])",
@@ -342,7 +377,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_InsertedBytes[5m])",
@@ -352,7 +387,20 @@
       ],
       "fieldConfig": {
         "defaults": {},
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/bytes/"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "Bps"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -363,11 +411,12 @@
           "mode": "multi"
         }
       },
-      "description": "The OTel Collector's batched log/trace inserts. A cliff here with a healthy collector points at CH-side backpressure."
+      "description": "The OTel Collector's batched log/trace inserts. A cliff here with a healthy collector points at CH-side backpressure.",
+      "id": 8
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -381,7 +430,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_DelayedInserts[5m])",
@@ -390,7 +439,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_RejectedInserts[5m])",
@@ -399,7 +448,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_FailedInsertQuery[5m])",
@@ -408,7 +457,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_DelayedInserts[5m])",
@@ -417,7 +466,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_RejectedInserts[5m])",
@@ -426,7 +475,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_FailedInsertQuery[5m])",
@@ -435,7 +484,9 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "ops"
+        },
         "overrides": []
       },
       "options": {
@@ -447,7 +498,8 @@
           "mode": "multi"
         }
       },
-      "description": "Escalation ladder of the too-many-parts guard: delayed, then rejected, then the collector starts dropping. All six series should sit at zero (three are cluster-shaped, three local-shaped)."
+      "description": "Escalation ladder of the too-many-parts guard: delayed, then rejected, then the collector starts dropping. All six series should sit at zero (three are cluster-shaped, three local-shaped).",
+      "id": 9
     },
     {
       "type": "row",
@@ -459,11 +511,12 @@
         "x": 0,
         "y": 22
       },
-      "panels": []
+      "panels": [],
+      "id": 10
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -477,7 +530,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_PartsActive",
@@ -486,7 +539,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseMetrics_PartsActive",
@@ -507,11 +560,12 @@
           "mode": "multi"
         }
       },
-      "description": "Merge backlog indicator; ClickHouseTooManyParts alerts at a sustained 300 in both stacks."
+      "description": "Merge backlog indicator; ClickHouseTooManyParts alerts at a sustained 300 in both stacks.",
+      "id": 11
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -525,7 +579,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_Merge",
@@ -534,7 +588,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_MergedRows[5m])",
@@ -543,7 +597,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(chi_clickhouse_event_FailedMerges[5m])",
@@ -552,7 +606,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseMetrics_Merge",
@@ -561,7 +615,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_MergedRows[5m])",
@@ -570,7 +624,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(ClickHouseProfileEvents_FailedMerges[5m])",
@@ -590,7 +644,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "id": 12
     },
     {
       "type": "row",
@@ -602,11 +657,12 @@
         "x": 0,
         "y": 31
       },
-      "panels": []
+      "panels": [],
+      "id": 13
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -620,7 +676,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_DiskDataBytes",
@@ -629,7 +685,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_DiskFreeBytes",
@@ -638,7 +694,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseAsyncMetrics_DiskUsed_default",
@@ -647,7 +703,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseAsyncMetrics_DiskAvailable_default",
@@ -670,11 +726,12 @@
           "mode": "multi"
         }
       },
-      "description": "Cluster: exporter disk series. Local: per-disk async metrics (suffix `_default` = the single Compose volume)."
+      "description": "Cluster: exporter disk series. Local: per-disk async metrics (suffix `_default` = the single Compose volume).",
+      "id": 14
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -688,7 +745,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_MemoryTracking",
@@ -697,7 +754,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated",
@@ -706,7 +763,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "ClickHouseMetrics_MemoryTracking",
@@ -728,7 +785,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "id": 15
     },
     {
       "type": "row",
@@ -740,11 +798,12 @@
         "x": 0,
         "y": 40
       },
-      "panels": []
+      "panels": [],
+      "id": 16
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "table",
@@ -758,19 +817,25 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "topk(10, sum by (name) (rate(chi_clickhouse_system_errors_value[15m])))",
-          "refId": "A"
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "range": false
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "topk(10, sum by (__name__) (rate({__name__=~\"ClickHouseErrorMetric_.+\"}[15m])))",
-          "refId": "B"
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
@@ -778,11 +843,12 @@
         "overrides": []
       },
       "options": {},
-      "description": "Broad server-side error census. Cluster rows keyed by the exporter's name label; local rows by the ClickHouseErrorMetric_* series name."
+      "description": "Broad server-side error census. Cluster rows keyed by the exporter's name label; local rows by the ClickHouseErrorMetric_* series name.",
+      "id": 17
     },
     {
       "datasource": {
-        "type": "victoriametrics-metrics-datasource",
+        "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "type": "timeseries",
@@ -796,7 +862,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(clickhouse_operator_host_reconciles_started[15m])",
@@ -805,7 +871,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(clickhouse_operator_host_reconciles_completed[15m])",
@@ -814,7 +880,7 @@
         },
         {
           "datasource": {
-            "type": "victoriametrics-metrics-datasource",
+            "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "rate(clickhouse_operator_host_reconciles_errors[15m])",
@@ -823,7 +889,9 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "ops"
+        },
         "overrides": []
       },
       "options": {
@@ -835,7 +903,8 @@
           "mode": "multi"
         }
       },
-      "description": "The Altinity operator's control-plane view. Empty on local-stack by design — Compose runs the server only, no operator."
+      "description": "The Altinity operator's control-plane view. Empty on local-stack by design — Compose runs the server only, no operator.",
+      "id": 18
     }
   ],
   "refresh": "30s",

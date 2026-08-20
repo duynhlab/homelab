@@ -1084,8 +1084,8 @@
       "title": "Worker → server request latency (p95)",
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 12,
+        "x": 12,
         "y": 51
       },
       "fieldConfig": {
@@ -1158,9 +1158,9 @@
       "title": "Sticky cache",
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 51
+        "w": 12,
+        "x": 0,
+        "y": 59
       },
       "fieldConfig": {
         "defaults": {
@@ -1250,7 +1250,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 67
       },
       "panels": []
     },
@@ -1266,7 +1266,7 @@
         "h": 8,
         "w": 4,
         "x": 0,
-        "y": 60
+        "y": 68
       },
       "fieldConfig": {
         "defaults": {
@@ -1344,7 +1344,7 @@
         "h": 8,
         "w": 10,
         "x": 4,
-        "y": 60
+        "y": 68
       },
       "fieldConfig": {
         "defaults": {
@@ -1419,7 +1419,7 @@
         "h": 8,
         "w": 10,
         "x": 14,
-        "y": 60
+        "y": 68
       },
       "fieldConfig": {
         "defaults": {
@@ -1496,7 +1496,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 68
+        "y": 76
       },
       "fieldConfig": {
         "defaults": {
@@ -1570,7 +1570,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 68
+        "y": 76
       },
       "fieldConfig": {
         "defaults": {
@@ -1654,7 +1654,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 68
+        "y": 76
       },
       "fieldConfig": {
         "defaults": {

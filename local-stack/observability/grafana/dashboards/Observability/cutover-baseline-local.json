@@ -20,6 +20,33 @@
   "links": [],
   "panels": [
     {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 400,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "### RFC-0021 cutover-gate baseline — read this first\n\nThis board is the **RFC-0021 order-saga / payment overhaul cutover baseline** (RFC implemented **2026-08-06**). Every panel reads pre-aggregated `rfc0021:*` recording rules — they are fixed 5-minute windows by design, so do not swap them to `$__rate_interval`.\n\nPanels marked **RETIRED** are deliberate tombstones for the old product-stock contract (product-side ReserveStock, checkout shadow compare). **No data on a RETIRED panel is the expected, healthy reading** — it proves the retired contract is dead. Data appearing there is a regression.\n\nDesign record: `docs/proposals/rfc/RFC-0021/`.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.1.0",
+      "title": "Read this panel before the tombstones",
+      "transparent": true,
+      "type": "text"
+    },
+    {
       "id": 100,
       "type": "row",
       "title": "Checkout confirm — read-path cutover gate",
@@ -28,7 +55,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 5
       },
       "panels": []
     },
@@ -45,7 +72,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 1
+        "y": 6
       },
       "fieldConfig": {
         "defaults": {
@@ -104,7 +131,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 1
+        "y": 6
       },
       "fieldConfig": {
         "defaults": {
@@ -154,7 +181,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 1
+        "y": 6
       },
       "fieldConfig": {
         "defaults": {
@@ -200,7 +227,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 14
       },
       "panels": []
     },
@@ -217,7 +244,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 10
+        "y": 15
       },
       "fieldConfig": {
         "defaults": {
@@ -267,7 +294,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 10
+        "y": 15
       },
       "fieldConfig": {
         "defaults": {
@@ -317,7 +344,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 10
+        "y": 15
       },
       "fieldConfig": {
         "defaults": {
@@ -363,7 +390,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 23
       },
       "panels": []
     },
@@ -380,7 +407,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 19
+        "y": 24
       },
       "fieldConfig": {
         "defaults": {
@@ -430,7 +457,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 19
+        "y": 24
       },
       "fieldConfig": {
         "defaults": {
@@ -480,7 +507,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 19
+        "y": 24
       },
       "fieldConfig": {
         "defaults": {
@@ -535,7 +562,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 32
       },
       "panels": []
     },
@@ -552,7 +579,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 33
       },
       "fieldConfig": {
         "defaults": {
@@ -602,7 +629,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 33
       },
       "fieldConfig": {
         "defaults": {
@@ -687,7 +714,7 @@
     "to": "now"
   },
   "timezone": "browser",
-  "title": "RFC-0021 — Overhaul Baseline — Local",
+  "title": "Order Saga & Payment — Cutover Baseline — Local",
   "uid": "rfc0021-baseline",
   "version": 1,
   "weekStart": ""

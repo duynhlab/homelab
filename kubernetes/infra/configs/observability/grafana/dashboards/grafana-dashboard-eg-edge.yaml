@@ -1,0 +1,31 @@
+# Envoy Gateway — Edge Overview: the hand-authored operator board (for the SRE/on-call audience) that the
+# vendored EG suite lacks — one page answering "is the edge healthy" (golden
+# signals), "is the control plane converging" (watchables/xDS), and "is the
+# process itself fine". Four rows:
+#   Edge Overview   RPS · 5xx rate · p99 · availability      job="envoy-gateway"
+#   Data Plane      per-route rate, 4xx/5xx, latency
+#                   quantiles, retries/timeouts, connections  job="envoy-gateway"
+#   Control Plane   watchable events/depth, xDS snapshots,
+#                   status updates, panics + certwatcher      job="envoy-gateway-controller"
+#   Infrastructure  process CPU/memory, Envoy server health,
+#                   pod restarts (kube-state/cAdvisor)
+# Local-stack twin: local-stack/observability/grafana/dashboards/Gateway/
+# eg-edge.json (same uid, jobs remapped envoy→envoy-gateway,
+# envoy-gateway→envoy-gateway-controller for the cluster scrape jobs).
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: eg-edge
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "API Gateway"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-eg-edge
+    key: eg-edge.json
+  datasources:
+    - inputName: DS_PROMETHEUS
+      datasourceName: VictoriaMetrics

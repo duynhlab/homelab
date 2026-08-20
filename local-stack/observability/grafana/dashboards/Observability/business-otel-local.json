@@ -8,7 +8,7 @@
   "graphTooltip": 1,
   "links": [],
   "liveNow": false,
-  "refresh": "",
+  "refresh": "1m",
   "schemaVersion": 41,
   "style": "dark",
   "tags": [
@@ -190,7 +190,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": ""
+        "content": "### Payments — how to read this row\n\n`payment-service` business KPIs from its OTel instruments. **Card decline rate** (left) is the `declined` share of `payment_authorization_total` over the dashboard time range — mockpay declines deterministic test cards, so a small non-zero value is normal under synthetic traffic.\n\nBelow: **Authorization outcomes** and **Money operations** (`payment_operation_total` by op & result) as rates over `$rate`; **Provider-hop latency p95** times only the outbound mockpay call; **Reconciliation discrepancies** must stay flat at zero — any point there is money drift to investigate."
       },
       "gridPos": {
         "x": 6,
@@ -2120,7 +2120,7 @@
           },
           "options": {
             "mode": "markdown",
-            "content": ""
+            "content": "### Checkout — how to read this row\n\n`checkout-service` session funnel. **Sessions confirmed** (left) counts `checkout_sessions_confirmed_total` over the dashboard time range.\n\nBelow: **Expirations by reason** tracks sessions that never confirmed; **Promo redeemed vs rejected** splits rejects by reason; **Price-changed on confirm** counts confirms that repriced against the live catalog — occasional points are expected, a step change means catalog churn or a pricing bug; **Confirm latency p95** is the end-to-end confirm handler, which includes the inventory availability check since RFC-0021."
           },
           "gridPos": {
             "x": 6,

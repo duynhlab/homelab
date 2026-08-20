@@ -22,7 +22,7 @@
     {
       "id": 100,
       "type": "row",
-      "title": "Checkout confirm \u2014 read-path cutover gate",
+      "title": "Checkout confirm — read-path cutover gate",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -145,7 +145,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "Saga-side ReserveStock outcomes",
-      "description": "order_stock_reservation_total by result \u2014 the series the phase-3 flip rehomes onto inventory.",
+      "description": "order_stock_reservation_total by result — the series the phase-3 flip rehomes onto inventory.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -194,7 +194,7 @@
     {
       "id": 101,
       "type": "row",
-      "title": "Product stock surface \u2014 what phases 2-4 replace",
+      "title": "Product stock surface — what phases 2-4 replace",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -308,7 +308,7 @@
       "id": 6,
       "type": "timeseries",
       "title": "Product gRPC error ratio by method",
-      "description": "non-OK / all responses. Business rejections (FailedPrecondition on insufficient stock) count as non-OK here \u2014 read alongside the outcomes panel.",
+      "description": "non-OK / all responses. Business rejections (FailedPrecondition on insufficient stock) count as non-OK here — read alongside the outcomes panel.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -421,7 +421,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Compensation runs by step and result",
-      "description": "result=failed is the stuck-money population \u2014 its baseline should be flat zero.",
+      "description": "result=failed is the stuck-money population — its baseline should be flat zero.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -531,7 +531,12 @@
       "type": "row",
       "title": "RFC-0021 read migration — shadow compare (P2-7)",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
       "panels": []
     },
     {
@@ -539,22 +544,45 @@
       "type": "timeseries",
       "title": "Shadow compare outcomes (per second) (RETIRED — no data is expected)",
       "description": "HISTORICAL. inventory_shadow_compare_total was removed with the shadow compare in checkout 0.5.0 (RFC-0021 phase 4) — inventory is the only availability authority now, so there is nothing to compare against. This panel is empty BY DESIGN; it is not an outage and not a broken scrape. The live signal is checkout_availability_check_total{result} (see the checkout-availability rules).",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
-          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 8, "showPoints": "never" }
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
           "expr": "rfc0021:checkout_shadow_compare:rate5m",
           "legendFormat": "{{result}}",
           "refId": "A"
@@ -566,24 +594,59 @@
       "type": "timeseries",
       "title": "Shadow divergence ratio (RETIRED — no data is expected)",
       "description": "HISTORICAL — empty by design. The shadow compare and its CheckoutInventoryShadowDivergence alert were removed in checkout 0.5.0 (RFC-0021 phase 4): with one availability authority there is nothing to compare against. Live equivalents: CheckoutAvailabilityErrors and CheckoutAvailabilityRefusingEverything on checkout_availability_check_total.",
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 8, "showPoints": "never" },
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.01 } ] }
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.01
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
           "expr": "rfc0021:checkout_shadow_divergence:ratio5m",
           "legendFormat": "divergence",
           "refId": "A"
@@ -606,7 +669,7 @@
     "to": "now"
   },
   "timezone": "browser",
-  "title": "RFC-0021 \u2014 Overhaul Baseline",
+  "title": "Order Saga & Payment — Cutover Baseline",
   "uid": "rfc0021-baseline",
   "version": 1,
   "weekStart": ""

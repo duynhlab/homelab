@@ -389,5 +389,6 @@
         }
       ]
     }
-  ]
+  ],
+  "description": "RED (rate, errors, duration) per service from the spanmetrics connector in the local OTel Collector — the local stand-in for Tempo's metrics-generator. Server-span request rate, error ratio, and latency quantiles derived from spanmetrics_calls_total / spanmetrics_duration_milliseconds_bucket."
 }

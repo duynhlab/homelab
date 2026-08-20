@@ -19,6 +19,8 @@ resources:
   # Envoy Gateway first-party dashboards (RFC-0024 P4 edge slice) — JSON vendored
   # from envoyproxy/gateway v1.9.0 via configMapGenerator below
   - grafana-dashboard-envoy-gateway.yaml
+  # Envoy Gateway — Edge Overview (hand-authored; JSON via configMapGenerator below)
+  - grafana-dashboard-eg-edge.yaml
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
   - grafana-dashboard-clickhouse-server-engine.yaml
@@ -33,9 +35,9 @@ resources:
   # Flux GitOps dashboards
   - grafana-dashboard-flux-cluster.yaml
   - grafana-dashboard-flux-controlplane.yaml
-  # RFC-0021 overhaul baseline (CP-0 gate)
-  - grafana-dashboard-rfc0021-baseline.yaml
-  # RFC-0021 P1-9 inventory-service overview
+  # Order Saga & Payment — Cutover Baseline (RFC-0021 CP-0 gate)
+  - grafana-dashboard-cutover-baseline.yaml
+  # Inventory Service — Stock Authority (RFC-0021 P1-9)
   - grafana-dashboard-inventory.yaml
   # cert-manager — visual surface for the CertManager* alerts (JSON via configMapGenerator below)
   - grafana-dashboard-cert-manager.yaml
@@ -61,9 +63,9 @@ configMapGenerator:
   - name: grafana-dashboard-clickhouse-traces-explorer
     files:
       - clickhouse-traces-explorer.json
-  - name: grafana-dashboard-rfc0021-baseline
+  - name: grafana-dashboard-cutover-baseline
     files:
-      - rfc0021-baseline.json
+      - cutover-baseline.json
   - name: grafana-dashboard-inventory
     files:
       - inventory.json
@@ -86,6 +88,9 @@ configMapGenerator:
   - name: grafana-dashboard-envoy-gateway-global
     files:
       - envoy-gateway/envoy-gateway-global.json
+  - name: grafana-dashboard-eg-edge
+    files:
+      - eg-edge.json
   - name: grafana-dashboard-envoy-resources-monitor
     files:
       - envoy-gateway/resources-monitor.gen.json

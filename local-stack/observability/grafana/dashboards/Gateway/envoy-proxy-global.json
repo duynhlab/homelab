@@ -472,7 +472,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "sum(rate(envoy_http_downstream_rq_total[5m]))",
+          "expr": "sum(rate(envoy_http_downstream_rq_total[$__rate_interval]))",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "Envoy HTTP Downstream Rq total",
@@ -538,7 +538,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -569,7 +570,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(namespace) (rate(envoy_http_downstream_cx_total{namespace=~\"$Namespace\"}[5m]))",
+          "expr": "sum by(namespace) (rate(envoy_http_downstream_cx_total{namespace=~\"$Namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{namespace}}",
           "range": true,
@@ -692,7 +693,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.9, sum by(le) (rate(envoy_http_downstream_rq_time_bucket[5m])))",
+          "expr": "histogram_quantile(0.9, sum by(le) (rate(envoy_http_downstream_rq_time_bucket[$__rate_interval])))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{service}} 90%",
@@ -704,7 +705,7 @@
             "uid": "$datasource"
           },
           "editorMode": "builder",
-          "expr": "histogram_quantile(0.5, sum by(le) (rate(envoy_http_downstream_rq_time_bucket[5m])))",
+          "expr": "histogram_quantile(0.5, sum by(le) (rate(envoy_http_downstream_rq_time_bucket[$__rate_interval])))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -717,7 +718,7 @@
             "uid": "$datasource"
           },
           "editorMode": "builder",
-          "expr": "histogram_quantile(0.99, sum by(le) (rate(envoy_http_downstream_rq_time_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by(le) (rate(envoy_http_downstream_rq_time_bucket[$__rate_interval])))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{service}} 99%",
@@ -908,7 +909,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -939,7 +941,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(namespace) (rate(envoy_tcp_downstream_cx_total{namespace=~\"$Namespace\"}[5m]))",
+          "expr": "sum by(namespace) (rate(envoy_tcp_downstream_cx_total{namespace=~\"$Namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{namespace}}",
           "range": true,
@@ -1004,7 +1006,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -1035,7 +1038,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(namespace) (rate(envoy_tcp_downstream_cx_rx_bytes_total{namespace=~\"$Namespace\"}[5m]))",
+          "expr": "sum by(namespace) (rate(envoy_tcp_downstream_cx_rx_bytes_total{namespace=~\"$Namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{namespace}}",
           "range": true,
@@ -1100,7 +1103,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -1131,7 +1135,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(namespace) (rate(envoy_tcp_downstream_cx_tx_bytes_total{namespace=~\"$Namespace\"}[5m]))",
+          "expr": "sum by(namespace) (rate(envoy_tcp_downstream_cx_tx_bytes_total{namespace=~\"$Namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{namespace}}",
           "range": true,
@@ -1277,7 +1281,7 @@
             "uid": "$datasource"
           },
           "editorMode": "builder",
-          "expr": "sum by(namespace) (rate(envoy_cluster_upstream_rq_total{namespace=~\"$Namespace\"}[5m]))",
+          "expr": "sum by(namespace) (rate(envoy_cluster_upstream_rq_total{namespace=~\"$Namespace\"}[$__rate_interval]))",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "__auto",
@@ -1397,7 +1401,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "sum(rate(envoy_cluster_upstream_cx_total{namespace=~\"$Namespace\",}[5m])) by (namespace)",
+          "expr": "sum(rate(envoy_cluster_upstream_cx_total{namespace=~\"$Namespace\",}[$__rate_interval])) by (namespace)",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "__auto",
@@ -1518,7 +1522,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(envoy_cluster_upstream_rq_time_bucket{namespace=~\"$Namespace\"}[5m])) by (le, namespace))",
+          "expr": "histogram_quantile(0.99, sum(rate(envoy_cluster_upstream_rq_time_bucket{namespace=~\"$Namespace\"}[$__rate_interval])) by (le, namespace))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{namespace}} 99%",
@@ -1530,7 +1534,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.9, sum(rate(envoy_cluster_upstream_rq_time_bucket{namespace=~\"$Namespace\"}[5m])) by (le, namespace))",
+          "expr": "histogram_quantile(0.9, sum(rate(envoy_cluster_upstream_rq_time_bucket{namespace=~\"$Namespace\"}[$__rate_interval])) by (le, namespace))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{namespace}} 90%",
@@ -1542,7 +1546,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.5, sum(rate(envoy_cluster_upstream_rq_time_bucket{namespace=~\"$Namespace\"}[5m])) by (le, namespace))",
+          "expr": "histogram_quantile(0.5, sum(rate(envoy_cluster_upstream_rq_time_bucket{namespace=~\"$Namespace\"}[$__rate_interval])) by (le, namespace))",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 1,
@@ -1727,7 +1731,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -1757,7 +1762,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(namespace) (rate(envoy_cluster_upstream_cx_rx_bytes_total{namespace=~\"$Namespace\"}[5m]))",
+          "expr": "sum by(namespace) (rate(envoy_cluster_upstream_cx_rx_bytes_total{namespace=~\"$Namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{namespace}}",
           "range": true,
@@ -1819,7 +1824,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -1849,7 +1855,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "sum by(namespace) (rate(envoy_cluster_upstream_cx_tx_bytes_total{namespace=~\"$Namespace\"}[5m]))",
+          "expr": "sum by(namespace) (rate(envoy_cluster_upstream_cx_tx_bytes_total{namespace=~\"$Namespace\"}[$__rate_interval]))",
           "instant": false,
           "legendFormat": "{{namespace}}",
           "range": true,
@@ -1997,7 +2003,7 @@
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=~\"2\"}[5m]))",
+          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=~\"2\"}[$__rate_interval]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -2120,7 +2126,7 @@
             "uid": "$datasource"
           },
           "editorMode": "builder",
-          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=~\"3\"}[5m]))",
+          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=~\"3\"}[$__rate_interval]))",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "value",
@@ -2241,7 +2247,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=\"4\"}[5m]))",
+          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=\"4\"}[$__rate_interval]))",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "Value",
@@ -2362,7 +2368,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=\"5\"}[5m]))",
+          "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=\"5\"}[$__rate_interval]))",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "Value",

@@ -89,7 +89,21 @@
       }
     ]
   },
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "clickhouse"
+      ],
+      "targetBlank": false,
+      "title": "ClickHouse suite",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "panels": [
     {
       "id": 1,
@@ -116,7 +130,8 @@
         "x": 0,
         "y": 3
       },
-      "panels": []
+      "panels": [],
+      "id": 21
     },
     {
       "id": 2,
@@ -141,7 +156,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, count()/60.0 AS v FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, count()/$__interval_s AS v FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
           "format": 1,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
@@ -346,7 +361,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, count()/60.0 AS v FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, count()/$__interval_s AS v FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
           "format": 1,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
@@ -526,7 +541,8 @@
         "x": 0,
         "y": 9
       },
-      "panels": []
+      "panels": [],
+      "id": 22
     },
     {
       "id": 8,
@@ -551,7 +567,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, ServiceName, count()/60.0 AS rps FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time, ServiceName ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, ServiceName, count()/$__interval_s AS rps FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time, ServiceName ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
@@ -693,7 +709,8 @@
         "x": 0,
         "y": 18
       },
-      "panels": []
+      "panels": [],
+      "id": 23
     },
     {
       "id": 10,
@@ -873,7 +890,8 @@
         "x": 0,
         "y": 27
       },
-      "panels": []
+      "panels": [],
+      "id": 24
     },
     {
       "id": 12,
@@ -1105,7 +1123,8 @@
         "x": 0,
         "y": 36
       },
-      "panels": []
+      "panels": [],
+      "id": 25
     },
     {
       "id": 15,
@@ -1388,7 +1407,8 @@
         "x": 0,
         "y": 45
       },
-      "panels": []
+      "panels": [],
+      "id": 26
     },
     {
       "id": 18,

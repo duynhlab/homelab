@@ -192,6 +192,19 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### GitOps
+
+- **`scripts/kind-seed.sh` — demo data for a Kind cluster**, the missing twin of
+  compose's eight `command: ["seed"]` one-shots. Seed data is not desired state,
+  so it stays a script rather than a manifest Flux would re-run forever. Each Job
+  is derived from the running Deployment (`kubectl get deploy -o json | jq`), so
+  it inherits that service's exact image, DB host, user and password
+  `secretKeyRef` instead of drifting from a hand-written copy. One deliberate
+  override: the ResourceSet sets `ENV=production` fleet-wide and every seed
+  refuses to run there ("demo data is dev-only"), so the Job sets
+  `ENV=development` — fenced by a context guard that refuses any non-`kind-*`
+  context.
+
 #### Observability
 
 - **Keycloak login SLO** — the last recorded identity-observability gap closes:

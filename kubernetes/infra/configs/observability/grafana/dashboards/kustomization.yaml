@@ -19,8 +19,8 @@ resources:
   # Envoy Gateway first-party dashboards (RFC-0024 P4 edge slice) — JSON vendored
   # from envoyproxy/gateway v1.9.0 via configMapGenerator below
   - grafana-dashboard-envoy-gateway.yaml
-  # Envoy Gateway — Edge SRE Overview (hand-authored; JSON via configMapGenerator below)
-  - grafana-dashboard-eg-edge-sre.yaml
+  # Envoy Gateway — Edge Overview (hand-authored; JSON via configMapGenerator below)
+  - grafana-dashboard-eg-edge.yaml
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
   - grafana-dashboard-clickhouse-server-engine.yaml
@@ -88,9 +88,9 @@ configMapGenerator:
   - name: grafana-dashboard-envoy-gateway-global
     files:
       - envoy-gateway/envoy-gateway-global.json
-  - name: grafana-dashboard-eg-edge-sre
+  - name: grafana-dashboard-eg-edge
     files:
-      - eg-edge-sre.json
+      - eg-edge.json
   - name: grafana-dashboard-envoy-resources-monitor
     files:
       - envoy-gateway/resources-monitor.gen.json

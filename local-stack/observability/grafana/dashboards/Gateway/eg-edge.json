@@ -1,11 +1,10 @@
 {
-  "uid": "eg-edge-sre",
-  "title": "Envoy Gateway \u2014 Edge SRE Overview \u2014 Local",
+  "uid": "eg-edge",
+  "title": "Envoy Gateway — Edge Overview — Local",
   "description": "Edge SRE view of the local-stack Envoy Gateway: golden signals on the data plane (job=envoy, gateway:19005 /stats/prometheus), control-plane health (job=envoy-gateway, gateway:19001), and process-level infrastructure. Cluster-only panels are marked planned.",
   "tags": [
     "envoy-gateway",
-    "edge",
-    "sre"
+    "edge"
   ],
   "timezone": "browser",
   "editable": true,
@@ -41,7 +40,7 @@
     {
       "id": 25,
       "type": "text",
-      "title": "README \u2014 how to read this dashboard",
+      "title": "README — how to read this dashboard",
       "gridPos": {
         "h": 6,
         "w": 24,
@@ -56,7 +55,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Control plane says** \u201ctraffic to `/payment` must go THERE, with THIS timeout and THIS TLS.\u201d \u00b7 **Data plane says** \u201cOK \u2014 a `/payment` request just passed through me in 120 ms.\u201d \u00b7 **This dashboard says** \u201c20k req/s, p99 is 1.2 s, and 5xx is rising.\u201d\n\n**What each row reads:** **Edge Overview** + **Data Plane** \u2190 job `envoy` (Envoy proxy stats, gateway:19005 `/stats/prometheus`) \u00b7 **Control Plane** \u2190 job `envoy-gateway` (EG controller, gateway:19001) \u00b7 **Infrastructure** \u2190 process/server metrics from both jobs.\n\nPanels titled **\u201c(cluster \u2014 planned)\u201d** read kube-state / cAdvisor / status-updater metrics that only exist on the Kubernetes cluster \u2014 they are empty locally **by design**; each carries a live local fallback query."
+        "content": "**Control plane says** “traffic to `/payment` must go THERE, with THIS timeout and THIS TLS.” · **Data plane says** “OK — a `/payment` request just passed through me in 120 ms.” · **This dashboard says** “20k req/s, p99 is 1.2 s, and 5xx is rising.”\n\n**What each row reads:** **Edge Overview** + **Data Plane** ← job `envoy` (Envoy proxy stats, gateway:19005 `/stats/prometheus`) · **Control Plane** ← job `envoy-gateway` (EG controller, gateway:19001) · **Infrastructure** ← process/server metrics from both jobs.\n\nPanels titled **“(cluster — planned)”** read kube-state / cAdvisor / status-updater metrics that only exist on the Kubernetes cluster — they are empty locally **by design**; each carries a live local fallback query."
       }
     },
     {
@@ -640,7 +639,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Upstream latency p95 by route",
-      "description": "Per-upstream-cluster request time p95 \u2014 the backend's share of edge latency.",
+      "description": "Per-upstream-cluster request time p95 — the backend's share of edge latency.",
       "datasource": {
         "type": "prometheus",
         "uid": "victoriametrics"
@@ -1153,7 +1152,7 @@
       "id": 16,
       "type": "timeseries",
       "title": "Watchable queue depth by runner",
-      "description": "Unprocessed watchable queue depth per component \u2014 sustained growth means the control plane is not keeping up with config churn.",
+      "description": "Unprocessed watchable queue depth per component — sustained growth means the control plane is not keeping up with config churn.",
       "datasource": {
         "type": "prometheus",
         "uid": "victoriametrics"
@@ -1243,7 +1242,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "xDS snapshot creates / updates",
-      "description": "xDS snapshot cache activity. NOTE: only xds_snapshot_create_total is confirmed in local-stack; xds_snapshot_update_total (and xds_stream_duration_seconds) appear once snapshots update \u2014 query B may be empty.",
+      "description": "xDS snapshot cache activity. NOTE: only xds_snapshot_create_total is confirmed in local-stack; xds_snapshot_update_total (and xds_stream_duration_seconds) appear once snapshots update — query B may be empty.",
       "datasource": {
         "type": "prometheus",
         "uid": "victoriametrics"
@@ -1340,8 +1339,8 @@
     {
       "id": 18,
       "type": "timeseries",
-      "title": "Gateway / HTTPRoute status updates (cluster \u2014 status updater, planned)",
-      "description": "status_update_total{kind} exists only where EG runs with the Kubernetes provider (cluster); local-stack Host mode emits none \u2014 query A stays empty locally. Working local fallback (query B): the provider's *-status watchable queue depths (0 = status work drained).",
+      "title": "Gateway / HTTPRoute status updates (cluster — status updater, planned)",
+      "description": "status_update_total{kind} exists only where EG runs with the Kubernetes provider (cluster); local-stack Host mode emits none — query A stays empty locally. Working local fallback (query B): the provider's *-status watchable queue depths (0 = status work drained).",
       "datasource": {
         "type": "prometheus",
         "uid": "victoriametrics"
@@ -1439,7 +1438,7 @@
       "id": 19,
       "type": "timeseries",
       "title": "Control-plane panics & cert watcher",
-      "description": "Any non-zero panic or cert-read error is actionable. watchable_panics_recovered_total is documented but only appears after a recovered panic \u2014 the `or vector(0)` keeps the series drawable.",
+      "description": "Any non-zero panic or cert-read error is actionable. watchable_panics_recovered_total is documented but only appears after a recovered panic — the `or vector(0)` keeps the series drawable.",
       "datasource": {
         "type": "prometheus",
         "uid": "victoriametrics"
@@ -1651,7 +1650,7 @@
     {
       "id": 22,
       "type": "timeseries",
-      "title": "Memory \u2014 EG process & Envoy server",
+      "title": "Memory — EG process & Envoy server",
       "description": "Control-plane process RSS next to the Envoy server's own memory gauges (both halves share the gateway container).",
       "datasource": {
         "type": "prometheus",
@@ -1883,8 +1882,8 @@
     {
       "id": 24,
       "type": "timeseries",
-      "title": "Pod restarts / HPA / node pressure (cluster \u2014 kube-state + cAdvisor, planned)",
-      "description": "kube-state-metrics / cAdvisor series exist only in the cluster \u2014 empty in local-stack by design (planned). Local fallback: Envoy uptime; a sawtooth means restarts.",
+      "title": "Pod restarts / HPA / node pressure (cluster — kube-state + cAdvisor, planned)",
+      "description": "kube-state-metrics / cAdvisor series exist only in the cluster — empty in local-stack by design (planned). Local fallback: Envoy uptime; a sawtooth means restarts.",
       "datasource": {
         "type": "prometheus",
         "uid": "victoriametrics"

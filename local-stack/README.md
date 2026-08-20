@@ -112,7 +112,7 @@ browsed).
 | API gateway (Envoy) | http://localhost:8080 | Pass-through edge for the application services; the root path has no route, so `/` answers 404 by design |
 | Keycloak | http://localhost:8081 | Two realms: `duynhlab` for customers and `duynhlab-staff` for operators (ADR-050). The origin both SPAs log in against and the `iss` in every token |
 | Temporal Web UI | http://localhost:8233 | Order and checkout workflows |
-| Grafana | http://localhost:3002 | 17 dashboards in three folders: Observability (RED, business, Temporal incl. server row, OTel Collector health, Inventory Service — Stock Authority, Order Saga & Payment — Cutover Baseline), Gateway (3 vendored Envoy boards + Edge SRE Overview), ClickHouse (6, incl. **Server / Engine**); Explore over VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse, and Pyroscope |
+| Grafana | http://localhost:3002 | 17 dashboards in three folders: Observability (RED, business, Temporal incl. server row, OTel Collector health, Inventory Service — Stock Authority, Order Saga & Payment — Cutover Baseline), Gateway (3 vendored Envoy boards + Edge Overview), ClickHouse (6, incl. **Server / Engine**); Explore over VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse, and Pyroscope |
 | VictoriaTraces | http://localhost:10428 | Trace storage, Jaeger query API, and vmui |
 | VictoriaMetrics | http://localhost:8428 | OTLP/remote-write metrics, PromQL, and vmui |
 | VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL — via its own vmui or the Grafana `VictoriaLogs` datasource (plugin installed at container start, needs outbound internet once, like the gateway's Envoy image download) |

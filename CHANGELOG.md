@@ -194,7 +194,7 @@ Skeleton (copy what you need):
 
 #### Observability
 
-- **New dashboard: "Envoy Gateway — Edge SRE Overview"** (uid `eg-edge-sre`,
+- **New dashboard: "Envoy Gateway — Edge Overview"** (uid `eg-edge`, built for the SRE/on-call audience;
   local `— Local` copy + cluster `GrafanaDashboard` CR in folder API Gateway).
   Four rows — Edge Overview (RPS · 5xx rate · p99 · availability), Data Plane
   (per-route rate, 4xx/5xx, latency quantiles, retries/timeouts, connections),

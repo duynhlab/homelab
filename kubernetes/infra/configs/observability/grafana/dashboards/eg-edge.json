@@ -1,11 +1,10 @@
 {
-  "uid": "eg-edge-sre",
-  "title": "Envoy Gateway — Edge SRE Overview",
+  "uid": "eg-edge",
+  "title": "Envoy Gateway — Edge Overview",
   "description": "Edge SRE view of the local-stack Envoy Gateway: golden signals on the data plane (job=envoy, gateway:19005 /stats/prometheus), control-plane health (job=envoy-gateway, gateway:19001), and process-level infrastructure. Cluster-only panels are marked planned.",
   "tags": [
     "envoy-gateway",
-    "edge",
-    "sre"
+    "edge"
   ],
   "timezone": "browser",
   "editable": true,

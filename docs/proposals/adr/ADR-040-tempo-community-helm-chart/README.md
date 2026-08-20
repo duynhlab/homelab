@@ -24,7 +24,7 @@
 | **Supersedes** | [ADR-032](../ADR-032-tempo-operator-monolithic/) (withdrawn before adoption) |
 | **Superseded by** | — |
 | **Implementation tracking** | Follow-up controllers PR (`HelmRelease`) and configs PR (consumer cutover); this PR is docs-only |
-| **Adoption** | Not started |
+| **Adoption** | Partial — phase 1 shipped (HelmRepository + `HelmRelease` #744, chart 2.2.4 #802, image parity 2.10.8 #825); phase 2 (delete the raw manifests, retire the `-config.expand-env` splice) not started |
 
 ## Context
 
@@ -259,8 +259,10 @@ for upstream to ship one would leave the operability gap open indefinitely.
 
 ## Implementation obligations
 
-All rows are **planned** — nothing below has started; the decision is
-recorded ahead of implementation.
+Phase 1 rows (HelmRepository, `HelmRelease`, parallel-run bucket, collector
+exporter, metrics-generator) have **shipped**; the cutover, doc-sync, and
+`-config.expand-env` rows remain **planned**. See the 2026-08-20 amendment for
+what is and is not met.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
@@ -283,6 +285,81 @@ recorded ahead of implementation.
 | Metrics-generator active | VictoriaMetrics query returns `traces_service_graph_request_total > 0` |
 | Trace path intact | E2E: a demo login/checkout trace is findable via the Grafana Tempo datasource against the chart-backed instance |
 | Documentation | Tracing docs and the alert catalog reference this ADR once adoption completes |
+
+## Amendments
+
+### 2026-08-20 — Tempo 3.x is blocked upstream, not by this decision
+
+The decision above is unchanged: Tempo is delivered by the
+`grafana-community/tempo` chart, the raw manifests are replaced at cutover, and
+the phases stand as written. What changes is one sentence of reasoning in
+**Context** and **Consequences** — the claim that "Tempo 3.x is a values
+change, not a mechanism change". Today it is neither: **there is nothing on 3.x
+to point the values at.**
+
+A Renovate major PR (#694, `grafana/tempo` 2.10.8 → 3.0.3) forced the question.
+Investigating it produced three findings.
+
+**1. The single-binary chart has no 3.x appVersion.** The registered
+`grafana-community` HelmRepository's index carries `tempo` chart **2.2.4 with
+appVersion 2.10.8 as its latest release**. Only `tempo-distributed` is on
+3.0.3 — and that is Option D above, rejected on footprint. So the chart family
+does *not* in fact "cover both eras" for our shape; the single-binary chart is
+still a 2.x chart. Pinning `tempo.tag: "3.x"` under a 2.x chart would run a
+3.x binary against a 2.x-templated config, which is the opposite of a
+values-only change.
+
+**2. Tempo 3.0 is a config migration, not an image bump.** The monolithic 3.0
+migration requires **deleting** the `ingester:` and `compactor:` blocks — both
+removed modules. Our raw config has both, and the compactor block is where the
+platform's **168h (7-day) block retention** lives, so the migration has to
+re-home that value, not just drop the block. Two things that would have been
+worse are *not* problems here: `metrics_generator` carries over unchanged (we
+use no `local_blocks` processor and no `metrics_generator_client`), and the raw
+config has no `overrides:` block, so the 3.0 legacy-overrides startup failure
+does not apply. The block-format prerequisite is met, but **only by implicit
+default**: we set no `storage.trace.block.version`, and 2.10's default is
+already vParquet4. If a 3.x migration is ever attempted, pin that field
+explicitly first so the prerequisite survives a chart or image default change.
+
+**3. Merging #694 would have destroyed the parallel run this ADR depends on.**
+#694 edits only the raw `Deployment` image. That file is exactly what phase 2
+deletes, so the bump is work on a doomed file — and worse, it would break the
+image-identical comparison the parallel run exists to provide (#825 bumped the
+chart tag to 2.10.8 specifically to establish that parity). **Disposition: not
+merged**; recommend closing as superseded by phase 2.
+
+**Guard now in place.** `.renovaterc.json5` gains a `packageRules` entry
+holding `grafana/tempo` (docker datasource) to `allowedVersions: "<3"`, with
+the reason inline. The repo previously had no `packageRules` at all — the major
+PR appeared because `extends` includes `docker:enableMajor` and nothing scoped
+it. The `tempo-chart` HelmRelease tag comment claimed Renovate bumps that tag;
+it never has (the helm-values manager has no `repository` sibling to key on),
+and #825 was a hand bump. That comment is corrected in the same change.
+
+**Phase-1 obligation not met.** Recording it here rather than silently: the
+obligation to drop the `-config.expand-env` splice in favour of chart-native
+env handling is **not satisfied**. The shipped HelmRelease still sets
+`extraArgs: {"config.expand-env": "true"}` and still carries `${ACCESS_KEY_ID}`
+/ `${ACCESS_SECRET_KEY}` placeholders in its storage values. The "Positive
+consequences" bullet claiming that splice is replaced is therefore still
+aspirational, and closing it belongs to phase 2.
+
+| Claim | Evidence |
+|-------|----------|
+| Two Tempo installs deployed, both 2.10.8 | `kubernetes/infra/controllers/tracing/tempo/deployment.yaml:20` (`grafana/tempo:2.10.8`); `tempo-chart/helmrelease.yaml:38` (`tag: "2.10.8"`) |
+| Both in the Flux wave, but only the raw one is health-checked | `kubernetes/infra/controllers/tracing/kustomization.yaml`; `kubernetes/clusters/local/tracing.yaml:37-41` health-checks `Deployment/tempo` only |
+| Collector fans to both; Grafana still reads the raw Service | `tracing/otel-collector/otel-collector.yaml:42-51` + `:148-149`; `datasource-tempo.yaml:27` |
+| Removed modules present in the raw config | `tempo/configmap.yaml:21-22` (`ingester`), `:62-65` (`compactor`, holding `block_retention: 168h`) |
+| Block format is vParquet4 by implicit default | No `storage.trace.block.version` anywhere in `tempo/configmap.yaml` or `helmrelease.yaml` |
+| `-config.expand-env` splice still in place | `tempo/deployment.yaml:23`; `tempo-chart/helmrelease.yaml:47-48` |
+| Major PR was unscoped, not intentional | `.renovaterc.json5` `extends: ["docker:enableMajor", …]`, no `packageRules` before this change |
+
+**Adoption corrected to Partial.** Phase 1 demonstrably shipped —
+HelmRepository + HelmRelease (#744), chart 2.2.4 (#802), tag parity 2.10.8
+(#825) — so `Not started` was stale. This is a statement of fact about
+implementation, not a change to the decision; `Status` stays **Proposed**
+pending owner review.
 
 ## Revisit triggers
 
@@ -323,6 +400,7 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Initial draft; supersedes ADR-032 |
+| 2026-08-20 | Proposed / Partial | Adoption corrected to Partial (phase 1 shipped: #744, #802, #825). Amended: Tempo 3.x is blocked upstream — the single-binary chart has no 3.x appVersion and 3.0 needs an `ingester`/`compactor` config migration; Renovate PR #694 not merged; `grafana/tempo` held to `<3` in `.renovaterc.json5`; one phase-1 obligation (`-config.expand-env`) recorded as unmet |
 
 ---
-_Last updated: 2026-08-10_
+_Last updated: 2026-08-20_

@@ -902,6 +902,17 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Tempo is held on 2.x, and the tag comment no longer lies about it.**
+  Renovate's `grafana/tempo` 3.0.3 major (#694) was unscoped by
+  `docker:enableMajor` — the repo had no `packageRules` at all. Tempo 3.0
+  removes the `ingester`/`compactor` modules (where our 168h `block_retention`
+  lives) and the single-binary `grafana-community/tempo` chart has no 3.x
+  appVersion to migrate to, so `grafana/tempo` is now pinned `<3` in
+  `.renovaterc.json5`. The `tempo-chart` tag comment claimed Renovate bumps
+  that tag; it never has — corrected to say it is hand-maintained in lockstep
+  with the raw Deployment. Recorded as an [ADR-040](docs/proposals/adr/ADR-040-tempo-community-helm-chart/README.md)
+  amendment, which also flips its Adoption to Partial (phase 1 shipped) and
+  logs the unmet `-config.expand-env` obligation.
 - **RED Span Metrics board: the overview row is whole again.** The stat row
   had only two w=6 panels (Rate + Errors) with the right half of the row
   empty — and no Duration stat on a board named RED. Now four even stats:

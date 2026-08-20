@@ -415,7 +415,7 @@ and extend Adoption instead.
 | [ADR-037](ADR-037-per-request-refund-identity/) | Let the caller name each refund | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
 | [ADR-038](ADR-038-shared-http-middleware/) | Promote the HTTP tracing and logging middleware into `pkg/httpmw` | Accepted | Partial | [RFC-0014](../rfc/RFC-0014/) |
 | [ADR-039](ADR-039-local-stack-temporal-server-postgres/) | Run local-stack Temporal as `temporalio/server` on Postgres with admin-tools | Accepted | Complete | [RFC-0021](../rfc/RFC-0021/) |
-| [ADR-040](ADR-040-tempo-community-helm-chart/) | Deliver Tempo through the `grafana-community/tempo` Helm chart | Proposed | Not started | — |
+| [ADR-040](ADR-040-tempo-community-helm-chart/) | Deliver Tempo through the `grafana-community/tempo` Helm chart | Proposed | Partial | — |
 | [ADR-041](ADR-041-keycloak-platform-idp/) | Adopt Keycloak as the platform identity provider and retire auth-service | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) |
 | [ADR-042](ADR-042-oidc-sub-as-user-id/) | Use the OIDC subject as the application `user_id`, as a string, fleet-wide | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) |
 | [ADR-043](ADR-043-oidc-browser-workload-trust/) | Authenticate browsers via OIDC; keep east-west trust workload-level | Accepted | Partial | [RFC-0022](../rfc/RFC-0022/) |

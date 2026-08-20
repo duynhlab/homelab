@@ -1470,6 +1470,9 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- tempo-chart values `tempo.tag` 2.10.7 → **2.10.8** — the parallel ADR-040
+  install now runs the same image as the raw Deployment (#737), so the
+  side-by-side comparison is image-identical.
 - **ClickHouse 25.3 → 25.12** (`clickhouseinstallation.yaml` + local-stack
   `otel` DB, #739): stepping-stone bump back inside ClickHouse's one-year
   compatibility window before the 26.x major (#734, held). Gated on a full

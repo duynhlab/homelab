@@ -9,7 +9,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 |---|---|
 | **Status** | **Deployed** — local-stack + cluster (RFC-0019 Phase B) |
 | **Role** | **Supplementary** OLAP for logs+traces SQL. Runs **alongside** VictoriaLogs / Tempo / VictoriaTraces (day-to-day ops primaries), which are **unchanged** |
-| **Engine** | `clickhouse/clickhouse-server:25.12`, MergeTree, single shard × single replica |
+| **Engine** | `clickhouse/clickhouse-server:26.7`, MergeTree, single shard × single replica |
 | **Operator** | Altinity `clickhouse-operator` `0.27.3` + a `ClickHouseInstallation` CR |
 | **Ingest** | OTel Collector contrib `clickhouse` exporter — fan-out on the **traces + logs** pipelines (metrics stay on VictoriaMetrics — **never** here) |
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), auto-created by the exporter (`create_schema`) |
@@ -193,7 +193,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 
 | Aspect | Detail |
 |--------|--------|
-| **Engine** | `clickhouse/clickhouse-server:25.12`, MergeTree, 1 shard × 1 replica |
+| **Engine** | `clickhouse/clickhouse-server:26.7`, MergeTree, 1 shard × 1 replica |
 | **Operator** | Altinity `altinity-clickhouse-operator` `0.27.3` (HelmRelease in the `controllers` wave, ns `monitoring`); CRDs health-checked before the CHI applies (`kubernetes/infra/controllers/clickhouse-operator/`) |
 | **Instance** | `ClickHouseInstallation` `clickhouse` (cluster `otel`) → StatefulSet `chi-clickhouse-otel-0-0`; own Flux Kustomization `clickhouse-local` `dependsOn [controllers-local, secrets-local]` (`kubernetes/infra/configs/clickhouse/`) |
 | **Storage** | PVC `standard` `10Gi` (`volumeClaimTemplates`); local-stack uses an ephemeral `clickhouse-data` volume |

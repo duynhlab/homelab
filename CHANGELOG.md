@@ -1541,6 +1541,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The VictoriaMetrics family moves as one reviewed set** (#731, #732, #733,
+  #807, #808): victoria-metrics + vmagent + vmalert **v1.150.0**,
+  victoria-logs **v1.52.0**, victoria-traces **v0.9.4 → v0.11.0** (the CR and
+  the compose image together, so cluster and local stay in lockstep on the
+  trace pilot). Worth taking rather than cosmetic: v1.150.0 fixes vmagent
+  persistent-queue corruption on unclean shutdown and carries two Go
+  CVE rebuilds, v1.52.0 restores LogsQL bare-filter pipes that v1.51.0
+  rejected (verified live — the previously-failing query shape now parses),
+  and VictoriaTraces 0.10 moved to a distroless base (no shell; nothing in
+  either stack execs into it). Gated on a full from-scratch E2E audit: A
+  20/20 + A13 timer, B 10/10, C 21/21 with the Jaeger query API, the Grafana
+  datasource, and all five bumped containers' logs verified clean. Docs now
+  state the deliberate skew honestly: the compose VM/VL pins run **ahead** of
+  the cluster's operator defaults until the operator's own defaults move.
 - **ClickHouse 25.12 → 26.7** (#734) — the deliberate major hop the 25.12
   stepping stone (#739) staged. Gated on a full from-scratch E2E audit run
   together with the Keycloak bump: version 26.7.4.58 live, ingest flowing,

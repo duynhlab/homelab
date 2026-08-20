@@ -346,11 +346,18 @@ trace pilot remains explicit so a future operator bump cannot move it silently.
 | Layer | Version | Pin source |
 |-------|---------|------------|
 | VM Operator | chart `0.66.2`, app `v0.73.1` | Flux `OCIRepository` |
-| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | `v1.147.0` | operator defaults; single-node image explicit in local-stack |
-| VictoriaLogs (`VLSingle`) | `v1.51.0` | operator defaults; single-node image explicit in local-stack |
-| VictoriaTraces (`VTSingle`) | `v0.9.4` | explicit CR and local-stack image |
+| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.147.0`, local-stack `v1.150.0` | operator defaults on the cluster; the three compose images are pinned explicitly and now run **ahead** — see the skew note below |
+| VictoriaLogs (`VLSingle`) | cluster `v1.51.0`, local-stack `v1.52.0` | same shape: operator default vs the explicit compose image |
+| VictoriaTraces (`VTSingle`) | `v0.11.0` | explicit CR and local-stack image |
 | Grafana VM / VL datasources | `v0.25.2` / `v0.29.0` | Grafana CR and datasource CRs |
 | VM / VL MCP charts | `0.3.0` / `0.1.0` | Flux `OCIRepository` |
+
+**The local-stack VM images run ahead of the cluster on purpose.** The compose
+pins take upstream bugfixes as soon as they are gated here (v1.150.0 carries a
+vmagent persistent-queue corruption fix, v1.52.0 restores LogsQL bare-filter
+pipes that v1.51.0 rejected); the cluster follows whenever the VM operator's
+defaults move. The trace pilot stays in lockstep instead — `VTSingle` is pinned
+by an explicit CR, so `v0.11.0` is the version in both places.
 
 The standalone `victoria-metrics-operator-crds` chart `0.13.1` targets the
 same operator `v0.73.1`, but is not installed here: the operator chart already
@@ -366,7 +373,7 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | Grafana | monitoring | `grafana-service` | 3000 | Dashboards and visualization |
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger` | 16686 | Trace query UI (alternative to Tempo) |
-| VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.9.4`, OTLP HTTP + Jaeger query API) |
+| VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.11.0`, OTLP HTTP + Jaeger query API) |
 | OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (Tempo/Jaeger/VT + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
 | Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, the edge's access log, PG plans, frontend); app logs go OTLP |

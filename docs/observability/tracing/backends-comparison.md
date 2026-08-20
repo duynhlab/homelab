@@ -2,7 +2,7 @@
 
 A decision-oriented comparison of the three tracing backends on this platform. **All three now run**
 — the OTel Collector fans the same traces to each: **Tempo** + **Jaeger** are the established pair,
-and **VictoriaTraces** is deployed as a **pilot 3rd backend** (`VTSingle`, image `v0.9.4`) to evaluate
+and **VictoriaTraces** is deployed as a **pilot 3rd backend** (`VTSingle`, image `v0.11.0`) to evaluate
 the "consolidate tracing into the VM operator" story. See [victoriatraces.md](victoriatraces.md).
 
 > **TL;DR** — **Tempo** is the durable backend (object storage on **RustFS**, TraceQL, native Grafana
@@ -19,7 +19,7 @@ flowchart LR
   Apps["10 services + 2 workers<br/>OTel SDK"] -->|OTLP| OC["OTel Collector"]
   OC -->|otlp/tempo| T["Tempo 2.10.8<br/>(durable · RustFS S3)"]
   OC -->|otlp/jaeger| J["Jaeger v2 all-in-one<br/>(in-memory · ephemeral)"]
-  OC -->|otlphttp/victoriatraces| V["VictoriaTraces v0.9.4<br/>(pilot · VLogs engine)"]
+  OC -->|otlphttp/victoriatraces| V["VictoriaTraces v0.11.0<br/>(pilot · VLogs engine)"]
   T --> G["Grafana (TraceQL +<br/>traces↔logs↔metrics)"]
   J --> JU["Jaeger UI"]
   V --> G
@@ -42,7 +42,7 @@ pilot (see [victoriatraces.md](victoriatraces.md)).
 
 | Dimension | **Grafana Tempo** | **Jaeger** | **VictoriaTraces** |
 |-----------|-------------------|------------|--------------------|
-| Maturity | Mature, GA | Mature, GA (v2 = OTel-Collector distro) | **`v0.9.4` — 0.x, pre-GA (piloted here)** |
+| Maturity | Mature, GA | Mature, GA (v2 = OTel-Collector distro) | **`v0.11.0` — 0.x, pre-GA (piloted here)** |
 | Storage | **Object storage** (S3/GCS/Azure/local) — uses **RustFS** here | memory / badger / ES / OpenSearch / Cassandra / ClickHouse — **no object storage** | stores traces in the **VictoriaLogs engine**; **no object storage needed** |
 | Ingestion | OTLP, Jaeger, Zipkin | OTLP (v2), Jaeger, Zipkin | **OTLP only** |
 | Query | **TraceQL** (scoped attrs + structural operators `>>`/`~`) | tag / duration / service filters (no query language) | **LogsQL** + **Jaeger and partial Tempo/TraceQL search APIs**; no TraceQL metrics/pipelines |
@@ -65,14 +65,14 @@ The platform already runs the **VictoriaMetrics Operator** (VMSingle/VMAgent/VMA
   comparison** UI, not the system of record.
 - **VictoriaTraces** is the *consolidation* play: tracing would join metrics + logs under one
   operator, one ops model, one query family (**LogsQL**), with no object-storage dependency.
-  Against that: **`v0.9.4`** (0.x, pre-GA) and **partial TraceQL API
+  Against that: **`v0.11.0`** (0.x, pre-GA) and **partial TraceQL API
   coverage** (no metrics/pipelines) — and Grafana sees it as a **Jaeger
   datasource**, so existing Tempo/TraceQL correlation links would be re-pointed.
 
 ## Recommendation / roadmap
 
 1. **Now:** **Tempo** is the durable backend (RustFS S3, 7-day retention); **Jaeger** in-memory is
-   the secondary learning UI; **VictoriaTraces** (`VTSingle` v0.9.4) is **deployed as a pilot 3rd
+   the secondary learning UI; **VictoriaTraces** (`VTSingle` v0.11.0) is **deployed as a pilot 3rd
    backend** (drop-in operator CRD, no object-storage dependency) — see
    [victoriatraces.md](victoriatraces.md). Evaluate LogsQL-trace querying + the Jaeger-datasource
    correlation on real data.
@@ -88,4 +88,7 @@ The platform already runs the **VictoriaMetrics Operator** (VMSingle/VMAgent/VMA
 - Grafana Tempo: <https://grafana.com/docs/tempo/latest/> · Jaeger: <https://www.jaegertracing.io/docs/> · VictoriaTraces: <https://docs.victoriametrics.com/victoriatraces/>
 
 ---
-_Last updated: 2026-07-14 — VictoriaTraces v0.9.4 compatibility and query coverage review._
+_Last updated: 2026-08-20 — image bumped v0.9.4 → v0.11.0 (Jaeger query API and the
+Grafana datasource re-verified on the compose E2E gate); the TraceQL-coverage
+assessment below still dates from the v0.9.4 review — no upstream change claims to
+close that gap._

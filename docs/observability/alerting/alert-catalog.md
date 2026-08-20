@@ -27,10 +27,10 @@ watchdog; up 4 from the previous 198 — the identity observability slice grew
 keycloak 2 → 5 (§2b) and envoy-gateway 11 → 12 (`EdgeAuthDeniedRatioHigh`). At
 the prior count the total was unchanged only by coincidence — the
 RFC-0024 P2.3 cutover retired kong's 13 for envoy-gateway's 11, and the 2
-keycloak alerts from P1 were missing from the previous breakdown), plus **64 Sloth-generated** SLO
-burn-rate alerts (2 × 32 SLOs). The 32 SLOs cover all 11 Go services: 30 rendered
-by the `mop` chart through the five domain ResourceSets, plus inventory's 2
-hand-written gRPC SLOs. Two CNPG topology rules are **gated** (not
+keycloak alerts from P1 were missing from the previous breakdown), plus **68 Sloth-generated** SLO
+burn-rate alerts (2 × 34 SLOs). The 34 SLOs cover all 11 Go services plus Keycloak:
+30 rendered by the `mop` chart through the five domain ResourceSets, plus inventory's 2
+hand-written gRPC SLOs and Keycloak's 2 hand-written identity SLOs. Two CNPG topology rules are **gated** (not
 deployed) and a subset is **inactive on Kind** (platform limitations) — both
 marked inline below.
 
@@ -52,7 +52,7 @@ had been deployed but never listed here.
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
 | [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
-| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 64 (generated) | Error-budget burn across all 11 services (10 HTTP × 3 SLOs + inventory × 2 gRPC SLOs) |
+| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 68 (generated) | Error-budget burn across all 11 services + Keycloak (10 HTTP × 3 SLOs + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs) |
 
 ---
 
@@ -554,12 +554,13 @@ Runbooks: one per alert under
 ## SLO burn-rate alerts (Sloth-generated)
 
 Almost never hand-written: the `mop` chart renders a `PrometheusServiceLevel` CR per service
-(which is why `grep PrometheusServiceLevel` in this repo finds only inventory's), and the
+(which is why `grep PrometheusServiceLevel` in this repo finds only inventory's and keycloak's), and the
 **Sloth operator** expands each into recording rules + **2 burn-rate alerts per SLO**. Detail:
 [slo-burn-rate-alerts.md](./slo-burn-rate-alerts.md), [SLO hub](../slo/README.md).
 
-- **32 SLOs → 64 alerts** = 10 HTTP services × 3 (chart-rendered) + inventory × 2
-  (hand-written, gRPC). Chart SLOs: **Availability** (99.5%, non-5xx ratio), **Latency**
+- **34 SLOs → 68 alerts** = 10 HTTP services × 3 (chart-rendered) + inventory × 2
+  (hand-written, gRPC) + keycloak × 2 (hand-written, identity). Chart SLOs:
+  **Availability** (99.5%, non-5xx ratio), **Latency**
   (95% < 500ms), **Error rate** (99%, non-4xx/5xx) — all from
   `http_server_request_duration_seconds`, against a **30-day** error budget.
 - **inventory is the exception** (2026-08-06): gRPC-only, so its three chart SLOs measured a
@@ -567,6 +568,13 @@ Almost never hand-written: the `mop` chart renders a `PrometheusServiceLevel` CR
   `grpc-availability` (99.9%, server faults only) and `reserve-latency`
   (`Reserve` p95 < 250 ms, RFC-0021 targets) on `rpc_server_call_duration_seconds`:
   `InventoryGrpcHighErrorRate`, `InventoryReserveHighLatency`.
+- **keycloak joined 2026-08-20**: not a mop-chart service (deployed from
+  `kubernetes/infra/controllers/keycloak`), so its SLOs are hand-written too
+  (`sloth/keycloak-login-slo.yaml`) — `login-availability` (99.9%, login events with a
+  non-empty `error` label; Keycloak has **no** login_error event) and `auth-latency`
+  (95% of `/realms/*` requests < 250 ms) on `keycloak_user_events_total` /
+  `http_server_requests_seconds`: `KeycloakLoginHighErrorRate`, `KeycloakAuthHighLatency`.
+  Closed the last identity-observability gap row (below).
 - **Page alert** — fast burn (14.4× over 1h, confirmed on 5m) → on-call.
 - **Ticket alert** — slow burn (6× over 6h, confirmed on 30m) → business hours.
 
@@ -611,7 +619,7 @@ implemented yet — they are recommendations.
 | KubeContainerWaiting | Kubernetes | `kube_pod_container_status_waiting_reason>0` >1h | warning | `ImagePullBackOff` (wrong SHA) never crash-loops → unalerted | general (k8s mixin) |
 | ~~KongRateLimitExceeded / Kong4xxSurge~~ ✅ superseded by `Edge429RatioHigh` (§2, RFC-0024 cutover) | Edge | local rate-limit `rate_limited` ratio | warning | Abusive client / misfiring rate-limit now alerts at the Envoy edge | ✅ shipped |
 | KubeStateMetricsListErrors / KSM TargetDown | Meta | KSM watch/list error rate; `up{kube-state-metrics}==0` | warning | KSM down → all KSM-sourced k8s alerts silently stop | general (KSM mixin) |
-| Keycloak login SLO | Identity | `keycloak_user_events_total` — the §2b alerts and the Keycloak Identity dashboard shipped with the identity observability slice, but no Sloth SLO covers the identity provider yet | — | Login success has no error budget; the burn-rate page layer stops at the edge | identity observability slice |
+| ~~Keycloak login SLO~~ ✅ shipped as `keycloak-login` (`sloth/keycloak-login-slo.yaml`, 2026-08-20) | Identity | `login-availability` 99.9% on `keycloak_user_events_total{event="login",error!=""}` + `auth-latency` 95% < 250 ms on `/realms/*` — 2 SLOs × 2 burn-rate alerts | page/ticket | Login success now has an error budget; the burn-rate page layer covers the identity provider | identity observability slice |
 
 ### Already-tracked DB gaps (from the DR review)
 
@@ -636,4 +644,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._
+_Last updated: 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._

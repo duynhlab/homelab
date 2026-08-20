@@ -57,7 +57,7 @@ For a deeper derivation see the [SRE Workbook chapter on alerting on SLOs](https
 
 ## 2. What Sloth generates per SLO
 
-Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules** + **2 alerts per SLO**. With 10 HTTP services covered by 3 SLOs each (availability, latency, and error rate) and inventory by 2 gRPC SLOs, that is **32 SLOs / 64 alerts**.
+Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules** + **2 alerts per SLO**. With 10 HTTP services covered by 3 SLOs each (availability, latency, and error rate), inventory by 2 gRPC SLOs, and Keycloak by 2 hand-written identity SLOs (`login-availability`, `auth-latency` — [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml)), that is **34 SLOs / 68 alerts**.
 
 ### Recording rules (per SLO, per window)
 
@@ -244,4 +244,4 @@ open http://karma.duynh.me
 - [Sloth](https://github.com/slok/sloth) — generator details and alert overrides (the sloth.dev docs site no longer serves the alerts page)
 
 ---
-_Last updated: 2026-08-13 — traffic-generation note corrected to "via the edge"_
+_Last updated: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (32 → 34 SLOs, 64 → 68 alerts)_

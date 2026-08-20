@@ -309,7 +309,7 @@ docs/observability/
 │
 ├── alerting/                     # Alerting rules
 │   ├── README.md                 # 2-layer alerting strategy
-│   ├── alert-catalog.md          # Full alert reference (198 static + 64 SLO burn-rate) + coverage gaps
+│   ├── alert-catalog.md          # Full alert reference (198 static + 68 SLO burn-rate) + coverage gaps
 │   ├── slo-burn-rate-alerts.md   # SLO burn-rate methodology + config
 │   └── dashboard-comparison.md   # Alerting/dashboard tooling comparison
 │

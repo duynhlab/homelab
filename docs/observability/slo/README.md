@@ -158,8 +158,9 @@ slo:
 
 ## Services
 
-All eleven services are SLO-enabled. Ten take the chart's HTTP SLOs; inventory
-is the one exception, and the reason is in the row.
+All eleven services are SLO-enabled, plus Keycloak. Ten services take the
+chart's HTTP SLOs; inventory and Keycloak are the exceptions, and the reasons
+are in their rows.
 
 | Service | Namespace | SLOs | SLI metric | Source |
 |---|---|---|---|---|
@@ -174,9 +175,11 @@ is the one exception, and the reason is in the row.
 | checkout | checkout | 3 | HTTP | chart, `slo.enabled: true` |
 | payment | payment | 3 | HTTP | chart, `slo.enabled: true` |
 | **inventory** | inventory | **2** | **gRPC** | hand-written [`inventory-grpc-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml); chart SLO off via `slo_disabled` |
+| **keycloak** | identity | **2** | **Keycloak events + HTTP** | hand-written [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml); Keycloak is platform infra, not a mop-chart service |
 
-**Total: 32 SLOs → 64 burn-rate alerts** — 30 chart-rendered (10 services × 3)
-plus inventory's 2 hand-written ones, through the five domain ResourceSets.
+**Total: 34 SLOs → 68 burn-rate alerts** — 30 chart-rendered (10 services × 3)
+through the five domain ResourceSets, plus inventory's 2 and Keycloak's 2
+hand-written ones.
 
 Until 2026-08-06 the count was 33 (11 × 3), but inventory's three were **dead**:
 the chart builds HTTP SLIs and inventory serves gRPC only (no Kong route,
@@ -269,4 +272,4 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - [Google SRE Workbook -- Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)
 
 ---
-_Last updated: 2026-08-13 — Sloth UI exposure documented as the edge HTTPRoute (envoy-gateway/routes/monitoring.yaml)_
+_Last updated: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (34 SLOs / 68 burn-rate alerts)_

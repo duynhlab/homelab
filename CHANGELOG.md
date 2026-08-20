@@ -841,6 +841,17 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`inventory:rpc_error:ratio5m` recorded nothing on a healthy service.** The
+  numerator filters `rpc_response_status_code!="OK"`, and a service that has
+  never returned an error has no such series — empty / denominator is empty,
+  so the rule (and its dashboard panel) showed no-data forever instead of a
+  flat 0. The expr now carries an `or <denominator> * 0` arm, recording an
+  explicit 0 per active RPC method (verified live: the fixed expr returns
+  `BatchGetAvailability = 0` under traffic where the old one returned no
+  series). Applied to both the cluster PrometheusRule and the vendored
+  local-stack vmalert copy; the two p95 rules were re-verified correct — they
+  record under traffic and are NaN-while-idle by histogram semantics, now
+  documented in the rule comments.
 - **Observability docs cleanup: the microservices hub dissolved, three pushed
   session artifacts deleted.** `runbooks/microservices-alerts.md` is gone — its
   unique content (4 cross-signal investigation workflows, threshold-tuning

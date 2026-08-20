@@ -1,0 +1,92 @@
+# Grafana MCP Server — AI-assisted Grafana querying
+# Chart: oci://ghcr.io/grafana-community/helm-charts/grafana-mcp
+# Docs: https://github.com/grafana/mcp-grafana
+#
+# Exposes Grafana's own APIs to AI assistants via MCP: dashboard and
+# datasource search, PromQL/LogsQL queries through the configured
+# datasources, alert-rule reads, Sift/incident reads, Pyroscope profiles.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana-mcp
+  namespace: monitoring
+spec:
+  interval: 30m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: grafana-mcp-oci
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    grafana:
+      url: "http://grafana-service.monitoring.svc:3000"
+      # Service-account token minted by the Grafana Operator from the
+      # GrafanaServiceAccount CR (configs/observability/grafana/
+      # grafana-service-account-mcp.yaml). The operator always writes the
+      # value under the `token` key, and only ever into its own namespace —
+      # which is why this release lives in `monitoring` beside Grafana.
+      # The chart maps this to GRAFANA_SERVICE_ACCOUNT_TOKEN (the
+      # GRAFANA_API_KEY name it is called after upstream is deprecated).
+      apiKeySecret:
+        name: grafana-mcp-token
+        key: token
+
+    # Read-only: refuses every write tool regardless of what the token could
+    # do. Paired with role Viewer on the service account, so a prompt cannot
+    # edit dashboards or silence alerts even by accident.
+    disableWrite: true
+
+    # The image ENTRYPOINT hardcodes `--transport sse --address 0.0.0.0:8000`,
+    # so `command` replaces it outright and every flag below is authoritative
+    # (verified with `helm template`: args render after the chart's own
+    # --disable-write, and no sse flag survives).
+    command: ["/app/mcp-grafana"]
+    extraArgs:
+      - --transport=streamable-http
+      - --address=0.0.0.0:8000
+      # Host-header validation is enforced on EVERY route (/mcp, /healthz,
+      # /metrics) and defaults to localhost only — without this list, in-cluster
+      # and gateway traffic both get 403. Keep the gateway hostname in sync with
+      # routes/mcp.yaml.
+      - --allowed-hosts=grafana-mcp.monitoring.svc.cluster.local:8000,grafana-mcp.monitoring.svc:8000,grafana-mcp:8000,grafana-mcp.duynh.me
+
+    service:
+      type: ClusterIP
+      port: 8000
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    # tcpSocket, not httpGet: kubelet sends the pod IP as the Host header, which
+    # the allowed-hosts check above would reject with a 403 — upstream documents
+    # tcpSocket (or a wildcard host list) as the way out.
+    livenessProbe:
+      tcpSocket:
+        port: mcp-http
+      initialDelaySeconds: 15
+      periodSeconds: 30
+      failureThreshold: 5
+    readinessProbe:
+      tcpSocket:
+        port: mcp-http
+      initialDelaySeconds: 5
+      periodSeconds: 15
+      failureThreshold: 5
+
+    # Same reason as the VictoriaMetrics MCP: metrics stay off, so no
+    # ServiceMonitor is generated and no scrape pool sits permanently empty.
+    metrics:
+      enabled: false
+    serviceMonitor:
+      enabled: false

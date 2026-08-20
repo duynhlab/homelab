@@ -1,0 +1,17 @@
+---
+# OCIRepository for the Grafana MCP Server chart
+# Chart: oci://ghcr.io/grafana-community/helm-charts/grafana-mcp
+# Docs: https://github.com/grafana/mcp-grafana
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: grafana-mcp-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/grafana-community/helm-charts/grafana-mcp
+  ref:
+    # Chart 0.20.0 ships mcp-grafana 1.1.0 (the appVersion drives the image tag).
+    semver: "0.20.0"

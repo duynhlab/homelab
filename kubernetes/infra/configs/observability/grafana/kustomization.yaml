@@ -12,4 +12,5 @@ resources:
   - datasource-clickhouse.yaml
   - datasource-victoriametrics.yaml
   - datasource-victoriametrics-prometheus.yaml
+  - grafana-service-account-mcp.yaml
   - dashboards/

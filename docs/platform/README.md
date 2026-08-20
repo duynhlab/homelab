@@ -99,7 +99,7 @@ specific Kustomization or run `make sync`.
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |
 | [`gitflow.md`](gitflow.md) | Branching and release policy (**target** — prod cluster TBD) |
 | [`kyverno.md`](kyverno.md) | Admission policy tiers, Audit→Enforce, PolicyExceptions |
-| [`mcp-servers.md`](mcp-servers.md) | VictoriaMetrics/Logs/Flux MCP servers for AI-assisted ops |
+| [`mcp-servers.md`](mcp-servers.md) | VictoriaMetrics/Logs/Flux/Grafana MCP servers for AI-assisted ops |
 | [`sonarcloud.md`](sonarcloud.md) | Per-repo SonarCloud keys and coverage gates |
 | [`ruleset-automation.md`](ruleset-automation.md) | Org-wide GitHub Ruleset automation via gh-patcher |
 | [`gke-internal-dns.md`](gke-internal-dns.md) | **Reference only** — GKE + Cloud DNS patterns; not homelab topology |

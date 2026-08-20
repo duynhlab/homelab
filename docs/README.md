@@ -133,7 +133,7 @@ docs/
 │   ├── envoy-gateway.md          # Platform edge — Gateway API resource model, both provider modes, edge telemetry
 │   ├── kong-gateway.md           # Archived — the platform's previous API gateway
 │   ├── kyverno.md                # Kyverno admission-policy platform guide
-│   ├── mcp-servers.md            # MCP servers wired into the platform
+│   ├── mcp-servers.md            # 4 MCP servers wired into the platform
 │   └── ruleset-automation.md     # GitHub ruleset automation
 ├── secrets/                      # Secrets, TLS & trust distribution (one chain)
 │   ├── README.md                 # Homelab secrets/TLS/trust hub
@@ -462,7 +462,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Identity Cutover Runbook](./platform/identity-cutover-runbook.md) - RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm)
 - [Graceful Shutdown](./api/graceful-shutdown.md) - Cross-service shutdown contract: readiness drain + signal handling (moved to `docs/api/`)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
-- [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics, VictoriaLogs, Flux Operator) behind the edge
+- [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics, VictoriaLogs, Flux Operator, Grafana) behind the edge
 - [Ruleset Automation](./platform/ruleset-automation.md) - GitHub repo ruleset provisioning
 
 ### Secrets

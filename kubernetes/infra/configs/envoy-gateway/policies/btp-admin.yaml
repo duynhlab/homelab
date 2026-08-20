@@ -9,8 +9,8 @@
 # rule made these policies invalid rather than stricter. See btp-api.yaml for
 # the full reasoning.
 #
-# Targets exactly the admin surfaces that need it: the monitoring UIs, both
-# MCP servers in monitoring, flux-ui + flux-mcp, rustfs-console,
+# Targets exactly the admin surfaces that need it: the monitoring UIs, the
+# three MCP servers in monitoring, flux-ui + flux-mcp, rustfs-console,
 # openbao-ui. One BTP per namespace (targetRefs are same-namespace only).
 # No requestBuffer / resilience block on these surfaces — out of scope for
 # admin UIs.
@@ -61,6 +61,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: victoria-logs-mcp
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: grafana-mcp
   rateLimit:
     type: Local
     local:

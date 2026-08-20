@@ -69,6 +69,26 @@ Before the first `make up`, one host-side prerequisite must be in place:
    sudo ./scripts/setup-hosts.sh remove    # cleans it up
    ```
 
+2. **Podman instead of Docker (macOS)** — `kind-up.sh` speaks the Docker CLI, so
+   export the podman socket as `DOCKER_HOST` and opt into kind's podman
+   provider. Two kernel settings inside the podman machine are load-bearing;
+   both were found the hard way on the 2026-08-20 bring-up:
+   ```bash
+   export KIND_EXPERIMENTAL_PROVIDER=podman
+   export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')"
+   # kind-up.sh maps container 30080/30443 -> host 80/443; rootless podman
+   # refuses privileged ports, failing at "Preparing nodes" with
+   # "rootlessport cannot expose privileged port 80".
+   podman machine ssh 'sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80'
+   # Each container claims a session keyring and the default quota is 200 keys
+   # per user, which the full platform exhausts: CNPG's postgres container
+   # crash-loops with exit 128 and "unable to join session keyring:
+   # disk quota exceeded" — a runtime error, not a Postgres or manifest fault.
+   podman machine ssh 'sudo sysctl -w kernel.keys.maxkeys=20000 kernel.keys.maxbytes=4000000'
+   ```
+   Neither setting survives a `podman machine stop`; persist them in the VM's
+   `/etc/sysctl.conf` if you bring clusters up often.
+
 On **local Kind** that is enough: `envoy-gateway-config.yaml` in the `clusters/local` overlay patches the `platform-edge-tls` Certificate to the self-signed **`homelab-ca`** issuer, so the edge terminates HTTPS with a self-signed wildcard (expect a browser warning unless `homelab-ca` is trusted). **No Cloudflare token or Let's Encrypt is needed locally.**
 
 **Prod only — Cloudflare API token in OpenBAO:** on prod the `letsencrypt-prod` ClusterIssuer uses Cloudflare DNS-01 to issue a publicly-trusted wildcard `*.duynh.me` cert. That token is **bootstrap-only** (not in Git) and must be re-seeded after every fresh cluster:

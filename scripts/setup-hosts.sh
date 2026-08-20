@@ -45,6 +45,7 @@ HOSTS=(
   vm-mcp.duynh.me
   vl-mcp.duynh.me
   flux-mcp.duynh.me
+  grafana-mcp.duynh.me
   slo.duynh.me
 )
 

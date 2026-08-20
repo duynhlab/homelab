@@ -15,6 +15,11 @@
       "type": "http",
       "url": "http://flux-mcp.duynh.me/mcp",
       "timeout": 30
+    },
+    "grafana": {
+      "type": "http",
+      "url": "http://grafana-mcp.duynh.me/mcp",
+      "timeout": 30
     }
   }
 }

@@ -4,3 +4,4 @@ resources:
   - victoria-metrics-mcp.yaml
   - victoria-logs-mcp.yaml
   - flux-operator-mcp.yaml
+  - grafana-mcp.yaml

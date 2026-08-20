@@ -13,7 +13,7 @@ spec:
         kind: HelmRepository
         name: rustfs
         namespace: flux-system
-      version: "0.8.0"
+      version: "0.12.0"
   releaseName: rustfs
   targetNamespace: rustfs
   
@@ -61,6 +61,14 @@ spec:
     # Credentials — sourced from OpenBAO via ExternalSecret (see external-secret.yaml).
     # The chart rejects the well-known default rustfsadmin/rustfsadmin since v0.3.0;
     # we keep credentials in OpenBAO and reference the synced Secret by name.
+    #
+    # RPC auth (app >= 1.0.0-beta.10, fail-closed): the server refuses RPC when
+    # RUSTFS_RPC_SECRET is unset AND either credential equals "rustfsadmin"
+    # (crates/credentials resolve_rpc_secret). With RUSTFS_RPC_SECRET unset it
+    # derives the RPC secret from the access/secret key pair via HMAC-SHA256 —
+    # the upstream-documented path. Our OpenBAO-seeded creds are non-default,
+    # so no explicit RUSTFS_RPC_SECRET is needed (and the 0.12.0 chart has no
+    # values key for it; it would have to ride the existingSecret's envFrom).
     secret:
       existingSecret: rustfs-credentials
     

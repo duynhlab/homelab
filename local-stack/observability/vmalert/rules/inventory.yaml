@@ -28,13 +28,25 @@ groups:
       # gRPC error ratio (non-OK / all) per RPC method. Business rejections
       # (FailedPrecondition on shortage) surface as non-OK here — read next to
       # the reservation-outcome panel to separate infra from business.
+      # The `or … * 0` arm records an explicit 0 for every ACTIVE method even
+      # when no non-OK series has ever existed (a healthy service never minted
+      # one) — without it the rule was empty forever and the dashboard showed
+      # no-data instead of a flat 0. While fully idle the ratio is 0/0 and
+      # records nothing, matching the p95 rules' NaN-while-idle behavior.
       - record: inventory:rpc_error:ratio5m
         expr: |
-          sum by (rpc_method) (rate(
-            rpc_server_call_duration_seconds_count{
-              service_name="inventory",
-              rpc_method=~"inventory.v1.InventoryService/.+",
-              rpc_response_status_code!="OK"}[5m]))
+          (
+            sum by (rpc_method) (rate(
+              rpc_server_call_duration_seconds_count{
+                service_name="inventory",
+                rpc_method=~"inventory.v1.InventoryService/.+",
+                rpc_response_status_code!="OK"}[5m]))
+            or
+            sum by (rpc_method) (rate(
+              rpc_server_call_duration_seconds_count{
+                service_name="inventory",
+                rpc_method=~"inventory.v1.InventoryService/.+"}[5m])) * 0
+          )
           /
           sum by (rpc_method) (rate(
             rpc_server_call_duration_seconds_count{

@@ -194,6 +194,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **New dashboard: "Envoy Gateway — Edge SRE Overview"** (uid `eg-edge-sre`,
+  local `— Local` copy + cluster `GrafanaDashboard` CR in folder API Gateway).
+  Four rows — Edge Overview (RPS · 5xx rate · p99 · availability), Data Plane
+  (per-route rate, 4xx/5xx, latency quantiles, retries/timeouts, connections),
+  Control Plane (watchables, xDS snapshots, status updates, panics,
+  certwatcher), Infrastructure (process CPU/memory, Envoy server health,
+  kube-state/cAdvisor) — every metric name verified against the live scrape
+  (Context7-checked EG + Envoy docs), cluster twin remaps the jobs
+  (`envoy`→`envoy-gateway`, `envoy-gateway`→`envoy-gateway-controller`) and
+  every panel query was exercised live before merge. A README text panel opens
+  the board (control-plane/data-plane/dashboard "three voices" mnemonic);
+  the same README pattern now also fronts the Cutover Baseline board and the
+  two formerly empty text slots on Business KPIs. e2e-audit C18 inventory
+  moves 16 → 17 uids.
 - **Runbooks reorganized: one folder per alert domain, one canonical template.**
   `infrastructure-alerts.md` (28 alerts, 6 domains lumped) is split into
   `runbooks/kubernetes/` (21 files) and `runbooks/valkey/` (7), each normalized
@@ -841,6 +855,24 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Dashboard audit sweep: all 17 local boards checked against the live stack,
+  12 fixed.** The real bugs: the vendored `envoy-gateway-global` board had
+  **43 dead queries** (equality matchers against an All-variable whose
+  `allValue` is `.*` — every Watching Components / xDS panel silently empty;
+  now `=~`), `clickhouse-otel-sql` divided counts by a hard 60 s (wrong rate
+  at any zoom; now `$__interval_s`), `envoy-proxy-global` averaged rates over
+  hard `[5m]` windows on a 5-minute board (now `$__rate_interval`), and two
+  boards had overlapping gridPos (Temporal Worker/SDK row, Microservices—OTel
+  overview stats — reflowed 2×5). Consistency fixes: suite dropdown on all six
+  ClickHouse boards, missing units (`Bps`/`ops`/cores), missing panel ids,
+  `refresh` enabled on live boards, `red-spanmetrics` description added.
+  Renamed to purpose (uids unchanged): "RFC-0021 — Inventory" →
+  **"Inventory Service — Stock Authority"**, "RFC-0021 — Overhaul Baseline" →
+  **"Order Saga & Payment — Cutover Baseline"** (local + cluster twins + docs).
+  Known gap flagged, not fixed here: three `inventory:*` recording rules
+  (`rpc_error:ratio5m`, `rpc_duration:p95_5m`, `db_operation_duration:p95_5m`)
+  return no series against live OTel metric names — the rules files need their
+  own pass.
 - **Observability docs cleanup: the microservices hub dissolved, three pushed
   session artifacts deleted.** `runbooks/microservices-alerts.md` is gone — its
   unique content (4 cross-signal investigation workflows, threshold-tuning

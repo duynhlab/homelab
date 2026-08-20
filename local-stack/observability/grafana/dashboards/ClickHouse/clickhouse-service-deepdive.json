@@ -23,7 +23,21 @@
   "timezone": "browser",
   "timepicker": {},
   "refresh": "30s",
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "clickhouse"
+      ],
+      "targetBlank": false,
+      "title": "ClickHouse suite",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "annotations": {
     "list": []
   },

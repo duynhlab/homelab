@@ -138,7 +138,7 @@ lets this stack validate the cluster's three server-side Temporal alerts.
 | RED spanmetrics / business dashboards | ✅ | ✅ | — |
 | Envoy dashboards (3 of 4) | ✅ (envoyproxy/gateway v1.9.0) | ✅ same tag, Gateway folder | `resources-monitor` is cluster-only (cAdvisor series) |
 | Temporal dashboard | ✅ `temporal.json` (uid `temporal-worker`) | ✅ `temporal-local.json` (uid `temporal-worker-local`) | generated from one panel set; SDK + Server rows |
-| RFC-0021 boards (`inventory`, `rfc0021-baseline`) | ✅ | ✅ local copies + vendored recording rules | `app=` → `service_name=` rewrite, see rule file headers |
+| Inventory + Cutover Baseline boards (`inventory`, `rfc0021-baseline` — RFC-0021-era) | ✅ | ✅ local copies + vendored recording rules | `app=` → `service_name=` rewrite, see rule file headers |
 | OTel Collector health board | ❌ (gap — collector alerts have no cluster board) | ✅ `otel-collector-health-local` | local-first; promote to the cluster when wanted |
 
 ## 4. Signal map — what each backend answers
@@ -215,7 +215,7 @@ so a runbook practised locally transfers. Different series by design:
 
 Beyond the ClickHouse slice, `rules/` also carries the vendored RFC-0021
 recording rules (`rfc0021-baseline.yaml`, `inventory.yaml` — 15 recording +
-3 inventory alerting rules) so the two RFC-0021 dashboards render locally;
+3 inventory alerting rules) so the Inventory and Cutover Baseline dashboards render locally;
 they materialize because vmalert runs with `-remoteWrite.url`. One mechanical
 rewrite applies: cluster series carry an `app` label, the local OTLP path
 promotes `service_name` — every `app=` matcher became `service_name=` (see

@@ -85,9 +85,9 @@ renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), or `spec.url`
 
 | Folder | Boards | Source |
 |--------|--------|--------|
-| Observability | Microservices Observability (~41 panels), Business KPIs, RFC-0021 Baseline, RFC-0021 Inventory, **Temporal — Workflows & Activities** (SDK + Server rows), Tempo self-observability, K8s cluster overview, Vector | helm-charts ConfigMaps ×2 · in-repo JSON ×3 · `spec.url` ×3 |
+| Observability | Microservices Observability (~41 panels), Business KPIs, Order Saga & Payment — Cutover Baseline, Inventory Service — Stock Authority (both RFC-0021-era), **Temporal — Workflows & Activities** (SDK + Server rows), Tempo self-observability, K8s cluster overview, Vector | helm-charts ConfigMaps ×2 · in-repo JSON ×3 · `spec.url` ×3 |
 | ClickHouse | Server/Engine, OTel logs+traces SQL, Service deep dive, OTel Overview / Logs Explorer / Trace Explorer | in-repo JSON ×6 (RFC-0019 / ADR-023) |
-| API Gateway | Envoy Global, Envoy Clusters, Envoy Gateway Global, Resources Monitor | in-repo JSON ×4, vendored from `envoyproxy/gateway` v1.9.0 |
+| API Gateway | Envoy Global, Envoy Clusters, Envoy Gateway Global, Resources Monitor, **Envoy Gateway — Edge SRE Overview** | in-repo JSON ×4 vendored from `envoyproxy/gateway` v1.9.0 + ×1 hand-authored (golden signals / control plane / infra) |
 | Databases | CloudNativePG, PG query performance, PG maintenance, PgDog | vendored/hand-rolled, external repo (`spec.url`) |
 | GitOps | **cert-manager** (expiry/renewal, controller, ACME, workqueue — the visual surface for the CertManager* alerts) | in-repo JSON |
 | VictoriaMetrics | VMSingle, VMAgent, VMAlert | grafana.com (`spec.url`) |

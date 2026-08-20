@@ -388,7 +388,7 @@
     "to": "now"
   },
   "timezone": "browser",
-  "title": "RFC-0021 — Inventory",
+  "title": "Inventory Service — Stock Authority",
   "uid": "inventory-overview",
   "version": 1,
   "weekStart": ""

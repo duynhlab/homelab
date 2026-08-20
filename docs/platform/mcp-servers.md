@@ -17,11 +17,14 @@ Kustomization and reachable through the Envoy Gateway edge:
 | **flux-operator-mcp** | Flux resources, reconciliation, logs | Kubernetes API | `*` (floating OCI semver) | `flux-system` | `flux-mcp.duynh.me` |
 | **grafana-mcp** | Dashboards, datasources, datasource queries, alert-rule reads | Grafana HTTP API | `0.20.0` | `monitoring` | `grafana-mcp.duynh.me` |
 
-> **Grafana MCP is in git but has not run on a cluster yet.** Its manifests,
-> route, and edge policies are merged and `helm template`-verified; the
-> HelmRelease, the operator-minted token, and the Viewer restriction are all
-> unverified against a live API server until the next Kind bring-up. Read
-> [§ 4](#4-grafana-mcp) before relying on it.
+> **Grafana MCP was verified on a live Kind cluster on 2026-08-20.** The
+> `GrafanaServiceAccount` CR reached `ServiceAccountSynchronized=True`, the
+> operator wrote a `glsa_…` token into `grafana-mcp-token`, the HelmRelease went
+> Ready, and the server answered an MCP handshake both in-cluster and through
+> the gateway. What it exposes was checked, not assumed: **59 tools, none of
+> them write tools**, and `list_datasources` returned the real datasource list.
+> See [§ 4](#4-grafana-mcp) for the two convention divergences that still
+> stand.
 
 ```mermaid
 flowchart TD
@@ -521,9 +524,10 @@ so an **unauthenticated** in-cluster caller already has Admin. Handing the MCP a
 token is therefore not about granting access it lacks — it is about *taking
 access away*: a Viewer token is strictly less than the anonymous Admin the
 server would otherwise inherit by making no credential decision at all. Read
-the token as a downgrade, not a grant. (Whether the Viewer role really refuses
-writes end-to-end is on the Kind verification list; the reasoning is sound but
-untested here.)
+the token as a downgrade, not a grant. Confirmed on the 2026-08-20 Kind run:
+`tools/list` returned 59 tools and **not one** `create_*`/`update_*`/`delete_*`
+among them, so `--disable-write` removes the capability rather than merely
+refusing it at call time.
 
 ### Token and Secret lifecycle
 
@@ -603,8 +607,9 @@ and `.crush.json` switched to them. 2026-08-20: the Grafana MCP joins as the
 fourth server — chart `0.20.0` (mcp-grafana 1.1.0), a `GrafanaServiceAccount`
 minting its Viewer token, the `grafana-operator-oci` pin tightened from a
 floating `>=5.0.0` to `5.24.0` to guarantee that CRD, and the 4th HTTPRoute
-added to both edge policies. Verified by `helm template` and by unpacking the
-operator chart; **not yet reconciled on a cluster**.
+added to both edge policies. Verified by `helm template`, by unpacking the
+operator chart, and then **live on Kind** (CRD present, token minted, MCP
+handshake 200 in-cluster and through the edge, wrong-`Host` correctly 403).
 
 ---
 
@@ -743,4 +748,4 @@ CR, or delete the CR and let it be recreated.
 | Grafana Operator Docs | https://grafana.github.io/grafana-operator/ |
 
 ---
-_Last updated: 2026-08-20 — Grafana MCP added as the fourth server: chart 0.20.0 (mcp-grafana 1.1.0), entrypoint override + `--allowed-hosts` + tcpSocket probes explained, Viewer service-account token read as a downgrade from anonymous Admin, and the two convention divergences stated plainly (operator-minted credential outside OpenBAO; no caller auth behind the CIDR fence). `grafana-operator-oci` pin 5.24.0 recorded. Everything here is manifest- and `helm template`-verified — nothing has reconciled on a cluster yet._
+_Last updated: 2026-08-20 — Grafana MCP added as the fourth server: chart 0.20.0 (mcp-grafana 1.1.0), entrypoint override + `--allowed-hosts` + tcpSocket probes explained, Viewer service-account token read as a downgrade from anonymous Admin, and the two convention divergences stated plainly (operator-minted credential outside OpenBAO; no caller auth behind the CIDR fence). `grafana-operator-oci` pin 5.24.0 recorded. Verified live on Kind the same day: operator v5.24.0 ships the CRD, the SA synchronized, the token landed, 59 tools with no write tool, handshake 200 in-cluster and via the gateway, wrong-`Host` 403._

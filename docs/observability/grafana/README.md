@@ -156,9 +156,9 @@ kubernetes/infra/configs/observability/grafana/
     ├── grafana-dashboard-cert-manager.yaml  # cert-manager (configMapRef → cert-manager.json)
     ├── grafana-dashboard-clickhouse*.yaml   # ClickHouse suite (configMapRef → clickhouse-*.json)
     ├── grafana-dashboard-envoy-gateway.yaml # 4 CRs (configMapRef → envoy-gateway/*.json, vendored v1.9.0)
-    ├── grafana-dashboard-rfc0021-baseline.yaml · grafana-dashboard-inventory.yaml
+    ├── grafana-dashboard-cutover-baseline.yaml · grafana-dashboard-inventory.yaml
     ├── grafana-dashboard-*.yaml         # remaining boards (spec.url → grafana.com or legacy repo)
-    ├── temporal.json · cert-manager.json · clickhouse-*.json · rfc0021-baseline.json · inventory.json
+    ├── temporal.json · cert-manager.json · clickhouse-*.json · cutover-baseline.json · inventory.json
     └── envoy-gateway/*.json             # vendored envoyproxy/gateway v1.9.0 dashboards
 ```
 

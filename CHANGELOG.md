@@ -1470,6 +1470,19 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **opentelemetry-collector chart constraint `<0.157.0` → `<0.171.0`** (#686),
+  merged WITH the values migration it requires: chart 0.161.0 removed the
+  backwards-compat shim for `config.service.telemetry.metrics.address`, so the
+  HelmRelease now declares the reader form (`telemetry.metrics.readers` →
+  prometheus pull on 0.0.0.0:8888) — without it self-telemetry would fall back
+  to localhost and every `otelcol_*` panel/alert would go dark silently. Rode
+  along: the five 0.159.0 component-rename deprecation aliases retired in both
+  configs (`otlphttp`→`otlp_http` ×3, `spanmetrics`→`span_metrics`,
+  `deltatocumulative`→`delta_to_cumulative`,
+  `prometheusremotewrite`→`prometheus_remote_write`; metric namespace
+  unchanged) — verified on the live stack: collector restarts with zero
+  deprecation warnings, spanmetrics/remote-write/VictoriaLogs paths all
+  exporting, self-telemetry scrape up.
 - **ClickHouse 25.3 → 25.12** (`clickhouseinstallation.yaml` + local-stack
   `otel` DB, #739): stepping-stone bump back inside ClickHouse's one-year
   compatibility window before the 26.x major (#734, held). Gated on a full

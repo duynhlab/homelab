@@ -894,6 +894,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **RED Span Metrics board: the overview row is whole again.** The stat row
+  had only two w=6 panels (Rate + Errors) with the right half of the row
+  empty — and no Duration stat on a board named RED. Now four even stats:
+  request rate, error rate, **overall p95 latency** (the missing D), and
+  **services reporting** (a quiet service is a finding, not a healthy zero).
+  Verified live: p95 ~5 ms, 15 services reporting.
 - **`inventory:rpc_error:ratio5m` recorded nothing on a healthy service.** The
   numerator filters `rpc_response_status_code!="OK"`, and a service that has
   never returned an error has no such series — empty / denominator is empty,

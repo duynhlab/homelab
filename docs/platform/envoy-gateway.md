@@ -49,7 +49,7 @@ flowchart TD
   ep["EnvoyProxy: platform-edge<br/>infrastructure + telemetry"]
   gw["Gateway: platform<br/>listeners"]
   cors["SecurityPolicy: cors-policy<br/>CORS baseline"]
-  hr["HTTPRoute × 38<br/>path matches (api 18, monitoring 10,<br/>mcp 3, infra 3, spa/backoffice/idp/temporal 4)"]
+  hr["HTTPRoute × 39<br/>path matches (api 18, monitoring 10,<br/>mcp 4, infra 3, spa/backoffice/idp/temporal 4)"]
   jwt["SecurityPolicy: jwt-edge × 7 + jwt-edge-staff × 6<br/>edge JWT, two realms (ADR-050)"]
   cidr["SecurityPolicy: admin-cidr-internal<br/>admin-surface client-CIDR fence"]
   btp["BackendTrafficPolicy: btp-api + btp-admin<br/>rate limit + body cap"]
@@ -292,4 +292,4 @@ validation.
 - [Envoy Gateway documentation](https://gateway.envoyproxy.io/docs/) — upstream
 - [Gateway API](https://gateway-api.sigs.k8s.io/) — the portable API this builds on
 
-_Last updated: 2026-08-19 — cluster status corrected to "reconciled on Kind" (#791 fixed two runtime defects live; only the K-row gate pass remains), resource model recounted (38 HTTPRoutes, 13 JWT policies across two realms, admin-CIDR + btp-admin added, Backend marked compose-only); earlier same day: local edge bumped to v1.9.0 with the ADR-053 train_
+_Last updated: 2026-08-20 — HTTPRoute count 38 → 39 (mcp 3 → 4: the Grafana MCP route, also added to the admin-CIDR fence and btp-admin). 2026-08-19: cluster status corrected to "reconciled on Kind" (#791 fixed two runtime defects live; only the K-row gate pass remains), resource model recounted (13 JWT policies across two realms, admin-CIDR + btp-admin added, Backend marked compose-only); earlier same day: local edge bumped to v1.9.0 with the ADR-053 train_

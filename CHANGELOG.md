@@ -399,6 +399,29 @@ Skeleton (copy what you need):
   `mergeType: StrategicMerge`).
 #### GitOps
 
+- **A fourth MCP server — Grafana**: HelmRelease
+  [`grafana-mcp.yaml`](kubernetes/infra/controllers/mcp/grafana-mcp.yaml) in
+  `monitoring` (chart `0.20.0` → mcp-grafana 1.1.0, new
+  `grafana-mcp-oci` OCIRepository), reachable at `grafana-mcp.duynh.me` as the
+  4th HTTPRoute in `routes/mcp.yaml` behind the same admin CIDR fence and
+  `btp-admin` rate limit as the other three. Two upstream traps are configured
+  around rather than discovered later: the image ENTRYPOINT hardcodes
+  `--transport sse`, so `command` replaces it outright, and Host-header
+  validation defaults to localhost only — hence `--allowed-hosts` (kept in sync
+  with the route) and `tcpSocket` probes, since kubelet sends the pod IP as
+  Host and would earn a 403. Auth is a `GrafanaServiceAccount` CR with role
+  **Viewer**, which *narrows* the MCP below the anonymous `Admin` an
+  unauthenticated caller already inherits; `--disable-write` backs it up. Riding
+  along: `grafana-operator-oci` moves off the floating `>=5.0.0` onto a hard
+  **`5.24.0`** pin, because `GrafanaServiceAccount` is a v5.20.0+ CRD and a
+  float resolving older would drop it silently (verified by unpacking the
+  chart). Two divergences stated in
+  [`mcp-servers.md`](docs/platform/mcp-servers.md#4-grafana-mcp): this is the
+  first workload credential a controller mints rather than OpenBAO/ESO, and the
+  endpoint still has no caller auth — the CIDR fence is the only control, as
+  with the other three. `helm template`-verified; **not yet reconciled on a
+  cluster**.
+
 - **The Backoffice portal gets a cluster home** (RFC-0023): namespace
   `backoffice`, standalone ResourceSet `rs-backoffice` (mop chart, Nginx on
   :80, no DB), and the `backoffice.duynh.me` HTTPRoute under the existing

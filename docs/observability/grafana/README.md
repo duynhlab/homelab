@@ -18,6 +18,8 @@ kubectl port-forward svc/grafana-service -n monitoring 3000:3000
 
 ## Security and access control
 
+One named identity exists alongside anonymous access: a `GrafanaServiceAccount` (`grafana-service-account-mcp.yaml`) with role **Viewer**, whose operator-minted token (Secret `grafana-mcp-token`) is consumed by the [Grafana MCP server](../../platform/mcp-servers.md#4-grafana-mcp). It exists to *narrow* the MCP below the anonymous `Admin` it would otherwise inherit.
+
 Grafana **organization roles**, **Teams**, and **anonymous** access are documented in [rbac-multi-team.md](rbac-multi-team.md). That page explains why anonymous `Admin` does not provide per-team separation and how this differs from **[VMAuth / vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned)** (HTTP proxy for VictoriaMetrics APIs—not the Grafana UI).
 
 ## Datasources
@@ -147,6 +149,7 @@ kubernetes/infra/configs/observability/grafana/
 ├── datasource-tempo.yaml
 ├── datasource-jaeger.yaml
 ├── datasource-pyroscope.yaml
+├── grafana-service-account-mcp.yaml   # Viewer SA + token Secret for the Grafana MCP server
 ├── dashboards-chart.yaml              # HelmRelease → helm-charts grafana-dashboards chart (RFC-0017 boards as ConfigMaps)
 └── dashboards/
     ├── kustomization.yaml               # CR list + configMapGenerator entries (stable names, no hash)

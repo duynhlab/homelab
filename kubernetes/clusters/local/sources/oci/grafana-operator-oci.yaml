@@ -10,4 +10,11 @@ spec:
   interval: 10m
   url: oci://ghcr.io/grafana/helm-charts/grafana-operator
   ref:
-    semver: ">=5.0.0"
+    # Pinned like every other chart here (was a floating ">=5.0.0"). The pin is
+    # load-bearing now: GrafanaServiceAccount — how the Grafana MCP server gets
+    # its token — is an operator v5.20.0 feature, so a float resolving to
+    # anything older would silently break that CR. Chart 5.24.0 ships operator
+    # v5.24.0, and its crds/ carries
+    # grafana.integreatly.org_grafanaserviceaccounts.yaml (verified by
+    # unpacking the chart, not from release notes).
+    semver: "5.24.0"

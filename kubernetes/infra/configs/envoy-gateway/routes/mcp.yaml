@@ -1,4 +1,4 @@
-# MCP server routes — one HTTPRoute per MCP server (3 routes total). Used by
+# MCP server routes — one HTTPRoute per MCP server (4 routes total). Used by
 # AI clients (Crush, Claude Desktop, VS Code) via Streamable HTTP. Each
 # carries:
 #   - CIDR fence       -> policies/security-admin-cidr.yaml
@@ -112,3 +112,42 @@ spec:
       backendRefs:
         - name: flux-operator-mcp
           port: 9090
+---
+# Grafana MCP — grafana-mcp.duynh.me
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-mcp
+  namespace: monitoring
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    # Keep in sync with --allowed-hosts in controllers/mcp/grafana-mcp.yaml:
+    # mcp-grafana validates the Host header on every route and 403s anything
+    # not listed there.
+    - grafana-mcp.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: grafana-mcp
+          port: 8000

@@ -12,7 +12,7 @@ spec:
         kind: HelmRepository
         name: opentelemetry
         namespace: flux-system
-      version: '<0.157.0'
+      version: '<0.171.0'
   dependsOn:
     - name: victoria-metrics-operator
       namespace: monitoring
@@ -51,14 +51,14 @@ spec:
           endpoint: tempo-chart.monitoring.svc.cluster.local:4317
           tls:
             insecure: true
-        otlphttp/victoriatraces:
+        otlp_http/victoriatraces:
           # VictoriaTraces OTLP-HTTP ingest (single port :10428). gRPC :4317 is
           # TLS-by-default, so use HTTP. Pilot: 3rd backend alongside Tempo + Jaeger.
           traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
           tls:
             insecure: true
           compression: gzip
-        otlphttp/victorialogs:
+        otlp_http/victorialogs:
           # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee posts
           # OTLP logs here; re-export to VictoriaLogs. VL-Stream-Fields makes
           # service.name the log-stream identity; trace_id stays a queryable
@@ -70,7 +70,7 @@ spec:
           tls:
             insecure: true
           compression: gzip
-        otlphttp/victoriametrics:
+        otlp_http/victoriametrics:
           # RFC-0014 P1: semconv app metrics (dual-emit) → vmagent's OTLP ingest,
           # NOT VMSingle direct — vmagent keeps the single choke point for
           # relabeling (service_name→app) and the RFC-0013 streamAggr pilot.
@@ -129,7 +129,7 @@ spec:
           spike_limit_mib: 200
         # RFC-0014 D-5: defensive — cumulative is the SDK default, but a delta
         # sample stored in VM silently breaks rate().
-        deltatocumulative:
+        delta_to_cumulative:
           max_stale: 5m
       receivers:
         otlp:
@@ -148,7 +148,7 @@ spec:
             - otlp/tempo
             - otlp/tempo-chart
             - otlp/jaeger
-            - otlphttp/victoriatraces
+            - otlp_http/victoriatraces
             - clickhouse
             processors:
             - memory_limiter
@@ -157,7 +157,7 @@ spec:
             - otlp
           logs:
             exporters:
-            - otlphttp/victorialogs
+            - otlp_http/victorialogs
             - clickhouse
             processors:
             - memory_limiter
@@ -166,18 +166,28 @@ spec:
             - otlp
           metrics:
             exporters:
-            - otlphttp/victoriametrics
+            - otlp_http/victoriametrics
             processors:
             - memory_limiter
-            - deltatocumulative
+            - delta_to_cumulative
             - batch
             receivers:
             - otlp
         telemetry:
           logs:
             level: info
+          # `metrics.address` stopped working with chart 0.161.0 (the chart
+          # dropped its backwards-compat shim; the collector core has ignored
+          # the field since v0.128). The reader form below is the supported
+          # way to bind self-telemetry on 0.0.0.0:8888 so vmagent can scrape
+          # it — same shape as local-stack/observability/otel-collector-config.yaml.
           metrics:
-            address: 0.0.0.0:8888
+            readers:
+              - pull:
+                  exporter:
+                    prometheus:
+                      host: 0.0.0.0
+                      port: 8888
     image:
       pullPolicy: IfNotPresent
       repository: otel/opentelemetry-collector-contrib

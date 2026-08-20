@@ -60,7 +60,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:25.12
+              image: clickhouse/clickhouse-server:26.7
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true

@@ -32,9 +32,12 @@ spec:
   values:
     replicas: 1
     tempo:
-      # Pin explicit tag — Renovate bumps via chart version + this tag.
-      # 2.10.8 = the raw Deployment's image (#737), keeping the ADR-040
-      # parallel-run comparison image-identical.
+      # Hand-maintained tag: Renovate does not track it (no `repository`
+      # sibling for the helm-values manager to key on), so bump it in lockstep
+      # with the raw Deployment's image whenever that moves. 2.10.8 = the raw
+      # Deployment's image (#737), keeping the ADR-040 parallel-run comparison
+      # image-identical. Both are held to <3 by `.renovaterc.json5` — see the
+      # `grafana/tempo` packageRule and ADR-040's 2026-08-20 amendment.
       tag: "2.10.8"
       resources:
         requests:

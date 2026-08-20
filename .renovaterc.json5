@@ -26,4 +26,17 @@
       "/^kubernetes/.+\\.yaml$/",
     ],
   },
+  packageRules: [
+    {
+      // Hold Tempo on 2.x. Tempo 3.0 removed the `ingester` and `compactor`
+      // modules, so the major is a hand-written config migration (drop both
+      // blocks, re-home the 168h block_retention) that a version bump cannot
+      // express — and the single-binary `grafana-community/tempo` chart has no
+      // 3.x appVersion to migrate to. The raw install this pin protects is
+      // scheduled for deletion by ADR-040 phase 2; revisit then.
+      matchDatasources: ["docker"],
+      matchPackageNames: ["grafana/tempo"],
+      allowedVersions: "<3",
+    },
+  ],
 }

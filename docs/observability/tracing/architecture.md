@@ -29,7 +29,7 @@ flowchart TB
     subgraph backends["Trace backends"]
         Tempo[("Tempo<br/>primary · RustFS S3")]
         Jaeger[("Jaeger<br/>in-memory learning UI")]
-        VT[("VictoriaTraces v0.9.4<br/>pilot VTSingle")]
+        VT[("VictoriaTraces v0.11.0<br/>pilot VTSingle")]
         CH[("ClickHouse<br/>otel_traces · 90d OLAP")]
     end
 
@@ -127,7 +127,7 @@ The OTel Collector fans out to **three** backends, each with a distinct role:
    - Evaluates the **VM-operator consolidation** story: tracing managed by the
      *same* VictoriaMetrics Operator and storage engine as metrics (`VMSingle`)
      and logs (`VLSingle`), with **no object-storage dependency**
-   - `v0.9.4` (0.x, pre-GA) — a pilot, not a replacement; any consolidation is a
+   - `v0.11.0` (0.x, pre-GA) — a pilot, not a replacement; any consolidation is a
      future ADR gated on ~1.0/GA. See [victoriatraces.md](victoriatraces.md) and
      the [backend comparison](backends-comparison.md)
 

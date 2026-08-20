@@ -6,7 +6,7 @@ the pilot is to evaluate the **VM-operator consolidation** story: tracing manage
 VictoriaMetrics Operator (and *same* storage engine) as metrics (`VMSingle`) and logs (`VLSingle`),
 with **no object-storage dependency**.
 
-> **Maturity caveat** — VictoriaTraces is **`v0.9.4` (0.x, pre-GA)**. This is a **pilot**, not a
+> **Maturity caveat** — VictoriaTraces is **`v0.11.0` (0.x, pre-GA)**. This is a **pilot**, not a
 > replacement: Tempo (durable on RustFS) + Jaeger stay. Any consolidation onto VictoriaTraces is a
 > future decision (ADR), gated on ~1.0/GA and validating partial TraceQL
 > compatibility against Tempo workflows. See the full [backends comparison](./backends-comparison.md).
@@ -41,7 +41,7 @@ CR: [`kubernetes/infra/configs/observability/tracing/victoriatraces/vtsingle.yam
 
 | Field | Value |
 |-------|-------|
-| `image` | `victoriametrics/victoria-traces:v0.9.4` (pinned — 0.x, fast-moving) |
+| `image` | `victoriametrics/victoria-traces:v0.11.0` (pinned — 0.x, fast-moving) |
 | operator | chart `0.66.2` / app `v0.73.1` (matching CRDs rendered by the same chart) |
 | `retentionPeriod` | `7d` (matches VMSingle/VLSingle) |
 | `storage` | 10Gi PVC (VictoriaLogs engine — **no object storage**) |
@@ -80,7 +80,8 @@ exporters:
 - **Grafana** — a **Jaeger-type** datasource (uid `victoriatraces`, there is no native VT datasource)
   pointed at the Jaeger query API: `http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/select/jaeger`.
   `tracesToLogsV2`/`tracesToMetrics` are wired to VictoriaLogs/VictoriaMetrics like the other backends.
-- **Tempo API** — v0.9.4 exposes partial Tempo/TraceQL-compatible search APIs,
+- **Tempo API** — v0.11.0 exposes partial Tempo/TraceQL-compatible search APIs
+  (coverage last assessed on v0.9.4; the 0.10/0.11 releases announce no change here),
   including Grafana Traces Drilldown support. This platform keeps the proven
   Jaeger datasource during the pilot; TraceQL metrics and pipelines remain a
   Tempo-only capability.
@@ -115,9 +116,11 @@ Quick ingest check: `curl 'http://localhost:10428/select/jaeger/api/services'`.
 
 Pilot, wired in the manifests — the collector's 3-way fan-out exporter and the Grafana
 `victoriatraces` datasource are both deployed config (`otel-collector.yaml`,
-`datasource-victoriatraces.yaml`); v0.9.4 verified standalone (ingests OTLP-HTTP traces; the
+`datasource-victoriatraces.yaml`); v0.11.0 verified standalone (ingests OTLP-HTTP traces; the
 Jaeger API returns them). Tempo + Jaeger are unchanged and Tempo stays primary/durable.
 See [backends-comparison.md](./backends-comparison.md) for the decision context.
 
 ---
-_Last updated: 2026-08-13 — exposure re-documented as the `victoriatraces` HTTPRoute; VictoriaTraces v0.9.4 and VM Operator v0.73.1 compatibility review._
+_Last updated: 2026-08-20 — image bumped to v0.11.0 (0.10 moved to a distroless
+base — no shell in the container; the operator's HTTP probes and this stack's
+queries are unaffected). Exposure re-documented as the `victoriatraces` HTTPRoute; VictoriaTraces v0.11.0 and VM Operator v0.73.1 compatibility review._

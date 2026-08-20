@@ -4,7 +4,7 @@ Platform cache tier — a **single-node Valkey** instance (`cache-system` namesp
 
 | Attribute | Value |
 |-----------|-------|
-| **Backend** | Valkey (Redis-compatible), official Helm chart `0.9.4` |
+| **Backend** | Valkey (Redis-compatible), official Helm chart `0.11.0` (app Valkey 9.x) |
 | **Namespace** | `cache-system` |
 | **Topology** | Single node — no replication, no persistence (local dev) |
 | **Eviction** | `maxmemory-policy allkeys-lru` (Helm `valkeyConfig`) |

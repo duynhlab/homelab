@@ -37,6 +37,10 @@ spec:
       labels:
         app.kubernetes.io/name: keycloak
         app.kubernetes.io/component: identity
+        # Bare `app` label: Vector's add_labels derives the VictoriaLogs
+        # stream `service` from it — without it the stream falls back to the
+        # pod name and every rollout starts a new log stream.
+        app: keycloak
     spec:
       securityContext:
         runAsNonRoot: true
@@ -83,6 +87,42 @@ spec:
               value: "true"
             - name: KC_METRICS_ENABLED
               value: "true"
+            # keycloak_user_events_total (LOGIN/LOGIN_ERROR/...) — the
+            # login-KPI counter the RFC-0022 signals need. Tags: default is
+            # realm-only (cardinality guard); clientId is safe here (2 clients
+            # per realm) and splits customer-spa vs admin-portal.
+            - name: KC_EVENT_METRICS_USER_ENABLED
+              value: "true"
+            - name: KC_EVENT_METRICS_USER_TAGS
+              value: realm,clientId
+            # Histograms + SLO buckets (ms) make
+            # http_server_requests_seconds_bucket quantile-queryable
+            # (p95 target <250ms on auth endpoints).
+            - name: KC_HTTP_METRICS_HISTOGRAMS_ENABLED
+              value: "true"
+            - name: KC_HTTP_METRICS_SLOS
+              value: 10,50,250,500,1000,2500
+            # OpenTelemetry tracing (GA since KC 26.1): OTLP gRPC straight to
+            # the collector (no egress NetworkPolicy exists — nothing to
+            # open). tracing-enabled is a BUILD-TIME option: the first start
+            # after this change re-augments the server in place (slower boot;
+            # the 5-min startupProbe below already covers it). Browsers reach
+            # Keycloak directly, so these spans are their own trace roots.
+            - name: KC_TRACING_ENABLED
+              value: "true"
+            - name: KC_TRACING_ENDPOINT
+              value: http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4317
+            - name: KC_TRACING_SAMPLER_TYPE
+              value: parentbased_traceidratio
+            - name: KC_TRACING_SAMPLER_RATIO
+              value: "0.1" # fleet parity (services sample 10% in prod)
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: deployment.environment.name=production # vmagent promote allowlist
+            # JSON console logs — level becomes a queryable VictoriaLogs field
+            # (Vector's cluster transform lifts `level`; full field-merge
+            # parity with local is a follow-up).
+            - name: KC_LOG_CONSOLE_OUTPUT
+              value: json
           ports:
             - name: http
               containerPort: 8080

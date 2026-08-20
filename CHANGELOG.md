@@ -1545,6 +1545,26 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **The whole fleet re-pins to multi-arch images** — product 1.13.1, order
+  2.3.1, cart/notification/review 2.1.1, checkout 0.9.1, payment 2.3.1,
+  shipping 1.6.1, user 2.2.1, inventory **0.6.0**, frontend 3.2.1,
+  admin-service 0.4.1, plus mockpay → 2.3.1 and checkout-worker → 0.9.1 by
+  their pair rules. Every previous tag was published `linux/amd64` only, so on
+  an arm64 cluster **not one first-party pod could start**: containerd refused
+  the pull with `no match for platform in manifest: not found`, and the visible
+  symptom was ten `migrate` init containers in `Init:ImagePullBackOff`. Fixed
+  at the source rather than worked around locally — `gha-workflows` #114 flips
+  the reusable workflows' `platforms` default to `linux/amd64,linux/arm64`
+  (the input already existed and QEMU was already gated on it; no caller had
+  ever passed it), and one PR per service repo adds the Dockerfile
+  cross-compile (`FROM --platform=$BUILDPLATFORM`, `GOARCH="${TARGETARCH}"`)
+  so the arm64 leg costs ~40s instead of running the toolchain under
+  emulation. All twelve new tags verified as real indexes carrying both
+  platforms. `inventory` takes a **minor** bump because its main already
+  carried four unreleased commits (Go 1.26.6 stdlib fixes, obsx span helpers,
+  staff-realm group check); `order-worker` stays at **1.13.2** — a frozen
+  Worker Versioning build id cannot be re-tagged (ADR-030), so that one image
+  still has no arm64 leg and needs either a backfill or a planned cutover.
 - **The ADR-053 train ships: checkout 0.9.0, frontend 3.2.0, admin-service
   0.4.0 (+ pkg httpx v0.37.0).** An untracked SKU stops masquerading as an
   outage: checkout answers `409 ITEM_NOT_ORDERABLE` (flat at session create,

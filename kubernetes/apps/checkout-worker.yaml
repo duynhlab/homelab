@@ -66,7 +66,7 @@ spec:
       # only the web transport arms — no workflow or activity code — so no
       # pinned execution can hit a non-determinism error. The compose gate ran
       # this worker on exactly this code (A13 expired|timer, saga completed).
-      tag: "0.9.0"
+      tag: "0.9.1"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.

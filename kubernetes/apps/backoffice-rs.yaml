@@ -53,7 +53,7 @@ spec:
             # untracked SKUs and the warn-never-gate publish notice (protected
             # balances read). gha-workflows pins aligned to e321897. Compose
             # gate 2026-08-19; Playwright bootstrap + publish-warning rows pass.
-            tag: "0.4.0" # {"$imagepolicy": "flux-system:admin-service:tag"}
+            tag: "0.4.1" # {"$imagepolicy": "flux-system:admin-service:tag"}
             pullPolicy: IfNotPresent
           # mop >=0.14: the HTTP port pair lives under service.http — this is
           # an Nginx image listening on 80, and the chart default 8080 would

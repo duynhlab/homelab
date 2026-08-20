@@ -67,7 +67,7 @@ spec:
     # registered is traced and logged as an ordinary 404 rather than vanishing.
     # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
     # for /metrics and 0 for /health and /ready, unchanged.
-    image_tag: "2.3.0" # {"$imagepolicy": "flux-system:order:tag"}
+    image_tag: "2.3.1" # {"$imagepolicy": "flux-system:order:tag"}
     namespace: order
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

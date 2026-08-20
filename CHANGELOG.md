@@ -1470,6 +1470,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse 25.3 → 25.12** (`clickhouseinstallation.yaml` + local-stack
+  `otel` DB, #739): stepping-stone bump back inside ClickHouse's one-year
+  compatibility window before the 26.x major (#734, held). Gated on a full
+  compose E2E audit run with the batch: live `SELECT version()` 25.12.11.4,
+  zero exporter insert rejections, `otel_logs`/`otel_traces` Map-column
+  schema unchanged, no upgrade/compat warnings in server logs.
+
 - **Renovate safe-batch (2026-08-19), observability half** — merged after review
   of every upstream changelog; the three compose-touching bumps were gated on a
   full E2E audit (A 20/20 + A13 timer, B 10/10, C 21/21, evidence on the PRs):
@@ -1497,8 +1504,28 @@ Skeleton (copy what you need):
   CreateReplace` picks up the CRD delta; the CHI itself does not restart on
   an operator upgrade.
 
+#### Databases
+
+- **Valkey 8 → 9 as a pair** — cluster chart `valkey-io/valkey-helm` 0.9.4 →
+  **0.11.0** (#690; the chart's only changes in that range are image bumps to
+  Valkey 9.x) and local-stack `valkey/valkey` **9-alpine** (#735), keeping
+  local = cluster on the same major. Valkey 9.0 lists no breaking changes
+  (upgrade urgency LOW); the platform cache is persistence-off/auth-off
+  allkeys-lru, so rollback is a repin. Gated on the same full E2E audit
+  (`valkey_version:9.1.1`, healthcheck healthy the whole run, cache get/set
+  spans live in the tagged trace).
+
 #### Secrets
 
+- **OpenBAO CLI jobs 2.5.3 → 2.6.2** (#692, `openbao-db-config` +
+  `openbao-bootstrap` Job images): re-aligns the CLI with the server the
+  floating chart (0.29.2) already runs, and picks up the 2.5.4–2.6.2 security
+  train (inline-auth dispatch GHSA-rh46-vc3j-w2w3, PKI IP-SAN CIDR
+  enforcement, ACL LIST bypass, LDAP injection, cross-namespace lease
+  revocation). Verified the default image still ships `sh` (the bootstrap
+  entrypoint) before merging. Follow-up on record: the built-in `awskms` seal
+  is deprecated for removal in 2.7.0 while the server config uses it — the
+  chart must not float past 2.6.x until the seal migrates.
 - **Renovate safe-batch (2026-08-19), secrets half**: `external-secrets`
   chart 2.5.0 → **2.9.0** (no CRD/API breaking change in 2.6–2.9; Go 1.26.5 +
   grpc-go CVE bumps; repo stays on `external-secrets.io/v1`) and `cert-manager`

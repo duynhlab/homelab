@@ -36,7 +36,7 @@
 - **API-compatible with Vault** — ESO, Kubernetes auth, all existing patterns carry over unchanged
 - **CNCF Sandbox project** under the OpenSSF
 - **Drop-in replacement** — rename `vault` CLI to `bao`, same REST API paths (`/v1/...`)
-- **Actively maintained** — this repo currently deploys OpenBAO 2.5.x via the OpenBAO Helm chart
+- **Actively maintained** — this repo currently deploys OpenBAO 2.6.x via the OpenBAO Helm chart
 
 ### Why Migrate from Vault Dev Mode
 

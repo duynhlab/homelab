@@ -74,7 +74,7 @@ spec:
     # registered is traced and logged as an ordinary 404 rather than vanishing.
     # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
     # for /metrics and 0 for /health and /ready, unchanged.
-    image_tag: "1.13.0" # {"$imagepolicy": "flux-system:product:tag"}
+    image_tag: "1.13.1" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     platform_backup_label: "cnpg"
     replicaCount: 1

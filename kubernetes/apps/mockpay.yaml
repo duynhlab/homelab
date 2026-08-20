@@ -55,7 +55,7 @@ spec:
       # still. Re-aligned as an ADR-053-train ride-along BEFORE the first Kind
       # bring-up, because mockpay is on that path (the saga charges through it,
       # and the F1 GameDay finding was precisely an image skew here).
-      tag: "2.3.0" # {"$imagepolicy": "flux-system:payment:tag"}
+      tag: "2.3.1" # {"$imagepolicy": "flux-system:payment:tag"}
       pullPolicy: IfNotPresent
     args: ["mockpay"]
     service:

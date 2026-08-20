@@ -159,13 +159,11 @@ spec:
       interval: 1m
       rules:
         - alert: EdgeJWKSFetchFailing
-          # METRIC NAME TO VERIFY ON THE KIND SPIKE: Envoy's jwt_authn filter
-          # documents counters http.<stat_prefix>.jwt_authn.{allowed,denied,
-          # jwks_fetch_success,jwks_fetch_failed}; the expected Prometheus
-          # rendering is envoy_http_jwt_authn_jwks_fetch_failed (conn-manager
-          # prefix extracted into envoy_http_conn_manager_prefix). If the tag
-          # extractor does not cover jwt_authn, the name will carry the
-          # conn-manager prefix inline — fix the selector then.
+          # Metric name VERIFIED LIVE on the compose stack 2026-08-20:
+          # envoy_http_jwt_authn_{jwks_fetch_failed,jwks_fetch_success,denied,
+          # allowed} exist with the conn-manager prefix extracted into the
+          # envoy_http_conn_manager_prefix label (job="envoy" locally; the
+          # cluster data-plane job is "envoy-gateway" — same metric names).
           # Why it matters: the edge holds no key material (RFC-0024); it
           # verifies against the realm JWKS with a bounded cache. While the
           # cache lives, traffic keeps flowing — sustained fetch failure is a
@@ -180,6 +178,38 @@ spec:
             summary: "Envoy Gateway cannot refresh the Keycloak JWKS"
             description: "jwks_fetch_failed is increasing: the edge cannot reach http://keycloak.identity:8080/realms/duynhlab JWKS. Cached keys serve until expiry, then every JWT-protected route starts answering 401. Check Keycloak health and the identity NetworkPolicy."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeJWKSFetchFailing.md"
+
+        - alert: EdgeAuthDeniedRatioHigh
+          # The symptom-side companion to EdgeJWKSFetchFailing: when the JWKS
+          # cache finally expires (or a client fleet ships bad tokens), the
+          # outage shows up as mass 401s at the jwt_authn filter — denied vs
+          # allowed — while every upstream service stays green and no other
+          # alert fires (401 is neither a 5xx nor a 429). The `and` arm is a
+          # min-traffic guard (>0.05 authenticated req/s, ~3/min) so a
+          # near-idle edge dividing 1 denial by ~0 traffic cannot page.
+          # Metric names verified live on the compose stack 2026-08-20.
+          expr: |
+            (
+              sum(rate(envoy_http_jwt_authn_denied{job="envoy-gateway"}[5m]))
+              /
+              (
+                sum(rate(envoy_http_jwt_authn_denied{job="envoy-gateway"}[5m]))
+                + sum(rate(envoy_http_jwt_authn_allowed{job="envoy-gateway"}[5m]))
+              )
+            ) > 0.5
+            and
+            (
+              sum(rate(envoy_http_jwt_authn_denied{job="envoy-gateway"}[5m]))
+              + sum(rate(envoy_http_jwt_authn_allowed{job="envoy-gateway"}[5m]))
+            ) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "Majority of JWT-protected edge requests are being denied (401)"
+            description: "{{ $value | humanizePercentage }} of requests hitting the jwt_authn filter are denied (threshold 50% for 10m). Mass 401s with healthy services usually mean an expired JWKS cache after a fetch outage (check EdgeJWKSFetchFailing), a Keycloak key rotation the edge missed, or a client fleet with broken/expired tokens."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/envoy-gateway/EdgeAuthDeniedRatioHigh.md"
 
     # --- Control plane (job="envoy-gateway-controller") ---
     - name: envoy-gateway-control-plane

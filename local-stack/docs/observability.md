@@ -101,12 +101,14 @@ Every signal has a home, and the collector fan-out matches the cluster
 The edge is a first-class span producer (its `ingress` span is the trace root —
 audit C2/C3) and contributes its JSON access log through Vector (C13). The
 scrape column is what makes `up` a real signal here: without it, a dead backend
-only ever showed up as somebody else's export failures. Five static jobs cover
+only ever showed up as somebody else's export failures. Six static jobs cover
 the engines that cannot push: ClickHouse (`:9363`), the collector's
 self-telemetry (`:8888`), both halves of the edge (`:19001` control plane,
-`:19005` `/stats/prometheus` data plane), and the Temporal server (`:8000`,
+`:19005` `/stats/prometheus` data plane), the Temporal server (`:8000`,
 the listener `PROMETHEUS_ENDPOINT` enables in `compose.yaml`) — which is what
-lets this stack validate the cluster's three server-side Temporal alerts.
+lets this stack validate the cluster's three server-side Temporal alerts — and
+Keycloak's management interface (`:9000`), which does the same for the
+Keycloak alert set.
 
 ## 3. Cluster vs local-stack — component parity matrix
 
@@ -139,6 +141,9 @@ lets this stack validate the cluster's three server-side Temporal alerts.
 | Envoy dashboards (3 of 4) | ✅ (envoyproxy/gateway v1.9.0) | ✅ same tag, Gateway folder | `resources-monitor` is cluster-only (cAdvisor series) |
 | Temporal dashboard | ✅ `temporal.json` (uid `temporal-worker`) | ✅ `temporal-local.json` (uid `temporal-worker-local`) | generated from one panel set; SDK + Server rows |
 | Inventory + Cutover Baseline boards (`inventory`, `rfc0021-baseline` — RFC-0021-era) | ✅ | ✅ local copies + vendored recording rules | `app=` → `service_name=` rewrite, see rule file headers |
+| Keycloak metrics scrape (`up{job="keycloak"}`, `keycloak_user_events_total`, agroal, http SLO buckets) | ✅ ServiceMonitor (management :9000) | ✅ vmagent job `keycloak` (:9000) | same job name + labels both stacks — no rewrite |
+| Keycloak alerts | ✅ PrometheusRule (5 rules) | ✅ ported subset (`keycloak.yaml`, 4 rules) | KeycloakRestartLoop is kube-state-only, cluster-only |
+| Keycloak — Identity board | ✅ (`keycloak-identity.json` CR) | ✅ `keycloak-identity-local.json` | same uid `keycloak-identity`, same queries (scrape labels identical) |
 | OTel Collector health board | ❌ (gap — collector alerts have no cluster board) | ✅ `otel-collector-health-local` | local-first; promote to the cluster when wanted |
 
 ## 4. Signal map — what each backend answers
@@ -217,7 +222,10 @@ so a runbook practised locally transfers. Different series by design:
 
 Beyond the ClickHouse slice, `rules/` also carries the vendored RFC-0021
 recording rules (`rfc0021-baseline.yaml`, `inventory.yaml` — 15 recording +
-3 inventory alerting rules) so the Inventory and Cutover Baseline dashboards render locally;
+3 inventory alerting rules) so the Inventory and Cutover Baseline dashboards render locally,
+and the keycloak rules (`keycloak.yaml` — 4 alerting: KeycloakDown + the three
+identity KPI alerts; no label rewrite needed, the `keycloak` scrape job is
+identical on both stacks);
 they materialize because vmalert runs with `-remoteWrite.url`. One mechanical
 rewrite applies: cluster series carry an `app` label, the local OTLP path
 promotes `service_name` — every `app=` matcher became `service_name=` (see

@@ -1523,6 +1523,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse 25.12 → 26.7** (#734) — the deliberate major hop the 25.12
+  stepping stone (#739) staged. Gated on a full from-scratch E2E audit run
+  together with the Keycloak bump: version 26.7.4.58 live, ingest flowing,
+  `otel_traces_trace_id_ts` MV populating, Map-column schema + 90-day
+  `ttl_only_drop_parts` TTL verbatim, zero upgrade/compat warnings in
+  err.log. The 26.x S3-credential breaking change does not apply (native-TCP
+  exporter with explicit credentials, no S3 usage).
 - **opentelemetry-collector chart constraint `<0.157.0` → `<0.171.0`** (#686),
   merged WITH the values migration it requires: chart 0.161.0 removed the
   backwards-compat shim for `config.service.telemetry.metrics.address`, so the
@@ -1605,6 +1612,15 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Keycloak 26.5.7 → 26.7.2** (#806) — two minors on the platform IdP,
+  taken as a greenfield redeploy (fresh DB, Liquibase on empty schema — the
+  one-way-migration caveat is a note, not a risk here). Gated on the full
+  E2E audit: identity rows A1/A4/A5/A17 byte-exact, browser login pages
+  zero-drift (B1–B7), and the identity signals prove the upgrade with
+  numbers — auth p95 35 ms, token p99 54 ms (under the 250 ms SLO bucket),
+  spans + `mdc.traceId` log correlation alive across the bump. Cosmetic
+  wire-shape note: 26.7's login-actions POST adds a base64 `client_data`
+  query param.
 - Bump `kyverno` chart 3.8.1 → **3.8.2** (app v1.18.2): security fix
   enforcing the namespace boundary in `generate.apply()` (GHSA-79gf-7frw-68m9)
   — hardens the repo's one generate-type policy — plus admission-controller

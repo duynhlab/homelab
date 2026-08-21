@@ -261,6 +261,32 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Kyverno has signals for the first time: scrape, dashboard, 4 alerts, 4
+  runbooks.** The admission webhook sits on the write path of every apply and had
+  **none** of them — and the manifest read as if metrics were solved. The values
+  carried a top-level `metricsService` + `serviceMonitor` pair; chart 3.8.2
+  defines neither at that level (each of the four controllers owns its own), so
+  Helm accepted them and ignored them. The cluster ran with **zero**
+  ServiceMonitors and zero `kyverno_*` series. Enabling the chart's own
+  per-controller toggle — the house rule already stated for cert-manager, prefer
+  the chart over a hand-rolled copy that drifts — produced 4 ServiceMonitors → 4
+  VMServiceScrapes, all `operational`, all four targets `health=up`. The
+  dashboard is chart-native too (`grafana.grafanaDashboard.create`), so there is
+  no vendored JSON to drift; it lands in the **GitOps** folder and reports
+  `ApplySuccessful`.
+  New alert domain §6b: `KyvernoControllerDown` (critical — with
+  `absent(kyverno_info)`, because `up == 0` cannot see a target that was never
+  created, which is exactly the state this change ends),
+  `KyvernoAdmissionDenying`, `KyvernoAdmissionLatencyHigh` and
+  `KyvernoPolicyRuleErrors`. **Every expression was run against live series
+  before being written** — measured p99 admission review is 4.95 ms, so the 1s
+  threshold sits ~200× above idle — and all four load into vmalert `inactive`
+  with an empty `lastError`, which is the proof no expression names a series that
+  does not exist. Four runbooks plus a domain README explain the part the metrics
+  cannot: which of the four controllers is down changes the impact completely,
+  and Kyverno is usually the *symptom* of platform slowness rather than its
+  cause.
+
 - **Keycloak login SLO** — the last recorded identity-observability gap closes:
   hand-written `PrometheusServiceLevel` `keycloak-login`
   (`sloth/keycloak-login-slo.yaml`) adds `login-availability` (99.9%, login
@@ -1104,6 +1130,21 @@ Skeleton (copy what you need):
 ### Bugfix
 
 #### Observability
+
+- **The Kind audit's dashboard check could never fail, and the alert count was
+  stale by 16.** K5.7 filtered `GrafanaDashboard` conditions on
+  `.type=="DashboardSynced"`; the Grafana Operator emits
+  **`DashboardSynchronized`**. Verified across every CR on the cluster — the only
+  condition type that exists is the longer name — so the query matched no
+  element, printed nothing, and read as a clean pass on every previous run. With
+  the correct type the cluster reports **34/34** synchronized. The row also now
+  says that git's count is a **floor**: a chart-provisioned CR (Kyverno's) exists
+  on the cluster without a file in `dashboards/`.
+  Separately, `alert-catalog.md` claimed **202** alerts with `observability 3`
+  while that directory holds **15** — the ClickHouse and tracing rules of §8/§8b
+  landed without the Summary being re-derived. Re-derived from the manifests it
+  is **218**. Incrementing by this change's 4 would have carried the error
+  forward instead of finding it.
 
 - **rustfs logged 17 GB an hour and took the whole cluster down with it.** The
   0.12.0 chart ships `config.log_level: "info"` and leaves every

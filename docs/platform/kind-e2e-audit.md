@@ -865,12 +865,22 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
      ```bash
      D=kubernetes/infra/configs/observability/grafana/dashboards
      grep -h -c '^kind: GrafanaDashboard' $D/*.yaml | paste -sd+ - | bc   # 33 at time of writing
+     # ...plus any chart-provisioned CR. Kyverno's chart renders its own
+     # (`grafana.grafanaDashboard.create`), so the cluster holds 34 while git
+     # holds 33 — the git figure is a floor, not the expected total.
      kubectl -n monitoring get grafanadashboards
      kubectl -n monitoring get grafanadashboards -o json | jq -r '
-       .items[] | select(.status.conditions[]? | select(.type=="DashboardSynced" and .status!="True"))
-       | "\(.metadata.name): \(.status.conditions[] | select(.type=="DashboardSynced") | .message)"'
+       .items[] | select((.status.conditions[]? | select(.type=="DashboardSynchronized") | .status) != "True")
+       | "\(.metadata.name): \(.status.conditions[] | select(.type=="DashboardSynchronized") | .message)"'
      ```
      **FAIL:** any CR named by the last command.
+     > **That command named nothing until 2026-08-21, and could not have.** It
+     > filtered on `.type=="DashboardSynced"`; the Grafana Operator emits
+     > **`DashboardSynchronized`**. Checked across every CR on the cluster, the
+     > only condition type that exists is the longer name — so the query matched
+     > no element, printed nothing, and read as a clean pass on every previous
+     > run. It is now the correct type, and with it the cluster reports
+     > **34/34 synchronized**.
 
   2. **The `url:`-sourced CRs actually fetched.** Of the 33, **18 use
      `configMapRef`** (JSON committed here) and **15 use `url:`** — they have no

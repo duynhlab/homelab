@@ -1,0 +1,99 @@
+# Kyverno alerts — the admission webhook had no signals at all until
+# 2026-08-21. Every metric name and label value below was read off the live
+# cluster before it was written here (`kyverno-svc-metrics` and friends are the
+# job labels the chart's per-controller ServiceMonitors produce), because a rule
+# naming a series that does not exist loads cleanly, never fires, and is
+# indistinguishable from a healthy alert.
+#
+# Why this domain matters more than its size suggests: `disallow-default-namespace`
+# runs with validationFailureAction Enforce AND failurePolicy Fail, so a dead
+# admission controller does not merely stop policing -- it can refuse admission.
+# The 2026-08-21 disk incident showed the shape of that failure: webhook calls
+# timing out at 5s turned into Flux dry-run InternalErrors and a chain of 14
+# Kustomizations parked on "dependency not ready", with nothing pointing at the
+# webhook.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kyverno-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    - name: kyverno-availability
+      interval: 1m
+      rules:
+        - alert: KyvernoControllerDown
+          # absent() covers the silent mode where the ServiceMonitor selects
+          # nothing -- label drift, or the values regressing to the top level as
+          # they had done until 2026-08-21, which left the cluster with zero
+          # ServiceMonitors while the manifest read as if metrics were solved.
+          expr: |
+            up{job=~"kyverno-.*-metrics|kyverno-svc-metrics"} == 0
+            or absent(kyverno_info)
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "Kyverno controller down or not scraped ({{ $labels.job }})"
+            description: "A Kyverno controller is unreachable, or the whole kyverno_* scrape is absent. disallow-default-namespace runs Enforce with failurePolicy Fail, so admission for the covered namespaces can be refused, not merely unpoliced."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kyverno/KyvernoControllerDown.md"
+
+    - name: kyverno-admission
+      interval: 1m
+      rules:
+        - alert: KyvernoAdmissionDenying
+          # request_allowed is a real label on kyverno_admission_requests_total;
+          # on a healthy cluster every series carries "true". Any sustained
+          # "false" means something is being refused at admission -- the class
+          # of failure that reads as "the PR merged but Flux will not apply it".
+          expr: sum(rate(kyverno_admission_requests_total{request_allowed="false"}[5m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "Kyverno is refusing admission requests"
+            description: "Kyverno has denied admission requests for 10 minutes. Expected only when an Enforce policy is doing its job on a genuinely bad manifest; otherwise a policy or exception has regressed."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kyverno/KyvernoAdmissionDenying.md"
+
+        - alert: KyvernoAdmissionLatencyHigh
+          expr: |
+            histogram_quantile(0.99,
+              sum by (le, job) (rate(kyverno_admission_review_duration_seconds_bucket[5m]))
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+            category: latency
+          annotations:
+            summary: "Kyverno admission review p99 above 1s ({{ $labels.job }})"
+            description: "Kyverno sits on the write path of every apply in the covered namespaces. Slow admission review becomes API-server webhook timeouts, which surface as Flux dry-run InternalErrors rather than as a Kyverno problem."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kyverno/KyvernoAdmissionLatencyHigh.md"
+
+    - name: kyverno-policy
+      interval: 1m
+      rules:
+        - alert: KyvernoPolicyRuleErrors
+          # `error` is a rule result, not a verdict: the rule could not be
+          # evaluated. In Audit mode it is invisible -- it reads exactly like a
+          # compliant resource. This is the exact defect the new policy fixtures
+          # found in require-probes, where a Pod with no ownerReferences made a
+          # JMESPath measure a null.
+          #
+          # ARMS WHEN EMITTED: on 2026-08-21 the live label set was
+          # rule_result={pass,fail,skip} only, because that defect was fixed in
+          # the same train. The rule stays silent until Kyverno emits `error`,
+          # which is the point -- an error must not be silent twice.
+          expr: sum(rate(kyverno_policy_results_total{rule_result="error"}[10m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: "Kyverno rules are erroring instead of returning a verdict"
+            description: "A policy rule could not be evaluated for {{ $labels.policy_name }}. An error is not a pass: in Audit mode it looks identical to a compliant resource, so the policy is silently not protecting anything."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kyverno/KyvernoPolicyRuleErrors.md"

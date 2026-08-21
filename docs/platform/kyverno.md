@@ -56,7 +56,7 @@ flowchart LR
     PR -.->|"planned"| Reporter["Policy Reporter UI (planned)"]
     Kyverno -->|"metrics"| VMAgent["VMAgent"]
     VMAgent --> VMSingle[("VictoriaMetrics")]
-    VMSingle --> Grafana["Grafana Dashboard 15983"]
+    VMSingle --> Grafana["Grafana<br/>GitOps → Kyverno"]
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
@@ -176,8 +176,34 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
 
 ## Observability
 
-- **Metrics**: `serviceMonitor.enabled: true` in HelmRelease → VMAgent scrape →
-  VictoriaMetrics → Grafana (import dashboard ID `15983`)
+- **Metrics**: `serviceMonitor.enabled: true` **under each of the four
+  controllers** in the HelmRelease → 4 ServiceMonitors → VM operator converts to
+  VMServiceScrape → VMAgent (`selectAllByDefault`) → VictoriaMetrics. Jobs are
+  the Service names: `kyverno-svc-metrics` (admission),
+  `kyverno-background-controller-metrics`,
+  `kyverno-cleanup-controller-metrics`, `kyverno-reports-controller-metrics`.
+  > The nesting is the whole point. Until 2026-08-21 this file described metrics
+  > as solved while the values set `metricsService` and `serviceMonitor` at the
+  > **top level**, which chart 3.8.2 does not define — Helm accepted them,
+  > ignored them, and the cluster carried zero ServiceMonitors and zero
+  > `kyverno_*` series.
+- **Dashboard**: chart-native. `grafana.enabled` + `grafana.grafanaDashboard.create`
+  render a ConfigMap plus a `GrafanaDashboard` CR whose `matchLabels` already
+  match this platform's Grafana `instanceSelector`; it lands in the **GitOps**
+  folder. No vendored JSON, so nothing to drift — the same reasoning as
+  cert-manager's chart-native ServiceMonitor.
+- **Alerts**: 4, in [`prometheusrules/kyverno/alerts.yaml`](../../kubernetes/infra/configs/observability/metrics/prometheusrules/kyverno/alerts.yaml),
+  catalogued at [`alert-catalog.md` § 6b](../observability/alerting/alert-catalog.md#6b-kyverno-admission)
+  with one runbook each under [`runbooks/kyverno/`](../observability/runbooks/kyverno/README.md).
+- **Logs**: nothing to wire. Vector tails every pod that does not carry
+  `platform.duynhlab.dev/otlp-logs=true`, so Kyverno's stdout is already in
+  VictoriaLogs (`namespace:"kyverno"`). Only `level` is lifted to a queryable
+  field; promoting other JSON keys would need a container-scoped merge branch in
+  Vector's `add_labels`, as the Envoy access log has — a known gap, not done.
+- **Tracing**: not enabled. The chart exposes `tracing.*` and the collector is
+  reachable at `otel-collector-opentelemetry-collector.monitoring.svc:4317`;
+  adopting it would show per-policy latency inside admission. Deliberately out of
+  scope for now.
 - **Reports**: Aggregate via `kubectl get policyreport -A`. A policy-reporter UI
   at `kyverno.duynh.me` is planned but **not deployed** — no HelmRelease, no
   HTTPRoute, and the hostname is absent from `scripts/setup-hosts.sh`

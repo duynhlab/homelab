@@ -1455,6 +1455,32 @@ Skeleton (copy what you need):
 
 #### Secrets
 
+- **`openbao-db-config` wrote through the round-robin Service and hung on a
+  standby, wedging the whole Flux chain.** Found by the Kind gate, which is the
+  only place it can be found: the Job writes `database/config/platform-db` and
+  then `database/static-roles/notification`, and its `BAO_ADDR` pointed at
+  `openbao.openbao.svc` — whose selector carries **no `openbao-active` label**, so
+  its endpoints are all three pods. Two requests in three land on a standby, and a
+  standby answers a **write** with a 307 to the active node's **pod IP**, which
+  this client cannot follow: the request hangs to the context deadline instead of
+  failing. Observed exactly that shape — `Success! Data written to:
+  database/config/platform-db` (lucky pod) followed immediately by `Error writing
+  data to database/static-roles/notification: context deadline exceeded`, three
+  restarts running. Everything else checked out and was ruled out one at a time:
+  the `notification` database and both `vault_rotator` / `notification` roles
+  exist, `allow-internal-callers` already permits `openbao` → `platform`, and the
+  exact connection string the Job configures (`vault_rotator` →
+  `notification`, `sslmode=disable`) succeeds from a pod in the `openbao`
+  namespace. Now points at **`openbao-active`**, verified to carry exactly one
+  endpoint (the pod labelled `openbao-active: "true"`, `"standby":false` on
+  `/v1/sys/health`). The static-role write also gains the retry loop its
+  neighbour already had, so a leader election *during* the Job cannot reintroduce
+  the hang. Same class as the bootstrap Job's standby hang (#793), which was fixed
+  by pinning to a pod — this Job was missed. Blast radius while broken:
+  `databases-local` never goes Ready, so `keycloak`, `temporal`, `apps` and
+  `envoy-gateway-config` never start, and `platform-db-notification-secret` never
+  syncs.
+
 - **docs/secrets synced to the deployed platform, two files dissolved.**
   `production-hardening.md` folds into README § Current boundaries — its
   Status table claimed Shamir-CronJob unseal (ADR-024 shipped awskms/floci

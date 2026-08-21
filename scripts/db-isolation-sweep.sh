@@ -92,9 +92,20 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
   # No pipe into while: a piped while runs in a subshell and FAIL=1 would be
   # lost — the sweep would always exit 0 (the exact harness-lies class the
   # e2e traps note warns about).
-  local out rows=0
-  out=$(kubectl run "isolation-sweep-$label" --rm -i --restart=Never -n "$ns" \
-    --image="$IMAGE" --command -- sh -c "$script" 2>/dev/null)
+  local out rows=0 pod="isolation-sweep-$label-$$"
+  # Read the pod's LOGS, do not attach to it. `kubectl run -i` streams over an
+  # attach, and an attach loses output when the container writes a burst and exits
+  # immediately: measured on Kind, the pod emitted all 36 PAIR lines while the
+  # parser saw 35 — a different pair each run, sometimes one in each cluster.
+  # Before the row-count assertion below existed, that printed
+  # "ISOLATION MATRIX: PASS" on 35 of 36 pairs, which is the worst possible
+  # outcome for a script whose green line is the isolation evidence. Logs are
+  # written by the kubelet and are not subject to that race.
+  kubectl run "$pod" --restart=Never -n "$ns" \
+    --image="$IMAGE" --command -- sh -c "$script" >/dev/null 2>&1
+  kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$pod" -n "$ns" --timeout=180s >/dev/null 2>&1
+  out=$(kubectl logs "pod/$pod" -n "$ns" 2>/dev/null)
+  kubectl delete "pod/$pod" -n "$ns" --wait=false >/dev/null 2>&1
   while read -r tag role db verdict; do
     # Only PAIR lines are verdicts; kubectl's own chatter (e.g. the pod
     # deletion notice) must not be parsed as a matrix row.
@@ -123,7 +134,7 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
   # harness-lies class this script's header warns about, so the row count is
   # itself an assertion: every pair in the matrix must come back with a verdict.
   if [ "$rows" -ne "${#pairs[@]}" ]; then
-    printf "FAIL  %-9s parsed %s verdicts, expected %s — the sweep verified nothing it claims to\n" \
+    printf "FAIL  %-9s parsed %s verdicts, expected %s — the matrix is not fully verified\n" \
       "$label" "$rows" "${#pairs[@]}"
     [ "$rows" -eq 0 ] && printf "      (no output at all: is the kubectl context set and the cluster up?)\n"
     FAIL=1

@@ -937,17 +937,20 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
      reproduces the failure with a green 200. The four vendored
      `envoy-gateway/*.json` boards are the inverse: no `__inputs`, so their CRs
      carry no `datasources:` block and they self-resolve via `templating.list`.
-     **`clickhouse-server-engine` needs reading carefully, and the old checklist
-     got it wrong.** The board is dual-target: 21 expressions read `chi_*` (the
-     Altinity metrics-exporter's `/chi` engine view) and 18 read the engine's own
-     `ClickHouseMetrics_*` / `ClickHouseProfileEvents_*` families. The predecessor
-     checklist said the `chi_*` panels are "empty by design, in both
-     environments, because nothing here runs that operator" — **that is false for
-     the cluster.** The Altinity operator *is* deployed
-     (`kubernetes/infra/controllers/clickhouse-operator/`, wired into
-     `controllers/kustomization.yaml`), so on Kind the `chi_*` panels are expected
-     to populate. Empty `chi_*` panels here are a **finding**, and the likely cause
-     is already written down — see [K5.10](#k5--the-four-signals).
+     **`clickhouse-server-engine` is dual-target, and both earlier readings of it
+     were wrong.** 21 expressions read `chi_*` (the Altinity metrics-exporter's
+     view of the CHI) and 18 read the engine's own `ClickHouseMetrics_*` /
+     `ClickHouseProfileEvents_*` families. The original checklist called the
+     `chi_*` panels "empty by design, because nothing here runs that operator" —
+     false, the Altinity operator *is* deployed. The correction that replaced it
+     then predicted empty `chi_*` panels as the likely finding — **also false.**
+     Measured 2026-08-21: **914 `chi_*` series present**, and **zero**
+     `ClickHouse*` series. So the exporter half populates and the engine-native
+     half is the empty one, which is the opposite of what was written down. The
+     engine's own Prometheus endpoint is not scraped at all; those 18 panels stay
+     blank until something scrapes it, and the alert expressions that name
+     `chi_*` families are the ones worth tuning — see
+     [K5.10](#k5--the-four-signals).
 
 - [ ] **K5.8 Alert rules loaded, none firing wrongly.** Group the firing set by
   `severity` — the name alone cannot tell you which of two Sloth variants fired:
@@ -1004,14 +1007,16 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   ```bash
   grep -rn 'VERIFY-AT-KIND' kubernetes/ docs/
   ```
-  At the time of writing that is **four** markers, plus two docs that say
+  At the time of writing that is **three** markers (a fourth, on the
+  ClickHouse scrape, was closed on 2026-08-21 — see the struck row below), plus
+  two docs that say
   expression tuning happens here
   ([`alert-catalog.md`](../observability/alerting/alert-catalog.md),
   [`clickhouse/README.md`](../observability/clickhouse/README.md)):
 
   | Marker | Question | How to answer |
   |---|---|---|
-  | `controllers/clickhouse-operator/helmrelease.yaml` | Does the chart's ServiceMonitor scrape **both** `/metrics` (operator control plane) and `/chi` (metrics-exporter engine view), or only `/metrics`? | `kubectl -n <ns> get servicemonitor -l app.kubernetes.io/name=altinity-clickhouse-operator -o yaml` and count `endpoints[]`. If only one, the fix is already specified: a hand-rolled ServiceMonitor at `configs/observability/metrics/servicemonitors/clickhouse-operator.yaml` with two `endpoints[]`, shaped like `otel-collector.yaml`. **This is the most likely cause of empty `chi_*` panels in [K5.7](#k5--the-four-signals).** |
+  | ~~`controllers/clickhouse-operator/helmrelease.yaml`~~ ✅ **closed 2026-08-21** | Does the chart's ServiceMonitor scrape **both** surfaces, or only one? | **Both, and the question's premise was wrong.** The chart renders one ServiceMonitor with **two `endpoints[]`**, split by **port** rather than path — `port=ch-metrics` (exporter, the CHI view) and `port=op-metrics` (operator control plane), both `path: /metrics`. `/chi` is not a second path on one port. The hand-rolled ServiceMonitor this row specified is **not needed**, and it was never the cause of anything: 914 `chi_*` series are present. |
   | `prometheusrules/observability/clickhouse-alerts.yaml` ×3 | The real series names: the fetch-error counter, `PartsActive` casing, and the event-counter names (`RejectedInserts`, …) | Query the live label values: `curl -sk 'https://vmui.duynh.me/api/v1/label/__name__/values' \| jq -r '.data[]' \| grep -iE 'chi_\|clickhouse'` and correct each expression against what exists. |
 
   These are **not optional**: a rule whose expression names a series that does not

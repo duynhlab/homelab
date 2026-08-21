@@ -90,6 +90,11 @@ spec:
     # rotation keys at all, while the log volume carried on to 8.8 GB. Verify a
     # change here by reading the rendered ConfigMap, never the values file:
     #   kubectl -n rustfs get cm rustfs-config -o jsonpath='{.data}' | tr , '\n' | grep LOG
+    # ...and then RESTART: the container reads this through envFrom, and the
+    # chart puts no checksum/config annotation on the pod template, so a
+    # corrected ConfigMap never reaches a running process. Verified the hard
+    # way -- the ConfigMap said `warn` while `env` inside the pod still said
+    # `info`. `kubectl -n rustfs rollout restart deploy/rustfs`. See README.
     config:
       rustfs:
         log_level: "warn"

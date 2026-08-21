@@ -1320,6 +1320,24 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **A corrected rustfs ConfigMap never reached the running process, and that is
+  the third silent trap in one incident.** The container takes its environment
+  through `envFrom: configMapRef`, and chart 0.12.0 puts **no annotations at all**
+  on the pod template — no `checksum/config`. So Helm updated the ConfigMap, the
+  Deployment spec did not change, no rollout happened, and the process kept the
+  environment it started with: the ConfigMap read `LOGGER_LEVEL=warn` while `env`
+  inside the pod still read `info`, with the pod at `restarts=0` and 52 minutes
+  older than the change. `rustfs/README.md` now documents both traps in the order
+  they bite — wrong nesting renders nothing, and a correct render does not restart
+  anything — each with the command that proves the real state (`get cm … | grep
+  LOG`, then `exec … env | grep RUSTFS_OBS_LOG`). It also records why the volume
+  needs a cap at all (span noise from `s3s` at INFO, one `new`/`close` pair per S3
+  request signature, so ~17 GB/hour tracking traffic rather than incidents), the
+  invariant `size × keep_files < logStorageSize`, and why nothing alerted: on Kind
+  the PV-filling rules cannot fire because local-path reports no
+  `kubelet_volume_stats_*`. **Measured after the restart: 0 bytes of log growth in
+  the first minute, against ~290 MB/minute before.**
+
 - **Four rows of the Kind audit asserted things that could not be true, so a
   healthy platform read as broken.** Found by running the gate end to end on
   2026-08-21.

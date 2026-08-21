@@ -628,6 +628,24 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The isolation sweep was silently verifying 35 of 36 pairs per cluster.** Found
+  by the row-count assertion added hours earlier, on its first real run against a
+  cluster — which is the whole argument for that assertion: **before it existed
+  this printed `ISOLATION MATRIX: PASS` on an incomplete matrix**, and a green line
+  is the only evidence anyone reads. Reproduced across runs: one pair missing in
+  `product`, then in `platform`, then one in each. The pair varied every time.
+  Located by capturing the pod's raw output directly — the pod emitted **all 36**
+  `PAIR` lines while the parser saw 35, so the loss was in `kubectl run -i`, not
+  in the probe: an attach drops output when the container writes a burst and exits
+  immediately. Two wrong guesses on the way, both recorded because they cost time:
+  the `--rm` pod-deletion notice merging into a line (the raw capture used `--rm`
+  and lost nothing), and a fixed pod name colliding with the previous run's
+  terminating pod (no leftovers existed). The capture now **waits for
+  `Succeeded` and reads `kubectl logs`** — written by the kubelet, not subject to
+  the attach race — with a per-run pod name. Four consecutive runs: **72/72 PASS,
+  exit 0**, where the previous shape gave 70, 71, 72, 70 across four. The guard's
+  message also stops saying "verified nothing" for a partial shortfall.
+
 - **First Drill Day recorded** (2026-08-07). `DR-2026-08-A` in `010.2` — the
   Barman acceptance gate, closed: PITR restore in 2 m 12 s with WAL replay
   stopping exactly at the requested instant. Eight of eleven run-sheet steps ran;

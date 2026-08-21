@@ -63,7 +63,7 @@ kustomize_overlays=(
 
 check_prerequisites() {
   local missing=0
-  for cmd in yq kustomize kubeconform curl; do
+  for cmd in yq kustomize kubeconform curl kyverno; do
     if ! command -v "$cmd" &> /dev/null; then
       echo "ERROR - $cmd is not installed" >&2
       missing=1
@@ -311,6 +311,36 @@ validate_worker_build_id() {
   echo "INFO - order-worker versioning: builds [${tags[*]}] consistent across manifests and the cutover CronJob (--build-id ${job_build_id}, deployment ${job_dep_name})"
 }
 
+# Kyverno policy behaviour. kubeconform only checks SHAPE, and it runs with
+# -ignore-missing-schemas, so a Kyverno CRD whose schema is absent is waved
+# through silently -- schema validation is not policy validation. `kyverno test`
+# asks the only question that matters: given this manifest, does this policy
+# pass or fail? That is the class of bug this repo has actually shipped. The
+# first run of these fixtures found one: require-probes returned `error`, not a
+# verdict, for any Pod with no ownerReferences.
+#
+# Pin the CLI to the engine the cluster runs (chart 3.8.2 -> v1.18.2). A CLI
+# ahead of the engine can agree with itself and disagree with admission.
+validate_kyverno_policies() {
+  local dir="kubernetes/infra/configs/kyverno/tests"
+  if [[ ! -d "$dir" ]]; then
+    echo "ERROR - $dir is missing; the policy fixtures are not optional" >&2
+    exit 1
+  fi
+  local count
+  count=$(find "$dir" -name 'kyverno-test.yaml' | wc -l | tr -d ' ')
+  if [[ "$count" -eq 0 ]]; then
+    echo "ERROR - no kyverno-test.yaml found under $dir" >&2
+    exit 1
+  fi
+  echo "INFO - Running $count Kyverno policy test suite(s)"
+  if ! kyverno test "$dir"; then
+    echo "ERROR - Kyverno policy tests failed" >&2
+    exit 1
+  fi
+  echo "INFO - Kyverno policy tests passed"
+}
+
 # Main
 check_prerequisites
 download_schemas
@@ -318,5 +348,6 @@ validate_yaml_syntax
 validate_standalone_manifests
 validate_kustomize_overlays
 validate_worker_build_id
+validate_kyverno_policies
 validate_production
 echo "INFO - All validations passed"

@@ -40,13 +40,17 @@ spec:
     remediation:
       retries: 5
   values:
-    # Scrape the operator's metrics Service (:8888) with the chart's own
-    # ServiceMonitor template — /metrics is the operator control plane,
-    # /chi the metrics-exporter's engine view of the CHI.
-    # VERIFY-AT-KIND: whether the chart's ServiceMonitor covers BOTH paths;
-    # if it only scrapes /metrics, add a hand-rolled ServiceMonitor at
-    # configs/observability/metrics/servicemonitors/clickhouse-operator.yaml
-    # with two endpoints[] (shape: servicemonitors/otel-collector.yaml).
+    # Scrape both surfaces with the chart's own ServiceMonitor template.
+    # ANSWERED AT KIND 2026-08-21: it renders ONE ServiceMonitor with **two
+    # endpoints**, and the split is by PORT rather than by path -- both use
+    # `path: /metrics`:
+    #     port=ch-metrics  path=/metrics  interval=30s   <- metrics-exporter, the
+    #                                                      engine view of the CHI
+    #     port=op-metrics  path=/metrics  interval=30s   <- operator control plane
+    # So the earlier plan here -- hand-roll a ServiceMonitor with two endpoints[]
+    # because the chart "only scrapes /metrics" -- is not needed: the premise that
+    # /chi is a second *path* on one port was wrong. Confirmed by the data, not
+    # just the object: 914 `chi_*` series are present.
     serviceMonitor:
       enabled: true
       keeperMetrics:

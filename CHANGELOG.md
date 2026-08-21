@@ -1132,6 +1132,22 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The ClickHouse scrape marker is closed, and both previous readings of the
+  `chi_*` panels were wrong.** The `VERIFY-AT-KIND` note asked whether the chart's
+  ServiceMonitor covers `/metrics` **and** `/chi`, and pre-specified a hand-rolled
+  replacement if it did not. Answered on the cluster: the chart renders **one**
+  ServiceMonitor with **two `endpoints[]`**, split by **port** rather than path —
+  `ch-metrics` (the exporter's CHI view) and `op-metrics` (the operator control
+  plane), both on `path: /metrics`. `/chi` is not a second path on one port, so
+  the premise was wrong and the hand-rolled ServiceMonitor is **not needed**.
+  The audit's K5.7 note is corrected with it. The original checklist called the
+  `chi_*` panels "empty by design, because nothing here runs that operator"
+  (false — the Altinity operator is deployed); the correction that replaced it
+  predicted empty `chi_*` panels as the likely finding (**also false**). Measured:
+  **914 `chi_*` series present and zero `ClickHouse*` series** — so the exporter
+  half populates and the *engine-native* half is the blank one, the opposite of
+  what was written down twice. Marker count drops 4 → 3.
+
 - **The rustfs log cap was one nesting level too shallow and did nothing.** The
   first attempt set `values.config.log_level` and `values.config.log_rotation`;
   chart 0.12.0 puts both under **`config.rustfs`**. Helm accepted the keys and

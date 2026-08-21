@@ -105,6 +105,26 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **`require-probes` reported eight violations nobody could act on, and 28
+  evaluation errors once fixed naively.** Surfaced by the Kind audit: the policy
+  matches `kinds: [Pod]` in the ten app namespaces, and its own description says
+  why it exists — *"Missing readinessProbe causes the edge gateway to route to
+  unready Pods, generating false-positive SLI errors in Sloth burn-rate alerts."*
+  That reasoning is about traffic-serving pods. A Job-owned pod is never in a
+  Service's endpoints, so it cannot cause that harm, and a readinessProbe on a
+  batch pod would never pass. `scripts/kind-seed.sh`'s Jobs are the first batch
+  workloads to run in an app namespace, so they were the first to expose it — 8
+  reports, doubled by autogen. Now skipped by a precondition on
+  `ownerReferences[?kind=='Job']`. **Autogen is also disabled on this policy**,
+  which the first attempt at the fix proved necessary: autogen rewrites
+  `request.object.metadata.ownerReferences` into
+  `request.object.spec.template.metadata.ownerReferences`, which does not exist on
+  a controller, and the rule then reports `error` — 28 of them — instead of a
+  verdict. The Deployment/CronJob variants were redundant anyway, since the rule
+  deliberately matches every Pod however created, and they double-counted every
+  violation. Verified against a real seed Job pod:
+  `require-probes=skip`, and zero `fail` or `error` results cluster-wide.
+
 - **ADR-050 executed — the workforce realm `duynhlab-staff`**: operator
   identity leaves the customer realm. Realm twins now carry two realms
   (staff: operator `duyne`, role `backoffice_admin`, client `admin-portal`,

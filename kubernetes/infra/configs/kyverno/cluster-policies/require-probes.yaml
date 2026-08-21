@@ -5,6 +5,15 @@ kind: ClusterPolicy
 metadata:
   name: require-probes
   annotations:
+    # Autogen OFF. The rule matches `kinds: [Pod]` on purpose — every pod in
+    # these namespaces, however it was created — so the Deployment/CronJob
+    # variants Kyverno would synthesise are redundant, and they double-count
+    # every violation in the reports. They also break the precondition below:
+    # autogen rewrites `request.object.metadata.ownerReferences` into
+    # `request.object.spec.template.metadata.ownerReferences`, which does not
+    # exist on a controller, and the rule then reports `error` instead of a
+    # verdict (measured: 28 such errors on this cluster).
+    pod-policies.kyverno.io/autogen-controllers: none
     policies.kyverno.io/title: Require liveness and readiness probes
     policies.kyverno.io/category: Best Practices, Reliability
     policies.kyverno.io/severity: medium
@@ -34,6 +43,19 @@ spec:
                 - shipping
                 - payment
                 - checkout
+      # Batch pods are out of scope, and the description above says why: this
+      # policy exists because an unready pod behind the gateway produces
+      # false-positive SLI errors. A Job-owned pod is never in a Service's
+      # endpoints, so it cannot cause that — while a readinessProbe on a batch
+      # pod would never pass, since it serves nothing. Without this the seed Jobs
+      # (`scripts/kind-seed.sh`, the first batch workloads to run in an app
+      # namespace) report eight violations that no one can act on, which is how a
+      # report trains people to stop reading it.
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.ownerReferences[?kind=='Job'] | length(@) }}"
+            operator: Equals
+            value: 0
       validate:
         message: "Containers must declare both livenessProbe and readinessProbe."
         foreach:

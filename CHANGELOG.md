@@ -1399,6 +1399,28 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The isolation sweep could not run on the machine that runs the audit, and was
+  testing a role that no longer exists.** `scripts/db-isolation-sweep.sh` is the
+  role x database `pg_hba` matrix ADR-015 promised would run at each bring-up, and
+  its green line is meant to be *proof* of isolation — so two defects mattered
+  more than they look. It needed **bash 4** for `declare -A` while macOS ships
+  **3.2**, dying at line 22 with `declare: -A: invalid option` before probing
+  anything; it was the only script in the repo requiring bash 4. And its
+  `platform_roles` / `platform_dbs` arrays still carried the retired **`auth`**
+  role and database, expecting an `allow` the committed pg_hba has not had since
+  Keycloak replaced auth-service — that pair answers `does not exist` and took the
+  whole sweep non-zero. The matrix is now a newline-delimited string with
+  last-write-wins lookup (the overwrite an associative array gave for free —
+  reading the *first* match would have silently expected `reject` on all seven
+  platform `allow` pairs) and reports **72 rows, 36 per cluster**. Verified both
+  directions against a stubbed `kubectl`: 72/72 PASS on a correct pg_hba, and a
+  deliberately loosened `user → notification` pair yields
+  `FAIL … got=allow want=reject` with exit 1 — a sweep that cannot fail is worth
+  nothing. Still uncovered and recorded in the script rather than papered over:
+  the pg_hba's **`keycloak`** role is not in the matrix, because adding it means
+  deciding its full allow/reject row (ADR-041 — Keycloak connects direct to
+  `:5432` for its Agroal pool).
+
 - **The committed PITR restore manifest had never worked.** The first Drill A run
   (2026-08-07) put `restore-cluster-example.yaml` through a real restore and
   Postgres refused to start: `FATAL: "min_wal_size" must be at least twice

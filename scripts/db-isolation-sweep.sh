@@ -19,38 +19,69 @@ FAIL=0
 # (pg_hba-level rejection expected). Derived from the committed pg_hba in
 # kubernetes/infra/configs/databases/clusters/*/instance.yaml — update BOTH
 # when a service is added.
-declare -A EXPECT
+#
+# Held as newline-delimited "label/role/db=verdict" rather than an associative
+# array. `declare -A` needs bash 4, macOS ships bash 3.2, and this was the only
+# script in the repo that required bash 4 — so on the machine that actually runs
+# the audit it died at this line with `declare: -A: invalid option` followed by
+# an unbound-variable cascade. A sweep whose green line is meant to be proof of
+# isolation must at least start.
+EXPECT=""
+expect_put() { EXPECT="${EXPECT}$1=$2
+"; }
+# prints the verdict for a key, or nothing when the key is absent.
+# LAST match wins, because the builders below deliberately write a broad
+# `reject` for every pair and then overwrite the committed allow lines — the
+# same overwrite an associative array gave for free. Taking the first match
+# would silently expect `reject` on all eight allow pairs.
+expect_get() {
+  local hit
+  hit=$(printf '%s' "$EXPECT" | grep -- "^$1=" | tail -1) || return 0
+  [ -n "$hit" ] || return 0
+  printf '%s' "${hit#*=}"
+}
+# prints the role/db pairs registered under a label, once each — an overwritten
+# key appears twice in EXPECT and would otherwise be probed twice
+expect_pairs() {
+  printf '%s' "$EXPECT" | sed -n "s|^$1/\([^=]*\)=.*|\1|p" | sort -u
+}
 
 product_roles=(payment product cart order checkout inventory)
 product_dbs=(payment product cart order checkout inventory)
 for r in "${product_roles[@]}"; do
   for d in "${product_dbs[@]}"; do
-    if [ "$r" = "$d" ]; then EXPECT["product/$r/$d"]=allow; else EXPECT["product/$r/$d"]=reject; fi
+    if [ "$r" = "$d" ]; then expect_put "product/$r/$d" allow; else expect_put "product/$r/$d" reject; fi
   done
 done
 
-platform_roles=(auth user notification shipping review temporal vault_rotator)
-platform_dbs=(auth user notification shipping review temporal temporal_visibility)
+platform_roles=(user notification shipping review temporal vault_rotator)
+platform_dbs=(user notification shipping review temporal temporal_visibility)
 for r in "${platform_roles[@]}"; do
   for d in "${platform_dbs[@]}"; do
-    EXPECT["platform/$r/$d"]=reject
+    expect_put "platform/$r/$d" reject
   done
 done
 # the committed allow lines (platform-db instance.yaml): each service to its
 # own db, temporal additionally to temporal_visibility, and the RFC-0008
 # rotator role to notification.
-for p in auth/auth user/user notification/notification shipping/shipping \
+#
+# NOT in the matrix, and deliberately so rather than forgotten: the pg_hba also
+# carries `host keycloak keycloak`. Keycloak connects direct to :5432 (its
+# Agroal pool needs long-lived connections and server-side prepared statements,
+# ADR-041), so the pair is real and currently untested — untested coverage, not
+# a failure. Adding it means deciding its full allow/reject row against every
+# other platform role, which is its own change.
+for p in user/user notification/notification shipping/shipping \
          review/review temporal/temporal temporal/temporal_visibility \
          vault_rotator/notification; do
-  EXPECT["platform/${p%%/*}/${p##*/}"]=allow
+  expect_put "platform/${p%%/*}/${p##*/}" allow
 done
 
 sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
   local label="$1" ns="$2" host="$3"; shift 3
   local pairs=()
-  for key in "${!EXPECT[@]}"; do
-    case "$key" in "$label"/*) pairs+=("${key#"$label"/}");; esac
-  done
+  local pr
+  while read -r pr; do [ -n "$pr" ] && pairs+=("$pr"); done <<<"$(expect_pairs "$label")"
 
   local script=""
   for pair in "${pairs[@]}"; do
@@ -69,17 +100,18 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
     # deletion notice) must not be parsed as a matrix row.
     [ "$tag" = "PAIR" ] || continue
     [ "$role" ] || continue
-    local key="$label/$role/$db" got=""
+    local key="$label/$role/$db" got="" want=""
+    want=$(expect_get "$key"); [ -n "$want" ] || want="?"
     case "$verdict" in
       *"pg_hba.conf rejects"*)            got=reject ;;
       *"password authentication failed"*) got=allow ;;
       *"does not exist"*)                 got=missing ;;
       *)                                  got="other($verdict)" ;;
     esac
-    if [ "${EXPECT[$key]:-?}" = "$got" ]; then
+    if [ "$want" = "$got" ]; then
       printf "PASS  %-9s %-14s -> %-20s %s\n" "$label" "$role" "$db" "$got"
     else
-      printf "FAIL  %-9s %-14s -> %-20s got=%s want=%s\n" "$label" "$role" "$db" "$got" "${EXPECT[$key]:-?}"
+      printf "FAIL  %-9s %-14s -> %-20s got=%s want=%s\n" "$label" "$role" "$db" "$got" "$want"
       FAIL=1
     fi
   done <<<"$out"
@@ -87,7 +119,7 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
 
 echo "== product-db (6 allow / 30 reject expected)"
 sweep product product "product-db-rw.product.svc.cluster.local"
-echo "== platform-db (8 allow / 41 reject expected)"
+echo "== platform-db (7 allow / 29 reject expected)"
 sweep platform platform "platform-db-rw.platform.svc.cluster.local"
 
 echo

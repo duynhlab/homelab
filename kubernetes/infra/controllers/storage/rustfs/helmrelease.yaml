@@ -83,12 +83,20 @@ spec:
     # Invariant to keep: size * keep_files must stay BELOW logStorageSize,
     # because local-path is hostPath-backed -- `requests.storage` is advisory
     # and enforces nothing. 50 MB * 3 = 150 MB < 256Mi.
+    #
+    # The keys live under `config.rustfs`, not `config`. Placed one level too
+    # shallow -- as they were on the first attempt -- Helm accepts them and
+    # renders nothing: the ConfigMap kept RUSTFS_OBS_LOGGER_LEVEL="info" and no
+    # rotation keys at all, while the log volume carried on to 8.8 GB. Verify a
+    # change here by reading the rendered ConfigMap, never the values file:
+    #   kubectl -n rustfs get cm rustfs-config -o jsonpath='{.data}' | tr , '\n' | grep LOG
     config:
-      log_level: "warn"
-      log_rotation:
-        size: 50
-        time: hour
-        keep_files: 3
+      rustfs:
+        log_level: "warn"
+        log_rotation:
+          size: 50
+          time: hour
+          keep_files: 3
 
     secret:
       existingSecret: rustfs-credentials

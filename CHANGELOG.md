@@ -1131,6 +1131,19 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The rustfs log cap was one nesting level too shallow and did nothing.** The
+  first attempt set `values.config.log_level` and `values.config.log_rotation`;
+  chart 0.12.0 puts both under **`config.rustfs`**. Helm accepted the keys and
+  rendered nothing — the ConfigMap kept `RUSTFS_OBS_LOGGER_LEVEL="info"` with no
+  rotation keys at all, and the log volume carried on from a fresh cluster to
+  **8.8 GB** (`rustfs.log` alone at 5.6 GB) in about an hour. The memory bump in
+  the same change *did* land, because that path was already correct — which is
+  what made the whole thing read as fixed. This is the identical failure mode as
+  the Kyverno values in #855, on the same day, in the opposite direction:
+  **verify a Helm values change against the rendered object, never the values
+  file.** The comment now carries that check:
+  `kubectl -n rustfs get cm rustfs-config -o jsonpath='{.data}' | tr , '\n' | grep LOG`.
+
 - **The Kind audit's dashboard check could never fail, and the alert count was
   stale by 16.** K5.7 filtered `GrafanaDashboard` conditions on
   `.type=="DashboardSynced"`; the Grafana Operator emits

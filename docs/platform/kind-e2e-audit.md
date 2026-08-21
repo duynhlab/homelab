@@ -512,7 +512,22 @@ cannot be derived from a single file — they get their own row (K2.3).
   manifests disagree about which roles exist — fix whichever is wrong in its own
   PR, and do not relax the matrix to make the sweep green.
 
-- [ ] **K3.5** Edge isolation holds. `./scripts/edge-isolation-sweep.sh --live`
+- [ ] **K3.5** Edge isolation holds — **and read what this row can and cannot
+  prove.** `./scripts/edge-isolation-sweep.sh --live`
+  **Kind's default CNI is `kindnet`, which ships no NetworkPolicy controller, so
+  NetworkPolicy is declared here and NOT enforced.** Measured 2026-08-21: a pod in
+  `user` reached `inventory:8080`, which `allow-inventory-protected-http` grants to
+  envoy-gateway *only*, in a namespace that also carries `deny-all-ingress`. The
+  policies are correct; nothing applies them. The sweep now detects this and marks
+  the deny probes `SKIP` rather than reporting them as isolation failures — before
+  that it read as `FAIL live: inventory:9090 -> got=open want=closed`, which
+  blames the manifests for the CNI's behaviour.
+  So: **manifest mode is the only isolation evidence this gate can give.** Do not
+  let a green K3.5 be read as "network isolation verified". Getting more requires
+  swapping in Calico or Cilium, which is its own change.
+  **FAIL:** a non-zero exit — i.e. a manifest-mode gap (a namespace the edge must
+  reach with no allow on that port, the blackhole risk) or an allow probe that
+  cannot connect. Deny probes cannot fail here, and that is the point of the row.
   The stale-`auth` warning that used to sit on this row is **resolved**:
   `EDGE_ALLOWS` now reads `cart checkout inventory notification order payment
   product review shipping user` on `:8080` plus `identity:8080` (Keycloak, for

@@ -105,6 +105,22 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **The edge sweep blamed the manifests for the CNI, and the Kind gate implied it
+  proved network isolation when it cannot.** `--live` reported
+  `FAIL live: inventory:9090 -> got=open want=closed`, which reads as an exposed
+  gRPC port. The NetworkPolicies are correct — `allow-inventory-grpc` admits only
+  `checkout`, `order`, `product` on 9090 — but **Kind's default CNI is `kindnet`,
+  which ships no NetworkPolicy controller**, so nothing applies them. Proved
+  directly rather than inferred: a pod in `user` reached `inventory:8080`, a port
+  `allow-inventory-protected-http` grants to envoy-gateway alone, in a namespace
+  carrying `deny-all-ingress`. The sweep now self-tests for enforcement before
+  reading any deny result and marks those probes `SKIP` with a loud banner —
+  *"THIS GATE DOES NOT PROVE NETWORK ISOLATION"* — and `kind-e2e-audit.md` K3.5
+  says the same, so a green row cannot be misread. Also fixed here, same class as
+  #847: the live capture used `kubectl run -i`, whose attach silently drops
+  output, and had no probe-count guard; it now waits for `Succeeded`, reads
+  `kubectl logs`, and fails if it parses fewer probes than it expected.
+
 - **`require-probes` reported eight violations nobody could act on, and 28
   evaluation errors once fixed naively.** Surfaced by the Kind audit: the policy
   matches `kinds: [Pod]` in the ten app namespaces, and its own description says

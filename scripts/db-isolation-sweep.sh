@@ -92,7 +92,7 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
   # No pipe into while: a piped while runs in a subshell and FAIL=1 would be
   # lost — the sweep would always exit 0 (the exact harness-lies class the
   # e2e traps note warns about).
-  local out
+  local out rows=0
   out=$(kubectl run "isolation-sweep-$label" --rm -i --restart=Never -n "$ns" \
     --image="$IMAGE" --command -- sh -c "$script" 2>/dev/null)
   while read -r tag role db verdict; do
@@ -108,6 +108,7 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
       *"does not exist"*)                 got=missing ;;
       *)                                  got="other($verdict)" ;;
     esac
+    rows=$((rows + 1))
     if [ "$want" = "$got" ]; then
       printf "PASS  %-9s %-14s -> %-20s %s\n" "$label" "$role" "$db" "$got"
     else
@@ -115,6 +116,18 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
       FAIL=1
     fi
   done <<<"$out"
+
+  # Silence is not success. With no cluster reachable, kubectl fails, $out is
+  # empty, the loop above runs zero times and FAIL stays 0 — so the sweep would
+  # print "ISOLATION MATRIX: PASS" having verified nothing. That is the exact
+  # harness-lies class this script's header warns about, so the row count is
+  # itself an assertion: every pair in the matrix must come back with a verdict.
+  if [ "$rows" -ne "${#pairs[@]}" ]; then
+    printf "FAIL  %-9s parsed %s verdicts, expected %s — the sweep verified nothing it claims to\n" \
+      "$label" "$rows" "${#pairs[@]}"
+    [ "$rows" -eq 0 ] && printf "      (no output at all: is the kubectl context set and the cluster up?)\n"
+    FAIL=1
+  fi
 }
 
 echo "== product-db (6 allow / 30 reject expected)"

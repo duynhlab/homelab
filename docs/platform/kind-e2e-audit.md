@@ -493,19 +493,21 @@ cannot be derived from a single file — they get their own row (K2.3).
   role×database `pg_hba` matrix ADR-015 promised would run "at each bring-up", and
   no document other than this one schedules it.
   `./scripts/db-isolation-sweep.sh`
-  **Read the script's `platform_roles` / `platform_dbs` arrays against the
-  committed pg_hba first** — they are the audit's own expectations, and they
-  currently disagree with the manifests in two ways:
-  - The arrays still carry a role and a database named **`auth`**, expecting an
-    `allow`. `platform-db/instance.yaml`'s pg_hba has no `auth` line (K2.4), so
-    the pair answers `does not exist` → `missing` and the sweep exits non-zero.
-    **The script is wrong here, not the cluster.**
-  - The pg_hba carries a **`keycloak`** role the arrays never test — Keycloak
-    connects direct to `:5432` because its Agroal pool needs long-lived
-    connections and server-side prepared statements (ADR-041). It is untested
-    coverage, not a failure.
-  **FAIL:** a non-zero exit for any reason **other** than the `auth` pair. Fix the
-  script in its own PR; do not paper over it here.
+  Expect **72 rows, all PASS** — 36 per cluster (6 roles x 6 databases), of which
+  6 + 7 are `allow`. Two defects that used to sit on this row were fixed on
+  2026-08-21 and should not be re-diagnosed: the arrays carried a retired
+  **`auth`** role and database expecting an `allow` that pg_hba no longer has, and
+  the script needed **bash 4** for `declare -A` while this machine ships bash 3.2
+  — it died before probing anything, with `declare: -A: invalid option`.
+  One gap is still open, and it is coverage rather than a failure: the pg_hba
+  carries a **`keycloak`** role the matrix does not test. Keycloak connects direct
+  to `:5432` because its Agroal pool needs long-lived connections and server-side
+  prepared statements (ADR-041). Adding it means deciding its whole allow/reject
+  row against every other platform role, so it is its own change — the script
+  records the gap in a comment rather than pretending the matrix is complete.
+  **FAIL:** any non-zero exit. A `missing` verdict means the script and the
+  manifests disagree about which roles exist — fix whichever is wrong in its own
+  PR, and do not relax the matrix to make the sweep green.
 
 - [ ] **K3.5** Edge isolation holds. `./scripts/edge-isolation-sweep.sh --live`
   The stale-`auth` warning that used to sit on this row is **resolved**:

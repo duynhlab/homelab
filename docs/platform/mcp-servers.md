@@ -7,7 +7,18 @@ operational capabilities to AI assistants. This lets AI agents query metrics,
 search logs, reconcile Flux resources, and assist with debugging directly from
 an IDE or CLI — against live cluster data, not stale copies.
 
-The homelab cluster runs **4 MCP servers**, delivered by the Flux `mcp-local`
+> **💤 Not deployed since 2026-08-21.** The owner switched the MCP servers off:
+> they were unused, and they were the largest idle consumers on the Kind host —
+> `victoria-metrics-mcp` alone held **662Mi**. Three lines are commented out and
+> re-enabling means uncommenting them: `- mcp.yaml` in
+> [`clusters/local/kustomization.yaml`](../../kubernetes/clusters/local/kustomization.yaml),
+> `- grafana-service-account-mcp.yaml` in the Grafana configs kustomization (it
+> minted the Viewer token, which has no consumer while the server is off), and
+> `- routes/mcp.yaml` in the Envoy Gateway configs kustomization (the HTTPRoutes
+> would otherwise resolve and 503). Everything below describes the design as
+> built and last verified on 2026-08-21, not what is running today.
+
+The cluster's MCP layer is **4 servers**, delivered by the Flux `mcp-local`
 Kustomization and reachable through the Envoy Gateway edge:
 
 | MCP Server | Purpose | Connects To | Chart | Namespace | Hostname |

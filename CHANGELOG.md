@@ -2277,6 +2277,31 @@ Skeleton (copy what you need):
 - `renovatebot/github-action` 46.1.18 → **46.2.2** (workflow wrapper only,
   same inputs).
 
+### Deprecation
+
+#### GitOps
+
+- **The four MCP servers are switched off.** Owner's call: they are not in use,
+  and they were the largest idle consumers on the Kind host —
+  `victoria-metrics-mcp` alone held **662Mi**, and the four together about 790Mi
+  of RAM for 6m of CPU. Three lines are commented out, and re-enabling is
+  uncommenting them: `- mcp.yaml` in `clusters/local/kustomization.yaml`,
+  `- grafana-service-account-mcp.yaml` in the Grafana configs kustomization, and
+  `- routes/mcp.yaml` in the Envoy Gateway configs kustomization. The second and
+  third are not incidental: the `GrafanaServiceAccount` mints a Grafana **Viewer
+  token** that would have no consumer, and the HTTPRoutes would resolve to
+  deleted backends and answer **503** rather than 404. The local cluster is now
+  **21 Kustomization CRs + `flux-system` = 22**; `AGENTS.md`,
+  `platform/setup.md`, `platform/README.md` and the audit's count are updated
+  with it.
+  Audit rows K3.6 and K4.9 are marked 💤 not-runnable rather than deleted, and
+  K3.6 **was run immediately before the switch-off precisely so the evidence
+  survives**: all four HelmReleases Ready, `GrafanaServiceAccount/grafana-mcp`
+  present, and the controller-minted token beginning `glsa_`. `mcp-servers.md`
+  keeps the design and says plainly that it describes what was built, not what is
+  running.
+
+
 ## [0.110.0] - 2026-08-07
 
 <!-- markdown-link-check-disable -->

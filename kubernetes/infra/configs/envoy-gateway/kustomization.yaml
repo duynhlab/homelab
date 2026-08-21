@@ -13,7 +13,8 @@ resources:
   - routes/api.yaml
   - routes/monitoring.yaml
   - routes/infra.yaml
-  - routes/mcp.yaml
+  # - routes/mcp.yaml    # DISABLED with mcp-local (2026-08-21): the backends are
+  #   gone, so these HTTPRoutes would resolve and then 503.
   - routes/frontend.yaml
   - routes/backoffice.yaml
   - routes/temporal.yaml

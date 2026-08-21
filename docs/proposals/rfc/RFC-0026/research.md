@@ -384,12 +384,12 @@ section that decides whether adoption is a swap or a rebuild.
 
 | Aspect | Platform today (deployed) | Candidate |
 |---|---|---|
-| Build id source | The **image tag**, by construction. [`order-worker-2-4-0.yaml`](../../../../kubernetes/apps/order-worker-2-4-0.yaml) carries `TEMPORAL_WORKER_BUILD_ID: "2.4.0"` next to `tag: "2.4.0"` | **Derived**: image prefix + a hash of the whole pod template. Any env, resource or probe edit mints a new version |
+| Build id source | The **image tag**, by construction. `kubernetes/apps/order-worker-2-4-0.yaml` (retired by ADR-054) carries `TEMPORAL_WORKER_BUILD_ID: "2.4.0"` next to `tag: "2.4.0"` | **Derived**: image prefix + a hash of the whole pod template. Any env, resource or probe edit mints a new version |
 | Enforcement | Two assertions in [`flux-validate.sh`](../../../../scripts/flux-validate.sh): build id must equal `image.tag`, and the **filename** must equal `order-worker-<tag with dots as dashes>.yaml` | None applicable — there is no second copy of the build id to disagree with. Both assertions become dead code |
 | Keeping the current model | — | `workerOptions.unsafeCustomBuildID` (≤ 63 chars) pins it back to the tag. Named "unsafe" because two different images under one id is exactly the non-determinism versioning prevents |
 | Server-side deployment name | Plain `order-fulfillment` (the env value the worker registers) | `<k8s-namespace>/<resource-name>` — e.g. `order/order-fulfillment`. **Not the same name**, so existing server-side version history does not carry over under it |
 | Registration | The worker registers itself from env at startup | The controller registers versions through the Temporal API |
-| One build = one file | Yes, deliberately: a **252-line** HelmRelease per build, staged by [`new-worker-build.sh`](../../../../scripts/new-worker-build.sh) | One resource; the controller creates the per-version `Deployment` |
+| One build = one file | Yes, deliberately: a **252-line** HelmRelease per build, staged by `scripts/new-worker-build.sh` (retired by ADR-054) | One resource; the controller creates the per-version `Deployment` |
 
 Adoption here is a **replacement, not an addition**: the tag-equals-build-id invariant,
 the filename convention, the staging script and both validation assertions are all
@@ -399,7 +399,7 @@ premised on a model the controller does not use.
 
 | Aspect | Platform today (deployed) | Candidate |
 |---|---|---|
-| Making a version Current | A **suspended CronJob** used as a run-on-demand template — `schedule: "0 0 31 2 *"` (a date that does not exist) with `suspend: true`, instantiated by hand with `kubectl create job --from=cronjob/…` ([`worker-set-current-version-cronjob.yaml`](../../../../kubernetes/infra/controllers/temporal/worker-set-current-version-cronjob.yaml)) | `rollout.strategy` — `AllAtOnce` or `Progressive` promote without a human; `Manual` does not |
+| Making a version Current | A **suspended CronJob** used as a run-on-demand template — `schedule: "0 0 31 2 *"` (a date that does not exist) with `suspend: true`, instantiated by hand with `kubectl create job --from=cronjob/…` (`worker-set-current-version-cronjob.yaml` (retired by ADR-054)) | `rollout.strategy` — `AllAtOnce` or `Progressive` promote without a human; `Manual` does not |
 | Fresh cluster | No Current version at all until the Job is run; documented as K1.7 because it fails **silently** — orders `pending`, pods `Ready`, gauges green | Reconciled from git, so a rebuilt cluster converges on its own — unless `Manual` is chosen |
 | Why it is not reconciled today | Two stated reasons, both still valid on their own terms: it is *"a DECISION, not a desired state"*, and from `controllers/temporal` with `wait: true` it would **deadlock** — the CLI needs a poller that `apps-local` deploys, and `apps-local` dependsOn `temporal-local` | The controller sits outside that chain: it watches CRs and calls the API, so the ordering constraint disappears rather than being worked around |
 | Retirement gate | `temporal worker deployment describe-version` reports `DrainageStatus`; ADR-030 records that **nothing in `scripts/` checks it** | `status.deprecatedVersions[].drainedSince` + `eligibleForDeletion`, then `sunset` timers |
@@ -725,7 +725,7 @@ stated as a cost, not assumed away.
 - Temporal Worker Controller — https://github.com/temporalio/temporal-worker-controller
 - Temporal — Kubernetes controller for Worker Deployments — https://docs.temporal.io/production-deployment/worker-deployments/kubernetes-controller
 - Temporal — Worker Versioning — https://docs.temporal.io/production-deployment/worker-deployments/worker-versioning
-- Temporal — Worker Versioning encyclopedia entry (Current / Ramping / Target) — https://docs.temporal.io/encyclopedia/workers/worker-versioning
+- Temporal — Worker Versioning encyclopedia entry (Current / Ramping / Target) — https://docs.temporal.io/production-deployment/worker-deployments/worker-versioning#worker-deployment-versions
 - Temporal — unversioned-to-versioned migration — https://docs.temporal.io/production-deployment/worker-deployments/unversioned-to-versioned-migration
 - Temporal — release stages — https://docs.temporal.io/evaluate/development-production-features/release-stages
 - Temporal — worker performance and slot suppliers — https://docs.temporal.io/develop/worker-performance

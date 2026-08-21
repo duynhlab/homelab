@@ -735,11 +735,28 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   own tee; the Vector leg carries containers with no SDK.
   ```bash
   curl -sk 'https://logs.duynh.me/select/logsql/query' --data-urlencode 'query=_time:45m _stream:{"service.name"="cart"} | count()'
-  curl -sk 'https://logs.duynh.me/select/logsql/query' --data-urlencode 'query=_time:45m _stream:{service="gateway"} upstream_cluster:* route_name:* | count()'
+  curl -sk 'https://logs.duynh.me/select/logsql/query' --data-urlencode 'query=_time:45m _stream:{namespace="envoy-gateway",container_name="envoy"} upstream_cluster:* route_name:* | count()'
   ```
   **FAIL:** both empty at once is **one** failure (the Vector leg), not two. Vector
   runs as a DaemonSet in `kube-system` and has no Compose twin at all, so this row
   is the only place it is exercised.
+  > **The Vector-leg query was wrong twice over until 2026-08-21, and each error
+  > alone made the row unpassable.** It selected `_stream:{service="gateway"}`,
+  > but Vector sets `service` from `pod_labels.app` and falls back to the **pod
+  > name** — there has never been a `gateway` value to match; select the stream by
+  > `namespace` + `container_name`, which survive pod churn. And it filtered on
+  > `upstream_cluster` / `route_name` as **fields** while Vector left the access
+  > log as an unparsed JSON string in `_msg`, so the field predicates matched
+  > nothing even once the right pods were selected. Both are fixed (#850 and the
+  > PR carrying this note); the failure mode to remember is that a row can be
+  > written so that it cannot pass, and reads exactly like a broken platform.
+  > Note also **which pod** must appear. Envoy Gateway runs two deployments: the
+  > control plane (`envoy-gateway-*`, tab-separated text) and the data plane
+  > (`envoy-envoy-gateway-platform-*`, the JSON access log). Only the second
+  > carries this evidence, and on Kind it is pinned to the **control-plane node**
+  > by `clusters/local/envoy-gateway-config.yaml` — so Vector needs its
+  > control-plane toleration (#850) or the row fails while the control plane's own
+  > logs arrive normally and make the namespace look healthy.
 
 - [ ] **K5.4 Metrics — worker telemetry identity (regression check).**
   Two series, different `k8s_pod_name`, for the API and the worker:

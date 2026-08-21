@@ -125,6 +125,22 @@ spec:
               }
             }
 
+            # Envoy Gateway's edge access log is structured JSON on stdout, and
+            # configs/envoy-gateway/envoyproxy.yaml states the purpose:
+            # response_flags, upstream_cluster and route_name are emitted "for
+            # edge-level debugging". Left inside .message they are an opaque
+            # string -- you cannot filter by route, upstream or status, which is
+            # the entire reason the format was declared. The JSON is already
+            # parsed just above for .level, so promoting its keys to fields
+            # costs no second parse. Scoped to the proxy container: the Envoy
+            # *control* plane pod logs tab-separated text, not JSON.
+            if .container_name == "envoy" && exists(.kubernetes.pod_labels."gateway.envoyproxy.io/owning-gateway-name") {
+              access, aerr = parse_json(.message)
+              if aerr == null {
+                . = merge(., object!(access))
+              }
+            }
+
         # ======================================================================
         # PostgreSQL auto_explain Pipeline (CloudNativePG)
         # ======================================================================

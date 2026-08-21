@@ -1030,6 +1030,47 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
 Worker Deployment Versions, one worker manifest per build.
 
+The build id is not a label for humans — it is the address the server routes on.
+It gets stamped into an execution's history when the workflow starts, and from
+then on that execution's tasks are only ever offered to a worker declaring the
+same build. `2.5.0` below is a hypothetical next build, used to show the handover;
+the only build deployed today is `2.4.0`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant API as order-service<br/>(starter)
+    participant TS as Temporal server<br/>frontend + matching
+    participant H as execution history<br/>(platform-db)
+    participant W4 as worker pod<br/>build 2.4.0
+    participant W5 as worker pod<br/>build 2.5.0
+
+    Note over TS: Current = order-fulfillment / 2.4.0
+    API->>TS: StartWorkflow OrderFulfillmentWorkflow
+    TS->>H: stamp order-fulfillment / 2.4.0<br/>on THIS execution
+    W4->>TS: poll "I am order-fulfillment / 2.4.0"
+    TS-->>W4: workflow task (stamp matches)
+
+    Note over W5: new manifest lands, pod is Ready
+    W5->>TS: poll "I am order-fulfillment / 2.5.0"
+    TS--xW5: zero tasks — Current is still 2.4.0
+
+    Note over TS: operator runs set-current-version 2.5.0
+    API->>TS: StartWorkflow (a NEW order)
+    TS->>H: stamp 2.5.0 on the new execution only
+    TS-->>W5: tasks for the new order
+    TS-->>W4: tasks for the OLD order<br/>its stamp still says 2.4.0
+
+    Note over W4: pod deleted before its orders finish
+    TS--xW4: task has nowhere to go
+    Note over TS,H: no error, no failed activity —<br/>the order simply stops moving
+```
+
+Read the last three lines as the failure mode, not a footnote: a stamped
+execution whose build has no poller does not fail, it goes quiet. That is why
+`OrderSagaNotCompleting` exists, why activation is a separate deliberate step,
+and why a build is only deleted at `DRAINED`.
+
 - The worker registers as deployment **`order-fulfillment`** build **`2.4.0`** (one manifest per pinned build; the number tracks the order release)
   (`TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, read by
   `pkg/temporalx`; both-or-neither, half-set refuses to start). The workflow
@@ -1149,4 +1190,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-08-11 — the legacy REST create is gone — `CreateOrder` over gRPC is the only starter._
+_Last updated: 2026-08-21 — § Worker Deployment Versioning gains a sequence diagram: how a task finds the worker build its execution was stamped with, and the two ways it finds none._

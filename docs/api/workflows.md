@@ -44,10 +44,10 @@ clock, so a lost signal delays an expiry rather than causing a wrong one.
 
 Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster on
 namespace `mop`. Order ships **one manifest per Worker Deployment Version**, side
-by side (ADR-030): `1-13-2` is Current, and earlier builds keep polling only
+by side (ADR-030): `2-4-0` is Current, and earlier builds keep polling only
 until their pinned histories drain — a pre-phase-4 saga left with no poller would
-stall holding stock and an authorization, because 1.13.x **refuses** a
-product-participant history rather than re-routing it. Checkout is deliberately
+stall holding stock and an authorization, because every build **since order
+1.13.0 refuses** a product-participant history rather than re-routing it. Checkout is deliberately
 **not** versioned, so its worker is a single manifest and a tag move is safe. See
 [order-worker-2-4-0.yaml](../../kubernetes/apps/order-worker-2-4-0.yaml) and
 [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml).
@@ -107,4 +107,4 @@ resolves it.
 - [temporal.md](./temporal.md) — the three workflows as built, plus saga theory and operations
 - [Service contracts](README.md#service-contracts) — platform deployment rollup
 
-_Last updated: 2026-08-11 — the saga role table moves product to None and names inventory as the stock participant._
+_Last updated: 2026-08-21 — Current order worker build is `2-4-0`; the product-participant refusal is re-attributed to the order 1.13.0 floor rather than to the running build._

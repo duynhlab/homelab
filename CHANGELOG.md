@@ -760,6 +760,32 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Three documents still named a worker build that no longer exists.** Found by
+  the owner reading `docs/api/workflows.md`, which said `` `1-13-2` is Current ``
+  after #841 had moved the worker to `2-4-0` — the tables and links were synced,
+  the prose was not. Two more of the same kind: `docs/proposals/adr/README.md`'s
+  ADR-030 status cell claimed *"Current is now build 1.13.0"*, stale since before
+  #841 (it never recorded the 1.13.2 move at all), and
+  `docs/platform/kind-e2e-audit.md` still offered *"two ways out, for a later
+  decision"* on the arm64 gap that closed the same day. Also re-attributed, not
+  deleted: the product-participant refusal was credited to "1.13.x" as though it
+  were the running build's behaviour — it is a floor from order **1.13.0** and is
+  still true of 2.4.0.
+
+- **`docs/api/temporal.md` § Worker Deployment Versioning gains the diagram it
+  never had.** Eighteen Mermaid blocks in that file and not one showed how a task
+  reaches the right worker build — the versioning section was the only Part 2
+  machinery section that was prose and bullets only, which is why the mechanism
+  read as trivia rather than as the thing the whole arrangement turns on. A new
+  `sequenceDiagram` answers one question: a build id is **stamped into the
+  execution's history** when the workflow starts, and from then on that
+  execution's tasks are only offered to a worker declaring the same build. It
+  draws both ways a task finds no worker — a new build polling before it is
+  Current gets zero tasks, and a build whose pod is deleted before its orders
+  finish leaves them with **no error, no failed activity, just orders that stop
+  moving**. `2.5.0` appears as a hypothetical next build, labelled as such in the
+  prose; `2.4.0` is the only build deployed.
+
 - **The Kind gate becomes a permanent runbook** —
   `docs/platform/kind-e2e-audit.md`, the twin of
   `local-stack/docs/e2e-audit.md`, promoted from the self-deleting

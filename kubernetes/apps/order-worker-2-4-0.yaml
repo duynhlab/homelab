@@ -8,28 +8,44 @@
 # and this file is deleted once its version shows DRAINED in
 # `temporal worker deployment describe`.
 #
+# Stage the next one with `scripts/new-worker-build.sh <build-id>` — a bump is
+# six values in 175 lines, and typing them by hand is how ORDER_RECONCILER_ENABLED
+# ended up `true` on three builds at once.
+#
 # ACTIVATION is a deliberate, separate step — never part of a reconcile:
 #   kubectl -n temporal create job order-set-current-$(date +%s) \
 #     --from=cronjob/temporal-worker-set-current-version
 # A versioned worker receives NOTHING until that step makes its version Current
-# (verified live), so landing a new build changes no traffic. Full procedure:
+# (verified live), so landing a new build changes no traffic. A cluster built
+# from zero has no Current version at all, which is why this is a per-bring-up
+# step there and not only a per-release one — docs/platform/setup.md and
+# kind-e2e-audit.md K1.7. Full procedure:
 # docs/proposals/rfc/RFC-0021/cutover-rollback.md § Worker version activation.
 #
-# Replaces order-worker-1-12-0 (RFC-0021 P4: the product-service stock branch is
-# deleted — the saga writes stock only at inventory-service).
+# Replaces order-worker-1-13-2, which ran the same RFC-0021 P4 workflow code
+# sixteen commits behind the order API. Two reasons this build exists, neither of
+# them a code change:
 #
-# 1-12-0 MUST stay side by side until its version shows DRAINED, and here that is
-# a correctness requirement rather than tidiness: it is the LAST build that can
-# serve a workflow whose participant is `product` or absent. This build refuses
-# those rather than re-routing them (releasing stock inventory never reserved
-# would orphan the real hold at product-service), so a pre-P4 saga left with no
-# poller stalls with its stock held and its payment authorized. Confirm DRAINED
-# before deleting that file — do not infer it from the age of the orders.
+#   1. Temporal SDK v1.45.0 → v1.48.0 (order-service v2.4.0). Additive only —
+#      no Breaking or Removed sections across v1.46–v1.48, and nothing touching
+#      DeploymentOptions or VersioningBehavior.
+#   2. 1.13.2 was published amd64-only and CANNOT be re-tagged: re-tagging would
+#      change the code behind a determinism-frozen build id. So on an arm64 node
+#      that image cannot be pulled at all, and the saga had no poller. A new
+#      build id is the escape hatch, and it is cheap exactly when the corpus
+#      says the code is compatible — which it does, below.
 #
-# The determinism split is measured, not assumed: of the six gen2 histories,
-# exactly the four carrying `participant=product` stop replaying against this
-# code. testdata/gen3 (5 shapes) is this version's corpus, and the two compatible
-# gen2 histories are still replayed alongside it.
+# 1-13-2 is DELETED rather than kept side by side, and that is a deliberate
+# deviation from the drain rule above. It is safe only because the drain set is
+# empty: no cluster holds any order history (clusters/production/ is a bootstrap
+# skeleton — flux-system and sources, no apps), and the local cluster is rebuilt
+# from zero. On any cluster with live executions, keep the old file until
+# DRAINED — do not copy this deletion forward as precedent.
+#
+# The determinism claim is measured, not assumed: testdata/gen3 (5 shapes) was
+# recorded from the P4 code that 1.13.2 runs, and it replays GREEN against this
+# build, as do the two carried-forward gen2 histories. So this is a maintenance
+# build of the same generation, not a new generation — nothing was stranded.
 #
 # This build registers BOTH workflow types and runs the reconciler and both
 # outbox dispatchers.
@@ -43,7 +59,7 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: order-worker-1-13-2
+  name: order-worker-2-4-0
   namespace: order
 spec:
   interval: 10m
@@ -52,7 +68,7 @@ spec:
     kind: OCIRepository
     name: mop-chart-oci
     namespace: flux-system
-  releaseName: order-worker-1-13-2
+  releaseName: order-worker-2-4-0
   install:
     remediation:
       retries: 3
@@ -60,9 +76,13 @@ spec:
     remediation:
       retries: 3
   values:
-    name: order-worker-1-13-2
+    name: order-worker-2-4-0
     # Architectural component → app.kubernetes.io/component: worker (mop default
-    # is "api"). The order-worker PodMonitor selects on this label.
+    # is "api"). NOTE: this label currently has no consumer — the order-worker
+    # PodMonitor was retired at RFC-0014 P3 (worker metrics arrive via OTLP push
+    # through the otel-collector; see configs/temporal/prometheusrule.yaml). Kept
+    # because it is the chart's documented way to say "this release serves no
+    # traffic", and because a future monitor would select on it.
     component: worker
     replicaCount: 1
     image:
@@ -73,7 +93,7 @@ spec:
       # file, never a tag bump here (a bump would strand the workflows pinned to
       # this version with no pollers). No migration init container; the API's
       # applies the schema this code expects.
-      tag: "1.13.2"
+      tag: "2.4.0"
       pullPolicy: IfNotPresent
     # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
     # no app traffic, so the Service is skipped.
@@ -113,7 +133,7 @@ spec:
       # worker version during the drain — without it the two workers are
       # indistinguishable in every signal except pod name.
       - name: OTEL_RESOURCE_ATTRIBUTES
-        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=1.13.2"
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=2.4.0"
       # RFC-0014 D-2: obsx reads these exact names for the Kubernetes resource
       # attributes on the OTLP path. OTEL_METRICS_ENABLED stays unset here —
       # the worker follows the fleet flip, not the product canary.
@@ -172,7 +192,7 @@ spec:
       - name: TEMPORAL_WORKER_DEPLOYMENT_NAME
         value: order-fulfillment
       - name: TEMPORAL_WORKER_BUILD_ID
-        value: "1.13.2"
+        value: "2.4.0"
       # The inventory reconciler — repairs terminal orders whose reservation
       # disagrees with their outcome, and reports rows that do not account for
       # one. ON here because this is the CURRENT build: the role is single-judge

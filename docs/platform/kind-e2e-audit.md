@@ -221,24 +221,24 @@ the tag exists; running it earlier audits the previous release.
   **FAIL:** `SINGLE-PLATFORM`, or a missing `linux/arm64` on an arm64 host — with
   **one expected exception**, below.
 
-- [ ] **K0.8** *(expected finding, not a new failure)* **`order-service:1.13.2`
-  is amd64-only and cannot be re-tagged.** `kubernetes/apps/order-worker-1-13-2.yaml`
-  pins that exact tag as a Temporal Worker Versioning build id, and
-  `scripts/flux-validate.sh` enforces the equality
-  ([K2.3](#k2--gitops-delivered-what-the-manifests-promise)). Force-pushing the
-  tag would change the code behind a determinism-frozen build id; cutting a new
-  tag is a **full worker version cutover** — replay corpus, activation, drain —
-  not a pin bump. So on an arm64 cluster the order saga has **no poller**, and
-  `order-worker` will not start.
+- [ ] **K0.8** **Every first-party image the cluster pins has an `arm64` leg —
+  including the worker.** This row was an *expected finding* until 2026-08-21:
+  `order-service:1.13.2` was amd64-only and could not be re-tagged, because
+  re-tagging changes the code behind a determinism-frozen build id. The escape
+  hatch was a new build id, which is cheap exactly when the replay corpus says
+  the code is compatible — `gen3` was recorded from the P4 code 1.13.2 ran and
+  replays green on 2.4.0, so the worker moved to `order-worker-2-4-0.yaml` and
+  the gap closed. Assert it rather than assume it:
   ```bash
-  arch_legs ghcr.io/duynhlab/order-service/order-service 1.13.2   # expect amd64 only
+  for t in $(grep -h 'image_tag:' kubernetes/apps/services/*.yaml | grep -oE '"[0-9.]+"' | tr -d '"'); do echo "$t"; done
+  arch_legs ghcr.io/duynhlab/order-service/order-service 2.4.0   # want amd64 AND arm64
   ```
-  **Record it and move on.** Do **not** file it as a new defect and do **not**
-  "fix" it by editing the pin. The two decisions still open are recorded in
-  [Previous runs](#2026-08-20--the-arm64-bring-up): backfill a `linux/arm64` leg
-  onto the existing tag while preserving the amd64 digest, or plan the cutover.
-  **FAIL** only if the *rest* of the fleet is also single-platform, which would
-  mean the multi-arch default regressed in `gha-workflows`.
+  **FAIL:** any pinned first-party tag missing `linux/arm64`. On an arm64 node
+  that is not a degraded pod — nothing starts at all, and for the worker the
+  order saga has no poller.
+  **If it is the worker specifically**, do **not** edit the pin in place: that is
+  the silent-hang shape. A new build id is the only correct move, and
+  `scripts/new-worker-build.sh <build-id>` stages it.
 
 ---
 
@@ -403,8 +403,8 @@ cannot be derived from a single file — they get their own row (K2.3).
     through the 2026-08-17 run. **That skew is now closed** and both moved
     together through the multi-arch re-pin. Treat any future gap as a finding to
     file, not to fix in place.
-  - **`order-worker` cannot be re-tagged at all.** `order-worker-1-13-2.yaml` pins
-    `order-service:1.13.2`, and `scripts/flux-validate.sh`'s
+  - **`order-worker` cannot be re-tagged at all.** `order-worker-2-4-0.yaml` pins
+    `order-service:2.4.0`, and `scripts/flux-validate.sh`'s
     `validate_worker_build_id` enforces `TEMPORAL_WORKER_BUILD_ID` == the file's
     `image.tag` == the build id in the filename == the cutover CronJob's
     `--build-id`. The Temporal server pins every workflow to the version that
@@ -739,7 +739,7 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   > k8s.pod.name, deployment.environment.name`, and Compose set no k8s attribute.
   > The 2026-08-17 run settled it: **there is no collision on the cluster**, and
   > not because `k8s.pod.name` disambiguates, but because `service.name` already
-  > differs — `kubernetes/apps/order-worker-1-13-2.yaml` and
+  > differs — `kubernetes/apps/order-worker-2-4-0.yaml` and
   > `checkout-worker.yaml` set `OTEL_SERVICE_NAME: order-worker` /
   > `checkout-worker` (and `service.instance.id` in
   > `OTEL_RESOURCE_ATTRIBUTES` besides). The collision was Compose-only, rooted in
@@ -1013,7 +1013,10 @@ homelab **#837** re-pinned all of it (`make validate` green;
 `validate_worker_build_id` still reports builds `[1.13.2]` consistent), and
 homelab **#836** added `scripts/kind-seed.sh` ([K1.6](#k1--bring-up)).
 
-**One real residual gap** — `order-service:1.13.2` — plus two honest CI gaps:
+**One residual gap at the time** — `order-service:1.13.2` — plus two honest CI
+gaps. *(The first was closed on 2026-08-21: the worker moved to build `2.4.0`,
+which carries both platforms. Kept here because the reasoning is the part worth
+re-reading, not the status.)*
 
 1. **`order-service:1.13.2` has no arm64 leg and cannot get one in place.** The
    frozen Worker Versioning build id is enforced by `validate_worker_build_id`

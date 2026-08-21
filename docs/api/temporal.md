@@ -1030,7 +1030,7 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
 Worker Deployment Versions, one worker manifest per build.
 
-- The worker registers as deployment **`order-fulfillment`** build **`1.13.2`** (one manifest per pinned build; the number tracks the order release)
+- The worker registers as deployment **`order-fulfillment`** build **`2.4.0`** (one manifest per pinned build; the number tracks the order release)
   (`TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, read by
   `pkg/temporalx`; both-or-neither, half-set refuses to start). The workflow
   registers **`VersioningBehaviorPinned`** — a saga holding money and stock is
@@ -1091,7 +1091,7 @@ How to deploy the worker, run the saga locally, and watch it in production.
   still needs liveness and readiness probes). Worker metrics export over OTLP.
 - **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
   ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
-  `order-worker-1-13-2` HelmRelease (`kubernetes/apps/order-worker-1-13-2.yaml`, namespace `order` —
+  `order-worker-2-4-0` HelmRelease (`kubernetes/apps/order-worker-2-4-0.yaml`, namespace `order` —
   one file per Worker Deployment Version; a retired file is deleted once its build is
   Current-superseded with nothing pinned to it, as 1-8-0 was, see
   [Worker Deployment Versioning](#worker-deployment-versioning-as-built)) carrying the

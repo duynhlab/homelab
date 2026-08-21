@@ -262,7 +262,7 @@ service that needs different numbers owns that override in its repo/chart
 values). The budget rule above is what a reviewer checks, not a table.
 
 **Recorded gaps:** the **Temporal workers** (`checkout-worker`,
-`order-worker-1-13-2`) follow a worker-specific lifecycle (task-slot draining,
+`order-worker-2-4-0`) follow a worker-specific lifecycle (task-slot draining,
 not HTTP draining) that this contract does not yet describe; `mockpay`, the
 SPA, and the back-office portal are likewise out of scope here.
 

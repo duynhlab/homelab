@@ -1085,6 +1085,23 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The edge access log reached the store as an opaque string, so the fields it
+  exists for were unqueryable.** `configs/envoy-gateway/envoyproxy.yaml` declares
+  a structured JSON access log and says why — `response_flags`,
+  `upstream_cluster` and `route_name` are there "for edge-level debugging" — but
+  Vector left the line whole in `_msg`. The values were present and no filter
+  could reach them: `upstream_cluster:*` and `route_name:*` returned zero
+  cluster-wide. `add_labels` already ran `parse_json` on every message to lift
+  `.level`, so promoting the access log's keys costs no second parse; it is
+  guarded to the proxy container, since the Envoy *control* plane logs
+  tab-separated text. Verified with `vector vrl` against the shipped binary on a
+  real event, including the two negative cases (non-JSON message, other
+  container) which pass through untouched. Kind audit row K5.3 is corrected with
+  it: the row selected `_stream:{service="gateway"}`, a value Vector never sets
+  — `service` comes from `pod_labels.app` and falls back to the pod name — so
+  between that and the unparsed fields, **the row could not pass in any
+  configuration**, and read exactly like a broken platform.
+
 - **The gateway access log never reached VictoriaLogs, and the Envoy control-plane
   pod masked it.** Vector's `HelmRelease` carried no `tolerations`, so the
   collector DaemonSet covered the three workers and skipped the tainted

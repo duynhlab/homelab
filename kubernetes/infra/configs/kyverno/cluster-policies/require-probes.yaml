@@ -51,9 +51,18 @@ spec:
       # (`scripts/kind-seed.sh`, the first batch workloads to run in an app
       # namespace) report eight violations that no one can act on, which is how a
       # report trains people to stop reading it.
+      # The `|| `[]`` default is load-bearing, not decoration. Without it a Pod
+      # carrying no ownerReferences at all -- a bare manifest, or anything
+      # `kubectl run` creates in one of these namespaces -- makes the JMESPath
+      # measure a null, and the rule reports `error` instead of a verdict. In
+      # Audit mode an `error` is invisible: it reads exactly like a compliant
+      # Pod. Real workloads are ReplicaSet-owned so the field exists, which is
+      # why the cluster never showed this and it survived the autogen fix above.
+      # Found by tests/require-probes on its first run and pinned there: the
+      # fixture covers bare, ReplicaSet-owned and Job-owned Pods.
       preconditions:
         all:
-          - key: "{{ request.object.metadata.ownerReferences[?kind=='Job'] | length(@) }}"
+          - key: "{{ request.object.metadata.ownerReferences[?kind=='Job'] || `[]` | length(@) }}"
             operator: Equals
             value: 0
       validate:

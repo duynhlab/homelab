@@ -696,6 +696,26 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Kyverno policies now have unit tests, and they found a defect on their first
+  run.** `kubeconform` only checks manifest *shape*, and it runs with
+  `-ignore-missing-schemas`, so a Kyverno CRD whose schema is absent is waved
+  through in silence — schema validation was never policy validation. Fixtures
+  live at `kubernetes/infra/configs/kyverno/tests/<policy>/` (the convention
+  `kyverno.md` had already named but never created) and cover the three policies
+  where a regression costs the most: `disallow-default-namespace` (the only
+  `Enforce`/`failurePolicy: Fail` rule, so the only one that can *block* an
+  apply), `require-probes` (the one that has actually misfired), and
+  `require-resources` (whose `postgres-operators` `PolicyException` gets its own
+  **skip** case, pinning the exception's blast radius — widen the selector and
+  the test moves). `scripts/flux-validate.sh` gains `validate_kyverno_policies`,
+  so `make validate` runs them, and the `validate` CI job — already a required
+  check on `pull_request` — installs the CLI **pinned to the engine the cluster
+  runs** (chart 3.8.2 ships v1.18.2; a CLI ahead of the engine can agree with
+  itself and disagree with admission). Proven both ways: loosening
+  `disallow-default-namespace` from `!default` to `*` turns the suite red with
+  *"Want fail, got pass"* (`kyverno test` exits 1, `make validate` exits 2), and
+  restoring it returns 10/10 green.
+
 - Keycloak identity foundation lands (RFC-0024 P1, executing the RFC-0022
   design record / ADR-041): `quay.io/keycloak/keycloak:26.5.7` (digest-pinned)
   runs as a raw Deployment in the new `identity` namespace, importing a
@@ -1645,6 +1665,17 @@ Skeleton (copy what you need):
   labeled as proposed (no PrometheusRule exists — recorded gap).
 
 #### Security
+
+- **`require-probes` reported `error` instead of a verdict for any Pod with no
+  ownerReferences.** The precondition measured
+  `request.object.metadata.ownerReferences[?kind=='Job'] | length(@)`; with the
+  field absent the JMESPath measures a null and the rule errors out. In Audit
+  mode an `error` is invisible — it reads exactly like a compliant Pod. Real
+  workloads are ReplicaSet-owned, so the field exists and the cluster never
+  showed it, which is how this survived the autogen fix in #848. Fixed with a
+  `|| `[]`` default. Found by the new `tests/require-probes` fixture on its first
+  run, which now pins all three shapes: bare, ReplicaSet-owned (pass **and**
+  fail cases) and Job-owned (skip).
 
 - **docs/security synced to the deployed fences; the review fixed six manifest
   defects it exposed.** `require-probes` + `require-resources` matched the

@@ -1,0 +1,22 @@
+# The only Enforce policy in the catalogue, and the only one with
+# failurePolicy: Fail -- so it is the only one that can BLOCK an apply. A
+# regression here is an incident, not a finding.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-in-default
+  namespace: default
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/product-service/product-service:v1.0.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-in-product
+  namespace: product
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/product-service/product-service:v1.0.0

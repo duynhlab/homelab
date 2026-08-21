@@ -1,0 +1,29 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-resources
+policies:
+  - ../../cluster-policies/require-resources.yaml
+resources:
+  - resources.yaml
+exceptions:
+  - ../../exceptions/postgres-operators.yaml
+results:
+  - policy: require-resources
+    rule: validate-resources
+    kind: Pod
+    resources:
+      - product/resources-complete
+    result: pass
+  - policy: require-resources
+    rule: validate-resources
+    kind: Pod
+    resources:
+      - product/memory-limit-missing
+    result: fail
+  - policy: require-resources
+    rule: validate-resources
+    kind: Pod
+    resources:
+      - product/cnpg-excepted
+    result: skip

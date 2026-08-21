@@ -1,0 +1,39 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-probes
+policies:
+  - ../../cluster-policies/require-probes.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: require-probes
+    rule: validate-probes
+    kind: Pod
+    resources:
+      - product/probes-present
+    result: pass
+  - policy: require-probes
+    rule: validate-probes
+    kind: Pod
+    resources:
+      - product/readiness-missing
+    result: fail
+  - policy: require-probes
+    rule: validate-probes
+    kind: Pod
+    resources:
+      - product/job-owned
+    result: skip
+  - policy: require-probes
+    rule: validate-probes
+    kind: Pod
+    resources:
+      - product/rs-owned-probes-present
+    result: pass
+  - policy: require-probes
+    rule: validate-probes
+    kind: Pod
+    resources:
+      - product/rs-owned-readiness-missing
+    result: fail

@@ -1,0 +1,21 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: disallow-default-namespace
+policies:
+  - ../../cluster-policies/disallow-default-namespace.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: disallow-default-namespace
+    rule: validate-namespace
+    kind: Pod
+    resources:
+      - default/pod-in-default
+    result: fail
+  - policy: disallow-default-namespace
+    rule: validate-namespace
+    kind: Pod
+    resources:
+      - product/pod-in-product
+    result: pass

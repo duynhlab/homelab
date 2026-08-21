@@ -36,6 +36,20 @@ jobs:
       - name: Setup kustomize
         uses: fluxcd/pkg/actions/kustomize@dfc427c54394de76e0053c2eba45699fad01c3b4 # main 2026-08-19
 
+      # Pinned to the engine the cluster runs: chart 3.8.2 ships Kyverno
+      # v1.18.2. A CLI ahead of the engine can agree with itself and disagree
+      # with admission, which is worse than having no gate.
+      - name: Setup Kyverno CLI
+        env:
+          KYVERNO_VERSION: v1.18.2
+        run: |
+          set -euo pipefail
+          curl -fsSL -o kyverno.tar.gz \
+            "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/kyverno-cli_${KYVERNO_VERSION}_linux_x86_64.tar.gz"
+          tar -xzf kyverno.tar.gz kyverno
+          sudo install -m 0755 kyverno /usr/local/bin/kyverno
+          kyverno version
+
       - name: Validate manifests
         run: ./scripts/flux-validate.sh
 

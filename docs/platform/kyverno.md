@@ -32,7 +32,7 @@ so the highest-value Kyverno features are:
 | 13 | JMESPath / context | ✅ when needed | — | Use sparingly (latency) |
 | 14 | Foreach | ✅ | 1 | Required for resources/probes rules |
 | 15 | `kyverno-policies` Helm chart | ❌ | — | Forked rules into repo, no chart |
-| 16 | Kyverno CLI `test` | ⏳ planned — not deployed | 2 | CI gate in gha-workflows |
+| 16 | Kyverno CLI `test` | ✅ | 3 | Gate in this repo — `make validate` + the `validate` CI job; CLI pinned to the engine (v1.18.2) |
 | 17 | Reports server | ❌ | — | KinD scale doesn't need it |
 | 18 | Namespaced `Policy` | ✅ when needed | — | Most rules are ClusterPolicy |
 
@@ -134,7 +134,10 @@ kubectl describe policyreport -n auth
 
 1. Branch off main
 2. Add `ClusterPolicy` to `kubernetes/infra/configs/kyverno/cluster-policies/`
-3. Add unit tests (planned: `tests/<policy>/kyverno-test.yaml`)
+3. Add unit tests at `kubernetes/infra/configs/kyverno/tests/<policy>/` — a
+   `kyverno-test.yaml` plus a `resources.yaml`. Cover a **pass** case, a **fail**
+   case, and, where a `PolicyException` applies, the **skip** case; `make
+   validate` runs them and fails the PR if any expectation moves
 4. PR with `validationFailureAction: Audit`
 5. Merge → wait 7 days → review reports
 6. Second PR flips to `Enforce`
@@ -187,4 +190,6 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
 
 ---
 
-_Last updated: 2026-08-19 — adoption matrix trued up: Mutate is not deployed, VAP is no longer version-blocked (Kind v1.34.3), planned rows (Cosign, Policy Reporter UI, CLI test) marked ⏳ not-deployed; architecture diagram moved to the house palette._
+_Last updated: 2026-08-21 — CLI `test` row flipped to adopted: policy fixtures live at `configs/kyverno/tests/` and run in `make validate` + the `validate` CI job, with the CLI pinned to the engine (v1.18.2). Their first run found `require-probes` reporting `error` rather than a verdict for Pods with no ownerReferences._
+
+_2026-08-19 — adoption matrix trued up: Mutate is not deployed, VAP is no longer version-blocked (Kind v1.34.3), planned rows (Cosign, Policy Reporter UI, CLI test) marked ⏳ not-deployed; architecture diagram moved to the house palette._

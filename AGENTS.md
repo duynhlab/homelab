@@ -356,12 +356,35 @@ reference style.
 1. **Choose one question.** State whether the diagram explains topology, a
    request path, ownership, lifecycle, or a historical migration. Split a
    diagram that tries to answer more than one of these.
+
+   **Repeating a diagram in another file is allowed**, and is not the same as
+   splitting one badly. Two files may draw the same system when each owns a
+   different question about it — `docs/api/workflows.md` owns the work layer's
+   topology, `docs/api/temporal.md` owns how a task finds its build, and
+   `docs/proposals/rfc/RFC-NNNN/` owns why the shape was chosen. When you carry a
+   diagram across, say in the lead-in which question *this* copy answers, and
+   **link** the canonical explanation rather than restating it. What is forbidden
+   is two files claiming the same answer, because then only one can be right after
+   the next change. `docs/api/` is the trusted source for every microservice, so a
+   diagram it lacks is a gap worth closing even when a proposal already has one.
 2. **Verify current reality.** Check service code, `docs/api/{service}.md`,
    `local-stack/compose.yaml`, and the relevant Kubernetes manifests. A current
    topology must include every relevant deployed service, worker, backend, and
    protocol. Historical diagrams must say **historical** in the surrounding
-   text. Committed targets use **planned**; non-committed teaching examples use
-   **reference** and **not deployed** in their labels.
+   text.
+
+   For anything not deployed, the label follows the **design record's status**,
+   not your confidence in it:
+
+   | Record state | Label | Example |
+   |---|---|---|
+   | ADR/RFC `Accepted`, not yet applied | **`planned`** | a decided rollout that has not landed |
+   | ADR `Proposed` under an `Accepted` RFC | **`planned`** + name the record + **`not installed`** | `planned — ADR-055, not installed` |
+   | Research phase, direction still open | **`reference`** + **`not deployed`** | shapes explored in `research.md` |
+
+   A `Proposed` ADR is committed in *direction* and not in *decision*, so its
+   nodes may be drawn — naming the record is what keeps that honest, and it gives
+   a reader one place to check whether the answer has changed.
 3. **Use semantic structure.** Prefer domain/layer subgraphs, stable node IDs,
    quoted labels, `<br/>` for intentional line breaks, and database shapes for
    persistent stores. Label edges with protocols or ports only when that detail

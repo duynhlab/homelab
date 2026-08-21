@@ -9,7 +9,7 @@ section, and the behaviour of each workflow is in
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
 | **Status** | Implemented — three workflows, two workers, all running in local-stack and in-cluster | — |
-| **Scope** | The index and the naming rules. Behaviour, steps and diagrams belong to [temporal.md](./temporal.md) | — |
+| **Scope** | The index, the ownership map and the naming rules. **Behaviour** — steps, compensation, retry policy, and the diagrams that explain them — belongs to [temporal.md](./temporal.md) | — |
 | **Namespace** | `mop` | — |
 | **Design records** | — | [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) (versioning model) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) (worker lifecycle) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) (start outbox) · [RFC-0021](../proposals/rfc/RFC-0021/) |
 
@@ -20,6 +20,108 @@ section, and the behaviour of each workflow is in
 | <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | Turn a committed order into money taken, stock committed and a shipment created — or undo all of it | order | `order-worker` — **versioned** as `order/order-fulfillment`, `Pinned` (ADR-030 model, ADR-054 mechanism) | `order-fulfillment` | [temporal.md § OrderFulfillmentWorkflow](./temporal.md#orderfulfillmentworkflow) |
 | <a id="order-cancellation"></a>`CancellationWorkflow` | Give back what a cancelled order took, and park loudly when it cannot | order | `order-worker` (same worker) | `order-fulfillment` | [temporal.md § CancellationWorkflow](./temporal.md#cancellationworkflow) |
 | <a id="abandoned-checkout"></a>`AbandonedCheckoutWorkflow` | Expire a checkout session the shopper walked away from | checkout | `checkout-worker` | `checkout` | [temporal.md § AbandonedCheckoutWorkflow](./temporal.md#abandonedcheckoutworkflow) |
+
+One diagram, and it is the **whole topology of the work layer**: who starts each
+workflow, which queue carries it, which worker serves that queue, and what owns that
+worker's lifecycle. Deliberately *not* how a workflow behaves step by step, nor how a
+task finds the build its execution was stamped with — those are
+[temporal.md](./temporal.md)'s, and this file links rather than restates them.
+
+```mermaid
+flowchart TD
+  subgraph starters["Starters — who begins a workflow"]
+    OAPI["order-service API<br/>+ start outbox (ADR-031)"]
+    CAPI["checkout-service API<br/>every session mutation signals"]
+  end
+
+  subgraph wf["Workflows"]
+    OFW["OrderFulfillmentWorkflow<br/>Pinned"]
+    CW["CancellationWorkflow<br/>Pinned"]
+    ACW["AbandonedCheckoutWorkflow<br/>unversioned"]
+  end
+
+  subgraph srv["Temporal — namespace mop"]
+    TS[("frontend · matching<br/>history · visibility")]
+    QF["task queue<br/>order-fulfillment"]
+    QC["task queue<br/>checkout"]
+  end
+
+  subgraph ctl["Lifecycle owners"]
+    WC["Temporal Worker Controller<br/>derives build id · ramps · sunsets"]
+    HR["HelmRelease checkout-worker<br/>ordinary release, tag move is safe"]
+  end
+
+  subgraph run["Workers"]
+    OWc["order-worker · Current build<br/>takes new workflows"]
+    OWd["order-worker · draining build<br/>serves only its pinned work"]
+    CKW["checkout-worker<br/>single replica"]
+  end
+
+  subgraph down["What activities reach"]
+    DS["inventory · shipping<br/>payment · notification · cart"]
+    CDB[("checkout DB<br/>its own rows only")]
+  end
+
+  KEDA["KEDA + one ScaledObject per version<br/>scales on task-queue backlog<br/>planned — ADR-055, not installed"]
+
+  OAPI --> OFW
+  OAPI --> CW
+  CAPI --> ACW
+  OFW --> QF
+  CW --> QF
+  ACW --> QC
+  QF -.->|"tasks, matched by build id"| OWc
+  QF -.->|"tasks, matched by build id"| OWd
+  QC -.-> CKW
+
+  WC -->|"creates one Deployment<br/>per build id"| OWc
+  WC --> OWd
+  WC -->|"sets Current / Ramping<br/>via the Temporal API"| TS
+  HR --> CKW
+
+  OWc --> DS
+  OWd --> DS
+  CKW --> CDB
+
+  KEDA -.->|"planned: reads backlog"| TS
+  KEDA -.->|"planned: sets replicas"| OWc
+
+  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+  class OAPI,CAPI,OFW,CW,ACW service
+  class OWc,OWd,CKW worker
+  class WC,HR platform
+  class TS,DS,CDB data
+  class QF,QC external
+  class KEDA planned
+```
+
+Legend: cyan = application code · orange = running worker pods · purple = what owns a
+worker's lifecycle · green = Temporal and the stores activities write to · grey = task queues, drawn inside the
+Temporal subgraph because the server owns them · dashed white = **planned**, not installed. Dotted edges are task dispatch
+(the server chooses the worker; nothing pushes) and the planned scaling path.
+
+> **In plain terms:** three workflows, two queues, and two workers whose lifecycles are
+> owned by different things — that asymmetry is the thing to carry away.
+>
+> Both order workflows share **one** queue and therefore one worker, so a build that
+> refuses one of them refuses both. That worker exists in the plural: the Current build
+> takes new workflows while a draining build keeps serving only the executions stamped
+> with it, and a controller — not a person — decides when the draining one may go.
+>
+> `AbandonedCheckoutWorkflow` sits alone on its own queue and touches nothing but its
+> own rows. That isolation is exactly why it could stay unversioned: there is no
+> cross-service state for a mid-flight code change to strand, so a tag move needs no
+> determinism argument.
+>
+> KEDA is drawn because the shape is decided, not because it runs. Nothing scales
+> today: every worker is one replica, and the backlog it would read is already scraped
+> and graphed with nothing acting on it — see
+> [ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/).
 
 ### What each one is for
 

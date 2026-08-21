@@ -32,7 +32,8 @@ What only a cluster can prove is everything Compose has no equivalent for:
 4. **The real edge** — TLS, Host-header routing, HTTP→HTTPS.
 5. **Controller-minted credentials** — the Grafana MCP server consumes a token
    the Grafana Operator writes, which has no Compose analogue at all
-   ([K3.6](#k3--admission-secrets-isolation)).
+   ([K3.6](#k3--admission-secrets-isolation)). 💤 Off since 2026-08-21; the row
+   records its last verified pass.
 6. **Kubernetes resource attributes** — `k8s.pod.name`, `k8s.namespace.name` and
    the `GrafanaDashboard` reconcile path only exist here.
 
@@ -272,7 +273,7 @@ the tag exists; running it earlier audits the previous release.
     .items[] | select(.status.conditions[]? | select(.type=="Ready" and .status!="True"))
     | "\(.metadata.name): \(.status.conditions[] | select(.type=="Ready") | .message)"'
   ```
-  At the time of writing that is **22 declared + `flux-system` = 23**, matching
+  At the time of writing that is **21 declared + `flux-system` = 22**, matching
   [`platform/README.md`](README.md) and `AGENTS.md`. First reconcile takes 5–10
   minutes; `temporal-local` is the long pole at a 20m timeout.
   **FAIL:** any name printed by the last command, or a Ready count below
@@ -536,16 +537,17 @@ cannot be derived from a single file — they get their own row (K2.3).
   `--live`.
   **FAIL:** non-zero exit.
 
-- [ ] **K3.6** **The four MCP servers reconciled, and the controller-minted token
-  exists.** `kubernetes/infra/controllers/mcp/` delivers `victoria-metrics-mcp`,
-  `victoria-logs-mcp`, `flux-operator-mcp` and `grafana-mcp` through the
-  `mcp-local` Kustomization. `grafana-mcp` is the platform's **first
-  controller-minted credential consumed by a workload**: the Grafana Operator
-  reconciles the `GrafanaServiceAccount` CR
-  (`configs/observability/grafana/grafana-service-account-mcp.yaml`, role
-  `Viewer`) and writes a `glsa_…` token into `Secret/grafana-mcp-token` under key
-  `token`, in its **own namespace only** — which is why both the CR and the
-  HelmRelease live in `monitoring`.
+- [ ] **K3.6** **The four MCP servers — 💤 not deployed since 2026-08-21.** The
+  owner turned them off: they were unused and the biggest idle consumers on the
+  Kind host (`victoria-metrics-mcp` alone held 662Mi). `mcp.yaml` is commented out
+  in [`clusters/local/kustomization.yaml`](../../kubernetes/clusters/local/kustomization.yaml),
+  along with the `GrafanaServiceAccount` that minted their Grafana token and the
+  `routes/mcp.yaml` HTTPRoutes. Re-enable by uncommenting those three lines.
+  **Run this row only after re-enabling.** It asserted the four HelmReleases plus
+  the platform's first controller-minted credential: the Grafana Operator
+  reconciles `GrafanaServiceAccount` (role `Viewer`) and writes a `glsa_…` token
+  into `Secret/grafana-mcp-token`, in its own namespace only — which is why both
+  the CR and the HelmRelease lived in `monitoring`.
   ```bash
   flux get hr -n monitoring victoria-metrics-mcp victoria-logs-mcp grafana-mcp
   flux get hr -n flux-system flux-operator-mcp
@@ -556,10 +558,17 @@ cannot be derived from a single file — they get their own row (K2.3).
   **FAIL:** a HelmRelease not Ready, or a missing/empty `grafana-mcp-token`. A
   missing token is a *controller* failure, not a secrets-store failure — ESO and
   OpenBAO are not in this path at all, so K3.3 passing tells you nothing about
-  it. Note `expires` is deliberately unset on the token: an expiring token is
-  deleted and recreated by the operator, while the consumer reads it through env
+  it. Note `expires` is deliberately unset: an expiring token is deleted and
+  recreated by the operator, while the consumer reads it through env
   `secretKeyRef`, which does not hot-reload.
-  Reachability through the edge is [K4.9](#k4--the-real-edge-and-identity).
+  > **Verified PASS on 2026-08-21, immediately before being switched off** — the
+  > row was run first precisely so turning MCP off would not erase the evidence:
+  > all four HelmReleases Ready (`grafana-mcp` 0.20.0, `victoria-logs-mcp` 0.1.0,
+  > `victoria-metrics-mcp` 0.3.0, `flux-operator-mcp` 0.58.1),
+  > `GrafanaServiceAccount/grafana-mcp` present, and the token's first five
+  > characters were `glsa_`.
+  Reachability through the edge is [K4.9](#k4--the-real-edge-and-identity), also
+  not runnable while this is off.
   Reference: [`mcp-servers.md`](mcp-servers.md).
 
 ---
@@ -582,7 +591,7 @@ that way. Translation table:
 | Pyroscope `:4040` | `https://pyroscope.duynh.me` |
 | vmalert `:8880` | `https://vmalert.duynh.me` — **service port is 8080** |
 | Temporal UI | `https://temporal.duynh.me` |
-| — | `https://vm-mcp.duynh.me`, `vl-mcp`, `flux-mcp`, `grafana-mcp` (MCP, K4.9) |
+| — | ~~`https://vm-mcp.duynh.me`, `vl-mcp`, `flux-mcp`, `grafana-mcp`~~ — 💤 MCP off since 2026-08-21, routes commented out ([K4.9](#k4--the-real-edge-and-identity)) |
 | — | `karma`, `jaeger`, `tempo`, `slo`, `source`, `ui`, `openbao` (platform UIs) |
 | vmagent `:8429` | **no route** → `kubectl port-forward -n monitoring svc/vmagent-victoria-metrics 8429:8429` |
 | ClickHouse `:8123` | **no route, by design** → `kubectl port-forward -n monitoring svc/clickhouse-clickhouse 8123:8123` |
@@ -692,7 +701,10 @@ breaks a command copied from the Compose audit:
   **Want 401.** A 403 means the edge let it through and a service rejected it —
   weaker than the contract, and a finding.
 
-- [ ] **K4.9** All four MCP servers answer **through their gateway hostname**.
+- [ ] **K4.9** **💤 Not runnable since 2026-08-21 — MCP is off** (see
+  [K3.6](#k3--admission-secrets-isolation); the HTTPRoutes are commented out too,
+  so these hostnames have no route at all). All four MCP servers answer **through
+  their gateway hostname**.
   ```bash
   for h in vm-mcp vl-mcp flux-mcp grafana-mcp; do
     printf '%-12s ' "$h"

@@ -456,7 +456,7 @@ homelab/
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind local environment (22 Kustomization CRs — see kustomization.yaml)
+│       └── local/                      # Kind local environment (21 Kustomization CRs — see kustomization.yaml)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration

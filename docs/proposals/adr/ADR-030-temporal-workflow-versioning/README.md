@@ -162,13 +162,104 @@ the operator manifests remain commented out for rollback.
 
 ---
 
+## Amendments
+
+### 2026-08-21 — a build id freezes the code, not the image
+
+The decision above is unchanged. Worker Deployment Versioning stays, workflows
+stay `Pinned`, a new build still lands as a new `order-worker-<build>.yaml` and
+is still activated by a deliberate separate step. Upstream has since made that
+choice easier to defend rather than harder: Temporal's own best-practices page
+calls Worker Versioning *"the recommended approach for deploying new Workflow
+code without disrupting running Executions"*, the pre-2025 experimental
+mechanism was removed from the server in **March 2026**, and Serverless Workers
+(Lambda, Cloud Run) now **require** versioning. And their decision guide selects
+behavior by workflow duration against deployment frequency — *"short-running
+Workflows that complete before the next deployment should use Pinned"* — which
+is what the order saga is: no Continue-as-New, no child workflows, activity
+timeouts of 30 s with one 30 m `ScheduleToClose`.
+
+What changes is a consequence this ADR did not price.
+
+**1. Decision 2 froze the code behind a build id. This repo also froze the
+image tag, and that is not the same thing.** `TEMPORAL_WORKER_BUILD_ID` ==
+`image.tag` == filename is a good convention — it makes the mapping auditable
+and `scripts/flux-validate.sh` enforces it — but it quietly implies an artifact
+that can never be rebuilt. Artifacts need rebuilding for reasons that have
+nothing to do with workflow code: a base-image CVE, a toolchain bump, a new
+architecture.
+
+That bill arrived. Every `ghcr.io/duynhlab/*` image had been published
+**amd64-only**, and the fleet-wide fix was a new tag per service — which
+`order-service:1.13.2` could not take, because re-tagging changes the code
+behind a determinism-frozen build id. On an arm64 cluster the worker image could
+not be pulled at all, so the order saga had **no poller**. It was the one
+workload the re-pin could not reach.
+
+The escape hatch is not a re-tag; it is **a new build id**, and it is cheap
+exactly when the replay corpus says the code is compatible. `testdata/gen3` was
+recorded from the RFC-0021 P4 code that `1.13.2` runs, and it replays green on
+`2.4.0` along with the two carried-forward `gen2` histories — a maintenance
+build of the same generation, so nothing was stranded. Recorded here so the next
+person facing an un-rebuildable worker image reaches for a build id instead of a
+force-push.
+
+Rejected while considering it: making the build id a **generation** label
+(`gen3`) so image tags could float underneath. Upstream is explicit that a build
+id *"identifies a specific release of code"* and must be unique; two images
+under one id means the server cannot tell them apart, which recreates the exact
+non-determinism versioning exists to prevent, with no signal at all.
+
+**2. The retirement gate is machine-checkable, and should be read that way.**
+The manifests say to delete a draining build once its version shows `DRAINED`
+and warn against inferring it from the age of the orders. That is right, and the
+CLI answers it directly: `temporal worker deployment describe-version` reports
+`DrainageStatus`. Nothing in `scripts/` checks it today.
+
+**3. Activation is a per-bring-up step, not only a per-release one.** A cluster
+built from zero has no Current version at all, and a nil Current routes new
+workflows to *unversioned* workers — of which there are none. Orders sit
+`pending` with no error, pods `Ready`, outbox gauges green. Deliberate
+un-reconciliation is still correct; what was missing was any document saying a
+fresh cluster starts in that state. Now in `docs/platform/setup.md` and
+`kind-e2e-audit.md` **K1.7**.
+
+**4. Ramping exists and is unused.** `set-ramping-version --percentage` allows a
+canary before promoting a version to Current; the cutover CronJob sets Current
+directly. Defensible for a compatible build, hard to defend for an incompatible
+one. Recorded as available, not adopted — there is no traffic to ramp on a local
+cluster.
+
+**5. The unversioned fallback is a real option with a stated price.** Upstream
+sanctions exactly two methods, and names the fallback plainly: *"If your
+infrastructure does not yet support blue-green or rainbow deployment models,
+patching is recommended as a temporary fallback solution."* So dropping
+versioning is **not** contrary to the docs — provided patching replaces it.
+Dropping both is what falls outside them. Our infrastructure does support
+rainbow, which is why this ADR stands.
+
+**6. Destination: the Temporal Worker Controller.** Temporal ships a Kubernetes
+controller for exactly this arrangement, and calls it *"the recommended tool"*:
+it creates **and deletes** the per-version resources, sets the Current version
+through the Temporal API, tracks active workflows for drainage, and supports
+`Progressive` rollouts with gate workflows plus HPA/KEDA autoscaling. It would
+close items 2, 3 and 4 above and retire the hand-written per-build manifest —
+measured at **six meaningful values inside 175 lines**, with the rest retyped
+byte-identically every cutover (`git show fdad929a`). It is an OCI Helm chart at
+1.0.0, which matches how this platform already installs controllers.
+
+Not adopted here: it needs its own RFC and an owner-approved number, and its CRD
+must be read from the chart rather than from documentation before anything is
+committed to. Until then, `scripts/new-worker-build.sh` removes the human doing
+the copy-paste without building machinery the controller would replace.
+
 ## History
 
 | Date | Change |
 |------|--------|
 | 2026-07-28 | Accepted; re-platform + Worker Versioning decided (see the revision note above). |
 | 2026-07-29 | Chart moved from `configs/temporal/` to `controllers/temporal/` — `controllers/` is where chart-installed platform components live (Kong, Valkey, OpenBAO, …); `configs/` holds what they consume, so the ingress + PrometheusRule stayed there under a `temporal-config-local` Kustomization (the `kong-local` → `kong-config-local` shape). Retirement method changed: instead of commenting out each manifest's contents, the four retired artifacts are **renamed to `.yaml.bak`** with their contents intact — the operator HelmRelease, both operator CRs, and the operator HelmRepository. A file no kustomization lists is already inert, so blanking it only made it unreadable; the suffix also keeps it out of `make validate`, which globs `*.yaml`. Accepted cost: a `.bak` file ships in the OCI artifact as dead weight and stops being syntax-checked or Renovate-tracked. This supersedes **Decision 1**'s statement that the chart lives in `configs/temporal/` and that the operator manifests are "commented out in place" — the intent (a rollback has the exact prior manifests) is unchanged and better served, since a `.bak` file is readable. Both temporal paths added to `scripts/flux-validate.sh`, which had been validating neither. |
-
+| 2026-08-21 | Amended: a build id freezes the code, not the image — `order-service:1.13.2` was amd64-only and could not be re-tagged, so the order saga had no poller on arm64; the escape hatch is a new build id, cheap when the replay corpus is green (gen3 replays on 2.4.0). Also recorded: `DrainageStatus` is the machine-checkable retirement gate; activation is a per-bring-up step on a rebuilt cluster, not only per-release; `set-ramping-version` exists and is unused; the unversioned fallback is sanctioned by upstream **only** if patching replaces it; and the Temporal Worker Controller is the recorded destination (own RFC). Decision unchanged. See § Amendments. |
 ---
 
-_Last updated: 2026-07-29_
+_Last updated: 2026-08-21_

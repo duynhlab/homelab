@@ -368,6 +368,27 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-030 amended: a build id freezes the code, not the image.** The decision
+  stands — Worker Versioning, `Pinned`, one file per build, activation as a
+  separate step — and upstream has since strengthened it (Temporal calls Worker
+  Versioning "the recommended approach", the pre-2025 experimental mechanism was
+  removed from the server in March 2026, Serverless Workers require versioning,
+  and their duration-based decision guide puts a short-running saga like this one
+  on `Pinned`). What the ADR did not price is that this repo froze the **image
+  tag** as well as the code: `order-service:1.13.2` was published amd64-only and
+  could not be re-tagged, so the order saga had no poller on arm64 and was the
+  one workload the fleet re-pin could not reach. Records the escape hatch (a new
+  build id, cheap when the replay corpus is green — `gen3` replays on 2.4.0), and
+  four more: `DrainageStatus` is the machine-checkable retirement gate;
+  activation is a **per-bring-up** step on a rebuilt cluster, not only
+  per-release; `set-ramping-version` exists and is unused; and the unversioned
+  fallback is sanctioned by upstream **only if patching replaces it** — dropping
+  both is what falls outside the docs. Names the **Temporal Worker Controller**
+  as the destination (own RFC; its CRD to be read from the chart, not from
+  docs). Also rejected in writing, so nobody rediscovers it: build id as a
+  *generation* label, which would let two images share one version and recreate
+  the non-determinism versioning exists to prevent.
+
 - **ADR-053 — treat the untracked SKU as operator data, not an outage**: the
   products/35 investigation (2026-08-18) showed the two halves of one hole —
   Backoffice slice B creates products nothing can sell (no balance row, and the

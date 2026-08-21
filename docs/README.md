@@ -125,6 +125,7 @@ docs/
 ├── platform/                     # Platform/deployment documentation
 │   ├── README.md                 # Platform hub — deployed vs planned, doc map, Flux summary
 │   ├── setup.md                  # GitOps deployment guide (+ seed data & demo accounts)
+│   ├── kind-e2e-audit.md         # The Kind cluster gate — K0–K6 audit runbook (twin of the Compose gate)
 │   ├── gke-internal-dns.md       # GKE cluster.local, Cloud DNS private zones, multi-environment
 │   ├── application-delivery.md    # ResourceSet patterns & templates
 │   ├── cicd.md                   # CI/CD pipelines + standard/policy (pinning, permissions, signing, GoReleaser)
@@ -331,6 +332,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
 5. **[Pooler operations](./databases/runbooks/pgdog-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
+6. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
 
 ---
 
@@ -451,6 +453,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 - [Platform hub](./platform/README.md) - Deployed vs planned, doc map, Flux summary
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
+- [Kind E2E audit](./platform/kind-e2e-audit.md) - The **cluster gate**: K0–K6 runbook proving Flux delivered the pinned images, admission/secrets/isolation, the real edge, and cluster-only telemetry. Twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, and trust-manager CA bundle distribution (§11)
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
@@ -483,6 +486,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Runbooks
 
+- [Kind E2E audit](./platform/kind-e2e-audit.md) - The cluster release gate (K0–K6), twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md) - Backup and restore procedures
 - [Logging troubleshooting](./observability/logging/README.md#troubleshooting) - Missing/blank Kubernetes logs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow

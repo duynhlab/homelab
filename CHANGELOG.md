@@ -721,6 +721,34 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The Kind gate becomes a permanent runbook** —
+  `docs/platform/kind-e2e-audit.md`, the twin of
+  `local-stack/docs/e2e-audit.md`, promoted from the self-deleting
+  `KIND-E2E-CHECKLIST.md` (PR #790, superseded) whose own last row said "delete
+  this file and close its pull request". The gate recurs, so every audit was
+  re-deriving it from scratch and the file rotted in an open PR. Rows that name a
+  version rot fastest, so the pin, hostname, dashboard and Kustomization rows are
+  now **commands that read the answer out of git** instead of frozen tables, and
+  findings live in a dated `Previous runs` section rather than dying with the
+  file. Refreshed against the tree: four MCP servers incl. `grafana-mcp` and its
+  operator-minted `grafana-mcp-token` (the platform's first controller-minted
+  credential consumed by a workload); dashboards re-pointed at the 33
+  `GrafanaDashboard` CRs (18 `configMapRef`, 15 `url:` of which 12 unpinned) and
+  the datasource reference-resolution failure mode; the spanmetrics leg marked
+  **N/A** (Compose-only connector — the cluster has Tempo's metrics-generator with
+  no consumer); K5.4's identity-collision premise demoted to a regression check
+  and its negative result preserved as history; `db-isolation-sweep.sh`'s stale
+  `auth` role recorded as a script-side defect (and its untested `keycloak` role);
+  `edge-isolation-sweep.sh`'s stale-`auth` warning removed as resolved; two live
+  Kyverno exceptions, not three. New rows the ephemeral file could not carry:
+  seeding via `scripts/kind-seed.sh`, per-architecture manifest-list checks with
+  the amd64-only `order-service:1.13.2` recorded as an **expected** finding rather
+  than a fresh defect, macOS + podman bring-up with the two non-persistent
+  sysctls, Keycloak's own metrics/alerts/SLO signals, MCP reachability through the
+  edge, and a row that closes the four in-tree `VERIFY-AT-KIND` markers — one of
+  which is the likely cause of the empty `chi_*` panels the old checklist wrongly
+  called "empty by design" (the Altinity operator *is* deployed). Linked from
+  `docs/README.md` and the platform hub.
 - **The retired auth-service and Kong stop speaking in live voice.** AGENTS.md
   — the operative contract — still said "11 services", "Kong DB-less gateway"
   in the local-stack line, four ResourceSet domains, and a dead

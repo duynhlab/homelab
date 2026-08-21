@@ -55,10 +55,28 @@ spec:
       runAsNonRoot: true
       seccompProfile:
         type: RuntimeDefault
+    # 100m starved it into a restart loop, and the way that presents is the
+    # reason these numbers carry a comment. The operator serves the CNPG
+    # admission webhooks (`mbackup.cnpg.io` and friends, failurePolicy: Fail),
+    # and its own liveness/startup probe is an HTTPS GET on /readyz with
+    # timeoutSeconds: 1. A TLS handshake plus /readyz cannot reliably finish
+    # inside 1s on 0.1 core, so kubelet killed it -- measured 2026-08-21:
+    # `Container manager failed startup probe` x4 and `failed liveness probe` x5
+    # inside 57 minutes, exit 137 after a clean shutdown (so not an OOM), pod
+    # 0/1 with 9 restarts.
+    #
+    # With no healthy endpoint behind cnpg-webhook-service, Flux dry-runs fail:
+    #   Backup/platform/platform-db-initial dry-run failed (InternalError):
+    #   failed calling webhook "mbackup.cnpg.io": ... connect: connection refused
+    # and databases-local parks, taking temporal, keycloak, apps and the DR
+    # Kustomization with it -- 8 Kustomizations reporting "dependency is not
+    # ready" and 10 services in CrashLoopBackOff, none of them naming a webhook.
+    # Third instance of this pattern in one day; see the External Secrets
+    # webhook (#857) and rustfs (#852).
     resources:
       limits:
-        cpu: 100m
-        memory: 100Mi
+        cpu: 500m
+        memory: 256Mi
       requests:
         cpu: 100m
         memory: 100Mi

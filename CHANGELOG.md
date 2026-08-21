@@ -1636,6 +1636,26 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The CNPG operator was starved at 100m CPU into a restart loop, and it took
+  the database half of the platform with it.** Its own liveness and startup probe
+  is an HTTPS GET on `/readyz` with **`timeoutSeconds: 1`**, which a TLS
+  handshake plus the handler cannot reliably finish on 0.1 core. Measured
+  2026-08-21: `Container manager failed startup probe` ×4 and `failed liveness
+  probe` ×5 inside 57 minutes, `exit 137` after a **clean** shutdown sequence
+  ("All workers finished" — so not an OOM), pod `0/1` with **9 restarts**, on
+  nodes with 8 idle CPUs each.
+  With no healthy endpoint behind `cnpg-webhook-service`, Flux dry-runs failed on
+  `failed calling webhook "mbackup.cnpg.io": ... connect: connection refused`;
+  `databases-local` parked and took temporal, keycloak, apps and the DR
+  Kustomization with it — 8 Kustomizations on `dependency ... is not ready` and
+  **10 services in CrashLoopBackOff**, not one of them naming a webhook. Limits
+  raised to 500m/256Mi (requests unchanged at 100m/100Mi, so it is now Burstable
+  and can absorb a reconcile burst). Operator came back `1/1` with **0
+  restarts**.
+  **Third instance of this pattern in one day** — External Secrets webhook at 50m
+  (#857) and rustfs (#852) — and each time the symptom was a chain of Flux
+  dependency messages that cannot name their own cause.
+
 - **The isolation sweep reported PASS with no cluster attached.** Found
   immediately after making it runnable, and it is the same class of defect the
   script's own header warns about: `kubectl run` fails, `$out` is empty, the

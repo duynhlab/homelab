@@ -1024,10 +1024,12 @@ re-reading, not the status.)*
    tag would change the code behind a determinism-frozen build id, and a new tag
    is a full worker version cutover (replay corpus + activation + drain), not a
    pin bump. On an arm64 cluster the order saga therefore has **no poller**. Two
-   ways out, for a later decision: **backfill** a `linux/arm64` leg onto the
-   existing tag while preserving the amd64 digest, or **plan the cutover** under
-   RFC-0021's activation procedure. [K0.8](#k0--the-machine) tells the auditor to
-   expect this rather than file it again.
+   ways out were open at the time: **backfill** a `linux/arm64` leg onto the
+   existing tag while preserving the amd64 digest, or **cut a new build id** under
+   RFC-0021's activation procedure. The second was taken on 2026-08-21 — the
+   worker is `2.4.0` and carries both platforms — which is why
+   [K0.8](#k0--the-machine) now asserts arm64 coverage instead of excusing its
+   absence.
 2. **The pre-push Trivy gate builds single-platform** — `load: true` cannot take a
    multi-platform build result — so the **arm64 layers ship unscanned**. A
    vulnerability present only in the arm64 base or toolchain passes the gate.

@@ -15,9 +15,12 @@
 #     Ramp % are printer columns.
 #   - TEMPORAL_DEPLOYMENT_NAME / TEMPORAL_WORKER_BUILD_ID. The controller injects
 #     both into every container of every version it creates. Hand-setting either
-#     gives the pod two identities; scripts/flux-validate.sh rejects it, and
-#     pkg/temporalx >= temporalx/v0.37.0 exits 1 on a disagreement rather than
-#     polling under the wrong one.
+#     gives the pod two identities. The guard is scripts/flux-validate.sh, and
+#     it is the ONLY guard: temporalx reads one name per variable, so it cannot
+#     see a hand-set value disagree with an injected one. What it does refuse is
+#     HALF a config -- one of the two variables present -- which is why the
+#     retired TEMPORAL_WORKER_DEPLOYMENT_NAME is a crash rather than a silent
+#     downgrade (pkg/temporalx >= temporalx/v0.37.0).
 #   - the server-side deployment name. It is "<k8s-namespace>/<resource-name>",
 #     so this resource registers as `order/order-fulfillment` — NOT the bare
 #     `order-fulfillment` ADR-030 used. Deliberate and verified: the drain set is
@@ -58,7 +61,6 @@ metadata:
   labels:
     app.kubernetes.io/name: order-worker
     app.kubernetes.io/component: worker
-    platform.duynhlab.dev/domain: fulfillment
     platform.duynhlab.dev/rfc: "0026"
 spec:
   replicas: 1
@@ -209,15 +211,23 @@ spec:
               value: order-fulfillment
             # The inventory reconciler and the two outbox dispatchers.
             #
-            # BOTH ARE ON, AND THEY NOW RUN ON EVERY LIVE VERSION. One pod
-            # template serves every version, so these can no longer be `false` on
-            # a draining build the way ADR-030 required. Verified safe rather than
-            # assumed: the dispatchers claim with FOR UPDATE SKIP LOCKED, and
-            # order-service documents extra instances as "correct — just
-            # unnecessary"; the reconciler has no lease but is documented "SAFE
-            # but noisy" — inventory serializes on the reservation row and
-            # short-circuits on status, so a second repair is a no-op RPC and the
-            # cost is a duplicated repair counter, not a wrong action.
+            # BOTH RUN ON EVERY LIVE VERSION, and that is the change — not these
+            # two lines. One pod template serves every version, so neither can be
+            # `false` on a draining build the way ADR-030 required.
+            #
+            # Neither line switches anything on. ORDER_RECONCILER_ENABLED was
+            # already `true` on the Current build, and ORDER_START_DISPATCHERS_ENABLED
+            # DEFAULTS to true in order-service (config/config.go: flagx.MustEnum
+            # with `flagOn` as the default), so the dispatchers were already running
+            # on the old manifest, which never set it. Both are written out here to
+            # state the posture rather than inherit it.
+            #
+            # Verified safe rather than assumed: the dispatchers claim with
+            # FOR UPDATE SKIP LOCKED, and order-service documents extra instances
+            # as "correct — just unnecessary"; the reconciler has no lease but is
+            # documented "SAFE but noisy" — inventory serializes on the reservation
+            # row and short-circuits on status, so a second repair is a no-op RPC
+            # and the cost is a duplicated repair counter, not a wrong action.
             #
             # The real fix is to move both out of the worker: neither is workflow
             # code, so neither needs pinning. That is order-service work, tracked

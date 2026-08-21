@@ -17,7 +17,7 @@ only writer of orders and the only place the fulfillment saga starts.
 | **Repository** | [`duynhlab/order-service`](https://github.com/duynhlab/order-service) | — |
 | **Owns** | Orders, order items, totals components, idempotency records, status history, processing projection, cancellation requests | — |
 | **Database** | `order` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
-| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) · [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (P5) |
+| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) · [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (P5) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) |
 
 ## Temporal participation
 
@@ -25,7 +25,7 @@ only writer of orders and the only place the fulfillment saga starts.
 |-------|-------|
 | **Role** | Orchestrator — owns the workflow, the worker, and every activity |
 | **Workflow** | `OrderFulfillmentWorkflow` + `CancellationWorkflow` (`internal/saga/`) |
-| **Worker** | `order-worker-2-4-0` (Current) — same image, `worker` subcommand; **versioned** (Worker Deployment `order-fulfillment`, one manifest per build, ADR-030), workflows run `Pinned`. Earlier builds keep polling until their pinned histories drain |
+| **Worker** | `order-worker` — same image, `worker` subcommand; **versioned** via the Temporal Worker Controller (server-side deployment `order/order-fulfillment`, build id derived from the pod template — [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/)), workflows run `Pinned`. A drained version scales to zero after 1h and is deleted after 24h |
 | **Task queue** | `order-fulfillment` (Temporal namespace `mop`) |
 | **Workflow ID** | `order-fulfillment-<orderID>`; cancellation episodes use `order-cancellation-<orderID>-v<epoch>` (epoch = observed `orders.version`, so a legally repeated episode gets a fresh id) |
 | **Start semantics** | Detached-context start after the order row commits (see [Saga handoff](#the-saga-handoff-start-after-commit)) |

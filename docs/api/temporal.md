@@ -12,7 +12,7 @@ when a shopper stopped.
 | **Task queues** | `order-fulfillment` (both order workflows) · `checkout` | — |
 | **Namespace** | `mop` | — |
 | **Registry** | [workflows.md](./workflows.md) — the one-line index of every workflow | — |
-| **Design record** | — | [RFC-0021](../proposals/rfc/RFC-0021/) (stock participant, worker versioning, start outbox) · [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-039](../proposals/adr/ADR-039-local-stack-temporal-server-postgres/) (local topology on Postgres) |
+| **Design record** | — | [RFC-0021](../proposals/rfc/RFC-0021/) (stock participant, worker versioning, start outbox) · [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-039](../proposals/adr/ADR-039-local-stack-temporal-server-postgres/) (local topology on Postgres) · [RFC-0026](../proposals/rfc/RFC-0026/) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) (worker lifecycle) |
 
 ## Overview
 
@@ -995,13 +995,18 @@ flowchart LR
         TC[temporal-frontend/history<br/>matching/worker]
         UI[temporal-web UI]
         TDB[(CNPG platform-db<br/>temporal + temporal_visibility<br/>direct :5432)]
+        WC[Worker Controller<br/>+ its CRDs chart]
         HR --> TC
         TC --> TDB
         TC --> UI
     end
     subgraph ns_order[ns order]
-        OW[order worker<br/>task queue: order-fulfillment]
+        WD[WorkerDeployment<br/>order-fulfillment]
+        OW[order worker pods<br/>one Deployment per version<br/>task queue: order-fulfillment]
     end
+    WC --> WD
+    WD --> OW
+    WC -- "set Current / Ramping" --> TC
     OW -- gRPC :7233 --> TC
     Edge[Envoy Gateway] -- temporal.duynh.me --> UI
     TC -- /metrics --> VM[VictoriaMetrics]
@@ -1013,17 +1018,19 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class Edge edge;
     class OW worker;
-    class HR,TC,UI,VM,Tempo platform;
+    class HR,TC,UI,VM,Tempo,WC platform;
+    class WD worker;
     class TDB data;
 ```
 
 Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/)** for the re-platform and the Worker Versioning requirement that forced it; **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** records the retired operator choice it superseded):
 
 - **`HelmRelease temporal`** — `controllers/temporal/helmrelease.yaml`: chart `1.6.0` (server **`1.31.2`** — Worker Versioning needs ≥ 1.29.1, which the retired operator could not run), `numHistoryShards: 512`, persistence → `platform-db-rw.platform:5432` (`temporal` + `temporal_visibility`, `createDatabase: false` — the role has no CREATEDB) via **`platform-db-temporal-secret`**, `mop` namespace (retention 168h) created by the chart's namespace Job, `web.enabled`, `admintools.enabled`, `server.metrics.serviceMonitor.enabled`, `schema.useHelmHooks: false` (Flux does not reconcile Helm hooks), resources set on every component. The frontend Service keeps the name **`temporal-frontend`**, so `TEMPORAL_HOSTPORT` is unchanged across the re-platform; the UI Service is **`temporal-web`** (was `temporal-ui`).
+- **`HelmRelease temporal-worker-controller-crds` → `temporal-worker-controller`** — `controllers/temporal/worker-controller-{crds-,}helmrelease.yaml` (ADR-054): charts `0.28.0` (appVersion `1.9.0`) from `docker.io/temporalio`, pinned as OCIRepositories in `clusters/local/sources/oci/`. CRDs chart first via `dependsOn`; the manager runs **one** replica (Kind is a single node), `metrics.disableAuth: true` (nothing scrapes it, so the kube-rbac-proxy sidecar would guard a port with no reader), and the optional `WorkerDeployment` webhook stays off — the CRD's own CEL rules already reject the mistakes that matter, and `make validate` never sees an admission webhook. The always-on `WorkerResourceTemplate` webhook is why cert-manager is required; the chart issues that cert from its own namespaced self-signed `Issuer`, not from the `homelab-ca` root.
 - **Retired operator** — its HelmRelease, both CRs and its HelmRepository are kept as `*.yaml.bak` beside their replacements: readable, and inert because no kustomization lists them (ADR-030). The `TemporalCluster`/`TemporalNamespace` CRDs and the cert-manager admission webhook are gone with the operator.
 - **`platform-db`** — `configs/databases/clusters/platform-db/`: consolidated CloudNativePG cluster (RFC-0018) hosting `temporal` + `temporal_visibility` alongside auth and supporting databases. 3-node HA; Barman backups at `s3://pg-backups-cnpg/platform-db/`.
 - **Edge & alerts** — the edge `HTTPRoute temporal-ui` (`configs/envoy-gateway/routes/temporal.yaml`, hostname `temporal.duynh.me`, **planned** — not yet exercised on Kind) plus `TemporalServerDown` and service/persistence error-rate `PrometheusRule`s in `configs/temporal/` (applied by `temporal-config-local`, after the chart).
-- **Flux order** — `controllers` (namespace only — no operator, and the cert-manager dependency retired with the webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, databases, monitoring) before `apps`, health-checked on the `HelmRelease` + `temporal-frontend` Deployment (helm-controller waits for release resources, so Ready also means the `mop` namespace Job completed — the ordering guarantee `apps-local` needs); the order worker `dependsOn` temporal.
+- **Flux order** — `controllers` (namespace only — no operator, and the cert-manager dependency retired with the webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, databases, monitoring) before `apps`, health-checked on the `HelmRelease` + `temporal-frontend` Deployment (helm-controller waits for release resources, so Ready also means the `mop` namespace Job completed — the ordering guarantee `apps-local` needs); the order worker `dependsOn` temporal. Since ADR-054 that ordering is load-bearing in a second way: the worker **CRDs and manager ride inside `temporal-local`** precisely so `apps-local`'s existing `dependsOn` covers them before it applies any `WorkerDeployment`. Note the `healthChecks` list still names only `temporal` + `temporal-frontend`, so a Ready `temporal-local` does not by itself prove the controller is up — `wait: true` is what covers it.
 
 ### Worker Deployment Versioning (as-built)
 
@@ -1035,8 +1042,10 @@ diagram below describes is unchanged, but no human performs any step in it.
 The build id is not a label for humans — it is the address the server routes on.
 It gets stamped into an execution's history when the workflow starts, and from
 then on that execution's tasks are only ever offered to a worker declaring the
-same build. `2.5.0` below is a hypothetical next build, used to show the handover;
-the only build deployed today is `2.4.0`.
+same build. Under the controller the build id is **derived** from the pod template and
+written down nowhere in git, so the diagram names the two participants by role rather
+than by number — read the live values from
+`kubectl -n order get wd order-fulfillment`.
 
 ```mermaid
 sequenceDiagram
@@ -1044,24 +1053,24 @@ sequenceDiagram
     participant API as order-service<br/>(starter)
     participant TS as Temporal server<br/>frontend + matching
     participant H as execution history<br/>(platform-db)
-    participant W4 as worker pod<br/>build 2.4.0
-    participant W5 as worker pod<br/>build 2.5.0
+    participant W4 as worker pod<br/>outgoing build
+    participant W5 as worker pod<br/>incoming build
 
-    Note over TS: Current = order-fulfillment / 2.4.0
+    Note over TS: Current = order/order-fulfillment / build A
     API->>TS: StartWorkflow OrderFulfillmentWorkflow
-    TS->>H: stamp order-fulfillment / 2.4.0<br/>on THIS execution
-    W4->>TS: poll "I am order-fulfillment / 2.4.0"
+    TS->>H: stamp order/order-fulfillment / build A<br/>on THIS execution
+    W4->>TS: poll "I am order/order-fulfillment / build A"
     TS-->>W4: workflow task (stamp matches)
 
-    Note over W5: new manifest lands, pod is Ready
-    W5->>TS: poll "I am order-fulfillment / 2.5.0"
-    TS--xW5: zero tasks — Current is still 2.4.0
+    Note over W5: image tag edited -> controller mints<br/>build B and creates its Deployment
+    W5->>TS: poll "I am order/order-fulfillment / build B"
+    TS--xW5: zero tasks — Current is still build A
 
     Note over TS: controller ramps 10% -> 50% -> Current
     API->>TS: StartWorkflow (a NEW order)
-    TS->>H: stamp 2.5.0 on the new execution only
+    TS->>H: stamp build B on the new execution only
     TS-->>W5: tasks for the new order
-    TS-->>W4: tasks for the OLD order<br/>its stamp still says 2.4.0
+    TS-->>W4: tasks for the OLD order<br/>its stamp still says build A
 
     Note over W4: pod deleted before its orders finish
     TS--xW4: task has nowhere to go
@@ -1140,12 +1149,16 @@ How to deploy the worker, run the saga locally, and watch it in production.
   Temporal + the downstreams, registers the workflow/activities, and polls the task queue. It also
   serves `/health` and `/ready` (the process has no application HTTP API, but
   still needs liveness and readiness probes). Worker metrics export over OTLP.
-- **In-cluster.** The worker is a **second release of the same `mop` chart** (`duynhlab/helm-charts`,
-  ≥`0.12.0`): same image, `args: ["worker"]`, `service.enabled: false`. In homelab it's the
-  `order-worker-2-4-0` HelmRelease (`kubernetes/apps/order-worker-2-4-0.yaml`, namespace `order` —
-  one file per Worker Deployment Version; a retired file is deleted once its build is
-  Current-superseded with nothing pinned to it, as 1-8-0 was, see
-  [Worker Deployment Versioning](#worker-deployment-versioning-as-built)) carrying the
+- **In-cluster.** Since [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/)
+  the worker is **not chart-rendered at all**: it is a `WorkerDeployment` + `Connection`
+  in [`kubernetes/apps/order-worker.yaml`](../../kubernetes/apps/order-worker.yaml)
+  (namespace `order`), whose `spec.template` is a raw pod spec. The `mop` chart is
+  deliberately out of the path — the accepted cost is that nothing keeps that template
+  in step with the chart's future defaults. The Temporal Worker Controller creates one
+  Deployment per version and deletes a drained one on `sunset` timers, so there is no
+  per-version file and no human deletion step (see
+  [Worker Deployment Versioning](#worker-deployment-versioning-as-built)). The template
+  carries the
   order DB address, `TEMPORAL_HOSTPORT` / `TEMPORAL_NAMESPACE` / `TASK_QUEUE`, and the downstream
   `*_GRPC_ADDR` targets (inventory, shipping, notification, payment — each
   `dns:///<service>.<ns>.svc.cluster.local:9090`, the single multi-port Service).
@@ -1200,4 +1213,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-08-21 — § Worker Deployment Versioning gains a sequence diagram: how a task finds the worker build its execution was stamped with, and the two ways it finds none._
+_Last updated: 2026-08-21 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle. § Worker Deployment Versioning, the in-cluster deploy bullet and the topology diagram all move off the per-build manifest model; the build id is derived and named nowhere in git._

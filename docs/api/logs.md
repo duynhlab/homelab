@@ -113,7 +113,7 @@ without parsing language-specific label strings:
 | `TraceId`, `SpanId`, `TraceFlags` | `obsx.TraceContext(ctx)` bound to the request logger |
 | `SeverityText`, `SeverityNumber` | zap `level` via the otelzap bridge |
 | `Body` | zap `message` |
-| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod — from `OTEL_SERVICE_NAME` + Downward API; `service.version` only on the versioned order worker today, ADR-030) |
+| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod — from `OTEL_SERVICE_NAME` + Downward API; `service.version` only on the versioned order worker today — the controller-derived build id, read from the `temporal.io/build-id` pod label, ADR-054) |
 | `InstrumentationScope` | the scope name passed to `obs.ZapCore(scopeName, minLevel)` |
 | `Attributes` | every `zap.Field` on the entry (`caller` included) |
 

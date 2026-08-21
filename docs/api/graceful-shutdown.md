@@ -257,12 +257,16 @@ The contract values are **uniform defaults, not per-service pins**:
 `READINESS_DRAIN_DELAY=5s` and `SHUTDOWN_TIMEOUT=10s` are the services' own
 defaults, and `terminationGracePeriodSeconds` comes from the `mop` chart in
 `duynhlab/helm-charts` — **no homelab manifest overrides any of the three**
+(the order worker is the one exception to the *provenance*, not the value: since
+ADR-054 it is a raw pod template rather than a chart render, so its budget is the
+Kubernetes 30s default. Same number — `charts/mop` sets no
+`terminationGracePeriodSeconds` key either — different source)
 (nothing in `kubernetes/apps/` or `local-stack/compose.yaml` sets them; a
 service that needs different numbers owns that override in its repo/chart
 values). The budget rule above is what a reviewer checks, not a table.
 
 **Recorded gaps:** the **Temporal workers** (`checkout-worker`,
-`order-worker-2-4-0`) follow a worker-specific lifecycle (task-slot draining,
+`order-worker`) follow a worker-specific lifecycle (task-slot draining,
 not HTTP draining) that this contract does not yet describe; `mockpay`, the
 SPA, and the back-office portal are likewise out of scope here.
 

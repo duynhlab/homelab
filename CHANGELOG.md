@@ -1067,6 +1067,21 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **A fresh cluster was born in the `OrderSagaNotCompleting` state and no
+  document said so.** `make up` leaves the `order-fulfillment` Worker
+  Deployment with **no Current version** — the Temporal database is new — and a
+  nil Current version routes new workflows to *unversioned* workers, of which
+  there are none. Every order sits `pending` with no error, no failed activity,
+  pods `Ready`, and the outbox gauges green because the workflow did start.
+  Activation is deliberately un-reconciled (ADR-030: making a version Current is
+  a decision, so the CronJob ships `suspend: true` on a `0 0 31 2 *` schedule),
+  which on a cluster you rebuild makes it a **per-bring-up** step rather than a
+  per-release one — and it appeared in no runbook. `kind-e2e-audit.md` gains
+  **K1.7** (activation + a verify that reads the server's Current build against
+  the build actually deployed, not one without the other) and `setup.md` gains
+  the same step in its post-bring-up expectations. Both defer diagnosis to the
+  existing `OrderSagaNotCompleting` runbook rather than restating it. Without
+  this the Kind audit fails K4/K5 and reports an application bug.
 - **The MCP doc stops describing a plan that already shipped — and the
   committed client config stops pointing at a domain that doesn't exist.**
   `.crush.json` targeted `vm-mcp.duynhne.me` / `vl-mcp.duynhne.me` /

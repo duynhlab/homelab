@@ -194,6 +194,24 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **`scripts/new-worker-build.sh` — stage a versioned Temporal worker build
+  without retyping it.** A build bump changes exactly **six** values in a
+  232-line HelmRelease; the number is measured, not estimated — `git show
+  fdad929a` holds the 1-12-0 → 1-13-0 cutover and, comments stripped, the two
+  files differ by those six lines and nothing else. The other 134 body lines get
+  retyped byte-identically and the 41-line header rewritten from scratch, which
+  is where the recorded mistake came from: `ORDER_RECONCILER_ENABLED` left
+  `true` on all three builds at once, three judges sharing one scan. The script
+  rewrites the six values plus the cutover CronJob's `--build-id`, flips the
+  draining build's reconciler to `false`, and **fails loudly if any single
+  substitution matches nothing** rather than half-editing a file. It deliberately
+  does **not** delete the outgoing build (ADR-030 keeps it until Temporal reports
+  DRAINED) or activate the new version — both are decisions, and it prints them
+  as next steps instead. It removes the human doing the copy-paste, not the
+  copy-paste: templating that away needs a worker ResourceSet plus a render step
+  in `flux-validate` (kustomize does not expand ResourceSets), and the Temporal
+  Worker Controller would replace all of it, so that work is deferred rather
+  than built twice.
 - **`scripts/kind-seed.sh` — demo data for a Kind cluster**, the missing twin of
   compose's eight `command: ["seed"]` one-shots. Seed data is not desired state,
   so it stays a script rather than a manifest Flux would re-run forever. Each Job

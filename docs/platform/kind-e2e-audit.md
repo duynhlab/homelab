@@ -626,13 +626,27 @@ breaks a command copied from the Compose audit:
   ```bash
   KCT="local-stack/scripts/keycloak-token.sh"
   KC_URL=https://id.duynh.me KC_INSECURE=1 USERNAME=alice PASSWORD=password123 $KCT
-  # Preferred — verify against the CA instead of skipping verification. The root
-  # is committed on purpose, so this needs no cluster access:
-  #   CA=kubernetes/infra/configs/cert-manager/ca-source/homelab-ca.crt
+  # Preferred — verify against the CA instead of skipping verification. Take the
+  # CA from the cluster, NOT from git:
+  #   CA=/tmp/homelab-ca.crt
+  #   kubectl -n cert-manager get secret homelab-ca-secret \
+  #     -o jsonpath='{.data.tls\.crt}' | base64 -d > $CA
   #   KC_URL=https://id.duynh.me KC_CACERT=$CA USERNAME=alice PASSWORD=password123 $KCT
   # (the live copy is Secret/homelab-ca-secret in cert-manager, distributed to
   #  labelled namespaces as ConfigMap/homelab-ca-bundle by trust-manager)
   ```
+  > **The committed CA cannot validate a fresh cluster, and the runbook used to
+  > say the opposite** ("the root is committed on purpose, so this needs no
+  > cluster access"). cert-manager mints a **new self-signed CA on every
+  > bring-up**: on 2026-08-21 the copy in
+  > `configs/cert-manager/ca-source/homelab-ca.crt` carried serial
+  > `6AF504AB…` dated 2026-05-05, while the cluster served `57B2C1F3…` issued
+  > 05:04 that morning — `make up` time. Both paths were tried: the committed
+  > file fails with `SSL certificate problem: unable to get local issuer
+  > certificate` before a code is ever issued; the live Secret returns a token.
+  > Only `KC_INSECURE=1` or the live CA works, and the live CA needs cluster
+  > access — so the "no cluster access" claim was the wrong half to keep.
+
   `KC_URL` must be the origin the token's `iss` should carry — Keycloak derives
   `iss` from the request host and the edge SecurityPolicy pins the issuer exactly.
   `KC_REDIRECT` defaults to `http://localhost:3001/` for local-stack; if the
@@ -708,8 +722,26 @@ Drive some traffic first, and tag it so later rows can find one request:
 ```bash
 TAG=$(date +%s)
 curl -sk -o /dev/null "https://gateway.duynh.me/product/v1/public/products?audit=$TAG"
+# One public GET is NOT enough. It reaches product and nothing else, which
+# leaves inventory, checkout and the east-west gRPC legs cold -- and a cold
+# service is indistinguishable from an uninstrumented one, because OTel only
+# materialises a series after the first call. Drive a real checkout session too:
+# it is the cheapest call that exercises gRPC, and it is what K5.5's rpc_* leg
+# and K5.2's coverage list actually depend on.
+CA=/tmp/homelab-ca.crt
+kubectl -n cert-manager get secret homelab-ca-secret -o jsonpath='{.data.tls\.crt}' | base64 -d > $CA
+TOK=$(KC_URL=https://id.duynh.me KC_CACERT=$CA KC_REDIRECT=https://local.duynh.me/ \
+      USERNAME=alice PASSWORD=password123 local-stack/scripts/keycloak-token.sh | tail -1)
+curl -sk -X POST "https://gateway.duynh.me/checkout/v1/private/checkout/sessions" \
+  -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{}'
 sleep 45   # OTLP export is 15s; give the collector and the stores a flush
 ```
+> Measured on 2026-08-21: before the checkout call,
+> `rpc_server_call_duration_seconds_count{service_name="inventory"}` returned
+> **NO SERIES** and `inventory` was **absent** from the trace service list. After
+> one session: `= 1`, and `inventory`, `checkout` and `checkout-worker` all
+> appeared. The row had looked like a missing-instrumentation defect for two
+> audits; it was a cold service.
 
 - [ ] **K5.1 Traces — the edge is the root and the chain is unbroken.**
   Port-forward ClickHouse (no route, by design), then:
@@ -790,14 +822,21 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   ```bash
   for q in 'sum(http_server_request_duration_seconds_count)' \
            'sum(rpc_server_call_duration_seconds_count{service_name="inventory"})' \
-           'count(temporal_workflow_endtoend_latency_seconds_bucket)' \
+           'count(temporal_workflow_endtoend_latency_bucket)' \
            'sum(envoy_http_downstream_rq_total)'; do
     echo -n "$q => "
     curl -sk 'https://vmui.duynh.me/api/v1/query' --data-urlencode "query=$q" | jq -r '.data.result[0].value[1] // "NO SERIES"'
   done
   ```
   Four legs: app HTTP semconv (OTLP ingest), app gRPC semconv, the Temporal SDK,
-  and the edge's own Envoy stats. `inventory` is gRPC-only with no edge route, so
+  and the edge's own Envoy stats.
+  > **The Temporal leg named a series that does not exist until 2026-08-21.** The
+  > query asked for `temporal_workflow_endtoend_latency_seconds_bucket`; the Go
+  > SDK emits `temporal_workflow_endtoend_latency_bucket` — **no `_seconds`**. It
+  > therefore reported `NO SERIES` on every run, indistinguishable from a dead
+  > SDK exporter. The correct name has 40 series on a seeded cluster. This is the
+  > same failure class the `VERIFY-AT-KIND` convention exists for: an expression
+  > that names a missing series loads cleanly and is silent forever. `inventory` is gRPC-only with no edge route, so
   its `rpc_*` count is the only metrics evidence it is instrumented at all.
   **The spanmetrics leg is N/A here.** `spanmetrics_calls_total` and
   `spanmetrics_duration_milliseconds_*` come from the OTel Collector's
@@ -888,12 +927,35 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
      to populate. Empty `chi_*` panels here are a **finding**, and the likely cause
      is already written down — see [K5.10](#k5--the-four-signals).
 
-- [ ] **K5.8 Alert rules loaded, none firing wrongly.**
-  `curl -sk https://vmalert.duynh.me/api/v1/rules | jq -r '[.data.groups[].rules[] | select(.state=="firing") | .name] | unique[]'`
+- [ ] **K5.8 Alert rules loaded, none firing wrongly.** Group the firing set by
+  `severity` — the name alone cannot tell you which of two Sloth variants fired:
+  ```bash
+  curl -sk https://vmalert.duynh.me/api/v1/rules \
+    | jq -r '[.data.groups[].rules[] | select(.state=="firing")]
+             | group_by(.labels.severity)[]
+             | "\(.[0].labels.severity): \(map(.name)|unique|join(", "))"'
+  ```
   **Do not** assert a total count:
   [`alert-catalog.md`](../observability/alerting/alert-catalog.md) marks a subset
-  **inactive on Kind** for platform reasons. Assert only that rules loaded and
-  that nothing is firing on a healthy stack.
+  **inactive on Kind** for platform reasons.
+  **Want:** rules loaded (800 across 195 groups on 2026-08-21), **no `page` and
+  no `critical` firing**, and `Watchdog` **present** — it is the dead-man's
+  switch, so its absence is the failure, not its presence.
+  **Expected on Kind, not a finding:**
+  - Sloth **`severity: ticket`** alerts (the slow-burn variants, 2h/1d and 6h/3d
+    windows) firing while the cluster is younger than the window. On 2026-08-21 a
+    cluster **1h51m** old had `CheckoutHighLatency`, `KeycloakLoginHighErrorRate`
+    and `ReviewHighOverallErrorRate` firing on `ticket` while **every** matching
+    `page` variant stayed `inactive` — the shortest ticket window (2h) already
+    exceeded the cluster's lifetime, so a couple of client-side 400s dominate the
+    ratio. `ReviewHighOverallErrorRate` fired on exactly **two** `400`s.
+  - kube-level rows such as `KubePodCPUThrottlingHigh`, which fires on
+    `kube-system/kindnet-*` at ~100% throttling. kindnet is Kind's own CNI and
+    nothing in this repo sets its limits. Record it and move on.
+  > The row used to read *"nothing is firing on a healthy stack"*, which is
+  > **unachievable by construction** here: `Watchdog` fires by design, and the
+  > slow-burn windows cannot be satisfied by a cluster that has just been built.
+  > Asserting it guaranteed a false FAIL on every run.
 
 - [ ] **K5.9 Keycloak's own signals.** New surface since the last audit: Keycloak
   emits metrics, tracing and JSON logs, and has a consumer for each.

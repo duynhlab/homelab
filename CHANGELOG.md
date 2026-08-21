@@ -1246,6 +1246,36 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Four rows of the Kind audit asserted things that could not be true, so a
+  healthy platform read as broken.** Found by running the gate end to end on
+  2026-08-21.
+  - **K5 preamble** drove one public `GET /products` and nothing else, leaving
+    inventory, checkout and every gRPC leg cold — and OTel only materialises a
+    series after the first call, so a cold service is indistinguishable from an
+    uninstrumented one. Before a checkout call,
+    `rpc_server_call_duration_seconds_count{service_name="inventory"}` returned
+    NO SERIES and `inventory` was absent from the trace list; after one session,
+    `= 1`, with `inventory`, `checkout` and `checkout-worker` all present. The
+    preamble now drives a real checkout session.
+  - **K5.5** asked for `temporal_workflow_endtoend_latency_seconds_bucket`. The
+    Go SDK emits `temporal_workflow_endtoend_latency_bucket` — no `_seconds` —
+    so the leg reported NO SERIES on every run while 40 series existed.
+  - **K4.5** told the operator the committed CA "needs no cluster access".
+    cert-manager mints a fresh CA per bring-up: git held serial `6AF504AB…`
+    (2026-05-05), the cluster served `57B2C1F3…` issued at `make up` time. The
+    committed file dies with `unable to get local issuer certificate` before a
+    code is issued; the live `Secret/homelab-ca-secret` returns a token. Both
+    were tried before rewriting the row.
+  - **K5.8** demanded "nothing is firing on a healthy stack", which is
+    unachievable by construction: `Watchdog` fires by design, and Sloth's
+    `severity: ticket` variants (2h/1d, 6h/3d) cannot be satisfied by a cluster
+    younger than the window — a **1h51m** old cluster had three firing on
+    `ticket` while every matching `page` variant stayed `inactive`, one of them
+    on exactly two client-side `400`s. The row now asserts by severity: no
+    `page`, no `critical`, `Watchdog` **must** be present, and kube-level rows
+    like `KubePodCPUThrottlingHigh` on `kindnet` are recorded as environment
+    artifacts rather than chased.
+
 - **A fresh cluster was born in the `OrderSagaNotCompleting` state and no
   document said so.** `make up` leaves the `order-fulfillment` Worker
   Deployment with **no Current version** — the Temporal database is new — and a

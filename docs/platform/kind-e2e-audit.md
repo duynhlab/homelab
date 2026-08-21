@@ -65,7 +65,7 @@ flowchart TD
     pin["Pin the tag in<br/>kubernetes/apps/"]
   end
   subgraph kind["Kind gate — THIS runbook"]
-    k0["K0 machine"] --> k1["K1 bring-up + seed"]
+    k0["K0 machine"] --> k1["K1 bring-up + seed<br/>+ activate worker version"]
     k1 --> k2["K2 delivery vs pins"]
     k2 --> k3["K3 admission / secrets / isolation"]
     k3 --> k4["K4 real edge + identity"]
@@ -309,7 +309,47 @@ the tag exists; running it earlier audits the previous release.
   [K5.1](#k5--the-four-signals), [K5.3](#k5--the-four-signals) and
   [K5.7](#k5--the-four-signals) all need real rows in real tables.
 
-- [ ] **K1.7** *(informational)* `make tf-plan` shows a zero diff.
+- [ ] **K1.7** **Activate the worker deployment version.** A fresh cluster is
+  *born* in the `OrderSagaNotCompleting` failure state, and nothing in `make up`
+  fixes it. The Temporal database is new, so the `order-fulfillment` deployment
+  has **no Current version**; the worker polls as its build id, and the SDK is
+  explicit about what nil Current means — *"Specifies which Deployment Version
+  should receive new workflow executions… **If nil, all unversioned workers are
+  the target**"* (quoted in `pkg/temporalx/versioning.go`). There are no
+  unversioned workers, so every new order is accepted and then dispatched
+  nowhere.
+  This is deliberately **not** reconciled: the activation CronJob ships
+  `suspend: true` on a `0 0 31 2 *` schedule (a date that does not exist),
+  because ADR-030 treats making a version Current as a decision, not desired
+  state — a Job re-asserting it every reconcile would fight an operator
+  mid-ramp. On a cluster you rebuild, that makes it a **per-bring-up** step, not
+  a per-release one.
+  ```bash
+  JOB="order-set-current-$(date +%s)"
+  kubectl -n temporal create job "$JOB" --from=cronjob/temporal-worker-set-current-version
+  kubectl -n temporal wait --for=condition=complete "job/$JOB" --timeout=120s
+  kubectl -n temporal logs "job/$JOB"
+  ```
+  Verify the server agrees, and that the build it names is the build that is
+  actually running — do not read one without the other:
+  ```bash
+  kubectl -n temporal exec deploy/temporal-admintools -- \
+    temporal worker deployment describe --namespace mop \
+      --address temporal-frontend.temporal.svc.cluster.local:7233 \
+      --name order-fulfillment
+  grep -h '  tag: "' kubernetes/apps/order-worker-*.yaml    # want: the same build id
+  ```
+  **FAIL — and this is the failure mode to recognise, because it looks like
+  nothing:** orders stay `pending`, no error is logged, no activity fails, pods
+  stay `Ready`, and the outbox gauges stay green because the workflow *did*
+  start. Diagnosis and the `--unversioned` first-cutover variant are in
+  [`OrderSagaNotCompleting`](../observability/runbooks/microservices/OrderSagaNotCompleting.md);
+  do not re-derive them here.
+  **Skipping this row does not fail this row.** It fails
+  [K4](#k4--the-real-edge-and-identity) and [K5](#k5--the-four-signals) later,
+  as what reads like an application bug.
+
+- [ ] **K1.8** *(informational)* `make tf-plan` shows a zero diff.
   **FAIL:** a non-empty plan means the bootstrap did not converge.
 
 ---
@@ -879,7 +919,7 @@ Preconditions: Compose gate <link/date> · tags pinned · previous cluster torn 
 | Group | Rows | Result | Evidence |
 |---|---|---|---|
 | K0 machine | 8 | | tools present; ports free; N/N route hostnames resolve; multi-arch legs |
-| K1 bring-up | 7 | | `make up` <time> exit 0; N/N Kustomizations Ready; seed 8/8 |
+| K1 bring-up | 8 | | `make up` <time> exit 0; N/N Kustomizations Ready; seed 8/8; worker version Current |
 | K2 delivery | 7 | | image↔pin table N/N exact; `auth` absent; 7/7 ResourceSets Ready |
 | K3 admission/secrets | 6 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token |
 | K4 edge/identity | 9 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |

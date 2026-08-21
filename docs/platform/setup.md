@@ -201,6 +201,24 @@ kubectl get prometheusservicelevel -n monitoring
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `platform-edge-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
+> **One step `make up` does not do: activate the order worker's deployment
+> version.** A fresh cluster has a fresh Temporal database, so the
+> `order-fulfillment` deployment has no Current version — and a nil Current
+> version means new workflows target *unversioned* workers, of which there are
+> none. The worker pod is `Ready`, no error is logged, and every order sits
+> `pending`. Activation is a deliberate one-shot (ADR-030 treats it as a
+> decision, not desired state, so its CronJob ships suspended):
+>
+> ```bash
+> JOB="order-set-current-$(date +%s)"
+> kubectl -n temporal create job "$JOB" --from=cronjob/temporal-worker-set-current-version
+> kubectl -n temporal wait --for=condition=complete "job/$JOB" --timeout=120s
+> ```
+>
+> Verify with `temporal worker deployment describe --name order-fulfillment` via
+> `deploy/temporal-admintools`. Failure mode and the `--unversioned` variant:
+> [`OrderSagaNotCompleting`](../observability/runbooks/microservices/OrderSagaNotCompleting.md).
+
 ---
 
 ## Accessing Services

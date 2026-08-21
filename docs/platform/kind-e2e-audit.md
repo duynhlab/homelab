@@ -494,7 +494,10 @@ cannot be derived from a single file — they get their own row (K2.3).
   no document other than this one schedules it.
   `./scripts/db-isolation-sweep.sh`
   Expect **72 rows, all PASS** — 36 per cluster (6 roles x 6 databases), of which
-  6 + 7 are `allow`. Two defects that used to sit on this row were fixed on
+  6 + 7 are `allow`. The row count is itself an assertion: the script fails if it
+  parses fewer verdicts than the matrix has pairs, so "PASS" cannot mean "probed
+  nothing". Run it with no cluster reachable and it says `FAIL … parsed 0
+  verdicts, expected 36`, not `PASS`. Two defects that used to sit on this row were fixed on
   2026-08-21 and should not be re-diagnosed: the arrays carried a retired
   **`auth`** role and database expecting an `allow` that pg_hba no longer has, and
   the script needed **bash 4** for `declare -A` while this machine ships bash 3.2

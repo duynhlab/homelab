@@ -1399,6 +1399,18 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The isolation sweep reported PASS with no cluster attached.** Found
+  immediately after making it runnable, and it is the same class of defect the
+  script's own header warns about: `kubectl run` fails, `$out` is empty, the
+  verdict loop runs zero times, `FAIL` stays 0, and it prints
+  `ISOLATION MATRIX: PASS` having verified nothing. Making the script runnable
+  turned a loud crash into a silent lie, so the row count is now an assertion —
+  each sweep must parse exactly as many verdicts as its matrix has pairs, and a
+  shortfall fails with `parsed 0 verdicts, expected 36 — the sweep verified
+  nothing it claims to` plus a hint to check the kubectl context. Verified across
+  four cases: no cluster → exit 1; correct pg_hba → 72/72 PASS, exit 0; a
+  loosened `user → notification` pair → the specific row fails, exit 1; truncated
+  output → the count fails, exit 1.
 - **The isolation sweep could not run on the machine that runs the audit, and was
   testing a role that no longer exists.** `scripts/db-isolation-sweep.sh` is the
   role x database `pg_hba` matrix ADR-015 promised would run at each bring-up, and

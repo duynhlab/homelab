@@ -1673,6 +1673,27 @@ Skeleton (copy what you need):
 
 #### Secrets
 
+- **The External Secrets webhook was starved at 50m CPU, and it stalled the
+  entire Flux chain for hours while looking like nine unrelated problems.**
+  Measured on 2026-08-21: the webhook pod sat at **51m against a 50m limit** with
+  `Ready=false`, and its internal 300s cert-validation loop stretched to 138s,
+  216s, then **934s** between log lines as throttling worsened. `certController`
+  was identically pinned at 50m/50m.
+  Because this webhook is on the **admission** path for `ExternalSecret` and
+  `ClusterSecretStore`, a throttled response exceeds the API server's 5s budget
+  and Flux dry-runs fail with
+  `failed calling webhook "validate.clustersecretstore.external-secrets.io": context deadline exceeded`.
+  `secrets-local` then parks, and **14 Kustomizations** report
+  `dependency ... is not ready` — cert-manager, databases, keycloak, temporal,
+  storage, tracing, profiling, clickhouse, apps — with not one of them naming a
+  webhook. It was misread as transient Kind slowness more than once during the
+  audit, including by the run that found it.
+  Raised to 300m/128Mi (webhook) and 200m/128Mi (certController). The proof is in
+  the *drop*: the replacement webhook pod uses **5m**, a tenth of the old
+  figure — the old one was never busy, it was throttled so hard it never drained
+  its queue. The chain went from 15 Kustomizations stalled to **0 in 40
+  seconds**.
+
 - **`openbao-db-config` wrote through the round-robin Service and hung on a
   standby, wedging the whole Flux chain.** Found by the Kind gate, which is the
   only place it can be found: the Job writes `database/config/platform-db` and

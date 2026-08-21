@@ -1337,6 +1337,33 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Two worker log lines on a fresh cluster read as defects and are not, and the
+  Kustomization count method started over-counting.** All three found during the
+  2026-08-21 rebuild; the first two were flagged by a reader, which is exactly why
+  they belong in the runbook rather than in someone's memory.
+  - **`order-worker` logs a burst of `42P01`.** The worker Deployment and the
+    order API's `migrate` init container have no ordering relationship, so the
+    worker starts first and its sweep loops query tables that do not exist:
+    `relation "fulfillment_start_requests" does not exist`. Measured: the worker
+    pod was **100s older** than the API pod, errors ran ~**2.5 minutes**, and
+    stopped on their own the moment `migrate` reported `ready=true exit=0` — **0
+    occurrences in the next 60s**. K1.6 now carries the signature and the check
+    that distinguishes healed from stuck (`logs --since=60s | grep -c 42P01`
+    must be `0`), because "it went away" is not something to assume.
+  - **`checkout-worker` logs `temporalx: worker versioning off`.** Correct and by
+    design: ADR-030 scopes Worker Versioning to *the order saga*, and
+    `checkout-worker.yaml` sets no `TEMPORAL_WORKER_*` variables, so it polls
+    unversioned — and with no Current version on its deployment, unversioned
+    workers are the target, so nothing is stranded. Only `order-worker` carries
+    the two variables and only it needs K1.7. That scope was stated in the ADR
+    and **nowhere near the thing that emits the line**; it is now in K1.6.
+  - **K1.4's count method.** Grepping `clusters/local/*.yaml` for
+    `kind: Kustomization` over-counts, because a file can sit on disk unreferenced
+    — `mcp.yaml` has, since the entry was commented out in #861. The directory
+    grep said **23** while the cluster had **22**, which reads as a missing
+    Kustomization. The row now derives the count from the uncommented `resources:`
+    entries: 21 + `flux-system` = 22.
+
 - **A corrected rustfs ConfigMap never reached the running process, and that is
   the third silent trap in one incident.** The container takes its environment
   through `envFrom: configMapRef`, and chart 0.12.0 puts **no annotations at all**

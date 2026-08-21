@@ -278,6 +278,19 @@ the tag exists; running it earlier audits the previous release.
   minutes; `temporal-local` is the long pole at a 20m timeout.
   **FAIL:** any name printed by the last command, or a Ready count below
   `DECLARED + 1`.
+  > **Count from `kustomization.yaml`, not from the directory.** Grepping
+  > `clusters/local/*.yaml` for `kind: Kustomization` over-counts, because a file
+  > can sit on disk without being referenced — `mcp.yaml` has done exactly that
+  > since 2026-08-21, when the `- mcp.yaml` entry was commented out and the file
+  > kept. On 2026-08-21 the directory grep said **23** while the cluster had
+  > **22**, which reads as a missing Kustomization. Derive it from the
+  > uncommented `resources:` entries instead:
+  > ```bash
+  > FILES=$(grep -E '^\s+- [a-z][a-z0-9-]*\.yaml' kubernetes/clusters/local/kustomization.yaml \
+  >   | sed 's/^\s*- //;s/ *#.*//')
+  > for f in $FILES; do grep -c '^kind: Kustomization' "kubernetes/clusters/local/$f"; done \
+  >   | paste -sd+ - | bc     # 21 on 2026-08-21; + flux-system = 22 live
+  > ```
 
 - [ ] **K1.5** If and only if `envoy-gateway-config-local` is not Ready, check the
   NodePort collision first — it is the documented failure mode and it looks
@@ -305,6 +318,36 @@ the tag exists; running it earlier audits the previous release.
   inventory`. `payment` and `checkout` have no seed.
   **FAIL:** a non-zero exit. Read the tailed Job logs it prints — a seed that
   fails on an empty database is a migration problem, not a seeding one.
+  > **Two things in the worker logs look like defects on a fresh cluster and are
+  > not. Both were flagged by a reader during the 2026-08-21 run, which is the
+  > point of writing them down.**
+  >
+  > **`order-worker` logs a burst of `42P01`.** The worker Deployment and the
+  > order API's `migrate` init container have no ordering relationship, so the
+  > worker starts first and its sweep loops query tables that do not exist yet:
+  > ```
+  > ERROR: relation "fulfillment_start_requests" does not exist (SQLSTATE 42P01)
+  > ERROR: relation "cancellation_requests"      does not exist (SQLSTATE 42P01)
+  > ERROR: relation "orders"                     does not exist (SQLSTATE 42P01)
+  > caller=sweeploop/sweeploop.go:36  "fulfillment start dispatcher sweep failed"
+  > ```
+  > Measured on 2026-08-21: the worker pod was **100 seconds older** than the API
+  > pod, errors ran for about **2.5 minutes**, and stopped by themselves the
+  > moment `migrate` reported `ready=true exit=0` — **0 occurrences in the
+  > following 60 seconds**. Confirm it healed rather than assuming it:
+  > `kubectl -n order logs <worker> --since=60s | grep -c 42P01` must be `0`.
+  > A count that stays non-zero after the API is Ready is a real failure.
+  >
+  > **`checkout-worker` logs `temporalx: worker versioning off`.** That is
+  > correct. [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/)
+  > scopes Worker Versioning to **the order saga**; `checkout-worker.yaml` sets no
+  > `TEMPORAL_WORKER_*` variables at all, so it polls unversioned — and per the
+  > SDK, when a deployment has no Current version the unversioned workers are the
+  > target, so nothing is stranded. Only `order-worker` carries
+  > `TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, and only it
+  > needs [K1.7](#k1--bring-up). The line would be alarming if `order-worker`
+  > printed it; from `checkout-worker` it is the designed state.
+
   **This row unblocks the rows the 2026-08-17 run could not run at all**:
   [K4.6](#k4--the-real-edge-and-identity), [K4.7](#k4--the-real-edge-and-identity),
   [K5.1](#k5--the-four-signals), [K5.3](#k5--the-four-signals) and

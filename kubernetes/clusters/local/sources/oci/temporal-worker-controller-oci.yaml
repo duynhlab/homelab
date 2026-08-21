@@ -1,0 +1,22 @@
+---
+# OCIRepository for the Temporal Worker Controller chart.
+# Chart: oci://docker.io/temporalio/temporal-worker-controller
+# Docs: https://github.com/temporalio/temporal-worker-controller
+#
+# Chart 0.28.0 ships appVersion 1.9.0. The project is Generally Available with
+# "stable APIs" — the temporal.io/v1alpha1 API group is the Kubernetes
+# api-version string, not the release stage (RFC-0026 research corrected that
+# reading). ADR-030 recorded this chart as "1.0.0" from the documentation; the
+# real chart version is 0.28.0.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: temporal-worker-controller-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://docker.io/temporalio/temporal-worker-controller
+  ref:
+    semver: "0.28.0"

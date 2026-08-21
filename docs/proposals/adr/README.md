@@ -429,6 +429,8 @@ and extend Adoption instead.
 | [ADR-051](ADR-051-trusted-operator-resolution/) | Trust the operator and make the audit trail the control | Accepted | Complete | [RFC-0023](../rfc/RFC-0023/) |
 | [ADR-052](ADR-052-converge-the-customer-spa-on-the-portal-stack/) | Converge the customer SPA on the Admin Portal's stack | Accepted | Complete | [RFC-0025](../rfc/RFC-0025/) |
 | [ADR-053](ADR-053-untracked-sku-operator-data-not-outage/) | Treat the untracked SKU as operator data, not an outage | Accepted | Partial | — |
+| [ADR-054](ADR-054-temporal-worker-controller/) | Give the versioned-worker lifecycle to the Temporal Worker Controller | Proposed | Not started | [RFC-0026](../rfc/RFC-0026/) |
+| [ADR-055](ADR-055-keda-worker-autoscaling/) | Scale versioned workers from task-queue backlog with KEDA | Proposed | Not started | [RFC-0026](../rfc/RFC-0026/) |
 
 Principles:
 
@@ -439,4 +441,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-19 — ADR-053 Adoption → Partial (train shipped, compose-verified; Kind gate pending)_
+_Last updated: 2026-08-21 — ADR-054 and ADR-055 created at `Proposed` with [RFC-0026](../rfc/RFC-0026/) (Worker Controller; KEDA recorded but not installed). Previously: ADR-053 Adoption → Partial (train shipped, compose-verified; Kind gate pending)_

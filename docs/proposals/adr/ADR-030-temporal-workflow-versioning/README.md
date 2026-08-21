@@ -12,6 +12,14 @@ Worker Versioning requires.
 > Supersedes the deployment half of
 > [ADR-002](../ADR-002-deploy-temporal-via-operator/) (deploy Temporal via the
 > alexandrevilain operator). ADR-001 (adopt Temporal) stands unchanged.
+>
+> **Partly superseded by [ADR-054](../ADR-054-temporal-worker-controller/)
+> (2026-08-21):** the *rollout mechanism* below — one manifest per build, a
+> suspended CronJob to make a version Current, a human reading `DrainageStatus` —
+> is retired in favour of the Temporal Worker Controller. The **decision** this
+> ADR records, to version the order saga with Worker Deployment Versions and
+> `VersioningBehaviorPinned` rather than in-workflow patching, is unchanged and
+> still in force. See § Amendments.
 
 ## Context
 
@@ -164,6 +172,50 @@ the operator manifests remain commented out for rollback.
 
 ## Amendments
 
+### 2026-08-21 (later the same day) — the destination was taken
+
+The follow-up below closes with *"Destination: the Temporal Worker Controller… Not
+adopted here: it needs its own RFC and an owner-approved number, and its CRD must be
+read from the chart rather than from documentation before anything is committed to."*
+Both conditions were met the same day: [RFC-0026](../../rfc/RFC-0026/) read the
+`0.28.0` CRDs chart and the controller's Go source directly, and
+[ADR-054](../ADR-054-temporal-worker-controller/) records the decision.
+
+What that changes here, precisely:
+
+- **Retired.** One `HelmRelease` per build id; `scripts/new-worker-build.sh`; the
+  suspended `temporal-worker-set-current-version` CronJob; and the
+  `flux-validate.sh` assertions that kept the image tag, the `BUILD_ID` env, the
+  filename and the CronJob's flags in agreement. With one file that states the build
+  id nowhere, there is nothing left to compare.
+- **Closed.** All three follow-ups this ADR recorded against itself — the
+  machine-checkable retirement gate (now `status.deprecatedVersions[].drainedSince`
+  plus `sunset` timers), activation as a per-bring-up step (now reconciled desired
+  state, and audit row K1.7 became a *proof that no step is needed*), and unused
+  ramping (now `rollout.strategy: Progressive`).
+- **Corrected.** This ADR recorded the controller as *"an OCI Helm chart at 1.0.0"*,
+  taken from documentation. The real charts are **`0.28.0`** (appVersion `1.9.0`) and
+  they publish on **`docker.io/temporalio`**, not ghcr.io.
+- **Changed on the server.** The controller composes the deployment name as
+  `<k8s-namespace>/<resource-name>`, so the saga now registers as
+  `order/order-fulfillment` rather than the bare `order-fulfillment` this ADR used.
+  Safe only because the drain set was empty on a cluster rebuilt from zero — the
+  same condition that justified deleting `1-13-2` outright, and the same caveat
+  applies: do not copy it forward to a cluster holding live history.
+- **Unchanged.** Worker Versioning itself, `VersioningBehaviorPinned` registered
+  explicitly in order-service, the pinned-drain contract, and the reason this ADR
+  exists — a saga holding money and stock is never moved onto a new build mid-flight.
+
+One consequence worth naming because it runs *against* this ADR's own rule: a single
+pod template serves every live version, so `ORDER_RECONCILER_ENABLED` can no longer be
+`false` on a draining build. Measured rather than assumed — order-service documents
+concurrent reconciler scans as *"SAFE but noisy"* (a duplicated repair counter, not a
+wrong action) and the outbox dispatchers claim with `FOR UPDATE SKIP LOCKED`. The
+`ORDER_START_DISPATCHERS_ENABLED` flag this ADR's follow-up asked for **already
+shipped** in order-service on 2026-08-04 (#172); homelab had simply never wired it, and
+now does. The durable fix is to move both roles out of the worker, since neither is
+workflow code — recorded in ADR-054, not done here.
+
 ### 2026-08-21 — a build id freezes the code, not the image
 
 The decision above is unchanged. Worker Deployment Versioning stays, workflows
@@ -259,6 +311,7 @@ the copy-paste without building machinery the controller would replace.
 |------|--------|
 | 2026-07-28 | Accepted; re-platform + Worker Versioning decided (see the revision note above). |
 | 2026-07-29 | Chart moved from `configs/temporal/` to `controllers/temporal/` — `controllers/` is where chart-installed platform components live (Kong, Valkey, OpenBAO, …); `configs/` holds what they consume, so the ingress + PrometheusRule stayed there under a `temporal-config-local` Kustomization (the `kong-local` → `kong-config-local` shape). Retirement method changed: instead of commenting out each manifest's contents, the four retired artifacts are **renamed to `.yaml.bak`** with their contents intact — the operator HelmRelease, both operator CRs, and the operator HelmRepository. A file no kustomization lists is already inert, so blanking it only made it unreadable; the suffix also keeps it out of `make validate`, which globs `*.yaml`. Accepted cost: a `.bak` file ships in the OCI artifact as dead weight and stops being syntax-checked or Renovate-tracked. This supersedes **Decision 1**'s statement that the chart lives in `configs/temporal/` and that the operator manifests are "commented out in place" — the intent (a rollback has the exact prior manifests) is unchanged and better served, since a `.bak` file is readable. Both temporal paths added to `scripts/flux-validate.sh`, which had been validating neither. |
+| 2026-08-21 | Partly superseded by [ADR-054](../ADR-054-temporal-worker-controller/): the rollout mechanism (per-build manifest, activation CronJob, hand-read drainage) is retired in favour of the Temporal Worker Controller; all three follow-ups below are closed. The versioning decision itself is unchanged. See § Amendments. |
 | 2026-08-21 | Amended: a build id freezes the code, not the image — `order-service:1.13.2` was amd64-only and could not be re-tagged, so the order saga had no poller on arm64; the escape hatch is a new build id, cheap when the replay corpus is green (gen3 replays on 2.4.0). Also recorded: `DrainageStatus` is the machine-checkable retirement gate; activation is a per-bring-up step on a rebuilt cluster, not only per-release; `set-ramping-version` exists and is unused; the unversioned fallback is sanctioned by upstream **only** if patching replaces it; and the Temporal Worker Controller is the recorded destination (own RFC). Decision unchanged. See § Amendments. |
 ---
 

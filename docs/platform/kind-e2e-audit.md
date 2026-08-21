@@ -237,9 +237,13 @@ the tag exists; running it earlier audits the previous release.
   **FAIL:** any pinned first-party tag missing `linux/arm64`. On an arm64 node
   that is not a degraded pod — nothing starts at all, and for the worker the
   order saga has no poller.
-  **If it is the worker specifically**, do **not** edit the pin in place: that is
-  the silent-hang shape. A new build id is the only correct move, and
-  `scripts/new-worker-build.sh <build-id>` stages it.
+  **If it is the worker specifically**, a new build is the only correct move — but
+  since [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) that IS
+  editing the pin: the controller derives a fresh build id from the changed pod
+  template and rolls the new version in beside the old one. What used to be the
+  silent-hang shape (an in-place tag bump stranding pinned workflows) is now the
+  supported path, and `kubernetes/apps/order-worker.yaml` is the only file to
+  touch.
 
 ---
 
@@ -339,59 +343,56 @@ the tag exists; running it earlier audits the previous release.
   > A count that stays non-zero after the API is Ready is a real failure.
   >
   > **`checkout-worker` logs `temporalx: worker versioning off`.** That is
-  > correct. [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/)
-  > scopes Worker Versioning to **the order saga**; `checkout-worker.yaml` sets no
-  > `TEMPORAL_WORKER_*` variables at all, so it polls unversioned — and per the
-  > SDK, when a deployment has no Current version the unversioned workers are the
-  > target, so nothing is stranded. Only `order-worker` carries
-  > `TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, and only it
-  > needs [K1.7](#k1--bring-up). The line would be alarming if `order-worker`
-  > printed it; from `checkout-worker` it is the designed state.
+  > correct, and the line means *the caller never asked* — `checkout-service`
+  > passes no versioning option to `temporalx.NewWorker`, so no env var is
+  > involved in that decision. [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/)
+  > scopes Worker Versioning to **the order saga**, and
+  > [RFC-0026](../proposals/rfc/RFC-0026/) deliberately left checkout out. Per the
+  > SDK, a deployment with no Current version targets unversioned workers, so
+  > nothing is stranded. `order-worker` gets its identity from the Worker
+  > Controller (`TEMPORAL_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, injected
+  > per version), so it prints `worker versioning on` with a build id — see
+  > [K1.7](#k1--bring-up). The line would be alarming from `order-worker`; from
+  > `checkout-worker` it is the designed state.
 
   **This row unblocks the rows the 2026-08-17 run could not run at all**:
   [K4.6](#k4--the-real-edge-and-identity), [K4.7](#k4--the-real-edge-and-identity),
   [K5.1](#k5--the-four-signals), [K5.3](#k5--the-four-signals) and
   [K5.7](#k5--the-four-signals) all need real rows in real tables.
 
-- [ ] **K1.7** **Activate the worker deployment version.** A fresh cluster is
-  *born* in the `OrderSagaNotCompleting` failure state, and nothing in `make up`
-  fixes it. The Temporal database is new, so the `order-fulfillment` deployment
-  has **no Current version**; the worker polls as its build id, and the SDK is
-  explicit about what nil Current means — *"Specifies which Deployment Version
-  should receive new workflow executions… **If nil, all unversioned workers are
-  the target**"* (quoted in `pkg/temporalx/versioning.go`). There are no
-  unversioned workers, so every new order is accepted and then dispatched
-  nowhere.
-  This is deliberately **not** reconciled: the activation CronJob ships
-  `suspend: true` on a `0 0 31 2 *` schedule (a date that does not exist),
-  because ADR-030 treats making a version Current as a decision, not desired
-  state — a Job re-asserting it every reconcile would fight an operator
-  mid-ramp. On a cluster you rebuild, that makes it a **per-bring-up** step, not
-  a per-release one.
+- [ ] **K1.7** **Confirm the worker version needs no human.** This row used to be
+  *"activate the worker deployment version"*: a fresh cluster was **born** in the
+  `OrderSagaNotCompleting` state, because the Temporal database was new, the
+  `order-fulfillment` deployment had no Current version, and the SDK is explicit
+  that nil Current means *"all unversioned workers are the target"* — of which
+  there were none. Every new order was accepted and dispatched nowhere. Fixing it
+  meant running a Job by hand on **every** bring-up.
+  [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) removed that
+  step: the Worker Controller registers the version and sets Current itself, so
+  activation is desired state reconciled from git. This row now **proves the step
+  is unnecessary** rather than performing it.
+  Run **no** Job. Read what the controller did:
   ```bash
-  JOB="order-set-current-$(date +%s)"
-  kubectl -n temporal create job "$JOB" --from=cronjob/temporal-worker-set-current-version
-  kubectl -n temporal wait --for=condition=complete "job/$JOB" --timeout=120s
-  kubectl -n temporal logs "job/$JOB"
-  ```
-  Verify the server agrees, and that the build it names is the build that is
-  actually running — do not read one without the other:
-  ```bash
+  kubectl -n order get wd order-fulfillment
+  # want: CURRENT populated, TARGET equal to it, RAMP % empty (rollout settled)
   kubectl -n temporal exec deploy/temporal-admintools -- \
     temporal worker deployment describe --namespace mop \
       --address temporal-frontend.temporal.svc.cluster.local:7233 \
-      --name order-fulfillment
-  grep -h '  tag: "' kubernetes/apps/order-worker-*.yaml    # want: the same build id
+      --name order/order-fulfillment
+  # NOTE the name: the controller composes <k8s-namespace>/<resource-name>,
+  # so it is order/order-fulfillment, not the bare order-fulfillment ADR-030 used.
+  kubectl -n order get po -L temporal.io/build-id
+  # want: the running pod's label == the CURRENT build id above
   ```
-  **FAIL — and this is the failure mode to recognise, because it looks like
-  nothing:** orders stay `pending`, no error is logged, no activity fails, pods
-  stay `Ready`, and the outbox gauges stay green because the workflow *did*
-  start. Diagnosis and the `--unversioned` first-cutover variant are in
-  [`OrderSagaNotCompleting`](../observability/runbooks/microservices/OrderSagaNotCompleting.md);
-  do not re-derive them here.
-  **Skipping this row does not fail this row.** It fails
-  [K4](#k4--the-real-edge-and-identity) and [K5](#k5--the-four-signals) later,
-  as what reads like an application bug.
+  **FAIL:** `CURRENT` empty after the chain is Ready, or a build-id label that
+  disagrees with it. Both reproduce the old failure mode, which still looks like
+  nothing: orders stay `pending`, no error is logged, no activity fails, pods stay
+  `Ready`, and the outbox gauges stay green because the workflow *did* start.
+  Diagnosis is unchanged —
+  [`OrderSagaNotCompleting`](../observability/runbooks/microservices/OrderSagaNotCompleting.md).
+  **If this row fails, suspect the controller, not the saga:** check
+  `kubectl -n temporal get hr temporal-worker-controller-crds temporal-worker-controller`
+  and the manager's logs before touching anything in `order`.
 
 - [ ] **K1.8** *(informational)* `make tf-plan` shows a zero diff.
   **FAIL:** a non-empty plan means the bootstrap did not converge.

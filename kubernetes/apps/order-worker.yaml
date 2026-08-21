@@ -1,0 +1,266 @@
+# Order-fulfillment Temporal worker — ONE file, forever (RFC-0026 / ADR-054).
+#
+# This replaces order-worker-<build>.yaml. There is no longer a file per build and
+# no activation Job: the controller derives the Build ID, creates one Deployment
+# per Worker Deployment Version, moves the Current version through the Temporal
+# API according to spec.rollout, and deletes a version once the server reports it
+# drained. A release edits ONE line here — image.tag below — and nothing else.
+#
+# WHAT IS NO LONGER WRITTEN DOWN, on purpose:
+#   - the Build ID. The controller composes it from the image reference plus a
+#     hash of this pod template (internal/k8s/deployments.go ComputeBuildID), so a
+#     resources or env edit also mints a version. Stricter than the old
+#     tag-only rule, and the reason a release is one line. Read the live value
+#     with `kubectl -n order get wd order-fulfillment` — Current, Target and
+#     Ramp % are printer columns.
+#   - TEMPORAL_DEPLOYMENT_NAME / TEMPORAL_WORKER_BUILD_ID. The controller injects
+#     both into every container of every version it creates. Hand-setting either
+#     gives the pod two identities; scripts/flux-validate.sh rejects it, and
+#     pkg/temporalx >= temporalx/v0.37.0 exits 1 on a disagreement rather than
+#     polling under the wrong one.
+#   - the server-side deployment name. It is "<k8s-namespace>/<resource-name>",
+#     so this resource registers as `order/order-fulfillment` — NOT the bare
+#     `order-fulfillment` ADR-030 used. Deliberate and verified: the drain set is
+#     empty on a cluster rebuilt from zero, so no history is stranded by the
+#     rename. On a cluster holding live order history, drain first.
+#
+# THE POD TEMPLATE IS A RAW PodSpec, so the `mop` chart does not render it any
+# more. Everything below was transplanted from what `helm template` proved the
+# chart emitted for order-worker-2-4-0 — a Deployment and nothing else, no
+# ServiceAccount and no securityContext. Accepted cost: nothing keeps this in step
+# with the chart's future defaults (ADR-054 § Negative consequences).
+#
+# WHAT DID NOT CHANGE: TEMPORAL_HOSTPORT stays, because order-service reads that
+# name and not the controller's TEMPORAL_ADDRESS; the Vector double-ingest guard
+# label stays; and VersioningBehaviorPinned stays registered in order-service
+# (cmd/main.go registerWorkflows) — this file changes who moves traffic, not
+# whether a workflow may be moved.
+---
+apiVersion: temporal.io/v1alpha1
+kind: Connection
+metadata:
+  name: temporal-mop
+  namespace: order
+  labels:
+    app.kubernetes.io/component: workflow-engine
+    platform.duynhlab.dev/rfc: "0026"
+spec:
+  # The frontend Service name survived the RFC-0021 re-platform, so this is the
+  # same address the worker has always dialled. Plaintext east-west, same posture
+  # as every other in-cluster hop; mTLS is RFC-0020's scope, not this file's.
+  hostPort: temporal-frontend.temporal.svc.cluster.local:7233
+---
+apiVersion: temporal.io/v1alpha1
+kind: WorkerDeployment
+metadata:
+  name: order-fulfillment
+  namespace: order
+  labels:
+    app.kubernetes.io/name: order-worker
+    app.kubernetes.io/component: worker
+    platform.duynhlab.dev/domain: fulfillment
+    platform.duynhlab.dev/rfc: "0026"
+spec:
+  replicas: 1
+
+  workerOptions:
+    connectionRef:
+      name: temporal-mop
+    temporalNamespace: mop
+
+  # Progressive, and the step schedule is bounded on purpose. apps-local runs
+  # `wait: true` with `timeout: 10m`, and WorkerDeployment reports a standard
+  # Ready condition that Flux's kstatus waits on — so a rollout longer than that
+  # timeout does not just take a while, it fails the whole app wave. Two steps at
+  # 30s (the CEL-enforced floor for pauseDuration) land near one minute.
+  #
+  # No `gate.workflowType`: a pre-deployment gate workflow has to exist in
+  # order-service first, and inventing one here would gate on a business workflow
+  # with real side effects. Recorded as follow-up work in RFC-0026.
+  rollout:
+    strategy: Progressive
+    steps:
+      - rampPercentage: 10
+        pauseDuration: 30s
+      - rampPercentage: 50
+        pauseDuration: 30s
+
+  # Chart defaults, stated explicitly because they are the retirement policy this
+  # platform used to run by hand: a version scales to zero an hour after Temporal
+  # reports it drained, and its resources are deleted a day later. The hour is the
+  # window to notice that "drained" was wrong; the day is the window to roll back
+  # without a rebuild. Watch it with
+  #   kubectl -n order get wd order-fulfillment -o yaml | yq .status.deprecatedVersions
+  sunset:
+    scaledownDelay: 1h
+    deleteDelay: 24h
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: order-worker
+        app.kubernetes.io/component: worker
+        # RFC-0014 P4: the worker ships its own logs over OTLP — Vector skips pods
+        # carrying this label. Dropping it double-ingests every worker log line.
+        platform.duynhlab.dev/otlp-logs: "true"
+    spec:
+      containers:
+        - name: worker
+          # Same image as the order API, different subcommand. THE ONE LINE a
+          # release edits. No migration init container: the API's applies the
+          # schema this code expects.
+          image: ghcr.io/duynhlab/order-service/order-service:2.5.0
+          imagePullPolicy: IfNotPresent
+          args: ["worker"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: OTEL_LOGS_ENABLED
+              value: "true"
+            - name: SERVICE_NAME
+              value: order-worker
+            - name: PORT
+              value: "8080"
+            - name: ENV
+              value: "production"
+            - name: OTEL_COLLECTOR_ENDPOINT
+              value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
+            - name: OTEL_SAMPLE_RATE
+              value: "0.1"
+            # OTel SDK reads OTEL_SERVICE_NAME (not SERVICE_NAME); without it
+            # service.name falls back to brittle hostname parsing.
+            - name: OTEL_SERVICE_NAME
+              value: order-worker
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # service.version carries the Build ID so outcomes and latency split by
+            # worker version during a drain — without it two versions are
+            # indistinguishable in every signal except pod name. Read from the
+            # label the controller stamps on each versioned pod rather than typed
+            # here, or a release would edit two lines instead of one.
+            - name: BUILD_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['temporal.io/build-id']
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=$(BUILD_ID)"
+            # RFC-0014 D-2: obsx reads these exact names for the Kubernetes
+            # resource attributes on the OTLP path. OTEL_METRICS_ENABLED stays
+            # unset — the worker follows the fleet flip, not the product canary.
+            - name: K8S_NAMESPACE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: DEPLOYMENT_ENVIRONMENT
+              value: "production"
+            - name: PYROSCOPE_ENDPOINT
+              value: http://pyroscope.monitoring.svc.cluster.local:4040
+            - name: LOG_LEVEL
+              value: info
+            - name: LOG_FORMAT
+              value: json
+            - name: TRACING_ENABLED
+              value: "true"
+            - name: PROFILING_ENABLED
+              value: "true"
+            # DB — the worker's ConfirmOrder/FailOrder activities update the order
+            # row (same pooler as the order API).
+            - name: DB_HOST
+              value: pgdog-product.product.svc.cluster.local
+            - name: DB_PORT
+              value: "6432"
+            - name: DB_NAME
+              value: order
+            - name: DB_USER
+              value: order
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-order-secret
+                  key: password
+            - name: DB_SSLMODE
+              value: disable
+            - name: DB_POOL_MAX_CONNECTIONS
+              value: "10"
+            - name: DB_POOL_MODE
+              value: transaction
+            # Temporal — the address order-service reads, and the queue it polls.
+            # The controller also injects TEMPORAL_ADDRESS and TEMPORAL_NAMESPACE
+            # with the same values from the Connection above; order-service reads
+            # these names, so both are kept rather than relying on the injected
+            # pair.
+            - name: TEMPORAL_HOSTPORT
+              value: temporal-frontend.temporal.svc.cluster.local:7233
+            - name: TEMPORAL_NAMESPACE
+              value: mop
+            - name: TASK_QUEUE
+              value: order-fulfillment
+            # The inventory reconciler and the two outbox dispatchers.
+            #
+            # BOTH ARE ON, AND THEY NOW RUN ON EVERY LIVE VERSION. One pod
+            # template serves every version, so these can no longer be `false` on
+            # a draining build the way ADR-030 required. Verified safe rather than
+            # assumed: the dispatchers claim with FOR UPDATE SKIP LOCKED, and
+            # order-service documents extra instances as "correct — just
+            # unnecessary"; the reconciler has no lease but is documented "SAFE
+            # but noisy" — inventory serializes on the reservation row and
+            # short-circuits on status, so a second repair is a no-op RPC and the
+            # cost is a duplicated repair counter, not a wrong action.
+            #
+            # The real fix is to move both out of the worker: neither is workflow
+            # code, so neither needs pinning. That is order-service work, tracked
+            # in ADR-054 § Negative consequences.
+            - name: ORDER_RECONCILER_ENABLED
+              value: "true"
+            - name: ORDER_START_DISPATCHERS_ENABLED
+              value: "true"
+            # The saga's only stock authority since RFC-0021 P4.
+            - name: INVENTORY_GRPC_ADDR
+              value: dns:///inventory.inventory.svc.cluster.local:9090
+            # Downstream services the activities call (gRPC east-west + cart REST).
+            # No PRODUCT_GRPC_ADDR: this build has no product stock activity to
+            # dial, and the binary does not read the variable (RFC-0021 P4).
+            - name: SHIPPING_GRPC_ADDR
+              value: dns:///shipping.shipping.svc.cluster.local:9090
+            - name: NOTIFICATION_GRPC_ADDR
+              value: dns:///notification.notification.svc.cluster.local:9090
+            # Payment gRPC — the saga's money transport. Dialed unconditionally
+            # (lazy); whether the steps run is decided by the workflow input's
+            # PaymentEnabled, stamped by the order API.
+            - name: PAYMENT_GRPC_ADDR
+              value: dns:///payment.payment.svc.cluster.local:9090
+            - name: CART_SERVICE_URL
+              value: http://cart.cart.svc.cluster.local:8080
+          # Kyverno require-probes and require-resources both match the `order`
+          # namespace, so these are admission requirements here, not hygiene.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "48Mi"
+              cpu: "20m"
+            limits:
+              memory: "128Mi"
+              cpu: "300m"

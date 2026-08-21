@@ -1,0 +1,38 @@
+# Temporal Worker Controller — CRDs chart (RFC-0026 / ADR-054).
+#
+# Installed as its OWN release, before the controller, because upstream ships the
+# CRDs separately so they can be upgraded independently of the manager. Same shape
+# the chain already uses for gateway-api-crds -> envoy-gateway.
+#
+# It contributes three served CRDs at temporal.io/v1alpha1 — WorkerDeployment,
+# Connection, WorkerResourceTemplate — plus the two deprecated kinds
+# (TemporalWorkerDeployment, TemporalConnection) that upstream still ships for
+# migration. We author only the current kinds; the deprecated pair is inert here.
+#
+# crds: CreateReplace on both install and upgrade: a CRD schema that lags the
+# manager is how a WorkerDeployment starts failing validation on a reconcile
+# nobody ran. Flux does not manage CRDs inside a release otherwise.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: temporal-worker-controller-crds
+  namespace: temporal
+spec:
+  interval: 10m
+  timeout: 5m
+  chartRef:
+    kind: OCIRepository
+    name: temporal-worker-controller-crds-oci
+    namespace: flux-system
+  releaseName: temporal-worker-controller-crds
+  install:
+    crds: Create
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  # The chart is CRDs only — no values, no workloads, nothing to size.

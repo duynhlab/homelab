@@ -126,6 +126,7 @@ for its own sake.
 | [RFC-0023](RFC-0023/) | Basic Backoffice portal (React + TanStack) and the first `protected` business APIs (depends on [RFC-0022](RFC-0022/)) | platform-wide | P2 | Accepted |
 | [RFC-0024](RFC-0024/) | Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover (executes [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | Accepted |
 | [RFC-0025](RFC-0025/) | Converge the customer SPA on the Admin Portal's stack — one cutover, no mocks (exercises [ADR-049](../adr/ADR-049-admin-portal-tanstack-spa/)'s convergence revisit trigger) | service:frontend | P2 | implemented |
+| [RFC-0026](RFC-0026/) | Adopt the Temporal Worker Controller for versioned workers; KEDA autoscaling designed and recorded (takes up the destination [ADR-030](../adr/ADR-030-temporal-workflow-versioning/) named but deferred) | platform-wide | P2 | Accepted — [ADR-054](../adr/ADR-054-temporal-worker-controller/) controller, [ADR-055](../adr/ADR-055-keda-worker-autoscaling/) KEDA (`Proposed`, not installed) |
 
 ## Backlog — candidate RFCs
 
@@ -152,4 +153,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-15 — RFC-0025 `implemented`: the storefront cutover shipped as frontend v3.0.0 with ADR-052 Accepted / Adoption Complete. RFC-0023 Accepted (Backoffice portal + first `protected` APIs); ADR-047..049 created at Accepted._
+_Last updated: 2026-08-21 — RFC-0026 **Accepted**: research gate passed and the Temporal Worker Controller adopted, retiring the per-build manifest and the hand-run activation Job; ADR-054 and ADR-055 created at `Proposed` (KEDA recorded, not installed). Previously: RFC-0025 `implemented` (storefront cutover as frontend v3.0.0, ADR-052 Accepted / Adoption Complete) and RFC-0023 Accepted (Backoffice portal + first `protected` APIs; ADR-047..049 created at Accepted)._

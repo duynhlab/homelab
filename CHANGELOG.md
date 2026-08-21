@@ -1085,6 +1085,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The gateway access log never reached VictoriaLogs, and the Envoy control-plane
+  pod masked it.** Vector's `HelmRelease` carried no `tolerations`, so the
+  collector DaemonSet covered the three workers and skipped the tainted
+  control-plane node. On Kind that is precisely where the edge runs:
+  `kind-up.sh` labels the control plane `ingress-ready=true` because it owns the
+  80/443 `extraPortMappings`, and `clusters/local/envoy-gateway-config.yaml`
+  pins both Envoy proxy replicas to that label. Both replicas emit JSON access
+  logs to stdout — visible via `kubectl logs` — yet the log store held **zero**
+  lines from either pod, and zero documents with `upstream_cluster` or
+  `route_name` fleet-wide. The Envoy *control* plane pod happened to land on
+  `homelab-worker` and was collected normally, so `namespace:"envoy-gateway"`
+  looked healthy and hid the gap. Vector now tolerates
+  `node-role.kubernetes.io/control-plane:NoSchedule`, which restores every
+  control-plane workload's logs, not only the edge's.
+
 - **Tempo is held on 2.x, and the tag comment no longer lies about it.**
   Renovate's `grafana/tempo` 3.0.3 major (#694) was unscoped by
   `docker:enableMajor` — the repo had no `packageRules` at all. Tempo 3.0

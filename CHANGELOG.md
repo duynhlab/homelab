@@ -723,9 +723,10 @@ Skeleton (copy what you need):
 #### Security
 
 - **Kyverno policies now have unit tests, and they found a defect on their first
-  run.** `kubeconform` only checks manifest *shape*, and it runs with
-  `-ignore-missing-schemas`, so a Kyverno CRD whose schema is absent is waved
-  through in silence — schema validation was never policy validation. Fixtures
+  run.** `kubeconform` only checks manifest *shape* — it validates a
+  `ClusterPolicy` against the Kyverno CRD schema and stops there, so nothing ever
+  asked whether a given manifest actually passes or fails a rule. Schema
+  validation was never policy validation. Fixtures
   live at `kubernetes/infra/configs/kyverno/tests/<policy>/` (the convention
   `kyverno.md` had already named but never created) and cover the three policies
   where a regression costs the most: `disallow-default-namespace` (the only

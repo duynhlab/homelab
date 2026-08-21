@@ -159,7 +159,7 @@ make flux-up
   - **Phase 1: Foundation** — `controllers-local`: namespaces + operators (cert-manager, CNPG, VictoriaMetrics/Grafana operators, OpenBAO + ESO, Kyverno, ClickHouse operator).
   - **Phase 2: Security & configs** — `secrets-local` (bootstrap Job + ClusterSecretStore + ExternalSecrets), `cert-manager-local`, `monitoring-local` (observability configs + Sloth SLO CRs).
   - **Phase 3: Platform services** — Envoy Gateway, Keycloak, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
-  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workers (`order-worker-1-13-2`, `checkout-worker`, `mockpay`).
+  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workers (`order-worker-2-4-0`, `checkout-worker`, `mockpay`).
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
 > with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
@@ -197,7 +197,7 @@ kubectl get prometheusservicelevel -n monitoring
 **Expected State:**
 - Namespaces for every domain provisioned (user, product, **inventory**, cart, **checkout**, order, review, notification, shipping, payment, frontend, **backoffice**, **identity**, **platform**, **cache-system**, **rustfs**, envoy-gateway, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, **temporal** — source of truth: `kubernetes/infra/controllers/namespaces.yaml`; `flux-system` is created by the bootstrap).
 - 7 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-fulfillment`, `rs-comms`, `rs-frontend`, `rs-backoffice`) successfully reconciled.
-- HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`**, **`order-worker-1-13-2`**, and **`checkout-worker`** (in the `payment` / `order` / `checkout` namespaces), in `Ready` state.
+- HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`**, **`order-worker-2-4-0`**, and **`checkout-worker`** (in the `payment` / `order` / `checkout` namespaces), in `Ready` state.
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `platform-edge-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
@@ -451,7 +451,7 @@ homelab/
 │   │   │   ├── notification.yaml       # domain=comms
 │   │   │   └── shipping.yaml           # domain=comms
 │   │   ├── mockpay.yaml                # mockpay HelmRelease (payment ns)
-│   │   ├── order-worker-1-13-2.yaml    # order-worker-1-13-2 HelmRelease (order ns, Temporal saga)
+│   │   ├── order-worker-2-4-0.yaml     # order-worker-2-4-0 HelmRelease (order ns, Temporal saga)
 │   │   ├── checkout-worker.yaml        # checkout-worker HelmRelease (checkout ns)
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)

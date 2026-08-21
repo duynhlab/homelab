@@ -98,7 +98,7 @@ kubernetes/apps/
 ├── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
 ├── backoffice-rs.yaml             # rs-backoffice (standalone) — operator portal SPA
 ├── mockpay.yaml                   # standalone HelmRelease — mock payment provider (payment ns)
-├── order-worker-1-13-2.yaml       # standalone HelmRelease — versioned Temporal saga worker (order ns)
+├── order-worker-2-4-0.yaml        # standalone HelmRelease — versioned Temporal saga worker (order ns)
 └── checkout-worker.yaml           # standalone HelmRelease — checkout abandonment worker (checkout ns)
 ```
 
@@ -345,7 +345,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 | **Blast radius** | One domain: 10–40% of the 10 backend services. `rs-checkout` carries 4 of 10 (40%) — a known concentration above the < 30% target (see §8.3) |
 | **Merge conflicts** | None (1 file per service) |
 | **Onboarding time** | < 5 min (create InputProvider + push) |
-| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay`, `order-worker-1-13-2`, and `checkout-worker` are standalone HelmReleases outside the ResourceSet checks |
+| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay`, `order-worker-2-4-0`, and `checkout-worker` are standalone HelmReleases outside the ResourceSet checks |
 | **Team autonomy** | Full (each service owns its InputProvider) |
 
 ### Beyond 50 Services: Further Scaling

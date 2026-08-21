@@ -17,8 +17,8 @@ section, and the behaviour of each workflow is in
 
 | Workflow | Purpose | Owner | Worker | Task queue | Detail |
 |----------|---------|-------|--------|------------|--------|
-| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | Turn a committed order into money taken, stock committed and a shipment created — or undo all of it | order | `order-worker-1-13-2` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | [temporal.md § OrderFulfillmentWorkflow](./temporal.md#orderfulfillmentworkflow) |
-| <a id="order-cancellation"></a>`CancellationWorkflow` | Give back what a cancelled order took, and park loudly when it cannot | order | `order-worker-1-13-2` (same worker) | `order-fulfillment` | [temporal.md § CancellationWorkflow](./temporal.md#cancellationworkflow) |
+| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | Turn a committed order into money taken, stock committed and a shipment created — or undo all of it | order | `order-worker-2-4-0` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | [temporal.md § OrderFulfillmentWorkflow](./temporal.md#orderfulfillmentworkflow) |
+| <a id="order-cancellation"></a>`CancellationWorkflow` | Give back what a cancelled order took, and park loudly when it cannot | order | `order-worker-2-4-0` (same worker) | `order-fulfillment` | [temporal.md § CancellationWorkflow](./temporal.md#cancellationworkflow) |
 | <a id="abandoned-checkout"></a>`AbandonedCheckoutWorkflow` | Expire a checkout session the shopper walked away from | checkout | `checkout-worker` | `checkout` | [temporal.md § AbandonedCheckoutWorkflow](./temporal.md#abandonedcheckoutworkflow) |
 
 ### What each one is for
@@ -49,7 +49,7 @@ until their pinned histories drain — a pre-phase-4 saga left with no poller wo
 stall holding stock and an authorization, because 1.13.x **refuses** a
 product-participant history rather than re-routing it. Checkout is deliberately
 **not** versioned, so its worker is a single manifest and a tag move is safe. See
-[order-worker-1-13-2.yaml](../../kubernetes/apps/order-worker-1-13-2.yaml) and
+[order-worker-2-4-0.yaml](../../kubernetes/apps/order-worker-2-4-0.yaml) and
 [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml).
 
 ## Standard roles

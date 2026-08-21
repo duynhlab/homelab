@@ -1843,6 +1843,34 @@ Skeleton (copy what you need):
   abandonment activity retries instead of abandoning the session forever
   (checkout-service #48 — the two review follow-ups from #47).
 
+#### Temporal
+
+- **order-worker moves to build `2.4.0`** — `order-worker-1-13-2.yaml` is
+  replaced by `order-worker-2-4-0.yaml`, and the cutover CronJob's `--build-id`
+  follows. Two reasons, neither a workflow code change. **(1)** The worker ran
+  sixteen commits behind the order API it shares a database with. **(2)** The
+  frozen `1.13.2` was published **amd64-only and cannot be re-tagged** —
+  re-tagging changes the code behind a determinism-frozen build id — so on an
+  arm64 node it could not be pulled at all and the order saga had **no poller**.
+  A new build id is the escape hatch, and it is cheap precisely when the corpus
+  says the code is compatible: `testdata/gen3` was recorded from the RFC-0021 P4
+  code that `1.13.2` runs and replays **green** on 2.4.0, as do the two
+  carried-forward `gen2` histories — so this is a maintenance build of the same
+  generation, not a new generation, and nothing was stranded. Carries Temporal
+  SDK v1.45.0 → **v1.48.0** (order-service #214; `pkg/temporalx` released as
+  `temporalx/v0.36.2`, #80), whose v1.46–v1.48 notes are Added/Fixed only with
+  nothing touching `DeploymentOptions` or `VersioningBehavior`. `1-13-2` is
+  **deleted rather than kept side by side** — a deliberate deviation from the
+  drain rule, safe only because the drain set is empty (no cluster holds order
+  history; `clusters/production/` is a bootstrap skeleton) and documented as such
+  in the new file's header so it is not copied forward as precedent. Docs synced
+  across `docs/api/{order,temporal,workflows,graceful-shutdown}.md`,
+  `docs/platform/{setup,application-delivery,README,kind-e2e-audit}.md`; the
+  audit runbook's K0.8 flips from *"expected finding: the worker is amd64-only"*
+  to an assertion that every pinned first-party tag carries both platforms. The
+  stale claim that a PodMonitor selects on `component: worker` is corrected —
+  that monitor was retired at RFC-0014 P3.
+
 #### Local-stack
 
 - `temporalio/ui` 2.53.1 → **2.53.3** (routine UI patches; compose-only, gated

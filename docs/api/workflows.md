@@ -11,14 +11,14 @@ section, and the behaviour of each workflow is in
 | **Status** | Implemented — three workflows, two workers, all running in local-stack and in-cluster | — |
 | **Scope** | The index and the naming rules. Behaviour, steps and diagrams belong to [temporal.md](./temporal.md) | — |
 | **Namespace** | `mop` | — |
-| **Design records** | — | [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) (worker versioning) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) (start outbox) · [RFC-0021](../proposals/rfc/RFC-0021/) |
+| **Design records** | — | [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) (versioning model) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) (worker lifecycle) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) (start outbox) · [RFC-0021](../proposals/rfc/RFC-0021/) |
 
 ## Registry
 
 | Workflow | Purpose | Owner | Worker | Task queue | Detail |
 |----------|---------|-------|--------|------------|--------|
-| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | Turn a committed order into money taken, stock committed and a shipment created — or undo all of it | order | `order-worker-2-4-0` — **versioned**, `Pinned` (ADR-030) | `order-fulfillment` | [temporal.md § OrderFulfillmentWorkflow](./temporal.md#orderfulfillmentworkflow) |
-| <a id="order-cancellation"></a>`CancellationWorkflow` | Give back what a cancelled order took, and park loudly when it cannot | order | `order-worker-2-4-0` (same worker) | `order-fulfillment` | [temporal.md § CancellationWorkflow](./temporal.md#cancellationworkflow) |
+| <a id="order-fulfillment"></a>`OrderFulfillmentWorkflow` | Turn a committed order into money taken, stock committed and a shipment created — or undo all of it | order | `order-worker` — **versioned** as `order/order-fulfillment`, `Pinned` (ADR-030 model, ADR-054 mechanism) | `order-fulfillment` | [temporal.md § OrderFulfillmentWorkflow](./temporal.md#orderfulfillmentworkflow) |
+| <a id="order-cancellation"></a>`CancellationWorkflow` | Give back what a cancelled order took, and park loudly when it cannot | order | `order-worker` (same worker) | `order-fulfillment` | [temporal.md § CancellationWorkflow](./temporal.md#cancellationworkflow) |
 | <a id="abandoned-checkout"></a>`AbandonedCheckoutWorkflow` | Expire a checkout session the shopper walked away from | checkout | `checkout-worker` | `checkout` | [temporal.md § AbandonedCheckoutWorkflow](./temporal.md#abandonedcheckoutworkflow) |
 
 ### What each one is for
@@ -43,13 +43,22 @@ touches no other service and holds nothing: the deadline on the row is the only
 clock, so a lost signal delays an expiry rather than causing a wrong one.
 
 Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster on
-namespace `mop`. Order ships **one manifest per Worker Deployment Version**, side
-by side (ADR-030): `2-4-0` is Current, and earlier builds keep polling only
-until their pinned histories drain — a pre-phase-4 saga left with no poller would
-stall holding stock and an authorization, because every build **since order
-1.13.0 refuses** a product-participant history rather than re-routing it. Checkout is deliberately
-**not** versioned, so its worker is a single manifest and a tag move is safe. See
-[order-worker-2-4-0.yaml](../../kubernetes/apps/order-worker-2-4-0.yaml) and
+namespace `mop`, and each is **one** manifest — but for different reasons, and the
+difference is versioned vs unversioned, not one file vs many.
+
+Order is **versioned** and its lifecycle belongs to the Temporal Worker Controller
+(ADR-054): a single `WorkerDeployment` declares the worker, the controller derives
+a build id from the pod template, creates one Deployment per version, ramps traffic
+onto it, and deletes a version once the server reports it drained. A release edits
+the image tag and nothing else. The determinism contract is unchanged and still the
+point: a pre-phase-4 saga left with no poller would stall holding stock and an
+authorization, because every build **since order 1.13.0 refuses** a
+product-participant history rather than re-routing it — which is why retirement
+waits on `drainedSince` rather than on a human's judgement.
+
+Checkout is deliberately **not** versioned ([RFC-0026](../proposals/rfc/RFC-0026/)
+left it out), so a tag move there is safe and its manifest is an ordinary
+`HelmRelease`. See [order-worker.yaml](../../kubernetes/apps/order-worker.yaml) and
 [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml).
 
 ## Standard roles
@@ -107,4 +116,4 @@ resolves it.
 - [temporal.md](./temporal.md) — the three workflows as built, plus saga theory and operations
 - [Service contracts](README.md#service-contracts) — platform deployment rollup
 
-_Last updated: 2026-08-21 — Current order worker build is `2-4-0`; the product-participant refusal is re-attributed to the order 1.13.0 floor rather than to the running build._
+_Last updated: 2026-08-21 — RFC-0026/ADR-054: the Temporal Worker Controller owns the order worker's lifecycle, so there is one `WorkerDeployment` and the build id is derived rather than named here. The product-participant refusal stays attributed to the order 1.13.0 floor rather than to any running build._

@@ -13,8 +13,19 @@
 # Kustomization and no new ordering rule were needed.
 #
 # Requires Temporal server >= 1.29.1 (we run 1.31.2 — see helmrelease.yaml) and
-# cert-manager for the WorkerResourceTemplate validating webhook, which is always
+# cert-manager, for the WorkerResourceTemplate validating webhook that is always
 # on regardless of `webhook.enabled`.
+#
+# NO extra dependsOn is needed for that, and the ordering is worth stating because
+# it is not visible from this file: temporal-local dependsOn controllers-local,
+# which health-checks `HelmRelease cert-manager` in ns cert-manager — so a Ready
+# controllers-local already means the CRDs exist and the webhook is up.
+#
+# It does NOT use the homelab-ca root, and does not need cert-manager-local's
+# ClusterIssuers. Verified by rendering the chart: it creates its own namespaced
+# `Issuer twc-selfsigned-issuer` (`selfSigned: {}`) plus a `Certificate` for
+# `*-webhook-service.temporal.svc`. cert-manager is required as the controller
+# that fulfils that Certificate, nothing more.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease

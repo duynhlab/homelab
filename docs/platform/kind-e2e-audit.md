@@ -580,6 +580,29 @@ cannot be derived from a single file — they get their own row (K2.3).
   `--live`.
   **FAIL:** non-zero exit.
 
+  > **⚠️ `--live` mode is NOT TRUSTWORTHY as of 2026-08-21 — do not read a green
+  > from it.** Measured on a settled cluster (all pods 17–19 minutes old, 0
+  > restarts, every Service carrying endpoints), two runs a minute apart produced
+  > **inverted** failing sets:
+  > ```
+  > run 1: cart, order, review  -> closed        (8 others open)
+  > run 2: those three OPEN; checkout, inventory, notification, payment,
+  >        product, shipping, user, identity -> closed
+  > ```
+  > The original probe was `nc -z -w 3 <ns>.<ns>.svc.cluster.local <port>`, run
+  > sequentially for ~13 probes, each paying its own DNS lookup — so it conflated
+  > "slower than 3s" with "port closed". Resolving the name once, retrying three
+  > times with a 5s budget, and reporting `unresolved` separately (shipped the
+  > same day) **reduced but did not remove** the nondeterminism: a following pair
+  > of runs gave 12/12 PASS, then 2 spurious failures.
+  > **And it cuts both ways, which is the dangerous half.** In one run
+  > `inventory:9090` reported `closed` and scored a **PASS** — on kindnet, where
+  > NetworkPolicy is not enforced, that port is reachable and the honest result is
+  > the `SKIP` banner. A flaky probe that happens to match a deny expectation
+  > manufactures evidence of isolation that does not exist.
+  > Until this is fixed: treat `--live` as **informational only**. Manifest mode
+  > (above) is the isolation evidence, and on kindnet it is the *only* one.
+
 - [ ] **K3.6** **The four MCP servers — 💤 not deployed since 2026-08-21.** The
   owner turned them off: they were unused and the biggest idle consumers on the
   Kind host (`victoria-metrics-mcp` alone held 662Mi). `mcp.yaml` is commented out

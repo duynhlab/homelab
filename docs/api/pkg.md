@@ -9,7 +9,7 @@ release line.
 |-----------|-------|-----------|
 | **Repository** | [`duynhlab/pkg`](https://github.com/duynhlab/pkg) | — |
 | **Modules** | **14**, one per package — `github.com/duynhlab/pkg/<module>`. There is **no root `go.mod`**, and one must never be re-created | — |
-| **Newest tags** | `v0.37.1` for `obsx` (span helpers) · `v0.37.0` for `authmw idempotency proto` (RFC-0024 P3 identity cutover) · `v0.36.1` for `dbx grpcx httpx migratex temporalx` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` · `v0.1.0` for `httpmw`, which starts its own line | — |
+| **Newest tags** | `v0.37.1` for `obsx` (span helpers) · `v0.37.0` for `temporalx` (Temporal's own versioning env names — **breaking**) · `v0.37.0` for `authmw idempotency proto` (RFC-0024 P3 identity cutover) · `v0.36.1` for `dbx grpcx httpx migratex` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` · `v0.1.0` for `httpmw`, which starts its own line | — |
 | **Single-module line** | Frozen at `v0.35.0` (2026-08-06). **No plain `v0.36.x` tag exists** | — |
 | **Consumers** | 11 Go services (the frontend SPA does not use it) | — |
 | **Bump mechanics** | Per module: `go get github.com/duynhlab/pkg/<module>@vX.Y.Z` | — |
@@ -92,7 +92,7 @@ the platform-side summary and the release ledger.
 | `logger/zapx` · `logger/zerolog` · `logger/clog` | 0 | Structured logger adapters with trace-ID injection. **Only `zapx` has consumers** — never add the other two to a service. |
 | `migratex` | 2 | Embedded golang-migrate runner (`Run(fsys, dir, dsn)`) — always against the DIRECT DB host, never a transaction pooler (DDL is unsafe through PgBouncer/PgDog). |
 | `obsx` | 2 | The single OTel SDK wiring point (RFC-0014 P0): traces/metrics/logs over OTLP, one `Shutdown`, zap tee, `TraceContext`, Pyroscope profiling. **v0.37.1:** also owns the span helpers services used to copy — `Tracer`, `StartSpan`, `AddSpanAttributes`, `AddSpanEvent`, `RecordError`, `SetSpanStatus`; the instrumentation `scope` they take is a package path (`github.com/duynhlab/user-service/internal/logic/v1`), never the service name, which already rides as `service.name` on the Resource. |
-| `temporalx` | 2 | Temporal client/worker bootstrap mirroring grpcx/obsx: OTel tracing interceptor, SDK RED metrics, Worker Deployment Versioning options. |
+| `temporalx` | 2 | Temporal client/worker bootstrap mirroring grpcx/obsx: OTel tracing interceptor, SDK RED metrics, Worker Deployment Versioning. **v0.37.0:** reads Temporal's own `TEMPORAL_DEPLOYMENT_NAME` (the platform's invented `TEMPORAL_WORKER_DEPLOYMENT_NAME` is gone), so an identity injected by the Temporal Worker Controller needs no manifest help; `Versioning`/`MustVersioning`/`WithDefaultVersioningBehavior` removed — `VersioningFromEnv`/`MustVersioningFromEnv` are the only entry points, half a config still exits 1, and an unset behaviour still resolves to `Pinned`. |
 | `proto/<svc>/v1` | 0 | Versioned contracts + committed stubs for `cart`, `inventory`, `notification`, `order`, `payment`, `product`, `review`, `shipping`. **v0.37.0:** `user_id` is `string` everywhere — notification (was `int32`) and payment (was `int64`) joined the already-string contracts (ADR-042). |
 
 ## Consumer matrix
@@ -128,7 +128,8 @@ repo.
 | Modules | Pinned at |
 |---------|-----------|
 | `authmw idempotency proto` | `v0.37.0` |
-| `dbx grpcx httpx migratex temporalx` | `v0.36.1` |
+| `dbx grpcx httpx migratex` | `v0.36.1` |
+| `temporalx` | `v0.37.0` on `order` — the breaking env rename reaches only the versioned worker; `checkout` stays on `v0.36.1`, which is safe because it passes no versioning option at all |
 | `flagx logger/zapx` | `v0.36.0` |
 | `obsx` | `v0.36.1`, except `inventory` on `v0.37.0` — the span-helper wave is still rolling |
 | `httpmw` | **Not adopted anywhere yet.** `v0.1.0` is tagged and all nine HTTP services have an open pull request pinning it; none is merged, so every service still carries its own `middleware/` copy. `inventory` is not in that count — it serves gRPC and mounts no Gin middleware |
@@ -172,6 +173,8 @@ per-module numbering continues from it, which is why the first per-module tag is
 | `v0.37.1` | `obsx` | 2026-08-16 | The tracer scope is the package path of the code creating the span, not the service name. |
 | `v0.1.0` + `v0.37.0` | `httpmw` `obsx` | 2026-08-16 | `httpmw` itself (ADR-038): the shared Gin `Tracing` + `Logging` pair lifted out of the per-service `middleware/` copies — one skip list behind both, exact matching on the Gin route pattern. `obsx` took the span helpers in the same release. Its `v0.37.0` is this wave, not the 2026-08-11 line below that carries the same number for other modules. |
 | `v0.37.0` | `authmw idempotency proto` | 2026-08-11 | RFC-0024 P3 identity cutover (ADR-041/042): authmw verifies the Keycloak realm via `Config` + `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL` (old `AUTH_JWKS_URL`/`JWT_*` names removed) and normalizes `realm_access.roles`; idempotency `UserID` → `string`; notification/payment protos `user_id` → `string`. |
+| `v0.37.0` | `temporalx` | 2026-08-21 | **Breaking — the first per-module tag to remove exported API.** Reads Temporal's own `TEMPORAL_DEPLOYMENT_NAME`; the invented `TEMPORAL_WORKER_DEPLOYMENT_NAME` is retired, so a worker still given the old name exits 1 rather than polling unversioned. `Versioning`, `MustVersioning` and `WithDefaultVersioningBehavior` deleted — a fleet-wide grep found no caller. Landed with homelab RFC-0026 / ADR-054. |
+| `v0.36.2` | `temporalx` | 2026-08-21 | Temporal SDK `v1.45.0` → `v1.48.0`. Additive across v1.46–v1.48; nothing touching `DeploymentOptions` or `VersioningBehavior`. |
 | `v0.36.1` | `authmw dbx grpcx httpx idempotency migratex obsx proto temporalx` | 2026-08-08 | gRPC and `golang.org/x` security bumps; test-coverage gaps closed. The four modules without those dependencies stayed at `v0.36.0`. |
 | `v0.36.0` | all 13 | 2026-08-07 | The split itself: one module per package, Go 1.26, per-module release tooling. `grpcx` inlined its trace-id helper to drop the `obsx` call the new layering forbids. |
 
@@ -235,4 +238,4 @@ sequence jumps `v0.12.0` → `v0.12.2`).
 - [observability.md](./observability.md) — the obsx contract every service follows
 - Per-service contracts: [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-16 — the shared HTTP middleware wave (ADR-038): new `httpmw` module at `v0.1.0`, `obsx v0.37.1` span helpers with package-path scopes._
+_Last updated: 2026-08-21 — `temporalx v0.36.2` (Temporal SDK v1.48.0) and `v0.37.0` (breaking: Temporal's own versioning env names, three exported helpers removed) added to the ledger; the fleet pin for `temporalx` is split while only order needs it. Previously: the shared HTTP middleware wave (ADR-038) — `httpmw v0.1.0`, `obsx v0.37.1` span helpers with package-path scopes._

@@ -29,6 +29,18 @@ spec:
       retries: 3
   values:
     role: Agent
+    # A log collector must cover every node, control plane included. Without
+    # this the DaemonSet skips the tainted control-plane node, and on Kind that
+    # is exactly where the edge lives: kind-up.sh labels the control plane
+    # `ingress-ready=true` (it owns the 80/443 extraPortMappings), and
+    # clusters/local/envoy-gateway-config.yaml pins both Envoy proxy replicas
+    # there. The gateway access log -- the first thing you reach for when a
+    # route misbehaves -- never reached VictoriaLogs, while the Envoy *control*
+    # plane pod on a worker was collected normally and masked the gap.
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
     customConfig:
       data_dir: /vector-data-dir
       api:

@@ -1036,8 +1036,9 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
 Worker Deployment Versions. Since **RFC-0026 / ADR-054** the *mechanism* is a
-Kubernetes controller rather than a manifest per build — the routing model the
-diagram below describes is unchanged, but no human performs any step in it.
+Kubernetes controller rather than a manifest per build. The routing model below is
+unchanged — the server still stamps an execution and offers its tasks only to a
+matching build — but every step that used to be a human is now the controller's.
 
 The build id is not a label for humans — it is the address the server routes on.
 It gets stamped into an execution's history when the workflow starts, and from
@@ -1053,35 +1054,39 @@ sequenceDiagram
     participant API as order-service<br/>(starter)
     participant TS as Temporal server<br/>frontend + matching
     participant H as execution history<br/>(platform-db)
-    participant W4 as worker pod<br/>outgoing build
-    participant W5 as worker pod<br/>incoming build
+    participant WOld as worker pod<br/>outgoing build
+    participant WNew as worker pod<br/>incoming build
 
     Note over TS: Current = order/order-fulfillment / build A
     API->>TS: StartWorkflow OrderFulfillmentWorkflow
     TS->>H: stamp order/order-fulfillment / build A<br/>on THIS execution
-    W4->>TS: poll "I am order/order-fulfillment / build A"
-    TS-->>W4: workflow task (stamp matches)
+    WOld->>TS: poll "I am order/order-fulfillment / build A"
+    TS-->>WOld: workflow task (stamp matches)
 
-    Note over W5: image tag edited -> controller mints<br/>build B and creates its Deployment
-    W5->>TS: poll "I am order/order-fulfillment / build B"
-    TS--xW5: zero tasks — Current is still build A
+    Note over WNew: image tag edited -> controller mints<br/>build B and creates its Deployment
+    WNew->>TS: poll "I am order/order-fulfillment / build B"
+    TS--xWNew: zero tasks — Current is still build A
 
-    Note over TS: controller ramps 10% -> 50% -> Current
+    Note over TS: controller walks rollout.steps,<br/>then promotes build B to Current
     API->>TS: StartWorkflow (a NEW order)
     TS->>H: stamp build B on the new execution only
-    TS-->>W5: tasks for the new order
-    TS-->>W4: tasks for the OLD order<br/>its stamp still says build A
+    TS-->>WNew: tasks for the new order
+    TS-->>WOld: tasks for the OLD order<br/>its stamp still says build A
 
-    Note over W4: pod deleted before its orders finish
-    TS--xW4: task has nowhere to go
+    Note over WOld: IF its pods go before its orders finish<br/>(forced delete — sunset prevents this)
+    TS--xWOld: task has nowhere to go
     Note over TS,H: no error, no failed activity —<br/>the order simply stops moving
 ```
 
-Read the last three lines as the failure mode, not a footnote: a stamped
-execution whose build has no poller does not fail, it goes quiet. That is why
-`OrderSagaNotCompleting` exists, and why a build is only deleted once it is
-drained — a rule the controller now enforces with timers instead of a human
-reading `describe-version`.
+Read the last three lines as the failure mode the design exists to make
+unreachable, not as something that happens. A stamped execution whose build has
+no poller does not fail — it goes quiet, which is why `OrderSagaNotCompleting` is
+the backstop. Under ADR-030 a human kept that from happening by reading
+`describe-version` before deleting a file. Under ADR-054 `sunset` keeps it from
+happening on its own: a version is scaled to zero only an hour after the server
+reports it `drained`, and deleted a day after that. It is still reachable by
+force — deleting the `WorkerDeployment`, or scaling a draining version to zero by
+hand — which is why the shape is worth knowing rather than forgetting.
 
 - The worker registers as deployment **`order/order-fulfillment`** — the
   controller composes the server-side name as `<k8s-namespace>/<resource-name>`,
@@ -1108,6 +1113,44 @@ reading `describe-version`.
 - Design record: [RFC-0026](../proposals/rfc/RFC-0026/) ·
   [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/). The historical
   hand-run procedure is [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover).
+
+The sequence above answers *how a task finds its build*. This one answers *who moves
+a version through its life* — the same mechanics [RFC-0026's
+research](../proposals/rfc/RFC-0026/research.md#core-mechanism) walks through, kept
+here because the as-built contract is where an on-call reader looks first. Colours are
+the house palette — purple is what GitOps and the controller compute, orange is the
+version's own state, green is a fact or a timer the Temporal server owns.
+
+```mermaid
+flowchart TD
+  tag["Image tag edited in<br/>order-worker.yaml<br/>(the only routine edit)"] --> bid["Build id derived<br/>image ref + pod-template hash"]
+  bid --> dep["Versioned Deployment created<br/>one per build id"]
+  dep --> reg["Version registered<br/>with the Temporal server"]
+  reg --> ramp["Ramping version<br/>rollout.steps, pause >= 30s"]
+  ramp --> cur["Promoted to Current<br/>new workflows stamp here"]
+  cur --> dpr["Previous version deprecated<br/>keeps serving its pinned work"]
+  dpr --> drn["Server reports drained<br/>status.deprecatedVersions[].drainedSince"]
+  drn --> sd["scaledownDelay 1h<br/>replicas -> 0"]
+  sd --> del["deleteDelay 24h<br/>eligibleForDeletion, resources removed"]
+
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  class tag,bid,dep platform
+  class ramp,cur,dpr worker
+  class reg,drn,sd,del data
+```
+
+> **In plain terms:** exactly three of these boxes used to be a person, and they are
+> not the ones a colour picks out. **Promoted to Current** was
+> `kubectl create job --from=cronjob/…`, run on every release *and* every fresh
+> cluster. **Server reports drained** was a human reading `describe-version` and
+> judging it. **Resources removed** was that same human deleting a file. The first is
+> now a policy in the manifest, the second is a field, and the third is a timer.
+>
+> The two delays are the margin for the second answer being wrong: an hour with the
+> pods at zero before anything is deleted, and a day before the resources go — so a
+> version that was called drained too early can still be scaled back up.
 
 ### As-Built Notes and Roadmap
 

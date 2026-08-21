@@ -69,6 +69,27 @@ spec:
     # the upstream-documented path. Our OpenBAO-seeded creds are non-default,
     # so no explicit RUSTFS_RPC_SECRET is needed (and the 0.12.0 chart has no
     # values key for it; it would have to ride the existingSecret's envFrom).
+    # Logging. The 0.12.0 chart ships log_level "info" and leaves every
+    # log_rotation sub-key commented out, so no size cap is rendered at all.
+    # On 2026-08-21 that combination filled the whole 100 GB podman machine:
+    # 34 GB of log in two hourly files (19 GB + 15 GB, ~17 GB/hour), and not
+    # one line of it was an error -- it was span noise from the s3s crate, a
+    # new/close pair per S3 request signature. Barman WAL archiving, Tempo and
+    # Pyroscope push objects continuously, so the volume tracks traffic rather
+    # than incidents. `warn` cuts that class at the source.
+    #
+    # Hourly rotation was already working (the files were named by hour); what
+    # was missing is a cap on SIZE, which is why a single hour reached 19 GB.
+    # Invariant to keep: size * keep_files must stay BELOW logStorageSize,
+    # because local-path is hostPath-backed -- `requests.storage` is advisory
+    # and enforces nothing. 50 MB * 3 = 150 MB < 256Mi.
+    config:
+      log_level: "warn"
+      log_rotation:
+        size: 50
+        time: hour
+        keep_files: 3
+
     secret:
       existingSecret: rustfs-credentials
     
@@ -93,4 +114,7 @@ spec:
         # ~1281m/1500m → S3 PUT "context deadline exceeded" → Pyroscope 422 again).
         # Raise to 2.5 CPU (host has ample cores).
         cpu: "2500m"
-        memory: 512Mi
+        # 512Mi was the ceiling it died at: the 2026-08-21 full-disk event ended
+        # with the kernel OOM-killing rustfs at anon-rss 520416kB, i.e. exactly
+        # at the limit, while it was writing the 17 GB/hour log flood above.
+        memory: 1Gi

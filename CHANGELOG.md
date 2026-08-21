@@ -1085,6 +1085,34 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **rustfs logged 17 GB an hour and took the whole cluster down with it.** The
+  0.12.0 chart ships `config.log_level: "info"` and leaves every
+  `log_rotation` sub-key commented out, so no size cap was ever rendered. The
+  result on 2026-08-21: **34 GB of log in two hourly files** (19 GB + 15 GB) on a
+  PVC whose manifest asks for **256Mi**, filling the entire 100 GB podman machine.
+  local-path is hostPath-backed, so `requests.storage` is advisory and enforces
+  nothing — the invariant `size * keep_files < logStorageSize` was never encoded
+  anywhere, and it is now, in the values comment. Not one line of the 34 GB was an
+  error: it was span noise from the `s3s` crate, a `new`/`close` pair per S3
+  request signature, so the volume tracked Barman WAL + Tempo + Pyroscope traffic
+  rather than incidents. Hourly rotation *was* working — the files were named by
+  hour — which is exactly why the missing cap was on size. Fixed with
+  `log_level: warn` plus `size: 50` / `time: hour` / `keep_files: 3` (150 MB).
+  The memory limit goes 512Mi → 1Gi in the same change: the kernel OOM-killed
+  rustfs at anon-rss 520416kB, i.e. precisely at the old ceiling, while it was
+  writing that flood.
+  **The blast radius is worth recording, because none of it looked like a disk
+  problem.** Admission webhooks began timing out at 5s, so Flux dry-runs failed
+  with `InternalError` and 14 Kustomizations parked on `dependency not ready`;
+  the API server then returned `EOF`; `kubernetes-admin` got **`Forbidden` on
+  VictoriaMetrics CRs** — a phantom RBAC error from a half-serving API server;
+  `podman exec` failed writing its own container state DB; and `vtsingle` /
+  `vlsingle` / `vmagent` errored in `monitoring` while their own PVCs held
+  3.7M–59M, making them look like the cause. Nothing alerted, and that part is
+  by design on Kind: `KubePersistentVolumeFillingUp` and
+  `CNPGClusterLowDiskSpace*` are marked 💤 inactive there because local-path
+  reports no `kubelet_volume_stats_*`.
+
 - **The edge access log reached the store as an opaque string, so the fields it
   exists for were unqueryable.** `configs/envoy-gateway/envoyproxy.yaml` declares
   a structured JSON access log and says why — `response_flags`,

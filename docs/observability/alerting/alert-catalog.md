@@ -19,15 +19,11 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**202 statically-defined alerts** across 9 domains (re-derive with
+**218 statically-defined alerts** across 10 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
 — by domain: postgres 53, microservices 52, victoriametrics 31, kubernetes 29,
-envoy-gateway 12, gitops 9, valkey 7, observability 3, keycloak 5, + the
-watchdog; up 4 from the previous 198 — the identity observability slice grew
-keycloak 2 → 5 (§2b) and envoy-gateway 11 → 12 (`EdgeAuthDeniedRatioHigh`). At
-the prior count the total was unchanged only by coincidence — the
-RFC-0024 P2.3 cutover retired kong's 13 for envoy-gateway's 11, and the 2
-keycloak alerts from P1 were missing from the previous breakdown), plus **68 Sloth-generated** SLO
+envoy-gateway 12, gitops 9, valkey 7, observability 15, keycloak 5, kyverno 4,
++ the watchdog), plus **68 Sloth-generated** SLO
 burn-rate alerts (2 × 34 SLOs). The 34 SLOs cover all 11 Go services plus Keycloak:
 30 rendered by the `mop` chart through the five domain ResourceSets, plus inventory's 2
 hand-written gRPC SLOs and Keycloak's 2 hand-written identity SLOs. Two CNPG topology rules are **gated** (not
@@ -35,10 +31,12 @@ deployed) and a subset is **inactive on Kind** (platform limitations) — both
 marked inline below.
 
 The count is re-derived from the manifests (`- alert:` occurrences under
-`prometheusrules/**` plus `temporal/prometheusrule.yaml`), not incremented by hand.
-It rose by 20 rather than by the 9 this change adds: domain 9 below also catalogues
-the RFC-0021 alerts that shipped in earlier phases, and `OtelCollectorDown`, which
-had been deployed but never listed here.
+`prometheusrules/**`), never incremented by hand — and re-deriving on 2026-08-21
+showed why that rule exists. The page had said **202** with `observability 3`,
+while that directory holds **15**: the ClickHouse and tracing rules of §8/§8b
+landed without the Summary being re-derived. This change adds 4 (§6b Kyverno),
+and the honest total is **218**, not 206. Incrementing would have carried the
+error forward a fourth time.
 
 | Domain | Count | Protects |
 |--------|-------|----------|
@@ -49,6 +47,7 @@ had been deployed but never listed here.
 | [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 51 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
+| [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
 | [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
@@ -315,6 +314,32 @@ The three CertManager* alerts now have a visual surface: the **cert-manager**
 dashboard (folder GitOps, `grafana-dashboard-cert-manager.yaml`) — per-cert
 time-to-expiry and renewal tables with thresholds mirroring the 7d/24h alert
 windows, controller sync errors, work queues.
+
+## 6b. Kyverno admission
+
+Source: `prometheusrules/kyverno/alerts.yaml`. New on 2026-08-21 — Kyverno had
+**no signals at all** before it: no scrape, no dashboard, no alert, no runbook.
+The values carried a top-level `metricsService` + `serviceMonitor` pair, which
+chart 3.8.2 does not define (each of the four controllers owns its own), so Helm
+accepted them and ignored them. The cluster ran with zero ServiceMonitors while
+the manifest read as if metrics were solved.
+
+Every expression below was checked against live series before being written:
+`kyverno_info` from all four jobs, `kyverno_policy_results_total` at 324 series
+with `rule_result` ∈ {pass 316, fail 1, skip 7}, and an admission-review p99 of
+**4.95 ms** on an idle cluster.
+
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| KyvernoControllerDown | critical | `up{job=~"kyverno-.*-metrics\|kyverno-svc-metrics"}==0` or `absent(kyverno_info)` | Admission can be **refused**, not just unpoliced — `disallow-default-namespace` is `Enforce` + `failurePolicy: Fail`. Background/reports/cleanup fail silently instead | 5m | [KyvernoControllerDown](../runbooks/kyverno/KyvernoControllerDown.md) |
+| KyvernoAdmissionDenying | warning | `rate(kyverno_admission_requests_total{request_allowed="false"}[5m])>0` | Something cannot be created and its controller will retry forever; a Flux Kustomization stalls behind a message that names the dependency, never the denial | 10m | [KyvernoAdmissionDenying](../runbooks/kyverno/KyvernoAdmissionDenying.md) |
+| KyvernoAdmissionLatencyHigh | warning | p99 `kyverno_admission_review_duration_seconds` > 1s | Kyverno is on the write path of every apply; past the webhook timeout this surfaces as Flux dry-run `InternalError`s and an API server returning `EOF` — never as a Kyverno alert | 10m | [KyvernoAdmissionLatencyHigh](../runbooks/kyverno/KyvernoAdmissionLatencyHigh.md) |
+| KyvernoPolicyRuleErrors ⏳ *arms when emitted — live `rule_result` set is {pass,fail,skip}* | warning | `rate(kyverno_policy_results_total{rule_result="error"}[10m])>0` | A rule returned no verdict. In `Audit` an `error` is indistinguishable from a compliant resource, so the policy protects nothing while appearing healthy | 10m | [KyvernoPolicyRuleErrors](../runbooks/kyverno/KyvernoPolicyRuleErrors.md) |
+
+The threshold on the latency rule sits ~200× above the measured idle p99 on
+purpose: it is not a tuning alert, it is a "the platform is in trouble and
+Kyverno is where you will see it" alert. The 2026-08-21 disk incident is the
+worked example, in that runbook.
 
 ## 7. VictoriaMetrics self-health
 
@@ -644,4 +669,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._
+_Last updated: 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._

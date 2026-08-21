@@ -58,21 +58,57 @@ spec:
         resources:
           requests: { cpu: 100m, memory: 128Mi }
           limits: { cpu: 500m, memory: 512Mi }
+      # Scrape: the chart's own toggle (default false), one per controller.
+      # metricsService.create already defaults to true on :8000. The VM
+      # operator converts the ServiceMonitor to a VMServiceScrape and VMAgent
+      # picks it up via selectAllByDefault.
+      serviceMonitor:
+        enabled: true
     backgroundController:
       replicas: 1
       resources:
         requests: { cpu: 50m, memory: 64Mi }
         limits: { cpu: 300m, memory: 256Mi }
+      # Scrape: the chart's own toggle (default false), one per controller.
+      # metricsService.create already defaults to true on :8000. The VM
+      # operator converts the ServiceMonitor to a VMServiceScrape and VMAgent
+      # picks it up via selectAllByDefault.
+      serviceMonitor:
+        enabled: true
     cleanupController:
       replicas: 1
       resources:
         requests: { cpu: 50m, memory: 64Mi }
         limits: { cpu: 200m, memory: 128Mi }
+      # Scrape: the chart's own toggle (default false), one per controller.
+      # metricsService.create already defaults to true on :8000. The VM
+      # operator converts the ServiceMonitor to a VMServiceScrape and VMAgent
+      # picks it up via selectAllByDefault.
+      serviceMonitor:
+        enabled: true
     reportsController:
       replicas: 1
       resources:
         requests: { cpu: 50m, memory: 64Mi }
         limits: { cpu: 300m, memory: 256Mi }
+      # Scrape: the chart's own toggle (default false), one per controller.
+      # metricsService.create already defaults to true on :8000. The VM
+      # operator converts the ServiceMonitor to a VMServiceScrape and VMAgent
+      # picks it up via selectAllByDefault.
+      serviceMonitor:
+        enabled: true
+    # Dashboard: chart-native, same reasoning as cert-manager's servicemonitor
+    # toggle -- prefer the chart over a vendored JSON copy that then drifts.
+    # The chart renders a ConfigMap plus a GrafanaDashboard CR whose
+    # matchLabels already equal this platform's Grafana instanceSelector.
+    grafana:
+      enabled: true
+      namespace: monitoring
+      grafanaDashboard:
+        create: true
+        folder: GitOps
+        allowCrossNamespaceImport: true
+
     # Exclude critical platform namespaces from admission webhooks.
     # Without this, a Kyverno outage can break Flux reconciliation,
     # cert-manager webhooks, or operator startup.
@@ -101,10 +137,9 @@ spec:
         - "[*,kyverno,*]"
         - "[*,cert-manager,*]"
         - "[*,external-secrets-system,*]"
-    # Observability — VMAgent scrapes the ServiceMonitor automatically
-    # because PrometheusOperator CRDs are installed via VictoriaMetrics auto-conversion.
-    metricsService:
-      create: true
-    serviceMonitor:
-      enabled: true
-      namespace: kyverno
+    # Observability lives per controller, not at the top level -- see the
+    # serviceMonitor blocks above. This file used to carry a top-level
+    # `metricsService` + `serviceMonitor` pair here; chart 3.8.2 has no such
+    # keys (each of the four controllers owns its own), so Helm accepted them
+    # and ignored them. The cluster ran with **zero** ServiceMonitors and zero
+    # kyverno_* series, while the manifest read as if metrics were solved.

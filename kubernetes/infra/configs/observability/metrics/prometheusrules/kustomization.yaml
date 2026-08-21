@@ -11,4 +11,5 @@ resources:
   - observability/
   - valkey/
   - gitops/
+  - kyverno/
   - watchdog.yaml

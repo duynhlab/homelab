@@ -70,7 +70,9 @@ drafts of this ADR made:
 | Worker Versioning APIs are gated behind dynamic-config flags dev-server does not surface | **Refuted** | With **zero** dynamic config, `worker deployment list`, `set-current-version`, `Pinned` behaviour, side-by-side builds and `DrainageStatus: draining` all worked |
 
 So the versioning **API** surface was always reachable locally — the blocker was
-only that no worker set `TEMPORAL_WORKER_DEPLOYMENT_NAME` / `_BUILD_ID`. What
+only that no worker set the versioning variables (`TEMPORAL_DEPLOYMENT_NAME` /
+`TEMPORAL_WORKER_BUILD_ID` since ADR-054; `TEMPORAL_WORKER_DEPLOYMENT_NAME`
+before it). What
 genuinely cannot be rehearsed on the dev-server is anything that must **span a
 restart**: a drain that outlives a server bounce, a timer that survives one, or
 any `TemporalPersistenceErrorRateHigh` path. Two further divergences are

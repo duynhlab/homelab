@@ -661,9 +661,22 @@ docker compose exec -T postgres psql -U postgres -d cart -t -A -c \
        docker compose exec -T postgres psql -U postgres -d cart -c \
          "SELECT user_id, product_id FROM cart_items ORDER BY id DESC LIMIT 5" </dev/null; }
 
-# A15. Worker Deployment Versioning drill (ADR-030). CONDITIONAL: run it when a
-#      change touches worker versioning, the saga's activity set, or the rollout
-#      runbook. It is the only rehearsal of a pinned drain outside the cluster.
+# A15. Worker Deployment Versioning drill (ADR-030, mechanism now ADR-054).
+#      CONDITIONAL: run it when a change touches worker versioning, the saga's
+#      activity set, or the rollout runbook. It is the only rehearsal of a pinned
+#      drain outside the cluster — Compose has no Kubernetes, so it is also the
+#      only place the ENV CONTRACT can be gated before Kind.
+#
+#      The variable is TEMPORAL_DEPLOYMENT_NAME, Temporal's own name: the Worker
+#      Controller injects it, Temporal's reference worker reads it, and
+#      pkg/temporalx >= temporalx/v0.37.0 reads only it. The retired
+#      TEMPORAL_WORKER_DEPLOYMENT_NAME was a synonym this platform invented; a
+#      worker given the old name plus a build id sees half a config and exits 1,
+#      which is what makes this row a real gate rather than a formality.
+#
+#      The deployment name here stays the bare `order-fulfillment` because this
+#      drill sets it by hand. On the cluster the controller composes
+#      `<namespace>/<resource-name>`, so it is `order/order-fulfillment` there.
 #
 #      Keep the pause UNDER the saga's 30s StartToCloseTimeout
 #      (order-service/internal/saga/workflow.go). A longer pause makes every
@@ -671,7 +684,7 @@ docker compose exec -T postgres psql -U postgres -d cart -t -A -c \
 #      never converges and strands an in-flight workflow.
 docker compose stop order-worker
 docker compose run -d --no-deps --name ow-v1 \
-  -e TEMPORAL_WORKER_DEPLOYMENT_NAME=order-fulfillment -e TEMPORAL_WORKER_BUILD_ID=v1 \
+  -e TEMPORAL_DEPLOYMENT_NAME=order-fulfillment -e TEMPORAL_WORKER_BUILD_ID=v1 \
   -e ORDER_FAULT_COMMIT_PAUSE=20s order-worker worker
 sleep 12
 $TCLI worker deployment list --namespace mop            # want: order-fulfillment, version v1
@@ -682,7 +695,7 @@ $TCLI workflow describe --workflow-id "order-fulfillment-$OID" --namespace mop \
   | grep -A3 'Versioning Info'                          # want: Behavior Pinned, BuildId v1
 
 docker compose run -d --no-deps --name ow-v2 \
-  -e TEMPORAL_WORKER_DEPLOYMENT_NAME=order-fulfillment -e TEMPORAL_WORKER_BUILD_ID=v2 \
+  -e TEMPORAL_DEPLOYMENT_NAME=order-fulfillment -e TEMPORAL_WORKER_BUILD_ID=v2 \
   order-worker worker
 sleep 10
 $TCLI worker deployment set-current-version \

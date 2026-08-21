@@ -16,6 +16,9 @@ resources:
   - oci/flux-operator-mcp-oci.yaml
   - oci/grafana-mcp-oci.yaml
   - oci/envoy-gateway-oci.yaml
+  # CRDs chart first — the controller HelmRelease dependsOn it (ADR-054).
+  - oci/temporal-worker-controller-crds-oci.yaml
+  - oci/temporal-worker-controller-oci.yaml
   
   # Helm Repositories
   - helm/prometheus-community.yaml

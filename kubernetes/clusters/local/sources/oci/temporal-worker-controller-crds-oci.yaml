@@ -1,0 +1,27 @@
+---
+# OCIRepository for the Temporal Worker Controller CRDs chart.
+# Chart: oci://docker.io/temporalio/temporal-worker-controller-crds
+# Docs: https://github.com/temporalio/temporal-worker-controller/blob/main/docs/crd-management.md
+#
+# The CRDs ship as their OWN chart so they can be upgraded independently of the
+# controller, and this one installs FIRST — the controller chart's HelmRelease
+# dependsOn it (RFC-0026 / ADR-054).
+#
+# docker.io, not ghcr.io: that is where Temporal publishes. A pull from
+# ghcr.io/temporalio/... returns 403 (verified 2026-08-21), so the README's
+# `oci://docker.io/temporalio/...` is the only working coordinate.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: temporal-worker-controller-crds-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://docker.io/temporalio/temporal-worker-controller-crds
+  ref:
+    # Pinned, not a range: the CRDs and the controller are versioned in lockstep
+    # (both charts are 0.28.0) and a CRD schema that moves ahead of the manager is
+    # how a WorkerDeployment starts failing validation on a reconcile nobody ran.
+    semver: "0.28.0"

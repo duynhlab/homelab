@@ -10,6 +10,9 @@ kind: Kustomization
 # here and out of `make validate` without commenting the file into unreadability.
 resources:
   - helmrelease.yaml
-  # Suspended run-on-demand template for the ADR-030 version cutover — LISTED so
-  # it actually ships; a file no kustomization names is never applied.
-  - worker-set-current-version-cronjob.yaml
+  # RFC-0026 / ADR-054: the Worker Controller. CRDs chart first — the manager's
+  # HelmRelease dependsOn it. These replace the ADR-030 cutover CronJob, which is
+  # deleted rather than kept: the controller sets the Current version itself, so a
+  # suspended Job template would be a second, contradicting writer of that setting.
+  - worker-controller-crds-helmrelease.yaml
+  - worker-controller-helmrelease.yaml

@@ -148,167 +148,89 @@ validate_production() {
 }
 
 
-# Versioned order workers pin new workflows to a Worker Deployment Version whose
-# Build ID is an env var, while the image comes from image.tag in the same file,
-# and the cutover CronJob names a Build ID and deployment name again. If any copy
-# drifts, the Temporal server routes new workflows to a version NO worker serves:
-# they sit there with no error in any log, no failed activity, and no alert — the
-# cutover simply stops progressing. Nothing else compares them, so this does.
+# Worker Versioning wiring, RFC-0026 / ADR-054 shape.
+#
+# The controller now owns the version identity: it derives the Build ID and
+# injects TEMPORAL_DEPLOYMENT_NAME + TEMPORAL_WORKER_BUILD_ID into every pod of
+# every version it creates. So the three-way build-id comparison this function
+# used to make has nothing left to compare — there is one file, and it states the
+# Build ID nowhere. What replaces it are the mistakes that ARE still reachable,
+# and every one of them fails the same way the old drift did: silently, with new
+# workflows pinned to a version no worker serves.
 #
 # Written to fail LOUDLY rather than skip: every path that cannot make a
 # comparison exits non-zero. A guard that silently compares nothing is worse than
 # no guard, because its green line reads as proof.
-#
-# Layout it enforces (ADR-030):
-#   kubernetes/apps/order-worker.yaml        — the unversioned worker. OPTIONAL:
-#     the retirement PR deletes it. While present it must carry NO versioning env
-#     (an in-place flip is the proven silent-hang mistake).
-#   kubernetes/apps/order-worker-*.yaml      — one file per versioned build,
-#     discovered by glob so the next release is covered without editing this.
-#   the cutover CronJob                      — its --build-id must name a build
-#     some deployed versioned worker serves.
-validate_worker_build_id() {
-  local unversioned="kubernetes/apps/order-worker.yaml"
-  local cutover="kubernetes/infra/controllers/temporal/worker-set-current-version-cronjob.yaml"
+validate_worker_versioning() {
+  local wd="kubernetes/apps/order-worker.yaml"
 
-  if [[ ! -f "${cutover}" ]]; then
-    echo "ERROR - ${cutover} is missing; cannot verify the Worker Versioning wiring" >&2
+  if [[ ! -f "${wd}" ]]; then
+    echo "ERROR - ${wd} is missing; cannot verify the Worker Versioning wiring" >&2
     exit 1
   fi
 
-  # --- The unversioned worker, while it exists, must stay unversioned.
+  # --- No per-build files may survive the cutover. One left behind means the old
+  # HelmRelease and the controller both write Deployments for one deployment name,
+  # and the loser is whichever reconciles second.
+  local -a legacy=()
+  local f
+  for f in kubernetes/apps/order-worker-*.yaml; do
+    [[ -f "${f}" ]] && legacy+=("${f}")
+  done
+  if [[ ${#legacy[@]} -gt 0 ]]; then
+    echo "ERROR - per-build worker manifests still present (${legacy[*]}). ADR-054 replaced them with the single ${wd}; two writers of one deployment name is the drift this check used to police." >&2
+    exit 1
+  fi
+
+  # --- The WorkerDeployment and its Connection must both be there, and the
+  # connectionRef must resolve. A dangling ref leaves the controller unable to
+  # reach Temporal, which surfaces as a version that is never registered.
+  local kinds conn_name ref_name
+  kinds=$(yq eval-all '[.kind] | join(",")' "${wd}")
+  if [[ "${kinds}" != *"WorkerDeployment"* || "${kinds}" != *"Connection"* ]]; then
+    echo "ERROR - ${wd}: expected both a Connection and a WorkerDeployment, found kinds [${kinds}]" >&2
+    exit 1
+  fi
+  conn_name=$(yq eval-all 'select(.kind == "Connection") | .metadata.name' "${wd}")
+  ref_name=$(yq eval-all 'select(.kind == "WorkerDeployment") | .spec.workerOptions.connectionRef.name' "${wd}")
+  if [[ -z "${conn_name}" || "${conn_name}" == "null" || "${ref_name}" != "${conn_name}" ]]; then
+    echo "ERROR - ${wd}: workerOptions.connectionRef.name (${ref_name}) does not name the Connection in this file (${conn_name})" >&2
+    exit 1
+  fi
+
+  # --- The pod template must NOT hand-set the identity the controller injects.
+  # Both spellings are rejected: the current one would give the pod two
+  # identities (pkg/temporalx exits 1 on a disagreement, but failing here beats
+  # failing at pod start), and the retired TEMPORAL_WORKER_DEPLOYMENT_NAME would
+  # be a variable no binary reads any more — a manifest that lies quietly.
+  local stray
+  stray=$(yq eval-all '[select(.kind == "WorkerDeployment") | .spec.template.spec.containers[].env[]? | select(.name == "TEMPORAL_DEPLOYMENT_NAME" or .name == "TEMPORAL_WORKER_BUILD_ID" or .name == "TEMPORAL_WORKER_DEPLOYMENT_NAME")] | length' "${wd}")
+  if [[ -n "${stray}" && "${stray}" != "null" && "${stray}" -ne 0 ]]; then
+    echo "ERROR - ${wd}: the pod template hand-sets versioning env. The controller injects TEMPORAL_DEPLOYMENT_NAME and TEMPORAL_WORKER_BUILD_ID per version (internal/k8s/deployments.go); a hand-set copy is a second identity." >&2
+    exit 1
+  fi
+
+  # --- Unversioned workers must stay unversioned. checkout-worker is not under
+  # versioning (RFC-0026 deferred it), and an in-place env flip is the proven
+  # silent-hang mistake.
+  local unversioned="kubernetes/apps/checkout-worker.yaml"
   if [[ -f "${unversioned}" ]]; then
-    local env_count stray
-    # Existence first: with .spec.values.env absent, the select below returns 0
+    local env_count uv_stray
+    # Existence first: with .spec.values.env absent the select below returns 0
     # rather than erroring, and the check would pass while reading nothing.
     env_count=$(yq '.spec.values.env | length' "${unversioned}")
     if [[ -z "${env_count}" || "${env_count}" == "null" || "${env_count}" -eq 0 ]]; then
       echo "ERROR - ${unversioned}: .spec.values.env is missing or empty; the versioning check cannot read anything" >&2
       exit 1
     fi
-    stray=$(yq '[.spec.values.env[] | select(.name == "TEMPORAL_WORKER_BUILD_ID" or .name == "TEMPORAL_WORKER_DEPLOYMENT_NAME")] | length' "${unversioned}")
-    if [[ "${stray}" -ne 0 ]]; then
-      echo "ERROR - ${unversioned}: carries Worker Versioning env. Versioning ships as a SIDE-BY-SIDE deployment (order-worker-<build>.yaml), never as an in-place flip — see ADR-030." >&2
+    uv_stray=$(yq '[.spec.values.env[] | select(.name == "TEMPORAL_DEPLOYMENT_NAME" or .name == "TEMPORAL_WORKER_BUILD_ID" or .name == "TEMPORAL_WORKER_DEPLOYMENT_NAME")] | length' "${unversioned}")
+    if [[ "${uv_stray}" -ne 0 ]]; then
+      echo "ERROR - ${unversioned}: carries Worker Versioning env but is not a WorkerDeployment. Versioning is the controller's to grant (ADR-054); setting it here polls as a version nothing routes to." >&2
       exit 1
     fi
   fi
 
-  # --- Every versioned worker file, by glob.
-  local -a versioned_files=()
-  local f
-  for f in kubernetes/apps/order-worker-*.yaml; do
-    [[ -f "${f}" ]] && versioned_files+=("${f}")
-  done
-  if [[ ${#versioned_files[@]} -eq 0 ]]; then
-    echo "ERROR - no kubernetes/apps/order-worker-<build>.yaml found while the cutover CronJob exists; its --build-id would name a version no worker serves" >&2
-    exit 1
-  fi
-
-  local -a tags=() dep_names=() recon_enabled=()
-  local tag env_count dep_name build_id fname_build
-  for f in "${versioned_files[@]}"; do
-    tag=$(yq '.spec.values.image.tag' "${f}")
-    if [[ -z "${tag}" || "${tag}" == "null" ]]; then
-      echo "ERROR - ${f}: .spec.values.image.tag is missing" >&2
-      exit 1
-    fi
-    env_count=$(yq '.spec.values.env | length' "${f}")
-    if [[ -z "${env_count}" || "${env_count}" == "null" || "${env_count}" -eq 0 ]]; then
-      echo "ERROR - ${f}: .spec.values.env is missing or empty; the Build ID check cannot read anything" >&2
-      exit 1
-    fi
-    dep_name=$(yq '.spec.values.env[] | select(.name == "TEMPORAL_WORKER_DEPLOYMENT_NAME") | .value' "${f}")
-    build_id=$(yq '.spec.values.env[] | select(.name == "TEMPORAL_WORKER_BUILD_ID") | .value' "${f}")
-    [[ "${dep_name}" == "null" ]] && dep_name=""
-    [[ "${build_id}" == "null" ]] && build_id=""
-    if [[ -z "${dep_name}" || -z "${build_id}" ]]; then
-      echo "ERROR - ${f}: Worker Versioning env incomplete (DEPLOYMENT_NAME='${dep_name}', BUILD_ID='${build_id}')" >&2
-      exit 1
-    fi
-    if [[ "${build_id}" != "${tag}" ]]; then
-      echo "ERROR - ${f}: TEMPORAL_WORKER_BUILD_ID (${build_id}) != image.tag (${tag}). New workflows would pin to a version no worker serves and hang silently." >&2
-      exit 1
-    fi
-    # The filename is the human's copy of the Build ID; a file whose name lies
-    # about its contents defeats the one-file-per-build layout.
-    fname_build=$(basename "${f}" .yaml); fname_build=${fname_build#order-worker-}
-    if [[ "${fname_build}" != "${tag//./-}" ]]; then
-      echo "ERROR - ${f}: filename says build '${fname_build}' but image.tag is '${tag}' (expected order-worker-${tag//./-}.yaml)" >&2
-      exit 1
-    fi
-    tags+=("${tag}")
-    dep_names+=("${dep_name}")
-
-    # The reconciler is a SINGLE-JUDGE role: its scan claims nothing (no FOR
-    # UPDATE SKIP LOCKED), so two runners judge the same orders concurrently and
-    # can both act on one. Side-by-side worker builds make that easy to get
-    # wrong — every build carries the env, and leaving the old one enabled at an
-    # activation is invisible until the judgements disagree.
-    local recon
-    recon=$(yq '[.spec.values.env[] | select(.name == "ORDER_RECONCILER_ENABLED") | .value] | .[0]' "${f}")
-    if [[ "${recon}" == "true" ]]; then
-      recon_enabled+=("${tag}")
-    fi
-  done
-
-  if [[ ${#recon_enabled[@]} -ne 1 ]]; then
-    echo "ERROR - order-worker: ORDER_RECONCILER_ENABLED must be \"true\" on EXACTLY ONE build (found: ${recon_enabled[*]:-none}). It is a single-judge role; enable it on the build the cutover CronJob makes Current and disable it on every draining build." >&2
-    exit 1
-  fi
-
-  # --- The CronJob's args must actually invoke this subcommand — flag equality
-  # on a job that runs something else entirely proves nothing.
-  local arg0 subcmd
-  arg0=$(yq '.spec.jobTemplate.spec.template.spec.containers[0].args[0]' "${cutover}")
-  subcmd=$(yq '[.spec.jobTemplate.spec.template.spec.containers[0].args[] | select(. == "set-current-version")] | length' "${cutover}")
-  if [[ "${arg0}" != "temporal" || "${subcmd}" != "1" ]]; then
-    echo "ERROR - ${cutover}: args do not invoke 'temporal ... set-current-version' (args[0]='${arg0}')" >&2
-    exit 1
-  fi
-
-  local flag idx job_build_id job_dep_name flag_count
-  for flag in --build-id --deployment-name; do
-    # Exactly once: the CLI lets a LATER duplicate win, so a drifted second copy
-    # would pass a first-occurrence read while being the value that executes.
-    flag_count=$(yq "[.spec.jobTemplate.spec.template.spec.containers[0].args[] | select(. == \"${flag}\")] | length" "${cutover}")
-    if [[ "${flag_count}" != "1" ]]; then
-      echo "ERROR - ${cutover}: ${flag} must appear exactly once (found ${flag_count})" >&2
-      exit 1
-    fi
-    idx=$(yq ".spec.jobTemplate.spec.template.spec.containers[0].args | to_entries | map(select(.value == \"${flag}\")) | .[0].key" "${cutover}")
-    if [[ -z "${idx}" || "${idx}" == "null" ]]; then
-      echo "ERROR - ${cutover}: no ${flag} argument found" >&2
-      exit 1
-    fi
-    local val
-    val=$(yq ".spec.jobTemplate.spec.template.spec.containers[0].args[$((idx + 1))]" "${cutover}")
-    if [[ -z "${val}" || "${val}" == "null" ]]; then
-      echo "ERROR - ${cutover}: ${flag} has no value" >&2
-      exit 1
-    fi
-    [[ "${flag}" == "--build-id" ]] && job_build_id="${val}" || job_dep_name="${val}"
-  done
-
-  # The reconciler must be Current-build-only; compare after the CronJob is read.
-  if [[ "${recon_enabled[0]}" != "${job_build_id}" ]]; then
-    echo "ERROR - order-worker: ORDER_RECONCILER_ENABLED is \"true\" on build ${recon_enabled[0]}, but the cutover CronJob makes ${job_build_id} Current. The judge must be the Current build." >&2
-    exit 1
-  fi
-
-  local hit=0 t
-  for t in "${tags[@]}"; do [[ "${t}" == "${job_build_id}" ]] && hit=1; done
-  if [[ ${hit} -ne 1 ]]; then
-    echo "ERROR - ${cutover}: --build-id (${job_build_id}) matches no deployed versioned worker (have: ${tags[*]}). The cutover would make a version Current that no worker serves." >&2
-    exit 1
-  fi
-  for t in "${dep_names[@]}"; do
-    if [[ "${t}" != "${job_dep_name}" ]]; then
-      echo "ERROR - ${cutover}: --deployment-name (${job_dep_name}) != a worker's TEMPORAL_WORKER_DEPLOYMENT_NAME (${t})" >&2
-      exit 1
-    fi
-  done
-
-  echo "INFO - order-worker versioning: builds [${tags[*]}] consistent across manifests and the cutover CronJob (--build-id ${job_build_id}, deployment ${job_dep_name})"
+  echo "INFO - order-worker versioning: single WorkerDeployment wired to Connection '${conn_name}', no per-build manifests, no hand-set version identity"
 }
 
 # Kyverno policy behaviour. kubeconform only checks SHAPE, and it runs with
@@ -347,7 +269,7 @@ download_schemas
 validate_yaml_syntax
 validate_standalone_manifests
 validate_kustomize_overlays
-validate_worker_build_id
+validate_worker_versioning
 validate_kyverno_policies
 validate_production
 echo "INFO - All validations passed"

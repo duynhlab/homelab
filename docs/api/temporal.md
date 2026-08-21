@@ -1028,7 +1028,9 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 ### Worker Deployment Versioning (as-built)
 
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with
-Worker Deployment Versions, one worker manifest per build.
+Worker Deployment Versions. Since **RFC-0026 / ADR-054** the *mechanism* is a
+Kubernetes controller rather than a manifest per build — the routing model the
+diagram below describes is unchanged, but no human performs any step in it.
 
 The build id is not a label for humans — it is the address the server routes on.
 It gets stamped into an execution's history when the workflow starts, and from
@@ -1055,7 +1057,7 @@ sequenceDiagram
     W5->>TS: poll "I am order-fulfillment / 2.5.0"
     TS--xW5: zero tasks — Current is still 2.4.0
 
-    Note over TS: operator runs set-current-version 2.5.0
+    Note over TS: controller ramps 10% -> 50% -> Current
     API->>TS: StartWorkflow (a NEW order)
     TS->>H: stamp 2.5.0 on the new execution only
     TS-->>W5: tasks for the new order
@@ -1068,27 +1070,35 @@ sequenceDiagram
 
 Read the last three lines as the failure mode, not a footnote: a stamped
 execution whose build has no poller does not fail, it goes quiet. That is why
-`OrderSagaNotCompleting` exists, why activation is a separate deliberate step,
-and why a build is only deleted at `DRAINED`.
+`OrderSagaNotCompleting` exists, and why a build is only deleted once it is
+drained — a rule the controller now enforces with timers instead of a human
+reading `describe-version`.
 
-- The worker registers as deployment **`order-fulfillment`** build **`2.4.0`** (one manifest per pinned build; the number tracks the order release)
-  (`TEMPORAL_WORKER_DEPLOYMENT_NAME` + `TEMPORAL_WORKER_BUILD_ID`, read by
-  `pkg/temporalx`; both-or-neither, half-set refuses to start). The workflow
-  registers **`VersioningBehaviorPinned`** — a saga holding money and stock is
-  never moved onto a new build mid-flight.
-- A new build lands as a **new** `kubernetes/apps/order-worker-<build>.yaml`
-  beside the old one and receives **nothing** until an operator makes it Current
-  — verified live: a versioned worker without Current gets zero tasks, and a
-  version made Current with no pollers hangs new workflows *silently*
-  (`OrderSagaNotCompleting` is the end-to-end backstop). Activation is a
-  suspended CronJob template (`temporal-worker-set-current-version`), never a
-  reconciled Job; `make validate` fails on any drift among the worker's image
-  tag, its `BUILD_ID` env, its filename, and the CronJob's flags.
-- The old file is deleted in its own PR at **DRAINED** (versioned→versioned) or
-  at a zero visibility count of running unversioned workflows (the first
-  cycle's substitute — the unversioned worker never appears as a version row).
-  The unversioned worker was retired that way after the activation drill.
-- Full procedure: [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover).
+- The worker registers as deployment **`order/order-fulfillment`** — the
+  controller composes the server-side name as `<k8s-namespace>/<resource-name>`,
+  so it is no longer the bare `order-fulfillment` ADR-030 used. The **build id is
+  derived** by the controller from the image reference plus a hash of the pod
+  template, so it is not written down anywhere in git; read the live value from
+  `kubectl -n order get wd order-fulfillment`, whose printer columns are Current,
+  Target and Ramp %. The identity reaches the pod as `TEMPORAL_DEPLOYMENT_NAME` +
+  `TEMPORAL_WORKER_BUILD_ID`, **injected by the controller** and read by
+  `pkg/temporalx` (both-or-neither; half-set refuses to start). The workflow
+  registers **`VersioningBehaviorPinned`** in order-service — a saga holding money
+  and stock is never moved onto a new build mid-flight.
+- A new build is **one line**: the image tag in
+  [`kubernetes/apps/order-worker.yaml`](../../kubernetes/apps/order-worker.yaml),
+  a single `WorkerDeployment` that is never copied. The controller creates the new
+  versioned Deployment, registers the version, ramps `10% → 50%` with 30-second
+  pauses, and promotes it to Current — no CronJob, no `kubectl create job`, and
+  nothing to run on a freshly built cluster. `make validate` checks what is still
+  checkable: one `WorkerDeployment` wired to a `Connection` in the same file, no
+  leftover per-build manifests, and no hand-set version identity.
+- Retirement is declarative: `sunset.scaledownDelay 1h` then `deleteDelay 24h`,
+  keyed off the server's own `status.deprecatedVersions[].drainedSince` — the
+  machine-checkable gate ADR-030 recorded as follow-up 2 and nothing checked.
+- Design record: [RFC-0026](../proposals/rfc/RFC-0026/) ·
+  [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/). The historical
+  hand-run procedure is [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover).
 
 ### As-Built Notes and Roadmap
 

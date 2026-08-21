@@ -369,6 +369,46 @@ Skeleton (copy what you need):
   `MicroserviceHighLatencyP99`, `GrpcServerHighLatencyP95`) are rewritten to
   full template shape grounded in their live exprs.
 
+#### Temporal
+
+- **The Worker Controller owns the versioned-worker lifecycle; 638 lines of hand
+  operation retired** (RFC-0026 / ADR-054). Two HelmReleases land in the existing
+  `temporal` namespace and the existing `temporal-local` Kustomization — CRDs chart
+  first via `dependsOn`, the same shape as `gateway-api-crds` → `envoy-gateway` —
+  which is why no new Flux Kustomization and no new ordering rule were needed:
+  `apps-local` already `dependsOn: temporal-local` with `wait: true`, so the CRDs and
+  the manager are Ready before any `WorkerDeployment` is applied.
+  `kubernetes/apps/order-worker-2-4-0.yaml` (252) becomes
+  `kubernetes/apps/order-worker.yaml`, one `Connection` + one `WorkerDeployment` whose
+  only routine edit is the image tag; `worker-set-current-version-cronjob.yaml` (120)
+  and `scripts/new-worker-build.sh` (123) are deleted, and
+  `validate_worker_build_id()` (143) is **replaced, not dropped** — the three-way
+  build-id comparison has nothing left to compare, so `validate_worker_versioning()`
+  checks what is still reachable: no leftover per-build manifests (two writers of one
+  deployment name), a `connectionRef` that resolves, and no hand-set version identity
+  in either the versioned or the unversioned worker.
+  Chosen deliberately over the alternatives, each rejected for a stated reason:
+  `strategy: Manual` would have left K1.7 in place (*"requires manual intervention to
+  promote versions"*), and `unsafeCustomBuildID` pinned to the image tag would have
+  made a release edit two lines to preserve an invariant whose only consumer was a
+  human correlating a filename with a server version. So the build id is **derived**
+  from the pod template and written down nowhere; `service.version` reads the
+  controller's `temporal.io/build-id` label through a `fieldRef` rather than being
+  typed, or the one-line claim would be false. `rollout: Progressive` with two 30s
+  pauses (the CEL floor) stays inside `apps-local`'s `timeout: 10m` — a longer
+  schedule would fail the whole app wave, because `WorkerDeployment` reports a
+  standard `Ready` condition that Flux's kstatus waits on.
+  Two behaviour changes recorded rather than buried: the saga now registers as
+  **`order/order-fulfillment`** (the controller composes
+  `<k8s-namespace>/<resource-name>`), safe only because the drain set is empty on a
+  cluster rebuilt from zero — the same condition that justified deleting `1-13-2`; and
+  one pod template serves every live version, so `ORDER_RECONCILER_ENABLED` can no
+  longer be `false` on a draining build. Measured, not assumed: order-service documents
+  concurrent reconciler scans as *"SAFE but noisy"* (a duplicated repair counter, not a
+  wrong action) and the dispatchers claim with `FOR UPDATE SKIP LOCKED`. While here,
+  **`ORDER_START_DISPATCHERS_ENABLED` is finally wired** — the flag ADR-030's follow-up
+  asked for shipped in order-service on 2026-08-04 (#172) and homelab had never set it.
+
 #### Local-stack
 
 - **The compose gate learns the ADR-053 rows, and the local edge catches up to

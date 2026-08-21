@@ -1,0 +1,112 @@
+# Temporal Worker Controller — the manager (RFC-0026 / ADR-054).
+#
+# Owns the versioned-worker lifecycle that ADR-030 ran by hand: it derives the
+# build id, creates one Deployment per Worker Deployment Version, moves
+# Current/Ramping through the Temporal API according to the WorkerDeployment's
+# rollout policy, and deletes a version once the server reports it drained. The
+# suspended set-current-version CronJob and scripts/new-worker-build.sh are
+# retired by this release, not coexisting with it.
+#
+# Lives in the `temporal` namespace and in the temporal-local Kustomization on
+# purpose: apps-local already dependsOn temporal-local with wait: true, so the
+# CRDs and this manager are Ready before any WorkerDeployment is applied. No new
+# Kustomization and no new ordering rule were needed.
+#
+# Requires Temporal server >= 1.29.1 (we run 1.31.2 — see helmrelease.yaml) and
+# cert-manager for the WorkerResourceTemplate validating webhook, which is always
+# on regardless of `webhook.enabled`.
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: temporal-worker-controller
+  namespace: temporal
+spec:
+  dependsOn:
+    # CRDs before the manager, or the manager crash-loops on missing kinds.
+    - name: temporal-worker-controller-crds
+      namespace: temporal
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: temporal-worker-controller-oci
+    namespace: flux-system
+  releaseName: temporal-worker-controller
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # ONE replica, not the chart's default 2. Kind is a single node, so a second
+    # manager buys no availability — it only competes for the CPU this platform
+    # has repeatedly had to reclaim. Revisit on multi-node (RFC-0011).
+    replicas: 1
+
+    # cert-manager is already deployed and issues from the homelab-ca root, so the
+    # bundled subchart stays off while the chart still creates the Issuer +
+    # Certificate the webhook needs.
+    certmanager:
+      install: false
+      enabled: true
+
+    # The namespace comes from controllers/namespaces.yaml, the single source of
+    # truth for namespaces in this repo.
+    namespace:
+      create: false
+
+    metrics:
+      enabled: true
+      # No auth proxy. disableAuth: false would inject a kube-rbac-proxy sidecar
+      # (registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.14.1) to authorize every
+      # scrape — and nothing scrapes this endpoint: the chart's own prometheus
+      # integration is marked "not yet supported", so there is no ServiceMonitor
+      # to add. That sidecar would be a second container and a stale third-party
+      # image guarding a port with no reader. Same call the VictoriaMetrics
+      # operator release makes about its admission webhooks in local dev.
+      disableAuth: true
+
+    # The OPTIONAL WorkerDeployment validating webhook. Left off (chart default):
+    # the CRD's own CEL rules already reject the mistakes that matter — Progressive
+    # without steps, rampPercentage outside 1..99, pauseDuration under 30s — and
+    # `make validate` never sees an admission webhook, so a rule enforced only
+    # there would pass CI and fail the cluster. The WorkerResourceTemplate webhook
+    # is always on and is unaffected by this flag.
+    webhook:
+      enabled: false
+
+    # Which resource kinds a WorkerResourceTemplate may embed. This value drives
+    # BOTH the webhook allow-list and the controller's RBAC, so it is the single
+    # place autoscaling gets unblocked: ADR-055 adds
+    #   - kinds: ["ScaledObject"], apiGroups: ["keda.sh"], resources: ["scaledobjects"]
+    # here. Left at the chart default until then — an unused grant is still a
+    # grant.
+    workerResourceTemplate:
+      allowedResources:
+        - kinds: ["HorizontalPodAutoscaler"]
+          apiGroups: ["autoscaling"]
+          resources: ["horizontalpodautoscalers"]
+
+    # PSS baseline is what applies here (pss-restricted-apps is disabled
+    # platform-wide since 2026-08-17, and it only ever matched app namespaces).
+    # The chart already sets runAsNonRoot and drops ALL capabilities; this turns on
+    # its seccomp toggle rather than overriding the whole block, which would mean
+    # guessing at readOnlyRootFilesystem against a webhook that writes its serving
+    # certs under /tmp.
+    securityContext:
+      seccompProfile:
+        enabled: true
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        # No cpu limit change from the chart: a reconcile burst that gets throttled
+        # shows up as a rollout that stalls mid-ramp, which is the one failure this
+        # controller exists to remove.
+        cpu: 500m
+        memory: 128Mi

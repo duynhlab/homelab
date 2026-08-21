@@ -1823,6 +1823,28 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **`edge-isolation-sweep.sh --live` invents failures *and* manufactures passes;
+  improved, not fixed.** On a settled cluster — all pods 17–19 minutes old, 0
+  restarts, every Service carrying endpoints — two runs a minute apart produced
+  **inverted** failing sets: first `cart, order, review` closed with eight others
+  open, then those three open and eight different ones closed. The probe was
+  `nc -z -w 3 <ns>.<ns>.svc.cluster.local <port>`, run sequentially ~13 times with
+  each probe paying its own DNS lookup, so it conflated **"slower than 3s"** with
+  **"port closed"**.
+  Now it resolves the name once, probes the address, retries three times with a
+  5s budget, and reports `unresolved` as its own verdict — DNS never answering is
+  an infrastructure fault, not a policy result, and reporting it as `closed` is
+  precisely how this gate invented failures. That **reduced but did not remove**
+  the nondeterminism: the next pair of runs gave 12/12 PASS, then 2 spurious
+  failures.
+  **The more dangerous direction is the one that looks fine.** In one run
+  `inventory:9090` reported `closed` and scored a **PASS** — on kindnet, where no
+  NetworkPolicy controller exists, that port is reachable and the honest output is
+  the `SKIP` banner. A flaky probe that happens to match a deny expectation
+  fabricates evidence of isolation. K3.5 now carries a ⚠️ saying `--live` is
+  **informational only** and must not be read as a green, with the measurements
+  above; manifest mode remains the only isolation evidence Kind can give.
+
 - **`require-probes` reported `error` instead of a verdict for any Pod with no
   ownerReferences.** The precondition measured
   `request.object.metadata.ownerReferences[?kind=='Job'] | length(@)`; with the

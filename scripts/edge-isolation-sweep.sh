@@ -67,16 +67,44 @@ manifest_sweep() {
 
 live_sweep() {
   echo "== live mode: TCP probes from the envoy-gateway namespace"
-  local script=""
+  # `nc -z -w 3` conflated "slower than 3s" with "port closed", and every probe
+  # pays for its own DNS lookup of <ns>.<ns>.svc.cluster.local. Run sequentially
+  # on a freshly built cluster that is enough to lose several probes per run --
+  # measured 2026-08-21: two runs a minute apart on pods 17-19 minutes old with 0
+  # restarts reported completely DIFFERENT, in fact inverted, failing sets
+  # (cart/order/review closed, then those three open and eight others closed).
+  # A gate that invents failures is no better than one that hides them.
+  #
+  # So: resolve the name once and probe the ADDRESS, take three attempts, and
+  # give each a 5s budget. Report "closed" only when all three fail, and say
+  # "unresolved" when DNS itself never answered -- that is a different fault from
+  # a refused connection and must not be reported as one.
+  local probe_fn='probe() {
+    ns="$1"; port="$2"; host="$3"
+    ip=""
+    for _ in 1 2 3; do
+      ip=$(nslookup "$host" 2>/dev/null | awk "/^Address: /{print \$2; exit}")
+      [ -n "$ip" ] && break
+      sleep 1
+    done
+    if [ -z "$ip" ]; then echo "PROBE $ns $port unresolved"; return; fi
+    for _ in 1 2 3; do
+      if nc -z -w 5 "$ip" "$port" >/dev/null 2>&1; then echo "PROBE $ns $port open"; return; fi
+      sleep 1
+    done
+    echo "PROBE $ns $port closed"
+  };'
+
+  local script="$probe_fn"
   for pair in $EDGE_ALLOWS; do
     ns="${pair%%:*}" port="${pair##*:}"
     host="$ns.$ns.svc.cluster.local"
     [ "$ns" = "identity" ] && host="keycloak.identity.svc.cluster.local"
-    script+="nc -z -w 3 $host $port >/dev/null 2>&1 && echo \"PROBE $ns $port open\" || echo \"PROBE $ns $port closed\";"
+    script+="probe $ns $port $host;"
   done
   for pair in $EDGE_DENIES; do
     ns="${pair%%:*}" port="${pair##*:}"
-    script+="nc -z -w 3 $ns.$ns.svc.cluster.local $port >/dev/null 2>&1 && echo \"PROBE $ns $port open\" || echo \"PROBE $ns $port closed\";"
+    script+="probe $ns $port $ns.$ns.svc.cluster.local;"
   done
 
   # Read the pod's LOGS rather than attaching. `kubectl run -i` streams over an
@@ -122,7 +150,12 @@ live_sweep() {
     probes=$((probes + 1))
     want=open
     case " $EDGE_DENIES " in *" $ns:$port "*) want=closed ;; esac
-    if [ "$verdict" = "$want" ]; then
+    if [ "$verdict" = unresolved ]; then
+      # DNS never answered. That is an infrastructure fault, not a policy
+      # verdict, and calling it "closed" is how this sweep used to invent
+      # failures. Fail loudly, but say which fault it is.
+      fail "live: $ns:$port -> DNS did not resolve (not a policy result; check CoreDNS)"
+    elif [ "$verdict" = "$want" ]; then
       pass "live: $ns:$port -> $verdict"
     elif [ "$want" = closed ] && [ "$unenforced" = 1 ]; then
       printf "SKIP  live: %s:%s -> open, unenforceable on this CNI\n" "$ns" "$port"

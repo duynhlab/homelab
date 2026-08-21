@@ -35,6 +35,7 @@ so the highest-value Kyverno features are:
 | 16 | Kyverno CLI `test` | ✅ | 3 | Gate in this repo — `make validate` + the `validate` CI job; CLI pinned to the engine (v1.18.2) |
 | 17 | Reports server | ❌ | — | KinD scale doesn't need it |
 | 18 | Namespaced `Policy` | ✅ when needed | — | Most rules are ClusterPolicy |
+| 19 | Tracing (OTLP) | ❌ not adopted — blocked upstream of Kyverno | 3 | Metrics already answer "which policy is slow"; spans would arrive as orphan roots until **API server tracing** is enabled. [Full reasoning](#why-tracing-is-not-adopted) |
 
 **Skipped on purpose**: full `kyverno-policies` chart (avoid implicit policies),
 ConfigMap/Secret generation (handled by Flux), reports server (KinD scale).
@@ -200,13 +201,66 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
   VictoriaLogs (`namespace:"kyverno"`). Only `level` is lifted to a queryable
   field; promoting other JSON keys would need a container-scoped merge branch in
   Vector's `add_labels`, as the Envoy access log has — a known gap, not done.
-- **Tracing**: not enabled. The chart exposes `tracing.*` and the collector is
-  reachable at `otel-collector-opentelemetry-collector.monitoring.svc:4317`;
-  adopting it would show per-policy latency inside admission. Deliberately out of
-  scope for now.
+- **Tracing**: **not enabled, and the reason is not cost** — see
+  [Why tracing is not adopted](#why-tracing-is-not-adopted) after this list.
 - **Reports**: Aggregate via `kubectl get policyreport -A`. A policy-reporter UI
   at `kyverno.duynh.me` is planned but **not deployed** — no HelmRelease, no
   HTTPRoute, and the hostname is absent from `scripts/setup-hosts.sh`
+
+### Why tracing is not adopted
+
+Recorded because the question keeps coming back, and because the first version of
+this note answered it wrongly.
+
+**The reason is not span volume or effort. It is that there is nothing for the
+spans to attach to.**
+
+Tracing earns its cost when a span can be *correlated* — when the admission call
+is one segment of a larger request's trace. Nothing on this cluster puts trace
+context into an admission request:
+
+| Producer | Emits traces? |
+|---|---|
+| Envoy Gateway (edge) | ✅ OTLP gRPC to the collector |
+| Keycloak | ✅ `KC_TRACING_ENABLED` |
+| The 10 Go services | ✅ via `pkg/obsx` |
+| **Kubernetes API server** | ❌ no `TracingConfiguration` in `scripts/kind-up.sh` or `clusters/local/` |
+| **Flux / `kubectl`** | ❌ do not propagate trace context into admission |
+
+So Kyverno spans would arrive as **orphan roots** — a pile of parentless spans
+that join nothing.
+
+**And the question tracing was going to answer is already answered.** The first
+version of this note claimed tracing would "show per-policy latency inside
+admission". It would, but so do the metrics that shipped in the same train, with
+percentiles and eight dimensions:
+
+```promql
+histogram_quantile(0.99,
+  sum by (le, policy_name, rule_name) (
+    rate(kyverno_policy_execution_duration_seconds_bucket[5m])
+  )
+)
+```
+
+`kyverno_policy_execution_duration_seconds` carries `policy_name`, `rule_name`,
+`rule_type`, `rule_result`, `resource_kind`, `policy_validation_mode`, `dry_run`
+and `rule_execution_cause`. For "which policy is slow, on which kind", an
+aggregate histogram is the better instrument, not the worse one.
+
+**The prerequisite, if this is ever revisited:** enable API server tracing
+(`TracingConfiguration` pointing at
+`otel-collector-opentelemetry-collector.monitoring.svc:4317`) *first*. Until
+admission is part of a real trace, Kyverno tracing adds a surface to audit and
+returns spans nobody can follow.
+
+**And when it is enabled, mind the nesting.** Chart 3.8.2 defines `tracing:`
+**four times — once per controller** (`admissionController`,
+`backgroundController`, `cleanupController`, `reportsController`), exactly like
+`serviceMonitor`. Setting it at the top level of `values` is accepted by Helm and
+silently ignored — the failure that left this cluster with zero ServiceMonitors
+while the manifest read as if metrics were solved. Verify against the rendered
+Deployment, never the values file.
 
 ## References
 
@@ -216,6 +270,6 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
 
 ---
 
-_Last updated: 2026-08-21 — CLI `test` row flipped to adopted: policy fixtures live at `configs/kyverno/tests/` and run in `make validate` + the `validate` CI job, with the CLI pinned to the engine (v1.18.2). Their first run found `require-probes` reporting `error` rather than a verdict for Pods with no ownerReferences._
+_Last updated: 2026-08-21 — added row 19 (Tracing, not adopted) and a **Why tracing is not adopted** section: the blocker is upstream of Kyverno (no API server `TracingConfiguration`, so spans would be orphan roots), and the per-policy latency question tracing was going to answer is already answered by `kyverno_policy_execution_duration_seconds`, which carries `policy_name` + `rule_name`. Also records that the chart defines `tracing:` per controller, the same nesting trap that left the cluster with zero ServiceMonitors. Previously — CLI `test` row flipped to adopted: policy fixtures live at `configs/kyverno/tests/` and run in `make validate` + the `validate` CI job, with the CLI pinned to the engine (v1.18.2). Their first run found `require-probes` reporting `error` rather than a verdict for Pods with no ownerReferences._
 
 _2026-08-19 — adoption matrix trued up: Mutate is not deployed, VAP is no longer version-blocked (Kind v1.34.3), planned rows (Cosign, Policy Reporter UI, CLI test) marked ⏳ not-deployed; architecture diagram moved to the house palette._

@@ -79,21 +79,63 @@ live_sweep() {
     script+="nc -z -w 3 $ns.$ns.svc.cluster.local $port >/dev/null 2>&1 && echo \"PROBE $ns $port open\" || echo \"PROBE $ns $port closed\";"
   done
 
-  # No pipe into while: a piped while runs in a subshell and FAIL=1 would be
-  # lost (same harness-lies trap db-isolation-sweep.sh guards against).
-  local out
-  out=$(kubectl run edge-isolation-sweep --rm -i --restart=Never -n envoy-gateway \
-    --image=busybox:1.37.0 --command -- sh -c "$script" 2>/dev/null)
+  # Read the pod's LOGS rather than attaching. `kubectl run -i` streams over an
+  # attach, and an attach loses output when the container writes a burst and then
+  # exits — measured in db-isolation-sweep.sh, where it silently dropped one
+  # verdict per run. No pipe into while either: a piped while runs in a subshell
+  # and FAIL=1 would be lost.
+  local out pod="edge-isolation-sweep-$$" probes=0 expected=0
+  for pair in $EDGE_ALLOWS $EDGE_DENIES; do expected=$((expected + 1)); done
+  kubectl run "$pod" --restart=Never -n envoy-gateway \
+    --image=busybox:1.37.0 --command -- sh -c "$script" >/dev/null 2>&1
+  kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$pod" -n envoy-gateway --timeout=120s >/dev/null 2>&1
+  out=$(kubectl logs "pod/$pod" -n envoy-gateway 2>/dev/null)
+  kubectl delete "pod/$pod" -n envoy-gateway --wait=false >/dev/null 2>&1
+
+  # Does this cluster enforce NetworkPolicy at all? Answer that BEFORE reading any
+  # deny result, because if it does not, every deny probe reports "open" and the
+  # sweep would blame the manifests for the CNI's behaviour.
+  #
+  # Kind's default CNI is kindnet, which ships no NetworkPolicy controller.
+  # Measured on Kind 2026-08-21: a pod in `user` reached `inventory:8080`, which
+  # `allow-inventory-protected-http` grants to envoy-gateway ONLY, in a namespace
+  # that also carries `deny-all-ingress`. The policies are correct and simply not
+  # applied.
+  local denies_open=0 cni unenforced=0
   while read -r tag ns port verdict; do
     [ "$tag" = "PROBE" ] || continue
+    case " $EDGE_DENIES " in *" $ns:$port "*) [ "$verdict" = open ] && denies_open=1 ;; esac
+  done <<<"$out"
+  cni=$(kubectl -n kube-system get pods -o name 2>/dev/null | grep -oE 'kindnet|calico|cilium' | head -1)
+  if [ "$denies_open" = 1 ] && [ "${cni:-kindnet}" = "kindnet" ]; then
+    unenforced=1
+    echo "SKIP  live: NetworkPolicy is NOT ENFORCED here (CNI: ${cni:-kindnet})."
+    echo "      kindnet ships no NetworkPolicy controller, so every deny probe answers"
+    echo "      'open' whatever the manifests say. The allow probes below still mean"
+    echo "      something; the deny probes do not. THIS GATE DOES NOT PROVE NETWORK"
+    echo "      ISOLATION — manifest mode above is the only isolation evidence Kind"
+    echo "      can give. Swap in Calico or Cilium to get more."
+  fi
+
+  while read -r tag ns port verdict; do
+    [ "$tag" = "PROBE" ] || continue
+    probes=$((probes + 1))
     want=open
     case " $EDGE_DENIES " in *" $ns:$port "*) want=closed ;; esac
     if [ "$verdict" = "$want" ]; then
       pass "live: $ns:$port -> $verdict"
+    elif [ "$want" = closed ] && [ "$unenforced" = 1 ]; then
+      printf "SKIP  live: %s:%s -> open, unenforceable on this CNI\n" "$ns" "$port"
     else
       fail "live: $ns:$port -> got=$verdict want=$want"
     fi
   done <<<"$out"
+
+  # Silence is not success: every probe must come back with a verdict.
+  if [ "$probes" -ne "$expected" ]; then
+    fail "live: parsed $probes probes, expected $expected — the sweep is not fully verified"
+    [ "$probes" -eq 0 ] && echo "      (no output at all: is the kubectl context set and the cluster up?)"
+  fi
 }
 
 manifest_sweep

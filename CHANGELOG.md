@@ -1337,6 +1337,27 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`kyverno.md` said tracing would show per-policy latency. It would, and the
+  metrics already do.** The note written in #855 gave the wrong reason for a
+  correct decision, so anyone re-opening the question would have re-opened it on a
+  false premise. `kyverno_policy_execution_duration_seconds` carries `policy_name`,
+  `rule_name`, `rule_type`, `rule_result`, `resource_kind`,
+  `policy_validation_mode`, `dry_run` and `rule_execution_cause` — for "which
+  policy is slow, on which kind", an aggregate histogram with percentiles is the
+  better instrument, not the worse one.
+  The real blocker sits **upstream of Kyverno**: tracing pays for itself through
+  correlation, and nothing here puts trace context into an admission request.
+  `scripts/kind-up.sh` and `clusters/local/` configure no API server
+  `TracingConfiguration`, and Flux and `kubectl` do not propagate context — so
+  Kyverno spans would arrive as **orphan roots** joining nothing. The edge,
+  Keycloak and the ten Go services are traced; the Kubernetes control plane is
+  not. New row 19 in the adoption matrix plus a **Why tracing is not adopted**
+  section record the prerequisite (enable API server tracing first) and the trap
+  for whoever does it: chart 3.8.2 defines `tracing:` **four times, once per
+  controller**, exactly like `serviceMonitor` — setting it at the top level is
+  accepted and silently ignored, which is the failure that left this cluster with
+  zero ServiceMonitors while the manifest read as solved.
+
 - **Two worker log lines on a fresh cluster read as defects and are not, and the
   Kustomization count method started over-counting.** All three found during the
   2026-08-21 rebuild; the first two were flagged by a reader, which is exactly why

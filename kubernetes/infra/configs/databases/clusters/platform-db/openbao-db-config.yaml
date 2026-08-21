@@ -46,8 +46,20 @@ spec:
           env:
             - name: HOME
               value: /tmp
+            # MUST be the active node, not the round-robin `openbao` Service.
+            # This Job WRITES; `openbao` selects all three pods (no
+            # `openbao-active` label in its selector), so two requests in three
+            # land on a standby. A standby answers a write with a 307 to the
+            # active node's POD IP, which this client cannot follow — the request
+            # hangs to the context deadline instead of failing. Measured on Kind:
+            # `database/config/platform-db` succeeded (lucky pod) and the
+            # `static-roles/notification` write immediately after it timed out,
+            # repeatedly, across three restarts. Same class as the bootstrap Job's
+            # standby hang (#793), which was fixed by pinning to a pod; this one
+            # was missed. `openbao-active` carries exactly one endpoint — the pod
+            # labelled `openbao-active: "true"`.
             - name: BAO_ADDR
-              value: http://openbao.openbao.svc.cluster.local:8200
+              value: http://openbao-active.openbao.svc.cluster.local:8200
           command:
             - sh
             - -c
@@ -78,10 +90,18 @@ spec:
               done
 
               echo "Writing static-role notification (rotate the fixed role's password)..."
-              bao write database/static-roles/notification \
+              # Retried for the same reason the config write above is: a leader
+              # election DURING this Job moves the active node, and the next write
+              # would hang rather than error. The address fix removes the
+              # steady-state race; this removes the mid-run one.
+              n=0
+              until bao write database/static-roles/notification \
                 db_name=platform-db \
                 username="notification" \
-                rotation_period="720h"
+                rotation_period="720h"; do
+                n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role notification failed after 60s"; exit 1; }
+                echo "  static-role write failed, retry 5s..."; sleep 5
+              done
 
               echo "openbao-db-config complete: static-role notification ready."
           resources:

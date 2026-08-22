@@ -411,6 +411,26 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **Every HTTP-shaped row of the compose gate is now a k6 assertion**, and the
+  Kind runbook stops carrying two descriptions of the same row. Five new scripts
+  under [`scripts/k6/`](scripts/k6/) — `staff.js` (A17–A19, A21), `operator.js`
+  (A20), `session.js` (A4/A5), `observability.js` (C17–C20) — plus A2/A3/A7/A11
+  and the cluster's K5.3–K5.9 folded into `smoke.js`, with `make e2e-staff`,
+  `e2e-operator`, `e2e-session`, `e2e-observability`. Every one of the 15 compose
+  rows turned out to be **pure HTTP**: none needs `psql`, `valkey-cli` or
+  `docker compose exec`, so the arming the runbook warns about belongs entirely
+  to the rows left alone. `curl` in the Kind audit drops **32 → 13**, and the 13
+  that remain are the rows the suite does not cover (GHCR pre-cluster, MCP 💤,
+  the K5.1 traffic drive) plus a new **Diagnostics** section holding the
+  hand-driven forms worth keeping. Two shared libraries came out of it:
+  `lib/funnel.js`, because four scripts drove the checkout funnel and shared one
+  bug, and `lib/dashboards.js` for the reference check both gates need.
+  **Verification is uneven and labelled as such:** every script passes against the
+  cluster (46/46 on the staff surface, 26/26 on the operator row, 11/11 on the
+  session rows), but nothing has yet run on compose itself — the podman VM had 3G
+  free with the cluster up. `observability.js` asserts local-stack's exact
+  provisioned set and refuses to run elsewhere.
+
 - **Both E2E gates can now fail.** A k6 suite in
   [`scripts/k6/`](scripts/k6/) expresses each HTTP-shaped audit row as a check
   with a per-row `rate==1.0` threshold, so a bad row exits non-zero and prints
@@ -1247,6 +1267,32 @@ Skeleton (copy what you need):
   explicitly validates the chain-excluded `controllers/keycloak` overlay.
 
 ### Bugfix
+
+#### Local-stack
+
+- **A checkout session can be adopted, and four scripts assumed it could not.**
+  Creating a session answers 201 with a new one but **200 with the existing one**
+  when that identity already has an open session, since the services hold one per
+  user as a partial unique index. A run that left a session behind handed the next
+  run a session built from a different cart, so a price assertion measured the
+  wrong basket and failed as "the total is not what I engineered" — which reads
+  like a pricing bug in the platform. `lib/funnel.js` now populates the cart
+  first and treats a 200 as somebody else's session. The audit's shell rows guard
+  this by probing *before* populating the cart, which cannot work: an empty cart
+  answers `409 Cart is empty`, so the probe never sees what it is looking for.
+- **The evidence table said a row failed and nothing said why.** `handleSummary`
+  replaces stdout, which takes k6's own per-check listing with it, so a failed row
+  reported a count and no names. It now prints the failing assertions.
+- **K5.7 had never been run on a cluster, and three dashboards are broken.**
+  `flux-cluster` and `cloudnative-pg` hard-code `"uid": "prometheus"` in panels
+  while declaring a `DS_PROMETHEUS` variable, and no datasource carries that uid
+  or name; `_hAsuzBnz` names an upstream uid that arrived with a vendored board.
+  Their panels render `Datasource … was not found` behind a green 200 — exactly
+  what the row exists to catch. Recorded as an open finding; the row is expected
+  to fail until they are fixed. The check itself needed one correction first: it
+  counted only uids as live and flagged two working boards that reference a
+  datasource by display name, which Grafana resolves. The section also claims 34
+  dashboard CRs while the cluster serves 41.
 
 #### Observability
 

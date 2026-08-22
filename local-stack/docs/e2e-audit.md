@@ -174,16 +174,35 @@ already mint their own for this reason.
 
 ## Phase A — API contract (curl, ~10 min hands-on)
 
-> **A k6 suite now asserts these rows on the cluster, and is staged for compose.**
-> [`scripts/k6/`](../../scripts/k6/) expresses each HTTP-shaped row as a check
-> with a per-row threshold, so a failed row exits non-zero instead of scrolling
-> past ([ADR-056](../../docs/proposals/adr/ADR-056-k6-e2e-assertion-layer/),
-> [`docs/testing/k6.md`](../../docs/testing/k6.md)). On this gate it currently
-> covers the token-claims and telemetry-coverage rows via
-> `make e2e GATE=compose`; **A2–A5, A7, A11 and A17–A21 are still hand-run here**
-> and are named as staged work in ADR-056 rather than quietly assumed converted.
-> Porting the equivalent rows to the cluster gate found two that could not pass as
-> written, so expect the same when the rest move.
+> **These rows are asserted by a k6 suite.** [`scripts/k6/`](../../scripts/k6/)
+> expresses each HTTP-shaped row as a check with a per-row threshold, so a failed
+> row exits non-zero and prints the evidence table this document asks you to fill
+> in by hand ([ADR-056](../../docs/proposals/adr/ADR-056-k6-e2e-assertion-layer/),
+> [`docs/testing/k6.md`](../../docs/testing/k6.md)).
+>
+> | Rows | Command |
+> |---|---|
+> | A1, A2, A3, A7, A11 | `make e2e-smoke GATE=compose` |
+> | A4, A5 | `make e2e-session` — separate because A4 kills the realm session on purpose |
+> | A17, A18, A19, A21 | `make e2e-staff` |
+> | A20 | `make e2e-operator` |
+> | C6, C16, C17, C18, C19, C20, C21 | `make e2e-smoke GATE=compose`, `make e2e-observability` |
+>
+> **How far this has been verified, precisely.** Every one of these scripts has
+> been run against the **cluster** and passes there — 46/46 assertions on the
+> staff surface, 26/26 on the operator row, 11/11 on the session rows. What has
+> **not** been exercised is this environment: the localhost ports, plain HTTP,
+> and local-stack's own Grafana provisioning. `observability.js` in particular
+> asserts local-stack's exact provisioned set (five datasources, eighteen
+> dashboard uids) and refuses to run anywhere else, so it has only been checked
+> for parse and imports. Treat a first compose run as the verification it is, and
+> expect to find something: porting these rows to the cluster turned up two that
+> could not pass as written and three dashboards whose datasource references
+> resolve to nothing.
+>
+> The rows this suite does **not** cover stay exactly as written below: A6, A8,
+> A9, A10, A12–A16 need `psql`, `valkey-cli`, `docker compose exec` or the
+> Temporal CLI, and Phase B is a browser.
 
 
 Timing is dominated by waits, not by typing: A10 sleeps 13s, A12 polls up to 24s,

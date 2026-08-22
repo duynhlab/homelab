@@ -24,6 +24,8 @@ const PRESETS = {
     pyroscope: 'http://localhost:4040',
     vtraces: 'http://localhost:10428',
     vmalert: 'http://localhost:8880',
+    vmagent: 'http://localhost:8429',
+    logs: 'http://localhost:9428',
     redirect: { customer: 'http://localhost:3001/', staff: 'http://localhost:3009/' },
     // gateway/eg/backendtrafficpolicy.yaml: one Envoy process, 50/Second.
     rateCeiling: 50,
@@ -37,6 +39,9 @@ const PRESETS = {
     pyroscope: 'https://pyroscope.duynh.me',
     vtraces: 'https://victoriatraces.duynh.me',
     vmalert: 'https://vmalert.duynh.me',
+    // No route by design; reach it with a port-forward and override VMAGENT.
+    vmagent: 'http://localhost:8429',
+    logs: 'https://logs.duynh.me',
     redirect: { customer: 'https://local.duynh.me/', staff: 'https://backoffice.duynh.me/' },
     // policies/btp-api.yaml requests-per-Second x data-plane replicas
     // (25 x 2). Keep this in step with that manifest; a stale number here
@@ -61,6 +66,8 @@ export const target = {
   pyroscope: __ENV.PYROSCOPE || preset.pyroscope,
   vtraces: __ENV.VTRACES || preset.vtraces,
   vmalert: __ENV.VMALERT || preset.vmalert,
+  vmagent: __ENV.VMAGENT || preset.vmagent,
+  logs: __ENV.LOGS || preset.logs,
   redirect: preset.redirect,
   rateCeiling: preset.rateCeiling,
 };

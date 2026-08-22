@@ -232,7 +232,11 @@ the tag exists; running it earlier audits the previous release.
   the gap closed. Assert it rather than assume it:
   ```bash
   for t in $(grep -h 'image_tag:' kubernetes/apps/services/*.yaml | grep -oE '"[0-9.]+"' | tr -d '"'); do echo "$t"; done
-  arch_legs ghcr.io/duynhlab/order-service/order-service 2.4.0   # want amd64 AND arm64
+  # The worker's tag is NOT in that glob — it lives in the WorkerDeployment, so
+  # read it from there rather than hardcoding what this file was last updated with.
+  WT=$(yq 'select(.kind == "WorkerDeployment") | .spec.template.spec.containers[0].image' \
+       kubernetes/apps/order-worker.yaml | cut -d: -f2)
+  arch_legs ghcr.io/duynhlab/order-service/order-service "$WT"   # want amd64 AND arm64
   ```
   **FAIL:** any pinned first-party tag missing `linux/arm64`. On an arm64 node
   that is not a degraded pod — nothing starts at all, and for the worker the
@@ -448,17 +452,22 @@ cannot be derived from a single file — they get their own row (K2.3).
     through the 2026-08-17 run. **That skew is now closed** and both moved
     together through the multi-arch re-pin. Treat any future gap as a finding to
     file, not to fix in place.
-  - **`order-worker` cannot be re-tagged at all.** `order-worker-2-4-0.yaml` pins
-    `order-service:2.4.0`, and `scripts/flux-validate.sh`'s
-    `validate_worker_build_id` enforces `TEMPORAL_WORKER_BUILD_ID` == the file's
+  - **`order-worker` is re-tagged in place now, and that is the change.** Until
+    2026-08-21 it could not be: `order-worker-2-4-0.yaml` pinned
+    `order-service:2.4.0` and `scripts/flux-validate.sh`'s
+    `validate_worker_build_id` enforced a four-way equality — env `BUILD_ID` ==
     `image.tag` == the build id in the filename == the cutover CronJob's
-    `--build-id`. The Temporal server pins every workflow to the version that
-    started it, so a bump in place strands this version's pinned workflows with no
-    pollers — and it fails **silently**: no error, no failed activity, just orders
-    that never leave pending. A new build lands as a new
-    `order-worker-<build>.yaml` side by side, is activated by a separate
-    deliberate step, and the old file is deleted only once its version shows
-    `DRAINED` (ADR-030; RFC-0021 `cutover-rollback.md`).
+    `--build-id` — because a bump in place stranded that version's pinned workflows
+    with no pollers, and it failed **silently**: no error, no failed activity, just
+    orders that never left pending.
+    Since [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) the
+    controller derives the build id from the pod template, so editing the tag in
+    `kubernetes/apps/order-worker.yaml` mints a NEW version beside the old one
+    rather than replacing it — the stranding shape is gone by construction. There
+    is no filename, no CronJob and no env copy left to disagree, so the four-way
+    check is retired; `validate_worker_versioning` now asserts what remains
+    reachable (no leftover per-build manifests, a resolvable `connectionRef`, no
+    hand-set version identity).
     `make validate` covers the equality; assert here that it still ran:
     `./scripts/flux-validate.sh 2>&1 | tail -1   # want "INFO - All validations passed"`
     This freeze is also why the tag is amd64-only — see
@@ -790,6 +799,58 @@ breaks a command copied from the Compose audit:
   the `admin-cidr-internal` SecurityPolicy (deny by default, private CIDRs only),
   so a 403 from *outside* a private CIDR is the policy working.
 
+- [ ] **K4.10** **An order completes, and nobody touched anything to make it.**
+  Added 2026-08-22 with [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/).
+  Until then **no row in this audit confirmed an order** — K4.6 signed in and looked at
+  a catalog, and K5's preamble opened a checkout session without confirming it. So the
+  whole gate could go green while the order saga had never run on a cluster, which is
+  precisely what the Worker Controller changed and therefore what is most worth proving.
+  The Compose audit has this as A10; the cluster had nothing.
+  ```bash
+  CA=/tmp/homelab-ca.crt
+  kubectl -n cert-manager get secret homelab-ca-secret -o jsonpath='{.data.tls\.crt}' | base64 -d > $CA
+  AT=$(KC_URL=https://id.duynh.me KC_CACERT=$CA KC_REDIRECT=https://local.duynh.me/ \
+       USERNAME=alice PASSWORD=password123 local-stack/scripts/keycloak-token.sh | tail -1)
+  B=https://gateway.duynh.me
+  curl -sk -o /dev/null -X DELETE $B/cart/v1/private/cart -H "Authorization: Bearer $AT"
+  curl -sk -o /dev/null -X POST $B/cart/v1/private/cart -H "Authorization: Bearer $AT" \
+    -H 'Content-Type: application/json' \
+    -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
+  SID=$(curl -sk -X POST $B/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT" \
+        | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+  curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/address \
+    -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' \
+    -d '{"full_name":"Alice","line1":"1 Main St","city":"HN","country":"VN"}'
+  curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/shipping \
+    -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' -d '{"shipping_method":"standard"}'
+  curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/payment \
+    -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' -d '{"payment_method_token":"tok_visa_ok"}'
+  OID=$(curl -sk -X POST $B/checkout/v1/private/checkout/sessions/$SID/confirm \
+        -H "Authorization: Bearer $AT" -H "Idempotency-Key: k410-$(date +%s)" \
+        | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("order_id") or d.get("id"))')
+  echo "OID=$OID"; sleep 15
+  kubectl -n temporal exec deploy/temporal-admintools -- \
+    temporal workflow describe --workflow-id "order-fulfillment-$OID" --namespace mop \
+    | grep -E '^  Status|Behavior|DeploymentName|BuildId'
+  ```
+  **Want:** `Status COMPLETED`, and the versioning block showing `Behavior Pinned`
+  with `DeploymentName` **`order/order-fulfillment`** and a `BuildId` equal to the
+  `CURRENT` that [K1.7](#k1--bring-up) read. That build id is the controller's derived
+  value — not the image tag, and written down nowhere in git.
+  **FAIL, and what each shape means:**
+  - Order stuck `pending`, workflow `Running` with no progress → the old K1.7 failure
+    is back. Read `kubectl -n order get wd order-fulfillment` for an empty `CURRENT`
+    before suspecting the saga.
+  - `Behavior` absent, or `DeploymentName` the bare `order-fulfillment` → the pod is
+    polling unversioned. The worker log settles it: `worker versioning off` means the
+    identity never reached the process.
+  - A 5xx at `confirm` is an application failure, not a versioning one — that is what
+    `OrderSagaNotCompleting` and K5 are for. Do not re-derive it here.
+  > **Run no Job before this row.** The point is not that an order *can* complete —
+  > Compose already proves that — but that it completes on a cluster built from zero
+  > with no human step in between. Running the retired activation Job "just in case"
+  > destroys the only evidence this row exists to collect.
+
 ---
 
 ## K5 — The four signals
@@ -887,7 +948,8 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   > k8s.pod.name, deployment.environment.name`, and Compose set no k8s attribute.
   > The 2026-08-17 run settled it: **there is no collision on the cluster**, and
   > not because `k8s.pod.name` disambiguates, but because `service.name` already
-  > differs — `kubernetes/apps/order-worker-2-4-0.yaml` and
+  > differs — the order worker's manifest (then `order-worker-2-4-0.yaml`, now the
+  > `WorkerDeployment` in `order-worker.yaml`) and
   > `checkout-worker.yaml` set `OTEL_SERVICE_NAME: order-worker` /
   > `checkout-worker` (and `service.instance.id` in
   > `OTEL_RESOURCE_ATTRIBUTES` besides). The collision was Compose-only, rooted in

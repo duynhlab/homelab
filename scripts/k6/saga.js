@@ -27,6 +27,7 @@ import { sleep } from 'k6';
 import { target, tlsOptions, identityFor } from './lib/config.js';
 import { bearer } from './lib/auth.js';
 import { rowCheck, rowThresholds, evidenceTable } from './lib/rows.js';
+import { clearCart, addItem, freshSession, priceSession, confirmSession } from './lib/funnel.js';
 
 const TEMPORAL = __ENV.TEMPORAL_UI || 'https://temporal.duynh.me';
 const TQ_NAMESPACE = __ENV.TEMPORAL_NAMESPACE || 'mop';
@@ -69,36 +70,17 @@ export default function () {
   });
 
   // SG.2 -- drive the funnel and confirm.
-  http.del(`${B}/cart/v1/private/cart`, null, auth);
-  http.post(
-    `${B}/cart/v1/private/cart`,
-    JSON.stringify({
-      product_id: SKU,
-      product_name: 'Wireless Mouse',
-      product_price: 29.99,
-      quantity: 1,
-    }),
-    { headers: jsonHeaders(auth.headers) }
-  );
-  const created = http.post(`${B}/checkout/v1/private/checkout/sessions`, null, auth);
-  const sid = created.json('id');
-  const s = `${B}/checkout/v1/private/checkout/sessions/${sid}`;
-  http.put(
-    `${s}/address`,
-    JSON.stringify({ full_name: 'Saga', line1: '1 Main St', city: 'HN', country: 'VN' }),
-    { headers: jsonHeaders(auth.headers) }
-  );
-  http.put(`${s}/shipping`, JSON.stringify({ shipping_method: 'standard' }), {
-    headers: jsonHeaders(auth.headers),
+  clearCart(B, auth);
+  addItem(B, auth, {
+    product_id: SKU,
+    product_name: 'Wireless Mouse',
+    product_price: 29.99,
+    quantity: 1,
   });
-  http.put(`${s}/payment`, JSON.stringify({ payment_method_token: 'tok_visa_ok' }), {
-    headers: jsonHeaders(auth.headers),
-  });
-  const confirm = http.post(`${s}/confirm`, null, {
-    headers: jsonHeaders(
-      Object.assign({ 'Idempotency-Key': `saga-${Date.now()}` }, auth.headers)
-    ),
-  });
+  const opened = freshSession(B, auth);
+  const sid = opened.id;
+  priceSession(B, auth, sid, { address: { full_name: 'Saga', line1: '1 Main St', city: 'HN', country: 'VN' } });
+  const confirm = confirmSession(B, auth, sid, `saga-${Date.now()}`);
   const orderId = confirm.json('order_id') || confirm.json('id');
   rowCheck('SG.2', confirm, {
     'confirm creates an order': (r) => r.status === 201 || r.status === 200,

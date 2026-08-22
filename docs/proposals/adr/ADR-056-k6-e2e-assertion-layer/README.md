@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | PRs on `feat/k6-e2e-assertions` |
-| **Adoption** | Partial — Kind rows converted and proven; compose rows staged |
+| **Adoption** | Partial — Kind rows converted and proven; compose rows written and contract-verified, environment untested |
 
 ## Context
 
@@ -189,8 +189,13 @@ how far careful bash gets: far enough to be valuable, not far enough to fail.
 - Sustained order load exhausts a SKU's seeded stock and the saga then fails
   correctly; past that point a run measures the inventory rather than the
   platform.
-- Compose rows are staged, not converted: the compose stack was down while the
-  cluster was up, and running both at once is not something this host tolerates.
+- Compose rows are written but not yet run on compose: the podman VM had 3G free
+  with the cluster up, and ~25 containers do not fit in that. They were instead
+  run against the **cluster**, which shares the API contract — so the assertions
+  are verified and the environment is not.
+- One row is expected to fail: K5.7 finds three dashboards whose datasource
+  references resolve to nothing. Recording that as a red row is the point, but a
+  gate with a standing failure needs the finding closed rather than tolerated.
 
 ### Neutral consequences
 
@@ -206,8 +211,9 @@ how far careful bash gets: far enough to be valuable, not far enough to fail.
 | Saga + versioning rows over HTTP | platform | same | K1.7/K4.10 need no `kubectl exec` |
 | Edge limiter asserted both directions | platform | same | `make e2e-ratelimit` proves the ceiling and the headers |
 | Rate-limit sizing corrected + recorded | platform | ADR-045 History | 25/Second in `btp-api.yaml`, amendment written |
-| Compose rows converted | platform | follow-up | `make e2e GATE=compose` covers the 19 `http` rows |
-| Runbook rows point at the suite | platform | same | No converted row still asks for a hand-read `curl` |
+| Compose rows written | platform | `feat/k6-compose-rows` | All 15 remaining `http` rows expressed; every script passes against the cluster |
+| Compose rows verified on compose | platform | follow-up | `make e2e GATE=compose` green on a live local-stack |
+| Runbook rows point at the suite | platform | `feat/k6-compose-rows` | Kind `curl` count 32 → 13, and every remaining line is a row the suite does not cover or a Diagnostics entry |
 
 ## Validation and compliance
 
@@ -232,6 +238,9 @@ Re-open this decision when one or more of the following become true:
   would mean the ownership rule is not holding and needs a mechanism.
 - More than a handful of customer identities exist, lifting the four-VU ceiling
   on order load.
+- A row's expectation is found to live only in code — the ownership rule above is
+  a discipline, and the categories gap in A19 (documented, never coded) is a
+  reminder that the runbooks can drift from themselves too.
 
 ## References
 

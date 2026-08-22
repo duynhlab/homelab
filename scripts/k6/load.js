@@ -32,6 +32,7 @@ import { Counter, Trend } from 'k6/metrics';
 import { target, tlsOptions, identityFor } from './lib/config.js';
 import { bearer } from './lib/auth.js';
 import { rowCheck, rowThresholds } from './lib/rows.js';
+import { clearCart, addItem, freshSession, priceSession, confirmSession } from './lib/funnel.js';
 
 const ORDERS_PER_SEC = Number(__ENV.ORDERS_PER_SEC || 2);
 const DURATION = __ENV.LOAD_DURATION || '30s';
@@ -86,47 +87,22 @@ export function order() {
 
   // A stale cart carries lines from an earlier iteration and changes the total,
   // so each order starts from an empty one.
-  http.del(`${B}/cart/v1/private/cart`, null, auth);
-  http.post(
-    `${B}/cart/v1/private/cart`,
-    JSON.stringify({
-      product_id: '1',
-      product_name: 'Wireless Mouse',
-      product_price: 29.99,
-      quantity: 1,
-    }),
-    { headers: json(auth.headers) }
-  );
+  clearCart(B, auth);
+  addItem(B, auth, {
+    product_id: '1',
+    product_name: 'Wireless Mouse',
+    product_price: 29.99,
+    quantity: 1,
+  });
 
-  const created = http.post(`${B}/checkout/v1/private/checkout/sessions`, null, auth);
-  if (created.status !== 201 && created.status !== 200) {
-    rejected.add(1);
-    return;
-  }
-  const sid = created.json('id');
+  const opened = freshSession(B, auth);
+  const sid = opened.id;
   if (!sid) {
     rejected.add(1);
     return;
   }
-
-  const s = `${B}/checkout/v1/private/checkout/sessions/${sid}`;
-  http.put(
-    `${s}/address`,
-    JSON.stringify({ full_name: 'Load', line1: '1 Main St', city: 'HN', country: 'VN' }),
-    { headers: json(auth.headers) }
-  );
-  http.put(`${s}/shipping`, JSON.stringify({ shipping_method: 'standard' }), {
-    headers: json(auth.headers),
-  });
-  http.put(`${s}/payment`, JSON.stringify({ payment_method_token: 'tok_visa_ok' }), {
-    headers: json(auth.headers),
-  });
-
-  const done = http.post(`${s}/confirm`, null, {
-    headers: json(
-      Object.assign({ 'Idempotency-Key': `load-${__VU}-${__ITER}-${sid}` }, auth.headers)
-    ),
-  });
+  priceSession(B, auth, sid, { address: { full_name: 'Load', line1: '1 Main St', city: 'HN', country: 'VN' } });
+  const done = confirmSession(B, auth, sid, `load-${__VU}-${__ITER}-${sid}`);
   if (done.status === 201 || done.status === 200) confirmed.add(1);
   else rejected.add(1);
 }

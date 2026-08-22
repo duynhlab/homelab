@@ -38,6 +38,15 @@ export function evidenceTable(data, rows, title) {
   let failed = 0;
   let missing = 0;
 
+  // Which named assertions actually failed. Without this the table says a row
+  // failed and nothing says why -- and since handleSummary replaces stdout, the
+  // usual per-check listing is gone too. A verdict you cannot act on is barely
+  // better than scrollback, which is the thing this suite exists to replace.
+  const failures = [];
+  for (const c of (data.root_group && data.root_group.checks) || []) {
+    if (c.fails > 0) failures.push(c.name);
+  }
+
   for (const id of rows) {
     const m = data.metrics[`checks{row:${id}}`];
     if (!m) {
@@ -66,5 +75,10 @@ export function evidenceTable(data, rows, title) {
       `${missing} did not run — ${total.passes} of ${total.passes + total.fails} assertions passed.`,
     ''
   );
+  if (failures.length) {
+    lines.push('Failed assertions:', '');
+    for (const name of failures) lines.push(`- ${name}`);
+    lines.push('');
+  }
   return lines.join('\n');
 }

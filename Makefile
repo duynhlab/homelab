@@ -82,7 +82,7 @@ validate: ## Validate Kubernetes manifests (Kustomize)
 # read by eye.
 
 .PHONY: e2e
-e2e: e2e-smoke e2e-saga ## Run the k6 gate suite (set GATE=compose|kind)
+e2e: e2e-smoke e2e-saga e2e-staff e2e-operator ## Run the k6 gate suite (set GATE=compose|kind)
 
 .PHONY: e2e-smoke
 e2e-smoke: ## Functional + telemetry rows as checks with thresholds
@@ -91,6 +91,22 @@ e2e-smoke: ## Functional + telemetry rows as checks with thresholds
 .PHONY: e2e-saga
 e2e-saga: ## An order completes, Pinned, on the Current build id
 	GATE=$(or $(GATE),kind) k6 run scripts/k6/saga.js
+
+.PHONY: e2e-session
+e2e-session: ## Refresh rotation, reuse detection, logout (compose A4/A5)
+	GATE=$(or $(GATE),compose) k6 run scripts/k6/session.js
+
+.PHONY: e2e-staff
+e2e-staff: ## The /protected/ Backoffice surface (compose A17-A19, A21)
+	GATE=$(or $(GATE),compose) k6 run scripts/k6/staff.js
+
+.PHONY: e2e-operator
+e2e-operator: ## Operator resolve of a parked order (compose A20)
+	GATE=$(or $(GATE),compose) k6 run scripts/k6/operator.js
+
+.PHONY: e2e-observability
+e2e-observability: ## Datasources, dashboards, panel path, scrape targets (compose C17-C20)
+	GATE=compose k6 run scripts/k6/observability.js
 
 .PHONY: e2e-ratelimit
 e2e-ratelimit: ## Drive under and over the edge ceiling; 429 must be well-formed

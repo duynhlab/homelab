@@ -17,8 +17,10 @@
 import http from 'k6/http';
 import encoding from 'k6/encoding';
 import { target, tlsOptions, identityFor, REALMS } from './lib/config.js';
-import { tokenResponse, token } from './lib/auth.js';
+import { tokenResponse, token, bearer } from './lib/auth.js';
 import { rowCheck, rowThresholds, evidenceTable } from './lib/rows.js';
+import { promqlScalar, promqlCountBy, logsqlCount } from './lib/vmql.js';
+import { liveDatasources, dashboardUids, referenceProblems } from './lib/dashboards.js';
 
 const CATALOG = '/product/v1/public/products';
 
@@ -49,7 +51,7 @@ const UNITS = [
   },
   {
     name: 'TLS serves the seeded catalog',
-    rows: { kind: 'K4.2', compose: 'A11a' },
+    rows: { kind: 'K4.2' },
     run(id) {
       const res = http.get(`${target.base}${CATALOG}`);
       rowCheck(id, res, {
@@ -114,7 +116,7 @@ const UNITS = [
     // The Kind runbook has no staff mint anywhere -- K4.7 exercises staff
     // identity in a browser only -- so this closes a real hole rather than
     // restating a row.
-    rows: { kind: 'K4.5s', compose: 'A17a' },
+    rows: { kind: 'K4.5s' },
     run(id) {
       const t = tokenResponse('staff', identityFor('staff', 0));
       const c = claims(t.access_token);
@@ -171,6 +173,224 @@ const UNITS = [
         'is 200': (r) => r.status === 200,
         'all ten services present': () => SERVICES.every((s) => names.some((n) => n === s || n.indexOf(s) === 0)),
         'auth is absent': () => !names.some((n) => n === 'auth'),
+      });
+    },
+  },
+  {
+    name: 'private routes answer through the edge JWT filter',
+    rows: { compose: 'A2' },
+    run(id) {
+      const auth = bearer('customer', identityFor('customer', 0));
+      for (const p of [
+        '/user/v1/private/users/profile',
+        '/cart/v1/private/cart',
+        '/order/v1/private/orders',
+        '/notification/v1/private/notifications',
+      ]) {
+        const res = http.get(`${target.base}${p}`, auth);
+        rowCheck(id, res, { [`${p} is 200`]: (r) => r.status === 200 });
+      }
+    },
+  },
+  {
+    name: 'a missing or unverifiable token dies at the edge',
+    rows: { compose: 'A3' },
+    run(id) {
+      // Three claims, all required: the status, the plain-text reason the
+      // jwt_authn filter writes, and the challenge header. The realm value is
+      // the REQUEST URL rather than an identity-provider URL -- Envoy echoes
+      // back what was asked for.
+      const url = `${target.base}/cart/v1/private/cart`;
+      const none = http.get(url);
+      const wa = none.headers['Www-Authenticate'] || none.headers['WWW-Authenticate'] || '';
+      rowCheck(id, none, {
+        'no token is 401': (r) => r.status === 401,
+        'body says Jwt is missing': (r) => String(r.body || '').indexOf('Jwt is missing') !== -1,
+        'content-type is text/plain': (r) =>
+          String(r.headers['Content-Type'] || '').indexOf('text/plain') !== -1,
+        'www-authenticate names the requested URL': () =>
+          wa.indexOf(`Bearer realm="${url}"`) === 0,
+      });
+
+      const broken = http.get(url, { headers: { Authorization: 'Bearer x.y.z' } });
+      const wa2 = broken.headers['Www-Authenticate'] || broken.headers['WWW-Authenticate'] || '';
+      rowCheck(id, broken, {
+        'a broken token is 401': (r) => r.status === 401,
+        'the challenge adds error="invalid_token"': () =>
+          wa2.indexOf('error="invalid_token"') !== -1,
+      });
+    },
+  },
+  {
+    name: 'the collection-noun shipping paths serve, and the old alias still does',
+    rows: { compose: 'A7' },
+    run(id) {
+      // Expand phase: the v3 paths and the deprecated alias must both answer.
+      // The retired auth alias is deliberately not probed -- it certified a
+      // token layer that no longer has a backend.
+      const trk = '1Z999AA10123456784';
+      const cases = [
+        [`/shipping/v1/public/shipments/track?tracking_number=${trk}`, 'shipments/track'],
+        ['/shipping/v1/public/shipments/estimate?origin=HN&destination=SG&weight=1', 'shipments/estimate'],
+        [`/shipping/v1/public/track?tracking_number=${trk}`, 'deprecated alias'],
+      ];
+      for (const [path, label] of cases) {
+        const res = http.get(`${target.base}${path}`);
+        rowCheck(id, res, { [`${label} is 200`]: (r) => r.status === 200 });
+      }
+    },
+  },
+  {
+    name: 'product details fans out across the fleet',
+    rows: { compose: 'A11' },
+    run(id) {
+      const res = http.get(`${target.base}/product/v1/public/products/1/details`);
+      const d = res.json() || {};
+      const p = d.product || {};
+      const a = d.availability || {};
+      const reviews = d.reviews;
+      const summary = d.reviews_summary || {};
+      rowCheck(id, res, {
+        // The id is a STRING in this contract, not a number.
+        'product.id is "1"': () => p.id === '1',
+        'availability carries available_to_promise': () =>
+          a.available_to_promise !== undefined && a.available_to_promise !== null,
+        'reviews is a non-empty list': () => Array.isArray(reviews) && reviews.length > 0,
+        'reviews_summary.total matches the list': () =>
+          Array.isArray(reviews) && summary.total === reviews.length,
+      });
+    },
+  },
+  {
+    name: 'both log legs carry what only they can carry',
+    rows: { kind: 'K5.3' },
+    group: 'telemetry',
+    run(id) {
+      // The OTLP leg is the services' own tee. The Vector leg carries
+      // containers with no SDK, and its stream must be selected by namespace +
+      // container_name: Vector sets `service` from pod_labels.app and falls
+      // back to the pod name, so there has never been a `gateway` value to
+      // match.
+      const otlp = logsqlCount(target.logs, '_time:45m _stream:{"service.name"="cart"} | count()');
+      const vector = logsqlCount(
+        target.logs,
+        '_time:45m _stream:{namespace="envoy-gateway",container_name="envoy"} upstream_cluster:* route_name:* | count()'
+      );
+      rowCheck(id, null, {
+        'the OTLP leg has cart logs': () => otlp !== null && otlp > 0,
+        'the Vector leg has edge access logs': () => vector !== null && vector > 0,
+      });
+    },
+  },
+  {
+    name: 'each worker is its own telemetry identity',
+    rows: { kind: 'K5.4' },
+    group: 'telemetry',
+    run(id) {
+      const byService = promqlCountBy(
+        target.vm,
+        'count by (service_name) (go_goroutine_count)',
+        'service_name'
+      );
+      for (const svc of ['order', 'order-worker', 'checkout', 'checkout-worker']) {
+        rowCheck(id, null, {
+          [`${svc} is its own service_name`]: () => (byService[svc] || 0) >= 1,
+        });
+      }
+      // More than one order-worker process is EXPECTED while a version is
+      // inside its sunset window -- two versions of one worker share a
+      // service_name, which is exactly what service_version exists to split.
+      const byVersion = promqlCountBy(
+        target.vm,
+        'count by (service_name, service_version) (go_goroutine_count{service_name="order-worker"})',
+        'service_version'
+      );
+      const versions = Object.keys(byVersion).filter((v) => v && v !== 'undefined');
+      rowCheck(id, null, {
+        'order-worker splits by service_version': () => versions.length >= 1,
+      });
+    },
+  },
+  {
+    name: 'the four metric legs fail independently',
+    rows: { kind: 'K5.5' },
+    group: 'telemetry',
+    run(id) {
+      // Four legs, four ways to lose telemetry without losing the others.
+      // spanmetrics is deliberately absent: that connector lives only in the
+      // compose collector, so asserting it here would fail by construction.
+      const legs = [
+        ['app HTTP semconv', 'sum(http_server_request_duration_seconds_count)'],
+        ['app gRPC semconv', 'sum(rpc_server_call_duration_seconds_count{service_name="inventory"})'],
+        // No `_seconds` in this name. The Go SDK emits it without, and the
+        // query that asked for the longer name reported NO SERIES on every run
+        // -- indistinguishable from a dead exporter.
+        ['Temporal SDK', 'count(temporal_workflow_endtoend_latency_bucket)'],
+        ['edge Envoy stats', 'sum(envoy_http_downstream_rq_total)'],
+      ];
+      for (const [label, q] of legs) {
+        const v = promqlScalar(target.vm, q);
+        rowCheck(id, null, { [`${label} has series`]: () => v !== null && v > 0 });
+      }
+    },
+  },
+  {
+    name: 'every dashboard reference resolves',
+    // K5.7's third assertion only. Its first two -- that every GrafanaDashboard
+    // CR reconciled, and that the url-sourced ones actually fetched -- are
+    // kubectl-and-git work and stay in the runbook.
+    rows: { kind: 'K5.7' },
+    group: 'telemetry',
+    run(id) {
+      // The uid list comes from Grafana rather than a literal: the cluster
+      // provisions through operator CRs, so its set differs from local-stack's
+      // and a hard-coded list here would rot on the next dashboard.
+      const uids = dashboardUids(target.graf);
+      rowCheck(id, null, { 'the dashboard list is readable': () => uids !== null });
+      if (!uids) return;
+      const live = liveDatasources(target.graf);
+      const broken = [];
+      for (const uid of uids) {
+        const ref = referenceProblems(target.graf, uid, live);
+        if (ref.status !== 200 || ref.problems.length) {
+          broken.push(`${uid}: ${ref.problems.join(', ') || ref.status}`);
+        }
+      }
+      rowCheck(id, null, {
+        [`all ${uids.length} dashboards resolve${broken.length ? ` (${broken.slice(0, 3).join('; ')})` : ''}`]: () =>
+          broken.length === 0,
+      });
+    },
+  },
+  {
+    name: 'the identity provider emits its own signals',
+    // K5.9's HTTP half. The ServiceMonitor and PrometheusServiceLevel checks
+    // stay kubectl rows -- an identity provider can serve tokens perfectly
+    // while emitting nothing, which is why this is asserted separately from
+    // K4.4/K4.5.
+    rows: { kind: 'K5.9' },
+    group: 'telemetry',
+    run(id) {
+      const up = promqlScalar(target.vm, 'max(up{job=~".*keycloak.*"})');
+      rowCheck(id, null, { 'the Keycloak scrape target is up': () => up === 1 });
+
+      const rules = http.get(`${target.vmalert}/api/v1/rules`);
+      const names = [];
+      for (const g of (rules.json('data') || {}).groups || []) {
+        for (const r of g.rules || []) names.push(r.name);
+      }
+      for (const alert of [
+        'KeycloakDown',
+        'KeycloakRestartLoop',
+        'KeycloakLoginFailureRatioHigh',
+        'KeycloakTokenLatencyHigh',
+        'KeycloakDbPoolExhausted',
+      ]) {
+        rowCheck(id, null, { [`${alert} is loaded`]: () => names.indexOf(alert) !== -1 });
+      }
+
+      rowCheck(id, http.get(`${target.graf}/api/dashboards/uid/keycloak-identity`), {
+        'the identity dashboard loads': (r) => r.status === 200,
       });
     },
   },

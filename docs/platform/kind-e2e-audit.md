@@ -706,22 +706,18 @@ The authoritative list is `kubernetes/infra/configs/envoy-gateway/routes/*.yaml`
 (K0.6 reads it). Three cluster-only facts, each its own row because each silently
 breaks a command copied from the Compose audit:
 
-- [ ] **K4.1** Plain HTTP is redirected, not served.
-  `curl -s -o /dev/null -w '%{http_code}\n' http://gateway.duynh.me/product/v1/public/products`
+- [ ] **K4.1** Plain HTTP is redirected, not served. Asserted as **K4.1** by
+  `make e2e-smoke GATE=kind`.
   **Want 301.** A body here means the redirect route is missing.
 
 - [ ] **K4.2** TLS is the self-signed `homelab-ca`, so **every** `curl` needs `-k`
   (or `--cacert`). Kind has no Cloudflare token, so `platform-edge-tls` is patched
-  to the local issuer.
-  `curl -sk https://gateway.duynh.me/product/v1/public/products | head -c 120`
-  **FAIL:** a certificate error even with `-k`, or an empty body. After K1.6 this
-  should return seeded products, not `[]`.
+  to the local issuer. Asserted as **K4.2**.
+  **FAIL:** a certificate error even trusting the CA, or an empty body. After K1.6
+  this should return seeded products, not `[]`.
 
 - [ ] **K4.3** Routing is by **Host header**, not by whatever answers the socket.
-  ```bash
-  curl -sk -o /dev/null -w '%{http_code}\n' -H 'Host: nope.invalid' \
-    https://gateway.duynh.me/product/v1/public/products
-  ```
+  Asserted as **K4.3** — a valid SNI carrying a Host no HTTPRoute claims.
   **Want 404** — the request was routed, and the routing layer found no route for
   that Host. A 200 would mean a route is bound too widely.
   > **This row could not pass as written until 2026-08-22.** It drove
@@ -734,11 +730,8 @@ breaks a command copied from the Compose audit:
   > which is the argument for porting rows.
 
 - [ ] **K4.4** Both realms exist and are the ones from git
-  (`kubernetes/infra/controllers/keycloak/configmap-realm.yaml`).
-  ```bash
-  curl -sk https://id.duynh.me/realms/duynhlab       | jq -r .realm
-  curl -sk https://id.duynh.me/realms/duynhlab-staff | jq -r .realm
-  ```
+  (`kubernetes/infra/controllers/keycloak/configmap-realm.yaml`). Asserted as
+  **K4.4** — each realm answers 200 and names itself.
   **FAIL:** a 404 → the ConfigMap did not mount, or the realm import did not run.
   The import is one-shot; a failed import needs a rebuild, not a retry.
 
@@ -785,19 +778,13 @@ breaks a command copied from the Compose audit:
 - [ ] **K4.5s A staff token mints through the workforce realm.** The audit had no
   staff mint anywhere — K4.7 exercised staff identity in a browser only — so
   nothing here could reach a `/protected/` route, and the surface went unverified
-  on every cluster run. Different realm, different client, different redirect:
-  ```bash
-  KCT="local-stack/scripts/keycloak-token.sh"
-  AT_STAFF=$(KC_URL=https://id.duynh.me KC_INSECURE=1 \
-    KC_REALM=duynhlab-staff KC_CLIENT_ID=admin-portal \
-    KC_REDIRECT=https://backoffice.duynh.me/ \
-    USERNAME=duyne PASSWORD='p@ss1234' bash $KCT)
-  curl -sk -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $AT_STAFF" \
-    https://gateway.duynh.me/inventory/v1/protected/balances
-  ```
-  **Want 200** with real rows. Run this under `bash`, not zsh: zsh sets
+  on every cluster run. Asserted as **K4.5s** — different realm, different
+  client, different redirect from K4.5, all three handled by the suite.
+  **Want 200** with real rows. The hand-driven form is in
+  [Diagnostics](#diagnostics), and it must run under `bash`, not zsh: zsh sets
   `USERNAME` itself to the OS user, so the assignment is ignored and the script
-  logs in as whoever is at the keyboard.
+  logs in as whoever is at the keyboard. The suite mints in-process and does not
+  have that problem.
   **FAIL:** `503 Authentication temporarily unavailable` means the service's
   staff JWKS is unreachable, not that identity is down — see
   [`api.md` § protected surfaces](../api/api.md). That was the state of all six
@@ -832,12 +819,7 @@ breaks a command copied from the Compose audit:
 
 - [ ] **K4.8** The realm fence holds at the edge. A **customer** token on a
   `/protected/` route dies as wrong-issuer before any service role logic —
-  `/protected/` rides `jwt-edge-staff` (staff issuer).
-  ```bash
-  AT=$(KC_URL=https://id.duynh.me KC_INSECURE=1 USERNAME=alice PASSWORD=password123 $KCT)
-  curl -sk -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $AT" \
-    https://gateway.duynh.me/inventory/v1/protected/balances
-  ```
+  `/protected/` rides `jwt-edge-staff` (staff issuer). Asserted as **K4.8**.
   **Want 401.** A 403 means the edge let it through and a service rejected it —
   weaker than the contract, and a finding.
 
@@ -893,33 +875,9 @@ breaks a command copied from the Compose audit:
   whole gate could go green while the order saga had never run on a cluster, which is
   precisely what the Worker Controller changed and therefore what is most worth proving.
   The Compose audit has this as A10; the cluster had nothing.
-  ```bash
-  CA=/tmp/homelab-ca.crt
-  kubectl -n cert-manager get secret homelab-ca-secret -o jsonpath='{.data.tls\.crt}' | base64 -d > $CA
-  AT=$(KC_URL=https://id.duynh.me KC_CACERT=$CA KC_REDIRECT=https://local.duynh.me/ \
-       USERNAME=alice PASSWORD=password123 local-stack/scripts/keycloak-token.sh | tail -1)
-  B=https://gateway.duynh.me
-  curl -sk -o /dev/null -X DELETE $B/cart/v1/private/cart -H "Authorization: Bearer $AT"
-  curl -sk -o /dev/null -X POST $B/cart/v1/private/cart -H "Authorization: Bearer $AT" \
-    -H 'Content-Type: application/json' \
-    -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
-  SID=$(curl -sk -X POST $B/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT" \
-        | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
-  curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/address \
-    -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' \
-    -d '{"full_name":"Alice","line1":"1 Main St","city":"HN","country":"VN"}'
-  curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/shipping \
-    -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' -d '{"shipping_method":"standard"}'
-  curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/payment \
-    -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' -d '{"payment_method_token":"tok_visa_ok"}'
-  OID=$(curl -sk -X POST $B/checkout/v1/private/checkout/sessions/$SID/confirm \
-        -H "Authorization: Bearer $AT" -H "Idempotency-Key: k410-$(date +%s)" \
-        | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("order_id") or d.get("id"))')
-  echo "OID=$OID"; sleep 15
-  kubectl -n temporal exec deploy/temporal-admintools -- \
-    temporal workflow describe --workflow-id "order-fulfillment-$OID" --namespace mop \
-    | grep -E '^  Status|Behavior|DeploymentName|BuildId'
-  ```
+  Asserted as **SG.1–SG.4** by `make e2e-saga GATE=kind`, which needs no
+  `kubectl` at all — see the note below. The hand-driven form is in
+  [Diagnostics](#diagnostics).
   **Want:** `Status COMPLETED`, and the versioning block showing `Behavior Pinned`
   with `DeploymentName` **`order/order-fulfillment`** and a `BuildId` equal to the
   `CURRENT` that [K1.7](#k1--bring-up) read. That build id is the controller's derived
@@ -964,7 +922,11 @@ breaks a command copied from the Compose audit:
 The Compose audit's Phase C, re-pointed at the cluster. Local patches the edge
 `samplingRate` to **100**, so trace results here are deterministic.
 
-Drive some traffic first, and tag it so later rows can find one request:
+Drive some traffic first, and tag it so later rows can find one request. **This
+preamble is only needed for the rows that are still hand-run** — K5.1 reads
+ClickHouse through a port-forward and needs a tagged request to look for.
+`make e2e-smoke GATE=kind` drives its own traffic and waits for it to land, so
+K5.2-K5.9 do not depend on what you type here.
 ```bash
 TAG=$(date +%s)
 curl -sk -o /dev/null "https://gateway.duynh.me/product/v1/public/products?audit=$TAG"
@@ -1006,15 +968,14 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   local-stack runs standalone and configures differently.
 
 - [ ] **K5.2 Traces — coverage.** All 10 services plus the edge appear with
-  `server_spans > 0`; `auth` is absent.
-  `curl -sk https://victoriatraces.duynh.me/select/jaeger/api/services | jq -r '.data[]' | sort`
+  `server_spans > 0`; `auth` is absent. Asserted as **K5.2**, which also drives
+  the traffic first: `review` is only reachable through product's fan-out, so a
+  run that never calls it leaves it with no span and the row fails for a reason
+  that has nothing to do with telemetry.
 
 - [ ] **K5.3 Logs — both legs, and correlation.** The OTLP leg is the services'
   own tee; the Vector leg carries containers with no SDK.
-  ```bash
-  curl -sk 'https://logs.duynh.me/select/logsql/query' --data-urlencode 'query=_time:45m _stream:{"service.name"="cart"} | count()'
-  curl -sk 'https://logs.duynh.me/select/logsql/query' --data-urlencode 'query=_time:45m _stream:{namespace="envoy-gateway",container_name="envoy"} upstream_cluster:* route_name:* | count()'
-  ```
+  Asserted as **K5.3** — both counts must be non-zero.
   **FAIL:** both empty at once is **one** failure (the Vector leg), not two. Vector
   runs as a DaemonSet in `kube-system` and has no Compose twin at all, so this row
   is the only place it is exercised.
@@ -1038,18 +999,14 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
 
 - [ ] **K5.4 Metrics — worker telemetry identity (regression check).**
   Two series, different `k8s_pod_name`, for the API and the worker:
-  ```bash
-  curl -sk 'https://vmui.duynh.me/api/v1/query' --data-urlencode 'query=count by (service_name) (go_goroutine_count)' \
-    | jq -r '.data.result[] | "\(.metric.service_name) \(.value[1])"' | sort
-  ```
+  Asserted as **K5.4**.
   **Want:** `order`, `order-worker`, `checkout` and `checkout-worker` each present
   as **separate** `service_name` values, each with count **≥ 1**.
   `order-worker` above 1 is expected whenever a version is inside its
   `sunset.scaledownDelay` window — two versions of one worker are two processes with
   one `service_name`, which is the very thing `service_version` exists to split:
-  ```bash
-  curl -sk 'https://vmui.duynh.me/api/v1/query' --data-urlencode 'query=count by (service_name, service_version) (go_goroutine_count{service_name="order-worker"})'
-  ```
+  — and the suite asserts that split too, so a second version inside its sunset
+  window reads as two `service_version` values rather than as a duplicate.
   **FAIL:** a worker missing entirely, or an `order-worker` series whose
   `service_version` matches neither `CURRENT` nor an entry in
   `status.deprecatedVersions` — that is a real collision, not a drain.
@@ -1073,15 +1030,8 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   > remains is this cheap regression check.
 
 - [ ] **K5.5 Metrics — the legs that fail independently.**
-  ```bash
-  for q in 'sum(http_server_request_duration_seconds_count)' \
-           'sum(rpc_server_call_duration_seconds_count{service_name="inventory"})' \
-           'count(temporal_workflow_endtoend_latency_bucket)' \
-           'sum(envoy_http_downstream_rq_total)'; do
-    echo -n "$q => "
-    curl -sk 'https://vmui.duynh.me/api/v1/query' --data-urlencode "query=$q" | jq -r '.data.result[0].value[1] // "NO SERIES"'
-  done
-  ```
+  Asserted as **K5.5** — one check per leg, so a dead exporter names itself
+  instead of hiding behind three healthy ones.
   Four legs: app HTTP semconv (OTLP ingest), app gRPC semconv, the Temporal SDK,
   and the edge's own Envoy stats.
   > **The Temporal leg named a series that does not exist until 2026-08-21.** The
@@ -1102,11 +1052,7 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   reports a false FAIL. Do not add a spanmetrics row until a consumer exists.
 
 - [ ] **K5.6 Profiles.** Pyroscope carries all 10 services; `auth` is absent.
-  ```bash
-  curl -sk -X POST 'https://pyroscope.duynh.me/querier.v1.QuerierService/LabelValues' \
-    -H 'Content-Type: application/json' \
-    -d "{\"name\":\"service_name\",\"matchers\":[\"{}\"],\"start\":$(( ($(date +%s)-3600)*1000 )),\"end\":$(( $(date +%s)*1000 ))}" | jq -r '.names[]' | sort
-  ```
+  Asserted as **K5.6** (Connect-RPC `LabelValues` over a one-hour window).
 
 - [ ] **K5.7 Dashboards resolve, not merely load.** The cluster's dashboards are
   **`GrafanaDashboard` CRs** from
@@ -1161,15 +1107,25 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   3. **Every datasource reference resolves.** A dashboard whose panels name
      `${DS_PROMETHEUS}` without declaring it, or a `"uid"` no datasource carries,
      returns **HTTP 200** and then renders `Datasource … was not found` on **every
-     panel** — an error banner, never "No data". Use the Compose gate's **C18
-     block 2** (`local-stack/docs/e2e-audit.md`, § Phase C) with
-     `GRAF=https://grafana.duynh.me` and `curl -k`, and drive the uid list from
-     `/api/search` rather than a literal, since the cluster set differs from
-     local-stack's.
-     ```bash
-     GRAF=https://grafana.duynh.me
-     curl -sk "$GRAF/api/search?type=dash-db" | jq -r '.[].uid' | sort   # feed these into C18 block 2
-     ```
+     panel** — an error banner, never "No data".
+     Asserted as **K5.7** by `make e2e-smoke GATE=kind`, which enumerates the uid
+     list from `/api/search` rather than a literal — the cluster's set comes from
+     operator CRs and differs from local-stack's. It counts a datasource **name**
+     as a legal reference too: older boards write `"uid": "VictoriaMetrics"`,
+     which Grafana resolves, and a uid-only view reports those as broken.
+
+     > **OPEN FINDING, 2026-08-22 — three boards carry references that resolve
+     > to nothing**, and this row had never actually been run on a cluster, which
+     > is why nobody knew. On a 41-dashboard cluster: `flux-cluster` and
+     > `cloudnative-pg` both hard-code `"uid": "prometheus"` in panels while
+     > declaring a `DS_PROMETHEUS` variable, and no datasource carries that uid
+     > or that name; `_hAsuzBnz` names `y-Ka8y37k`, an upstream uid that came
+     > with a vendored board. Their panels render `Datasource … was not found`
+     > while the dashboard answers 200 — exactly the failure this assertion
+     > exists to catch. **The row is expected to fail until they are fixed**; do
+     > not weaken the assertion to make the gate green. Note also the count: this
+     > section says 34 CRs while the cluster serves 41 boards, so the chart- and
+     > operator-provisioned extras need reconciling with assertion (1).
      **Cluster-specific note:** five committed JSONs (`clickhouse-server-engine`,
      `cutover-baseline`, `inventory`, `eg-edge`, `keycloak-identity`) carry an
      `__inputs` block instead of declaring the variable in `templating.list`, and
@@ -1196,12 +1152,8 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
 
 - [ ] **K5.8 Alert rules loaded, none firing wrongly.** Group the firing set by
   `severity` — the name alone cannot tell you which of two Sloth variants fired:
-  ```bash
-  curl -sk https://vmalert.duynh.me/api/v1/rules \
-    | jq -r '[.data.groups[].rules[] | select(.state=="firing")]
-             | group_by(.labels.severity)[]
-             | "\(.[0].labels.severity): \(map(.name)|unique|join(", "))"'
-  ```
+  Asserted as **K5.8**, which prints the firing `page`/`critical` names on
+  failure so the group-by is not needed by hand.
   **Do not** assert a total count:
   [`alert-catalog.md`](../observability/alerting/alert-catalog.md) marks a subset
   **inactive on Kind** for platform reasons.
@@ -1235,16 +1187,13 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
 
 - [ ] **K5.9 Keycloak's own signals.** New surface since the last audit: Keycloak
   emits metrics, tracing and JSON logs, and has a consumer for each.
+  The HTTP half is asserted as **K5.9** — the scrape target is `up`, the five
+  Keycloak alerts are loaded, and the `keycloak-identity` dashboard answers 200.
+  The two delivery checks stay `kubectl`, because that is what they are:
   ```bash
   kubectl -n monitoring get servicemonitor keycloak
-  curl -sk 'https://vmui.duynh.me/api/v1/query' --data-urlencode 'query=up{job=~".*keycloak.*"}' | jq -r '.data.result[].value[1]'
-  # 5 alerts: KeycloakDown, KeycloakRestartLoop, KeycloakLoginFailureRatioHigh,
-  #           KeycloakTokenLatencyHigh, KeycloakDbPoolExhausted
-  curl -sk https://vmalert.duynh.me/api/v1/rules | jq -r '[.data.groups[].rules[].name] | map(select(startswith("Keycloak")))[]'
   # 2 Sloth SLOs on the keycloak-login service: login-availability (99.9), auth-latency (95)
   kubectl get prometheusservicelevel -A | grep keycloak
-  # the dashboard, uid keycloak-identity
-  curl -sk -o /dev/null -w '%{http_code}\n' "https://grafana.duynh.me/api/dashboards/uid/keycloak-identity"
   ```
   **FAIL:** `up == 0` for the Keycloak job (the ServiceMonitor reconciled but the
   management port is not exposed), a missing alert, or a
@@ -1450,6 +1399,71 @@ Also from this run: the two podman sysctls now in
   belongs in its own PR so the audit's evidence stays about the cluster.
 - **Prod.** `kubernetes/clusters/production/` is a stub. This runbook is the local
   Kind gate only.
+
+## Diagnostics
+
+Commands the suite replaced, kept because they are the right thing to have in
+your hand when a row fails: they show one request in isolation, which a suite
+deliberately does not.
+
+These are **not** the gate. A status code read by eye cannot fail a release, and
+one row here had been unpassable for weeks before anything noticed (K4.3).
+
+**A staff token, and one protected call** (K4.5s). Run it under `bash`: zsh sets
+`USERNAME` itself to the OS user, so under zsh the assignment is ignored and the
+script logs in as whoever is at the keyboard.
+
+```bash
+KCT="local-stack/scripts/keycloak-token.sh"
+AT_STAFF=$(KC_URL=https://id.duynh.me KC_INSECURE=1 \
+  KC_REALM=duynhlab-staff KC_CLIENT_ID=admin-portal \
+  KC_REDIRECT=https://backoffice.duynh.me/ \
+  USERNAME=duyne PASSWORD='p@ss1234' bash $KCT)
+curl -sk -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $AT_STAFF" \
+  https://gateway.duynh.me/inventory/v1/protected/balances
+```
+
+**The full checkout funnel** (K4.10). Prefer the live CA over skipping
+verification — cert-manager mints a new one on every bring-up, so the committed
+copy cannot validate a fresh cluster.
+
+```bash
+CA=/tmp/homelab-ca.crt
+kubectl -n cert-manager get secret homelab-ca-secret -o jsonpath='{.data.tls\.crt}' | base64 -d > $CA
+AT=$(KC_URL=https://id.duynh.me KC_CACERT=$CA KC_REDIRECT=https://local.duynh.me/ \
+     USERNAME=alice PASSWORD=password123 local-stack/scripts/keycloak-token.sh | tail -1)
+B=https://gateway.duynh.me
+curl -sk -o /dev/null -X DELETE $B/cart/v1/private/cart -H "Authorization: Bearer $AT"
+curl -sk -o /dev/null -X POST $B/cart/v1/private/cart -H "Authorization: Bearer $AT" \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"1","product_name":"Wireless Mouse","product_price":29.99,"quantity":1}'
+SID=$(curl -sk -X POST $B/checkout/v1/private/checkout/sessions -H "Authorization: Bearer $AT" \
+      | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/address \
+  -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' \
+  -d '{"full_name":"Alice","line1":"1 Main St","city":"HN","country":"VN"}'
+curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/shipping \
+  -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' -d '{"shipping_method":"standard"}'
+curl -sk -o /dev/null -X PUT $B/checkout/v1/private/checkout/sessions/$SID/payment \
+  -H "Authorization: Bearer $AT" -H 'Content-Type: application/json' -d '{"payment_method_token":"tok_visa_ok"}'
+OID=$(curl -sk -X POST $B/checkout/v1/private/checkout/sessions/$SID/confirm \
+      -H "Authorization: Bearer $AT" -H "Idempotency-Key: k410-$(date +%s)" \
+      | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("order_id") or d.get("id"))')
+echo "OID=$OID"; sleep 15
+kubectl -n temporal exec deploy/temporal-admintools -- \
+  temporal workflow describe --workflow-id "order-fulfillment-$OID" --namespace mop \
+  | grep -E '^  Status|Behavior|DeploymentName|BuildId'
+```
+
+Then read the workflow the way the row used to:
+
+```bash
+kubectl -n temporal exec deploy/temporal-admintools -- \
+  temporal workflow describe --workflow-id "order-fulfillment-$OID" --namespace mop \
+  | grep -E '^  Status|Behavior|DeploymentName|BuildId'
+```
+
+---
 
 ## References
 

@@ -75,6 +75,31 @@ flux-status: ## Show Flux status (all resources)
 validate: ## Validate Kubernetes manifests (Kustomize)
 	./scripts/flux-validate.sh
 
+##@ End-to-end assertions
+
+# GATE selects the target preset (compose | kind); every script reads it. These
+# exit non-zero when a row fails, which is the point: the gates used to be
+# read by eye.
+
+.PHONY: e2e
+e2e: e2e-smoke e2e-saga ## Run the k6 gate suite (set GATE=compose|kind)
+
+.PHONY: e2e-smoke
+e2e-smoke: ## Functional + telemetry rows as checks with thresholds
+	GATE=$(or $(GATE),kind) k6 run scripts/k6/smoke.js
+
+.PHONY: e2e-saga
+e2e-saga: ## An order completes, Pinned, on the Current build id
+	GATE=$(or $(GATE),kind) k6 run scripts/k6/saga.js
+
+.PHONY: e2e-ratelimit
+e2e-ratelimit: ## Drive under and over the edge ceiling; 429 must be well-formed
+	GATE=$(or $(GATE),kind) k6 run scripts/k6/ratelimit.js
+
+.PHONY: e2e-load
+e2e-load: ## Order load; reports the Temporal backlog it built
+	GATE=$(or $(GATE),kind) k6 run scripts/k6/load.js
+
 ##@ Utilities
 
 .PHONY: prereqs

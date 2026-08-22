@@ -411,6 +411,28 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **Both E2E gates can now fail.** A k6 suite in
+  [`scripts/k6/`](scripts/k6/) expresses each HTTP-shaped audit row as a check
+  with a per-row `rate==1.0` threshold, so a bad row exits non-zero and prints
+  the PASS/FAIL evidence table both runbooks used to ask a human to type
+  ([ADR-056](docs/proposals/adr/ADR-056-k6-e2e-assertion-layer/),
+  [`docs/testing/k6.md`](docs/testing/k6.md)). New `make e2e`, `e2e-smoke`,
+  `e2e-saga`, `e2e-ratelimit`, `e2e-load` — the repository had no e2e target at
+  all before, so nothing could depend on a gate's verdict. One suite serves both
+  gates: a unit declares a row id **per gate** (a token mint is `A1` on compose,
+  `K4.5` on Kind) and a unit with no id on the current gate is reported as
+  skipped, so the coverage asymmetry is a number rather than something you notice
+  by reading two files side by side. A row that never executed reports **DID NOT
+  RUN**, the one outcome a green summary otherwise cannot tell from success.
+  PKCE moves into JS — neither realm accepts a password grant — which also
+  sidesteps zsh treating `USERNAME` as the OS user. **K1.7 and K4.10 no longer
+  need `kubectl exec`:** the Temporal UI serves a JSON API carrying a workflow's
+  `versioningInfo` and a deployment's `routingConfig`, and comparing the two is
+  stronger than reading the CRD status — the routing config is what the server
+  dispatches on, the CRD is what the controller believes it asked for. Kind rows
+  are converted and proven on a live cluster (9/10, the tenth an honest failure);
+  compose rows are named as staged, not assumed converted.
+
 - **The compose gate learns the ADR-053 rows, and the local edge catches up to
   the cluster.** The audit gains A21 (a published product with no balance row
   answers a flat `409 ITEM_NOT_ORDERABLE` at session create — no `Retry-After`,
@@ -1452,6 +1474,19 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **K4.3 had never been able to pass.** The row drove
+  `https://127.0.0.1/product/v1/public/products` and wanted `404`; that request
+  never reaches HTTP, because SNI may not carry an IP literal, so no TLS filter
+  chain matches and Envoy drops the connection — `curl` reports exit 35 and
+  `http_code 000`. The intent (routing is by Host header) was right and the
+  mechanism was not: the row now reaches the real listener with a valid SNI and a
+  Host no HTTPRoute claims, which tests the same thing and can actually pass.
+  Found by porting the row to k6. Also fixed: the trace-coverage rows failed
+  because `review` is only reachable through product's fan-out, so no run had
+  ever given it a span — the suite drives that traffic and waits for it to land.
+  And **K4.5s** is new, a staff mint recipe the Kind audit never had, which is
+  why nothing in it could reach a `/protected/` route.
+
 - **`kyverno.md` said tracing would show per-policy latency. It would, and the
   metrics already do.** The note written in #855 gave the wrong reason for a
   correct decision, so anyone re-opening the question would have re-opened it on a
@@ -1660,6 +1695,27 @@ Skeleton (copy what you need):
   patches behind, no functional skew, but the F1 finding was exactly a skew here.
 
 #### Gateway
+
+- **The edge ceiling was a per-caller number doing an aggregate job.** API routes
+  go from `requests: 2` to `requests: 25` per Envoy instance (~50/s across two
+  replicas, matching compose) in
+  [`btp-api.yaml`](kubernetes/infra/configs/envoy-gateway/policies/btp-api.yaml),
+  recorded as an amendment on
+  [ADR-045](docs/proposals/adr/ADR-045-local-first-edge-rate-limiting/#history).
+  The mechanism is untouched — still `rateLimit.local`, still exactly one rule
+  without `clientSelectors`, still no RLS and no Redis. The sizing was the
+  problem: the pre-cutover limit was billed per client, and halving it for two
+  replicas turned it into an aggregate shared by every client, identity and route
+  the policy targets. At ~4/s fleet-wide one SPA page fanning out parallel calls
+  could exhaust the bucket and see its own 429. Nothing measured it — ADR-045's
+  own validation row was never exercised and the Kind runbook did not mention
+  rate limiting at all. Now asserted in both directions by the new **K4.11** and
+  `scripts/k6/ratelimit.js`: nothing limited below the ceiling, `429` with the
+  `X-RateLimit` draft-03 headers above it. Measured on Kind before and after —
+  25/s went from heavily limited to clean while 200/s still 429s, so the limiter
+  was raised and not disabled. A second rule cannot be used to exempt a caller:
+  Envoy Gateway applies every matching rule and rejects if any triggers, so
+  `clientSelectors` can only make a subset stricter.
 
 - **The Gateway API CRDs could never install.** `gateway-api-crds` was a
   HelmRelease on `gateway-crds-helm`, which ships its CRDs in `templates/`, so

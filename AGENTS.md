@@ -245,6 +245,11 @@ make flux-sync    # force reconciliation
   **Phase B (browser):** read the **agent-browser** skill from the agent IDE and run
   `agent-browser skills get core` (see [Engineering skills workflow](#engineering-skills-workflow)),
   then the Phase B commands in the local-stack E2E runbook.
+- **k6 assertion layer:** the HTTP-shaped rows of both gates are asserted by
+  `make e2e GATE=compose|kind` ([`scripts/k6/`](scripts/k6/),
+  [`docs/testing/k6.md`](docs/testing/k6.md), ADR-056). A failed row exits
+  non-zero and prints the evidence table — prefer it over pasting `curl` by hand,
+  and keep a row's pass bar in the runbook rather than only in code.
 - **Service dev:** in the service repo, `GOTOOLCHAIN=auto go build ./... && go test ./...`.
 
 ## Platform architecture & conventions

@@ -46,6 +46,10 @@ spec:
     # change in this service beyond the shared-contract bump.
     image_tag: "0.6.0" # {"$imagepolicy": "flux-system:inventory:tag"}
     namespace: inventory
+    # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm
+    # pairs belong in the manifest rather than in compiled defaults.
+    authmw: true
+    staffauthmw: true
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — inventory's data lives on
     # product-db in the product namespace, which is already backed up.

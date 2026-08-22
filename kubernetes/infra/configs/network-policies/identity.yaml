@@ -58,11 +58,21 @@ spec:
     # `protected` route in the cluster answered 401. Found by the Kind gate's new
     # K4.10 row; it is why K4.5 onward had never passed on a cluster.
     #
-    # Scoped to exactly the namespaces that need it — the seven whose Deployments
-    # carry OIDC_JWKS_URL, enumerated from the live cluster rather than assumed.
-    # NOT listed: product, shipping and inventory (no in-service verifier);
-    # frontend and backoffice (SPAs served by nginx — the browser holds the token,
-    # nothing server-side verifies it).
+    # Scoped to exactly the namespaces that need it.
+    #
+    # CORRECTED 2026-08-22. This list first read "the seven whose Deployments
+    # carry OIDC_JWKS_URL" and said product, shipping and inventory were absent
+    # because they had "no in-service verifier". That was wrong: all three
+    # construct pkg/authmw in cmd/main.go. What they lacked was the env pair, so
+    # they fell back to compiled defaults that hairpin to the public host — the
+    # verifier was there all along, just pointed somewhere it could not reach.
+    # Enumerating by which manifests happened to set a variable found the
+    # symptom, not the set.
+    #
+    # The ten now listed are every namespace running an in-service verifier
+    # against either realm. Still NOT listed: frontend and backoffice (SPAs
+    # served by nginx — the browser holds the token, nothing server-side
+    # verifies it).
     #
     # Port 8080 only. The management interface (:9000) stays reachable from
     # `monitoring` alone.
@@ -74,10 +84,13 @@ spec:
                 values:
                   - cart
                   - checkout
+                  - inventory
                   - notification
                   - order
                   - payment
+                  - product
                   - review
+                  - shipping
                   - user
       ports:
         - protocol: TCP

@@ -76,6 +76,10 @@ spec:
     # for /metrics and 0 for /health and /ready, unchanged.
     image_tag: "1.13.1" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
+    # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm
+    # pairs belong in the manifest rather than in compiled defaults.
+    authmw: true
+    staffauthmw: true
     platform_backup_label: "cnpg"
     replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"

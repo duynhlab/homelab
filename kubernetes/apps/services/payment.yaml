@@ -57,6 +57,10 @@ spec:
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
     authmw: true
+    # Serves /protected/ (staff realm). The staff JWKS must be set for the
+    # same reason as the customer one: left empty the service derives it
+    # from the staff ISSUER, which is the public host.
+    staffauthmw: true
     # No platform_backup_label: that label routes CNPG/barman S3 credentials to
     # namespaces hosting a database cluster — payment's data lives on product-db
     # in the product namespace, which is already backed up.

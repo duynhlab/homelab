@@ -19,12 +19,22 @@
   that admit callers only to the service pods themselves — in `product` because
   PgDog also listens on `:9090` (openmetrics) and a namespace-wide `:9090` allow
   would hand the metrics port to app callers.
-- **Keycloak (`identity` namespace) is the token issuer** (RFC-0024). Only two
+- **Keycloak (`identity` namespace) is the token issuer** (RFC-0024). Three
   sources hold an ingress allow into `identity`: `envoy-gateway` on `:8080`
   (the `id.duynh.me` route **and** the edge SecurityPolicy `remoteJWKS` fetches
-  of `/realms/duynhlab/protocol/openid-connect/certs`) and `monitoring` on
-  `:9000` (Keycloak management/metrics). **No service namespace is admitted
-  into `identity`** — JWT screening against the JWKS happens at the edge.
+  of `/realms/duynhlab/protocol/openid-connect/certs`), `monitoring` on `:9000`
+  (Keycloak management/metrics), and — **added 2026-08-22** — the **seven service
+  namespaces that run `pkg/authmw`** on `:8080`, for their own JWKS fetch.
+  That third allow corrects a documented contradiction rather than widening a
+  boundary casually. This page used to say *"no service namespace is admitted —
+  JWT screening happens at the edge"*, while
+  [`docs/api/api.md`](../api/api.md) names the edge check **coarse** and the
+  in-service `pkg/authmw` verifier **authoritative**. The manifests implemented
+  both: every service carried `OIDC_JWKS_URL`, and `authmw` is fail-closed, so a
+  JWKS it could not reach rejected every token. The result was that **every
+  `private` and `protected` route in the cluster answered 401** — found by the
+  Kind gate's K4.10 row, and the reason K4.5 onward had never passed on a
+  cluster. The edge check is kept; it is the coarse first pass, not the only one.
 - The checkout service is a pure gRPC **client** east-west: nothing dials into
   it on `:9090`, while it appears as a `:9090` caller on cart, order, product,
   shipping, and inventory.
@@ -81,7 +91,7 @@ traffic; the rest mirror the east-west call graph. Ports are TCP.
 
 | Callee ns | Allowed callers (policy) | Why |
 |-----------|--------------------------|-----|
-| **identity** (Keycloak) | `envoy-gateway` → `:8080`; `monitoring` → `:9000` | The edge serves the `id.duynh.me` route and fetches the JWKS (`/realms/duynhlab/protocol/openid-connect/certs`) for its `remoteJWKS` SecurityPolicy; VMAgent scrapes the Keycloak management interface. **No service namespace is admitted** — token verification happens at the edge, not by services dialing Keycloak. |
+| **identity** (Keycloak) | `envoy-gateway` → `:8080`; `monitoring` → `:9000`; `cart` `checkout` `notification` `order` `payment` `review` `user` → `:8080` | The edge serves the `id.duynh.me` route and fetches the JWKS for its `remoteJWKS` SecurityPolicy; VMAgent scrapes the management interface. The **seven `pkg/authmw` services fetch the same JWKS themselves** — their verifier is the authoritative one ([`api.md`](../api/api.md)) and is fail-closed, so without this allow every `private` route 401s. Scoped by enumerating the Deployments that carry `OIDC_JWKS_URL`: **not** `product`/`shipping`/`inventory` (no in-service verifier), **not** `frontend`/`backoffice` (SPAs — the browser holds the token). `:9000` stays `monitoring`-only. |
 | **user** | `envoy-gateway` → `:8080` | Browser-only today; no service-to-service caller. |
 | **product** | `envoy-gateway` → `:8080`; `checkout` → `:9090` (**pod-scoped** `allow-product-grpc`) | Checkout re-validates prices via `product.v1` (RFC-0015). `order` was deliberately **removed** from the gRPC allow — RFC-0021 P4 deleted the saga's product stock activities, and keeping the allow would let a rolled-back build silently reserve stock at product again. DB-tier allows: [table below](#db-tier-allows). |
 | **cart** | `envoy-gateway`, `order` → `:8080`; `checkout` → `:9090` | `order` reads the cart during checkout; the checkout service reads it over `cart.v1` gRPC only (RFC-0015), never the HTTP API. |
@@ -148,6 +158,11 @@ flowchart LR
     EDGE -->|"id.duynh.me + remoteJWKS"| IDP
     EDGE -->|":8080 Backoffice only"| INV
 
+    %% The seven pkg/authmw services fetch the JWKS themselves (added 2026-08-22).
+    %% Their verifier is the authoritative one and is fail-closed, so this is not
+    %% redundancy with the edge -- without it every private route answers 401.
+    USER & CART & ORDER & CHECKOUT & REVIEW & NOTIF & PAYMENT -->|":8080 JWKS"| IDP
+
     %% East-west business calls
     ORDER -->|read cart| CART
     CHECKOUT -->|":9090 cart.v1"| CART
@@ -166,9 +181,11 @@ flowchart LR
     classDef pay fill:#0d5c3d,color:#fff,stroke:#063020
 ```
 
-> Note the two arrows that do **not** exist: no service namespace →
-> `identity` (only the edge fetches the JWKS), and nothing → `checkout`
-> on `:9090` (it is a gRPC client, never a server to the mesh). The
+> Note the arrow that does **not** exist: nothing → `checkout` on `:9090` (it is a
+> gRPC client, never a server to the mesh). The seven `pkg/authmw` namespaces
+> **do** reach `identity:8080` since 2026-08-22 — that arrow was missing from
+> both this diagram and the policy, and its absence 401'd every authenticated
+> route on the cluster. The
 > `pod-scoped` labels mark allows that admit callers only to the service
 > pods (`allow-product-grpc`, `allow-inventory-grpc`), not the whole
 > namespace. Internal-audience routes ride these same hops — the

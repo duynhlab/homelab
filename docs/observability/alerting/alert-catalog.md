@@ -433,9 +433,18 @@ a cluster twin is a recorded gap. Pyroscope profiling-backend health is covered 
 Source: `prometheusrules/observability/clickhouse-alerts.yaml`. Series come from
 the Altinity operator's metrics Service (`/metrics` = operator control plane,
 `/chi` = metrics-exporter engine view), scraped by the chart's ServiceMonitor
-(`controllers/clickhouse-operator`). **Planned** — merged but not yet run on
-Kind; the expressions marked VERIFY-AT-KIND in the rule file get tuned against
-the first live scrape.
+(`controllers/clickhouse-operator`). **Verified on Kind 2026-08-22** — 920
+`chi_*`/`clickhouse` series present, and the three `VERIFY-AT-KIND` markers are
+closed. Two expressions were correct as written (`chi_clickhouse_metric_fetch_errors`,
+`chi_clickhouse_metric_PartsActive`). **Three alerts were deleted** because the
+series they named do not exist and no equivalent exists under another name:
+`ClickHouseInsertsRejected`, `ClickHouseInsertsFailing`, `ClickHouseMergesFailing`
+(`chi_clickhouse_event_{RejectedInserts,FailedInsertQuery,FailedMerges}` — a search
+for `Failed` across every `chi_` series returns nothing). `ClickHouseInsertsDelayed`
+moved from the non-existent `event_DelayedInserts` to the real
+`chi_clickhouse_metric_DelayedInserts`, and from `rate()` to `> 0` because it is a
+gauge. The parts→delay→reject chain keeps its first two links alerted; nothing
+reaches the third without passing them.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|

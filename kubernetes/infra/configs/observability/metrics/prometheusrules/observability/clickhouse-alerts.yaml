@@ -36,7 +36,9 @@ spec:
         # scrape; fetch errors are the earliest "server unreachable" signal
         # we have without a per-pod scrape. `up` on the operator job covers
         # the exporter itself being gone.
-        # VERIFY-AT-KIND: fetch-error series name.
+        # Series name verified on the Kind cluster 2026-08-22: the exporter does
+        # publish chi_clickhouse_metric_fetch_errors. An earlier note in this repo
+        # claimed it did not exist -- that was wrong.
         - alert: ClickHouseServerUnreachable
           expr: chi_clickhouse_metric_fetch_errors > 0
           for: 5m
@@ -86,7 +88,8 @@ spec:
         # Early merge-starvation signal, well before parts_to_throw_insert
         # (default 300 active parts per partition throws; we alert at the
         # table-wide count trend instead).
-        # VERIFY-AT-KIND: PartsActive casing.
+        # Casing verified on the Kind cluster 2026-08-22:
+        # chi_clickhouse_metric_PartsActive, exactly as written.
         - alert: ClickHouseTooManyParts
           expr: chi_clickhouse_metric_PartsActive > 300
           for: 10m
@@ -97,40 +100,29 @@ spec:
             summary: "ClickHouse active parts high ({{ $labels.hostname }})"
             description: "Active part count is sustained above 300 — merges are not keeping up with inserts. Left alone this ends in delayed, then rejected inserts."
 
-        # VERIFY-AT-KIND: event-counter names below (RejectedInserts,
-        # FailedInsertQuery, FailedMerges, DelayedInserts).
-        - alert: ClickHouseInsertsRejected
-          expr: rate(chi_clickhouse_event_RejectedInserts[5m]) > 0
-          for: 5m
-          labels:
-            severity: warning
-            category: observability
-          annotations:
-            summary: "ClickHouse rejecting inserts ({{ $labels.hostname }})"
-            description: "Inserts are being rejected (too-many-parts guard). The OTel Collector will retry, then drop — check merges and disk."
-
-        - alert: ClickHouseInsertsFailing
-          expr: rate(chi_clickhouse_event_FailedInsertQuery[5m]) > 0
-          for: 5m
-          labels:
-            severity: warning
-            category: observability
-          annotations:
-            summary: "ClickHouse insert queries failing ({{ $labels.hostname }})"
-            description: "Insert queries are erroring on the OTel store — telemetry rows are being lost at the door."
-
-        - alert: ClickHouseMergesFailing
-          expr: rate(chi_clickhouse_event_FailedMerges[5m]) > 0
-          for: 10m
-          labels:
-            severity: warning
-            category: observability
-          annotations:
-            summary: "ClickHouse merges failing ({{ $labels.hostname }})"
-            description: "Background merges are failing; parts will accumulate until inserts are delayed and then rejected."
-
+        # Event-counter names verified on the Kind cluster 2026-08-22, and THREE
+        # of the four alerts that stood here were deleted because the series they
+        # named do not exist. The exporter publishes 166 chi_clickhouse_event_*
+        # series and 920 chi_*/clickhouse series in total; a name search for
+        # RejectedInserts, FailedInsertQuery, FailedMerges -- and for `Failed`
+        # anywhere in a chi_ series -- returns nothing. No replacement exists
+        # under another name, so there was nothing to re-point them at.
+        #
+        # This is exactly the failure the VERIFY-AT-KIND convention was invented
+        # for: an expression naming a series that does not exist loads cleanly,
+        # never fires, and is indistinguishable from a healthy alert. Three of
+        # these had been sitting here reading as coverage.
+        #
+        # What still covers the condition, with real series: the chain is
+        # too-many-parts -> delayed inserts -> rejected inserts, and its first two
+        # links are alerted above by ClickHouseTooManyParts (PartsActive) and by
+        # ClickHouseInsertsDelayed below. Losing the terminal link costs little,
+        # because nothing reaches it without passing the first two.
         - alert: ClickHouseInsertsDelayed
-          expr: rate(chi_clickhouse_event_DelayedInserts[5m]) > 0
+          # chi_clickhouse_metric_DelayedInserts, NOT the event_ family: this is a
+          # gauge of currently-delayed inserts, so `> 0 for 10m` is the right shape
+          # and rate() over it would be meaningless.
+          expr: chi_clickhouse_metric_DelayedInserts > 0
           for: 10m
           labels:
             severity: info

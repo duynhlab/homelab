@@ -1110,9 +1110,15 @@ hand — which is why the shape is worth knowing rather than forgetting.
 - Retirement is declarative: `sunset.scaledownDelay 1h` then `deleteDelay 24h`,
   keyed off the server's own `status.deprecatedVersions[].drainedSince` — the
   machine-checkable gate ADR-030 recorded as follow-up 2 and nothing checked.
+- **How to release a new build** — one line, and the procedure is
+  [`application-delivery.md` § Releasing the order worker](../platform/application-delivery.md#releasing-the-order-worker).
+  Read that rather than this section if the task is "a new tag exists, now what".
 - Design record: [RFC-0026](../proposals/rfc/RFC-0026/) ·
-  [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/). The historical
-  hand-run procedure is [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover).
+  [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/). The pre-ADR-054
+  hand-run procedure survives as **history only** —
+  [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover)
+  describes a per-build manifest and an activation Job that no longer exist. Do
+  not follow it.
 
 The sequence above answers *how a task finds its build*. This one answers *who moves
 a version through its life* — the same mechanics [RFC-0026's

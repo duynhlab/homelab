@@ -431,6 +431,7 @@ and extend Adoption instead.
 | [ADR-053](ADR-053-untracked-sku-operator-data-not-outage/) | Treat the untracked SKU as operator data, not an outage | Accepted | Partial | — |
 | [ADR-054](ADR-054-temporal-worker-controller/) | Give the versioned-worker lifecycle to the Temporal Worker Controller | Accepted | Complete | [RFC-0026](../rfc/RFC-0026/) |
 | [ADR-055](ADR-055-keda-worker-autoscaling/) | Scale versioned workers from task-queue backlog with KEDA | Proposed | Not started | [RFC-0026](../rfc/RFC-0026/) |
+| [ADR-056](ADR-056-k6-e2e-assertion-layer/) | Assert the E2E gates with k6 instead of reading curl by eye | Accepted | Partial — Kind rows converted and proven on a live cluster; compose rows staged | — |
 
 Principles:
 
@@ -441,4 +442,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-21 — ADR-054 and ADR-055 created at `Proposed` with [RFC-0026](../rfc/RFC-0026/) (Worker Controller; KEDA recorded but not installed). Previously: ADR-053 Adoption → Partial (train shipped, compose-verified; Kind gate pending)_
+_Last updated: 2026-08-22 — ADR-056 accepted (k6 assertion layer; ADR-045 sizing amended alongside it, and ADR-055 finally has an observed backlog to scale on). Previously: ADR-054 and ADR-055 created at `Proposed` with [RFC-0026](../rfc/RFC-0026/)_

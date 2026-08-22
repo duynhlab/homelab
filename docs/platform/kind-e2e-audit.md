@@ -408,6 +408,14 @@ the tag exists; running it earlier audits the previous release.
   `kubectl -n temporal get hr temporal-worker-controller-crds temporal-worker-controller`
   and the manager's logs before touching anything in `order`.
 
+  > **Also asserted by `make e2e-saga GATE=kind`** (SG.4), which reads the same
+  > facts over HTTP: the Temporal UI serves a JSON API carrying a deployment's
+  > `routingConfig.currentDeploymentVersion.buildId` and a workflow's
+  > `versioningInfo`. That comparison is **stronger** than reading the CRD's
+  > status — the routing config is what the server actually dispatches on, while
+  > the CRD reports what the controller believes it asked for. Keep the `kubectl`
+  > form below for diagnosing a disagreement between the two.
+
 - [ ] **K1.8** *(informational)* `make tf-plan` shows a zero diff.
   **FAIL:** a non-empty plan means the bootstrap did not converge.
 
@@ -663,6 +671,16 @@ cannot be derived from a single file — they get their own row (K2.3).
 
 ## K4 — The real edge and identity
 
+> **Run these rows with one command.** `make e2e-smoke GATE=kind` asserts
+> **K4.1–K4.5, K4.5s and K4.8** and prints a PASS/FAIL table per row — paste that
+> table as the evidence for them ([ADR-056](../proposals/adr/ADR-056-k6-e2e-assertion-layer/),
+> [`docs/testing/k6.md`](../testing/k6.md)). The `curl` in each row below stays as
+> the **diagnostic** for a row the suite reports as failing: it shows the single
+> request in isolation, which is what you want in your hand when you are working
+> out why. What it is no longer is the gate — a status code read by eye cannot
+> fail a release, and one of these rows had been unpassable for weeks without
+> anyone noticing (see K4.3).
+
 Compose reached everything on a fixed localhost port. The cluster reaches nothing
 that way. Translation table:
 
@@ -699,9 +717,21 @@ breaks a command copied from the Compose audit:
   **FAIL:** a certificate error even with `-k`, or an empty body. After K1.6 this
   should return seeded products, not `[]`.
 
-- [ ] **K4.3** Routing is by **Host header**, not by IP.
-  `curl -sk -o /dev/null -w '%{http_code}\n' https://127.0.0.1/product/v1/public/products`
-  **Want 404** — no route matches. A 200 would mean a route is bound too widely.
+- [ ] **K4.3** Routing is by **Host header**, not by whatever answers the socket.
+  ```bash
+  curl -sk -o /dev/null -w '%{http_code}\n' -H 'Host: nope.invalid' \
+    https://gateway.duynh.me/product/v1/public/products
+  ```
+  **Want 404** — the request was routed, and the routing layer found no route for
+  that Host. A 200 would mean a route is bound too widely.
+  > **This row could not pass as written until 2026-08-22.** It drove
+  > `https://127.0.0.1/product/v1/public/products` and wanted 404. That request
+  > never reaches HTTP: SNI may not carry an IP literal, so no TLS filter chain
+  > matches and Envoy drops the connection — `curl` reports exit **35** and
+  > `http_code` **000**, and k6 an EOF. The intent was right and the mechanism
+  > was not; reaching the real listener with a valid SNI and an unclaimed Host
+  > tests the same thing and can actually pass. Found by porting the row to k6,
+  > which is the argument for porting rows.
 
 - [ ] **K4.4** Both realms exist and are the ones from git
   (`kubernetes/infra/controllers/keycloak/configmap-realm.yaml`).
@@ -811,6 +841,29 @@ breaks a command copied from the Compose audit:
   **Want 401.** A 403 means the edge let it through and a service rejected it —
   weaker than the contract, and a finding.
 
+- [ ] **K4.11 The edge rate limiter holds, in both directions.** Added
+  2026-08-22. This audit had never mentioned rate limiting at all, and the gap
+  mattered more here than on compose: the compose edge allows 50/s and tells you
+  a 429 is a finding, while this one was configured at **2/Second per instance**
+  — roughly 4/s across two replicas, shared by every client, identity and route,
+  because the catch-all rule has no client dimension. A single page fanning out
+  parallel calls could exhaust it and see its own 429, and no row would have
+  caught that.
+  ```bash
+  make e2e-ratelimit GATE=kind
+  ```
+  **Want:** nothing limited below the ceiling, and above it a **429** carrying
+  `X-RateLimit-Limit`, `-Remaining` and `-Reset` (draft-03) so a client can back
+  off correctly. The ceiling was raised to **25/Second** per instance (~50/s
+  fleet-wide, matching compose) on 2026-08-22 — see
+  [ADR-045 § History](../proposals/adr/ADR-045-local-first-edge-rate-limiting/#history).
+  **FAIL:** limited *below* the ceiling means `btp-api.yaml` and
+  `scripts/k6/lib/config.js` disagree about the number. Never limited *above* it
+  means the policy is not attached to the route — the limiter is absent, not fast.
+  > A second rule cannot be used to exempt a caller: Envoy Gateway applies every
+  > matching rule and rejects if any triggers, so `clientSelectors` can only ever
+  > make a subset stricter. Raising the ceiling means changing the number.
+
 - [ ] **K4.9** **💤 Not runnable since 2026-08-21 — MCP is off** (see
   [K3.6](#k3--admission-secrets-isolation); the HTTPRoutes are commented out too,
   so these hostnames have no route at all). All four MCP servers answer **through
@@ -885,9 +938,28 @@ breaks a command copied from the Compose audit:
   > with no human step in between. Running the retired activation Job "just in case"
   > destroys the only evidence this row exists to collect.
 
+  > **Now a single command: `make e2e-saga GATE=kind`.** It arms stock through the
+  > staff receipt endpoint, drives the funnel, then polls the Temporal UI's JSON
+  > API until the workflow is terminal and asserts `COMPLETED`, `Pinned`, the
+  > composed `DeploymentName`, a build id equal to the deployment's **Current**,
+  > and no half-finished ramp — SG.1 through SG.4, no `kubectl exec` anywhere.
+  > Arming the stock is not incidental: a single SKU carries finite seeded stock,
+  > so a repeated run eventually meets `insufficient stock to reserve` and the
+  > saga fails, correctly refusing to oversell. Unarmed, this row would decay run
+  > over run and read as a broken saga. The commands above remain the diagnostic
+  > for a run the suite reports as failing.
+
 ---
 
 ## K5 — The four signals
+
+> **K5.2, K5.6 and K5.8 are asserted by `make e2e-smoke GATE=kind`** together
+> with the K4 rows. The suite drives its own traffic first and waits for the
+> spans to land, which is a step this section used to leave to the reader: a
+> coverage row reads a store that lags the traffic, and `review` in particular is
+> only reachable through product's fan-out, so a run that lists products leaves
+> it with no span and the row fails for a reason that has nothing to do with
+> telemetry.
 
 The Compose audit's Phase C, re-pointed at the cluster. Local patches the edge
 `samplingRate` to **100**, so trace results here are deterministic.
@@ -1147,6 +1219,15 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   - kube-level rows such as `KubePodCPUThrottlingHigh`, which fires on
     `kube-system/kindnet-*` at ~100% throttling. kindnet is Kind's own CNI and
     nothing in this repo sets its limits. Record it and move on.
+  - **After running `make e2e-load`**, expect `InventoryGrpcHighErrorRate` on
+    `page`. Sustained order load exhausts a SKU's seeded stock, inventory then
+    answers `FailedPrecondition: insufficient stock to reserve`, and the saga
+    fails — which is inventory *working*, refusing to oversell. The alert counts
+    that business rejection as a gRPC error, so a correct refusal inflates an
+    error-rate SLO. Worth a decision of its own (should `FailedPrecondition` be
+    excluded from the error ratio?); until then it is drill fallout, not a
+    defect. `MicroserviceNoSuccessfulRequests` firing alongside it usually means
+    a worker was scaled to zero for the backlog drill and never scaled back.
   > The row used to read *"nothing is firing on a healthy stack"*, which is
   > **unachievable by construction** here: `Watchdog` fires by design, and the
   > slow-burn windows cannot be satisfied by a cluster that has just been built.

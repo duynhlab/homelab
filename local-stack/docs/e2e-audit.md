@@ -174,6 +174,18 @@ already mint their own for this reason.
 
 ## Phase A — API contract (curl, ~10 min hands-on)
 
+> **A k6 suite now asserts these rows on the cluster, and is staged for compose.**
+> [`scripts/k6/`](../../scripts/k6/) expresses each HTTP-shaped row as a check
+> with a per-row threshold, so a failed row exits non-zero instead of scrolling
+> past ([ADR-056](../../docs/proposals/adr/ADR-056-k6-e2e-assertion-layer/),
+> [`docs/testing/k6.md`](../../docs/testing/k6.md)). On this gate it currently
+> covers the token-claims and telemetry-coverage rows via
+> `make e2e GATE=compose`; **A2–A5, A7, A11 and A17–A21 are still hand-run here**
+> and are named as staged work in ADR-056 rather than quietly assumed converted.
+> Porting the equivalent rows to the cluster gate found two that could not pass as
+> written, so expect the same when the rest move.
+
+
 Timing is dominated by waits, not by typing: A10 sleeps 13s, A12 polls up to 24s,
 A14 restarts `temporal` and waits for it to report healthy, and the conditional
 A15 adds roughly 5 minutes of drill. **A13 is the outlier** — it is gated on the

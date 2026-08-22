@@ -257,7 +257,11 @@ function runGroup(kinds) {
 // reached through product's fan-out, so a run that lists products never gives
 // it a span.
 export function drive() {
-  http.get(`${target.base}/review/v1/public/reviews`);
+  // `product_id` is required on the review list -- a bare GET answers 400, and
+  // a drive step that manufactures 400s is worse than none: it fired
+  // ReviewHighOverallErrorRate and then failed the alert row two scenarios
+  // later, which reads as a platform fault caused by the test.
+  http.get(`${target.base}/review/v1/public/reviews?product_id=1`);
   http.get(`${target.base}/product/v1/public/products/1/details`);
 }
 

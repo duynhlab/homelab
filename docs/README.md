@@ -487,6 +487,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 ### Runbooks
 
 - [Kind E2E audit](./platform/kind-e2e-audit.md) - The cluster release gate (K0–K6), twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
+- [k6 assertion layer](./testing/k6.md) - One suite for both gates: rows as thresholds, saga over HTTP, edge limiter, Temporal backlog
 - [PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md) - Backup and restore procedures
 - [Logging troubleshooting](./observability/logging/README.md#troubleshooting) - Missing/blank Kubernetes logs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow

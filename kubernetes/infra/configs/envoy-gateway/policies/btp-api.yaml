@@ -3,8 +3,18 @@
 # per-domain resilience source values):
 #
 #   1. rateLimit.local sized as per-instance buckets (effective ceiling =
-#      configured x replicas — ADR-045 local-first decision): 2/Second
-#      (round of 2.5), so 4/s across replicaCount 2.
+#      configured x replicas — ADR-045 local-first decision): 25/Second, so
+#      ~50/s across replicaCount 2, matching the compose edge so a number
+#      measured on one gate means the same on the other.
+#
+#      RAISED from 2/Second on 2026-08-22. The catch-all rule below has no
+#      clientSelectors, and that is what the old number missed: with no client
+#      dimension the ceiling is not "per caller" but an AGGREGATE shared by
+#      every client, every identity and every route this policy targets. At
+#      ~4/s fleet-wide, one SPA page that fans out a handful of parallel calls
+#      can exhaust the bucket by itself and see its own 429. Nothing in either
+#      gate measured the limiter at all -- scripts/k6/ratelimit.js now does,
+#      driving below the ceiling expecting none and above it expecting 429.
 #      ONE rule, and that is a hard constraint, not a preference: Envoy
 #      Gateway rejects a local rateLimit with more than one rule unless the
 #      extras carry clientSelectors, and clientSelectors match headers/CIDR —
@@ -60,7 +70,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -99,7 +109,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -138,7 +148,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -177,7 +187,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -219,7 +229,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -258,7 +268,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -297,7 +307,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -339,7 +349,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:
@@ -378,7 +388,7 @@ spec:
     local:
       rules:
         - limit:
-            requests: 2
+            requests: 25
             unit: Second
           xRateLimitHeaders: DraftVersion03
   requestBuffer:

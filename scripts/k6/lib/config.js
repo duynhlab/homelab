@@ -38,9 +38,10 @@ const PRESETS = {
     vtraces: 'https://victoriatraces.duynh.me',
     vmalert: 'https://vmalert.duynh.me',
     redirect: { customer: 'https://local.duynh.me/', staff: 'https://backoffice.duynh.me/' },
-    // policies/btp-api.yaml requests-per-Second x data-plane replicas. Keep this
-    // in step with that manifest; a stale number here reads as a platform fault.
-    rateCeiling: Number(__ENV.RATE_CEILING || 4),
+    // policies/btp-api.yaml requests-per-Second x data-plane replicas
+    // (25 x 2). Keep this in step with that manifest; a stale number here
+    // reads as a platform fault.
+    rateCeiling: Number(__ENV.RATE_CEILING || 50),
     insecure: true,
   },
 };

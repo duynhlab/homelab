@@ -279,7 +279,7 @@ export function handleSummary(data) {
   }
   return {
     stdout: md,
-    [`k6/out/smoke-${target.gate}.md`]: md,
-    [`k6/out/smoke-${target.gate}.json`]: JSON.stringify(data),
+    [`scripts/k6/out/smoke-${target.gate}.md`]: md,
+    [`scripts/k6/out/smoke-${target.gate}.json`]: JSON.stringify(data),
   };
 }

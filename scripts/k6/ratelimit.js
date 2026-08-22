@@ -134,5 +134,5 @@ export function handleSummary(data) {
     );
   }
   const md = lines.join('\n');
-  return { stdout: md, [`k6/out/ratelimit-${target.gate}.md`]: md };
+  return { stdout: md, [`scripts/k6/out/ratelimit-${target.gate}.md`]: md };
 }

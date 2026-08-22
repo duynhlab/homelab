@@ -31,7 +31,7 @@ max(order_reconciler_backlog)
 
 ### kubectl / logs
 ```bash
-kubectl logs -n order -l app=order-worker --tail=300 | grep -iE "compensation|failOrder"
+kubectl logs -n order -l app.kubernetes.io/name=order-worker --tail=300 | grep -iE "compensation|failOrder"
 ```
 
 ### Temporal

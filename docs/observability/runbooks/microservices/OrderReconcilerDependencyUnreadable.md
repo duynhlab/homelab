@@ -35,7 +35,7 @@ sum by (action) (rate(order_reconciler_repairs_total[10m]))   # unreadable vs de
 
 ### kubectl / logs
 ```bash
-kubectl logs -n order -l app=order-worker --tail=200 | grep -E "could not read a reservation|could not determine whether the saga"
+kubectl logs -n order -l app.kubernetes.io/name=order-worker --tail=200 | grep -E "could not read a reservation|could not determine whether the saga"
 kubectl -n inventory get pods -l app=inventory
 kubectl -n temporal get pods -l app.kubernetes.io/component=frontend
 ```

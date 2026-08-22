@@ -52,7 +52,7 @@ Same ordering the scan uses: repairable work first, known breaches last.
 
 ### kubectl / logs
 ```bash
-kubectl logs -n order -l app=order-worker --tail=300 | grep -i reconcil
+kubectl logs -n order -l app.kubernetes.io/name=order-worker --tail=300 | grep -i reconcil
 ```
 Each order is reported **once**, not once per pass — a single line is the normal
 representation of a persistent problem, not a transient one.

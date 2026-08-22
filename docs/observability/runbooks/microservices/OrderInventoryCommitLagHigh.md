@@ -46,7 +46,7 @@ completing rather than completing slowly.
 
 ### kubectl / logs
 ```bash
-kubectl logs -n order -l app=order-worker --tail=300 | grep -i "CommitInventory"
+kubectl logs -n order -l app.kubernetes.io/name=order-worker --tail=300 | grep -i "CommitInventory"
 kubectl -n inventory logs -l app=inventory --tail=200
 ```
 `CommitInventory failed after the pivot` at Error level means the retry budget was

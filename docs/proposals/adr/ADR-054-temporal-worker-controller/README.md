@@ -14,8 +14,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-21 |
 | **Owners** | `platform` |
 | **Deciders** | `platform owner` |
 | **Scope** | Who owns the lifecycle of a versioned Temporal worker on Kubernetes: build-id derivation, per-version Deployments, Current/Ramping routing, and retirement. Not whether to use Worker Versioning (ADR-030 decided that), not worker autoscaling (ADR-055), not `checkout-worker`'s opt-in. |
@@ -25,7 +25,7 @@
 | **Supersedes** | — (amends [ADR-030](../ADR-030-temporal-workflow-versioning/): its rollout **mechanism**, not its versioning decision) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0026 § Implementation History; work lands in `duynhlab/pkg` → `order-service` → `homelab` in that order |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — merged (#866–#869) and verified on Kind 2026-08-22: `CURRENT` set with no human step (K1.7), a saga completing with `Behavior Pinned` on `order/order-fulfillment` (K4.10), a `Progressive` rollout walking 10 → 50 → promoted, a rollback re-promoting the previous build id, and `service_version` tracking the derived build id (K5.4). **Not observed:** the `sunset.scaledownDelay` scale-to-zero — it needs 1h and the session was shorter; `drainedSince` was observed |
 
 ## Context
 
@@ -187,8 +187,8 @@ per-bring-up failure.
 ### Negative consequences and accepted trade-offs
 
 - **The `mop` chart no longer renders this workload.** `spec.template` is a raw
-  PodSpec: ~30 env vars, probes and resources are hand-written, and the file lands at
-  ~180 lines. Accepted because it is *one* file forever and a bump is one line — but
+  PodSpec: 37 env vars, probes and resources are hand-written, and the file lands at
+  **276 lines**. Accepted because it is *one* file forever and a bump is one line — but
   nothing now keeps it in step with the chart's future defaults, and that is a real
   drift surface.
 - **Env can no longer differ per live version.** One template serves every version, so
@@ -228,7 +228,7 @@ per-bring-up failure.
 | 4 | Install both charts; add the OCIRepository sources | `kubernetes/infra/controllers/temporal/`, `clusters/local/sources/oci/` |
 | 5 | Author `Connection` + `WorkerDeployment`; delete the per-build file, the CronJob and the script | `kubernetes/apps/`, `kubernetes/infra/controllers/temporal/`, `scripts/` |
 | 6 | Delete `validate_worker_build_id()`; keep the "stray versioning env on an unversioned worker" tripwire and point it at the new name | `scripts/flux-validate.sh` |
-| 7 | Remove audit row K1.7; update A15's env names | `docs/platform/kind-e2e-audit.md`, `local-stack/docs/e2e-audit.md` |
+| 7 | **Repurpose** audit row K1.7 — it now proves no activation step is needed, which is stronger than removing it; update A15's env names | `docs/platform/kind-e2e-audit.md`, `local-stack/docs/e2e-audit.md` |
 | 8 | Sync the as-built env contract and the single-file layout | [`docs/api/temporal.md`](../../../api/temporal.md) |
 | 9 | Amend ADR-030: rollout mechanism superseded, versioning decision left standing | [`ADR-030`](../ADR-030-temporal-workflow-versioning/) |
 
@@ -270,3 +270,5 @@ per-bring-up failure.
 | Date | Change |
 |------|--------|
 | 2026-08-21 | Proposed with RFC-0026 at architecture review. |
+| 2026-08-21 | Accepted; implementation merged in #866–#869. |
+| 2026-08-22 | Adoption **Complete** — verified on a Kind cluster built from zero. The Kind gate also surfaced two defects this decision did not cause: the `identity` NetworkPolicy admitted no service namespace to the JWKS (every `private` route 401'd), and the six staff verifiers default to a public issuer URL no pod can use (every `protected` route 503s). Both are recorded as findings, not as consequences of this ADR. |

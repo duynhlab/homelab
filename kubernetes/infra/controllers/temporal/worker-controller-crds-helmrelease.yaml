@@ -9,8 +9,10 @@
 # (TemporalWorkerDeployment, TemporalConnection) that upstream still ships for
 # migration. We author only the current kinds; the deprecated pair is inert here.
 #
-# crds: CreateReplace on both install and upgrade: a CRD schema that lags the
-# manager is how a WorkerDeployment starts failing validation on a reconcile
+# crds: Create on install, CreateReplace on upgrade (see below -- the values and
+# this comment disagreed until 2026-08-22). Create is enough for a first install;
+# CreateReplace on upgrade is the one that matters, because a CRD schema lagging
+# the manager is how a WorkerDeployment starts failing validation on a reconcile
 # nobody ran. Flux does not manage CRDs inside a release otherwise.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2

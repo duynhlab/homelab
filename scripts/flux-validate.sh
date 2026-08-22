@@ -199,10 +199,12 @@ validate_worker_versioning() {
   fi
 
   # --- The pod template must NOT hand-set the identity the controller injects.
-  # Both spellings are rejected: the current one would give the pod two
-  # identities (pkg/temporalx exits 1 on a disagreement, but failing here beats
-  # failing at pod start), and the retired TEMPORAL_WORKER_DEPLOYMENT_NAME would
-  # be a variable no binary reads any more — a manifest that lies quietly.
+  # Both spellings are rejected, and this is the ONLY guard against either:
+  # pkg/temporalx reads one name per variable, so it cannot see a hand-set value
+  # disagree with an injected one -- it exits only on HALF a config. A hand-set
+  # TEMPORAL_DEPLOYMENT_NAME therefore reaches the process silently, and the
+  # retired TEMPORAL_WORKER_DEPLOYMENT_NAME is a variable no binary reads at all
+  # -- a manifest that lies quietly. Hence the check lives here.
   local stray
   stray=$(yq eval-all '[select(.kind == "WorkerDeployment") | .spec.template.spec.containers[].env[]? | select(.name == "TEMPORAL_DEPLOYMENT_NAME" or .name == "TEMPORAL_WORKER_BUILD_ID" or .name == "TEMPORAL_WORKER_DEPLOYMENT_NAME")] | length' "${wd}")
   if [[ -n "${stray}" && "${stray}" != "null" && "${stray}" -ne 0 ]]; then

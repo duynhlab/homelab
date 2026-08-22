@@ -297,10 +297,17 @@ kubectl -n order get po -L temporal.io/build-id
 ```
 
 **Rolling back** is the same one line in reverse: set the tag to the previous
-image. The controller mints a build id for it (a *new* one — the hash covers the
-template, and the template is what changed back), ramps onto it, and the build you
-are abandoning drains on its own. Workflows already pinned to it keep running to
-completion on it; that is the guarantee, and it is why nothing needs to be rushed.
+image. If that template was deployed before, the build id is **the same one it had**
+— `ComputeBuildID` is deterministic over the image reference plus the pod template,
+so a revert re-promotes the existing version object and its Deployment rather than
+minting a third. A new id appears only for a template this `WorkerDeployment` has
+never carried. Verified on the cluster 2026-08-22: reverting a memory-limit change
+re-promoted `2.5.0-498f` with its original `healthySince`, and the abandoned build
+moved into `status.deprecatedVersions`.
+
+Either way the build you are abandoning drains on its own, and workflows already
+pinned to it keep running to completion on it. That is the guarantee, and it is why
+a rollback needs no hurry.
 
 **Verifying an actual saga** — the audit row is
 [`kind-e2e-audit.md` K4.10](kind-e2e-audit.md#k4--the-real-edge-and-identity),
@@ -398,7 +405,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 | **Blast radius** | One domain: 10–40% of the 10 backend services. `rs-checkout` carries 4 of 10 (40%) — a known concentration above the < 30% target (see §8.3) |
 | **Merge conflicts** | None (1 file per service) |
 | **Onboarding time** | < 5 min (create InputProvider + push) |
-| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay`, `order-worker-2-4-0`, and `checkout-worker` are standalone HelmReleases outside the ResourceSet checks |
+| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay` and `checkout-worker` are standalone HelmReleases, and `order-worker` is a standalone `WorkerDeployment`, all outside the ResourceSet checks |
 | **Team autonomy** | Full (each service owns its InputProvider) |
 
 ### Beyond 50 Services: Further Scaling
@@ -466,4 +473,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._

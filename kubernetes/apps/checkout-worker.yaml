@@ -2,7 +2,7 @@
 # that runs its `worker` subcommand (no HTTP API traffic, no Service). It polls
 # the `checkout` task queue and runs AbandonedCheckoutWorkflow's activity
 # (MarkSessionExpired — RFC-0015 P2, timer + lazy-backstop expiry). Modelled on
-# the order worker (now order-worker-2-4-0.yaml): same image as `checkout`, `args: ["worker"]`,
+# the order worker (then order-worker-2-4-0.yaml; since ADR-054 a WorkerDeployment in order-worker.yaml): same image as `checkout`, `args: ["worker"]`,
 # `service.enabled: false`. Deployed directly (not via the checkout ResourceSet)
 # because its shape is a one-off — no Service, no migrations, Temporal env.
 ---
@@ -42,7 +42,7 @@ spec:
       # `internal/workflow/` changed by exactly one test file, so the workflow
       # DEFINITION is byte-identical and an in-flight AbandonedCheckoutWorkflow
       # (30-minute timer) replays without a non-determinism error. This worker is
-      # NOT under ADR-030 versioning — only order is — so there is no build id to
+      # NOT under versioning — only order is (ADR-030 decided it; ADR-054 owns the mechanism) — so there is no build id to
       # activate and no side-by-side step. `repo.ExpireDue`, the only activity it
       # runs, is also unchanged.
       repository: ghcr.io/duynhlab/checkout-service/checkout-service

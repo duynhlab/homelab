@@ -570,4 +570,4 @@ A service or worker PR is observability-compliant only when:
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-08-16 — canonical cross-cutting observability contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-16 — canonical cross-cutting observability contract; as-built claims verified against `duynhlab/pkg` and the service repos._

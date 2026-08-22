@@ -159,7 +159,7 @@ make flux-up
   - **Phase 1: Foundation** — `controllers-local`: namespaces + operators (cert-manager, CNPG, VictoriaMetrics/Grafana operators, OpenBAO + ESO, Kyverno, ClickHouse operator).
   - **Phase 2: Security & configs** — `secrets-local` (bootstrap Job + ClusterSecretStore + ExternalSecrets), `cert-manager-local`, `monitoring-local` (observability configs + Sloth SLO CRs).
   - **Phase 3: Platform services** — Envoy Gateway, Keycloak, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
-  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workers (`order-worker-2-4-0`, `checkout-worker`, `mockpay`).
+  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workloads (`order-worker` — a `Connection` + `WorkerDeployment` — plus `checkout-worker` and `mockpay`).
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
 > with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
@@ -197,26 +197,34 @@ kubectl get prometheusservicelevel -n monitoring
 **Expected State:**
 - Namespaces for every domain provisioned (user, product, **inventory**, cart, **checkout**, order, review, notification, shipping, payment, frontend, **backoffice**, **identity**, **platform**, **cache-system**, **rustfs**, envoy-gateway, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, **temporal** — source of truth: `kubernetes/infra/controllers/namespaces.yaml`; `flux-system` is created by the bootstrap).
 - 7 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-fulfillment`, `rs-comms`, `rs-frontend`, `rs-backoffice`) successfully reconciled.
-- HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`**, **`order-worker-2-4-0`**, and **`checkout-worker`** (in the `payment` / `order` / `checkout` namespaces), in `Ready` state.
+- HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`** and **`checkout-worker`** (in the `payment` / `checkout` namespaces), in `Ready` state. Also in `temporal`: **`temporal-worker-controller-crds`** then **`temporal-worker-controller`** (ADR-054).
+- In `order`: a **`Connection`** and a **`WorkerDeployment`** (`order-fulfillment`) — *not* a HelmRelease. `kubectl -n order get wd order-fulfillment` must show `CURRENT` populated.
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `platform-edge-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
-> **One step `make up` does not do: activate the order worker's deployment
-> version.** A fresh cluster has a fresh Temporal database, so the
-> `order-fulfillment` deployment has no Current version — and a nil Current
-> version means new workflows target *unversioned* workers, of which there are
-> none. The worker pod is `Ready`, no error is logged, and every order sits
-> `pending`. Activation is a deliberate one-shot (ADR-030 treats it as a
-> decision, not desired state, so its CronJob ships suspended):
+> **`make up` needs no worker step.** This used to be the one thing it did not do:
+> a fresh cluster had a fresh Temporal database, so `order-fulfillment` had no
+> Current version, new workflows targeted *unversioned* workers of which there
+> were none, and every order sat `pending` with the pod `Ready` and nothing
+> logged. The fix was a hand-run Job, on **every** bring-up.
+>
+> Since [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) the
+> Temporal Worker Controller registers the version and sets Current itself, so
+> activation is desired state reconciled from git. **Do not run an activation
+> Job** — the CronJob is deleted, and a hand-run `set-current-version` now
+> competes with the controller rather than helping it.
+>
+> Verify instead:
 >
 > ```bash
-> JOB="order-set-current-$(date +%s)"
-> kubectl -n temporal create job "$JOB" --from=cronjob/temporal-worker-set-current-version
-> kubectl -n temporal wait --for=condition=complete "job/$JOB" --timeout=120s
+> kubectl -n order get wd order-fulfillment
+> #   NAME               CURRENT     TARGET      RAMP %
+> #   order-fulfillment  <build id>  <build id>   (empty once settled)
 > ```
 >
-> Verify with `temporal worker deployment describe --name order-fulfillment` via
-> `deploy/temporal-admintools`. Failure mode and the `--unversioned` variant:
+> `CURRENT` populated with no human step is the whole point, and it is what audit
+> row [K1.7](kind-e2e-audit.md#k1--bring-up) now proves. If it is empty, suspect
+> the controller or the `Connection` before the saga —
 > [`OrderSagaNotCompleting`](../observability/runbooks/microservices/OrderSagaNotCompleting.md).
 
 ---
@@ -421,7 +429,7 @@ homelab/
 │   │   │   ├── secrets/                # OpenBAO + External Secrets Operator HelmReleases
 │   │   │   ├── cert-manager/
 │   │   │   ├── clickhouse-operator/    # Altinity ClickHouse operator (CRDs)
-│   │   │   ├── temporal/               # Temporal operator
+│   │   │   ├── temporal/               # Temporal server + Worker Controller HelmReleases
 │   │   │   └── kyverno/
 │   │   │   # tracing/, profiling/, caching/, storage/, envoy-gateway/, keycloak/ — separate Flux Kustomizations
 │   │   ├── configs/                    # Component instances and configurations
@@ -451,7 +459,9 @@ homelab/
 │   │   │   ├── notification.yaml       # domain=comms
 │   │   │   └── shipping.yaml           # domain=comms
 │   │   ├── mockpay.yaml                # mockpay HelmRelease (payment ns)
-│   │   ├── order-worker-2-4-0.yaml     # order-worker-2-4-0 HelmRelease (order ns, Temporal saga)
+│   │   ├── order-worker.yaml          # Connection + WorkerDeployment (order ns) — ONE file
+│   │   │                                # forever; the controller creates one Deployment
+│   │   │                                # per derived build id (ADR-054)
 │   │   ├── checkout-worker.yaml        # checkout-worker HelmRelease (checkout ns)
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
@@ -492,7 +502,7 @@ homelab/
 11. `cnpg-barman-plugin-local`: CNPG Barman Cloud Plugin + `ObjectStore` CRD (depends on `controllers-local`, `cert-manager-local`).
 12. `databases-local`: CNPG `platform-db` and `product-db` clusters (depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
 13. `databases-cnpg-dr-local`: CNPG DR replica (depends on `databases-local`, `secrets-local`).
-14. `temporal-local`: Temporal server via the official `temporalio` HelmRelease (server 1.31.2 — ADR-030), `mop` namespace created by the chart's namespace Job, persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `databases-local`, `monitoring-local`).
+14. `temporal-local`: Temporal server via the official `temporalio` HelmRelease (server 1.31.2 — ADR-030), `mop` namespace created by the chart's namespace Job, persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `databases-local`, `monitoring-local`). **Also ships the Temporal Worker Controller** — CRDs chart first via `dependsOn`, then the manager (ADR-054). That placement is load-bearing: `apps-local` already `dependsOn: temporal-local`, and that is the only thing ordering the CRDs and manager before any `WorkerDeployment` is applied. Note the `healthChecks` list names only the Temporal HelmRelease and frontend Deployment, so `wait: true` — not a health check — is what covers the manager.
 14a. `temporal-config-local`: the Temporal config half (`./configs/temporal` — server alerts; the Web UI HTTPRoute lives in `configs/envoy-gateway/routes/temporal.yaml`) (depends on `temporal-local`).
 15. `kyverno-policies-local`: Admission policies (depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
 15a. `mcp-local`: MCP servers (depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
@@ -512,4 +522,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-08-19 — synced to the deployed platform (Keycloak login flow, anonymous Grafana, 22 Kustomizations, 7 ResourceSets, inventory; auth-service rows removed)._
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed platform (Keycloak login flow, anonymous Grafana, 22 Kustomizations, 7 ResourceSets, inventory; auth-service rows removed)._

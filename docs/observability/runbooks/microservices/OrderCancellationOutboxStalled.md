@@ -27,8 +27,9 @@ sum by (result) (rate(order_cancellation_start_dispatch_total[5m]))
 ```
 No series ⇒ the dispatcher isn't running (worker down). `result="error"` ⇒
 running and failing (Temporal unreachable, or the worker version serving the
-queue does not register `CancellationWorkflow` — check the ADR-030 activation
-state: the v1.10.0+ build must be Current).
+queue does not register `CancellationWorkflow` — check `kubectl -n order get wd order-fulfillment` — the
+  Current build must be one whose image registers it. Activation itself is the
+  controller's since ADR-054, so there is no "activation state" to inspect.10.0+ build must be Current).
 
 ```sql
 SELECT * FROM cancellation_requests WHERE status <> 'DISPATCHED' ORDER BY created_at;

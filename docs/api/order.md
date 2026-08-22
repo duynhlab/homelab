@@ -418,4 +418,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [ADR-051](../proposals/adr/ADR-051-trusted-operator-resolution/) — why the resolve command trusts the operator, and what it records instead
 - [OrderManualReviewBacklog runbook](../observability/runbooks/microservices/OrderManualReviewBacklog.md) — operating the parked queue
 
-_Last updated: 2026-08-14 — RFC-0023 Train 7: the `manual_review` resolve command ships (ADR-051); the case view gains the external truths, the transition history, and `version`._
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-14 — RFC-0023 Train 7: the `manual_review` resolve command ships (ADR-051); the case view gains the external truths, the transition history, and `version`._

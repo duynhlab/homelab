@@ -23,14 +23,14 @@
   sources hold an ingress allow into `identity`: `envoy-gateway` on `:8080`
   (the `id.duynh.me` route **and** the edge SecurityPolicy `remoteJWKS` fetches
   of `/realms/duynhlab/protocol/openid-connect/certs`), `monitoring` on `:9000`
-  (Keycloak management/metrics), and — **added 2026-08-22** — the **seven service
+  (Keycloak management/metrics), and — **added 2026-08-22** — the **ten service
   namespaces that run `pkg/authmw`** on `:8080`, for their own JWKS fetch.
   That third allow corrects a documented contradiction rather than widening a
   boundary casually. This page used to say *"no service namespace is admitted —
   JWT screening happens at the edge"*, while
   [`docs/api/api.md`](../api/api.md) names the edge check **coarse** and the
   in-service `pkg/authmw` verifier **authoritative**. The manifests implemented
-  both: every service carried `OIDC_JWKS_URL`, and `authmw` is fail-closed, so a
+  both, and `authmw` is fail-closed, so a
   JWKS it could not reach rejected every token. The result was that **every
   `private` and `protected` route in the cluster answered 401** — found by the
   Kind gate's K4.10 row, and the reason K4.5 onward had never passed on a
@@ -91,7 +91,7 @@ traffic; the rest mirror the east-west call graph. Ports are TCP.
 
 | Callee ns | Allowed callers (policy) | Why |
 |-----------|--------------------------|-----|
-| **identity** (Keycloak) | `envoy-gateway` → `:8080`; `monitoring` → `:9000`; `cart` `checkout` `notification` `order` `payment` `review` `user` → `:8080` | The edge serves the `id.duynh.me` route and fetches the JWKS for its `remoteJWKS` SecurityPolicy; VMAgent scrapes the management interface. The **seven `pkg/authmw` services fetch the same JWKS themselves** — their verifier is the authoritative one ([`api.md`](../api/api.md)) and is fail-closed, so without this allow every `private` route 401s. Scoped by enumerating the Deployments that carry `OIDC_JWKS_URL`: **not** `product`/`shipping`/`inventory` (no in-service verifier), **not** `frontend`/`backoffice` (SPAs — the browser holds the token). `:9000` stays `monitoring`-only. |
+| **identity** (Keycloak) | `envoy-gateway` → `:8080`; `monitoring` → `:9000`; the ten `pkg/authmw` namespaces → `:8080` | The edge serves the `id.duynh.me` route and fetches the JWKS for its `remoteJWKS` SecurityPolicy; VMAgent scrapes the management interface. The **ten `pkg/authmw` services fetch the same JWKS themselves** — their verifier is the authoritative one ([`api.md`](../api/api.md)) and is fail-closed, so without this allow every `private` route 401s. The list first held seven, scoped by enumerating the Deployments that carried `OIDC_JWKS_URL`, and excluded `product`/`shipping`/`inventory` as having "no in-service verifier". **Corrected 2026-08-22:** all three build `pkg/authmw` in `cmd/main.go`; what they lacked was the env pair, so they used compiled defaults pointing at the public host. Enumerating by which manifest happened to set a variable found the symptom rather than the set. Still **not** `frontend`/`backoffice` (SPAs — the browser holds the token). `:9000` stays `monitoring`-only. |
 | **user** | `envoy-gateway` → `:8080` | Browser-only today; no service-to-service caller. |
 | **product** | `envoy-gateway` → `:8080`; `checkout` → `:9090` (**pod-scoped** `allow-product-grpc`) | Checkout re-validates prices via `product.v1` (RFC-0015). `order` was deliberately **removed** from the gRPC allow — RFC-0021 P4 deleted the saga's product stock activities, and keeping the allow would let a rolled-back build silently reserve stock at product again. DB-tier allows: [table below](#db-tier-allows). |
 | **cart** | `envoy-gateway`, `order` → `:8080`; `checkout` → `:9090` | `order` reads the cart during checkout; the checkout service reads it over `cart.v1` gRPC only (RFC-0015), never the HTTP API. |

@@ -185,6 +185,24 @@ spec:
           - name: OIDC_JWKS_URL
             value: "http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab/protocol/openid-connect/certs"
           <<- end >>
+          <<- if (index inputs "staffauthmw") >>
+          # The /protected/ Backoffice surface is verified against the SECOND realm,
+          # and it needs both variables for two different reasons. OIDC_STAFF_ISSUER
+          # is an IDENTITY claim: it must equal the `iss` the realm stamps into the
+          # token, so it stays the public host. OIDC_STAFF_JWKS_URL is a NETWORK
+          # PATH: it must be fetchable from inside the pod.
+          #
+          # Left empty, the service derives the JWKS from the issuer and hairpins to
+          # the public host -- which in-cluster resolves to 127.0.0.1, refuses the
+          # connection, and makes a fail-closed verifier answer every /protected/
+          # request with 503 "Authentication temporarily unavailable". That is the
+          # same trap the customer pair above documents; the staff pair was simply
+          # never set, so it was live on all six services that serve /protected/.
+          - name: OIDC_STAFF_ISSUER
+            value: "https://id.duynh.me/realms/duynhlab-staff"
+          - name: OIDC_STAFF_JWKS_URL
+            value: "http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/certs"
+          <<- end >>
         # PSS restricted fields — commented out 2026-08-17 together with the
         # pss-restricted-apps policy itself (see that file's header for why and
         # for the two conditions that bring both back). Left in place rather

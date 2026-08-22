@@ -1422,6 +1422,25 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **Every `/protected/` route answered `503`, and the staff JWKS URL was the
+  reason.** `OIDC_STAFF_ISSUER` and `OIDC_STAFF_JWKS_URL` are now declared
+  explicitly for the six services that serve `/protected/` (inventory, order,
+  payment, product, shipping, user) via a `staffauthmw` input on all five domain
+  ResourceSets. Left implicit, each service derived the staff JWKS from the
+  **issuer** — the public `id.duynh.me` — which in-cluster resolves to
+  `127.0.0.1`, refused the connection, and made the fail-closed verifier answer
+  `503 Authentication temporarily unavailable` on every staff request. The two
+  variables are not interchangeable: the issuer is an identity claim and must
+  match the token's `iss`, the JWKS URL is a network path and must be reachable
+  from the pod. Verified on Kind: all six routes went 503 → 200 with real rows.
+  The identity NetworkPolicy grows from seven namespaces to ten — `inventory`,
+  `product` and `shipping` were excluded on the claim that they had "no
+  in-service verifier", but all three build `pkg/authmw` in `cmd/main.go`; they
+  merely lacked the env pair, so enumerating by which manifest set a variable had
+  found the symptom rather than the set. `api.md`, `network-policies.md` and the
+  Kind audit are corrected, and the audit gains **K4.5s** — a staff mint recipe,
+  which it had never had, so nothing in it could reach a `/protected/` route.
+
 - **A spent promo code answers `409 PROMO_EXHAUSTED` at apply**, not `500`
   (`checkout-service` **0.7.1**, checkout-service#66). `respondSessionError`
   had arms for every other promo error, so an exhausted cap fell to the

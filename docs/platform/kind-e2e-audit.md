@@ -740,6 +740,28 @@ breaks a command copied from the Compose audit:
   **FAIL:** empty output. Check `id.duynh.me` resolves (K0.6) before anything
   else, then that a TLS knob is set.
 
+- [ ] **K4.5s A staff token mints through the workforce realm.** The audit had no
+  staff mint anywhere — K4.7 exercised staff identity in a browser only — so
+  nothing here could reach a `/protected/` route, and the surface went unverified
+  on every cluster run. Different realm, different client, different redirect:
+  ```bash
+  KCT="local-stack/scripts/keycloak-token.sh"
+  AT_STAFF=$(KC_URL=https://id.duynh.me KC_INSECURE=1 \
+    KC_REALM=duynhlab-staff KC_CLIENT_ID=admin-portal \
+    KC_REDIRECT=https://backoffice.duynh.me/ \
+    USERNAME=duyne PASSWORD='p@ss1234' bash $KCT)
+  curl -sk -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $AT_STAFF" \
+    https://gateway.duynh.me/inventory/v1/protected/balances
+  ```
+  **Want 200** with real rows. Run this under `bash`, not zsh: zsh sets
+  `USERNAME` itself to the OS user, so the assignment is ignored and the script
+  logs in as whoever is at the keyboard.
+  **FAIL:** `503 Authentication temporarily unavailable` means the service's
+  staff JWKS is unreachable, not that identity is down — see
+  [`api.md` § protected surfaces](../api/api.md). That was the state of all six
+  `/protected/` services until 2026-08-22: the staff JWKS URL was left implicit,
+  so each derived it from the public issuer and hairpinned to `127.0.0.1`.
+
 - [ ] **K4.6** **The storefront signs in end to end** at `https://local.duynh.me`
   as `alice` / `password123`, in a browser, and the catalog shows **seeded
   products** — not an empty grid. Run it with the **agent-browser** skill (read it

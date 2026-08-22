@@ -397,6 +397,7 @@ ships, and the owning `docs/api/{service}.md` documents each as-built contract.
 |---------|------------|
 | Guard chain | Edge `jwt-edge-staff` SecurityPolicy (coarse signature/iss/aud/exp against the **workforce realm** `duynhlab-staff`, [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) → in-service `pkg/authmw` staff verifier (authoritative) → `MiddlewareRequireRole("backoffice_admin")`. A customer-realm token is wrong-issuer at the edge — it never reaches the role gate |
 | Role miss | `403` with the shared envelope, code `FORBIDDEN`; never retried by clients |
+| Verifier config | The staff verifier needs **both** variables declared, and they are not interchangeable. `OIDC_STAFF_ISSUER` is an identity claim — it must equal the `iss` the realm stamps, so it stays the public host. `OIDC_STAFF_JWKS_URL` is a network path — it must be fetchable from inside the pod, so it names the in-cluster Keycloak Service. Left unset, the service derives the JWKS from the issuer and hairpins to the public host, which resolves in-cluster to `127.0.0.1`; the fail-closed verifier then answers every `/protected/` request `503 Authentication temporarily unavailable`. Fixed 2026-08-22 by declaring both on all six services that serve `/protected/` |
 | Actor | `actor_sub` = the verified token `sub`; a body-supplied actor is ignored |
 | Pagination | The standard `page`/`page_size` envelope above — including on services whose public reads diverge (product's `limit`) |
 | Idempotency | Retryable commands use `Idempotency-Key` (payment-lineage style) **or** body `command_id` (inventory style); the owning contract names which |
@@ -862,4 +863,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-14 — ADR-050: protected surfaces verify the workforce realm (`duynhlab-staff`); customer tokens die at the edge as wrong-issuer._
+_Last updated: 2026-08-22 — the staff verifier's issuer and JWKS URL are declared, not derived: an implicit JWKS hairpinned to the public host and 503'd every `/protected/` route._

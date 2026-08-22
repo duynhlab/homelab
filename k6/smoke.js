@@ -142,6 +142,7 @@ const UNITS = [
   {
     name: 'traces cover every service and the edge',
     rows: { kind: 'K5.2', compose: 'C6' },
+    group: 'telemetry',
     run(id) {
       const res = http.get(`${target.vtraces}/select/jaeger/api/services`);
       const names = (res.json('data') || []).map(String);
@@ -156,6 +157,7 @@ const UNITS = [
   {
     name: 'profiles cover every service',
     rows: { kind: 'K5.6', compose: 'C16' },
+    group: 'telemetry',
     run(id) {
       // Connect-RPC, and the window is milliseconds since epoch.
       const end = Date.now();
@@ -175,6 +177,7 @@ const UNITS = [
   {
     name: 'alert rules are loaded, and nothing urgent is firing',
     rows: { kind: 'K5.8', compose: 'C21' },
+    group: 'telemetry',
     run(id) {
       const res = http.get(`${target.vmalert}/api/v1/rules`);
       const groups = (res.json('data') && res.json('data').groups) || [];
@@ -202,22 +205,40 @@ const UNITS = [
 
 // --- wiring ----------------------------------------------------------------
 
-const planned = UNITS.filter((u) => u.rows[target.gate]).map((u) => u.rows[target.gate]);
-const skipped = UNITS.filter((u) => !u.rows[target.gate]);
+const forGate = (u) => u.rows[target.gate];
+const planned = UNITS.filter(forGate).map(forGate);
+const skipped = UNITS.filter((u) => !forGate(u));
+
+// Two scenarios rather than one, because the telemetry rows assert on a store
+// that lags the traffic. Coverage rows ask "does every service appear in the
+// trace store" -- a question about the cluster, not about this run, but one
+// this run can still spoil: a service nothing has called since bring-up has no
+// span to find. `drive` therefore touches the surfaces that are otherwise never
+// exercised, and `telemetry` starts late enough for those spans to land.
+const SETTLE = '50s';
 
 export const options = Object.assign(
   {
-    vus: 1,
-    iterations: 1,
+    scenarios: {
+      drive: { executor: 'per-vu-iterations', vus: 1, iterations: 1, exec: 'drive' },
+      functional: { executor: 'per-vu-iterations', vus: 1, iterations: 1, exec: 'functional' },
+      telemetry: {
+        executor: 'per-vu-iterations',
+        vus: 1,
+        iterations: 1,
+        exec: 'telemetry',
+        startTime: SETTLE,
+      },
+    },
     thresholds: rowThresholds(planned),
   },
   tlsOptions
 );
 
-export default function () {
+function runGroup(kinds) {
   for (const unit of UNITS) {
-    const id = unit.rows[target.gate];
-    if (!id) continue;
+    const id = forGate(unit);
+    if (!id || kinds.indexOf(unit.group || 'functional') === -1) continue;
     // Isolate units. An uncaught throw ends the whole iteration, which would
     // leave every later row with no verdict -- one broken row would hide the
     // state of all the others, and a gate that reports less the worse things
@@ -228,6 +249,24 @@ export default function () {
       rowCheck(id, null, { [`did not raise: ${e.message}`]: () => false });
     }
   }
+}
+
+// Not assertions -- traffic. Every service must have been called at least once
+// in the cluster's life for the coverage rows to mean anything, and the two
+// read surfaces below are the ones no other row touches: `review` is only ever
+// reached through product's fan-out, so a run that lists products never gives
+// it a span.
+export function drive() {
+  http.get(`${target.base}/review/v1/public/reviews`);
+  http.get(`${target.base}/product/v1/public/products/1/details`);
+}
+
+export function functional() {
+  runGroup(['functional']);
+}
+
+export function telemetry() {
+  runGroup(['telemetry']);
 }
 
 export function handleSummary(data) {

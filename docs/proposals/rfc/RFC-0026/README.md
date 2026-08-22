@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-08-21 | 2026-08-21 | 2026-08-21 |
+| implemented | platform-wide | [./research.md](./research.md) — gate passed 2026-08-21 | 2026-08-21 | 2026-08-21 |
 
 > **Don't forget: every decision is a tradeoff.** This one buys away a hand-run
 > activation step and a 252-line file per build, and pays for it by giving up the
@@ -249,7 +249,7 @@ replace the human reading `describe-version`.
 **Drawbacks, all real.**
 
 - **The `mop` chart is gone for this workload.** `spec.template` is a raw PodSpec, so ~30 env
-  vars, probes and resources are hand-written. The file lands at ~180 lines. It is *one*
+  vars, probes and resources are hand-written. The file lands at **276 lines** (measured after the fact; the RFC estimated ~180, which understated the cost of losing the chart by a third). It is *one*
   file forever and a bump is one line, but the first authoring is not cheap and nothing
   keeps it in step with the chart's future defaults.
 - **Per-version env is impossible.** One template serves every live version, so
@@ -284,6 +284,12 @@ replace the human reading `describe-version`.
   namespaces holding `WorkerDeployment` resources. `rbac.restrictWatchNamespaces` can narrow
   this to `order` and should be considered at review — it converts the ClusterRole into a
   per-namespace Role.
+  **Considered and deferred (2026-08-22):** it is **not** set, so the controller
+  watches cluster-wide. Deferred rather than dropped — narrowing it to `order` now
+  would have to be widened the moment a second namespace carries a
+  `WorkerDeployment`, which `checkout` will once its service opts in. Revisit
+  trigger: **the second `WorkerDeployment` landing**, when the list is known and
+  stable.
 - **Webhook.** `WorkerResourceTemplate` requires a validating webhook, hence cert-manager.
   The webhook performs SubjectAccessReview against **both** the applying identity and the
   controller's service account, which means Flux's service account needs the same
@@ -361,13 +367,23 @@ KEDA without the controller has no per-version template to attach to.
 | Date | Milestone |
 |------|-----------|
 | 2026-08-21 | Research gate passed; RFC Accepted; ADR-054 and ADR-055 created at `Proposed` |
+| 2026-08-21 | Implementation merged: #866 (controller + design record), #867 (`docs/api` staleness), #868 (diagrams + `AGENTS.md` diagram rules), #869 (the JWKS NetworkPolicy fix and the K4.10 row) |
+| 2026-08-22 | **Kind-verified.** `CURRENT` set with no human step (K1.7); a saga completing `Pinned` on `order/order-fulfillment` (K4.10, a row this RFC added because none existed); a `Progressive` rollout walking 10 → 50 → promoted from a pod-template change alone; a rollback re-promoting the previous build id rather than minting a new one; `service_version` carrying the derived build id (K5.4). ADR-054 Adoption → Complete |
 
-- [ ] ADR-054 Adoption → Complete
-- [ ] ADR-055 Adoption → decided (installed, or deferred with a trigger)
-- [ ] `docs/api/temporal.md` § Worker Deployment Versioning synced to the as-built env
+- [x] ADR-054 Adoption → Complete
+- [ ] ADR-055 Adoption → decided (installed, or deferred with a trigger) — still `Proposed`
+- [x] `docs/api/temporal.md` § Worker Deployment Versioning synced to the as-built env
       contract and the single-file layout
-- [ ] `kind-e2e-audit.md` K1.7 removed; `local-stack/docs/e2e-audit.md` A15 env names updated
-- [ ] ADR-030 amended: rollout mechanism superseded, original decision left standing
+- [x] `kind-e2e-audit.md` K1.7 **repurposed** rather than removed — it now proves no
+      activation step is needed, which is stronger than deleting the row;
+      `local-stack/docs/e2e-audit.md` A15 env names updated
+- [x] ADR-030 amended: rollout mechanism superseded, original decision left standing
+
+**Not observed, and not claimed:** the `sunset.scaledownDelay` scale-to-zero needs an
+hour; `drainedSince` was observed, the scale-down was not. And no order was caught
+landing on the outgoing build *during* the ~1-minute ramp window — the ramp steps were
+observed at the `WorkerDeployment`, and the pinning guarantee separately (an order
+started before the rollout completed on the old build).
 
 ## Related
 

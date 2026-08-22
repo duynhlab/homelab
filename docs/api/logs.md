@@ -368,4 +368,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-17 — HTTP access logging and probe filtering re-documented against the shared `pkg/httpmw` pair (`httpmw.Logging` + `httpmw.DefaultSkipRoutes`, exact route match)._
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-17 — HTTP access logging and probe filtering re-documented against the shared `pkg/httpmw` pair (`httpmw.Logging` + `httpmw.DefaultSkipRoutes`, exact route match)._

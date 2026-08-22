@@ -108,9 +108,18 @@ spec:
     spec:
       containers:
         - name: worker
-          # Same image as the order API, different subcommand. THE ONE LINE a
-          # release edits. No migration init container: the API's applies the
-          # schema this code expects.
+          # Same REPOSITORY as the order API, different subcommand — and
+          # deliberately NOT in lockstep with services/order.yaml. The API is on
+          # its own pin (2.3.1 as of 2026-08-22) because a worker build exists to
+          # freeze workflow code, not to track the API.
+          #
+          # THE ONE LINE a release edits.
+          #
+          # No migration init container: the API's applies the schema. That means
+          # the schema this worker expects is the one the API's pin ships, so the
+          # skew is a real (if narrow) coupling -- widen it only when the replay
+          # corpus and the migrations both say it is safe. The retired per-build
+          # manifest carried this caveat and it was worth keeping.
           image: ghcr.io/duynhlab/order-service/order-service:2.5.0
           imagePullPolicy: IfNotPresent
           args: ["worker"]

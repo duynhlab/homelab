@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **RFC** | RFC-0026 |
-| **Status** | researching |
+| **Status** | frozen — research gate passed 2026-08-21; kept as the audit trail (see [`./README.md`](./README.md) for the decision) |
 | **Scope** | platform-wide |
 | **Created** | 2026-08-21 |
 | **Last updated** | 2026-08-21 |
@@ -385,7 +385,7 @@ section that decides whether adoption is a swap or a rebuild.
 | Aspect | Platform today (deployed) | Candidate |
 |---|---|---|
 | Build id source | The **image tag**, by construction. `kubernetes/apps/order-worker-2-4-0.yaml` (retired by ADR-054) carries `TEMPORAL_WORKER_BUILD_ID: "2.4.0"` next to `tag: "2.4.0"` | **Derived**: image prefix + a hash of the whole pod template. Any env, resource or probe edit mints a new version |
-| Enforcement | Two assertions in [`flux-validate.sh`](../../../../scripts/flux-validate.sh): build id must equal `image.tag`, and the **filename** must equal `order-worker-<tag with dots as dashes>.yaml` | None applicable — there is no second copy of the build id to disagree with. Both assertions become dead code |
+| Enforcement *(retired by ADR-054)* | Two assertions in [`flux-validate.sh`](../../../../scripts/flux-validate.sh): build id must equal `image.tag`, and the **filename** must equal `order-worker-<tag with dots as dashes>.yaml` | None applicable — there is no second copy of the build id to disagree with. Both assertions become dead code |
 | Keeping the current model | — | `workerOptions.unsafeCustomBuildID` (≤ 63 chars) pins it back to the tag. Named "unsafe" because two different images under one id is exactly the non-determinism versioning prevents |
 | Server-side deployment name | Plain `order-fulfillment` (the env value the worker registers) | `<k8s-namespace>/<resource-name>` — e.g. `order/order-fulfillment`. **Not the same name**, so existing server-side version history does not carry over under it |
 | Registration | The worker registers itself from env at startup | The controller registers versions through the Temporal API |

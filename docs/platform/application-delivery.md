@@ -98,7 +98,9 @@ kubernetes/apps/
 ├── frontend-rs.yaml               # rs-frontend (standalone, inline inputs)
 ├── backoffice-rs.yaml             # rs-backoffice (standalone) — operator portal SPA
 ├── mockpay.yaml                   # standalone HelmRelease — mock payment provider (payment ns)
-├── order-worker-2-4-0.yaml        # standalone HelmRelease — versioned Temporal saga worker (order ns)
+├── order-worker.yaml              # standalone Connection + WorkerDeployment — versioned Temporal
+│                                  # saga worker (order ns). ONE file forever; the Temporal Worker
+│                                  # Controller creates one Deployment per build id (ADR-054)
 └── checkout-worker.yaml           # standalone HelmRelease — checkout abandonment worker (checkout ns)
 ```
 
@@ -249,13 +251,71 @@ runtime effect.
    | Payment | Payment service pin **and** `kubernetes/apps/mockpay.yaml` |
    | Frontend | `kubernetes/apps/frontend-rs.yaml` |
    | Backoffice portal | `kubernetes/apps/backoffice-rs.yaml` — the tag is only deployable if its build carried the cluster build args (see the file's comment) |
-   | Order API | Order service pin; do not edit an existing versioned worker |
-   | Order worker | Add a new `order-worker-<build-id>.yaml`, deploy it side by side, then activate it using [RFC-0021 cutover/rollback](../proposals/rfc/RFC-0021/cutover-rollback.md) |
+   | Order API | `kubernetes/apps/services/order.yaml` → `image_tag` |
+   | Order worker | **One line**: the `image:` tag in `kubernetes/apps/order-worker.yaml`. Nothing else — see below |
 
-   For a versioned order worker, the filename, HelmRelease/name fields, image
-   tag, `TEMPORAL_WORKER_BUILD_ID`, and `service.version` must describe the new
-   build. The previous worker remains until Temporal reports its version
-   `DRAINED`; changing its tag in place would strand pinned workflows.
+### Releasing the order worker
+
+Since [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) this is
+**one line and no manual step**, and the instructions that used to live here —
+add `order-worker-<build>.yaml` side by side, run the activation Job, delete the
+old file at `DRAINED` — describe a model that no longer exists. The
+[RFC-0021 cutover/rollback](../proposals/rfc/RFC-0021/cutover-rollback.md)
+runbook is kept as the **historical** procedure; do not follow it.
+
+```bash
+# 1. Edit ONE line. Nothing else in the file changes.
+$EDITOR kubernetes/apps/order-worker.yaml     # image: ...order-service:<new tag>
+
+# 2. Validate, then publish.
+make validate && make flux-push && make flux-sync
+
+# 3. Watch the controller do the rest. Ramp % walks the rollout.steps.
+kubectl -n order get wd order-fulfillment -w
+#   NAME               CURRENT      TARGET       RAMP %
+#   order-fulfillment  <old build>  <new build>  10   -> 50 -> (empty when promoted)
+```
+
+**What you do NOT do, and why each one is gone:**
+
+| Retired step | Why |
+|---|---|
+| Copy the manifest to a new filename | There is one `WorkerDeployment`, forever. The controller creates the per-version `Deployment`s |
+| Set `TEMPORAL_WORKER_BUILD_ID` | The controller **derives** the build id and injects it. Hand-setting it gives the pod two identities; `make validate` rejects that |
+| Update `service.version` | It is read from the `temporal.io/build-id` pod label via `fieldRef`, so it follows the build id by itself |
+| Run `kubectl create job --from=cronjob/temporal-worker-set-current-version` | The CronJob is deleted. The controller sets the Current version through the Temporal API |
+| Read `describe-version` and delete the old file | `sunset` does it: scale to zero 1h after the server reports the version `drained`, delete 24h later |
+
+**The build id is not the image tag**, and that surprises people. It is the image
+prefix plus a hash of the whole pod template, so a resources or env edit mints a
+version too — stricter than the old tag-only rule, and the reason a release is one
+line. It is written down nowhere in git; read the live value:
+
+```bash
+kubectl -n order get wd order-fulfillment      # CURRENT / TARGET / RAMP % are printer columns
+kubectl -n order get po -L temporal.io/build-id
+```
+
+**Rolling back** is the same one line in reverse: set the tag to the previous
+image. If that template was deployed before, the build id is **the same one it had**
+— `ComputeBuildID` is deterministic over the image reference plus the pod template,
+so a revert re-promotes the existing version object and its Deployment rather than
+minting a third. A new id appears only for a template this `WorkerDeployment` has
+never carried. Verified on the cluster 2026-08-22: reverting a memory-limit change
+re-promoted `2.5.0-498f` with its original `healthySince`, and the abandoned build
+moved into `status.deprecatedVersions`.
+
+Either way the build you are abandoning drains on its own, and workflows already
+pinned to it keep running to completion on it. That is the guarantee, and it is why
+a rollback needs no hurry.
+
+**Verifying an actual saga** — the audit row is
+[`kind-e2e-audit.md` K4.10](kind-e2e-audit.md#k4--the-real-edge-and-identity),
+which drives a checkout to confirm and asserts `Status COMPLETED` with a `BuildId`
+equal to the `CURRENT` above.
+
+`checkout-worker` is **not** versioned and takes none of this: it is an ordinary
+`HelmRelease`, and a tag move there is a normal rollout.
 4. Validate before publishing manifests:
 
    ```bash
@@ -345,7 +405,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 | **Blast radius** | One domain: 10–40% of the 10 backend services. `rs-checkout` carries 4 of 10 (40%) — a known concentration above the < 30% target (see §8.3) |
 | **Merge conflicts** | None (1 file per service) |
 | **Onboarding time** | < 5 min (create InputProvider + push) |
-| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay`, `order-worker-2-4-0`, and `checkout-worker` are standalone HelmReleases outside the ResourceSet checks |
+| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay` and `checkout-worker` are standalone HelmReleases, and `order-worker` is a standalone `WorkerDeployment`, all outside the ResourceSet checks |
 | **Team autonomy** | Full (each service owns its InputProvider) |
 
 ### Beyond 50 Services: Further Scaling
@@ -413,4 +473,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._

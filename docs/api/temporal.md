@@ -925,7 +925,7 @@ distinguishes `started` / `refused`, and `unrecognised` is alerted on
 
 **Rollout requirement, not a property of the code:** the removal ships as a new
 Worker Deployment Version, so pinned versioning must be ON and the previous
-build must keep polling until pre-P4 sagas drain. A pinned saga left with no
+build must keep polling until pre-P4 sagas drain — since ADR-054 that waiting is `sunset`'s job, keyed off `status.deprecatedVersions[].drainedSince`, not an operator's. A pinned saga left with no
 poller stalls with its stock held and its payment authorized.
 
 #### The Inventory Reconciler
@@ -1026,7 +1026,7 @@ flowchart LR
 Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/)** for the re-platform and the Worker Versioning requirement that forced it; **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** records the retired operator choice it superseded):
 
 - **`HelmRelease temporal`** — `controllers/temporal/helmrelease.yaml`: chart `1.6.0` (server **`1.31.2`** — Worker Versioning needs ≥ 1.29.1, which the retired operator could not run), `numHistoryShards: 512`, persistence → `platform-db-rw.platform:5432` (`temporal` + `temporal_visibility`, `createDatabase: false` — the role has no CREATEDB) via **`platform-db-temporal-secret`**, `mop` namespace (retention 168h) created by the chart's namespace Job, `web.enabled`, `admintools.enabled`, `server.metrics.serviceMonitor.enabled`, `schema.useHelmHooks: false` (Flux does not reconcile Helm hooks), resources set on every component. The frontend Service keeps the name **`temporal-frontend`**, so `TEMPORAL_HOSTPORT` is unchanged across the re-platform; the UI Service is **`temporal-web`** (was `temporal-ui`).
-- **`HelmRelease temporal-worker-controller-crds` → `temporal-worker-controller`** — `controllers/temporal/worker-controller-{crds-,}helmrelease.yaml` (ADR-054): charts `0.28.0` (appVersion `1.9.0`) from `docker.io/temporalio`, pinned as OCIRepositories in `clusters/local/sources/oci/`. CRDs chart first via `dependsOn`; the manager runs **one** replica (Kind is a single node), `metrics.disableAuth: true` (nothing scrapes it, so the kube-rbac-proxy sidecar would guard a port with no reader), and the optional `WorkerDeployment` webhook stays off — the CRD's own CEL rules already reject the mistakes that matter, and `make validate` never sees an admission webhook. The always-on `WorkerResourceTemplate` webhook is why cert-manager is required; the chart issues that cert from its own namespaced self-signed `Issuer`, not from the `homelab-ca` root.
+- **`HelmRelease temporal-worker-controller-crds` → `temporal-worker-controller`** — `controllers/temporal/worker-controller-{crds-,}helmrelease.yaml` (ADR-054): charts `0.28.0` (appVersion `1.9.0`) from `docker.io/temporalio`, pinned as OCIRepositories in `clusters/local/sources/oci/`. CRDs chart first via `dependsOn`; the manager runs **one** replica — it is a single-writer controller with no HA requirement locally, not because of node count (the cluster has 4), `metrics.disableAuth: true` (nothing scrapes it, so the kube-rbac-proxy sidecar would guard a port with no reader), and the optional `WorkerDeployment` webhook stays off — the CRD's own CEL rules already reject the mistakes that matter, and `make validate` never sees an admission webhook. The always-on `WorkerResourceTemplate` webhook is why cert-manager is required; the chart issues that cert from its own namespaced self-signed `Issuer`, not from the `homelab-ca` root.
 - **Retired operator** — its HelmRelease, both CRs and its HelmRepository are kept as `*.yaml.bak` beside their replacements: readable, and inert because no kustomization lists them (ADR-030). The `TemporalCluster`/`TemporalNamespace` CRDs and the cert-manager admission webhook are gone with the operator.
 - **`platform-db`** — `configs/databases/clusters/platform-db/`: consolidated CloudNativePG cluster (RFC-0018) hosting `temporal` + `temporal_visibility` alongside auth and supporting databases. 3-node HA; Barman backups at `s3://pg-backups-cnpg/platform-db/`.
 - **Edge & alerts** — the edge `HTTPRoute temporal-ui` (`configs/envoy-gateway/routes/temporal.yaml`, hostname `temporal.duynh.me`, **planned** — not yet exercised on Kind) plus `TemporalServerDown` and service/persistence error-rate `PrometheusRule`s in `configs/temporal/` (applied by `temporal-config-local`, after the chart).
@@ -1110,9 +1110,15 @@ hand — which is why the shape is worth knowing rather than forgetting.
 - Retirement is declarative: `sunset.scaledownDelay 1h` then `deleteDelay 24h`,
   keyed off the server's own `status.deprecatedVersions[].drainedSince` — the
   machine-checkable gate ADR-030 recorded as follow-up 2 and nothing checked.
+- **How to release a new build** — one line, and the procedure is
+  [`application-delivery.md` § Releasing the order worker](../platform/application-delivery.md#releasing-the-order-worker).
+  Read that rather than this section if the task is "a new tag exists, now what".
 - Design record: [RFC-0026](../proposals/rfc/RFC-0026/) ·
-  [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/). The historical
-  hand-run procedure is [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover).
+  [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/). The pre-ADR-054
+  hand-run procedure survives as **history only** —
+  [cutover-rollback.md § Worker version activation](../proposals/rfc/RFC-0021/cutover-rollback.md#worker-version-activation-phase-3-before-the-write-cutover)
+  describes a per-build manifest and an activation Job that no longer exist. Do
+  not follow it.
 
 The sequence above answers *how a task finds its build*. This one answers *who moves
 a version through its life* — the same mechanics [RFC-0026's
@@ -1209,8 +1215,8 @@ How to deploy the worker, run the saga locally, and watch it in production.
   order namespace stops needing product's `:9090` at all — the NetworkPolicy allow is
   withdrawn once the pre-phase-4 builds finish draining.
   `apps-local` `dependsOn` `temporal-local` so it deploys after the cluster is
-  Ready. (Earlier drafts used a `worker.enabled` chart toggle; the chart was reworked to the
-  separate-release model.)
+  Ready. (Historical: earlier drafts used a `worker.enabled` chart toggle, then the
+  separate-release model. Since ADR-054 the order worker is not a chart release at all; `checkout-worker` still is.)
 - **Locally.** `local-stack/compose.yaml` runs `temporalio/server` **1.31.2** — the same server
   version the cluster chart deploys — with all four roles in one container, backed by the shared
   PostgreSQL through the `postgres12` plugin (databases `temporal` and `temporal_visibility`).

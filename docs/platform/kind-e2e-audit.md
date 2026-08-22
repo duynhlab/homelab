@@ -211,12 +211,16 @@ the tag exists; running it earlier audits the previous release.
     n=$(basename "$f" .yaml); t=$(yq '.spec.inputs[0].image_tag' "$f")
     printf '%-16s %-8s %s\n' "$n" "$t" "$(arch_legs ghcr.io/duynhlab/$n-service/$n-service "$t")"
   done
-  # The five standalone ResourceSets read their repository and tag directly:
+  # The four standalone workloads that carry their own repository + tag:
   for f in kubernetes/apps/frontend-rs.yaml kubernetes/apps/backoffice-rs.yaml \
-           kubernetes/apps/mockpay.yaml kubernetes/apps/checkout-worker.yaml \
-           kubernetes/apps/order-worker-*.yaml; do
+           kubernetes/apps/mockpay.yaml kubernetes/apps/checkout-worker.yaml; do
     grep -HE 'repository:|  tag:' "$f"
   done   # then run arch_legs on each pair
+  # order-worker is NOT in that loop and must not be: it is a WorkerDeployment
+  # whose image is one field, not a repository/tag pair. K0.8 reads it with yq.
+  # It used to be globbed as order-worker-*.yaml, which since ADR-054 matches
+  # nothing -- so the arm64 preflight silently skipped the one workload the
+  # 2026-08-20 run found broken.
   ```
   **Want:** `linux/amd64 linux/arm64` on every first-party pin.
   **FAIL:** `SINGLE-PLATFORM`, or a missing `linux/arm64` on an arm64 host — with
@@ -386,10 +390,16 @@ the tag exists; running it earlier audits the previous release.
   # NOTE the name: the controller composes <k8s-namespace>/<resource-name>,
   # so it is order/order-fulfillment, not the bare order-fulfillment ADR-030 used.
   kubectl -n order get po -L temporal.io/build-id
-  # want: the running pod's label == the CURRENT build id above
+  # want: a Ready pod labelled with the CURRENT build id.
+  # MORE than one build-id label is NORMAL, not a failure: a version stays up for
+  # sunset.scaledownDelay (1h) after the server reports it drained, so a cluster
+  # that has rolled once legitimately shows two. Check the extras are accounted for:
+  kubectl -n order get wd order-fulfillment -o jsonpath='{range .status.deprecatedVersions[*]}{.buildID}{" drainedSince="}{.drainedSince}{"\n"}{end}'
   ```
-  **FAIL:** `CURRENT` empty after the chain is Ready, or a build-id label that
-  disagrees with it. Both reproduce the old failure mode, which still looks like
+  **FAIL:** `CURRENT` empty after the chain is Ready, or **no** pod carrying the
+  Current build id, or a build-id label that appears on a pod while being absent
+  from both `CURRENT` and `deprecatedVersions` (an orphan the controller is not
+  tracking). Both reproduce the old failure mode, which still looks like
   nothing: orders stay `pending`, no error is logged, no activity fails, pods stay
   `Ready`, and the outbox gauges stay green because the workflow *did* start.
   Diagnosis is unchanged —
@@ -417,8 +427,10 @@ cannot be derived from a single file — they get their own row (K2.3).
   ```bash
   grep -H 'image_tag:' kubernetes/apps/services/*.yaml
   grep -Hn '  tag:' kubernetes/apps/frontend-rs.yaml kubernetes/apps/backoffice-rs.yaml \
-                    kubernetes/apps/mockpay.yaml kubernetes/apps/checkout-worker.yaml \
-                    kubernetes/apps/order-worker-*.yaml
+                    kubernetes/apps/mockpay.yaml kubernetes/apps/checkout-worker.yaml
+  # The worker's pin lives in the WorkerDeployment, as one image field:
+  yq 'select(.kind == "WorkerDeployment") | .spec.template.spec.containers[0].image' \
+     kubernetes/apps/order-worker.yaml
   ```
   Ten service pins (`kubernetes/apps/services/*.yaml`, one file per service) plus
   five standalone ResourceSets: `frontend-rs` (SPA), `backoffice-rs`
@@ -958,10 +970,17 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   curl -sk 'https://vmui.duynh.me/api/v1/query' --data-urlencode 'query=count by (service_name) (go_goroutine_count)' \
     | jq -r '.data.result[] | "\(.metric.service_name) \(.value[1])"' | sort
   ```
-  **Want:** `order`, `order-worker`, `checkout` and `checkout-worker` each
-  present as **separate** `service_name` values, each with count 1.
-  **FAIL:** a worker missing, or a `service_name` carrying more than one process's
-  series.
+  **Want:** `order`, `order-worker`, `checkout` and `checkout-worker` each present
+  as **separate** `service_name` values, each with count **≥ 1**.
+  `order-worker` above 1 is expected whenever a version is inside its
+  `sunset.scaledownDelay` window — two versions of one worker are two processes with
+  one `service_name`, which is the very thing `service_version` exists to split:
+  ```bash
+  curl -sk 'https://vmui.duynh.me/api/v1/query' --data-urlencode 'query=count by (service_name, service_version) (go_goroutine_count{service_name="order-worker"})'
+  ```
+  **FAIL:** a worker missing entirely, or an `order-worker` series whose
+  `service_version` matches neither `CURRENT` nor an entry in
+  `status.deprecatedVersions` — that is a real collision, not a drain.
   > **This row used to be the reason the audit existed, and its premise turned out
   > to be false.** On Compose, `order` and `order-worker` published under an
   > identical identity and overwrote each other's series — an alternating value
@@ -1199,7 +1218,7 @@ Preconditions: Compose gate <link/date> · tags pinned · previous cluster torn 
 | K1 bring-up | 8 | | `make up` <time> exit 0; N/N Kustomizations Ready; seed 8/8; worker version Current |
 | K2 delivery | 7 | | image↔pin table N/N exact; `auth` absent; 7/7 ResourceSets Ready |
 | K3 admission/secrets | 6 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token |
-| K4 edge/identity | 9 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |
+| K4 edge/identity | 10 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |
 | K5 signals | 10 | | traces rooted at edge; both log legs; 33/33 dashboards resolve; N VERIFY-AT-KIND markers closed |
 | K6 wrap | 3 | | `make down` removes cluster **and** registry |
 
@@ -1365,4 +1384,4 @@ Also from this run: the two podman sysctls now in
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-08-21_
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

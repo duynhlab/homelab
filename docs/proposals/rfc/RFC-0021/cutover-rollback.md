@@ -9,6 +9,7 @@ the evidence that closed the irreversible steps.
 | | |
 |---|---|
 | **Status** | as-executed; every cutover in this RFC has run. The flag-flip commands are kept as the historical record — the flags themselves were deleted in phase 4 |
+| **⚠️ Worker section is HISTORICAL** | § [Worker version activation](#worker-version-activation-phase-3-before-the-write-cutover) describes a model **deleted** by [ADR-054](../../adr/ADR-054-temporal-worker-controller/). Do not follow it. See the banner in that section |
 | **Owning RFC** | [README.md](./README.md) § Rollout & rollback |
 
 ## Phase 2 prep (backfill + structural shadow) — nothing to roll back
@@ -44,6 +45,28 @@ kubectl -n inventory logs -f job/inventory-backfill-<id>   # inspect the report
   if abandoning.
 
 ## Worker version activation (phase 3, before the write cutover)
+
+> ### ⚠️ HISTORICAL — do not follow this section
+>
+> Everything below records how phase 3 was executed in July 2026 and is kept as
+> evidence. It describes a model that
+> [ADR-054](../../adr/ADR-054-temporal-worker-controller/) **deleted** on
+> 2026-08-21. Following it now does damage, in three specific ways:
+>
+> - **`order-worker.yaml` no longer means what it means here.** In this section it
+>   is the *unversioned* worker, and step 4 says to delete it. That filename is now
+>   the **single live `Connection` + `WorkerDeployment`** — deleting it removes the
+>   versioned worker entirely.
+> - **The activation Job does not exist.** `temporal-worker-set-current-version`
+>   was deleted; the controller is the only writer of the Current version, and a
+>   hand-run `set-current-version` competes with it.
+> - **There is no per-build file.** A release is one line: the image tag in
+>   `kubernetes/apps/order-worker.yaml`.
+>
+> Current procedure:
+> [`application-delivery.md` § Releasing the order worker](../../../platform/application-delivery.md#releasing-the-order-worker).
+> Incident diagnosis:
+> [`OrderSagaNotCompleting`](../../../observability/runbooks/microservices/OrderSagaNotCompleting.md).
 
 ADR-030 versions the saga with Worker Deployment Versions. The manifests ship the
 versioned worker **side by side** with the unversioned one — never as an in-place

@@ -48,7 +48,7 @@ a message — group by it.
 
 ### kubectl / logs
 ```bash
-kubectl logs -n order -l app=order-worker --tail=300 | grep -iE "outbox sweep|recovered a fulfillment start"
+kubectl logs -n order -l app.kubernetes.io/name=order-worker --tail=300 | grep -iE "outbox sweep|recovered a fulfillment start"
 kubectl -n temporal get pods
 ```
 

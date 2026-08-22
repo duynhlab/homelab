@@ -126,7 +126,7 @@ for its own sake.
 | [RFC-0023](RFC-0023/) | Basic Backoffice portal (React + TanStack) and the first `protected` business APIs (depends on [RFC-0022](RFC-0022/)) | platform-wide | P2 | Accepted |
 | [RFC-0024](RFC-0024/) | Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover (executes [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | Accepted |
 | [RFC-0025](RFC-0025/) | Converge the customer SPA on the Admin Portal's stack — one cutover, no mocks (exercises [ADR-049](../adr/ADR-049-admin-portal-tanstack-spa/)'s convergence revisit trigger) | service:frontend | P2 | implemented |
-| [RFC-0026](RFC-0026/) | Adopt the Temporal Worker Controller for versioned workers; KEDA autoscaling designed and recorded (takes up the destination [ADR-030](../adr/ADR-030-temporal-workflow-versioning/) named but deferred) | platform-wide | P2 | Accepted — [ADR-054](../adr/ADR-054-temporal-worker-controller/) controller, [ADR-055](../adr/ADR-055-keda-worker-autoscaling/) KEDA (`Proposed`, not installed) |
+| [RFC-0026](RFC-0026/) | Adopt the Temporal Worker Controller for versioned workers; KEDA autoscaling designed and recorded (takes up the destination [ADR-030](../adr/ADR-030-temporal-workflow-versioning/) named but deferred) | platform-wide | done | implemented — [ADR-054](../adr/ADR-054-temporal-worker-controller/) controller, [ADR-055](../adr/ADR-055-keda-worker-autoscaling/) KEDA (`Proposed`, not installed). Kind-verified 2026-08-22: `CURRENT` set with no human step, a saga completing Pinned, a Progressive rollout and a rollback both observed |
 
 ## Backlog — candidate RFCs
 

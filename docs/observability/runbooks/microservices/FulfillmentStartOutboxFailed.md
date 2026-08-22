@@ -124,7 +124,7 @@ Page. Then split the worklist by code:
 - All one transient code → one Temporal or Postgres outage longer than two hours.
   That is its own incident; check the deploy/incident timeline.
 - `PARTICIPANT_UNSERVABLE` appearing at a rollout → a worker-versioning problem,
-  not an order problem. Stop the rollout before more orders land here.
+  not an order problem. Revert the image tag in `kubernetes/apps/order-worker.yaml` and let Flux reconcile — the ramp is 30s per step and cannot be paused by hand (ADR-054).
 - Mixed codes → per-order data, work the list.
 
 ---

@@ -43,8 +43,11 @@ Versioning and re-platformed the cluster onto the official
 `temporalio/helm-charts` release. `kubernetes/infra/controllers/temporal/helmrelease.yaml`
 enables `admintools.enabled: true` (long-running `temporal-admintools`
 Deployment) and pairs it with a suspended
-`worker-set-current-version` CronJob that instantiates a
+`worker-set-current-version` CronJob that instantiated a
 `temporalio/admin-tools:1.31.2` Job on activation. Every Worker Versioning
+**RETIRED 2026-08-21** by [ADR-054](../ADR-054-temporal-worker-controller/): the
+CronJob is deleted and the Temporal Worker Controller sets the Current version, so
+no activation Job exists. The `admintools` half of this paragraph still holds.
 operation — `temporal worker deployment describe|list|set-current-version`,
 the drain-gate `temporal workflow count` query, the `--unversioned` rollback —
 runs through `kubectl exec deploy/temporal-admintools`. RFC-0021's
@@ -104,8 +107,10 @@ ADR is now argued on.
   unchanged; ADR-030 keeps ownership of that path.
 - Workflow history archival. Cluster and local both run with retention-only
   today; adopting archival is a separate ADR when a driver appears.
-- Automating the `--build-id` sync for the `worker-set-current-version`
-  CronJob. That remains an ADR-030 follow-up.
+- ~~Automating the `--build-id` sync for the `worker-set-current-version`
+  CronJob. That remains an ADR-030 follow-up.~~ **Moot since
+  [ADR-054](../ADR-054-temporal-worker-controller/):** there is no CronJob and no
+  `--build-id` to sync — the controller derives the build id.
 - Local TLS/mTLS, OIDC on the Web UI, multi-cluster replication.
 - Any change to downstream services' `TEMPORAL_HOSTPORT` contract; they keep
   pointing at `temporal:7233`.
@@ -163,7 +168,8 @@ after the databases are first initialised**. Retention matches the cluster.
 
 All image tags track the cluster: `server` and `admin-tools` at the chart's
 appVersion `1.31.2`, per
-`kubernetes/infra/controllers/temporal/worker-set-current-version-cronjob.yaml`.
+`kubernetes/infra/controllers/temporal/helmrelease.yaml` (the former reference, the
+`worker-set-current-version` CronJob, was deleted by ADR-054).
 Note that **Renovate does not watch `local-stack/**`** (`.renovaterc.json5`
 restricts every manager to `kubernetes/`), so the drift rule below has no
 automation behind it and is enforced by review only.
@@ -180,7 +186,7 @@ on `:8233`. The `mop` namespace name does not change.
 | **CLI entry point** | Temporal CLI operations from developer or runbook flows use `docker compose exec temporal-admintools temporal ...`. This mirrors the cluster's `kubectl exec deploy/temporal-admintools ...` muscle memory, and there is no alternative — the server image has no client binary. |
 | **Health probing** | The server healthcheck stays namespace-independent. A `--namespace mop` probe deadlocks: `mop` is created by `temporal-bootstrap`, which waits on this very healthcheck. |
 | **Shard count** | `numHistoryShards` is fixed at 4 and documented as a divergence from the cluster's 512. It cannot be changed after the databases are initialised, so changing it means recreating them. |
-| **Image pins** | The `admin-tools` image tag in `local-stack/` matches the cluster pin used by `worker-set-current-version-cronjob.yaml`. Version drift here is a bug. |
+| **Image pins** | The `admin-tools` image tag in `local-stack/` matches the cluster pin. **Source moved 2026-08-22:** the reference used to be `worker-set-current-version-cronjob.yaml`, deleted by [ADR-054](../ADR-054-temporal-worker-controller/) — a rule enforced by review only, pointing at a file that no longer exists, silently stops being checkable. The pin now lives in `kubernetes/infra/controllers/temporal/helmrelease.yaml` (chart appVersion). Version drift here is still a bug. |
 | **Downstream contract** | `TEMPORAL_HOSTPORT` for every consumer stays `temporal:7233`. Any transport change is a separate ADR. |
 | **Failure behavior** | Compose start blocks Temporal-dependent services until `temporal-bootstrap` completes successfully; the existing `depends_on: temporal: service_healthy` blocks are updated accordingly. |
 

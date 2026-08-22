@@ -290,7 +290,7 @@ Platform-wide call graph: [api.md § Current east-west call graph](./api.md#curr
   1.7.0/1.8.0), the read-contract fields (1.8.0), and the schema plus the
   cross-service grant (migration `000006`, 1.10.0) are all gone. What remains
   is bookkeeping tracked in the RFC, not in this contract: retiring the
-  migration-era alert rules and deleting the drained pre-P4 worker manifests.
+  migration-era alert rules. (The drained pre-P4 worker manifests are gone: ADR-054 left one file.)
 - gRPC east-west mTLS is **Planned** platform-wide (RFC-0020 research);
   today the `:9090` surface is fenced by NetworkPolicy only.
 - The check-then-reserve TOCTOU window was an accepted tradeoff under RFC-0003

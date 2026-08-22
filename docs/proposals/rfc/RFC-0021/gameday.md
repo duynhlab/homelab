@@ -522,7 +522,12 @@ kubectl exec -n product product-db-1 -c postgres -- psql -U postgres -d inventor
 
 # G1 / G2 — involuntary kills. Never `drain`: the *-primary PDBs allow 0 disruptions.
 kubectl scale deploy/inventory -n inventory --replicas=0
-kubectl delete pod -n order -l app=order-worker-1-13-0 --grace-period=0 --force
+# The label was `app=order-worker-<build>` when this drill ran. Since ADR-054 the
+# worker's pod template is hand-written and carries no bare `app:` label, so that
+# selector matches NOTHING -- the drill would inject no fault and pass silently.
+kubectl delete pod -n order -l app.kubernetes.io/name=order-worker --grace-period=0 --force
+# To kill only one version (the interesting case now that two can coexist):
+#   kubectl delete pod -n order -l temporal.io/build-id=<build id> --grace-period=0 --force
 
 # G3 — switchover. `kubectl cnpg switchover` does not exist; `promote` does.
 kubectl cnpg promote product-db product-db-2 -n product

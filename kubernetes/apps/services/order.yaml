@@ -37,11 +37,13 @@ spec:
     # servable participant left, so there is nothing to select.
     #
     # 1.13.1: pkg v0.35.0 wave (2026-08-07) - dependency-only patch release.
-    # Worker build 1-13-1 is staged alongside this pin (1-13-0 retired in the
-    # same change; the cluster was down, so there was nothing to drain) and
-    # MUST be activated at the next bring-up: gate on
-    # `temporal worker deployment list` showing order-fulfillment, then run
-    # the set-current-version CronJob (ADR-030) - pod Ready is NOT the gate.
+    # HISTORICAL from here to the end of this note: worker build 1-13-1 was staged
+    # alongside this pin (1-13-0 retired in the same change; the cluster was down,
+    # so there was nothing to drain) and had to be ACTIVATED BY HAND at the next
+    # bring-up via the set-current-version CronJob (ADR-030).
+    # That instruction is DEAD. ADR-054 deleted the CronJob; the Temporal Worker
+    # Controller sets the Current version itself, so there is no bring-up step and
+    # nothing to gate on. Do not go looking for the Job.
     # 1.13.2: 1.13.2: G2b fault hook (ORDER_FAULT_COMMIT_PAUSE, GameDay-only, default off) + UNKNOWN_SKU failure reason - a data gap stops hiding inside stockout statistics (order#180).
     # 1.13.3: telemetry-audit fix for the HTTP access log (F-1/F-2) on top of the
     # per-module pkg v0.36.1 migration and the dependency CVE round. The access

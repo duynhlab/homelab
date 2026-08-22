@@ -674,6 +674,10 @@ docker compose exec -T postgres psql -U postgres -d cart -t -A -c \
 #      worker given the old name plus a build id sees half a config and exits 1,
 #      which is what makes this row a real gate rather than a formality.
 #
+#      `set-current-version` below is a COMPOSE-ONLY crutch: on the cluster the
+#      controller is the sole writer of Current, and running it against Kind fights
+#      the controller. Never copy these three invocations to a cluster incident.
+#
 #      The deployment name here stays the bare `order-fulfillment` because this
 #      drill sets it by hand. On the cluster the controller composes
 #      `<namespace>/<resource-name>`, so it is `order/order-fulfillment` there.

@@ -421,4 +421,4 @@ kubectl describe pod <pod-name> -n user | grep -i kill
 - [Tracing Architecture](../observability/tracing/architecture.md) - OpenTelemetry integration
 
 ---
-_Last updated: 2026-08-19 — moved from docs/platform/ to docs/api/ as the cross-service shutdown contract; the per-service config table (unbacked by any homelab manifest, incl. a retired-auth row) replaced by the uniform-defaults contract; EndpointSlice wording fixed (removal is not instantaneous — the drain delay exists because of the propagation window); machine-local paths and dead-namespace commands removed._
+_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — moved from docs/platform/ to docs/api/ as the cross-service shutdown contract; the per-service config table (unbacked by any homelab manifest, incl. a retired-auth row) replaced by the uniform-defaults contract; EndpointSlice wording fixed (removal is not instantaneous — the drain delay exists because of the propagation window); machine-local paths and dead-namespace commands removed._

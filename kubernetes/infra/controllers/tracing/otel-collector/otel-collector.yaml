@@ -59,7 +59,7 @@ spec:
             insecure: true
           compression: gzip
         otlp_http/victorialogs:
-          # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee posts
+          # OTLP logs sink (RFC-0014 P4): the 10 Go services' + 2 workers' otelzap tee posts
           # OTLP logs here; re-export to VictoriaLogs. VL-Stream-Fields makes
           # service.name the log-stream identity; trace_id stays a queryable
           # regular field. Envoy Gateway access logs go to stdout and ride the
@@ -81,8 +81,10 @@ spec:
           compression: gzip
         clickhouse:
           # RFC-0019 Phase B / ADR-023: long-retention SQL over OTel logs+traces.
-          # 4th trace sink + 2nd log sink, fan-out alongside Tempo/Jaeger/
-          # VictoriaTraces and VictoriaLogs. Metrics are NEVER routed here.
+          # 5th trace sink + 2nd log sink, fan-out alongside Tempo (raw),
+          # Tempo (chart), Jaeger, VictoriaTraces and VictoriaLogs. The ordinal
+          # said 4th until 2026-08-23: this comment predates the tempo-chart
+          # parallel run added by ADR-040 phase 1. Metrics are NEVER routed here.
           # create_schema bootstraps the otel_logs/otel_traces MergeTree tables
           # (+ trace_id materialized view); TTL 90d (2160h) vs 7d ops. sending_queue
           # + retry_on_failure isolate ClickHouse *runtime* backpressure from the

@@ -1520,6 +1520,23 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`docs/api/` described a log and trace topology the platform stopped having.** The
+  trusted tree — the one `AGENTS.md` tells agents to believe over service-repo READMEs —
+  claimed **one** log store and **three** trace backends. The collector's
+  `service.pipelines` says **two** and **five**: logs go to VictoriaLogs (7d, LogsQL)
+  *and* ClickHouse `otel_logs` (90d, SQL); traces go to Tempo (raw), Tempo (chart),
+  Jaeger, VictoriaTraces and ClickHouse. No page in `docs/api/` had ever named ClickHouse
+  as a store for either signal, though it has held every log and every span for 90 days
+  since [ADR-023](docs/proposals/adr/ADR-023-clickhouse-observability-olap/) was accepted
+  on 2026-07-19. Corrected in `tracing.md`, `logs.md`, `observability.md`, `api.md` and
+  `metrics.md`, including the correlation loops that named Tempo as the only trace
+  destination. Also fixed three comments that made the manifests contradict the corrected
+  docs: the collector called itself the sink for *"the 9 Go services"* (it is 10 plus 2
+  workers, in both the cluster and compose configs), the ClickHouse exporter called itself
+  the *"4th trace sink"* (a comment written before ADR-040's parallel run made it the 5th),
+  and `controllers/tracing/kustomization.yaml` described a stack of three components while
+  delivering four. `docs/observability/` follows in its own change.
+
 - **K4.3 had never been able to pass.** The row drove
   `https://127.0.0.1/product/v1/public/products` and wanted `404`; that request
   never reaches HTTP, because SNI may not carry an IP literal, so no TLS filter

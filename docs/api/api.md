@@ -846,8 +846,8 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 | Inspect HTTP | `curl` through the edge or an allowed in-cluster address |
 | Inspect gRPC services | `grpcurl <target> list` using server reflection |
 | Check service health | HTTP `/health`, `/ready`, or gRPC health |
-| Trace a request | Search Tempo/Jaeger by `trace_id` |
-| Find downstream failures | Check RPC RED metrics and VictoriaLogs access entries |
+| Trace a request | Search any trace store by `trace_id` — Tempo, Jaeger or VictoriaTraces, or ClickHouse `otel_traces` past 7 days |
+| Find downstream failures | Check RPC RED metrics and access entries in VictoriaLogs (7d) or ClickHouse `otel_logs` (90d) |
 | Validate manifests | `make validate` |
 | Validate a service repo | `GOTOOLCHAIN=auto go build ./... && go test ./...` |
 
@@ -863,4 +863,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-22 — the staff verifier's issuer and JWKS URL are declared, not derived: an implicit JWKS hairpinned to the public host and 503'd every `/protected/` route._
+_Last updated: 2026-08-23 — the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-22 — the staff verifier's issuer and JWKS URL are declared, not derived._

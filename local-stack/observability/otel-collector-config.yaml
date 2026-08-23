@@ -44,7 +44,7 @@ exporters:
     tls:
       insecure: true
     compression: gzip
-  # OTLP logs sink (RFC-0014 P4): the 9 Go services' otelzap tee posts OTLP
+  # OTLP logs sink (RFC-0014 P4): the 10 Go services' + 2 workers' otelzap tee posts OTLP
   # logs here; re-export to VictoriaLogs' OTLP ingest path. VL-Stream-Fields
   # makes service.name a log-STREAM field (indexed stream identity) instead of
   # a regular field — one stream per service, and trace_id stays a queryable

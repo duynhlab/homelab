@@ -15,7 +15,11 @@ Cross-cutting instrumentation contract for every Go service and worker in the pl
 
 ## Overview
 
-Every service and worker shares one instrumentation stack wired through **`pkg/obsx`**. Services never build OTel providers, exporters, or resources by hand. Platform backends (VictoriaMetrics, VictoriaLogs, Tempo, Pyroscope) and the Collector fan-out are documented under [`docs/observability/`](../observability/README.md).
+Every service and worker shares one instrumentation stack wired through **`pkg/obsx`**. Services never build OTel providers, exporters, or resources by hand. Platform backends and the Collector fan-out are documented under
+[`docs/observability/`](../observability/README.md). The full set the collector writes to
+today is **seven**: VictoriaMetrics (metrics), VictoriaLogs and ClickHouse (logs), and
+Tempo ×2, Jaeger, VictoriaTraces and ClickHouse (traces); Pyroscope receives profiles
+directly from the SDK, not through the collector.
 
 ## Document ownership
 
@@ -514,12 +518,15 @@ Sampling details: [Application tracing](./tracing.md#sampling).
 
 | Field | Signal | Join |
 |-------|--------|------|
-| `trace_id` | Logs, traces | Log → Tempo; Tempo → logs (`tracesToLogsV2`) |
+| `trace_id` | Logs, traces | Log → any trace store; Tempo, Jaeger and VictoriaTraces all link back to logs (`tracesToLogsV2` → `victorialogs`). ClickHouse joins `otel_logs` ↔ `otel_traces` on this field in one query |
 | `span_id` | Logs | Span-scoped log lines |
 | `pyroscope.profile.id` | Traces, profiles | Span → CPU flame graph — see [profiling.md](./profiling.md) |
 | `service.name` / `app` | Metrics, traces, logs, profiles | Fleet identity via `OTEL_SERVICE_NAME` |
 
-Exemplars are **not** available on this platform (VictoriaMetrics D-14). Correlation loop: metric → logs by label+time → `trace_id` → Tempo — see [metrics.md](./metrics.md#correlation-metrics--traces--logs).
+Exemplars are **not** available on this platform (VictoriaMetrics D-14). Correlation loop:
+metric → logs by label+time → `trace_id` → a trace store (Tempo, Jaeger or VictoriaTraces),
+or a single SQL join in ClickHouse when the question spans more than 7 days — see
+[metrics.md](./metrics.md#correlation-metrics--traces--logs).
 
 ---
 
@@ -570,4 +577,4 @@ A service or worker PR is observability-compliant only when:
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-16 — canonical cross-cutting observability contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-08-23 — the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

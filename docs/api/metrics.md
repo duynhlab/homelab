@@ -571,10 +571,12 @@ Correlation is instead done through the shared `trace_id`:
    log line carries a `trace_id` field (populated because tracing middleware
    runs before logging — see above). This is what P4 fixed: `trace_id` is now a
    first-class, queryable log field.
-3. Follow that `trace_id` into **Tempo** for the full distributed trace, and
-   back to logs via the Tempo↔logs datasource link.
+3. Follow that `trace_id` into a trace store for the full distributed trace —
+   **Tempo**, **Jaeger** or **VictoriaTraces** all carry the same span, and each
+   links back to logs via `tracesToLogsV2`. Past the 7-day ops window, the same
+   `trace_id` joins `otel_logs` ↔ `otel_traces` in **ClickHouse** in one query.
 
-So the loop is metric → logs (by label + time) → `trace_id` → Tempo, rather than
+So the loop is metric → logs (by label + time) → `trace_id` → trace, rather than
 metric → exemplar → trace.
 
 ---
@@ -587,5 +589,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`, and probe filtering is an exact match on the Gin route pattern via `httpmw.DefaultSkipRoutes`._
+_Last updated: 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
 

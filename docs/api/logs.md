@@ -7,7 +7,7 @@ Structured logging contract for every Go service and worker in the platform serv
 | **Logger** | `github.com/duynhlab/pkg/logger/zapx` (fleet-wide since RFC-0014 P4) | — |
 | **Format** | JSON on stdout + OTLP logs when `OTEL_LOGS_ENABLED=true` | — |
 | **Correlation** | `trace_id` / `span_id` from active span context | — |
-| **Platform pipeline** | [Logging (platform)](../observability/logging/README.md) — VictoriaLogs, Vector, dual-path ingest | — |
+| **Platform pipeline** | [Logging (platform)](../observability/logging/README.md) — dual-path ingest (OTLP + Vector) into **two** stores: VictoriaLogs (7d, LogsQL) and ClickHouse `otel_logs` (90d, SQL) | — |
 | **Cross-cutting** | [Application observability](./observability.md) — middleware order, env, `obsx` | — |
 | **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) |
 
@@ -17,7 +17,11 @@ Structured logging contract for every Go service and worker in the platform serv
 
 Every service outputs **structured JSON** using the shared **`zapx`** logger. Its zap core is **tee'd** into the OpenTelemetry log pipeline (see [OpenTelemetry integration](#opentelemetry-integration)).
 
-**Current status (RFC-0014 P4):** the fleet has converged on **`zapx`** — one logger, one JSON contract, one otelzap tee → OTLP → OpenTelemetry Collector → VictoriaLogs (stdout is still emitted for `kubectl logs`).
+**Current status (RFC-0014 P4):** the fleet has converged on **`zapx`** — one logger, one
+JSON contract, one otelzap tee → OTLP → OpenTelemetry Collector, which exports to **two**
+stores: **VictoriaLogs** (7-day ops retention, LogsQL) and **ClickHouse** `otel_logs`
+(90-day SQL, [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/)). Stdout is
+still emitted for `kubectl logs`.
 
 Scope and shared bootstrap rules: [Application observability](./observability.md).
 
@@ -39,7 +43,10 @@ Canonical access-log line (middleware-owned summary):
 {"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"httpmw/logging.go:192","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"duration_seconds":0.042}
 ```
 
-The stdout line is what `kubectl logs` shows; the same record is also exported over OTLP to VictoriaLogs by the otelzap tee.
+The stdout line is what `kubectl logs` shows; the same record is also exported over OTLP by
+the otelzap tee, and the collector's `logs` pipeline writes it to **both** VictoriaLogs and
+ClickHouse. The two are retention tiers, not a mistake: 7 days of LogsQL for ops, 90 days of
+SQL for questions that cross days.
 
 ---
 
@@ -368,4 +375,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-17 — HTTP access logging and probe filtering re-documented against the shared `pkg/httpmw` pair (`httpmw.Logging` + `httpmw.DefaultSkipRoutes`, exact route match)._
+_Last updated: 2026-08-23 — the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

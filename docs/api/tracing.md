@@ -7,7 +7,7 @@ Distributed tracing contract for every Go service and worker in the platform ser
 | **SDK** | `obsx.SetupObservability()` — one call in `main()` | — |
 | **Propagation** | W3C Trace Context (`traceparent`), native at the edge and in every service | — |
 | **Sampling** | `ParentBased(TraceIDRatioBased)` — root decides, downstream honours | — |
-| **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — Tempo, Jaeger, VictoriaTraces | — |
+| **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — the collector fans every span to **five** sinks: Tempo (raw manifests), Tempo (Helm chart, ADR-040 parallel run), Jaeger, VictoriaTraces, and ClickHouse `otel_traces` | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
 | **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) |
 
@@ -320,7 +320,10 @@ Structured logs carry `trace_id` when a span is active (logging middleware runs 
 }
 ```
 
-Grafana Explore → Tempo → search by Trace ID. Details: [Application logging](./logs.md).
+Grafana Explore → Tempo → search by Trace ID. Tempo is one of four query paths, not
+the only one: Jaeger and VictoriaTraces each carry the same span, and ClickHouse holds it
+for 90 days where it can be joined to `otel_logs` on `trace_id`. Details:
+[Application logging](./logs.md), [Tracing (platform)](../observability/tracing/README.md).
 
 ---
 
@@ -332,4 +335,4 @@ Grafana Explore → Tempo → search by Trace ID. Details: [Application logging]
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`; as-built claims verified against `duynhlab/pkg`, the service repos, and the edge config._
+_Last updated: 2026-08-23 — the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`._

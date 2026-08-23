@@ -1520,6 +1520,32 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`docs/observability/` said three trace backends and one log store; the collector says
+  five and two.** Twelve files corrected against `service.pipelines`, the completion of the
+  work #874 started in `docs/api/`. The headline errors: three separate pages called
+  VictoriaLogs the **sole** log backend (`logging/README.md`, the observability hub, and
+  `grafana/README.md`) — while `logging/README.md:491` had named the ClickHouse fan-out
+  correctly 440 lines further down, so the file contradicted itself; `tracing/README.md`'s
+  *"Three backends, by design"* callout; `architecture.md`'s *"triple-backend fan-out"*;
+  `collector.md`'s *"7 defined, 6 wired"* (it is 8 and 7); and
+  `victoriatraces.md:75`, which quoted the exporter list verbatim and got it wrong three
+  ways — two exporters missing, `otlphttp` where the manifest says `otlp_http`, and a
+  different order. Every `otlphttp/` in the tree is now `otlp_http/`.
+- **`tempo-chart` had no operational documentation at all** — a deployed workload whose only
+  mention anywhere was ADR-040. It now appears in six pages, including a new
+  **Tempo runs twice** section explaining what the counts alone cannot: the two installs
+  share an image and split into two RustFS buckets, and the **chart install's
+  metrics-generator is the live one** while the raw install's is inert (`remote_write: []`).
+  That correction matters beyond bookkeeping —
+  `backends-comparison.md:50` had cited the generator being inert as a reason to prefer the
+  chart, which stopped being true when the chart shipped. Recorded alongside it: nothing
+  consumes those series (`traces_spanmetrics` / `traces_service_graph` appear in no
+  dashboard, alert or rule), and `TempoDown` watches only the raw install because the
+  ServiceMonitor selects `app: tempo`, which the chart does not set.
+- **`tracing/README.md` carried two conflicting `Last updated` footers** (2026-07-14 and
+  2026-08-13), so the page's freshness could not be read off the page at all. Now one.
+  Every touched file's footer says what was wrong, not just that something changed.
+
 - **`docs/api/` described a log and trace topology the platform stopped having.** The
   trusted tree — the one `AGENTS.md` tells agents to believe over service-repo READMEs —
   claimed **one** log store and **three** trace backends. The collector's

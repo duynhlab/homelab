@@ -44,7 +44,8 @@ flowchart TB
         VMAgent[/"VMAgent :8429<br/>OTLP ingest + infra scrape"/]
         VMSingle[("VictoriaMetrics :8428")]
         VLogs[("VictoriaLogs :9428")]
-        Tempo[("Tempo<br/>durable on RustFS")]
+        Tempo[("Tempo raw<br/>durable on RustFS")]
+        TempoC[("Tempo chart<br/>ADR-040 parallel run")]
         Jaeger[("Jaeger<br/>in-memory UI")]
         VT[("VictoriaTraces :10428<br/>pilot")]
         CH[("ClickHouse :9000<br/>otel_logs · otel_traces")]
@@ -69,6 +70,7 @@ flowchart TB
     Processors -->|"logs"| VLogs
     Processors -->|"logs + traces"| CH
     Processors -->|"traces"| Tempo
+    Processors -->|"traces"| TempoC
     Processors -->|"traces"| Jaeger
     Processors -->|"traces"| VT
     Vector -->|"JSON line ingest"| VLogs
@@ -99,7 +101,7 @@ flowchart TB
     class Receiver,Processors collector;
     class VMAgent,VMSingle metric;
     class Vector,VLogs log;
-    class Tempo,Jaeger,VT trace;
+    class Tempo,TempoC,Jaeger,VT trace;
     class CH data;
     class Pyro profile;
     class Sloth,VMAlert,VMAM,Grafana platform;
@@ -255,8 +257,8 @@ handler examples.
 | Pillar | Tool | Question It Answers | Platform docs | App contract |
 |--------|------|---------------------|---------------|--------------|
 | **Metrics** | VMSingle + VMAgent | "Is something wrong?" | [metrics/](metrics/README.md) | [api/metrics.md](../api/metrics.md) |
-| **Traces** | Tempo + Jaeger (+ VictoriaTraces pilot) via OTel Collector | "Where is it slow?" | [tracing/](tracing/README.md) | [api/tracing.md](../api/tracing.md) |
-| **Logs** | VictoriaLogs (OTLP tee; Vector for infra) | "Why is it broken?" | [logging/](logging/README.md) | [api/logs.md](../api/logs.md) |
+| **Traces** | **Five sinks** via OTel Collector: Tempo raw + Tempo chart (ADR-040 parallel) + Jaeger + VictoriaTraces (pilot) + ClickHouse `otel_traces` | "Where is it slow?" | [tracing/](tracing/README.md) | [api/tracing.md](../api/tracing.md) |
+| **Logs** | VictoriaLogs 7d (OTLP tee; Vector for infra) **+ ClickHouse `otel_logs` 90d** | "Why is it broken?" | [logging/](logging/README.md) | [api/logs.md](../api/logs.md) |
 | **Profiles** | Pyroscope | "Which code line is the bottleneck?" | [profiling/](profiling/README.md) | [api/profiling.md](../api/profiling.md) |
 
 ## Documentation Map
@@ -286,10 +288,10 @@ docs/observability/
 │
 ├── tracing/                      # Pillar 2: Distributed tracing
 │   ├── README.md                 # Tracing guide (Tempo + OTel)
-│   ├── architecture.md           # Triple backend (Tempo + Jaeger + VictoriaTraces pilot)
+│   ├── architecture.md           # Five-sink fan-out (Tempo ×2 + Jaeger + VT + ClickHouse)
 │   ├── jaeger.md                 # Jaeger UI guide
 │   ├── backends-comparison.md    # Tempo vs Jaeger vs VictoriaTraces
-│   └── victoriatraces.md         # VictoriaTraces pilot (3rd backend)
+│   └── victoriatraces.md         # VictoriaTraces pilot
 │
 ├── logging/                      # Pillar 3: Structured logging
 │   └── README.md                 # Platform pipeline (VictoriaLogs + Vector)
@@ -374,8 +376,8 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
 | Jaeger | monitoring | `jaeger` | 16686 | Trace query UI (alternative to Tempo) |
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.11.0`, OTLP HTTP + Jaeger query API) |
-| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (Tempo/Jaeger/VT + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
-| VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, sole log backend) |
+| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (Tempo raw/Tempo chart/Jaeger/VT + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
+| VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, 7d ops tier — ClickHouse `otel_logs` is the 90d second store) |
 | Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, the edge's access log, PG plans, frontend); app logs go OTLP |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
 | Sloth | monitoring | operator | -- | SLO-to-PrometheusRule generator |
@@ -458,4 +460,4 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-08-18 — Documentation Map corrected to the real tree (runbook counts, envoy-gateway/ + missing files, alert totals) and the local-stack observability doc is now linked from the map; previously 2026-08-17 — HTTP middleware diagrams name the shared `pkg/httpmw` pair._
+_Last updated: 2026-08-23 — the Four Pillars table, the file-tree notes and the topology diagram all counted three trace backends; the real number is five (`tempo-chart` and ClickHouse were missing) and logs land in two stores, not one._

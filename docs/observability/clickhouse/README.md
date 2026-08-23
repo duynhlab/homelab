@@ -161,7 +161,7 @@ see its **real DDL** in [Operations](#operations) and watch pruning happen in th
 ## Architecture
 
 The Collector fans telemetry out to every backend in parallel. ClickHouse is the
-4th trace sink and the 2nd log sink; a failure there cannot stall the ops
+5th trace sink and the 2nd log sink; a failure there cannot stall the ops
 primaries (`sending_queue` + `retry_on_failure` isolate it).
 
 ```mermaid
@@ -737,4 +737,4 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-08-13 — edge `ServiceName` example corrected to the real derived value `platform.envoy-gateway-system`; `$environment` variable note corrected for the edge's local `deployment.environment.name` customTag_
+_Last updated: 2026-08-23 — trace-sink ordinal corrected from 4th to 5th (this page predated ADR-040's parallel run)._

@@ -39,7 +39,7 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 
 See [datasources.md](datasources.md) for metrics datasource details and Grafana Alerting UI notes.
 
-**VictoriaLogs** is the sole log backend (logs ingested by Vector); use it for LogsQL queries, trace correlation, and the VM plugin workflow. See [datasources.md](datasources.md#logs-victorialogs).
+**VictoriaLogs** is the 7-day ops log store, fed by **both** paths — the app fleet's OTLP tee through the collector, and Vector for everything OTel cannot instrument; use it for LogsQL queries, trace correlation, and the VM plugin workflow. The same OTLP logs are also kept 90 days in **ClickHouse** `otel_logs` for SQL. See [datasources.md](datasources.md#logs-victorialogs).
 
 **Datasource CRD files:**
 

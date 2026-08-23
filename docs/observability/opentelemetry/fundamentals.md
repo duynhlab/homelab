@@ -34,8 +34,8 @@ under the CNCF — every language SDK implements the same data model, so a trace
 started in Go looks identical to one started in Java.
 
 What it deliberately does **not** do: store data or draw dashboards. Storage
-and query belong to backends (here: VictoriaMetrics, VictoriaLogs, Tempo,
-ClickHouse, Pyroscope), and visualization to Grafana. Choosing OTel is what
+and query belong to backends (here: VictoriaMetrics, VictoriaLogs, ClickHouse,
+Tempo ×2, Jaeger, VictoriaTraces, Pyroscope), and visualization to Grafana. Choosing OTel is what
 lets this platform swap backends (Loki → VictoriaLogs, the VictoriaTraces
 pilot, the ClickHouse OLAP path) **without touching a single service**.
 
@@ -536,4 +536,4 @@ never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 
 ---
 
-_Last updated: 2026-08-13 — edge diagrams and the traceparent walkthrough re-documented for Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, no plugin); absorbed the RFC-0014 explainer (all diagrams preserved; cutover pipeline diagram kept as historical, superseded by collector.md); facts audited against the OTel specification._
+_Last updated: 2026-08-23 — the backend enumeration was missing Jaeger and VictoriaTraces._

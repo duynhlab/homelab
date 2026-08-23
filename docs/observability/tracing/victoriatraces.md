@@ -1,7 +1,8 @@
 # VictoriaTraces (pilot)
 
-**VictoriaTraces** is deployed as a **pilot, third tracing backend** alongside [Tempo](./README.md)
-and [Jaeger](./jaeger.md) — the OTel Collector fans the same OTLP traces to all three. The point of
+**VictoriaTraces** is deployed as a **pilot** tracing backend. The OTel Collector fans the same
+OTLP traces to **five** sinks — Tempo (raw), Tempo (chart), Jaeger, VictoriaTraces and ClickHouse — see
+[tracing/README.md](./README.md). The point of
 the pilot is to evaluate the **VM-operator consolidation** story: tracing managed by the *same*
 VictoriaMetrics Operator (and *same* storage engine) as metrics (`VMSingle`) and logs (`VLSingle`),
 with **no object-storage dependency**.
@@ -18,7 +19,7 @@ flowchart LR
   Apps["10 services + 2 workers<br/>OTel SDK"] -->|OTLP| OC["OTel Collector"]
   OC -->|otlp/tempo| T["Tempo (durable · RustFS)"]
   OC -->|otlp/jaeger| J["Jaeger (in-memory)"]
-  OC -->|otlphttp/victoriatraces| V["VictoriaTraces VTSingle :10428"]
+  OC -->|otlp_http/victoriatraces| V["VictoriaTraces VTSingle :10428"]
   V --> G["Grafana (Jaeger datasource → /select/jaeger)"]
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
   classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
@@ -68,11 +69,11 @@ so HTTP is simpler). In
 
 ```yaml
 exporters:
-  otlphttp/victoriatraces:
+  otlp_http/victoriatraces:
     traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
     tls: { insecure: true }
     compression: gzip
-# pipelines.traces.exporters: [otlp/tempo, otlp/jaeger, otlphttp/victoriatraces]
+# pipelines.traces.exporters: [otlp/tempo, otlp/tempo-chart, otlp/jaeger, otlp_http/victoriatraces, clickhouse]
 ```
 
 ## Querying
@@ -100,7 +101,7 @@ exporters:
 
 The [`local-stack`](../../../local-stack/README.md) wires the same path on a laptop — no cluster
 needed: the 10 services and 2 workers emit OTLP-HTTP to an **OTel Collector**,
-which re-exports to a single-node **VictoriaTraces** container, and you audit traces in a bundled **Grafana**.
+which re-exports to a single-node **VictoriaTraces** container and to **ClickHouse**, and you audit traces in a bundled **Grafana**.
 
 ```bash
 cd local-stack && docker compose up -d --build
@@ -114,13 +115,13 @@ Quick ingest check: `curl 'http://localhost:10428/select/jaeger/api/services'`.
 
 ## Status
 
-Pilot, wired in the manifests — the collector's 3-way fan-out exporter and the Grafana
+Pilot, wired in the manifests — the collector's five-sink fan-out exporter and the Grafana
 `victoriatraces` datasource are both deployed config (`otel-collector.yaml`,
 `datasource-victoriatraces.yaml`); v0.11.0 verified standalone (ingests OTLP-HTTP traces; the
-Jaeger API returns them). Tempo + Jaeger are unchanged and Tempo stays primary/durable.
+Jaeger API returns them). Tempo stays the documented primary/durable store — and it now runs twice, the raw manifests plus the ADR-040 chart parallel run.
 See [backends-comparison.md](./backends-comparison.md) for the decision context.
 
 ---
-_Last updated: 2026-08-20 — image bumped to v0.11.0 (0.10 moved to a distroless
+_Last updated: 2026-08-23 — the fan-out is five sinks, not three. The quoted exporter list was wrong three ways: two exporters missing, exporter name spelled `otlphttp` where the manifest says `otlp_http`, and the order differed._
 base — no shell in the container; the operator's HTTP probes and this stack's
 queries are unaffected). Exposure re-documented as the `victoriatraces` HTTPRoute; VictoriaTraces v0.11.0 and VM Operator v0.73.1 compatibility review._

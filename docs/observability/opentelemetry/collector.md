@@ -2,7 +2,7 @@
 
 > The **otel-collector** is the single door all application telemetry walks
 > through: one OTLP endpoint in, governed processing in the middle, fan-out to
-> six backends on the way out. This doc explains how a Collector works —
+> seven distinct backends on the way out. This doc explains how a Collector works —
 > components, pipelines, deployment patterns — and then walks the **actual
 > deployed configuration** line by line.
 
@@ -48,7 +48,7 @@ three together per signal:
 |-----------|------|---------------|
 | **Receiver** | How data gets in — push (listen on a port) or pull (scrape a target) | `otlp` (gRPC `:4317`, HTTP `:4318`) |
 | **Processor** | Transformations between receive and export; run **in the order listed** | `memory_limiter`, `deltatocumulative`, `batch` |
-| **Exporter** | How data leaves — per backend, with its own retry/queue | 7 defined, 6 wired (see below) |
+| **Exporter** | How data leaves — per backend, with its own retry/queue | **8 defined, 7 wired** (only `debug` is unwired — see below) |
 | **Extension** | Cross-cutting services outside the data path | `health_check` `:13133`, `zpages` `:55679` |
 | **Connector** | Joins the *exporter* end of one pipeline to the *receiver* end of another (e.g. deriving span metrics from traces) | none deployed |
 
@@ -71,6 +71,7 @@ flowchart LR
     end
     subgraph TRACESTORES["trace stores"]
         TEMPO[("Tempo :4317")]
+        TEMPOC[("Tempo chart :4317<br/>ADR-040 parallel")]
         JAE[("Jaeger :4317")]
         VT[("VictoriaTraces :10428")]
         CHT[("ClickHouse otel_traces")]
@@ -79,6 +80,7 @@ flowchart LR
     BT -->|"logs"| VL
     BT -->|"logs"| CHL
     BT -->|"traces"| TEMPO
+    BT -->|"traces"| TEMPOC
     BT -->|"traces"| JAE
     BT -->|"traces"| VT
     BT -->|"traces"| CHT
@@ -92,7 +94,7 @@ flowchart LR
     class EDGE edge;
     class RCV,ML,D2C,BM,BT,VMA collector;
     class VM metric;
-    class VL,CHL,TEMPO,JAE,VT,CHT data;
+    class VL,CHL,TEMPO,TEMPOC,JAE,VT,CHT data;
 ```
 
 ## Deployment patterns — and which one this platform runs
@@ -117,9 +119,9 @@ same Service; only tail-based sampling (not used — head sampling per
 
 | Pipeline | Receivers | Processors (ordered) | Exporters |
 |----------|-----------|----------------------|-----------|
-| `traces` | `otlp` | `memory_limiter` → `batch` | `otlp/tempo` · `otlp/jaeger` · `otlphttp/victoriatraces` · `clickhouse` |
-| `logs` | `otlp` | `memory_limiter` → `batch` | `otlphttp/victorialogs` · `clickhouse` |
-| `metrics` | `otlp` | `memory_limiter` → `deltatocumulative` → `batch` | `otlphttp/victoriametrics` |
+| `traces` | `otlp` | `memory_limiter` → `batch` | `otlp/tempo` · **`otlp/tempo-chart`** · `otlp/jaeger` · `otlp_http/victoriatraces` · `clickhouse` |
+| `logs` | `otlp` | `memory_limiter` → `batch` | `otlp_http/victorialogs` · `clickhouse` |
+| `metrics` | `otlp` | `memory_limiter` → `deltatocumulative` → `batch` | `otlp_http/victoriametrics` |
 
 A `debug` exporter is **defined but wired into no pipeline** — attach it
 temporarily when debugging ingest, never leave it on.
@@ -127,8 +129,12 @@ temporarily when debugging ingest, never leave it on.
 Two non-obvious facts about what is *not* in these pipelines: there are **no
 connectors** — cluster RED metrics come exclusively from the applications'
 own SDK metrics, not from span derivation (local-stack keeps a spanmetrics
-connector as a compatibility path only); and Tempo's own metrics-generator is
-configured but writes nowhere (`remote_write: []`), so it produces nothing.
+connector as a compatibility path only); and the **raw** Tempo install's
+metrics-generator is configured but writes nowhere (`remote_write: []`), so it
+produces nothing — while the **chart** install's generator is enabled and does
+remote-write span-metrics and service-graphs to vmagent. Nothing consumes those
+series yet: `traces_spanmetrics` / `traces_service_graph` appear in no dashboard,
+alert or recording rule.
 
 ### Processors, and why the order is law
 
@@ -206,4 +212,4 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 
 ---
 
-_Last updated: 2026-08-13 — trace source diagram re-documented as the Envoy Gateway edge (OTLP/gRPC :4317, `telemetry.tracing`); initial dedicated Collector doc; every value verified against the deployed HelmRelease._
+_Last updated: 2026-08-23 — exporter count corrected to 8 defined / 7 wired, `otlp/tempo-chart` added to the traces pipeline, exporter names respelled `otlp_http` to match the manifest, and the metrics-generator note split: raw is inert, chart is live._

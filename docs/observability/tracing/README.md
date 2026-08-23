@@ -14,9 +14,11 @@ Track requests as they flow through multiple microservices to understand perform
 
 **Technologies:**
 - **OpenTelemetry**: Industry-standard tracing instrumentation
-- **Grafana Tempo**: primary tracing backend (v2.10.8; metrics-generator configured but inert — `remote_write: []`) — durable on **RustFS S3** (`tempo-traces` bucket, **7-day** block retention)
+- **Grafana Tempo — raw manifests**: documented primary (v2.10.8; metrics-generator configured but **inert**, `remote_write: []`) — durable on **RustFS S3** (`tempo-traces` bucket, **7-day** block retention)
+- **Grafana Tempo — Helm chart**: same image, second bucket (`tempo-chart-traces`), [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/) phase-1 parallel run — and the **only live metrics-generator** (span-metrics + service-graphs → vmagent). See [Tempo runs twice](#tempo-runs-twice)
 - **Jaeger**: secondary UI (Helm chart, all-in-one) — **in-memory / ephemeral** (lost on restart)
-- **VictoriaTraces**: pilot 3rd backend (`v0.11.0`, VM-operator-managed, VictoriaLogs engine) — same OTel fan-out; see [victoriatraces.md](victoriatraces.md)
+- **VictoriaTraces**: pilot (`v0.11.0`, VM-operator-managed, VictoriaLogs engine) — same OTel fan-out; see [victoriatraces.md](victoriatraces.md)
+- **ClickHouse**: `otel_traces`, **90-day** SQL tier with a `trace_id` JOIN against `otel_logs` ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)); see [clickhouse](../clickhouse/README.md)
 - **W3C Trace Context**: Standard for trace propagation between services
 
 ---
@@ -84,9 +86,11 @@ flowchart LR
     C -->|Spans OTLP| O
     D -->|Spans OTLP| O
 
-    O --> E[Tempo]
+    O --> E["Tempo (raw)"]
+    O --> E2["Tempo (chart)"]
     O --> J[Jaeger]
     O --> V[VictoriaTraces pilot]
+    O --> CH[("ClickHouse otel_traces · 90d")]
 
     E -->|TraceQL queries| F[Grafana]
 
@@ -108,10 +112,48 @@ flowchart LR
 2. **W3C Trace Context** header (`traceparent`) propagated to the services and downstream
 3. Each service creates **child spans** for its operations (the edge propagates a W3C `traceparent` natively on every proxied request — see [edge→service linkage](architecture.md#edge--service-linkage))
 4. **10% sampling** — the edge (root) decides by ratio (`samplingRate: 10` in the cluster CR, **planned**; `100` in local-stack); each service wraps its ratio in `ParentBased` (`ParentBased(TraceIDRatioBased(rate))`), so downstream hops honour the root's `sampled` flag and traces stay whole — a service's own ratio only applies when it is itself the root (see the [sampling note](architecture.md#edge--service-linkage))
-5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **Tempo**, **Jaeger**, and **VictoriaTraces**
+5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **five** sinks: **Tempo** (raw manifests), **Tempo** (Helm chart — the ADR-040 parallel run), **Jaeger**, **VictoriaTraces**, and **ClickHouse** `otel_traces`
 6. **Grafana** queries Tempo for trace visualization
 
-> **Three backends, by design.** **Tempo** is the primary backend (queried in Grafana via TraceQL) and the **durable** store — traces live in **RustFS S3** (`tempo-traces` bucket) with **7-day** retention. **Jaeger** is an alternative UI fed by the same OTel Collector fan-out, kept on **in-memory storage (ephemeral — traces are lost on pod restart)** because Jaeger has no S3/object-storage backend (see [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)). **VictoriaTraces** (`v0.11.0`) is a **pilot** 3rd fan-out target — VM-operator-managed, no object-storage dependency — evaluating tracing consolidation onto the VictoriaMetrics stack; Tempo stays primary/durable (see [victoriatraces.md](victoriatraces.md)). The multi-backend setup is intentional — Tempo for durable day-to-day Grafana workflows, Jaeger for its dedicated trace-search UI / learning, VictoriaTraces as a consolidation pilot. See [architecture.md](architecture.md), [jaeger.md](jaeger.md), and the [backend comparison](backends-comparison.md).
+> **Five sinks, four of them stores.** Read the collector's `service.pipelines` for the
+> authoritative list — it is the only place the real answer lives.
+>
+> | Sink | Store | Retention | Role |
+> |---|---|---|---|
+> | **Tempo** (raw manifests) | RustFS S3 `tempo-traces` | 7d | Documented as the primary, durable store; queried in Grafana via TraceQL |
+> | **Tempo** (Helm chart) | RustFS S3 `tempo-chart-traces` | 7d | [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/) phase-1 parallel run — see [below](#tempo-runs-twice) |
+> | **Jaeger** | in-memory, `max_traces: 100000` | ephemeral, lost on restart | Alternative trace-search UI; Jaeger has no S3/object-storage backend (see [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)) |
+> | **VictoriaTraces** `v0.11.0` | PVC 10Gi | 7d | **Pilot** — VM-operator-managed, no object-storage dependency, evaluating consolidation onto the VictoriaMetrics stack (see [victoriatraces.md](victoriatraces.md)) |
+> | **ClickHouse** | `otel_traces` | **90d** | Long-retention SQL and a `trace_id` JOIN against `otel_logs` ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/), [clickhouse](../clickhouse/README.md)) |
+>
+> The multi-backend setup grew from three separate decisions rather than one: Tempo for
+> durable Grafana workflows, Jaeger for its dedicated UI, VictoriaTraces as a consolidation
+> pilot, ClickHouse as the analytics tier — plus one migration (ADR-040) that is half done.
+> See [architecture.md](architecture.md) and the [backend comparison](backends-comparison.md).
+
+### Tempo runs twice
+
+Two Tempo installs receive the same spans, from the same image (`grafana/tempo:2.10.8`),
+into **two different RustFS buckets**. This is [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/)
+phase 1: the chart-based release (`tempo-chart`) runs alongside the raw manifests during the
+parallel run, and phase 2 — deleting the raw manifests and renaming the release to `tempo` —
+has not started. The ADR is still `Proposed`.
+
+They are **not** interchangeable, and the difference is easy to miss:
+
+| | Tempo (raw manifests) | Tempo (Helm chart) |
+|---|---|---|
+| Bucket | `tempo-traces` | `tempo-chart-traces` |
+| `metrics_generator` | configured but **inert** (`remote_write: []`) | **enabled** — remote-writes to vmagent with `send_exemplars: true` |
+| Processors | — | `service-graphs` + `span-metrics` |
+| Scraped | `ServiceMonitor/tempo` (`app: tempo`) | `serviceMonitor.enabled: false` |
+
+So the chart install is the **only live producer of RED span metrics and service graphs** on
+the cluster. Note also that nothing consumes them yet: `traces_spanmetrics` /
+`traces_service_graph` appear in no dashboard, alert or recording rule, and the Kind audit's
+K5.5 row records the spanmetrics leg as N/A on the cluster. And because `TempoDown` alerts on
+`up{job=~".*tempo.*"}` while only the raw install carries the `app: tempo` label the
+ServiceMonitor selects, that alert watches the raw install alone.
 
 ### Automatic Features
 
@@ -277,7 +319,11 @@ attribute.String("db.table", "users")
 
 ---
 
-**Last Updated**: 2026-07-14 — metrics-generator noted configured-but-inert (`remote_write: []`); collector fan-out drawn end-to-end; `OTEL_SERVICE_NAME` injected by ResourceSets; sampling corrected to the shipped `ParentBased(TraceIDRatioBased)` (root decides, downstream honours; no auto ENV mapping); Tempo v2.10.8 on RustFS S3 (7d), Jaeger in-memory, VictoriaTraces v0.11.0 (pilot)
+
 
 ---
-_Last updated: 2026-08-13 — trace root re-documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, no plugin)_
+_Last updated: 2026-08-23 — the fan-out is five sinks, not three: `tempo-chart` and ClickHouse
+were missing, and this page carried two conflicting `Last updated` footers (2026-07-14 and
+2026-08-13) so its freshness could not be read off the page. Previously: trace root
+re-documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, no plugin);
+sampling is `ParentBased(TraceIDRatioBased)` — root decides, downstream honours._

@@ -6,8 +6,10 @@ profiles "which line of code?"; see [`../README.md`](../README.md)). Logs reach
 VictoriaLogs by **two complementary paths**: instrumented Go services ship over
 **OTLP** (otelzap → OpenTelemetry Collector), and everything not OTel-instrumented
 (databases, the edge's access log, the frontend, system pods) is tailed by **Vector**.
-Both land in one backend, queryable with LogsQL and correlated to traces by
-`trace_id`.
+Both land in **VictoriaLogs**, queryable with LogsQL and correlated to traces by
+`trace_id`. The OTLP path additionally writes to **ClickHouse** `otel_logs` — a second
+store on purpose, for 90-day SQL ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/));
+see [ClickHouse](../clickhouse/README.md).
 
 | | |
 |---|---|
@@ -32,7 +34,7 @@ Both land in one backend, queryable with LogsQL and correlated to traces by
 
 ## Overview
 
-The platform has **two log paths into one backend**:
+The platform has **two log paths**, and the OTLP one lands in **two stores**:
 
 - **App path (OTLP).** The 10 Go services + both workers emit structured JSON
   with `zapx`, and their zap core is **tee'd** — one branch to stdout (for
@@ -48,8 +50,10 @@ The platform has **two log paths into one backend**:
   (they carry `platform.duynhlab.dev/otlp-logs=true`), so the two paths never
   double-ingest.
 
-VictoriaLogs is the **sole** log backend (Loki was removed). Application logs
-preserve `trace_id`, so they join directly to distributed traces. Infrastructure
+VictoriaLogs is the **ops** log backend and the only one Vector writes to (Loki was
+removed). It is **not** the only log store: the collector's `logs` pipeline also exports to
+ClickHouse `otel_logs`, which keeps 90 days for SQL while VictoriaLogs keeps 7 for LogsQL.
+Application logs preserve `trace_id`, so they join directly to distributed traces. Infrastructure
 logs normally correlate by namespace, pod, and time unless their source also
 emits a trace ID.
 
@@ -60,7 +64,7 @@ flowchart LR
     subgraph apps["Instrumented workloads (10 services + 2 workers)"]
         Z["zapx core (tee)"]
         Z -->|stdout| KLOGS["kubectl logs"]
-        Z -->|"otelzap → otlploghttp"| OTLP
+        Z -->|"otelzap → otlp_http"| OTLP
     end
     subgraph infra["Non-instrumented workloads"]
         CNPG["CloudNativePG<br/>auto_explain plans"]
@@ -72,14 +76,17 @@ flowchart LR
     EDGE --> VEC
     FE --> VEC
     COL -->|"/insert/opentelemetry/v1/logs<br/>VL-Stream-Fields: service.name"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
+    COL -->|"native :9000<br/>otel_logs"| CH[("ClickHouse<br/>monitoring · 90d SQL")]
     VEC -->|"/insert/jsonline"| VL
     VL --> GRAF{{"Grafana Explore<br/>(LogsQL)"}}
-    GRAF <-. "trace_id ↔ Tempo" .-> TEMPO[("Tempo")]
+    CH --> GRAF
+    GRAF <-. "trace_id ↔ trace store" .-> TEMPO[("Tempo · Jaeger<br/>VictoriaTraces")]
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     class OTLP,COL collector;
     class VL log;
+    class CH log;
     class TEMPO trace;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
@@ -90,7 +97,7 @@ flowchart LR
     class GRAF platform;
 ```
 
-**Two paths, one backend, no double-ingest.** App logs travel over OTLP; Vector
+**Two paths, no double-ingest — and two stores on the OTLP leg.** App logs travel over OTLP; Vector
 handles only the workloads OTel can't instrument. Vector still runs two pipelines
 of its own — the *infra* pipeline (label + ship) and the *PostgreSQL* pipeline
 (extract `auto_explain` execution plans into their own stream) — and the
@@ -115,9 +122,10 @@ parse contract for Vector sources and Grafana panels: `time`, `client`,
 ## Why VictoriaLogs (and why not Loki / ELK)
 
 The platform standardised on VictoriaLogs and **removed Loki** (CHANGELOG
-`v0.83.0` architectural switch, `v0.94.0` dead-manifest cleanup): one backend, no
-second system to operate, native trace correlation, and `auto_explain` plan
-analysis out of the box.
+`v0.83.0` architectural switch, `v0.94.0` dead-manifest cleanup): one **ops** backend
+instead of two, native trace correlation, and `auto_explain` plan analysis out of the box.
+The ClickHouse tier added later by [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)
+is a deliberate second store for long-retention SQL, not a second ops system.
 
 | | **VictoriaLogs** (chosen) | Loki | ELK / OpenSearch |
 |---|---|---|---|

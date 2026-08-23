@@ -2,7 +2,7 @@
 
 ## Overview
 
-Jaeger is an open-source distributed tracing platform that runs alongside Grafana Tempo (and the VictoriaTraces pilot — see [victoriatraces.md](victoriatraces.md)) in this project. All three backends receive the same traces via OpenTelemetry Collector fan-out, giving you the flexibility to use either UI.
+Jaeger is an open-source distributed tracing platform that runs alongside Grafana Tempo (and the VictoriaTraces pilot — see [victoriatraces.md](victoriatraces.md)) in this project. All **five** sinks receive the same traces via OpenTelemetry Collector fan-out (Tempo (raw), Tempo (chart), Jaeger, VictoriaTraces and ClickHouse), giving you the flexibility to use either UI.
 
 ## Quick Start
 
@@ -126,7 +126,9 @@ flowchart TB
     end
 
     subgraph backends["Trace backends"]
-        Tempo[("Tempo<br/>primary · durable")]
+        Tempo[("Tempo raw<br/>primary · durable")]
+        TempoC[("Tempo chart<br/>ADR-040 parallel")]
+        CH[("ClickHouse<br/>otel_traces · 90d")]
         Jaeger[("Jaeger<br/>in-memory UI")]
         VT[("VictoriaTraces<br/>pilot")]
     end
@@ -148,7 +150,7 @@ flowchart TB
 
 **Key Points:**
 - Applications send to OTel Collector (not Jaeger directly)
-- Same traces appear in Tempo, Jaeger, and VictoriaTraces (pilot)
+- Same traces appear in all five sinks: Tempo (raw), Tempo (chart), Jaeger, VictoriaTraces (pilot), and ClickHouse `otel_traces`
 - No data duplication at application level
 
 ## Configuration
@@ -320,4 +322,4 @@ ctx, span := tracer.Start(ctx, "ProcessOrder")
 - [Jaeger Official Docs](https://www.jaegertracing.io/docs/)
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-23 — "all three backends" corrected to five sinks. This was the oldest page in the tracing tree (2026-07-14) and predated ADR-023's acceptance entirely._

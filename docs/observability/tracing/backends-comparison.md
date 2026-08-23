@@ -1,13 +1,17 @@
 # Tracing Backends: Tempo vs Jaeger vs VictoriaTraces
 
-A decision-oriented comparison of the three tracing backends on this platform. **All three now run**
-— the OTel Collector fans the same traces to each: **Tempo** + **Jaeger** are the established pair,
-and **VictoriaTraces** is deployed as a **pilot 3rd backend** (`VTSingle`, image `v0.11.0`) to evaluate
-the "consolidate tracing into the VM operator" story. See [victoriatraces.md](victoriatraces.md).
+A decision-oriented comparison of the tracing backends on this platform. The OTel Collector fans
+the same traces to **five** sinks: **Tempo** from the raw manifests, **Tempo** again from the Helm
+chart ([ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/) phase-1 parallel run),
+**Jaeger**, **VictoriaTraces** (`VTSingle`, `v0.11.0`) as a pilot, and **ClickHouse** `otel_traces`
+as a 90-day SQL tier. The three columns below compare the *engines*; the two Tempo installs share
+one engine and differ in delivery — see [tracing/README.md](README.md#tempo-runs-twice).
 
 > **TL;DR** — **Tempo** is the durable backend (object storage on **RustFS**, TraceQL, native Grafana
-> correlation); **Jaeger** is a secondary in-memory UI kept for learning; **VictoriaTraces** is a
-> **pilot** (3rd fan-out) — the strategic "tracing in the VM operator beside metrics + logs" play, but
+> correlation), and it runs **twice** during the ADR-040 parallel run; **Jaeger** is a secondary
+> in-memory UI kept for learning; **ClickHouse** holds the same spans for 90 days for SQL and a
+> `trace_id` JOIN against logs; **VictoriaTraces** is a
+> **pilot** — the strategic "tracing in the VM operator beside metrics + logs" play, but
 > still **`v0.x` (pre-GA)** with **partial TraceQL search compatibility** but no
 > TraceQL metrics or pipelines. It does not replace Tempo/Jaeger; a future ADR
 > decides any consolidation.
@@ -17,12 +21,15 @@ the "consolidate tracing into the VM operator" story. See [victoriatraces.md](vi
 ```mermaid
 flowchart LR
   Apps["10 services + 2 workers<br/>OTel SDK"] -->|OTLP| OC["OTel Collector"]
-  OC -->|otlp/tempo| T["Tempo 2.10.8<br/>(durable · RustFS S3)"]
+  OC -->|otlp/tempo| T["Tempo 2.10.8 · raw<br/>(durable · RustFS tempo-traces)"]
+  OC -->|otlp/tempo-chart| TC["Tempo 2.10.8 · chart<br/>(ADR-040 parallel · tempo-chart-traces)"]
   OC -->|otlp/jaeger| J["Jaeger v2 all-in-one<br/>(in-memory · ephemeral)"]
-  OC -->|otlphttp/victoriatraces| V["VictoriaTraces v0.11.0<br/>(pilot · VLogs engine)"]
+  OC -->|otlp_http/victoriatraces| V["VictoriaTraces v0.11.0<br/>(pilot · VLogs engine)"]
+  OC -->|clickhouse| CH["ClickHouse otel_traces<br/>(90d SQL)"]
   T --> G["Grafana (TraceQL +<br/>traces↔logs↔metrics)"]
   J --> JU["Jaeger UI"]
   V --> G
+  CH --> G
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
   classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
   classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
@@ -33,7 +40,7 @@ flowchart LR
   class G,JU platform;
 ```
 
-The OTel Collector fans the **same** traces to all three backends — see
+The OTel Collector fans the **same** traces to all five sinks — see
 [architecture.md](architecture.md). Tempo is durable; Jaeger is ephemeral by choice (see
 [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)); VictoriaTraces is the
 pilot (see [victoriatraces.md](victoriatraces.md)).
@@ -47,7 +54,7 @@ pilot (see [victoriatraces.md](victoriatraces.md)).
 | Ingestion | OTLP, Jaeger, Zipkin | OTLP (v2), Jaeger, Zipkin | **OTLP only** |
 | Query | **TraceQL** (scoped attrs + structural operators `>>`/`~`) | tag / duration / service filters (no query language) | **LogsQL** + **Jaeger and partial Tempo/TraceQL search APIs**; no TraceQL metrics/pipelines |
 | Grafana | **Native datasource** + traces↔logs↔metrics↔profiles correlation | Jaeger datasource / standalone UI | via the **Jaeger datasource** (no native VT datasource) |
-| Service graph / span metrics | metrics-generator configured but **inert** (`remote_write: []` — writes nowhere) | dependency graph; SPM (needs a metrics backend) | built-in service-graph generation |
+| Service graph / span metrics | **raw install inert** (`remote_write: []` — writes nowhere), but the **chart install is live**: span-metrics + service-graphs remote-written to vmagent with `send_exemplars: true`. Nothing consumes those series yet (`traces_spanmetrics` / `traces_service_graph` appear in no dashboard, alert or rule) | dependency graph; SPM (needs a metrics backend) | built-in service-graph generation |
 | Operator on this platform | Helm/manifests | Helm chart (all-in-one) | **`VTSingle`/`VTCluster` CRDs** — drop-in to the **VictoriaMetrics Operator** |
 | Correlation sweet spot | single-pane Grafana across all 4 pillars | own UI | tightest **log↔trace** (traces *are* VictoriaLogs data, same LogsQL) |
 
@@ -71,11 +78,17 @@ The platform already runs the **VictoriaMetrics Operator** (VMSingle/VMAgent/VMA
 
 ## Recommendation / roadmap
 
-1. **Now:** **Tempo** is the durable backend (RustFS S3, 7-day retention); **Jaeger** in-memory is
-   the secondary learning UI; **VictoriaTraces** (`VTSingle` v0.11.0) is **deployed as a pilot 3rd
-   backend** (drop-in operator CRD, no object-storage dependency) — see
+1. **Now:** five sinks receive every span. **Tempo** is the durable backend (RustFS S3, 7-day
+   retention) and runs twice while ADR-040 phase 2 is outstanding; **Jaeger** in-memory is the
+   secondary learning UI; **ClickHouse** is the 90-day SQL tier; **VictoriaTraces**
+   (`VTSingle` v0.11.0) is a **pilot** (drop-in operator CRD, no object-storage dependency) — see
    [victoriatraces.md](victoriatraces.md). Evaluate LogsQL-trace querying + the Jaeger-datasource
    correlation on real data.
+
+   Note when comparing storage footprints: no measurement of ClickHouse against VictoriaTraces or
+   VictoriaLogs exists on this platform, or in the public claims either — both ClickHouse and
+   VictoriaLogs publish their compression advantage against *Elasticsearch and Loki*, not against
+   each other.
 2. **Adopt VictoriaTraces as the sole backend only when** it reaches ~1.0/GA and
    the remaining **TraceQL coverage gap** is acceptable — for the prize of
    consolidating tracing into the
@@ -88,7 +101,7 @@ The platform already runs the **VictoriaMetrics Operator** (VMSingle/VMAgent/VMA
 - Grafana Tempo: <https://grafana.com/docs/tempo/latest/> · Jaeger: <https://www.jaegertracing.io/docs/> · VictoriaTraces: <https://docs.victoriametrics.com/victoriatraces/>
 
 ---
-_Last updated: 2026-08-20 — image bumped v0.9.4 → v0.11.0 (Jaeger query API and the
+_Last updated: 2026-08-23 — corrected to five sinks (`tempo-chart` and ClickHouse were absent), and the span-metrics row: the chart install's metrics-generator is live, which was the doc's own stated reason to prefer the chart._
 Grafana datasource re-verified on the compose E2E gate); the TraceQL-coverage
 assessment below still dates from the v0.9.4 review — no upstream change claims to
 close that gap._

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document explains the distributed tracing architecture used in this project, including the triple-backend fan-out (Tempo + Jaeger + VictoriaTraces pilot), OpenTelemetry Collector fan-out pattern, and SDK-based instrumentation approach.
+This document explains the distributed tracing architecture used in this project, including the five-sink fan-out (Tempo ×2 + Jaeger + VictoriaTraces pilot + ClickHouse), OpenTelemetry Collector fan-out pattern, and SDK-based instrumentation approach.
 
 ## Architecture
 
@@ -27,7 +27,8 @@ flowchart TB
     end
 
     subgraph backends["Trace backends"]
-        Tempo[("Tempo<br/>primary · RustFS S3")]
+        Tempo[("Tempo raw<br/>primary · RustFS S3")]
+        TempoC[("Tempo chart<br/>ADR-040 parallel run<br/>2nd bucket · live generator")]
         Jaeger[("Jaeger<br/>in-memory learning UI")]
         VT[("VictoriaTraces v0.11.0<br/>pilot VTSingle")]
         CH[("ClickHouse<br/>otel_traces · 90d OLAP")]
@@ -44,6 +45,7 @@ flowchart TB
     Edge -->|"OTLP/gRPC :4317 edge spans"| Receiver
     Services & Workers -->|"OTLP application spans"| Receiver
     Processors -->|"OTLP/gRPC"| Tempo
+    Processors -->|"OTLP/gRPC"| TempoC
     Processors -->|"OTLP/gRPC"| Jaeger
     Processors -->|"OTLP/HTTP"| VT
     Processors -->|"native TCP"| CH
@@ -63,7 +65,7 @@ flowchart TB
     class Services service;
     class Workers worker;
     class Receiver,Processors collector;
-    class Tempo,Jaeger,VT trace;
+    class Tempo,TempoC,Jaeger,VT trace;
     class CH data;
     class Temporal,Grafana,JaegerUI platform;
 ```
@@ -93,7 +95,7 @@ behavior that makes this reliable.
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
-- **Function**: Fan-out layer — a `traces` pipeline distributing to the three backends, plus a `logs` pipeline (fleet-wide app `otelzap` tee → VictoriaLogs). The edge has no OTLP logs path; its only log output is the JSON access log on stdout, tailed separately by Vector
+- **Function**: Fan-out layer — a `traces` pipeline distributing to **five** sinks, plus a `logs` pipeline going to **two** (fleet-wide app `otelzap` tee → VictoriaLogs *and* ClickHouse `otel_logs`). The edge has no OTLP logs path; its only log output is the JSON access log on stdout, tailed separately by Vector
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
@@ -111,7 +113,7 @@ behavior that makes this reliable.
 
 ## Why Multiple Backends?
 
-The OTel Collector fans out to **three** backends, each with a distinct role:
+The OTel Collector fans out to **five** sinks, each with a distinct role:
 
 ### Use Cases
 
@@ -123,13 +125,28 @@ The OTel Collector fans out to **three** backends, each with a distinct role:
    - Alternative UI, learning / comparison
    - In-memory / ephemeral (no S3/object-storage backend)
 
-3. **VictoriaTraces — pilot (3rd backend)**
+3. **VictoriaTraces — pilot**
    - Evaluates the **VM-operator consolidation** story: tracing managed by the
      *same* VictoriaMetrics Operator and storage engine as metrics (`VMSingle`)
      and logs (`VLSingle`), with **no object-storage dependency**
    - `v0.11.0` (0.x, pre-GA) — a pilot, not a replacement; any consolidation is a
      future ADR gated on ~1.0/GA. See [victoriatraces.md](victoriatraces.md) and
      the [backend comparison](backends-comparison.md)
+
+4. **Tempo (Helm chart) — ADR-040 phase-1 parallel run**
+   - Same image as the raw install, **second** RustFS bucket (`tempo-chart-traces`)
+   - The **only live metrics-generator** on the cluster: span-metrics +
+     service-graphs remote-written to vmagent with `send_exemplars: true`, while
+     the raw install's generator is inert (`remote_write: []`)
+   - [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/) is still
+     `Proposed`; phase 2 (delete the raw manifests, rename the release) has not
+     started, so both run
+
+5. **ClickHouse — long-retention analytics tier**
+   - `otel_traces`, **90 days** vs 7 on every other store
+   - The only place a `trace_id` JOIN across `otel_logs` ↔ `otel_traces` is
+     possible in one query ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/),
+     [clickhouse](../clickhouse/README.md))
 
 ### Current Status
 
@@ -258,7 +275,7 @@ The deployed pipelines (`kubernetes/infra/controllers/tracing/otel-collector/ote
 
 | Pipeline | Processors | Exporters |
 |----------|------------|-----------|
-| `traces` | `memory_limiter` → `batch` | Tempo (OTLP gRPC) · Jaeger (OTLP gRPC) · VictoriaTraces (OTLP HTTP `:10428`) · **ClickHouse** `otel_traces` |
+| `traces` | `memory_limiter` → `batch` | Tempo raw (OTLP gRPC) · **Tempo chart (OTLP gRPC)** · Jaeger (OTLP gRPC) · VictoriaTraces (OTLP HTTP `:10428`) · ClickHouse `otel_traces` |
 | `logs` | `memory_limiter` → `batch` | VictoriaLogs (OTLP HTTP `:9428`) · **ClickHouse** `otel_logs` |
 | `metrics` | `memory_limiter` → `deltatocumulative` → `batch` | vmagent OTLP ingest `:8429` |
 
@@ -283,7 +300,7 @@ the ClickHouse startup coupling, and the troubleshooting runbook:
 5. **Batch export** every 5 seconds (or when batch full)
 6. **OTLP HTTP** sent to OTel Collector
 7. **Collector processes** (memory limit, batch)
-8. **Fan-out** to Tempo + Jaeger (OTLP gRPC), VictoriaTraces (OTLP HTTP), and ClickHouse (`otel_traces`)
+8. **Fan-out** to Tempo raw + Tempo chart + Jaeger (OTLP gRPC), VictoriaTraces (OTLP HTTP), and ClickHouse (`otel_traces`) — five sinks
 9. **Backends store** traces
 10. **Query** via Grafana (Tempo) or Jaeger UI
 
@@ -440,4 +457,4 @@ spec:
 - [Jaeger v2 Deployment Guide](https://www.jaegertracing.io/docs/2.13/deployment/kubernetes/)
 - [OpenTelemetry Operator](https://opentelemetry.io/docs/platforms/kubernetes/operator/)
 
-_Last updated: 2026-08-13 — edge documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, ParentBased sampler, no OTLP logs path); diagrams and pipeline table aligned with the deployed collector (ClickHouse fan-out, `clickhouse-local` ordering); collector deep dive split out to [collector.md](../opentelemetry/collector.md)._
+_Last updated: 2026-08-23 — the fan-out is five sinks: `tempo-chart` (ADR-040 phase-1 parallel run, and the only live metrics-generator) and ClickHouse `otel_traces` were both missing from the counts, the diagram and the pipeline table._

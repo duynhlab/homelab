@@ -29,6 +29,7 @@ HOSTS=(
   backoffice.duynh.me       # Backoffice portal (RFC-0023)
   gateway.duynh.me          # the API edge
   id.duynh.me               # Keycloak — BOTH OIDC flows dead-end without it
+  kyverno.duynh.me          # Policy Reporter UI — Kyverno PolicyReports, browsable
   temporal.duynh.me         # Temporal UI
   grafana.duynh.me
   vmui.duynh.me

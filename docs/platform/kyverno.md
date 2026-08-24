@@ -11,7 +11,7 @@ so the highest-value Kyverno features are:
 
 1. **Validate** — catch insecure manifests *before* they reach etcd
 2. **Background scan** — surface violations in resources applied before Kyverno
-3. **PolicyReports** — feed Grafana / policy-reporter UI for dev visibility
+3. **PolicyReports** — read them in the **Policy Reporter UI** at `kyverno.duynh.me` (deployed; see [Reports](#observability))
 
 ## Adoption matrix
 
@@ -122,13 +122,19 @@ never block applies.
 
 ### View policy reports
 
+Browsable at **`kyverno.duynh.me`** (Policy Reporter — see [Observability](#observability)).
+The Kyverno plugin is what makes a failing result name the policy that failed,
+rather than just the rule id.
+
+The CLI still works and is the fallback when the UI is down:
+
 ```bash
 # Cluster-wide PolicyReports
 kubectl get clusterpolicyreport -A
 kubectl get policyreport -A
 
-# Pretty summary
-kubectl describe policyreport -n auth
+# Pretty summary — pick a namespace that exists (auth was retired with RFC-0024)
+kubectl describe policyreport -n product
 ```
 
 ### Add a new policy
@@ -203,9 +209,26 @@ kubectl logs -n kyverno -l app.kubernetes.io/component=admission-controller --ta
   Vector's `add_labels`, as the Envoy access log has — a known gap, not done.
 - **Tracing**: **not enabled, and the reason is not cost** — see
   [Why tracing is not adopted](#why-tracing-is-not-adopted) after this list.
-- **Reports**: Aggregate via `kubectl get policyreport -A`. A policy-reporter UI
-  at `kyverno.duynh.me` is planned but **not deployed** — no HelmRelease, no
-  HTTPRoute, and the hostname is absent from `scripts/setup-hosts.sh`
+- **Reports**: **Policy Reporter** at `kyverno.duynh.me` — chart
+  `kyverno/policy-reporter` 3.9.1, delivered by the `policy-reporter-local`
+  Kustomization (`controllers/policy-reporter`). Three Deployments: the core
+  (watches PolicyReports, serves the REST API and Prometheus metrics), the **UI**,
+  and the **Kyverno plugin**. `kubectl get policyreport -A` still works and is the
+  fallback the `PolicyReporterDown` alert points at.
+  - **What the plugin buys.** Without it the UI lists *results*: a resource, a
+    rule name, a status. With it a result resolves back to the policy behind it —
+    verified on this cluster, `GET /v1/policies` on the plugin returns each
+    `ClusterPolicy` with its title, category, severity and description, which is
+    what turns "`require-resources` failed" into something actionable.
+  - **Admin surface, fenced like its siblings.** The route lives in
+    `configs/envoy-gateway/routes/infra.yaml` beside the Flux, RustFS and OpenBAO
+    UIs, and carries the same CIDR fence (`policies/security-admin-cidr.yaml`) and
+    admin rate limit (`policies/btp-admin.yaml`). Both target same-namespace
+    routes only, so each gained a `policy-reporter` block — an entry in the
+    `monitoring` one would not have applied.
+  - **Enforcement is unaffected if it is down.** Kyverno keeps admitting and keeps
+    writing reports; only the browsable view stops. That is why
+    `PolicyReporterDown` is `warning`, not `critical`.
 
 ### Why tracing is not adopted
 

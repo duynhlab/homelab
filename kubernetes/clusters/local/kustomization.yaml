@@ -21,6 +21,7 @@ resources:
   - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)
   - monitoring.yaml      # Grafana + Prometheus Configs
   - kyverno.yaml         # Admission policies (depends on controllers + monitoring)
+  - policy-reporter.yaml # Kyverno's PolicyReports, browsable (depends on kyverno-policies-local)
   - network-policies.yaml   # Ingress NetworkPolicies (inert on kindnet; depends on controllers)
   # - mcp.yaml           # DISABLED 2026-08-21 — owner: the MCP servers are not in use, and they were
   # the biggest idle consumers on the Kind host (victoria-metrics-mcp alone held

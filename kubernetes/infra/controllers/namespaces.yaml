@@ -181,6 +181,18 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # Deliberately NOT platform.duynhlab.dev/tier: app. That label is what the
+    # default-deny-networkpolicy ClusterPolicy selects on, and this is
+    # infrastructure like monitoring or rustfs -- labelling it `app` would
+    # generate a deny-all-ingress here and the UI would answer nothing through
+    # the edge with no manifest to point at.
+  name: policy-reporter
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
   name: frontend
 ---
 apiVersion: v1

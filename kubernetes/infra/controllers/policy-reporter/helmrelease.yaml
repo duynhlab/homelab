@@ -1,0 +1,83 @@
+# Policy Reporter — reads Kyverno's PolicyReports and gives them a UI.
+# Chart: https://github.com/kyverno/policy-reporter/tree/main/charts/policy-reporter
+#
+# Closes the gap docs/platform/kyverno.md recorded: "a policy-reporter UI at
+# kyverno.duynh.me is planned but not deployed". Before this, reading violations
+# meant `kubectl get policyreport -A`.
+#
+# Three Deployments come out of this release -- core, ui, and the kyverno plugin
+# -- and all three pass through this cluster's own Kyverno admission. The chart
+# leaves `resources` EMPTY by default on every one of them, so each block below
+# is required, not tuning: require-resources rejects a container without
+# requests.{cpu,memory} + limits.memory. Probes need nothing: core and ui carry
+# values-driven probes that the chart fills in, and the plugin's Deployment
+# hardcodes liveness/readiness in its template.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: policy-reporter
+  namespace: policy-reporter
+spec:
+  interval: 10m
+  timeout: 10m
+  chart:
+    spec:
+      chart: policy-reporter
+      sourceRef:
+        kind: HelmRepository
+        name: policy-reporter
+        namespace: flux-system
+      version: "3.9.1"
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # --- core: watches PolicyReports, serves the REST API and metrics ---
+    resources:
+      requests:
+        cpu: 25m
+        memory: 96Mi
+      limits:
+        memory: 256Mi
+
+    # ServiceMonitor for the core's own metrics. The chart nests the
+    # ServiceMonitor toggle under `monitoring` and defaults `monitoring.enabled`
+    # to false, so the inner `serviceMonitor.enabled: true` alone does nothing.
+    monitoring:
+      enabled: true
+
+    # --- UI: the browsable surface, reached at kyverno.duynh.me ---
+    ui:
+      enabled: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 192Mi
+
+    # --- Kyverno plugin: what makes a report row explain itself ---
+    # Without it the UI lists results; with it a result resolves back to the
+    # ClusterPolicy and rule, which is the whole reason this is installed.
+    plugin:
+      kyverno:
+        enabled: true
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 192Mi
+
+    # The route is hand-written in configs/envoy-gateway/routes/monitoring.yaml,
+    # beside every other UI route and sharing their security-header filter. The
+    # chart can render an HTTPRoute itself (httproute.enabled) -- deliberately
+    # not used, so route ownership stays in one file.
+    httproute:
+      enabled: false
+    ingress:
+      enabled: false

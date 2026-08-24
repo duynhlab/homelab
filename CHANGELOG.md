@@ -1017,6 +1017,48 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Kyverno's reports are browsable: Policy Reporter at `kyverno.duynh.me`.**
+  `docs/platform/kyverno.md` had recorded this as *"planned but not deployed — no
+  HelmRelease, no HTTPRoute, and the hostname is absent from
+  `scripts/setup-hosts.sh"`*; all three now exist. Chart
+  `kyverno/policy-reporter` 3.9.1 brings three Deployments — the core (watches
+  PolicyReports, serves the REST API and Prometheus metrics), the **UI**, and the
+  **Kyverno plugin**. The plugin is the point: without it the UI lists results, and
+  with it a result resolves back to the policy behind it — verified, `GET
+  /v1/policies` returns each `ClusterPolicy` with title, category, severity and
+  description. There are **256 PolicyReports and 11 ClusterPolicyReports** to read.
+  - **The chart leaves `resources` empty on all three Deployments**, so each block
+    is required rather than tuning: this cluster's own `require-resources` policy
+    would reject them. Probes needed nothing — the core and UI carry values-driven
+    probes the chart fills in, and the plugin's Deployment hardcodes liveness and
+    readiness in its template. **No PolicyException was needed**, confirmed by all
+    three admitting first time.
+  - **Its own Flux wave** (`policy-reporter-local`, `dependsOn:
+    kyverno-policies-local`), not `controllers-local`. The chart needs CRDs that
+    `controllers-local` itself installs — PolicyReport from Kyverno and
+    ServiceMonitor from prometheus-operator-crds — and ordering *within* a
+    Kustomization is not guaranteed, which is the deadlock debugs.md Bug 6 records
+    and the reason `tracing-local`, `profiling-local` and `caching-local` were each
+    split out.
+  - **Fenced like the admin surface it is.** The route sits in
+    `routes/infra.yaml` beside the Flux, RustFS and OpenBAO UIs and carries the
+    same CIDR fence and admin rate limit. Both policies target **same-namespace
+    routes only**, so each gained a `policy-reporter` block — an entry in the
+    `monitoring` one would silently not have applied. The chart's own
+    `httproute.enabled` is deliberately off so route ownership stays in one file
+    with its security-header filter. Verified: `HTTP/2 200` with all four headers
+    and no `Server` header.
+  - `PolicyReporterDown` added in its own file, `warning` not `critical`:
+    enforcement and report writing continue if it is down, only the view stops.
+  - The namespace is deliberately **not** labelled `platform.duynhlab.dev/tier:
+    app` — that label is what `default-deny-networkpolicy` selects on, and the UI
+    would have answered nothing through the edge with no manifest to blame.
+  - Corrected while here: `AGENTS.md`, `docs/platform/setup.md` and
+    `docs/platform/README.md` said **21** Kustomization CRs. That count was right
+    for `clusters/local/` and is now **22**; a cluster reports **23** because
+    `flux-system` is created by the FluxInstance rather than that directory, and
+    the docs now say so instead of leaving the two numbers looking contradictory.
+
 - **Kyverno policies now have unit tests, and they found a defect on their first
   run.** `kubeconform` only checks manifest *shape* — it validates a
   `ClusterPolicy` against the Kyverno CRD schema and stops there, so nothing ever

@@ -5,6 +5,7 @@ resources:
   - pyroscope-alerts.yaml
   - clickhouse-alerts.yaml
   - otel-collector-alerts.yaml
+  - policy-reporter-alerts.yaml
 # RFC-0027 / ADR-059: TempoDown retired with Tempo (*.yaml.bak). Removing BOTH
 # installs is what makes deleting it correct — dropping one would have left the
 # alert with zero series: loading clean, never firing, reading as healthy forever.

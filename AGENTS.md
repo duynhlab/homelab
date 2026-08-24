@@ -333,9 +333,12 @@ Every manifest applied to the cluster must satisfy admission:
   envoy-gateway-config (after envoy-gateway + cert-manager + keycloak)
   monitoring → {kyverno-policies, mcp, caching}
   temporal → temporal-config
+  kyverno-policies → policy-reporter
   apps-local (depends: databases + monitoring + temporal)
   ```
-  (21 Kustomization CRs total — full graph in
+  (22 Kustomization CRs in `clusters/local/`; a cluster reports **23** because
+  `flux-system` itself is created by the FluxInstance, not by this directory —
+  full graph in
   [`docs/platform/setup.md`](docs/platform/setup.md).)
 - **CHANGELOG.** Entries grouped **`### Category` → `#### Component`** per the hidden template comment at the top of `CHANGELOG.md` (categories, fixed order: `Breaking Change`/`Feature`/`Bugfix`/`Performance`/`Dependency`/`Deprecation`; components: GitOps, Gateway, Observability, Databases, Secrets, Security, Services, Temporal, Local-stack, Docs, Proposals, CI). New entries go at the **top** of the matching group in `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history (older releases keep the format they shipped with). Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` under the template comment.
 - **Image naming:** `ghcr.io/duynhlab/<repo>/<image>` (multi-level). The `mop` chart renders `<name>-service/<name>-service`; migrations reuse that same image, so there is no second image per service.

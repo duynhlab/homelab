@@ -78,7 +78,7 @@ flowchart TD
     temporal --> apps
 ```
 
-This diagram is a summary — the full numbered graph of all 21 Kustomization CRs
+This diagram is a summary — the full numbered graph of all 22 Kustomization CRs
 lives in [`setup.md`](setup.md#project-architecture).
 
 `make flux-sync` (inside `make sync`) reconciles only a **subset** of Kustomizations

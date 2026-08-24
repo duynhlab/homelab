@@ -2,10 +2,12 @@
 
 <!-- The title must be short and descriptive. Copy this file ONLY after research.md
      review gate passes and the owner approves "ready for RFC".
+     Template v3 (2026-08-24): added § Decision outcome between
+     § Other solutions considered and § Architecture & Diagrams.
      Template v2 (2026-08-18): added § Other solutions considered between
      § Alternatives and § Architecture & Diagrams. RFCs authored from
-     RFC-0000/README.md before that date use template v1 — no backfill unless
-     the owner asks. -->
+     RFC-0000/README.md before those dates use the earlier template — no
+     backfill unless the owner asks. -->
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
@@ -84,6 +86,31 @@ every other option we looked at and ruled out.
 |--------|-------|----------------|
 | `<option-A>` | <!-- one-line sketch --> | <!-- concrete rejection reason --> |
 | `<option-B>` | <!-- --> | <!-- --> |
+
+## Decision outcome
+
+<!--
+State the choice once, in one place, and name the option exactly as
+§ Alternatives and § Other solutions considered name it — so the three sections
+read together.
+
+Fill this at architecture review (Process step 6), not at first publish: a
+`provisional` RFC may legitimately still say `undecided`.
+
+Rationale argues against § Goals and the research criteria — not "it is newer"
+or "it is more modern". Name the runner-up and the factor that decided between
+them.
+
+Do NOT restate per-option pros/cons here: research.md § Alternatives owns those
+("decision stays open"), and the cost side of the chosen path belongs in
+§ Design Details → drawbacks.
+-->
+
+**Chosen option:** `<option-A>` <!-- or: undecided — architecture review pending -->
+
+**Rationale:** <!-- how it satisfies § Goals better than the runner-up, and the deciding factor -->
+
+**Decided:** <!-- optional — YYYY-MM-DD + who, when the choice was made outside this RFC's PR -->
 
 ## Architecture & Diagrams
 

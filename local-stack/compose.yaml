@@ -26,7 +26,7 @@
 # realm `duynhlab`, keycloak-js PKCE) and services verify realm tokens via OIDC_*
 # (pkg authmw). The realm is the only token issuer: there is no
 # auth-service here, and no service, worker, or route refers to one. Its
-# cluster surface retires in P5.
+# cluster surface retired with RFC-0024 P5; the repo is archived.
 # Demo login: alice / password123 (by username, on the Keycloak login page).
 
 x-svc-env: &svc-env

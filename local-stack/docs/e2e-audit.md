@@ -1101,6 +1101,29 @@ audit_curl -s -o /dev/null -X POST "http://localhost:8080/product/v1/protected/p
 # own contract tests, which the release CI runs on the same commit.
 audit_curl -s -o /dev/null -X DELETE $BASE/checkout/v1/private/checkout/sessions/$S21 -H "Authorization: Bearer $AT21"
 audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorization: Bearer $AT21"
+
+# ---------------------------------------------------------------------------
+# A22. THE ATTENTION CARDS' SIX READS. B6 proves the cards RENDER; this proves
+#      the queries beneath them. Same paths and params the portal's dashboard
+#      issues (admin-service src/routes/_authenticated/index.tsx), so a renamed
+#      filter or a dropped `total_items` fails here with the endpoint named
+#      rather than surfacing as a blank card nobody can attribute.
+for q in \
+  "inventory/v1/protected/balances?page=1&page_size=1&low_stock=true" \
+  "order/v1/protected/orders?page=1&page_size=1&status=manual_review" \
+  "order/v1/protected/orders?page=1&page_size=1&status=cancelling" \
+  "payment/v1/protected/attempts/open?page=1&page_size=1" \
+  "payment/v1/protected/reconciliations/runs?page=1&page_size=1"; do
+  audit_curl -s "$BASE/$q" -H "Authorization: Bearer $KCT_STAFF" \
+    | python3 -c "import json,sys;d=json.load(sys.stdin);print(type(d.get('total_items')).__name__, d.get('total_items'))"
+done
+# The drift guard, and the reason the row is worth more than five 200s: a status
+# order-service does not know must be 400. Were it ignored instead, the
+# manual_review and cancelling cards would BOTH report the total order count --
+# two plausible numbers, both wrong, with no non-200 anywhere to reveal it.
+audit_curl -s -o /dev/null -w '%{http_code}\n' \
+  "$BASE/order/v1/protected/orders?status=not_a_status" \
+  -H "Authorization: Bearer $KCT_STAFF"   # 400
 ```
 
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
@@ -1137,7 +1160,7 @@ audit_curl -s -o /dev/null -X DELETE $BASE/cart/v1/private/cart -H "Authorizatio
 ## Phase B — real browser (agent-browser, ~8 min)
 
 Two SPAs, run in that order: the storefront (`:3001`, B1-B4) and the Backoffice
-Portal (`:3009`, B5-B8).
+Portal (`:3009`, B5-B8, then the ADR-053 affordances B9-B10).
 
 What Phase B proves that Phase A cannot: the SPA holds **no token of its own**.
 keycloak-js owns the token lifecycle in adapter memory, the browser never sees an
@@ -1453,6 +1476,30 @@ agent-browser $Q --args "--no-sandbox" batch \
 # (sign in via the realm form as in B5 if the login page appears, then
 #  re-open /inventory and re-snapshot. Use the refs YOUR snapshot prints.)
 agent-browser $Q batch "click <ref of 'Receive first stock'>" "wait 800" "snapshot -i"
+
+#     THE DIALOG HAS NO REFS. It opens and renders correctly — `screenshot`
+#     and `read` both show it — but the portal's dialogs carry `role="dialog"`
+#     WITHOUT `aria-modal`, and neither `snapshot` nor `snapshot -i` surfaces
+#     their fields. So there is nothing to `click`/`type` by ref, and a missing
+#     ref here is NOT a failed row. Drive it through the DOM instead. React
+#     controlled inputs ignore a plain `.value =`, so go through the native
+#     setter and dispatch `input`, or the field reverts on the next render:
+#
+#       agent-browser $Q eval "(() => {
+#         const set = (el, v) => {
+#           Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value')
+#             .set.call(el, v);
+#           el.dispatchEvent(new Event('input', { bubbles: true }));
+#         };
+#         const d = document.querySelector('[role=dialog]');
+#         const [sku, wh, qty] = d.querySelectorAll('input');
+#         set(sku, 'b9-' + Math.floor(Date.now()/1000)); set(wh, '1'); set(qty, '4');
+#         return d.innerText;
+#       })()"
+#
+#     `read` is what reads the advisory line back; the submit is the same shape,
+#     clicking the dialog's own `Receive` button. Ref-driven flows work normally
+#     everywhere else on the page — this applies only to the dialogs.
 # Fill a SKU id that has no balance row (b9-<epoch> is untracked by
 # construction), warehouse 1, quantity 4 — and BEFORE submitting, the advisory
 # line must read "No balance row yet — this receipt creates it."
@@ -2039,6 +2086,7 @@ print('C21 rules loaded: %d alerting (want 19) + %d recording (want 15); firing:
 | A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
 | A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |
+| A22 | The attention cards' six reads (RFC-0023) | the five count queries the portal dashboard issues each answer **200** with a **numeric `total_items`** (zero is a legitimate count; a missing or non-numeric field is not), the recent-orders panel honours `page_size=5`, and a status order-service does not know is **400** — which is what proves the `manual_review` and `cancelling` cards are genuinely filtered rather than both reporting the total order count |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |

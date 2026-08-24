@@ -515,6 +515,19 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **The portal's attention cards now have a gate row of their own** (`A22`,
+  `scripts/k6/staff.js`). B6 proves the five cards *render* a numeral, but only
+  in a browser, and a dash tells nobody which of the six reads broke. A22 issues
+  the dashboard's exact six queries — same paths, same params as
+  `admin-service` `src/routes/_authenticated/index.tsx` — and asserts each
+  answers 200 with a **numeric `total_items`** (zero is a legitimate count) plus
+  `page_size=5` honoured on the recent-orders panel. The assertion that earns
+  the row is the last one: a status order-service does not know must be **400**.
+  Were an unknown status ignored instead, the `manual_review` and `cancelling`
+  cards would both report the total order count — two plausible numbers, both
+  wrong, with no non-200 anywhere to reveal it. 13/13 on compose; the staff gate
+  goes 46 → 59 assertions.
+
 - **`make e2e-restock` — seeding was a first-fill and the load row empties it.**
   `make e2e-load` drove SKU 1 from 50 to **0**, after which a run rejected **51 of
   60** orders and the checkout/inventory/product SLOs burned into `page` — which
@@ -1484,6 +1497,21 @@ Skeleton (copy what you need):
 ### Bugfix
 
 #### Local-stack
+
+- **Two stale claims in the local-stack tree, and the one runbook step that
+  could not be followed as written.** `gateway/eg/routes.yaml` listed an
+  `auth public … (P3: still auth-service)` route in its anonymous-routes
+  summary and then said four lines later that there is *deliberately no*
+  `/auth/v1/` route — a reader of the list would conclude the opposite of the
+  truth; the entry is gone. `compose.yaml` said auth-service's cluster surface
+  "retires in P5", which shipped. And B9/B10 told the next runner to drive the
+  portal's dialogs by a11y ref: the dialogs carry `role="dialog"` **without**
+  `aria-modal`, so neither `snapshot` nor `snapshot -i` surfaces their fields
+  and there are no refs to use — the row is not failing, the instruction was
+  unfollowable. The runbook now records the method that works (native value
+  setter + dispatched `input`, because React controlled inputs revert a plain
+  `.value =`) and says plainly that a missing ref there is not a failed row.
+  Phase B's own lead-in also stopped omitting B9-B10.
 
 - **Three compose-gate rows could not pass, each for its own reason — found by
   actually running the gate.** RFC-0027 owed a re-derivation of C17/C18/C21 after

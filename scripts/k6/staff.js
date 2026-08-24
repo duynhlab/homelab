@@ -1,6 +1,6 @@
-// The /protected/ Backoffice surface: four rows that share one staff token.
+// The /protected/ Backoffice surface: five rows that share one staff token.
 //
-// A17 mints it and A18/A19/A21 spend it, which is why they live together. The
+// A17 mints it and A18/A19/A21/A22 spend it, which is why they live together. The
 // shape of every row here is the same three-part guard chain: the edge checks
 // the workforce issuer coarsely, the service's own verifier is authoritative,
 // and only then does a role gate apply. A customer token is wrong-issuer at the
@@ -16,9 +16,7 @@
 //
 //   GATE=compose k6 run scripts/k6/staff.js
 //
-// NOT YET RUN against a live stack -- written from the audit rows, verified only
-// for parse and imports. Rows A17, A18, A19 and A21 of
-// local-stack/docs/e2e-audit.md.
+// Rows A17, A18, A19, A21 and A22 of local-stack/docs/e2e-audit.md.
 
 import http from 'k6/http';
 import { target, tlsOptions, identityFor } from './lib/config.js';
@@ -30,7 +28,7 @@ import { clearCart, addItem, freshSession, deleteSession } from './lib/funnel.js
 // recorded in a ledger is the TOKEN's subject and never the body's.
 const STAFF_SUB = 'd0e00000-0000-4000-8000-000000000001';
 
-const ROWS = ['A17', 'A18', 'A19', 'A21'];
+const ROWS = ['A17', 'A18', 'A19', 'A21', 'A22'];
 
 export const options = Object.assign(
   { vus: 1, iterations: 1, thresholds: rowThresholds(ROWS) },
@@ -55,6 +53,7 @@ export default function () {
   a18(B, staff, customer);
   a19(B, staff, customer, staffJson);
   a21(B, staff, staffJson);
+  a22(B, staff);
 }
 
 // --- A17: the protected surface, and its first command -----------------------
@@ -313,6 +312,50 @@ function a21(B, staff, staffJson) {
 
   if (recovered.id) deleteSession(B, auth, recovered.id);
   clearCart(B, auth);
+}
+
+// --- A22: the six reads behind the portal's attention cards ------------------
+//
+// B6 looks at the five cards and reads a numeral off each. What it cannot do is
+// say WHICH query broke when a card shows a dash, and it cannot run at all
+// without a browser. These are the exact six reads the dashboard issues
+// (admin-service `src/routes/_authenticated/index.tsx`) -- same paths, same
+// params -- so a renamed filter or a dropped `total_items` fails here with the
+// endpoint named instead of surfacing as a blank card.
+//
+// The last assertion is the one that earns the row. A `status` order-service
+// does not know is a 400, which proves the two order cards are really FILTERED.
+// Were an unknown status ignored instead, `manual_review` and `cancelling`
+// would both report the total order count -- two plausible numbers, both wrong,
+// and not one non-200 anywhere to reveal it.
+
+function a22(B, staff) {
+  const cards = [
+    ['low / out of stock', `${B}/inventory/v1/protected/balances?page=1&page_size=1&low_stock=true`],
+    ['manual review', `${B}/order/v1/protected/orders?page=1&page_size=1&status=manual_review`],
+    ['cancelling', `${B}/order/v1/protected/orders?page=1&page_size=1&status=cancelling`],
+    ['unresolved attempts', `${B}/payment/v1/protected/attempts/open?page=1&page_size=1`],
+    ['recon discrepancies', `${B}/payment/v1/protected/reconciliations/runs?page=1&page_size=1`],
+  ];
+
+  for (const [label, url] of cards) {
+    rowCheck('A22', http.get(url, staff), {
+      [`the ${label} card's query is 200`]: (r) => r.status === 200,
+      [`the ${label} card gets a numeric total_items`]: (r) =>
+        typeof (r.json() || {}).total_items === 'number',
+    });
+  }
+
+  // The recent-orders panel is a list rather than a count, so page_size is the
+  // thing to hold it to. A null `items` on an empty stack is a legal 200.
+  rowCheck('A22', http.get(`${B}/order/v1/protected/orders?page=1&page_size=5`, staff), {
+    'the recent-orders panel is 200': (r) => r.status === 200,
+    'the recent-orders panel honours page_size=5': (r) => ((r.json() || {}).items || []).length <= 5,
+  });
+
+  rowCheck('A22', http.get(`${B}/order/v1/protected/orders?status=not_a_status`, staff), {
+    'an unknown status is 400, so the order cards are genuinely filtered': (r) => r.status === 400,
+  });
 }
 
 export function handleSummary(data) {

@@ -35,7 +35,6 @@
 #
 # Which routes carry edge JWT is declared once, in securitypolicy.yaml — the
 # seven `private` routes. Everything else is anonymous by design:
-#   auth public      login/register/refresh/logout/jwks (P3: still auth-service)
 #   user public      GET /users/{id}
 #   product public   catalog reads
 #   review public    review lists

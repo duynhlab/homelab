@@ -21,13 +21,25 @@ spec:
   # secrets-local (dependsOn controllers-local) cannot create until
   # controllers-local is Ready. See debugs.md Bug 6.
   #
-  # secrets-local + storage-local date from Tempo, which stored blocks in RustFS
-  # (S3) via the ESO-managed tempo-rustfs-credentials Secret. Tempo is retired
-  # (RFC-0027), so nothing in ./controllers/tracing reads RustFS any more and
-  # these two edges are now only needed transitively, through clickhouse-local.
+  # storage-local was removed 2026-08-24: it dated from Tempo, which stored
+  # blocks in RustFS, and nothing under ./controllers/tracing reads RustFS any
+  # more -- ClickHouse does not use S3 either. A dependsOn edge that is not real
+  # is misinformation in the one file whose job is to encode ordering: it sends
+  # whoever asks "why is tracing waiting?" to look at RustFS. (RustFS still comes
+  # up regardless, because profiling-local genuinely needs it.)
+  #
+  # secrets-local STAYS, and not for Tempo's reason. The collector has its own
+  # non-optional secretKeyRef on clickhouse-credentials (see extraEnvs below in
+  # otel-collector.yaml) -- an ESO-managed Secret from
+  # configs/secrets/cluster-external-secrets/clickhouse.yaml, which this wave
+  # applies. Strictly the edge is redundant for ORDERING, because
+  # clickhouse-local already dependsOn secrets-local. It is kept because
+  # dependsOn is documentation as much as sequence: drop it and the ordering
+  # hangs off an indirect path, so the day someone removes secrets-local from
+  # clickhouse-local this wave breaks with CreateContainerConfigError and nothing
+  # in THIS file hints why.
   dependsOn:
     - name: secrets-local
-    - name: storage-local
     # RFC-0019: the OTel Collector's clickhouse exporter runs CREATE DATABASE/TABLE
     # in its start() (create_schema: true). If ClickHouse is unreachable when the
     # collector starts, the WHOLE collector fails to start — taking VictoriaTraces

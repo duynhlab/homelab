@@ -2059,6 +2059,32 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **A `dependsOn` edge that was not real, and a comment of mine that said the
+  wrong thing about the one that is.** `tracing-local` listed `storage-local`,
+  which dated from Tempo's RustFS buckets; nothing under `./controllers/tracing`
+  reads S3 any more and ClickHouse does not either (`grep 'rustfs\|s3\|backup'`
+  over `configs/clickhouse/` is empty). Removed — a false edge is misinformation
+  in the one file whose job is to encode ordering, and it sends whoever asks "why
+  is tracing waiting?" to look at RustFS. RustFS still comes up regardless,
+  because `profiling-local` genuinely needs it.
+  - **`secrets-local` stays, and my earlier note about it was wrong.** #882 wrote
+    that both edges "date from Tempo" and are "only needed transitively" — but the
+    collector has its **own** non-optional `secretKeyRef` on
+    `clickhouse-credentials`, an ESO-managed Secret this wave applies. The
+    relationship is current and direct, not a Tempo leftover; the edge is
+    redundant only for *ordering*, because `clickhouse-local` already depends on
+    `secrets-local`. Kept because `dependsOn` is documentation as much as
+    sequence: without it the ordering hangs off an indirect path, and the day
+    someone drops `secrets-local` from `clickhouse-local` this wave breaks with
+    `CreateContainerConfigError` and nothing in `tracing.yaml` hints why. Worth
+    knowing what that failure looks like: `apps-local` does **not** depend on
+    `tracing-local`, so the services come up fine and the platform becomes a
+    telemetry black hole with nothing red in an obvious place.
+  - Same correction applied to `controllers/kustomization.yaml`,
+    `docs/platform/setup.md` and `docs/observability/README.md`, the last of which
+    described the collector as needing ClickHouse "up first" without mentioning
+    that it also needs ClickHouse's Secret.
+
 - **A `op: add` patch on `/spec/.../envoyDeployment/pod` silently dropped the
   base's `pod.labels`.** JSON Patch `add` on an existing object path *replaces* it,
   so the local overlay's node-pinning patch erased the ADR-060 `otlp-logs` guard

@@ -415,7 +415,7 @@ make flux-status     # Check status
 Flux reconciliation order:
 1. **Controllers** -- operators, CRDs (VictoriaMetrics Operator, Prometheus CRDs, Grafana Operator, Sloth)
 2. **Configs** -- monitoring stack (VMSingle, VMAgent, VMAlert, Grafana, VictoriaLogs, etc.)
-3. **Tracing / Profiling** -- the OTel Collector (`tracing-local`) and Pyroscope (`profiling-local`), each split out of the controllers wave to avoid a dependency deadlock. Pyroscope needs the ESO-managed RustFS credentials Secret and RustFS itself; the collector needs **ClickHouse** up first, because its `clickhouse` exporter runs `CREATE TABLE` at start-up and fails the whole collector if the database is unreachable
+3. **Tracing / Profiling** -- the OTel Collector (`tracing-local`) and Pyroscope (`profiling-local`), each split out of the controllers wave to avoid a dependency deadlock. Pyroscope needs the ESO-managed RustFS credentials Secret and RustFS itself; the collector needs **ClickHouse** — both the *database* up first, because its `clickhouse` exporter runs `CREATE TABLE` at start-up and fails the whole collector if it is unreachable, and the *Secret*, since `CLICKHOUSE_PASSWORD` comes from a non-optional `secretKeyRef` on the ESO-managed `clickhouse-credentials`. It does **not** need RustFS: that edge went with Tempo
 4. **Apps** -- microservices (push OTLP metrics to the collector; no ServiceMonitor scrape for app services)
 
 ## Quick Start: Accessing the Stack

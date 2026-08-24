@@ -323,16 +323,11 @@ const UNITS = [
     },
   },
   {
-    name: 'the four metric legs fail independently',
+    name: 'the five metric legs fail independently',
     rows: { kind: 'K5.5' },
     group: 'telemetry',
     run(id) {
-      // Four legs, four ways to lose telemetry without losing the others.
-      // spanmetrics is absent here for a weaker reason than it used to be:
-      // ADR-057 put the span_metrics connector on the CLUSTER collector too, so
-      // spanmetrics_* is real on this gate (measured 421 series). A fifth leg is
-      // assertable now -- it just has not been added. The old comment claimed the
-      // connector lived only in the compose collector.
+      // Five legs, five ways to lose telemetry without losing the others.
       const legs = [
         ['app HTTP semconv', 'sum(http_server_request_duration_seconds_count)'],
         ['app gRPC semconv', 'sum(rpc_server_call_duration_seconds_count{service_name="inventory"})'],
@@ -341,6 +336,12 @@ const UNITS = [
         // -- indistinguishable from a dead exporter.
         ['Temporal SDK', 'count(temporal_workflow_endtoend_latency_bucket)'],
         ['edge Envoy stats', 'sum(envoy_http_downstream_rq_total)'],
+        // The connector leg. Derived from spans by the collector rather than
+        // emitted by an SDK, so it is the one leg that survives an SDK metrics
+        // outage and dies with the collector's traces pipeline -- which is the
+        // whole point of listing legs separately. Cluster-side since ADR-057;
+        // it was compose-only before, which is why this leg did not exist.
+        ['span_metrics connector', 'sum(spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"})'],
       ];
       for (const [label, q] of legs) {
         const v = promqlScalar(target.vm, q);

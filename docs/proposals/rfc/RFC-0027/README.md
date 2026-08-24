@@ -293,14 +293,15 @@ returns to the table.
 
 Four independent decisions, all created at `Proposed` during architecture review per the flow
 in [`../README.md`](../README.md). All four are `Accepted` as of 2026-08-24, on the evidence of
-the P1 experiment. Three are `Adoption: Complete`; ADR-057 stays `Partial` on purpose — the
-series exist and nothing reads them yet.
+the P1 experiment. **All four are `Adoption: Complete`** as of 2026-08-24 — ADR-057 was the last
+one, held at `Partial` until the span-metric series had a consumer; the `red-spanmetrics` and
+`otel-collector-health` boards were ported to the cluster and gate row K5.5 gained a fifth leg.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
 | Retire both Tempo installs, resolving the ADR-032 → ADR-040 lineage rather than extending it; service graphs come from VictoriaTraces' dependency API | [`ADR-059`](../../adr/ADR-059-retire-tempo/) | Accepted · Adoption `Complete` — and [ADR-040](../../adr/ADR-040-tempo-community-helm-chart/) is now `Withdrawn`, the obligation P4 missed |
 | Retire Jaeger while keeping the Jaeger **datasource type** that VictoriaTraces is queried through | [`ADR-058`](../../adr/ADR-058-retire-jaeger/) | Accepted · Adoption `Complete` |
-| Derive RED span metrics in the collector rather than inside a trace backend — **already implemented** in #878, ahead of this gate | [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/) | Accepted · Adoption `Partial` |
+| Derive RED span metrics in the collector rather than inside a trace backend — **already implemented** in #878, ahead of this gate | [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/) | Accepted · Adoption `Complete` (consumer landed 2026-08-24) |
 | Send Envoy access logs over an OpenTelemetry sink in addition to stdout, with the `otlp-logs` label closing the double count | [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) | Accepted · Adoption `Complete` (P6) |
 
 The first depends on the third: retiring Tempo without a span-metrics producer removes series

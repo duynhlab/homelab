@@ -1050,8 +1050,10 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
 - [ ] **K5.5 Metrics — the legs that fail independently.**
   Asserted as **K5.5** — one check per leg, so a dead exporter names itself
   instead of hiding behind three healthy ones.
-  Four legs: app HTTP semconv (OTLP ingest), app gRPC semconv, the Temporal SDK,
-  and the edge's own Envoy stats.
+  Five legs: app HTTP semconv (OTLP ingest), app gRPC semconv, the Temporal SDK,
+  the edge's own Envoy stats, and the `span_metrics` **connector** — the one leg
+  derived from spans rather than emitted by an SDK, so it survives an SDK metrics
+  outage and dies with the traces pipeline.
   > **The Temporal leg named a series that does not exist until 2026-08-21.** The
   > query asked for `temporal_workflow_endtoend_latency_seconds_bucket`; the Go
   > SDK emits `temporal_workflow_endtoend_latency_bucket` — **no `_seconds`**. It
@@ -1068,9 +1070,14 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   This replaced Tempo's metrics-generator, which went away with Tempo
   ([RFC-0027](../proposals/rfc/RFC-0027/README.md)); the old note here said the
   connector existed "only in `local-stack/compose.yaml`", which is no longer true.
-  Assert the series directly — but check the dashboard side before adding a
-  *dashboard* row: `red-spanmetrics` and `otel-collector-health` are still
-  local-stack-only boards.
+  Both boards now exist cluster-side too (`red-spanmetrics`,
+  `otel-collector-health`), so the series have a consumer and **K5.7** checks
+  their datasource references like any other board. Porting them needed one
+  non-obvious fix worth remembering: the collector board's 26 selectors said
+  `job="otel-collector"`, but the Helm release names the cluster scrape job
+  **`otel-collector-opentelemetry-collector`** — the literal matched nothing and
+  every panel would have rendered empty. They use `job=~".*otel-collector.*"`
+  now, the same selector `OtelCollectorDown` uses.
 
 - [ ] **K5.6 Profiles.** Pyroscope carries all 10 services; `auth` is absent.
   Asserted as **K5.6** (Connect-RPC `LabelValues` over a one-hour window).

@@ -189,8 +189,9 @@ Skeleton (copy what you need):
   `JWT_AUDIENCE` names are gone — and `user_id` is the token `sub` (string
   UUID) end to end: 5 `INTEGER` columns, the notification/payment protos,
   `pkg/idempotency`, and the Temporal workflow inputs. Requires the
-  greenfield DB reset in
-  [`docs/platform/identity-cutover-runbook.md`](docs/platform/identity-cutover-runbook.md);
+  greenfield DB reset now documented in
+  [`docs/platform/keycloak.md`](docs/platform/keycloak.md#reset-and-reseed-the-realms)
+  (it lived in `identity-cutover-runbook.md` until that file was folded in);
   the domain ResourceSets inject the explicit `OIDC_*` pair behind the new
   `authmw` RSIP input. auth-service keeps running (nothing verifies its
   tokens) until the P5 decommission.

@@ -96,7 +96,7 @@ specific Kustomization or run `make sync`.
 | [`application-delivery.md`](application-delivery.md) | Add a service, ResourceSet contract, image pins, domain labels |
 | [`envoy-gateway.md`](envoy-gateway.md) | The edge: resource model, policy attachment, both provider modes, failure modes |
 | [`kong-gateway.md`](kong-gateway.md) | **Archived** — the previous gateway's guide, kept for reference |
-| [`identity-cutover-runbook.md`](identity-cutover-runbook.md) | RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm) |
+| [`keycloak.md`](keycloak.md) | The identity provider: deployment, realm import, database, reset procedure, signals |
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |
 | [`gitflow.md`](gitflow.md) | Branching and release policy (**target** — prod cluster TBD) |
 | [`kyverno.md`](kyverno.md) | Admission policy tiers, Audit→Enforce, PolicyExceptions |

@@ -55,6 +55,8 @@ flowchart LR
 - [AGENTS.md § Kyverno admission rules](../../AGENTS.md) — the operative contract for every manifest
 - [docs/platform/kyverno.md](../platform/kyverno.md) — controller deployment, rollout history
 - [docs/api/api.md § edge exposure](../api/api.md) — audience doctrine the fences implement
+- [docs/platform/keycloak.md](../platform/keycloak.md) — the identity provider: its NetworkPolicy, exposed login surface, and credential handling
+- [docs/api/identity.md](../api/identity.md) — where a token is verified, and why the edge is not authoritative
 
 ---
 _Last updated: 2026-08-19 — hub created (the folder was the last docs area without one)._

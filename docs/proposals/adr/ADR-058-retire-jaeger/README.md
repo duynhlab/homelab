@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0027 rollout P2 |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — HelmRelease and `jaegertracing` HelmRepository retired to `*.yaml.bak` (#881); verified 2026-08-24 on a cluster rebuilt from scratch: **0** Jaeger workloads. The Grafana datasource of **type `jaeger`** deliberately remains — that is VictoriaTraces' query interface, and 14 services answer on it |
 
 ## Context
 

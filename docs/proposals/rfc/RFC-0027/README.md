@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-08-23 | 2026-08-24 | 2026-08-24 |
+| implemented | platform-wide | [./research.md](./research.md) — gate passed 2026-08-23 | 2026-08-24 | 2026-08-24 |
 
 > **Don't forget: every decision is a tradeoff.** This one buys back three of five trace
 > sinks, two RustFS writers and an undecided ADR lineage. It pays by making a **pre-GA**
@@ -28,7 +28,8 @@ Cut the trace tier from **five sinks to two** — keep **VictoriaTraces** (7d, f
 **ClickHouse** (90d, SQL) — by retiring both Tempo installs and Jaeger. **The log tier does not
 change**: application logs keep landing in both VictoriaLogs and ClickHouse, deliberately.
 Envoy access logs gain an OpenTelemetry sink so the edge reaches both stores over one path
-instead of only the Vector road.
+instead of only the Vector road — shipped in P6, the phase this table originally forgot to
+schedule.
 
 Nothing about the application changes. Every service exports to one collector endpoint, so this
 is an exporter-list change — the principle [ADR-023](../../adr/ADR-023-clickhouse-observability-olap/)
@@ -267,6 +268,7 @@ no application traffic depends on any of it.
 | **P3** | Decide service graphs: add the `servicegraph` connector, or accept the loss in writing | Connector out, or the decision reversed |
 | **P4** | Retire both Tempo installs to `*.yaml.bak`, drop them from their kustomizations, and delete both RustFS buckets, `TempoDown`, the ServiceMonitor, the ExternalSecret and the edge route | Rename the `.bak` files back and restore the kustomization entries; traces inside the 7-day window are not recoverable |
 | **P5** | Correct the 15 comment-only mentions, the hardcoded audit counts, and the observability docs. The archived records — [`tracing/tempo.md`](../../../observability/tracing/tempo.md) and [`tracing/jaeger.md`](../../../observability/tracing/jaeger.md) — are written *before* P4, not after | Docs only |
+| **P6** | [ADR-060](../../adr/ADR-060-envoy-access-log-transport/): add the `OpenTelemetry` access-log sink beside `File`, and label the Envoy pods so Vector stops tailing them. **This phase was missing from the table until 2026-08-24** — the decision was `Accepted` with no phase to carry it, while this RFC's own summary described the sink as though it existed | Remove the sink and the label — one file; Vector resumes tailing on the next reconcile |
 
 P1 gates P4: if TraceQL parity is unacceptable, this RFC's chosen option fails and option B
 returns to the table.
@@ -274,25 +276,32 @@ returns to the table.
 ## Testing / verification
 
 - `make validate` on every phase — Kustomize build plus the Kyverno policy tests
-- **The P1 experiment is the deciding input**: a Tempo-type datasource against `/select/tempo`,
-  exercised with the TraceQL queries actually used. **Not yet run — the Kind cluster is down.**
+- **The P1 experiment was the deciding input**: a Tempo-type datasource against `/select/tempo`,
+  exercised with the TraceQL queries actually used. **Run 2026-08-24**; the result and the
+  silent-failure cost it exposed are recorded in
+  [ADR-059](../../adr/ADR-059-retire-tempo/).
 - A PromQL check that the connector's series exist and carry the service label:
   `count(spanmetrics_calls_total)` and `count by (service_name) (spanmetrics_calls_total)`
 - The compose gate stays the reference: it already runs the three-store shape end to end
-- Kind gate rows to re-derive after P4: K5.5 (spanmetrics leg, currently N/A on the cluster),
-  K5.7 (dashboard datasource refs), and the hardcoded counts C17 / C18 / C21
+- Kind gate rows re-derived after P4: **K5.5** now passes (the spanmetrics leg is live on the
+  cluster per ADR-057, not compose-only as the runbook claimed) and **K5.7** passes. **K5.3** had
+  to be retargeted in P6: its Vector leg asserted *"the Vector leg has edge access logs"*, which
+  ADR-060 makes permanently false. C17 / C18 / C21 are **compose** rows and are re-derived on the
+  next compose gate
 
 ## Resulting decisions
 
 Four independent decisions, all created at `Proposed` during architecture review per the flow
-in [`../README.md`](../README.md). All four are `Accepted` as of 2026-08-24, on the evidence of the P1 experiment.
+in [`../README.md`](../README.md). All four are `Accepted` as of 2026-08-24, on the evidence of
+the P1 experiment. Three are `Adoption: Complete`; ADR-057 stays `Partial` on purpose — the
+series exist and nothing reads them yet.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Retire both Tempo installs, resolving the ADR-032 → ADR-040 lineage rather than extending it; service graphs come from VictoriaTraces' dependency API | [`ADR-059`](../../adr/ADR-059-retire-tempo/) | Accepted |
-| Retire Jaeger while keeping the Jaeger **datasource type** that VictoriaTraces is queried through | [`ADR-058`](../../adr/ADR-058-retire-jaeger/) | Accepted |
+| Retire both Tempo installs, resolving the ADR-032 → ADR-040 lineage rather than extending it; service graphs come from VictoriaTraces' dependency API | [`ADR-059`](../../adr/ADR-059-retire-tempo/) | Accepted · Adoption `Complete` — and [ADR-040](../../adr/ADR-040-tempo-community-helm-chart/) is now `Withdrawn`, the obligation P4 missed |
+| Retire Jaeger while keeping the Jaeger **datasource type** that VictoriaTraces is queried through | [`ADR-058`](../../adr/ADR-058-retire-jaeger/) | Accepted · Adoption `Complete` |
 | Derive RED span metrics in the collector rather than inside a trace backend — **already implemented** in #878, ahead of this gate | [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/) | Accepted · Adoption `Partial` |
-| Send Envoy access logs over an OpenTelemetry sink in addition to stdout, with the `otlp-logs` label closing the double count | [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) | Accepted |
+| Send Envoy access logs over an OpenTelemetry sink in addition to stdout, with the `otlp-logs` label closing the double count | [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) | Accepted · Adoption `Complete` (P6) |
 
 The first depends on the third: retiring Tempo without a span-metrics producer removes series
 the SLO maths consumes. The other two stand alone.
@@ -305,6 +314,19 @@ the SLO maths consumes. The other two stand alone.
   with the reason and rollback condition recorded in the research
 - **2026-08-24** — this README; Status `provisional`, under architecture review
 - **2026-08-24** — P1 TraceQL experiment run on Kind; span-metrics verified at 421 series. RFC → `Accepted`, ADR-057..060 → `Accepted`
+- **2026-08-24** — P2 + P3 + P4 (#881): Jaeger and both Tempo installs retired to `*.yaml.bak`,
+  service graphs taken from VictoriaTraces' dependency task. Verified on a cluster rebuilt from
+  scratch — 22/22 Kustomizations Ready, **0** Tempo/Jaeger workloads, RustFS writers 4 → 2, and
+  the replacement graph at **31 edges** including database and edge-originated dependencies
+- **2026-08-24** — P5 (#882): 40 documents and **10 runbooks** corrected. The audit found two
+  defects that were not documentation: `OtelCollectorDown` had shared a file with `TempoDown` and
+  was deleted with it (**critical**, restored in its own file), and `tracesToProfiles` turned out
+  to be a Tempo-datasource-only Grafana option, so the span→profile pivot is a **recorded gap**
+  rather than something that could be moved
+- **2026-08-24** — P6 (#886): ADR-060 implemented — the phase this RFC had never scheduled.
+  Edge rows in `otel.otel_logs` **0 → 30** for 30 requests, Vector path to **0**, no double
+  count. A `op: add` patch on the pod object was silently eating the guard label; the compose
+  exclusion list had drifted from the anchor that enables OTLP logs. RFC → `implemented`
 
 ## Related
 

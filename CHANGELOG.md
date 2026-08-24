@@ -573,6 +573,18 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0027 is `implemented`.** Tempo (both installs) and Jaeger are retired,
+  VictoriaTraces + ClickHouse are the two trace sinks, and P6 put the edge's access
+  log on the OTLP road. [ADR-058](docs/proposals/adr/ADR-058-retire-jaeger/),
+  [ADR-059](docs/proposals/adr/ADR-059-retire-tempo/) and
+  [ADR-060](docs/proposals/adr/ADR-060-envoy-access-log-transport/) are
+  `Adoption: Complete`; [ADR-057](docs/proposals/adr/ADR-057-span-metrics-in-collector/)
+  stays **`Partial`** on purpose — the span-metric series exist and no dashboard,
+  alert or rule reads them yet, so calling it complete would be a claim the cluster
+  does not support. The rollout table gained the **P6** row it never had: ADR-060
+  was `Accepted` with no phase to carry it, while the RFC's own summary described
+  the sink as though it already existed.
+
 - **RFC-0027 architecture review: four ADRs at `Proposed`, and Tempo's history
   archived before it is removed.** Splitting the retirement into independent
   records surfaced that they are not equally ready:
@@ -2410,6 +2422,20 @@ Skeleton (copy what you need):
   trusting it (1.5.2).
 
 #### Proposals
+
+- **ADR-040 sat at `Status: Proposed` for two weeks after nothing from it was
+  running.** [ADR-059](docs/proposals/adr/ADR-059-retire-tempo/) carries an explicit
+  obligation to withdraw it on acceptance, due in RFC-0027 P4; P4 shipped without
+  doing it, and the P5 docs audit found the record still `Proposed` with
+  `Adoption: Partial` while both Tempo installs were already gone. Now `Withdrawn`
+  with a banner and `Superseded by: ADR-059`, matching how ADR-032 was withdrawn,
+  and ADR-059's obligation row records that it landed late rather than quietly
+  ticking it.
+- **Two obligation rows in ADR-059 overstated what P4 achieved.** The row covering
+  `TempoDown`'s deletion now records that the same file held `OtelCollectorDown`
+  and took it along — an over-reach corrected in P5, not part of the decision. The
+  service-graph panel row is marked **still open**: the data is there (31 edges),
+  the dashboard panel is not.
 
 - **ADR-026 shipped without its paper trail.** The CNPG PgBouncer `Pooler`
   `platform-db-pooler-rw` has fronted `platform-db` since the pilot rolled out —

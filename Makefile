@@ -116,6 +116,10 @@ e2e-ratelimit: ## Drive under and over the edge ceiling; 429 must be well-formed
 e2e-load: ## Order load; reports the Temporal backlog it built
 	GATE=$(or $(GATE),kind) k6 run scripts/k6/load.js
 
+.PHONY: e2e-restock
+e2e-restock: ## Top demo stock back up to the seed baseline (kind-seed.sh cannot -- ON CONFLICT DO NOTHING)
+	GATE=$(or $(GATE),kind) k6 run scripts/k6/restock.js
+
 ##@ Utilities
 
 .PHONY: prereqs

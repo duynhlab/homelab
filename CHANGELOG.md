@@ -499,6 +499,28 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **`make e2e-restock` — seeding was a first-fill and the load row empties it.**
+  `make e2e-load` drove SKU 1 from 50 to **0**, after which a run rejected **51 of
+  60** orders and the checkout/inventory/product SLOs burned into `page` — which
+  reads exactly like a broken platform. Re-running `scripts/kind-seed.sh` does
+  nothing, because the inventory seed is
+  `INSERT ... ON CONFLICT (sku_id, warehouse_id) DO NOTHING`. The new
+  `scripts/k6/restock.js` reads the balances and **receives only the deficit**
+  against the seed's own baseline, so it is safe to re-run and restores a state
+  comparable with earlier rounds. Measured: **56 confirmed / 2 rejected**
+  afterwards against 10 / 51 before, and every SLO page cleared.
+  - It posts **receipts** rather than writing `inventory_balances`, because the
+    seed file says a real balance arrives one way only — an explicit RECEIVE
+    movement through the normal write path. k6 is where this belongs: the realms
+    refuse a password grant, so a staff token needs auth-code + PKCE, which
+    `lib/auth.js` already implements and audit row A17 already proves against this
+    endpoint.
+  - Worth knowing before reading the invariant check: **`on_hand ==
+    SUM(on_hand_delta)` is already violated by the seed.** It holds for every SKU
+    created through the API and fails for all 13 seeded ones, which carry an
+    `on_hand` the raw INSERT wrote and zero movements to account for it. A restock
+    is the only thing that ever *adds* a movement for those SKUs.
+
 - **Every HTTP-shaped row of the compose gate is now a k6 assertion**, and the
   Kind runbook stops carrying two descriptions of the same row. Five new scripts
   under [`scripts/k6/`](scripts/k6/) — `staff.js` (A17–A19, A21), `operator.js`

@@ -328,6 +328,28 @@ the tag exists; running it earlier audits the previous release.
   cluster. **Do not remove the guard.**
   Eight services seed: `user product cart order review shipping notification
   inventory`. `payment` and `checkout` have no seed.
+  > **Seeding is a first-fill, not a refill — and the load row empties it.**
+  > `make e2e-load` drove SKU 1 from 50 down to **0**, after which a load run
+  > rejected **51 of 60** orders and the checkout/inventory/product SLOs burned
+  > into `page`, which reads exactly like a broken platform. Re-running
+  > `kind-seed.sh` does **nothing**: the inventory seed is
+  > `INSERT ... ON CONFLICT (sku_id, warehouse_id) DO NOTHING`, so once the rows
+  > exist it is a no-op. Top up with
+  > ```bash
+  > make e2e-restock GATE=kind    # reads balances, receives only the deficit
+  > ```
+  > It posts **receipts** rather than touching `inventory_balances`, because the
+  > seed file itself says a real balance arrives one way only — an explicit
+  > RECEIVE movement through the normal write path. Measured: 56 confirmed / 2
+  > rejected afterwards, against 10 / 51 before, and the SLO pages cleared.
+  > Re-running it is a no-op once every SKU is at baseline.
+  >
+  > **The ledger invariant is already broken, by the seed.** `on_hand ==
+  > SUM(on_hand_delta)` holds for every SKU created through the API (29, 30, 33,
+  > 34, …) and fails for all **13 seeded** ones, which carry an `on_hand` the raw
+  > INSERT wrote and **zero** movements to account for it. Do not read a
+  > non-zero count from that check as damage from a restock — restock is the only
+  > thing that ever *adds* a movement for those SKUs.
   **FAIL:** a non-zero exit. Read the tailed Job logs it prints — a seed that
   fails on an empty database is a migration problem, not a seeding one.
   > **Two things in the worker logs look like defects on a fresh cluster and are

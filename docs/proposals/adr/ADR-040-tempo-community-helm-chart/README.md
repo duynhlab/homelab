@@ -1,6 +1,15 @@
 # ADR-040: Deliver Tempo through the `grafana-community/tempo` Helm chart
 
-> **Decision summary:** We will replace the hand-written Tempo Deployment,
+> **Withdrawn 2026-08-24** in favour of
+> [ADR-059](../ADR-059-retire-tempo/), which retires Tempo entirely rather than
+> changing how it is delivered. Reason: phase 1 of this decision shipped and
+> phase 2 never started, so the cluster carried **two** Tempo installs writing to
+> two RustFS buckets for weeks. [RFC-0027](../../rfc/RFC-0027/) resolved that by
+> removing both — which also closes the ADR-032 → ADR-040 lineage instead of
+> extending it. The `grafana-community` HelmRepository this decision introduced
+> has no consumer left and retired with it.
+>
+> **Decision summary (historical):** We will replace the hand-written Tempo Deployment,
 > ConfigMap, and Service with the `grafana-community/tempo` Helm chart
 > (single-binary mode) delivered as a Flux `HelmRelease`, and enable the
 > metrics-generator through the chart's `tempo.metricsGenerator` values. We
@@ -12,7 +21,7 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
+| **Status** | Withdrawn |
 | **Decision date** | — |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
@@ -22,9 +31,9 @@
 | **Related research** | — |
 | **Related ADR** | [ADR-032](../ADR-032-tempo-operator-monolithic/) (superseded — same problem, operator-based delivery), [ADR-023](../ADR-023-clickhouse-observability-olap/) |
 | **Supersedes** | [ADR-032](../ADR-032-tempo-operator-monolithic/) (withdrawn before adoption) |
-| **Superseded by** | — |
+| **Superseded by** | [ADR-059](../ADR-059-retire-tempo/) |
 | **Implementation tracking** | Follow-up controllers PR (`HelmRelease`) and configs PR (consumer cutover); this PR is docs-only |
-| **Adoption** | Partial — phase 1 shipped (HelmRepository + `HelmRelease` #744, chart 2.2.4 #802, image parity 2.10.8 #825); phase 2 (delete the raw manifests, retire the `-config.expand-env` splice) not started |
+| **Adoption** | Partial, then reverted — phase 1 shipped (HelmRepository + `HelmRelease` #744, chart 2.2.4 #802, image parity 2.10.8 #825); phase 2 never started, and RFC-0027 P4 removed both installs (#881). Nothing from this decision runs |
 
 ## Context
 

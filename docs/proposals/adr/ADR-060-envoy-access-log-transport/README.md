@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0027 rollout |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — RFC-0027 P6 (#886). Measured on Kind 2026-08-24: `otel.otel_logs` went from **0** `platform.envoy-gateway` rows to 30 for 30 requests, VictoriaLogs carried 70 lines under stream `service.name`, and the Vector path went to **0** — no double count |
 
 ## Context
 
@@ -137,6 +137,41 @@ Option C is the cleaner architecture on paper — one emission path, no guard
 needed, nothing to get wrong. It lost on operational reality rather than design:
 the pod-local log is the fallback that works when the collector is the thing that
 is broken, which is precisely when edge logs matter most.
+
+## Implementation notes (P6, 2026-08-24)
+
+Three things the decision text could not know, all settled against the installed
+API rather than by reasoning:
+
+- **`backendRefs`, not `host`/`port`.** This record names
+  `otel-collector.monitoring.svc.cluster.local:4317`; both `host` and `port` are
+  marked *"Deprecated: Use BackendRefs instead"* in the `EnvoyProxy` CRD shipped
+  with gateway-helm **v1.9.0**. Same destination, expressed the way the installed
+  API wants it — and the same shape the tracing provider beside it already uses.
+  `resources` is likewise deprecated in favour of `resourceAttributes`.
+- **`resourceAttributes.service.name` is required.** The collector exports logs
+  with `VL-Stream-Fields: "service.name"`, so without it the edge's log-stream
+  identity in VictoriaLogs is empty. Set to `platform.envoy-gateway`, which is
+  what Envoy Gateway already derives for the edge's **traces**
+  (`<gateway>.<namespace>`), so an edge log and an edge span share one identity.
+- **The JSON format survived the trip.** Every upstream example pairs the
+  OpenTelemetry sink with `format: Text`, and there was no documented case of
+  JSON + OTLP, so a `Text` fallback was prepared. It was not needed: the keys
+  arrive as log-record **attributes**, and Envoy Gateway adds `k8s.pod.name` /
+  `k8s.namespace.name` on its own, exactly as the positive consequences below
+  predicted. The cost is that `Body` is empty, so VictoriaLogs renders `_msg` as
+  `missing _msg field` and free-text search finds nothing — query by stream
+  (`_stream:{"service.name"="platform.envoy-gateway"}`). Documented, because the
+  first symptom looks like data loss. `VL-Msg-Field` on the exporter is a
+  possible follow-up; the format itself stays out of scope per this record.
+
+**The guard nearly failed silently.** The label is the single mechanism
+preventing double ingestion, and the local overlay's node-pinning patch used
+`op: add` on `/spec/provider/kubernetes/envoyDeployment/pod` — a JSON Patch `add`
+on an existing object path *replaces* it, so `pod.labels` was dropped. The CR
+applied cleanly, the pods came up healthy, and Vector kept tailing the edge. The
+patch now targets the child paths. This is exactly the negative consequence this
+record names, arriving by a route it did not anticipate.
 
 ## Consequences
 

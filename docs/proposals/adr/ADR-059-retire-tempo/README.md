@@ -17,10 +17,10 @@
 | **Affected components** | Tempo (both installs), OTel Collector, Grafana datasources, RustFS, ExternalSecrets, Envoy Gateway routes, `TempoDown` alert, ServiceMonitor, VictoriaTraces |
 | **Related RFC** | [RFC-0027](../../rfc/RFC-0027/) |
 | **Related research** | [research.md](../../rfc/RFC-0027/research.md) |
-| **Supersedes** | — *(on acceptance, [ADR-040](../ADR-040-tempo-community-helm-chart/) is `Withdrawn` in favour of this record — see obligations)* |
+| **Supersedes** | [ADR-040](../ADR-040-tempo-community-helm-chart/) (withdrawn 2026-08-24 — phase 1 shipped, phase 2 never started, both installs now removed) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0027 rollout P3–P5 |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — both installs retired to `*.yaml.bak` and dropped from their kustomizations (#881); verified on a cluster rebuilt from scratch 2026-08-24: 22/22 Kustomizations Ready, **0** Tempo workloads, datasources 8 → 7 with no `tempo` type, RustFS writers 4 → 2. The replacement service graph measured **31 edges**, including database dependencies (`cart -> cart:postgresql`) and edge-originated ones (`platform.envoy-gateway -> checkout`, 300 calls) |
 
 ## Context
 
@@ -223,12 +223,12 @@ component.
 | Run the TraceQL parity experiment | `duynhne` | RFC-0027 P1 | A Tempo-type datasource against `/select/tempo` exercised with real queries; failures recorded |
 | Consolidate Tempo knowledge into an archived doc | `duynhne` | this PR | `docs/observability/tracing/tempo.md` exists, banner present, body frozen |
 | Enable `-servicegraph.enableTask` on `vtsingle` | `duynhne` | RFC-0027 P3 | **Done 2026-08-24** — the pod runs with `-servicegraph.enableTask=true` and the endpoint returns **12 edges**, including database dependencies (`checkout → checkout:postgresql` 2251, `platform.envoy-gateway → checkout` 425, `checkout → checkout-worker` 421) |
-| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | Still open — the data is there; the panel is not |
+| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | **Still open** — the data is there (31 edges measured 2026-08-24); the panel is not. `nodeGraph.enabled: true` is set on the datasource, so Explore renders the graph; a dashboard panel is the gap |
 | Document the ClickHouse per-edge query | `duynhne` | RFC-0027 P3 | A `docs/observability/` page carries the self-join with failure and p95 per edge |
-| Retire manifests as `.bak`, drop from kustomizations with comments | `duynhne` | RFC-0027 P4 | `make validate` green; `.bak` files present; comments name this ADR |
-| Delete `TempoDown`, the ServiceMonitor, the dashboard, the datasource, the ExternalSecret, both buckets and the edge route | `duynhne` | RFC-0027 P4 | `scripts/edge-isolation-sweep.sh` clean; RustFS bucket list has two entries fewer |
-| **On acceptance: flip [ADR-040](../ADR-040-tempo-community-helm-chart/) to `Withdrawn` in favour of this record** | `duynhne` | RFC-0027 P4 | ADR-040 carries a withdrawal banner and `Superseded by: ADR-059`, matching how ADR-032 was withdrawn |
-| Correct the hardcoded audit counts and comment-only mentions | `duynhne` | RFC-0027 P5 | C17/C18/C21 assert current numbers; no comment claims Tempo is running |
+| Retire manifests as `.bak`, drop from kustomizations with comments | `duynhne` | RFC-0027 P4 | **Done** (#881) — `make validate` green; `.bak` files present; comments name this ADR |
+| Delete `TempoDown`, the ServiceMonitor, the dashboard, the datasource, the ExternalSecret, both buckets and the edge route | `duynhne` | RFC-0027 P4 | **Done, with one over-reach corrected in P5** — `TempoDown` shared its file with `OtelCollectorDown`, so `.bak`-ing the file deleted a **critical** alert that was not part of this decision. Restored as `otel-collector-alerts.yaml` (#882). RustFS bucket list has two entries fewer |
+| **On acceptance: flip [ADR-040](../ADR-040-tempo-community-helm-chart/) to `Withdrawn` in favour of this record** | `duynhne` | RFC-0027 P4 | **Done 2026-08-24, late** — missed in P4 and caught by the P5 docs audit, which found ADR-040 still at `Status: Proposed` with `Adoption: Partial` while nothing from it was running. ADR-040 now carries the banner and `Superseded by: ADR-059`, matching how ADR-032 was withdrawn |
+| Correct the hardcoded audit counts and comment-only mentions | `duynhne` | RFC-0027 P5 | **Done** (#882) — 40 documents and 10 runbooks corrected; no comment claims Tempo is running. C17/C18/C21 are compose rows and are re-derived on the next compose gate |
 | Update service contracts | — | N/A — infra-only | No route, RPC or payload changes |
 
 ## Validation and compliance

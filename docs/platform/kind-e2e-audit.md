@@ -976,6 +976,17 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
 - [ ] **K5.3 Logs — both legs, and correlation.** The OTLP leg is the services'
   own tee; the Vector leg carries containers with no SDK.
   Asserted as **K5.3** — both counts must be non-zero.
+  > **Both examples changed on 2026-08-24, for different reasons.** The OTLP leg
+  > now reads **`product`** instead of `cart`: nothing in this gate's drive step
+  > touches cart (it needs an authenticated session), so the row only passed when
+  > the saga or staff suite happened to have run inside the 45-minute window —
+  > the same "a row must drive what it asserts" defect K5.2 had with
+  > user-service. The Vector leg now reads a **CloudNativePG container** instead
+  > of the edge: [ADR-060](../proposals/adr/ADR-060-envoy-access-log-transport/)
+  > gave Envoy Gateway an OpenTelemetry access-log sink and labelled its pods
+  > `platform.duynhlab.dev/otlp-logs=true`, so **Vector no longer tails the edge
+  > at all** — it is an example of the OTLP leg now. The note below is kept
+  > because its lesson outlived its subject.
   **FAIL:** both empty at once is **one** failure (the Vector leg), not two. Vector
   runs as a DaemonSet in `kube-system` and has no Compose twin at all, so this row
   is the only place it is exercised.
@@ -996,6 +1007,13 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   > by `clusters/local/envoy-gateway-config.yaml` — so Vector needs its
   > control-plane toleration (#850) or the row fails while the control plane's own
   > logs arrive normally and make the namespace look healthy.
+  >
+  > **Historical since ADR-060** — the edge is no longer on the Vector road, so
+  > none of the paragraph above decides this row any more. To read edge access
+  > logs now, query the OTLP stream, and note that the JSON format lands its keys
+  > as **attributes** rather than a body: VictoriaLogs shows `missing _msg field`
+  > and free-text search returns nothing, which looks exactly like data loss.
+  > `_stream:{"service.name"="platform.envoy-gateway"}` returns them intact.
 
 - [ ] **K5.4 Metrics — worker telemetry identity (regression check).**
   Two series, different `k8s_pod_name`, for the API and the worker:

@@ -21,6 +21,18 @@ spec:
         # horizontally; the PDB below keeps one pod serving during voluntary
         # disruptions.
         replicas: 2
+        pod:
+          labels:
+            # LOAD-BEARING (ADR-060). Vector's kubernetes_logs source excludes
+            # this selector -- extra_label_selector:
+            # "platform.duynhlab.dev/otlp-logs!=true" in
+            # controllers/logging/vector/vector.yaml. Since the accessLog below
+            # now ALSO ships over OTLP, without this label VictoriaLogs would
+            # hold every edge line twice: once from Vector tailing stdout, once
+            # from the collector. Vector stops TAILING; stdout keeps being
+            # WRITTEN, so `kubectl logs` on the edge pod is unaffected -- which
+            # is the whole reason the File sink stays.
+            platform.duynhlab.dev/otlp-logs: "true"
         container:
           resources:
             requests:
@@ -97,9 +109,38 @@ spec:
           matches:
             - "!((request.url_path.startsWith('/health') || request.url_path.startsWith('/ready') || request.useragent.startsWith('kube-probe')) && response.code >= 200u && response.code < 300u)"
           sinks:
+            # Two destinations, ONE format and ONE CEL filter: both sinks live in
+            # the same settings[] entry, so stdout and OTLP describe the same
+            # request set in the same shape. Splitting them into two entries
+            # would let the two roads drift.
             - type: File
               file:
                 path: /dev/stdout
+            # ADR-060: puts edge logs on the same road as application logs, so
+            # they reach VictoriaLogs *and* ClickHouse -- the 90-day store where
+            # a SQL join against otel_traces on trace_id becomes possible. No
+            # new component: this is the collector's existing OTLP receiver, the
+            # same one the tracing provider below already uses on :4317.
+            - type: OpenTelemetry
+              openTelemetry:
+                # backendRefs, not host/port: both are marked "Deprecated: Use
+                # BackendRefs instead" in the EnvoyProxy CRD shipped with
+                # gateway-helm v1.9.0 (verified with `kubectl explain`). ADR-060
+                # names the host:port literal; this is the same destination
+                # expressed the way the installed API wants it.
+                backendRefs:
+                  - name: otel-collector-opentelemetry-collector
+                    namespace: monitoring
+                    port: 4317
+                # resourceAttributes, not the deprecated `resources`.
+                # service.name is REQUIRED, not decoration: the collector
+                # exports logs with `VL-Stream-Fields: "service.name"`, so
+                # without it the edge's log-stream identity in VictoriaLogs is
+                # empty. The value matches the service.name Envoy Gateway
+                # derives for its TRACES (<gateway>.<namespace>), so an edge log
+                # and an edge span carry the same identity.
+                resourceAttributes:
+                  service.name: platform.envoy-gateway
     tracing:
       # PERCENT (0-100), not a ratio: 10 means 10% of traces are sampled.
       # Envoy's default sampler is ParentBased, so an inbound sampled

@@ -266,19 +266,30 @@ const UNITS = [
     rows: { kind: 'K5.3' },
     group: 'telemetry',
     run(id) {
-      // The OTLP leg is the services' own tee. The Vector leg carries
-      // containers with no SDK, and its stream must be selected by namespace +
-      // container_name: Vector sets `service` from pod_labels.app and falls
-      // back to the pod name, so there has never been a `gateway` value to
-      // match.
-      const otlp = logsqlCount(target.logs, '_time:45m _stream:{"service.name"="cart"} | count()');
+      // The OTLP leg is a service's own tee; the Vector leg is a container with
+      // NO SDK. Both examples changed, for different reasons.
+      //
+      // OTLP: `product`, not `cart`. Nothing in this gate's drive step touches
+      // cart -- it needs an authenticated session -- so the row only passed when
+      // the saga or staff suite happened to have run in the last 45 minutes.
+      // Same defect as K5.2 had with user-service: a row must drive what it
+      // asserts. drive() calls product.
+      //
+      // Vector: a database container, not the edge. ADR-060 gave Envoy Gateway
+      // an OpenTelemetry access-log sink and labelled its pods
+      // platform.duynhlab.dev/otlp-logs=true, so Vector no longer tails the edge
+      // at all -- it is now an example of the OTLP leg, not the Vector one.
+      // CloudNativePG has no OTel SDK, which is exactly what this leg is for.
+      // Selected by namespace + container_name because Vector sets `service`
+      // from pod_labels.app and falls back to the pod name.
+      const otlp = logsqlCount(target.logs, '_time:45m _stream:{"service.name"="product"} | count()');
       const vector = logsqlCount(
         target.logs,
-        '_time:45m _stream:{namespace="envoy-gateway",container_name="envoy"} upstream_cluster:* route_name:* | count()'
+        '_time:45m _stream:{namespace="product",container_name="postgres"} | count()'
       );
       rowCheck(id, null, {
-        'the OTLP leg has cart logs': () => otlp !== null && otlp > 0,
-        'the Vector leg has edge access logs': () => vector !== null && vector > 0,
+        'the OTLP leg has product logs': () => otlp !== null && otlp > 0,
+        'the Vector leg has database logs': () => vector !== null && vector > 0,
       });
     },
   },

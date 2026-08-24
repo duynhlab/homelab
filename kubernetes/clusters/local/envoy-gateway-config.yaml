@@ -67,13 +67,19 @@ spec:
         kind: EnvoyProxy
         name: platform
         namespace: envoy-gateway
+      # Patch the CHILD paths, not `pod` itself. A JSON Patch `add` on an
+      # existing object path REPLACES it, so `op: add` on /pod silently dropped
+      # the base's pod.labels (the ADR-060 otlp-logs guard) -- the CR applied
+      # cleanly and Vector kept tailing the edge. `pod` already exists in the
+      # base, which is what makes these child adds valid.
       patch: |
         - op: add
-          path: /spec/provider/kubernetes/envoyDeployment/pod
+          path: /spec/provider/kubernetes/envoyDeployment/pod/nodeSelector
           value:
-            nodeSelector:
-              ingress-ready: "true"
-            tolerations:
-              - key: node-role.kubernetes.io/control-plane
-                operator: Exists
-                effect: NoSchedule
+            ingress-ready: "true"
+        - op: add
+          path: /spec/provider/kubernetes/envoyDeployment/pod/tolerations
+          value:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule

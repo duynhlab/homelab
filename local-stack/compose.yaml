@@ -384,8 +384,9 @@ services:
   #   1. Vector (below) tailing every container's stdout -> jsonline ingest
   #   2. the application fleet's OTLP logs via the collector -> OTLP ingest
   # so the Vector-vs-OTel comparison from the pilot is visible locally. The edge
-  # contributes only path 1: Envoy Gateway standalone writes its JSON access
-  # log to stdout and has no OTLP logs path of its own.
+  # is on path 2 since ADR-060: it keeps writing its JSON access log to stdout
+  # (so `docker logs` works) but Vector no longer tails it -- the OpenTelemetry
+  # access-log sink carries those lines instead.
   victoria-logs:
     image: victoriametrics/victoria-logs:v1.52.0
     command:

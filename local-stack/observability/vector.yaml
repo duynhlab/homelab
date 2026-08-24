@@ -4,24 +4,39 @@
 # parses JSON log lines, then ships to VictoriaLogs' jsonline ingest — the same
 # sink the cluster uses.
 #
-# This is the only path for anything without an OTel SDK: the edge's JSON access
-# log (its fields — `response_flags`, `upstream_cluster`, `route_name` — become
-# queryable because the parse merges them into the event), the databases, and
-# the infrastructure containers. It runs alongside the services' own OTLP log
-# export into the same VictoriaLogs instance; the two are told apart by their
-# stream fields (Vector rows carry `service`/`container_name`, OTLP rows carry
-# the `service.name` resource attribute).
+# This is the path for anything without an OTel SDK: the databases and the
+# infrastructure containers. It runs alongside the OTLP log export into the same
+# VictoriaLogs instance; the two are told apart by their stream fields (Vector
+# rows carry `service`/`container_name`, OTLP rows carry the `service.name`
+# resource attribute).
+#
+# The EDGE is no longer on this road. ADR-060 gave Envoy Gateway an
+# OpenTelemetry access-log sink, so its lines arrive over OTLP with
+# `service.name=platform.envoy-gateway`. One consequence worth knowing before
+# someone reports the edge's logs as missing: the JSON format maps its keys to
+# log-record ATTRIBUTES rather than a body, so a free-text search finds nothing
+# and VictoriaLogs renders `_msg` as "missing _msg field". Query by stream
+# instead -- `_stream:{"service.name"="platform.envoy-gateway"}` -- and every
+# field (`status`, `route_name`, `response_flags`, ...) is there.
 
 sources:
   docker:
     type: docker_logs
-    # RFC-0014 P4: the 9 Go services ship their own logs over OTLP (otelzap
-    # tee -> collector -> VictoriaLogs), so Vector must NOT tail them too —
-    # one line would land twice. Vector keeps every other container (infra,
-    # frontend, mockpay, gateway) and stays the fallback if a service's
-    # OTEL_LOGS_ENABLED is switched off (flip requires removing it here).
+    # Anything that ships its own logs over OTLP must NOT be tailed here too,
+    # or every line lands in VictoriaLogs twice. This list is the compose
+    # equivalent of the cluster's label selector
+    # (extra_label_selector: "platform.duynhlab.dev/otlp-logs!=true") and it is
+    # just as load-bearing: nothing errors when an entry is missing, the store
+    # simply holds the line twice.
+    #
+    # `OTEL_LOGS_ENABLED: "true"` lives in the *svc-env anchor, so it applies to
+    # ALL TEN services and BOTH workers -- keep this list in step with that
+    # anchor, not with a remembered service count.
+    #
+    # The `gateway` entry is ADR-060: the edge now has an OpenTelemetry
+    # access-log sink beside its File sink, so it too travels the OTLP road.
+    # Its stdout keeps being written, so `docker logs` on the edge still works.
     exclude_containers:
-      - local-stack-auth-1
       - local-stack-user-1
       - local-stack-product-1
       - local-stack-cart-1
@@ -31,6 +46,10 @@ sources:
       - local-stack-shipping-1
       - local-stack-notification-1
       - local-stack-payment-1
+      - local-stack-checkout-1
+      - local-stack-checkout-worker-1
+      - local-stack-inventory-1
+      - local-stack-gateway-1
 
 transforms:
   shape:
@@ -40,8 +59,9 @@ transforms:
       # Service name from the compose service label; fall back to container name.
       .service = .label."com.docker.compose.service"
       if .service == null { .service = .container_name }
-      # Parse JSON log lines (Go services' zerolog/zap + the edge's JSON access
-      # log); keep plain-text lines (e.g. gin's [GIN] lines) as raw messages.
+      # Parse JSON log lines; keep plain-text lines (e.g. gin's [GIN] lines) as
+      # raw messages. The edge's JSON access log used to be parsed here; it
+      # travels over OTLP since ADR-060.
       parsed, err = parse_json(string!(.message))
       if err == null {
         . = merge!(., object!(parsed))

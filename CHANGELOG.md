@@ -261,6 +261,28 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The edge's access log now reaches the 90-day store.**
+  [ADR-060](docs/proposals/adr/ADR-060-envoy-access-log-transport/) (RFC-0027 P6)
+  adds an `OpenTelemetry` sink beside the existing `File` sink in
+  `EnvoyProxy.spec.telemetry.accessLog` — one format, one CEL filter, two
+  destinations — so edge lines join the collector's `logs` pipeline and land in
+  VictoriaLogs **and** ClickHouse `otel_traces`' sibling `otel_logs`. Measured on
+  Kind: `platform.envoy-gateway` went from **0** rows to 30 for 30 requests, and
+  Envoy Gateway attaches `k8s.pod.name` / `k8s.namespace.name` on its own. Two
+  implementation notes the ADR could not know: `host`/`port` are marked
+  *Deprecated: Use BackendRefs instead* in the CRD shipped with gateway-helm
+  v1.9.0, so this uses `backendRefs`; and `resourceAttributes.service.name` is
+  **required**, not decoration, because the collector exports logs with
+  `VL-Stream-Fields: "service.name"` and the stream identity is otherwise empty.
+  The value matches the `service.name` the edge already uses for its traces, so an
+  edge log and an edge span share one identity.
+- **Edge logs are queried by stream, not by text.** The JSON format maps its keys
+  to log-record **attributes** rather than a body, so VictoriaLogs renders `_msg`
+  as `missing _msg field` and a free-text search finds nothing —
+  `_stream:{"service.name"="platform.envoy-gateway"}` returns them with every
+  field intact. Documented in `docs/observability/logging/README.md`, because the
+  first symptom looks like "the edge's logs are missing".
+
 - **The collector derives RED span metrics itself now, instead of Tempo doing
   it after storage.** The chart Tempo install was the **only live producer** of
   those series on the cluster — the hand-written install declares a
@@ -1344,6 +1366,16 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **Vector was tailing three containers that already ship their own logs.**
+  `exclude_containers` in `local-stack/observability/vector.yaml` is the compose
+  equivalent of the cluster's `otlp-logs` label selector, and it had drifted from
+  the `*svc-env` anchor that sets `OTEL_LOGS_ENABLED: "true"` fleet-wide:
+  `checkout`, `checkout-worker` and `inventory` were missing, so their lines
+  landed in VictoriaLogs twice, while `local-stack-auth-1` had outlived
+  auth-service's retirement. Found while adding the edge to the same list for
+  ADR-060. The comment now points at the anchor rather than a remembered service
+  count, which is what let the list drift.
+
 - **A checkout session can be adopted, and four scripts assumed it could not.**
   Creating a session answers 201 with a new one but **200 with the existing one**
   when that identity already has an open session, since the services hold one per
@@ -1863,6 +1895,14 @@ Skeleton (copy what you need):
   executed (local-stack, #752) from pending (Kind) and verifies both realms.
 
 #### GitOps
+
+- **A `op: add` patch on `/spec/.../envoyDeployment/pod` silently dropped the
+  base's `pod.labels`.** JSON Patch `add` on an existing object path *replaces* it,
+  so the local overlay's node-pinning patch erased the ADR-060 `otlp-logs` guard
+  label — the `EnvoyProxy` applied cleanly, the pods came up healthy, and Vector
+  kept tailing the edge, which is a silent double count rather than an error. The
+  patch now targets the child paths (`/pod/nodeSelector`, `/pod/tolerations`), so
+  anything the base puts under `pod` survives.
 
 - **Stale manifest comments across the tracing blast radius.** `tracing-local`
   still explained its `secrets-local` + `storage-local` edges as "Tempo needs

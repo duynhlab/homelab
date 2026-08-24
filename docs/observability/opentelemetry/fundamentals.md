@@ -290,7 +290,7 @@ the logs for this trace" silently returned nothing.
 lines still go to stdout (for `kubectl logs`), and a second core
 (`obs.ZapCore`, an `otelzap` bridge) sends them over OTLP to the Collector →
 VictoriaLogs, where `trace_id` **is** a real field. Vector stays — but only
-for things without an SDK (databases, the edge's access log, Postgres
+for things without an SDK (databases, Postgres
 `auto_explain` plans, the frontend). It skips the app pods so no line is
 ingested twice.
 
@@ -526,7 +526,7 @@ never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 | Log bridge | otelzap tee (`obs.ZapCore`) — [`docs/api/logs.md`](../../api/logs.md) |
 | Collector | [collector.md](collector.md) — pipelines, processors, fan-out |
 | Metrics ingest | **vmagent** `:8429` — translates OTLP names to Prometheus style, relabels, remote-writes to VictoriaMetrics; also scrapes infra exporters |
-| Non-SDK logs | **Vector** DaemonSet — ships logs for everything without an OTel SDK (DBs, the edge's access log, PG plans, frontend); skips app pods |
+| Non-SDK logs | **Vector** DaemonSet — ships logs for everything without an OTel SDK (DBs, PG plans, frontend); skips app pods **and the edge** ([ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/)) |
 | Backends | VictoriaMetrics (PromQL) · VictoriaLogs (LogsQL, `trace_id` first-class) · VictoriaTraces · ClickHouse OLAP · Pyroscope |
 | UI | **Grafana** — one pane over all backends; pivots between signals via `trace_id` |
 | Sampling | `ParentBased(TraceIDRatioBased)`, `OTEL_SAMPLE_RATE` — [README.md § Sampling](README.md#sampling) |

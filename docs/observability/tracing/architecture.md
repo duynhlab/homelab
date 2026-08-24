@@ -87,7 +87,7 @@ behavior that makes this reliable.
 - **Enabled by**: the `platform` GatewayClass's `parametersRef` — cluster CR `kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml` (`samplingRate: 10`, **planned** — not yet run on Kind); local overlay `local-stack/gateway/eg/envoyproxy.yaml` patches `samplingRate: 100` (verified in local-stack)
 - **Export**: OTLP **gRPC** to the collector on `:4317` — the tracing provider speaks gRPC only, unlike the app SDKs which export over OTLP HTTP `:4318`; `service.name` is derived as `<gateway>.<namespace>` (locally `platform.envoy-gateway-system`)
 - **Role**: opens the **root request span** for every proxied call and propagates the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service. Envoy's sampler is `ParentBased`, so an inbound sampled `traceparent` is always honored regardless of `samplingRate`
-- **Logs**: the edge has **no OTLP logs path** — its only log output is the JSON access log on stdout, tailed by Vector (see [../logging/README.md](../logging/README.md))
+- **Logs**: since [ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/) the edge has **two** access-log sinks — `File` to stdout (so `kubectl logs` works) and `OpenTelemetry` to the collector on `:4317`, which is how edge logs reach VictoriaLogs *and* ClickHouse. Vector no longer tails the Envoy pods; the `platform.duynhlab.dev/otlp-logs=true` label on them is what stops it (see [../logging/README.md](../logging/README.md))
 - **Config**: `kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml` (cluster); local mirror `local-stack/gateway/eg/envoyproxy.yaml`
 
 **1. Microservices (SDK Approach)**
@@ -99,7 +99,7 @@ behavior that makes this reliable.
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
-- **Function**: Fan-out layer — a `traces` pipeline distributing to **two** sinks (plus the `span_metrics` connector), and a `logs` pipeline going to **two** (fleet-wide app `otelzap` tee → VictoriaLogs *and* ClickHouse `otel_logs`). The edge has no OTLP logs path; its only log output is the JSON access log on stdout, tailed separately by Vector
+- **Function**: Fan-out layer — a `traces` pipeline distributing to **two** sinks (plus the `span_metrics` connector), and a `logs` pipeline going to **two** (fleet-wide app `otelzap` tee → VictoriaLogs *and* ClickHouse `otel_logs`). The edge's access log joins that same `logs` pipeline since [ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/)
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 

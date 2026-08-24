@@ -10,6 +10,7 @@ resources:
   - datasource-clickhouse.yaml
   - datasource-victoriametrics.yaml
   - datasource-victoriametrics-prometheus.yaml
+  - datasource-prometheus-alias.yaml
   # - grafana-service-account-mcp.yaml   # DISABLED with mcp-local (2026-08-21):
   #   this mints a Grafana Viewer token for grafana-mcp. With that server off the
   #   token has no consumer, and an unused credential is worth not minting.

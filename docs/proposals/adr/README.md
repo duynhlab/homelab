@@ -432,6 +432,10 @@ and extend Adoption instead.
 | [ADR-054](ADR-054-temporal-worker-controller/) | Give the versioned-worker lifecycle to the Temporal Worker Controller | Accepted | Complete | [RFC-0026](../rfc/RFC-0026/) |
 | [ADR-055](ADR-055-keda-worker-autoscaling/) | Scale versioned workers from task-queue backlog with KEDA | Proposed | Not started | [RFC-0026](../rfc/RFC-0026/) |
 | [ADR-056](ADR-056-k6-e2e-assertion-layer/) | Assert the E2E gates with k6 instead of reading curl by eye | Accepted | Partial — Kind rows converted and proven; compose rows written and contract-verified, environment untested | — |
+| [ADR-057](ADR-057-span-metrics-in-collector/) | Derive RED span metrics in the collector, not inside a trace backend | Proposed | Partial — manifest landed (#878); no series observed, Kind is down | [RFC-0027](../rfc/RFC-0027/) |
+| [ADR-058](ADR-058-retire-jaeger/) | Retire Jaeger, keeping the Jaeger query API as VictoriaTraces' interface | Proposed | Not started | [RFC-0027](../rfc/RFC-0027/) |
+| [ADR-059](ADR-059-retire-tempo/) | Retire both Tempo installs and take service graphs from VictoriaTraces | Proposed | Not started | [RFC-0027](../rfc/RFC-0027/) |
+| [ADR-060](ADR-060-envoy-access-log-transport/) | Send Envoy access logs over OTLP in addition to stdout | Proposed | Not started | [RFC-0027](../rfc/RFC-0027/) |
 
 Principles:
 

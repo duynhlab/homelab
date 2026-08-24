@@ -143,6 +143,47 @@ spec:
           transaction and let anti-wraparound autovacuum complete.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGTransactionIDWraparoundCritical.md"
 
+    # --- WAL retention ----------------------------------------------------
+    # An inactive replication slot holds WAL on the PRIMARY's disk forever.
+    # Found 2026-08-24 the hard way: a promotion left platform-db-3 on the old
+    # timeline, its slot went inactive, and the primary retained 2.4 GiB and
+    # climbing at ~250 MiB/h. The lag alert fired -- but lag is the SYMPTOM. The
+    # cause is disk filling, and nothing watched it.
+    #
+    # Three things this expression has to get right, all learned by measuring:
+    #   1. EVERY instance reports EVERY slot, so a standby's copy of the broken
+    #      slot would double-fire. `in_recovery == 0` keeps only the primary's
+    #      view -- and the primary is the machine whose disk is at stake.
+    #   2. A standby's view can be NEGATIVE (measured -67108704), which a naive
+    #      `> threshold` would silently pass over but which makes any `max by`
+    #      aggregation nonsense.
+    #   3. The byte metric is on the LEFT of the `and` so `$value` is the retained
+    #      size rather than the boolean from `active == 0`.
+    #
+    # Labels are kept unaggregated on purpose: slot_name is the actionable field.
+    - alert: CNPGInactiveSlotRetainingWAL
+      expr: |
+        (
+          cnpg_pg_replication_slots_pg_wal_lsn_diff > 1073741824
+          and cnpg_pg_replication_slots_active == 0
+        )
+        and on (namespace, pod) cnpg_pg_replication_in_recovery == 0
+      for: 15m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Inactive replication slot pinning WAL ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          Slot {{ $labels.slot_name }} on {{ $labels.cnpg_io_cluster }} has been inactive
+          while retaining {{ $value | humanize1024 }}B of WAL on the primary
+          ({{ $labels.pod }}) for >15m, and it will keep growing until the standby
+          rejoins or the slot is dropped. This is the CAUSE that
+          CNPGClusterPhysicalReplicationLagCritical reports as a symptom; left alone it
+          ends in a full disk, which on this platform surfaces as unrelated RBAC and
+          API errors rather than anything about storage.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGInactiveSlotRetainingWAL.md"
+
     # --- WAL archiving ----------------------------------------------------
     # A failure COUNT alone cannot tell a broken archiver from a healthy one
     # that hiccupped: a planned promotion always fails exactly one archive (the

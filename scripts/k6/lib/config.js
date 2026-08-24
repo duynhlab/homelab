@@ -26,6 +26,11 @@ const PRESETS = {
     vmalert: 'http://localhost:8880',
     vmagent: 'http://localhost:8429',
     logs: 'http://localhost:9428',
+    // Temporal's HTTP API, served by the UI container. saga.js used to default
+    // to the Kind hostname regardless of gate, so SG.3 polled a URL that does
+    // not resolve here and reported the saga as "never seen" while Temporal had
+    // it Completed all along.
+    temporalUI: 'http://localhost:8233',
     redirect: { customer: 'http://localhost:3001/', staff: 'http://localhost:3009/' },
     // gateway/eg/backendtrafficpolicy.yaml: one Envoy process, 50/Second.
     rateCeiling: 50,
@@ -39,6 +44,7 @@ const PRESETS = {
     pyroscope: 'https://pyroscope.duynh.me',
     vtraces: 'https://victoriatraces.duynh.me',
     vmalert: 'https://vmalert.duynh.me',
+    temporalUI: 'https://temporal.duynh.me',
     // No route by design; reach it with a port-forward and override VMAGENT.
     vmagent: 'http://localhost:8429',
     logs: 'https://logs.duynh.me',
@@ -66,6 +72,7 @@ export const target = {
   pyroscope: __ENV.PYROSCOPE || preset.pyroscope,
   vtraces: __ENV.VTRACES || preset.vtraces,
   vmalert: __ENV.VMALERT || preset.vmalert,
+  temporalUI: __ENV.TEMPORAL_UI || preset.temporalUI,
   vmagent: __ENV.VMAGENT || preset.vmagent,
   logs: __ENV.LOGS || preset.logs,
   redirect: preset.redirect,

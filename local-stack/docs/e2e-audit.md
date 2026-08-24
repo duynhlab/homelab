@@ -1974,9 +1974,15 @@ print('C20', 'OK all targets up:' if ok else 'FAIL:', t)"
 #      three inventory alerts that travel with the vendored RFC-0021 recording
 #      rules, and the four keycloak alerts (KeycloakDown + the three identity
 #      KPI alerts; KeycloakRestartLoop stays cluster-only — it reads
-#      kube-state metrics). 15 recording rules ride along (rfc0021-baseline 10 + inventory 5)
-#      so the two RFC-0021 dashboards render — counted separately because a
-#      recording rule can never fire.
+#      kube-state metrics), and Watchdog. 15 recording rules ride along
+#      (rfc0021-baseline 10 + inventory 5) so the two RFC-0021 dashboards
+#      render — counted separately because a recording rule can never fire.
+#
+#      Watchdog was ported from the cluster on 2026-08-24: local-stack had none,
+#      which made the k6 C21 assertion "Watchdog is present" unpassable here. It
+#      ALWAYS fires — that is the entire point of a dead-man's-switch — at
+#      `severity: none`, so it is expected in the firing list below and the k6
+#      row is unaffected (that one only counts page/critical).
 curl -s http://localhost:8880/api/v1/rules | python3 -c "
 import json, sys
 gs = json.load(sys.stdin)['data']['groups']
@@ -1984,11 +1990,13 @@ rules = [r for g in gs for r in g['rules']]
 alerting = [r for r in rules if r['type'] == 'alerting']
 recording = [r for r in rules if r['type'] == 'recording']
 firing = [r['name'] for r in alerting if r.get('state') == 'firing']
-print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing: %s'
+print('C21 rules loaded: %d alerting (want 19) + %d recording (want 15); firing: %s'
       % (len(alerting), len(recording), firing or 'none'))"
-# want: 18 alerting + 15 recording, firing none. A missing rule file mounts
-# silently — the counts are the tripwire. A firing rule on a fresh stack is a
-# real finding: chase it before calling the audit passed.
+# want: 19 alerting + 15 recording, firing ['Watchdog'] and nothing else. A
+# missing rule file mounts silently — the counts are the tripwire. Any OTHER
+# firing rule on a fresh stack is a real finding: chase it before calling the
+# audit passed. Watchdog MISSING from that list is also a finding — it means the
+# alert pipeline is not evaluating at all.
 
 #      Optional drill (NOT part of the pass bar — it takes ~6 minutes): stop
 #      clickhouse, wait out the 5m `for`, confirm ClickHouseServerUnreachable

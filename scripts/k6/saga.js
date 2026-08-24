@@ -29,7 +29,10 @@ import { bearer } from './lib/auth.js';
 import { rowCheck, rowThresholds, evidenceTable } from './lib/rows.js';
 import { clearCart, addItem, freshSession, priceSession, confirmSession } from './lib/funnel.js';
 
-const TEMPORAL = __ENV.TEMPORAL_UI || 'https://temporal.duynh.me';
+// Per-gate, from lib/config.js. It used to default to the Kind hostname no
+// matter which gate was running, so on compose SG.3 polled a URL that does not
+// resolve and reported "never seen" while Temporal had the workflow Completed.
+const TEMPORAL = target.temporalUI;
 const TQ_NAMESPACE = __ENV.TEMPORAL_NAMESPACE || 'mop';
 const DEPLOYMENT = __ENV.WORKER_DEPLOYMENT || 'order/order-fulfillment';
 const SKU = __ENV.SKU || '1';
@@ -125,6 +128,13 @@ export default function () {
   }
   const vi = (info && info.versioningInfo) || {};
   const ranOn = (vi.deploymentVersion || {}).buildId || null;
+
+  // SG.4 is KIND-ONLY. Worker versioning comes from the temporal-worker-
+  // controller (RFC-0026 / ADR-054), which compose does not run: measured there,
+  // /worker-deployments returns `{}` and a completed workflow carries no
+  // versioningInfo at all. Asserting it on compose fails for a capability the
+  // stack was never given, so the row is left unrun and counted as such.
+  if (target.gate !== 'kind') return;
 
   rowCheck('SG.4', info, {
     'behavior is Pinned': () => vi.behavior === 'VERSIONING_BEHAVIOR_PINNED',

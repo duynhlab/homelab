@@ -1,0 +1,22 @@
+# Dead-man's-switch, ported from the cluster's prometheusrules/watchdog.yaml.
+#
+# It always fires. Its value is entirely in its ABSENCE: if this stops arriving,
+# the alerting pipeline itself is broken and every other alert here is silent for
+# a reason nothing will tell you.
+#
+# local-stack had no Watchdog until 2026-08-24, which made audit row C21's
+# "Watchdog is present" assertion unpassable on this stack -- it asserted
+# something only the cluster had. Porting it was the right fix rather than
+# narrowing the row: the compose gate can now prove its own alert pipeline is
+# alive, which is the whole point of the rule.
+groups:
+  - name: watchdog
+    interval: 30s
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Alerting pipeline is functional"
+          description: "This alert is always firing. If you stop receiving it, the alerting pipeline is broken."

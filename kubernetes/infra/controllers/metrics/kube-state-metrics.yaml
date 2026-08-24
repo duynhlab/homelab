@@ -30,6 +30,21 @@ spec:
       requests:
         cpu: 20m
         memory: 64Mi
+      limits:
+        # No memory limit until 2026-08-24, and nothing caught it: kube-system is
+        # one of the admission-excluded namespaces (see docs/platform/kyverno.md),
+        # so require-resources never saw this container even though AGENTS.md asks
+        # for limits.memory on every one. It OOMKilled 10 times during a host
+        # saturation episode, at a working set of 117 MiB against a 64Mi request.
+        #
+        # 256Mi is ~2.2x that measured working set. Memory here scales with the
+        # number of cluster objects, and this cluster churns hard during rebuilds,
+        # so the headroom is the point.
+        #
+        # Deliberately NO limits.cpu: kube-state-metrics is scrape-bound, and
+        # throttling it would slow every scrape rather than protect anything --
+        # the same trap that made checkout unservable at 50m.
+        memory: 256Mi
 
     rbac:
       extraRules:

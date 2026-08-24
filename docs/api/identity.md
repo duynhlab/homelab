@@ -76,15 +76,14 @@ flowchart LR
     eg["Envoy Gateway<br/>SecurityPolicy.jwt"]
   end
   subgraph svcLayer["Service — authoritative"]
-    svc["Go service<br/>pkg/authmw"]
+    svc["Go service · pkg/authmw<br/>iss + signature + aud + exp<br/>user_id = sub"]
   end
   kc[("Keycloak<br/>2 realms")]
 
   browser -->|"Authorization: Bearer …"| eg
-  eg -->|"remoteJWKS<br/>iss + signature"| kc
+  eg -->|"remoteJWKS<br/>iss + signature only"| kc
   eg -->|"forwarded"| svc
-  svc -->|"cached JWKS<br/>iss + signature + aud + exp"| kc
-  svc -->|"user_id = sub"| svc
+  svc -->|"cached JWKS"| kc
 
   classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;

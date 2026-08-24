@@ -1227,6 +1227,34 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The README had no picture of what the platform is made of, and one of what it
+  is made of was wrong.** Two diagrams already lived there — `Topology` (how a
+  request travels) and `GitOps delivery` (how a change reaches the cluster) —
+  but neither answers *what is installed and how it groups*, which is the first
+  thing a reader wants. The new **Platform map** answers exactly that and
+  nothing else: six named tiers (Delivery · Edge & networking · Security &
+  identity · Observability · Applications · Data) inside a cluster boundary,
+  with `Outside the cluster` above it, and only **two** edges — both dotted and
+  both labelled, because Git reaches the cluster through the OCI registry and
+  OpenTofu only bootstraps Flux before handing over. Every node was checked
+  against a manifest, which is how the second half of this entry was found:
+  `Topology` still named **Tempo** as a trace backend. Tempo and Jaeger were
+  retired by RFC-0027 / ADR-058 + ADR-059 — `controllers/tracing/` deploys only
+  the OTel Collector now and the rest sits there as `*.yaml.bak` — so the live
+  sinks are **VictoriaTraces + ClickHouse**. Same drift, same fix, in the file
+  agents trust most: `AGENTS.md` § Platform architecture still listed
+  `Tempo (+ VictoriaTraces pilot) … Jaeger`, and § Gotchas still said **22**
+  Kustomizations where `clusters/local/` now holds **23** (a cluster reports
+  24) since `policy-reporter-local` landed.
+
+  The composition is the point: named tiers, a cluster boundary, and an edge
+  count low enough that the diagram reads as a map rather than a flow. Palette
+  is the house one from `AGENTS.md` § Diagram workflow — 78 files already use
+  it, and a second palette in the front door would be copied outward. Rendered
+  with `mmdc` before review; nested `direction` in Mermaid is only honoured
+  when a subgraph contains an edge, so each tier carries an invisible `~~~`
+  chain to lay its chips out in a row.
+
 - **Three documents still named a worker build that no longer exists.** Found by
   the owner reading `docs/api/workflows.md`, which said `` `1-13-2` is Current ``
   after #841 had moved the worker to `2-4-0` — the tables and links were synced,

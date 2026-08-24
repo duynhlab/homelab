@@ -254,7 +254,7 @@ make flux-sync    # force reconciliation
 
 ## Platform architecture & conventions
 
-- **Observability (platform stack):** VictoriaMetrics, Grafana, Tempo (+ VictoriaTraces pilot), VictoriaLogs (Loki removed), Pyroscope, Jaeger, Vector. SLO via Sloth. Envoy Gateway emits edge spans (OTLP gRPC, W3C, ParentBased). Application instrumentation policy (otel middleware chain, OTLP export, trace/log correlation) lives in service repos via `pkg/obsx` — see Cross-repo app context when editing ingress, NetworkPolicy, or observability docs.
+- **Observability (platform stack):** VictoriaMetrics, Grafana, VictoriaTraces, VictoriaLogs, ClickHouse, Pyroscope, Vector (Loki, Tempo and Jaeger all removed — RFC-0027 / ADR-058 + ADR-059; the retired manifests sit beside their kustomization as `*.yaml.bak`). SLO via Sloth. Envoy Gateway emits edge spans (OTLP gRPC, W3C, ParentBased). Application instrumentation policy (otel middleware chain, OTLP export, trace/log correlation) lives in service repos via `pkg/obsx` — see Cross-repo app context when editing ingress, NetworkPolicy, or observability docs.
 - **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.). Palette and workflow in Docs conventions below.
 - **Stack:** Go 1.26 (services, not authored here), PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
 
@@ -336,7 +336,7 @@ Every manifest applied to the cluster must satisfy admission:
   kyverno-policies → policy-reporter
   apps-local (depends: databases + monitoring + temporal)
   ```
-  (22 Kustomization CRs in `clusters/local/`; a cluster reports **23** because
+  (23 Kustomization CRs in `clusters/local/`; a cluster reports **24** because
   `flux-system` itself is created by the FluxInstance, not by this directory —
   full graph in
   [`docs/platform/setup.md`](docs/platform/setup.md).)

@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — phases P1/P3/P5 (PR trains) |
-| **Adoption** | Partial — local-stack runs the realm as the only issuer (compose E2E audit passed 2026-08-12); cluster manifests merged, first Kind deploy pending; auth-service retirement is P5 |
+| **Adoption** | Partial — the realm is the only issuer in both environments; `auth-service`'s cluster surface was deleted 2026-08-13 (RFC-0024 P5) and the required ops docs now exist ([`docs/platform/keycloak.md`](../../../platform/keycloak.md), [`docs/api/identity.md`](../../../api/identity.md)). **Remaining: the full Kind gate pass** — the last obligation between this and `Complete` |
 
 ## Context
 
@@ -295,6 +295,10 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Proposed inside the RFC-0022/RFC-0024 review |
 | 2026-08-11 | Accepted / Not started | Accepted with the RFC-0024 program review (this PR); numbering assigned 041–043 because ADR-039/040 were consumed by unrelated decisions |
+| 2026-08-12 | Accepted / Partial | Keycloak deployed on `platform-db` (RFC-0024 P1, #750); realm the only issuer in local-stack after the compose audit passed |
+| 2026-08-13 | Accepted / Partial | `auth-service`'s cluster surface deleted (P5, #760) — the retirement half of this decision is done. Adoption recorded in #757 |
+| 2026-08-14 | Accepted / Partial | Amended in effect by [ADR-050](../ADR-050-separate-staff-identity-realm/): the workforce moved to a second realm `duynhlab-staff`, so "realm `duynhlab`" in the decision summary is now one of two |
+| 2026-08-24 | Accepted / Partial | Documentation obligation met: [`docs/platform/keycloak.md`](../../../platform/keycloak.md) created and [`docs/api/identity.md`](../../../api/identity.md) added, both linking this ADR. The sole remaining blocker to `Complete` is the Kind gate |
 
 ---
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-24 — Adoption text refreshed (it still called P5 future; P5 shipped 2026-08-13) and the History rows that were skipped when Adoption moved to `Partial` appended. The `docs/platform/keycloak.md` obligation is now met; `Complete` still waits on the Kind gate._

@@ -257,6 +257,9 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Proposed inside the RFC-0022/RFC-0024 review |
 | 2026-08-11 | Accepted / Not started | Accepted with the RFC-0024 program review (this PR); numbering assigned 041–043 because ADR-039/040 were consumed by unrelated decisions |
+| 2026-08-12 | Accepted / Partial | Frontend cut over to `keycloak-js` (#752); browser flow verified in the compose audit (B1–B3: PKCE redirect, no token in web storage, end-session logout) |
+| 2026-08-14 | Accepted / Partial | [ADR-050](../ADR-050-separate-staff-identity-realm/) extends the same browser model to the Backoffice against a second realm, and [ADR-048](../ADR-048-admin-portal-no-bff/) reaffirms the no-BFF half of this decision |
+| 2026-08-24 | Accepted / Partial | Browser flow and its two consequences (token in JS memory, no central revocation inside the 15-minute TTL) documented in [`docs/api/identity.md`](../../../api/identity.md). Remaining for `Complete`: the Kind gate |
 
 ---
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-24 — appended the History rows that were skipped when Adoption moved to `Partial`; the table had still read `Accepted / Not started`._

@@ -651,6 +651,29 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0024's design record stopped at its own acceptance date.** Every phase
+  had shipped — P1 through P5 plus P6 arm A — while the RFC's Implementation
+  History still ended 2026-08-11 and all four "When Status → implemented" boxes
+  were unchecked. History is now filled in per phase against the merge commits
+  that carried it (#750 → #798), the docs boxes are ticked, and
+  [ADR-050](docs/proposals/adr/ADR-050-separate-staff-identity-realm/)'s
+  post-acceptance amendment is recorded: the RFC was written around one realm and
+  the as-built edge trusts two, which is why there are 13 JWT SecurityPolicies
+  and not 7. `research.md` also still said `researching` despite a 9/9 ticked
+  gate with owner sign-off. **Status deliberately stays `Accepted`:** the one
+  remaining obligation is the full Kind K-row gate pass, which is the single
+  blocker named by the `Partial` Adoption of ADR-041/042/043/044/045 — an
+  engineering step, not paperwork.
+- **Four ADR History tables were never appended when their Adoption changed.**
+  ADR-041/042/043 still read `Accepted / Not started`, and
+  [ADR-046](docs/proposals/adr/ADR-046-e2e-gate-kind-fallback/) read the same
+  while its own obligation row demanded "flip Adoption and append the chosen arm
+  + evidence to History" — its Adoption had named the arm since 2026-08-13 with
+  nothing in History. All four appended. ADR-041's Adoption text also still
+  called `auth-service` retirement future ("is P5") though P5 shipped
+  2026-08-13, and its `docs/platform/keycloak.md` obligation is now met.
+  ADR-044 records that `envoy-gateway.md` finally links it.
+
 - **RFC-0027 is `implemented`.** Tempo (both installs) and Jaeger are retired,
   VictoriaTraces + ClickHouse are the two trace sinks, and P6 put the edge's access
   log on the OTLP road. [ADR-058](docs/proposals/adr/ADR-058-retire-jaeger/),
@@ -1226,6 +1249,51 @@ Skeleton (copy what you need):
   checks the `temporal-worker-local` dashboard that already ships.
 
 #### Docs
+
+- **RFC-0024 shipped its code but never its docs, so identity had no contract
+  file and no platform file.** Two new docs close the gap the design records
+  actually named. **`docs/api/identity.md`** is the contract service code
+  follows: the two realms (`duynhlab`, `duynhlab-staff`), what the edge checks
+  versus what `pkg/authmw` checks, `user_id` = the token `sub` as
+  `VARCHAR(255)`, the `OIDC_*` env pair injected per service (10 `authmw` / 6
+  also `staffauthmw`), the browser PKCE flow, and how to mint a token when
+  Direct Access Grants are disabled. **`docs/platform/keycloak.md`** is the
+  deliverable [ADR-041](docs/proposals/adr/ADR-041-keycloak-platform-idp/) and
+  RFC-0022 both named and neither got — deployment shape, the Flux position and
+  why `envoy-gateway-config-local` waits on it, the **deliberately bypassed
+  PgDog pooler** (Agroal needs long-lived connections + server-side prepared
+  statements), the **one-shot realm import** and what that costs, the
+  10-namespace NetworkPolicy and the outage it closed, the live signals, and an
+  honest gap list (no prod deployment, `replicas: 1`, no CPU limit, no egress
+  policy, committed dev credentials). Recorded while writing them: **the edge
+  verifies issuer and signature but not the audience** — no `SecurityPolicy`
+  declares `audiences`, deliberately, and `docs/api/api.md` had claimed it did,
+  in two places. `docs/platform/identity-cutover-runbook.md` is deleted, its
+  pending cluster half folded into `keycloak.md` as the realm reset procedure.
+- **`kyverno.md` explained the engine but never named a policy, and
+  contradicted itself about Policy Reporter.** Its adoption matrix called the UI
+  "planned — not deployed" while three other sections of the same file, the
+  HelmRelease (`policy-reporter` 3.9.1), the HTTPRoute and `setup-hosts.sh` all
+  say it is live; the architecture diagram carried a matching `planned` node.
+  Both fixed. Adds a quick-facts table, a **policy inventory** keyed to the files
+  under `cluster-policies/`, a decision diagram for how one `apply` resolves, an
+  exceptions table, an 8-step verification runbook (including a `--dry-run=server`
+  probe that proves the one Enforce policy still blocks), and troubleshooting by
+  symptom. Counts trued up: **7 policies deployed, not 8** — the eighth file is a
+  `ClusterRole`, which `policy-catalog.md` already says is not a policy;
+  `docs/security/README.md` said 8 too and moves with it.
+- **`envoy-gateway.md` kept its resource counts in a diagram label, where they
+  drifted.** The label claimed 39 HTTPRoutes as `monitoring 10, infra 3`; the
+  manifests hold 8 and 4, and **4 of the 39 do not reconcile at all** because
+  `routes/mcp.yaml` is commented out — so the old total was right only by
+  coincidence. Counts now live in tables: core objects, route families, the
+  18-row API surface with the realm guarding each route, and all **33** policy
+  objects. Adds TLS, the Flux position, a signal/consumer table naming the 12
+  alerts and 10 recording rules, a 9-step verification runbook replacing the
+  3-command triad, troubleshooting by symptom, and a **Design decisions**
+  section carrying the ADR-044/045/046 links that
+  [ADR-044](docs/proposals/adr/ADR-044-envoy-gateway-platform-edge/)'s own
+  validation row required and the file had never had.
 
 - **The README had no picture of what the platform is made of, and one of what it
   is made of was wrong.** Two diagrams already lived there — `Topology` (how a

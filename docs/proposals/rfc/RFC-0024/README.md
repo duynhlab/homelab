@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed, owner signed off 2026-08-11 | 2026-08-10 | 2026-08-11 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed, owner signed off 2026-08-11 | 2026-08-10 | 2026-08-24 |
 
 > **Every decision is a tradeoff.** This RFC replaces a mature, working edge (Kong OSS
 > 3.9) with Envoy Gateway **and, in the same greenfield program, executes the Keycloak
@@ -398,14 +398,75 @@ edge ADRs took 044–046; RFC-0023's future ADRs shift to 047–049.
   Repo-verified corrections folded in: the `kong_*` rule set is 13 alerts +
   **20** recording rules, and the `platform-db` `bootstrap.initdb` contract
   already rests on `user`/`platform-db-user-secret` (see RFC-0022 history).
+- 2026-08-12 — **P1 identity foundation** (#750). Keycloak as a raw Deployment in
+  the new `identity` namespace, realm imported from a ConfigMap, `keycloak`
+  database as a declarative CNPG triplet on `platform-db` connected **direct to
+  `platform-db-rw`** (Agroal needs long-lived connections + server-side prepared
+  statements, so the pooler is bypassed — RFC-0022 OQ#8). ServiceMonitor plus
+  `KeycloakDown`/`KeycloakRestartLoop`; `keycloak-local` joins the Flux chain.
+- 2026-08-12 — **P2 additive edge** (#751). Envoy Gateway stood up *alongside*
+  Kong in namespace `envoy-gateway`, so the two edges coexisted for exactly one
+  train.
+- 2026-08-12 — **P3 compose arm + P6 arm A** (#752). The compose edge became
+  Envoy Gateway in **standalone** mode and carried the full release audit, so
+  [ADR-046](../../adr/ADR-046-e2e-gate-kind-fallback/)'s standalone-spike arm was
+  taken, the Kind-fallback arm was never needed, and the 283-line `kong.yml`
+  second dialect is gone. Keycloak joined compose in the same train.
+- 2026-08-13 — **P2.3 Kong decommission** (#753). Envoy Gateway became the only
+  edge: Kong's Flux Kustomizations, HelmRelease/HelmRepository, every
+  `configs/kong/` CR, the `kong` Namespace, `kong-proxy-tls`, the
+  `auth-issuer-jwt` ExternalSecret and the `temporal-ui` Ingress all deleted;
+  11 NetworkPolicies re-pointed.
+- 2026-08-13 — **P3 fleet identity cutover** (#756). Coordinated `pkg` wave:
+  `authmw` retargeted to the realm via `OIDC_*`, and `user_id` = the token `sub`
+  as a string end to end — five INTEGER columns, the notification and payment
+  protos, `pkg/idempotency`, and Temporal workflow inputs.
+- 2026-08-13 — **P5 decommission** (#760). `auth-service`'s entire cluster
+  surface deleted: app manifest, `auth` namespace, the `auth` database triplet,
+  the `auth-jwt-signing` ExternalSecret, its NetworkPolicy, and the
+  `api-auth-public` HTTPRoute. The realm is the only issuer.
+- 2026-08-13 — Adoption recorded (#757): five ADRs `Partial`, ADR-046
+  `Complete`.
+- 2026-08-14 — **Design amended after acceptance:
+  [ADR-050](../../adr/ADR-050-separate-staff-identity-realm/) splits the
+  workforce into its own realm** (#767). This RFC was written around a single
+  realm; the as-built edge trusts **two** (`duynhlab` for `/private/`,
+  `duynhlab-staff` for `/protected/`), which is why there are 13 JWT
+  SecurityPolicies and not 7. Recorded here because the RFC body still reads
+  single-realm.
+- 2026-08-14 — **P4 telemetry cutover** completes: the local-stack edge is
+  monitored natively (#772) and the edge alerts get the 10 runbooks they had
+  shipped without (#780). `envoy_*` rules and dashboards replaced the `kong_*`
+  set wholesale; alert-catalog §2 was rewritten.
+- 2026-08-17 → 08-18 — **Post-acceptance ADR-044 amendments, both from running
+  the edge on Kind.** #791 moved CRD delivery from Helm to vendored manifests +
+  server-side apply (the release Secret measured ~2.06 MB against a 1 MiB
+  ceiling) and fixed data-plane placement; #792 corrected rate-limit policies
+  that were making every targeted route answer 500; #798/#799 purged the last
+  Kong residue and bumped Envoy Gateway to v1.9.0 / Gateway API v1.6.1.
+- 2026-08-24 — **Docs obligations closed.**
+  [`docs/platform/keycloak.md`](../../../platform/keycloak.md) created (the
+  deliverable named by ADR-041 and RFC-0022) and
+  [`docs/api/identity.md`](../../../api/identity.md) added as the identity
+  contract `docs/api/` never had. `envoy-gateway.md` gained the ADR-044/045/046
+  links its validation row required. Recorded while writing them: the edge
+  verifies issuer and signature but **not** the audience — no SecurityPolicy
+  declares `audiences`, deliberately, and `api.md` had claimed otherwise.
+
+**Remaining before Status → `implemented`: the Kind gate.** Every phase above is
+merged, and the compose gate passes. What has not happened is a full end-to-end
+K-row pass on Kind, which is the single blocker named by the `Partial` Adoption
+row of ADR-041, 042, 043, 044 and 045. It is an engineering step, not paperwork —
+do not flip this RFC or those ADRs without it.
 
 When Status → implemented, confirm:
-- [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
-- [ ] `docs/api/api.md` edge-exposure prose updated; `docs/platform/envoy-gateway.md`
+- [ ] Linked ADR(s) Adoption → Complete (or Partial with note) — blocked on the Kind gate
+- [x] `docs/api/api.md` edge-exposure prose updated; `docs/platform/envoy-gateway.md`
       created; `docs/platform/kong-gateway.md` archived banner in place
-- [ ] Runbooks: edge runbook replaced; alert catalog §2 rewritten; rotation runbook
+- [x] Runbooks: edge runbook replaced; alert catalog §2 rewritten; rotation runbook
       edge step deleted from `docs/secrets/openbao.md`
-- [ ] RFC-0022/0023 cross-references updated to the as-built edge
+- [ ] RFC-0022/0023 cross-references updated to the as-built edge — RFC-0022 still
+      describes Kong as the edge; RFC-0023 carries ~20 Kong references
 
 ## Related
 
@@ -413,7 +474,8 @@ When Status → implemented, confirm:
 - [RFC-0022 — Keycloak as platform IdP](../RFC-0022/README.md) — the identity **design record**, absorbed here for execution (owner decision 2026-08-10)
 - [RFC-0023 — Backoffice + protected APIs](../RFC-0023/README.md) — receives its identity prerequisites from this program; `protected` routes gain the edge role gate
 - [RFC-0009](../RFC-0009/README.md) / [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — the Kong edge design being superseded in its vehicle, preserved in its principle
-- [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — to be archived read-only
+- [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — archived read-only (2026-08-12)
+- [`docs/platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) · [`docs/platform/keycloak.md`](../../../platform/keycloak.md) · [`docs/api/identity.md`](../../../api/identity.md) — the as-built platform and contract docs
 
 ---
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-24 — Implementation History filled in for P1–P5 and P6 arm A (it had stopped at the acceptance date), ADR-050's post-acceptance two-realm amendment recorded, docs checklist items 2 and 3 ticked, and the remaining blocker named explicitly as the Kind gate. Status stays `Accepted`: five ADRs are still `Partial` on that gate._

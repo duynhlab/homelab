@@ -1485,6 +1485,31 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **Three compose-gate rows could not pass, each for its own reason — found by
+  actually running the gate.** RFC-0027 owed a re-derivation of C17/C18/C21 after
+  P4; running it turned up two more.
+  - **C21 asserted a rule local-stack never had.** The cluster has a `Watchdog`
+    dead-man's-switch; compose had no such rule anywhere, so *"Watchdog is
+    present"* was unpassable here. Ported it rather than narrowing the row — the
+    compose gate can now prove its own alert pipeline is alive, which is the whole
+    point of the rule. The runbook's hardcoded count moves 18 → **19** alerting,
+    and it now says Watchdog is *expected* in the firing list, since the previous
+    wording called any firing rule "a real finding".
+  - **SG.3 polled the wrong host.** `saga.js` defaulted `TEMPORAL_UI` to the Kind
+    hostname regardless of gate, so on compose it reported the saga as
+    *"never seen"* while Temporal had the workflow `COMPLETED` the whole time.
+    `temporalUI` is now a per-gate value in `lib/config.js` like every other
+    endpoint.
+  - **SG.4 asserted a capability compose does not have.** Worker versioning comes
+    from the temporal-worker-controller (RFC-0026 / ADR-054), which compose does
+    not run: measured there, `/worker-deployments` returns `{}` and a completed
+    workflow carries no `versioningInfo` at all. The row is now Kind-only and
+    counted as **did not run** on compose instead of failing for a missing
+    feature.
+  - Full compose result afterwards: smoke **8/8 rows, 33/33**, observability
+    **4/4 rows, 52/52** (C18 alone is 37 assertions), saga 3 pass + 1 not-run,
+    session 11/11, staff 46/46, operator 26/26.
+
 - **Vector was tailing three containers that already ship their own logs.**
   `exclude_containers` in `local-stack/observability/vector.yaml` is the compose
   equivalent of the cluster's `otlp-logs` label selector, and it had drifted from

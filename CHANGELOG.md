@@ -1463,6 +1463,33 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **A `critical` alert whose condition was a strict superset of a `warning`
+  one.** `MicroserviceNoSuccessfulRequests` guarded on `rate(total[1h]) > 0` —
+  *had* traffic — so whenever `MicroserviceNoTraffic` (warning, non-paging) fired,
+  this one fired with it at a severity that pages, carrying no extra information:
+  no requests at all also means no 2xx. On a platform with bursty traffic and no
+  continuous synthetic load that was **every gate run** — measured at **8**
+  `(app, namespace)` pairs on an idle cluster. The guard is now
+  `rate(total[10m]) > 0` — traffic **now** — so it fires only in the case its own
+  name and description always claimed: requests arriving, none succeeding.
+  - Measured both directions: idle cluster → the alert goes `inactive` (8 → 0
+    matching series); driving **404-only** traffic at `product` → `pending` after
+    90s and **`firing`**, with `2xx` at 0 against 0.95 req/s total.
+  - `MicroserviceNoTraffic` is deliberately **untouched**. Its runbook's reasoning
+    holds: the ~40-minute self-clearing window is arithmetic, and suppressing it
+    would need `for: ≥50m`, which would delay a real total-traffic-loss signal by
+    the same 50 minutes. It stays `warning`.
+  - Chosen over the Alertmanager inhibition the catalog suggested, for two
+    reasons: the existing `inhibit_rules` match on
+    `equal: ['alertname','namespace']` and so cannot relate two different
+    alertnames, and an inhibited rule still reads `firing` in `/api/v1/rules` —
+    which is exactly what gate row K5.8 asserts against. Inhibition hides a wrong
+    expression; it does not fix one.
+  - Nothing is now uncovered: idleness stays with `MicroserviceNoTraffic`, and a
+    service receiving nothing at all is paged by `MicroserviceDown`,
+    `MicroserviceAllInstancesDown` and the edge's `EdgeUpstreamUnhealthy` /
+    `Edge5xxRatioCritical`.
+
 - **`OtelCollectorDown` had stopped being deployed, and the alert catalog still
   listed it as live.** The rule shared `tempo-alerts.yaml` with `TempoDown`, so
   retiring Tempo (RFC-0027 P4) took the collector's only liveness alert with it —

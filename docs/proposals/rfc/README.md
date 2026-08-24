@@ -105,7 +105,7 @@ for its own sake.
 | [RFC-0001](RFC-0001/) | Temporal for durable cross-service orchestration | platform-wide | done | implemented |
 | [RFC-0002](RFC-0002/) | East-west mTLS for internal gRPC | platform-wide | P1 | superseded — in-process → **[RFC-0020](RFC-0020/)**, mesh → [RFC-0006](RFC-0006/) |
 | [RFC-0003](RFC-0003/) | Inventory ownership and stock semantics | platform-wide | — | superseded — **[RFC-0021](RFC-0021/)** (inventory extraction) |
-| [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | P2 | provisional |
+| [RFC-0004](RFC-0004/) | Cross-service caching and invalidation | platform-wide | — | provisional |
 | [RFC-0005](RFC-0005/) | supporting-shared-db: HA or split | infra | P2 | provisional — **superseded by [RFC-0018](RFC-0018/)** (platform-db merge) |
 | [RFC-0006](RFC-0006/) | Service mesh evaluation (Istio Ambient vs Linkerd) — future mesh; in-process mTLS now in [RFC-0020](RFC-0020/) | infra | defer | provisional |
 | [RFC-0007](RFC-0007/) | Disaster-recovery drills program | infra | done | implemented — program documented and Drill A recorded (`DR-2026-08-A`, Barman gate closed); the recurring cadence and Drills C/D activate with durable hardware ([RFC-0011](RFC-0011/)) |
@@ -127,7 +127,7 @@ for its own sake.
 | [RFC-0024](RFC-0024/) | Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover (executes [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | Accepted |
 | [RFC-0025](RFC-0025/) | Converge the customer SPA on the Admin Portal's stack — one cutover, no mocks (exercises [ADR-049](../adr/ADR-049-admin-portal-tanstack-spa/)'s convergence revisit trigger) | service:frontend | P2 | implemented |
 | [RFC-0026](RFC-0026/) | Adopt the Temporal Worker Controller for versioned workers; KEDA autoscaling designed and recorded (takes up the destination [ADR-030](../adr/ADR-030-temporal-workflow-versioning/) named but deferred) | platform-wide | done | implemented — [ADR-054](../adr/ADR-054-temporal-worker-controller/) controller, [ADR-055](../adr/ADR-055-keda-worker-autoscaling/) KEDA (`Proposed`, not installed). Kind-verified 2026-08-22: `CURRENT` set with no human step, a saga completing Pinned, a Progressive rollout and a rollback both observed |
-| [RFC-0027](RFC-0027/) | Consolidate the trace and log backends: five trace sinks to two | platform-wide | — | researching |
+| [RFC-0027](RFC-0027/) | Retire Tempo and Jaeger, keeping VictoriaTraces and ClickHouse (five trace sinks to two; the log tier is unchanged by design) | platform-wide | — | provisional |
 
 ## Backlog — candidate RFCs
 
@@ -155,4 +155,4 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-23 — **RFC-0027** reserved at `researching`: research only, on consolidating five trace sinks to two (Tempo and Jaeger out) plus the log topology and the Envoy access-log transport; the backlog row is promoted. No `README.md` yet and no decision taken. 2026-08-21 — RFC-0026 **Accepted**: research gate passed and the Temporal Worker Controller adopted, retiring the per-build manifest and the hand-run activation Job; ADR-054 and ADR-055 created at `Proposed` (KEDA recorded, not installed). Previously: RFC-0025 `implemented` (storefront cutover as frontend v3.0.0, ADR-052 Accepted / Adoption Complete) and RFC-0023 Accepted (Backoffice portal + first `protected` APIs; ADR-047..049 created at Accepted)._
+_Last updated: 2026-08-24 — **RFC-0027** → `provisional`: research gate passed and the README written, deciding to retire Tempo and Jaeger and keep VictoriaTraces + ClickHouse. The log tier is unchanged by design. Four independent decisions are named; their ADRs are created at `Proposed` during architecture review. P0 groundwork (the collector `span_metrics` connector) landed ahead of the gate and is recorded as such. 2026-08-21 — RFC-0026 **Accepted**: research gate passed and the Temporal Worker Controller adopted, retiring the per-build manifest and the hand-run activation Job; ADR-054 and ADR-055 created at `Proposed` (KEDA recorded, not installed). Previously: RFC-0025 `implemented` (storefront cutover as frontend v3.0.0, ADR-052 Accepted / Adoption Complete) and RFC-0023 Accepted (Backoffice portal + first `protected` APIs; ADR-047..049 created at Accepted)._

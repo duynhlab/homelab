@@ -402,7 +402,8 @@ while stdout is still written.
 
 ## Integration paths
 
-All **planned** — no manifests exist for any of this.
+**Planned, with one exception.** Everything below is planned and unbuilt except the
+`span_metrics` connector edge, which is **deployed** — see the caveat under the diagram.
 
 ```mermaid
 flowchart LR
@@ -443,6 +444,27 @@ flowchart LR
 
 > **In plain terms:** the collector keeps being the only place that fans out, so each step here
 > is an exporter or a sink change rather than an application change.
+
+**The one solid edge landed ahead of this RFC's gate, and that is worth stating plainly.**
+The `span_metrics` connector was implemented on the cluster in #878 while this file was still
+at `researching` — no `README.md`, no architecture review, no ADR. It went in because the
+prerequisite it discharges is what made every other option in this research unreachable, and
+because it is additive: Tempo keeps producing `traces_spanmetrics_*` beside it, the names do
+not collide, and nothing was removed.
+
+Two honest qualifications:
+
+- **It is not decision-neutral.** An earlier note claimed it was. If this RFC ends up choosing
+  the shape that keeps the Tempo chart install ([Alternatives](#alternatives) option B), that
+  install's generator stays live and the connector becomes redundant — so the change quietly
+  favours the options that drop Tempo.
+- **Rollback condition.** If option B wins, the connector, its `metrics/spanmetrics` pipeline
+  and the `prometheus_remote_write` exporter come back out; that is one file and no data
+  migration.
+
+The ADR for this decision is deliberately **not** written yet: per `AGENTS.md` the ADRs for an
+RFC are created at `Proposed` during architecture review, alongside the other decisions this
+research feeds. Writing one now would jump the same gate twice.
 
 **Removal surface, counted from the tree.** A caution first, because it bit this research three
 times: `grep -rli tempo kubernetes/` returns **94** files, but "tempo" matches inside both
@@ -574,7 +596,7 @@ upstream advises keeping at least 20% free.
 - [x] **Context7 audit** complete; footer date updated
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
-- [ ] Owner sign-off: **ready for RFC**
+- [x] Owner sign-off: **ready for RFC** — 2026-08-24, with the three-store shape
 
 ---
 

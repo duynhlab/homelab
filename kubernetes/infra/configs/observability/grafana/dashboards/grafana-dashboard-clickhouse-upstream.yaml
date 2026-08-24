@@ -1,0 +1,110 @@
+# Vendored from grafana/clickhouse-datasource, src/dashboards (RFC-0027).
+#
+# Why vendored and not imported from the datasource's Dashboards tab: importing
+# through the UI bakes the template variable's *current* value into the saved
+# JSON, so the dashboard arrives carrying the datasource uid of whatever Grafana
+# exported it. That is how `_hAsuzBnz` ended up pointing at uid `y-Ka8y37k` and
+# failing the K5.7 audit row. Read from git, the `datasource` variable resolves
+# fresh on every load, and this platform has exactly one
+# grafana-clickhouse-datasource — so no uid rewriting is needed at all.
+#
+# NOT vendored: src/dashboards/system-dashboards.json. It references
+# `${the_datasource}` while declaring no templating variable at all, and carries
+# no dashboard uid — broken as shipped. Our own clickhouse-server-engine.json
+# covers that ground instead.
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: ch-cluster-analysis
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-ch-cluster-analysis
+    key: cluster-analysis.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: ch-data-analysis
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-ch-data-analysis
+    key: data-analysis.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: ch-otel-logs-explorer
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-ch-otel-logs-explorer
+    key: otel-logs-explorer.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: ch-otel-service-dashboard
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-ch-otel-service-dashboard
+    key: otel-service-dashboard.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: ch-otel-traces-explorer
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-ch-otel-traces-explorer
+    key: otel-traces-explorer.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: ch-query-analysis
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "ClickHouse"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-ch-query-analysis
+    key: query-analysis.json

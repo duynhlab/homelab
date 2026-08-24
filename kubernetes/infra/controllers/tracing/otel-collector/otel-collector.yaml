@@ -74,8 +74,10 @@ spec:
           # OTLP logs sink (RFC-0014 P4): the 10 Go services' + 2 workers' otelzap tee posts
           # OTLP logs here; re-export to VictoriaLogs. VL-Stream-Fields makes
           # service.name the log-stream identity; trace_id stays a queryable
-          # regular field. Envoy Gateway access logs go to stdout and ride the
-          # Vector DaemonSet instead of OTLP.
+          # regular field. Envoy Gateway access logs arrive here too since
+          # ADR-060 (service.name=platform.envoy-gateway); their JSON keys are
+          # log-record ATTRIBUTES, not a body, so VictoriaLogs shows no _msg for
+          # them -- query by stream, not free text.
           logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
           headers:
             VL-Stream-Fields: "service.name"

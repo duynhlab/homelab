@@ -12,7 +12,7 @@ external request passes through before it reaches a service.
 | Cluster config | `kubernetes/infra/configs/envoy-gateway/` — Kubernetes provider, 2 replicas, NodePort 30080/30443 |
 | Local config | `local-stack/gateway/eg/` — standalone provider, one Envoy child process, published on `:8080`; `envoyproxy/gateway:v1.9.0` (bumps ride the compose E2E audit) |
 | Edge authentication | `SecurityPolicy.jwt` with `remoteJWKS` against **two realms**: `duynhlab` (customer `/private/` surfaces) and `duynhlab-staff` (Backoffice `/protected/` surfaces, ADR-050); no key material in git |
-| Edge telemetry | OTLP **gRPC** traces, JSON access log on stdout, Prometheus stats endpoint |
+| Edge telemetry | OTLP **gRPC** traces, JSON access log on **two** sinks — stdout (`File`) and OTLP to the collector ([ADR-060](../proposals/adr/ADR-060-envoy-access-log-transport/)) — Prometheus stats endpoint |
 | Edge `service.name` in traces | Derived as `<gateway>.<namespace>` — locally `platform.envoy-gateway-system` |
 | Verified | Local edge end-to-end on 2026-08-12: root span, trace continuity, access log field set, edge JWT 401/200 |
 | Cluster status | **Reconciled on Kind** during the RFC-0024 bring-up — #791 fixed two runtime defects against the live edge (CRD delivery, data-plane node placement); the full end-to-end Kind gate pass (K-rows) is still pending |

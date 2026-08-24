@@ -154,8 +154,13 @@ flowchart LR
     class VMS0 metric;
 ```
 
-The edge has **no OTLP logs path** — its only log output is the JSON access
-log on stdout, tailed by Vector (see [../logging/README.md](../logging/README.md)).
+Since [ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/) the edge
+has **two** access-log sinks: `OpenTelemetry` to the collector, so its lines join
+the same `logs` pipeline as application logs and reach both stores, and `File` to
+stdout, so `kubectl logs` on the edge pod still works. Vector no longer tails
+those pods — the `platform.duynhlab.dev/otlp-logs=true` label on them is what
+stops it, and without that label VictoriaLogs would hold every edge line twice
+(see [../logging/README.md](../logging/README.md)).
 
 The metrics path in full (live per RFC-0014 P1–P4):
 

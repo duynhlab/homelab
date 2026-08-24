@@ -5,7 +5,8 @@ The **logs pillar** of the platform — the "**why is it broken?**" signal
 profiles "which line of code?"; see [`../README.md`](../README.md)). Logs reach
 VictoriaLogs by **two complementary paths**: instrumented Go services ship over
 **OTLP** (otelzap → OpenTelemetry Collector), and everything not OTel-instrumented
-(databases, the edge's access log, the frontend, system pods) is tailed by **Vector**.
+(databases, the frontend, system pods) is tailed by **Vector**. The edge left that road in
+ADR-060 — see [Edge access logs](#edge-access-logs-two-sinks-one-road).
 Both land in **VictoriaLogs**, queryable with LogsQL and correlated to traces by
 `trace_id`. The OTLP path additionally writes to **ClickHouse** `otel_logs` — a second
 store on purpose, for 90-day SQL ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/));
@@ -14,7 +15,7 @@ see [ClickHouse](../clickhouse/README.md).
 | | |
 |---|---|
 | **App-log path** | otelzap tee → OTLP (`otlploghttp`) → **OpenTelemetry Collector** → VictoriaLogs (fleet-wide since RFC-0014 P4) |
-| **Infra-log path** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source — DBs, the edge's access log, PG `auto_explain`, frontend, system pods |
+| **Infra-log path** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source — DBs, PG `auto_explain`, frontend, system pods. **Not** the edge (ADR-060) |
 | **Storage** | VictoriaLogs **VLSingle** `:9428` (`monitoring`, VM Operator CRD) — 7-day retention, 20Gi PVC |
 | **Query** | LogsQL (VictoriaLogs) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
@@ -44,11 +45,11 @@ The platform has **two log paths**, and the OTLP one lands in **two stores**:
   gets its own stream and **`trace_id` is a first-class queryable field**. This is
   the fleet-wide path since RFC-0014 P4.
 - **Infra path (Vector).** Everything **not** OTel-instrumented — databases
-  (CloudNativePG, incl. parsed **`auto_explain`** query plans), the edge's access log,
+  (CloudNativePG, incl. parsed **`auto_explain`** query plans),
   the frontend, and system pods — is tailed by a single **Vector** DaemonSet and
-  shipped over the jsonline endpoint. Vector explicitly **excludes the app pods**
-  (they carry `platform.duynhlab.dev/otlp-logs=true`), so the two paths never
-  double-ingest.
+  shipped over the jsonline endpoint. Vector explicitly **excludes the app pods
+  and the Envoy pods** (all of them carry `platform.duynhlab.dev/otlp-logs=true`),
+  so the two paths never double-ingest.
 
 VictoriaLogs is the **ops** log backend and the only one Vector writes to (Loki was
 removed). It is **not** the only log store: the collector's `logs` pipeline also exports to
@@ -106,14 +107,34 @@ collector is deployed), so Vector remains the single agent for that path. App po
 (`platform.duynhlab.dev/otlp-logs=true`), which is the double-ingest guard.
 Pipeline internals, sink headers, and stream definitions are below in [Platform pipeline](#platform-pipeline).
 
-### Edge access logs (single path)
+### Edge access logs (two sinks, one road)
 
-The edge feeds Vector by a **single** path: `EnvoyProxy.spec.telemetry.accessLog`
-writes a JSON access log to stdout, and Vector tails it like any other
-non-instrumented workload. The edge has **no OTLP logs path** — its only
-telemetry export to the collector is the OTLP/gRPC trace span (see
-[../opentelemetry/README.md](../opentelemetry/README.md)). Field names are a
-parse contract for Vector sources and Grafana panels: `time`, `client`,
+`EnvoyProxy.spec.telemetry.accessLog` declares **one format and two sinks**
+([ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/)):
+
+| Sink | Destination | Why it exists |
+|------|-------------|---------------|
+| `OpenTelemetry` | collector `:4317` → VictoriaLogs **and** ClickHouse | puts edge logs in the 90-day store, so SQL can relate edge behaviour to application spans on `trace_id` |
+| `File` | `/dev/stdout` | `kubectl logs` on the edge pod keeps working — the fallback that survives the collector being the broken thing |
+
+**Vector no longer tails the Envoy pods.** They carry
+`platform.duynhlab.dev/otlp-logs=true`, the selector Vector's `kubernetes_logs`
+source excludes. That label is load-bearing: remove it and VictoriaLogs silently
+holds every edge line twice. stdout keeps being *written* either way — Vector
+stops *reading*, which is why `kubectl logs` is unaffected.
+
+**Querying edge logs is not free-text.** The JSON format maps its keys to log
+record **attributes** rather than a body, so VictoriaLogs renders `_msg` as
+`missing _msg field` and a free-text search returns nothing. Query by stream:
+
+```logsql
+_stream:{"service.name"="platform.envoy-gateway"} _time:15m
+```
+
+Every field is there, plus `k8s.pod.name`, `k8s.namespace.name`, `cluster_name`
+and `log_name=otel_envoy_accesslog`, which Envoy Gateway attaches on its own.
+
+Field names are a parse contract for Grafana panels: `time`, `client`,
 `method`, `uri`, `status`, `response_flags`, `bytes`, `duration`,
 `upstream_time`, `upstream`, `upstream_cluster`, `route_name`, `host`,
 `request_id`, `user_agent`. Config:
@@ -505,4 +526,9 @@ If Vector is consuming too much memory:
 
 ---
 
-_Last updated: 2026-08-13 — platform infra hub; app contract → docs/api/logs.md — dual-path logging: app logs over OTLP (otelzap → OpenTelemetry Collector → VictoriaLogs, `VL-Stream-Fields: service.name`, fleet-wide since RFC-0014 P4) + Vector DaemonSet for non-instrumented workloads (DBs, the edge's access log, PG `auto_explain`, frontend); the edge has no OTLP logs path — its only log output is the JSON access log on stdout; VictoriaLogs VLSingle `:9428` (7d/20Gi), LogsQL, `trace_id` ↔ Tempo; Loki removed._
+_Last updated: 2026-08-24 — the edge is no longer Vector's: ADR-060 (RFC-0027 P6) added an
+**OpenTelemetry** access-log sink beside the `File` one, so edge logs now reach VictoriaLogs
+*and* ClickHouse over the same road as application logs, and the Envoy pods carry
+`platform.duynhlab.dev/otlp-logs=true` so Vector stops tailing them. Also corrected here: the
+old footer still claimed `trace_id ↔ Tempo`, a store retired by RFC-0027 — the pivot is to
+VictoriaTraces._

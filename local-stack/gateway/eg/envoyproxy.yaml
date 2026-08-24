@@ -122,9 +122,30 @@ spec:
           # seeing every request — probes included — is what makes a failed
           # audit row diagnosable.
           sinks:
+            # Two destinations, ONE format: both sinks sit in the same
+            # settings[] entry so stdout and OTLP describe the same requests in
+            # the same shape.
             - type: File
               file:
                 path: /dev/stdout
+            # ADR-060, mirroring the cluster: edge logs ride the same road as
+            # application logs, so they reach VictoriaLogs *and* ClickHouse.
+            # `kind: Backend` for the same reason the tracing provider below
+            # uses it -- standalone mode has no Kubernetes Services.
+            - type: OpenTelemetry
+              openTelemetry:
+                backendRefs:
+                  - group: gateway.envoyproxy.io
+                    kind: Backend
+                    name: otel-collector
+                    port: 4317
+                # REQUIRED, not decoration: the collector exports logs with
+                # `VL-Stream-Fields: "service.name"`, so without this the edge's
+                # log-stream identity in VictoriaLogs is empty. Same value the
+                # edge's TRACES carry (<gateway>.<namespace>), so an edge log and
+                # an edge span share one identity.
+                resourceAttributes:
+                  service.name: platform.envoy-gateway
 
     tracing:
       # PERCENT (0–100), not a 0–1 fraction: 100 means every request.

@@ -17,7 +17,7 @@ GitOps (Flux).
 Since RFC-0014 the 10 Go services plus order-worker and checkout-worker
 **push** all three signals over OTLP to one OpenTelemetry Collector, which fans
 each out to its backend. Vector
-is the side path for everything without an OTel SDK (databases, the edge's access log,
+is the side path for everything without an OTel SDK (databases,
 Postgres query plans, the frontend). Profiles push straight to Pyroscope.
 
 ```mermaid
@@ -369,7 +369,7 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace store, 7d — OTLP HTTP ingest + the **Jaeger query API** Grafana reads |
 | OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (VictoriaTraces + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, 7d ops tier — ClickHouse `otel_logs` is the 90d second store) |
-| Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, the edge's access log, PG plans, frontend); app logs go OTLP |
+| Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, PG plans, frontend); app logs **and the edge's access log** go OTLP ([ADR-060](../proposals/adr/ADR-060-envoy-access-log-transport/)) |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
 | Sloth | monitoring | operator | -- | SLO-to-PrometheusRule generator |
 

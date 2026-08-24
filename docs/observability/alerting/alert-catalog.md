@@ -49,7 +49,7 @@ error forward a fourth time.
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
-| [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 10 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
+| [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 68 (generated) | Error-budget burn across all 11 services + Keycloak (10 HTTP × 3 SLOs + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs) |
 
@@ -398,11 +398,12 @@ Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watchi
 
 ## 8. Temporal / Pyroscope / Watchdog
 
-Source: `prometheusrules/observability/pyroscope-alerts.yaml`, `prometheusrules/observability/otel-collector-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
+Source: `prometheusrules/observability/pyroscope-alerts.yaml`, `prometheusrules/observability/otel-collector-alerts.yaml`, `prometheusrules/observability/policy-reporter-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
 | PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m |
+| PolicyReporterDown | warning | `up{job=~".*policy-reporter.*"}==0` | `kyverno.duynh.me` and the policy metrics unavailable; enforcement and report writing unaffected — fall back to `kubectl get policyreport -A` | 10m |
 | TemporalServerDown | critical | `up{temporal}==0` | Durable workflows halt — order fulfilment blocked | 5m |
 | TemporalServiceErrorRateHigh | warning | `service_error_with_type`/`service_requests` >5% | Clients can't submit/query workflows | 10m |
 | TemporalPersistenceErrorRateHigh | warning | `persistence_error_with_type`/`persistence_requests` >2% | Workflow state not persisting — data risk | 10m |

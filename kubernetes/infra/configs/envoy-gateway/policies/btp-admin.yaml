@@ -129,3 +129,23 @@ spec:
             requests: 600
             unit: Minute
           xRateLimitHeaders: DraftVersion03
+---
+# policy-reporter: Policy Reporter UI
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: btp-admin
+  namespace: policy-reporter
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: policy-reporter-ui
+  rateLimit:
+    type: Local
+    local:
+      rules:
+        - limit:
+            requests: 600
+            unit: Minute
+          xRateLimitHeaders: DraftVersion03

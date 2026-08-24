@@ -1,0 +1,15 @@
+# Policy Reporter Helm repository — the read side of Kyverno.
+# Kyverno writes PolicyReport / ClusterPolicyReport resources; Policy Reporter
+# aggregates them, exposes Prometheus metrics, and (with the UI enabled) gives
+# them a browsable surface. The Kyverno *plugin* is what turns a bare report row
+# into the policy and rule behind it.
+# https://kyverno.github.io/policy-reporter-docs/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: policy-reporter
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://kyverno.github.io/policy-reporter

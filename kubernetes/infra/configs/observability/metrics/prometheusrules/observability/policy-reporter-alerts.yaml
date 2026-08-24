@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-policy-reporter-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    # Liveness of the read side of Kyverno. `warning`, not `critical`: nothing on
+    # the request path depends on this, and policy ENFORCEMENT is unaffected if it
+    # is down -- Kyverno keeps admitting and keeps writing PolicyReports, they
+    # just stop being browsable. Escalating it would page for a lost dashboard.
+    #
+    # Its own file, following the lesson otel-collector-alerts.yaml was created
+    # from: one alert per file, so retiring a component cannot silently delete a
+    # neighbour's alert that happened to share the YAML.
+    - name: observability-policy-reporter
+      interval: 30s
+      rules:
+        - alert: PolicyReporterDown
+          expr: up{job=~".*policy-reporter.*"} == 0
+          for: 10m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "Policy Reporter is down ({{ $labels.instance }})"
+            description: "Policy Reporter target {{ $labels.instance }} (job {{ $labels.job }}) has been down for more than 10 minutes — Kyverno PolicyReports are still being written and policy enforcement is unaffected, but kyverno.duynh.me and the policy metrics are unavailable. Fall back to `kubectl get policyreport -A`."

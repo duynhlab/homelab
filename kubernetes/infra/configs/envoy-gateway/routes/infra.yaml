@@ -1,4 +1,4 @@
-# Infrastructure routes — one HTTPRoute per admin surface (3 routes total).
+# Infrastructure routes — one HTTPRoute per admin surface (4 routes total).
 # Each carries:
 #   - CIDR fence       -> policies/security-admin-cidr.yaml
 #   - admin rate limit -> policies/btp-admin.yaml
@@ -111,3 +111,48 @@ spec:
       backendRefs:
         - name: openbao-ui
           port: 8200
+
+---
+# Policy Reporter UI — kyverno.duynh.me
+# The browsable side of Kyverno's PolicyReports. An admin surface like its
+# siblings here, so it carries the same CIDR fence + admin rate limit
+# (policies/security-admin-cidr.yaml, policies/btp-admin.yaml) -- and those
+# target same-namespace routes only, which is why both files gained a
+# policy-reporter block rather than an entry in the monitoring one.
+#
+# Not rendered by the chart's own httproute.enabled: route ownership stays in
+# this file, and so does the security-headers filter below.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: policy-reporter-ui
+  namespace: policy-reporter
+spec:
+  parentRefs:
+    - name: platform
+      namespace: envoy-gateway
+      sectionName: https
+  hostnames:
+    - kyverno.duynh.me
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Content-Type-Options
+                value: nosniff
+              - name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              - name: X-Frame-Options
+                value: DENY
+              - name: Strict-Transport-Security
+                value: "max-age=31536000; includeSubDomains"
+            remove:
+              - Server
+      backendRefs:
+        - name: policy-reporter-ui
+          port: 8080

@@ -150,3 +150,29 @@ spec:
             - "127.0.0.1/32"
             - "::1/128"
             - "fc00::/7"
+---
+# policy-reporter: Policy Reporter UI
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: admin-cidr-internal
+  namespace: policy-reporter
+spec:
+  mergeType: StrategicMerge
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: policy-reporter-ui
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: allow-internal
+        action: Allow
+        principal:
+          clientCIDRs:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+            - "127.0.0.1/32"
+            - "::1/128"
+            - "fc00::/7"

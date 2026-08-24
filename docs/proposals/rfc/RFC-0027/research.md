@@ -6,7 +6,7 @@
 | **Status** | researching |
 | **Scope** | platform-wide |
 | **Created** | 2026-08-23 |
-| **Last updated** | 2026-08-23 |
+| **Last updated** | 2026-08-24 |
 
 > **Plain-language research.** Written to explain the problem to ourselves before deciding
 > anything. No decision is taken in this file, and no manifest changes belong here.
@@ -193,11 +193,26 @@ maths, and removing their only producer removes them.
 local-stack already solves this a different way. Its collector runs the `span_metrics`
 **connector**, and the compose comment says so explicitly — it *"stands in for Tempo's
 metrics-generator (which produces span_metrics in-cluster)"*. A vendor-neutral replacement is
-therefore already written, already running and already covered by the compose gate; it just
-lives on the other side of the two-gate split.
+therefore already written and already covered by the compose gate.
 
-> **In plain terms:** the replacement for the piece we would be removing is already working in
-> the other environment. Moving it is a port, not a design.
+**Update 2026-08-24 — the span-metrics half is now deployed on the cluster too.** The
+`span_metrics` connector runs in the cluster collector, ported from local-stack so both gates
+emit the same series (`namespace: spanmetrics` → `spanmetrics_calls_total`,
+`spanmetrics_duration_*`), remote-writing to the same vmagent endpoint Tempo's generator uses.
+Tempo still produces its own `traces_spanmetrics_*` in parallel; the names differ, so the two
+producers do not collide and nothing was removed.
+
+**But the service-graph half has no counterpart, and an earlier draft of this file glossed
+over that.** The cluster's Tempo runs *both* processors — `overrides.defaults
+.metrics_generator.processors: [service-graphs, span-metrics]` — while the collector's
+`span_metrics` connector produces span metrics only. Service graphs are a **separate**
+connector, and local-stack does not run one either. So removing Tempo today would still drop
+`traces_service_graph_*`. That is a decision to take, not a detail: nothing consumes those
+series now, so the options are to add the `servicegraph` connector or to accept the loss
+explicitly.
+
+> **In plain terms:** the RED-metrics prerequisite is discharged; the service-graph one is
+> still open, and calling the whole move "a port, not a design" was too generous.
 
 ### Two log roads, and the guard that keeps them apart
 
@@ -275,7 +290,8 @@ telemetry:
 | Trace stores | 5 | 2 — VictoriaTraces + ClickHouse |
 | Log stores | 2 | 2 — unchanged |
 | Metric stores | 1 | 1 — unchanged |
-| Span metrics produced by | Tempo chart metrics-generator | collector `span_metrics` connector |
+| Span metrics produced by | Tempo chart metrics-generator **and** the collector `span_metrics` connector (both, since 2026-08-24) | connector only |
+| Service graphs produced by | Tempo chart metrics-generator only | **undecided** — needs a `servicegraph` connector or an accepted loss |
 | Trace query languages | TraceQL (Tempo), Jaeger-style (VictoriaTraces), SQL (ClickHouse) | TraceQL + LogsQL (VictoriaTraces), SQL (ClickHouse) |
 | Object storage dependency | RustFS — 4 writers | RustFS — 2 writers |
 | Envoy access logs | stdout → Vector → VictoriaLogs | additionally OTLP → collector → both stores |
@@ -408,7 +424,7 @@ flowchart LR
   COL -->|"logs + traces"| CH[("ClickHouse · 90d")]
   COL -->|traces| VT[("VictoriaTraces · 7d")]
   VEC --> VL
-  COL -.->|"planned: span_metrics connector"| VM[("VictoriaMetrics")]
+  COL -->|"span_metrics connector → vmagent"| VM[("VictoriaMetrics")]
 
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
   classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -422,7 +438,7 @@ flowchart LR
   class PG,SYS,SO external;
   class COL,VEC log;
   class VL,CH,VT data;
-  class VM planned;
+  class VM data;
 ```
 
 > **In plain terms:** the collector keeps being the only place that fans out, so each step here
@@ -473,6 +489,12 @@ All four remain open. This file does not choose.
 - [ ] **Measure our own compression and volume.** No figure in this research is ours; a
       `system.parts` query over `otel_logs` and `otel_traces` would give real bytes and real
       ratios.
+- [ ] **Decide the service-graph question** — add the `servicegraph` connector, or accept
+      losing `traces_service_graph_*` when Tempo goes. Nothing consumes them today.
+- [ ] **Give the new series a consumer.** The cluster now produces `spanmetrics_*` and no
+      cluster dashboard reads them — the same producer-without-consumer shape this research
+      criticises Tempo for. local-stack already has `red-spanmetrics.json`; porting it needs the
+      cluster VictoriaMetrics datasource uid, so it is deliberately left out until Kind is up.
 - [ ] **Confirm the log topology stays dual on purpose.** Application logs are stored twice
       today. Keeping that is a decision worth recording rather than leaving as an accident.
 - [ ] **Decide the Envoy access-log transport** — File only, OTel only, or both — and whether
@@ -556,6 +578,7 @@ upstream advises keeping at least 20% free.
 
 ---
 
-_Last verified: 2026-08-23 (Context7 + manifest cross-check at `1a6d471e`). The
+_Last verified: 2026-08-24 (Context7 + manifest cross-check; the `span_metrics` connector
+landed on the cluster after the first revision). The
 `/select/tempo` TraceQL experiment has **not** been run — the Kind cluster is down — and no
 volume or compression figure in this file was measured on this platform._

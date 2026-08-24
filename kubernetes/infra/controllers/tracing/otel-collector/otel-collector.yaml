@@ -30,6 +30,34 @@ spec:
   values:
     affinity: {}
     config:
+      # RFC-0027: derive RED span metrics HERE, in the collector, instead of inside
+      # Tempo. Tempo's metrics-generator is the ONLY live producer today (the raw
+      # install has remote_write: []), which is precisely what made removing Tempo
+      # impossible without losing the series the SLO and Apdex maths consume.
+      #
+      # This is a deliberate port of local-stack's collector so BOTH gates emit the
+      # same series: namespace `spanmetrics` -> spanmetrics_calls_total and
+      # spanmetrics_duration_*. Tempo's generator names its own
+      # traces_spanmetrics_*, so the two producers do NOT collide while both run --
+      # this lands as a parallel producer, and nothing is removed here.
+      connectors:
+        span_metrics:
+          namespace: spanmetrics
+          histogram:
+            explicit:
+              buckets: [1ms, 2ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s]
+          # service.name, span.name, span.kind and status.code are BUILT-IN
+          # dimensions -- listing them again duplicates labels.
+          dimensions:
+            - name: http.method
+            - name: http.route
+          # Preserves the metric -> one-sample-trace jump that Tempo gave us through
+          # send_exemplars: true. Without it a bucket is a dead end.
+          exemplars:
+            enabled: true
+          # Matches Tempo's registry.collection_interval: 15s, so the cadence of the
+          # derived series does not change under the swap.
+          metrics_flush_interval: 15s
       exporters:
         debug:
           sampling_initial: 5
@@ -79,6 +107,18 @@ spec:
           tls:
             insecure: true
           compression: gzip
+        prometheus_remote_write:
+          # RFC-0027: the connector's output takes the SAME vmagent remote-write
+          # endpoint Tempo's metrics-generator already writes to, and the same
+          # exporter local-stack uses. Deliberately NOT the OTLP path used for app
+          # metrics above: the OTLP->Prometheus name translation is a second
+          # variable that cannot be verified while Kind is down, whereas this exact
+          # endpoint is already proven for this exact class of series.
+          endpoint: http://vmagent-victoria-metrics.monitoring.svc.cluster.local:8429/api/v1/write
+          # Without this, service.name is dropped from the derived series and every
+          # per-service RED query loses the label it groups by.
+          resource_to_telemetry_conversion:
+            enabled: true
         clickhouse:
           # RFC-0019 Phase B / ADR-023: long-retention SQL over OTel logs+traces.
           # 5th trace sink + 2nd log sink, fan-out alongside Tempo (raw),
@@ -152,6 +192,7 @@ spec:
             - otlp/jaeger
             - otlp_http/victoriatraces
             - clickhouse
+            - span_metrics
             processors:
             - memory_limiter
             - batch
@@ -175,6 +216,18 @@ spec:
             - batch
             receivers:
             - otlp
+          # RFC-0027: connector-derived RED metrics. NO delta_to_cumulative here --
+          # the connector's aggregation_temporality defaults to cumulative, unlike
+          # the SDK push path above, and running it through that processor would be
+          # a no-op at best.
+          metrics/spanmetrics:
+            exporters:
+            - prometheus_remote_write
+            processors:
+            - memory_limiter
+            - batch
+            receivers:
+            - span_metrics
         telemetry:
           logs:
             level: info

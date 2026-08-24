@@ -39,13 +39,7 @@ spec:
       name: karma
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: jaeger
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
       name: victoriatraces
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: tempo
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: pyroscope

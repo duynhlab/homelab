@@ -23,7 +23,6 @@ resources:
   # Helm Repositories
   - helm/prometheus-community.yaml
   - helm/metrics-server.yaml
-  - helm/jaegertracing.yaml
   - helm/cnpg.yaml
   - helm/grafana.yaml
   - helm/sloth.yaml
@@ -41,3 +40,5 @@ resources:
   - helm/temporalio.yaml
   - helm/altinity.yaml
   - helm/grafana-community.yaml
+# RFC-0027 / ADR-058: the jaegertracing Helm repository retired with Jaeger
+# (helm/jaegertracing.yaml.bak).

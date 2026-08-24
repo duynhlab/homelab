@@ -6,7 +6,7 @@ kind: Kustomization
 # Collector (pipeline). VictoriaTraces and ClickHouse are the other two trace
 # sinks and are delivered by the configs layer, not here.
 resources:
-  - tempo/
-  - tempo-chart/
-  - jaeger/jaeger.yaml
   - otel-collector/otel-collector.yaml
+# RFC-0027 / ADR-058 + ADR-059: Tempo and Jaeger retired. Their manifests stay
+# beside this file as *.yaml.bak — the suffix keeps them out of here and out of
+# `make validate` without commenting the files into unreadability.

@@ -1,0 +1,40 @@
+# SECOND prometheus-type alias, this one pinned to uid `prometheus`.
+#
+# Why a second one: upstream dashboards fetched by URL routinely hardcode
+# `"uid": "prometheus"` inside their panels — not as a `__inputs` placeholder,
+# but as a literal. grafana-operator's `datasources:` remap binds declared
+# __inputs by name and therefore cannot reach those panels. Measured on Kind:
+# cloudnative-pg has literal refs in panels 29/49/50 and flux-cluster in 7
+# panels, and the K5.7 audit row failed on both with "unknown uid prometheus"
+# even though cloudnative-pg already carries a working remap.
+#
+# `prometheus` is the uid the upstream ecosystem assumes, so claiming it once
+# here fixes every such dashboard in one place and keeps them tracking upstream
+# — no vendored JSON to hand-edit and re-sync.
+#
+# manageAlerts is deliberately FALSE: datasource-victoriametrics-prometheus.yaml
+# owns alert management, and two datasources both managing the same vmalert
+# rule groups would surface them twice.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: prometheus-alias-datasource
+  namespace: monitoring
+spec:
+  datasource:
+    access: proxy
+    isDefault: false
+    # Named `Prometheus` on purpose: dashboards that reference the datasource by
+    # NAME rather than uid (their `DS_PROMETHEUS` variable ships
+    # `current.value: "Prometheus"`) resolve through the same alias.
+    name: Prometheus
+    type: prometheus
+    uid: prometheus
+    url: http://vmsingle-victoria-metrics.monitoring.svc:8428
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+      manageAlerts: false
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana

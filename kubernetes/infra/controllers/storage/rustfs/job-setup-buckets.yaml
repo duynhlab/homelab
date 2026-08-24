@@ -20,6 +20,19 @@ kind: Job
 metadata:
   name: rustfs-setup-buckets-init
   namespace: rustfs
+  annotations:
+    # A Job's pod template is IMMUTABLE, so editing the bucket list here makes
+    # Flux's apply fail with "field is immutable" and takes storage-local down
+    # with it -- which then blocks everything that dependsOn it. Hit exactly that
+    # when RFC-0027 removed the two Tempo buckets.
+    #
+    # This is the Flux-native fix (flux.io "running jobs" use case): force lets
+    # the controller delete and recreate the resource when an immutable field
+    # changes. It is set PER RESOURCE on purpose -- `spec.force` on the
+    # Kustomization would extend the same delete-and-recreate semantics to
+    # everything else in storage-local, including RustFS itself, and the Flux
+    # docs warn about exactly that on stateful workloads.
+    kustomize.toolkit.fluxcd.io/force: enabled
 spec:
   backoffLimit: 10
   template:
@@ -39,7 +52,7 @@ spec:
             - |
               set -e
               ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
-              BUCKETS="pg-backups-cnpg tempo-traces tempo-chart-traces pyroscope-profiles"
+              BUCKETS="pg-backups-cnpg pyroscope-profiles"
 
               # Gate on the server actually SERVING, not on the alias being writable.
               # `mc alias set` can return 0 against an endpoint that is not yet backed by a

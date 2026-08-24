@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-24 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | The transport for Envoy Gateway access logs; not their format or content |
@@ -210,3 +210,4 @@ a new ADR that supersedes this one.
 ## History
 
 - **2026-08-24** — created at `Proposed` during RFC-0027 architecture review.
+- **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.

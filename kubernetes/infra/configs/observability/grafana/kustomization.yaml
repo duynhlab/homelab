@@ -5,14 +5,16 @@ resources:
   - grafana.yaml
   - dashboards-chart.yaml
   - datasource-victorialogs.yaml
-  - datasource-tempo.yaml
-  - datasource-jaeger.yaml
   - datasource-victoriatraces.yaml
   - datasource-pyroscope.yaml
   - datasource-clickhouse.yaml
   - datasource-victoriametrics.yaml
   - datasource-victoriametrics-prometheus.yaml
+  - datasource-prometheus-alias.yaml
   # - grafana-service-account-mcp.yaml   # DISABLED with mcp-local (2026-08-21):
   #   this mints a Grafana Viewer token for grafana-mcp. With that server off the
   #   token has no consumer, and an unused credential is worth not minting.
   - dashboards/
+# RFC-0027: the Tempo and Jaeger datasources retired with their deployments
+# (*.yaml.bak). datasource-victoriatraces.yaml STAYS and is still `type: jaeger`
+# — that is VictoriaTraces' query interface, not a Jaeger artefact (ADR-058).

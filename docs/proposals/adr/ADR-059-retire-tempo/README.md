@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-24 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Whether Tempo stays; and where service-graph capability comes from afterwards |
@@ -173,15 +173,33 @@ component.
   cluster and local-stack finally measure the same shape
 - RustFS trace writers 4 → 2, on the component with 11 restarts in 3h12m
 - The ADR-032 → ADR-040 lineage closes with a decision instead of a third proposal
-- **A working service map for the first time**, from one flag on a store we keep
+- **A working service map for the first time**, from one flag on a store we keep —
+  measured at 12 edges, and richer than Tempo's: it includes database dependencies
+  (`checkout → checkout:postgresql`) alongside the service-to-service graph
 - `TempoDown`'s zero-series trap is removed by deletion rather than left latent
 
 ### Negative consequences and accepted trade-offs
 
-- **TraceQL becomes experimental.** VictoriaTraces' Tempo-compatible API requires
-  `v0.9.4+` (we pin `v0.11.0`) but upstream labels it experimental and states that
-  *"certain TraceQL functions and drilldown panels may not be fully supported."*
-  The parity experiment gates this ADR's implementation for that reason
+- **TraceQL becomes experimental, and the gaps are silent.** The P1 experiment
+  (2026-08-24, `v0.11.0`) confirmed single-selector TraceQL and TraceQL metrics work,
+  but `span.`/`span:` scoped attributes and multi-selector or structural queries
+  (`>>`, `>`, `&&` between selectors) return **zero results with HTTP 200**. A
+  deliberately malformed query does the same, so the API has **no error channel**:
+  an unsupported query is indistinguishable from "no trace matched". This is a
+  larger cost than upstream's *"certain TraceQL functions and drilldown panels may
+  not be fully supported"* conveys, and it is the same failure shape this record
+  removes elsewhere — `TempoDown`'s zero series. It is accepted because the queries
+  the platform actually runs are single-selector, and because keeping the
+  Jaeger-type datasource as the primary read path limits exposure to it
+- **`api/search/tags` v1 answers 400**; only the `v2` path works, so a Grafana
+  version that calls v1 will show empty autocomplete
+- **The dependency graph is not retroactive.** The background task runs on a 1
+  minute interval with a 1 minute lookbehind, so it aggregates only what is
+  ingested while it runs. Immediately after enabling the flag the endpoint
+  returned **0 edges** for eleven minutes because no traffic had flowed — the map
+  reads as broken when it is merely empty, the same silent shape as the TraceQL
+  gaps above. Anyone enabling this should generate traffic before concluding
+  anything
 - **Per-edge failure and latency metrics are lost.** The dependency API returns
   `callCount` only. Alerting on "edge A→B is failing" is not expressible until and
   unless the `service_graph` connector is adopted
@@ -204,8 +222,8 @@ component.
 |------------|-------|----------|-------------------|
 | Run the TraceQL parity experiment | `duynhne` | RFC-0027 P1 | A Tempo-type datasource against `/select/tempo` exercised with real queries; failures recorded |
 | Consolidate Tempo knowledge into an archived doc | `duynhne` | this PR | `docs/observability/tracing/tempo.md` exists, banner present, body frozen |
-| Enable `-servicegraph.enableTask` on `vtsingle` | `duynhne` | RFC-0027 P3 | `/select/jaeger/api/dependencies` returns edges |
-| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | A Node Graph renders services and call counts |
+| Enable `-servicegraph.enableTask` on `vtsingle` | `duynhne` | RFC-0027 P3 | **Done 2026-08-24** — the pod runs with `-servicegraph.enableTask=true` and the endpoint returns **12 edges**, including database dependencies (`checkout → checkout:postgresql` 2251, `platform.envoy-gateway → checkout` 425, `checkout → checkout-worker` 421) |
+| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | Still open — the data is there; the panel is not |
 | Document the ClickHouse per-edge query | `duynhne` | RFC-0027 P3 | A `docs/observability/` page carries the self-join with failure and p95 per edge |
 | Retire manifests as `.bak`, drop from kustomizations with comments | `duynhne` | RFC-0027 P4 | `make validate` green; `.bak` files present; comments name this ADR |
 | Delete `TempoDown`, the ServiceMonitor, the dashboard, the datasource, the ExternalSecret, both buckets and the edge route | `duynhne` | RFC-0027 P4 | `scripts/edge-isolation-sweep.sh` clean; RustFS bucket list has two entries fewer |
@@ -260,3 +278,4 @@ a new ADR that supersedes this one.
   service-graph disposition is folded into this record rather than split out, so
   that accepting the Tempo retirement is impossible without answering what happens
   to `traces_service_graph_*`.
+- **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.

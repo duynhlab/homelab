@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-08-23 | 2026-08-24 | 2026-08-24 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-08-23 | 2026-08-24 | 2026-08-24 |
 
 > **Don't forget: every decision is a tradeoff.** This one buys back three of five trace
 > sinks, two RustFS writers and an undecided ADR lineage. It pays by making a **pre-GA**
@@ -15,9 +15,9 @@
 - Context7 audit complete (see research footer)
 - Owner approved **ready for RFC** — 2026-08-24, with the three-store shape
 - Mechanism deep-dive is **not** repeated here — see [`./research.md`](./research.md)
-- ADR folders: [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/),
+- ADR folders (all `Accepted` 2026-08-24): [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/),
   [`ADR-058`](../../adr/ADR-058-retire-jaeger/), [`ADR-059`](../../adr/ADR-059-retire-tempo/),
-  [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) — all at `Proposed`
+  [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/)
 - `docs/api/` files to touch: **N/A — infra-only.** No route, RPC or payload changes; the
   observability pages under [`docs/observability/`](../../../observability/README.md) carry the
   as-built description instead
@@ -285,14 +285,14 @@ returns to the table.
 ## Resulting decisions
 
 Four independent decisions, all created at `Proposed` during architecture review per the flow
-in [`../README.md`](../README.md). They become `Accepted` with this RFC, not before.
+in [`../README.md`](../README.md). All four are `Accepted` as of 2026-08-24, on the evidence of the P1 experiment.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Retire both Tempo installs, resolving the ADR-032 → ADR-040 lineage rather than extending it; service graphs come from VictoriaTraces' dependency API | [`ADR-059`](../../adr/ADR-059-retire-tempo/) | Proposed |
-| Retire Jaeger while keeping the Jaeger **datasource type** that VictoriaTraces is queried through | [`ADR-058`](../../adr/ADR-058-retire-jaeger/) | Proposed |
-| Derive RED span metrics in the collector rather than inside a trace backend — **already implemented** in #878, ahead of this gate | [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/) | Proposed · Adoption `Partial` |
-| Send Envoy access logs over an OpenTelemetry sink in addition to stdout, with the `otlp-logs` label closing the double count | [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) | Proposed |
+| Retire both Tempo installs, resolving the ADR-032 → ADR-040 lineage rather than extending it; service graphs come from VictoriaTraces' dependency API | [`ADR-059`](../../adr/ADR-059-retire-tempo/) | Accepted |
+| Retire Jaeger while keeping the Jaeger **datasource type** that VictoriaTraces is queried through | [`ADR-058`](../../adr/ADR-058-retire-jaeger/) | Accepted |
+| Derive RED span metrics in the collector rather than inside a trace backend — **already implemented** in #878, ahead of this gate | [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/) | Accepted · Adoption `Partial` |
+| Send Envoy access logs over an OpenTelemetry sink in addition to stdout, with the `otlp-logs` label closing the double count | [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) | Accepted |
 
 The first depends on the third: retiring Tempo without a span-metrics producer removes series
 the SLO maths consumes. The other two stand alone.
@@ -304,6 +304,7 @@ the SLO maths consumes. The other two stand alone.
 - **2026-08-24** — P0 groundwork landed ahead of the gate: the `span_metrics` connector (#878),
   with the reason and rollback condition recorded in the research
 - **2026-08-24** — this README; Status `provisional`, under architecture review
+- **2026-08-24** — P1 TraceQL experiment run on Kind; span-metrics verified at 421 series. RFC → `Accepted`, ADR-057..060 → `Accepted`
 
 ## Related
 

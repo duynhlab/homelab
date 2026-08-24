@@ -8,7 +8,6 @@ resources:
   - grafana-dashboard-slo-overview.yaml
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml
-  - grafana-dashboard-tempo.yaml
   - grafana-dashboard-temporal.yaml
   - grafana-dashboard-cloudnative-pg.yaml
   - grafana-dashboard-pg-query-performance.yaml
@@ -24,10 +23,9 @@ resources:
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
   - grafana-dashboard-clickhouse-server-engine.yaml
-  # ClickHouse per-service deep dive — JSON via configMapGenerator below
-  - grafana-dashboard-clickhouse-deepdive.yaml
-  # ClickHouse standard suite: Overview → Logs Explorer → Trace Explorer
+  # ClickHouse: our Overview + SQL views, then the vendored upstream set
   - grafana-dashboard-clickhouse-suite.yaml
+  - grafana-dashboard-clickhouse-upstream.yaml
   # VictoriaMetrics stack dashboards
   - grafana-dashboard-vmsingle.yaml
   - grafana-dashboard-vmagent.yaml
@@ -53,18 +51,30 @@ configMapGenerator:
   - name: grafana-dashboard-clickhouse-otel-sql
     files:
       - clickhouse-otel-sql.json
-  - name: grafana-dashboard-clickhouse-service-deepdive
-    files:
-      - clickhouse-service-deepdive.json
   - name: grafana-dashboard-clickhouse-otel-overview
     files:
       - clickhouse-otel-overview.json
-  - name: grafana-dashboard-clickhouse-logs-explorer
+  # RFC-0027: vendored from grafana/clickhouse-datasource src/dashboards.
+  # They use a `datasource`-type template variable, and this platform has exactly
+  # one grafana-clickhouse-datasource, so they resolve with no uid rewriting.
+  - name: grafana-dashboard-ch-cluster-analysis
     files:
-      - clickhouse-logs-explorer.json
-  - name: grafana-dashboard-clickhouse-traces-explorer
+      - cluster-analysis.json
+  - name: grafana-dashboard-ch-data-analysis
     files:
-      - clickhouse-traces-explorer.json
+      - data-analysis.json
+  - name: grafana-dashboard-ch-otel-logs-explorer
+    files:
+      - otel-logs-explorer.json
+  - name: grafana-dashboard-ch-otel-service-dashboard
+    files:
+      - otel-service-dashboard.json
+  - name: grafana-dashboard-ch-otel-traces-explorer
+    files:
+      - otel-traces-explorer.json
+  - name: grafana-dashboard-ch-query-analysis
+    files:
+      - query-analysis.json
   - name: grafana-dashboard-cutover-baseline
     files:
       - cutover-baseline.json
@@ -102,3 +112,4 @@ configMapGenerator:
 
 generatorOptions:
   disableNameSuffixHash: true
+# RFC-0027 / ADR-059: the Tempo dashboard retired with Tempo (*.yaml.bak).

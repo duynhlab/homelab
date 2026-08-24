@@ -15,6 +15,16 @@ metadata:
   namespace: monitoring
 spec:
   retentionPeriod: "7d"
+
+  # RFC-0027 / ADR-059: serves the Jaeger service-dependency graph at
+  # /select/jaeger/api/dependencies, which Grafana's `jaeger` datasource renders
+  # natively through its Dependency graph query type. Without this flag the
+  # endpoint answers 200 with an empty array (measured 2026-08-24), so the
+  # service map would read as broken rather than as switched off. This replaces
+  # Tempo's service-graphs processor — topology and call counts, not per-edge
+  # failure or latency; for those, query the spans in ClickHouse.
+  extraArgs:
+    servicegraph.enableTask: "true"
   # removePvcAfterDelete removed: VTSingleSpec (operator v1) never defined it —
   # the API server pruned it silently (VMSingle-only field, caught by the
   # CRDs-catalog schema check in flux-validate.sh).

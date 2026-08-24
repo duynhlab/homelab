@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-24 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Where RED span metrics are produced, and how they reach VictoriaMetrics |
@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | #878 (landed ahead of the RFC gate — see History) |
-| **Adoption** | Partial — manifest landed on the cluster path; no series observed, Kind is down |
+| **Adoption** | Partial — **verified on Kind 2026-08-24**: 421 `spanmetrics_calls_total` and 5473 duration-bucket series, collector 0 restarts. Still no consumer reads them |
 
 ## Context
 
@@ -180,7 +180,7 @@ the naming question does not arise at all.
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
 | Connector + `metrics/spanmetrics` pipeline + remote-write exporter | `duynhne` | #878 | **Done** — merged 2026-08-24 |
-| Verify the series exist and carry the service label | `duynhne` | RFC-0027 P1 window | `count by (service_name) (spanmetrics_calls_total)` returns rows on the cluster |
+| Verify the series exist and carry the service label | `duynhne` | RFC-0027 P1 window | **Done 2026-08-24** — 421 series, grouped by `service_name`; the four metric names match local-stack exactly, confirming the remote-write choice over the OTLP path |
 | Give the series a consumer | `duynhne` | RFC-0027 | A cluster dashboard reads `spanmetrics_*`; porting local-stack's `red-spanmetrics.json` needs the cluster VictoriaMetrics datasource uid |
 | Re-derive the K5.5 audit row | `duynhne` | RFC-0027 P5 | K5.5 no longer reads *N/A on the cluster* |
 | Update service contracts | — | N/A — infra-only | No route, RPC or payload changes |
@@ -229,3 +229,4 @@ a new ADR that supersedes this one.
   recorded in the RFC research at the time; this ADR is the record catching up to
   the implementation, not the other way around.
 - **2026-08-24** — created at `Proposed` during RFC-0027 architecture review.
+- **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.

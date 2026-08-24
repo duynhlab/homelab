@@ -89,7 +89,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(envoy_http_downstream_rq_total{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"}[$__rate_interval]))",
+          "expr": "sum(rate(envoy_http_downstream_rq_total{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"}[$__rate_interval]))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -149,7 +149,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\",envoy_response_code_class=\"5\"}[$__rate_interval])) / sum(rate(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"}[$__rate_interval]))",
+          "expr": "sum(rate(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\",envoy_response_code_class=\"5\"}[$__rate_interval])) / sum(rate(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"}[$__rate_interval]))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -217,7 +217,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"}[$__rate_interval])))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -285,7 +285,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "1 - (sum(increase(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\",envoy_response_code_class=\"5\"}[$__range])) / sum(increase(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"}[$__range])))",
+          "expr": "1 - (sum(increase(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\",envoy_response_code_class=\"5\"}[$__range])) / sum(increase(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"}[$__range])))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -457,7 +457,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (envoy_response_code_class) (rate(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\",envoy_response_code_class=~\"4|5\"}[$__rate_interval]))",
+          "expr": "sum by (envoy_response_code_class) (rate(envoy_http_downstream_rq_xx{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\",envoy_response_code_class=~\"4|5\"}[$__rate_interval]))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -546,7 +546,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"}[$__rate_interval])))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -555,7 +555,7 @@
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"}[$__rate_interval])))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -564,7 +564,7 @@
         },
         {
           "refId": "C",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(envoy_http_downstream_rq_time_bucket{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"}[$__rate_interval])))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -858,7 +858,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(envoy_http_downstream_cx_active{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"http-.*\"})",
+          "expr": "sum(envoy_http_downstream_cx_active{job=\"envoy-gateway\",envoy_http_conn_manager_prefix=~\"https?-.*\"})",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1897,7 +1897,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (pod) (kube_pod_container_status_restarts_total{namespace=\"envoy-gateway-system\"})",
+          "expr": "sum by (pod) (kube_pod_container_status_restarts_total{exported_namespace=\"envoy-gateway\"})",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
@@ -1906,7 +1906,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"envoy-gateway-system\"}[$__rate_interval]))",
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"envoy-gateway\"}[$__rate_interval]))",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"

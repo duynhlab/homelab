@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-24 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Whether Tempo stays; and where service-graph capability comes from afterwards |
@@ -178,10 +178,19 @@ component.
 
 ### Negative consequences and accepted trade-offs
 
-- **TraceQL becomes experimental.** VictoriaTraces' Tempo-compatible API requires
-  `v0.9.4+` (we pin `v0.11.0`) but upstream labels it experimental and states that
-  *"certain TraceQL functions and drilldown panels may not be fully supported."*
-  The parity experiment gates this ADR's implementation for that reason
+- **TraceQL becomes experimental, and the gaps are silent.** The P1 experiment
+  (2026-08-24, `v0.11.0`) confirmed single-selector TraceQL and TraceQL metrics work,
+  but `span.`/`span:` scoped attributes and multi-selector or structural queries
+  (`>>`, `>`, `&&` between selectors) return **zero results with HTTP 200**. A
+  deliberately malformed query does the same, so the API has **no error channel**:
+  an unsupported query is indistinguishable from "no trace matched". This is a
+  larger cost than upstream's *"certain TraceQL functions and drilldown panels may
+  not be fully supported"* conveys, and it is the same failure shape this record
+  removes elsewhere — `TempoDown`'s zero series. It is accepted because the queries
+  the platform actually runs are single-selector, and because keeping the
+  Jaeger-type datasource as the primary read path limits exposure to it
+- **`api/search/tags` v1 answers 400**; only the `v2` path works, so a Grafana
+  version that calls v1 will show empty autocomplete
 - **Per-edge failure and latency metrics are lost.** The dependency API returns
   `callCount` only. Alerting on "edge A→B is failing" is not expressible until and
   unless the `service_graph` connector is adopted
@@ -260,3 +269,4 @@ a new ADR that supersedes this one.
   service-graph disposition is folded into this record rather than split out, so
   that accepting the Tempo retirement is impossible without answering what happens
   to `traces_service_graph_*`.
+- **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.

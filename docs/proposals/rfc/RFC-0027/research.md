@@ -511,6 +511,71 @@ All four remain open. This file does not choose.
 - [ ] **Measure our own compression and volume.** No figure in this research is ours; a
       `system.parts` query over `otel_logs` and `otel_traces` would give real bytes and real
       ratios.
+### P1 result — the TraceQL parity experiment, run 2026-08-24
+
+Run against the deployed `victoriametrics/victoria-traces:v0.11.0` on Kind, with **15 services**
+reporting traces after a k6 load run. Queries went to `/select/tempo/api/search`.
+
+| TraceQL | Result |
+|---------|--------|
+| `{}` · `{ resource.service.name = "checkout" }` · `{ name =~ ".*product.*" }` · `{ status = error }` · `{ duration > 10ms }` · `&&` **within one** selector | **works** — 100 / 16 / 26 / 22 / 100 / 14 traces |
+| `{} \| rate()` — TraceQL **metrics** | **works** — real series and samples returned |
+| trace-by-ID · `api/v2/search/tags` · tag values | **works** — 200 |
+| `{ span.duration > 5ms }` · `{ span:duration > 5ms }` · `{ span:name != "" }` | **0 results, silently** |
+| `>>` · `>` · `&&` **between two** selectors | **0 results, silently** — although `product` (27) and `platform.envoy-gateway` (100) each match alone |
+| `api/search/tags` (v1) | **400** — only the `v2` path answers |
+
+**The finding that matters is not the gap; it is how the gap reports itself.** A deliberately
+malformed query — `q={ this is not traceql` — also returns **HTTP 200 with `{"traces": []}`**.
+The API has no error channel: anything it cannot parse or does not implement comes back as an
+empty result, indistinguishable from *"no trace matched"*.
+
+> **In plain terms:** an unsupported query does not fail, it returns nothing — and nothing looks
+> exactly like a healthy answer.
+
+That is the same failure shape this research criticises in `TempoDown`: a panel reads "all clear"
+when the truth is "the question was never asked". Upstream's *"certain TraceQL functions and
+drilldown panels may not be fully supported"* does not convey that, so it is recorded explicitly
+in [ADR-059](../../adr/ADR-059-retire-tempo/).
+
+**It does not sink the decision.** Single-selector TraceQL — what day-to-day queries use — works,
+and so does TraceQL metrics. What is lost is structural search, scoped intrinsics, and the
+ability to *notice* they are lost.
+
+### Measured on the same run
+
+**[ADR-057](../../adr/ADR-057-span-metrics-in-collector/)'s connector works, and its riskiest
+assumption is now verified rather than assumed.** Queried from VictoriaMetrics:
+
+| Series | Count |
+|--------|------:|
+| `spanmetrics_calls_total` | **421** |
+| `spanmetrics_duration_milliseconds_bucket` | **5473** |
+| `traces_spanmetrics_calls_total` (Tempo, in parallel) | 458 |
+| `traces_service_graph_request_total` (Tempo) | **32 edges** |
+
+All four connector metric names are present — `spanmetrics_calls_total`,
+`spanmetrics_duration_milliseconds_{bucket,count,sum}` — and they are **exactly** the names
+local-stack's `red-spanmetrics.json` reads. ADR-057 chose remote-write over the OTLP metrics path
+specifically to avoid an untestable naming risk; that reasoning is now confirmed by measurement,
+not left as a plausible argument. The collector has **0 restarts** and no remote-write errors —
+the runtime check `make validate` cannot perform.
+
+Tempo's own series run beside them without collision, as ADR-057 predicted. And the 32
+`traces_service_graph_request_total` edges are the concrete thing ADR-059 gives up: real series,
+produced continuously, read by nothing.
+
+**The dependency endpoint needs its flag, and fails silently without it.**
+`/select/jaeger/api/dependencies` returns `{"data":[],"total":0}` — HTTP 200, empty — while
+`-servicegraph.enableTask` is unset. A Grafana Dependency graph panel would therefore render an
+empty graph with no error until that flag is set. Same silent-failure shape as the TraceQL gaps
+above, and worth knowing before anyone concludes the service map "does not work".
+
+Load used to generate this: `make e2e-load GATE=kind` — 2 orders/s for 30s, 6 confirmed, 55
+rejected (seeded stock exhaustion), `order_fulfillment` backlog peak 0.
+
+---
+
 - [ ] **Give the new series a consumer.** The cluster now produces `spanmetrics_*` and no
       cluster dashboard reads them — the same producer-without-consumer shape this research
       criticises Tempo for. local-stack already has `red-spanmetrics.json`; porting it needs the

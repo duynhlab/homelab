@@ -5,7 +5,7 @@ Auth turns credentials into short-lived RS256 access tokens and rotating refresh
 > **Archived — RFC-0024 P5 executed. Kept deliberately as learning
 > material.** This service no longer exists anywhere:
 > the identity cutover (P3) moved every consumer to the Keycloak realm
-> (`OIDC_*`, [api.md § Authentication](./api.md#authentication)), and P5
+> (`OIDC_*`, [identity.md](./identity.md) — the live replacement contract), and P5
 > deleted the entire cluster surface — app manifest, `auth` namespace, the
 > `auth` database triplet on platform-db, the `auth-jwt-signing`
 > ExternalSecret, the NetworkPolicy, and the `api-auth-public` edge route.
@@ -305,4 +305,4 @@ Paths in [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service). Tr
 - [RFC-0009: RS256 JWT and edge authentication](../proposals/rfc/RFC-0009/)
 - [ADR-006: Kong edge JWT](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) · [ADR-017: collection-noun migration](../proposals/adr/ADR-017-api-path-collection-noun/)
 
-_Last updated: 2026-08-12 — header note only: consumers verify the Keycloak realm as of RFC-0024 P3; full archive lands with P5._
+_Last updated: 2026-08-24 — the banner and this footer disagreed: P5 has executed, so the archive is complete rather than pending. The live replacement contract is [identity.md](./identity.md)._

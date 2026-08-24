@@ -244,6 +244,9 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Proposed inside the RFC-0022/RFC-0024 review |
 | 2026-08-11 | Accepted / Not started | Accepted with the RFC-0024 program review (this PR); numbering assigned 041–043 because ADR-039/040 were consumed by unrelated decisions |
+| 2026-08-12 | Accepted / Partial | Local-stack cut over (#752): the string subject verified to the column in the compose audit (A16) |
+| 2026-08-13 | Accepted / Partial | Fleet pinned to the cutover tags (#756) — five INTEGER columns, the notification and payment protos, `pkg/idempotency` and Temporal inputs all carry the string `sub`. Adoption recorded in #757 |
+| 2026-08-24 | Accepted / Partial | Contract documented in [`docs/api/identity.md`](../../../api/identity.md); the per-service `VARCHAR(255)` rows already cite this ADR. Remaining for `Complete`: the cluster greenfield reset, which is part of the Kind gate |
 
 ---
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-24 — appended the History rows that were skipped when Adoption moved to `Partial`; the table had still read `Accepted / Not started`._

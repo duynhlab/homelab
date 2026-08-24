@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **RFC** | RFC-0024 |
-| **Status** | researching |
+| **Status** | Accepted — the review gate below is 9/9 with owner sign-off 2026-08-11; the field had been left at `researching` |
 | **Scope** | platform-wide |
 | **Created** | 2026-08-10 |
 | **Last updated** | 2026-08-10 |

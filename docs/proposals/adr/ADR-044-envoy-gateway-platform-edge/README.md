@@ -489,6 +489,7 @@ new ADR that supersedes this one.
 | 2026-08-11 | Accepted / Not started | Accepted with RFC-0024; numbering assigned 044–046 because ADR-039/040 were consumed by unrelated decisions (RFC text had said 045–047) |
 | 2026-08-17 | Accepted / Partial | Amended: CRD delivery moves from a HelmRelease to vendored manifests applied server-side, after the first Kind bring-up proved the Helm path exceeds the 1 MiB `Secret` limit |
 | 2026-08-18 | Accepted / Partial | Amended: Envoy Gateway v1.8.3 → v1.9.0 with Gateway API v1.6.1 (mandatory for the TCPRoute/UDPRoute `v1` move); adopted `crds.enabled: false`; re-verified Amendment #1's subchart rejection against both chart packages and recorded the upstream evidence |
+| 2026-08-24 | Accepted / Partial | Documentation validation row satisfied: [`docs/platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) now links this ADR (and 045/046) and carries a Design decisions section for both amendments — it had linked neither since it was created. Its resource counts were also trued up against the manifests, and both amendments' live constraints written down. Remaining for `Complete`: the Kind K-row gate pass |
 
 ---
-_Last updated: 2026-08-18_
+_Last updated: 2026-08-24 — records that `envoy-gateway.md` finally links this ADR, closing this record's own Documentation validation row._

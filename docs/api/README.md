@@ -122,6 +122,7 @@ doc has no owning RFC or ADR. Legacy v1 contracts may still say **Design record*
 | Information | Canonical owner |
 |-------------|-----------------|
 | Shared URL, auth, error, pagination, idempotency, and gRPC rules | [api.md](./api.md) |
+| Realms, token claims, `user_id`, and the `OIDC_*` verification contract | [identity.md](./identity.md) |
 | Cross-cutting observability policy, env, middleware, layer responsibilities | [observability.md](./observability.md) |
 | Application logging JSON contract, levels, otelzap tee | [logs.md](./logs.md) |
 | Metric instruments, cardinality, business metric authoring | [metrics.md](./metrics.md) |
@@ -195,6 +196,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | Document | Covers | Current status |
 |----------|--------|----------------|
 | [api.md](./api.md) | HTTP and gRPC architecture, call graph, user journeys, HTTP/2 load balancing, security, observability | Implemented |
+| [identity.md](./identity.md) | Two realms, edge vs in-service verification, `sub` as `user_id`, the `OIDC_*` env contract, browser flow | Implemented |
 | [microservices.md](./microservices.md) | Service feature matrix, ownership, dependencies, and known gaps | Living reference |
 | [temporal.md](./temporal.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
 | [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | Implemented — P1-P5 shipped; the legacy order path was removed in RFC-0021 P5 |
@@ -205,6 +207,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | Topic | Document |
 |-------|----------|
 | Edge routing and policy | [Envoy Gateway](../platform/envoy-gateway.md) |
+| Identity provider deployment and ops | [Keycloak (platform)](../platform/keycloak.md) |
 | NetworkPolicy caller matrix | [Network policies](../security/network-policies.md) |
 | Application observability (normative contract) | [observability.md](./observability.md) · [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md) |
 | Metrics platform ops (alerts, dashboards) | [Application metrics (platform)](../observability/metrics/metrics-apps.md) |
@@ -218,6 +221,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 | Change | Required documentation |
 |--------|------------------------|
 | Shared convention changes | Update [api.md](./api.md) |
+| Realm, client, token-claim, or `OIDC_*` env changes | Update [identity.md](./identity.md); platform-side deployment changes go to [Keycloak (platform)](../platform/keycloak.md) |
 | Shared observability / instrumentation changes | Update [observability.md](./observability.md) and the relevant pillar file |
 | Cache-Aside contract, keys, stampede, or invalidation rules | Update [caching.md](./caching.md) |
 | Service route, RPC, payload, or state changes | Update only the owning service file |

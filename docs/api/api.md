@@ -280,6 +280,11 @@ route — `/auth/v1/*` matches nothing at either environment's edge. The realm
 is the only issuer; the retired contract stays readable in
 [auth.md](./auth.md) as an archived record.
 
+The full identity contract — both realms, the client and claim inventory, the
+`OIDC_*` env pair every service needs, and how to mint a token — lives in
+[identity.md](./identity.md). Platform deployment and ops:
+[Keycloak (platform)](../platform/keycloak.md).
+
 Private routes use the same layered model:
 
 ```mermaid
@@ -301,7 +306,7 @@ sequenceDiagram
 |------|---------|
 | Identity source | Read `user_id` from verified JWT claims (`sub`, string UUID), never from a private request body |
 | Authoritative check | Each service verifies the token locally with `pkg/authmw` (v0.37.0: `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL`) |
-| Gateway check | The edge's `SecurityPolicy.jwt` (`remoteJWKS`) verifies signature/iss/aud/exp against the realm's JWKS, with no provisioned key material — verified end-to-end in local-stack; the cluster carries the same policy but it has not yet been exercised on Kind (**planned**) |
+| Gateway check | The edge's `SecurityPolicy.jwt` (`remoteJWKS`) verifies **signature and issuer** against the realm's JWKS, with no provisioned key material. It does **not** verify the audience — no policy declares `audiences`, deliberately, so the edge cannot reject a token the services would accept; `aud` is enforced in-service. Verified end-to-end in local-stack; the cluster carries the same policy but it has not yet been exercised on Kind (**planned**) |
 | Auth gRPC | Removed; services do not call auth `GetMe` |
 | Failure mode | Missing, invalid, or unverifiable credentials fail closed |
 
@@ -395,7 +400,7 @@ ships, and the owning `docs/api/{service}.md` documents each as-built contract.
 
 | Concern | Convention |
 |---------|------------|
-| Guard chain | Edge `jwt-edge-staff` SecurityPolicy (coarse signature/iss/aud/exp against the **workforce realm** `duynhlab-staff`, [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) → in-service `pkg/authmw` staff verifier (authoritative) → `MiddlewareRequireRole("backoffice_admin")`. A customer-realm token is wrong-issuer at the edge — it never reaches the role gate |
+| Guard chain | Edge `jwt-edge-staff` SecurityPolicy (coarse signature/issuer against the **workforce realm** `duynhlab-staff`, [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) → in-service `pkg/authmw` staff verifier (authoritative) → `MiddlewareRequireRole("backoffice_admin")`. A customer-realm token is wrong-issuer at the edge — it never reaches the role gate |
 | Role miss | `403` with the shared envelope, code `FORBIDDEN`; never retried by clients |
 | Verifier config | The staff verifier needs **both** variables declared, and they are not interchangeable. `OIDC_STAFF_ISSUER` is an identity claim — it must equal the `iss` the realm stamps, so it stays the public host. `OIDC_STAFF_JWKS_URL` is a network path — it must be fetchable from inside the pod, so it names the in-cluster Keycloak Service. Left unset, the service derives the JWKS from the issuer and hairpins to the public host, which resolves in-cluster to `127.0.0.1`; the fail-closed verifier then answers every `/protected/` request `503 Authentication temporarily unavailable`. Fixed 2026-08-22 by declaring both on all six services that serve `/protected/` |
 | Actor | `actor_sub` = the verified token `sub`; a body-supplied actor is ignored |

@@ -9,7 +9,7 @@ whom once admitted (east-west micro-segmentation on kindnet, which enforces).
 | | |
 |---|---|
 | Admission engine | Kyverno (chart `3.8.2`, single-replica controllers on Kind) |
-| Policies | 8 deployed (mostly Audit; `disallow-default-namespace` Enforce) + 3 planned — [catalog](policy-catalog.md) |
+| Policies | 7 deployed (Audit, except `disallow-default-namespace` which Enforces) + 1 disabled + 3 planned — [catalog](policy-catalog.md) |
 | PSS | `pss-baseline` Audit cluster-wide; `pss-restricted-apps` **disabled 2026-08-17** — [known gaps](policy-catalog.md#known-gaps--history) |
 | Exceptions | 2 registered, owner + expiry mandatory, accepted only from ns `kyverno` — [registry](policy-exceptions.md) |
 | Segmentation | 26 committed NetworkPolicies (12 namespaces) + floci fence + Kyverno-generated `deny-all-ingress` per app namespace — [caller matrix](network-policies.md) |
@@ -55,6 +55,8 @@ flowchart LR
 - [AGENTS.md § Kyverno admission rules](../../AGENTS.md) — the operative contract for every manifest
 - [docs/platform/kyverno.md](../platform/kyverno.md) — controller deployment, rollout history
 - [docs/api/api.md § edge exposure](../api/api.md) — audience doctrine the fences implement
+- [docs/platform/keycloak.md](../platform/keycloak.md) — the identity provider: its NetworkPolicy, exposed login surface, and credential handling
+- [docs/api/identity.md](../api/identity.md) — where a token is verified, and why the edge is not authoritative
 
 ---
-_Last updated: 2026-08-19 — hub created (the folder was the last docs area without one)._
+_Last updated: 2026-08-24 — policy count trued up: 7 deployed + 1 disabled (`pss-restricted-apps`) rather than 8 deployed, matching the [platform guide's inventory](../platform/kyverno.md#policy-inventory). Adds the Keycloak and identity cross-links. Previously — 2026-08-19: hub created (the folder was the last docs area without one)._

@@ -12,6 +12,7 @@ docs/
 │   ├── README.md                 # Area hub and recommended learning path
 │   ├── api.md                    # Canonical shared HTTP + gRPC conventions and call graph
 │   ├── microservices.md          # Feature ownership, techniques, dependencies, known gaps
+│   ├── identity.md               # Identity contract — two realms, edge vs in-service verification, OIDC_* env, sub as user_id
 │   ├── auth.md                   # Archived — the retired token issuer's contract (RFC-0024 P5)
 │   ├── user.md                   # User profile contract
 │   ├── product.md                # Catalog, price gRPC contract, aggregation
@@ -132,6 +133,7 @@ docs/
 │   ├── gitflow.md                # Git branching & release standard
 │   ├── sonarcloud.md             # SonarCloud integration
 │   ├── envoy-gateway.md          # Platform edge — Gateway API resource model, both provider modes, edge telemetry
+│   ├── keycloak.md               # Identity provider — deployment, realm import, database, reset, signals, gaps
 │   ├── kong-gateway.md           # Archived — the platform's previous API gateway
 │   ├── kyverno.md                # Kyverno admission-policy platform guide
 │   ├── mcp-servers.md            # 4 MCP servers wired into the platform
@@ -285,6 +287,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 3. **[Microservices catalog](./api/microservices.md)** - Feature ownership, service dependencies, techniques, and known gaps
 
+4. **[Identity and tokens](./api/identity.md)** - Realms, where a token is verified, and the `OIDC_*` env contract every service follows
+
 4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Inventory](./api/inventory.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), and [Payment](./api/payments.md)
 
 6. **[Temporal workflows](./api/temporal.md)** - all three workflows as built, saga vs 2PC theory, infrastructure, and operations
@@ -381,6 +385,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 - [API area hub](./api/README.md) - Learning path, document ownership, deployment rollup, and all service contracts
 - [Shared API and communication guide](./api/api.md) - HTTP/gRPC conventions, call graph, user journeys, load balancing, security, and observability
+- [Identity and tokens](./api/identity.md) - The verification contract: two realms, edge vs in-service checks, `OIDC_*` env, `sub` as `user_id`
 - [Microservices catalog](./api/microservices.md) - Feature ownership, techniques, dependencies, and known gaps
 - [Service contracts](./api/README.md#service-contracts) - Platform deployment rollup and one file per Go service
 - [Workflow registry](./api/workflows.md) - Temporal workflows: owners, workers, task queues, and participants
@@ -463,7 +468,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Envoy Gateway](./platform/envoy-gateway.md) - The platform edge: Gateway API resource model, policy attachment, Kubernetes vs standalone providers, edge JWT, and the telemetry the proxy itself produces
 - [Kong API Gateway](./platform/kong-gateway.md) - **Archived.** The platform's previous API gateway, kept for reference
 - [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
-- [Identity Cutover Runbook](./platform/identity-cutover-runbook.md) - RFC-0024 P3 greenfield DB reset (string `user_id` + Keycloak realm)
+- [Keycloak](./platform/keycloak.md) - The platform identity provider: deployment shape, realm import and its one-shot limitation, the bypassed pooler, reset procedure, signals, and known gaps
 - [Graceful Shutdown](./api/graceful-shutdown.md) - Cross-service shutdown contract: readiness drain + signal handling (moved to `docs/api/`)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
 - [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics, VictoriaLogs, Flux Operator, Grafana) behind the edge

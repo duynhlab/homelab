@@ -317,8 +317,11 @@ const UNITS = [
     group: 'telemetry',
     run(id) {
       // Four legs, four ways to lose telemetry without losing the others.
-      // spanmetrics is deliberately absent: that connector lives only in the
-      // compose collector, so asserting it here would fail by construction.
+      // spanmetrics is absent here for a weaker reason than it used to be:
+      // ADR-057 put the span_metrics connector on the CLUSTER collector too, so
+      // spanmetrics_* is real on this gate (measured 421 series). A fifth leg is
+      // assertable now -- it just has not been added. The old comment claimed the
+      // connector lived only in the compose collector.
       const legs = [
         ['app HTTP semconv', 'sum(http_server_request_duration_seconds_count)'],
         ['app gRPC semconv', 'sum(rpc_server_call_duration_seconds_count{service_name="inventory"})'],
@@ -483,6 +486,15 @@ export function drive() {
   // later, which reads as a platform fault caused by the test.
   http.get(`${target.base}/review/v1/public/reviews?product_id=1`);
   http.get(`${target.base}/product/v1/public/products/1/details`);
+  // `user` gets a span from nothing else on this gate. The private-routes row
+  // that calls its profile endpoint declares only a compose id (A2), and the
+  // storefront sign-in that would otherwise touch it is a Phase B *browser*
+  // row. K5.2 asserts every service has a span, so the drive step has to
+  // create this one -- the same reason `review` is driven above. It must be the
+  // authenticated 200 path: a bare public GET answers 404 here (users are not
+  // keyed by a small integer), and manufacturing 404s is what the note above
+  // warns about.
+  http.get(`${target.base}/user/v1/private/users/profile`, bearer('customer', identityFor('customer', 0)));
 }
 
 export function functional() {

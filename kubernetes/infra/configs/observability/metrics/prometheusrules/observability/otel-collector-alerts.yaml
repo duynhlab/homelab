@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observability-otel-collector-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    # Health of the OTel Collector itself. Every metric, log and trace on this
+    # platform passes through it, so its liveness is the one alert that must not
+    # depend on the collector working: `up` comes from the ServiceMonitor scrape
+    # of :8888, not from anything the collector exports about itself.
+    #
+    # This rule lived in tempo-alerts.yaml and was retired with that file when
+    # RFC-0027 / ADR-059 removed TempoDown -- collateral, not a decision. Its own
+    # file now, so the next backend retirement cannot take it along again.
+    #
+    # Why the export-failure alerts do not cover this: OtelMetricsPipelineExport-
+    # Failures and ClickHouseExporterUnhealthy both read otelcol_* series, which
+    # stop existing when the collector is down. They go SILENT, not firing --
+    # exactly the "loads clean, never fires, reads as healthy" failure mode.
+    - name: observability-otel-collector
+      interval: 30s
+      rules:
+        - alert: OtelCollectorDown
+          expr: up{job=~".*otel-collector.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: observability
+          annotations:
+            summary: "OTel collector is down ({{ $labels.instance }})"
+            description: "The OpenTelemetry collector target has been down for more than 5 minutes — application metrics, traces and logs (the whole OTLP path) are not being ingested."

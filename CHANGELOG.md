@@ -1370,6 +1370,24 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`OtelCollectorDown` had stopped being deployed, and the alert catalog still
+  listed it as live.** The rule shared `tempo-alerts.yaml` with `TempoDown`, so
+  retiring Tempo (RFC-0027 P4) took the collector's only liveness alert with it —
+  collateral, not a decision. Restored as
+  `prometheusrules/observability/otel-collector-alerts.yaml`, its own file so the
+  next backend retirement cannot repeat this. The export-failure alerts do not
+  cover the gap: `OtelMetricsPipelineExportFailures` and
+  `ClickHouseExporterUnhealthy` both read `otelcol_*` series, which stop existing
+  when the collector is down, so they go **silent** rather than firing.
+- **`tracesToProfiles` is gone and cannot be moved.** The span→profile one-click
+  pivot lived on `datasource-tempo.yaml`, and Grafana implements that option (and
+  `serviceMap`) on the **Tempo datasource type only**; the `jaeger` type
+  VictoriaTraces is queried through supports `tracesToLogsV2`, `tracesToMetrics`,
+  `nodeGraph` and `traceIdTimeParams` and nothing else — verified against Grafana's
+  provisioning reference, not assumed. Recorded as a known gap in
+  `docs/observability/profiling/README.md` with the two-step manual procedure that
+  replaces it.
+
 - **The ClickHouse scrape marker is closed, and both previous readings of the
   `chi_*` panels were wrong.** The `VERIFY-AT-KIND` note asked whether the chart's
   ServiceMonitor covers `/metrics` **and** `/chi`, and pre-specified a hand-rolled
@@ -1593,6 +1611,24 @@ Skeleton (copy what you need):
   neither cap, so neither exhausted branch was reachable from a request.
 
 #### Docs
+
+- **RFC-0027 P5 docs audit — 40 files.** Every doc that still described the
+  five-sink trace fan-out now describes the two that exist (VictoriaTraces 7d +
+  ClickHouse 90d). Rewritten rather than patched: `tracing/architecture.md`
+  (topology diagram, backend rationale, pipeline table, trace lifecycle, and the
+  deployment-method section — which explained how to deploy Jaeger),
+  `tracing/backends-comparison.md` (the "which backend" question is closed, so it
+  now records the decision and the costs we accepted), and
+  `tracing/victoriatraces.md` (no longer a pilot). Corrected counts in
+  `opentelemetry/collector.md` (6 exporters defined / 5 wired, four pipelines, and
+  the `span_metrics` **connector** — the old text claimed there were *no*
+  connectors), `opentelemetry/README.md`, `observability/README.md` (which had
+  grown two duplicate VictoriaTraces service rows) and `docs/README.md`. **Ten
+  runbooks** told on-call to open a `trace_id` in Tempo; they now name
+  VictoriaTraces. `kind-e2e-audit.md` no longer claims the spanmetrics connector
+  exists only in local-stack — ADR-057 put it on the cluster. Also fixed a dangling
+  `class E,J,V` in `tracing/README.md`'s mermaid block, which would have rendered
+  two phantom nodes.
 
 - **`docs/observability/` said three trace backends and one log store; the collector says
   five and two.** Twelve files corrected against `service.pipelines`, the completion of the
@@ -1827,6 +1863,19 @@ Skeleton (copy what you need):
   executed (local-stack, #752) from pending (Kind) and verifies both realms.
 
 #### GitOps
+
+- **Stale manifest comments across the tracing blast radius.** `tracing-local`
+  still explained its `secrets-local` + `storage-local` edges as "Tempo needs
+  tempo-rustfs-credentials"; nothing under `controllers/tracing` reads RustFS any
+  more (verified — only `*.yaml.bak` files reference it), so those edges are now
+  needed only transitively through `clickhouse-local`. Comment corrected, edges
+  left in place. Same class in `controllers/kustomization.yaml`,
+  `clusters/local/{kustomization,monitoring}.yaml`, the RustFS bucket-Job and
+  sizing comments, `pyroscope/helmrelease.yaml`, and the ClickHouse, Sloth and
+  observability kustomizations. The `grafana-community` HelmRepository existed only
+  to ship the Tempo chart (ADR-040) and has no consumer left, so it retires the
+  documented way — `helm/grafana-community.yaml.bak`, dropped from the
+  kustomization. `grafana-mcp` is unaffected: it comes from an OCIRepository.
 
 - The `ClickHouseInstallation` CR moves from `infra/controllers/clickhouse/` to
   `infra/configs/clickhouse/`, matching the operator-vs-instance split every

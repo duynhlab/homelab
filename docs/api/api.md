@@ -846,7 +846,7 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 | Inspect HTTP | `curl` through the edge or an allowed in-cluster address |
 | Inspect gRPC services | `grpcurl <target> list` using server reflection |
 | Check service health | HTTP `/health`, `/ready`, or gRPC health |
-| Trace a request | Search any trace store by `trace_id` — Tempo, Jaeger or VictoriaTraces, or ClickHouse `otel_traces` past 7 days |
+| Trace a request | Search by `trace_id` — VictoriaTraces, or ClickHouse `otel_traces` past 7 days |
 | Find downstream failures | Check RPC RED metrics and access entries in VictoriaLogs (7d) or ClickHouse `otel_logs` (90d) |
 | Validate manifests | `make validate` |
 | Validate a service repo | `GOTOOLCHAIN=auto go build ./... && go test ./...` |

@@ -49,7 +49,7 @@ error forward a fourth time.
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
-| [Tempo / Temporal / Pyroscope / Watchdog](#8-tempo--temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
+| [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 10 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 68 (generated) | Error-budget burn across all 11 services + Keycloak (10 HTTP × 3 SLOs + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs) |
 
@@ -396,13 +396,12 @@ Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watchi
 | VMSingleTooHighSlowInsertsRate | warning | slow inserts >5% | Insufficient RAM for active series | 15m |
 | VMSingleMetadataCacheUtilizationIsTooHigh | warning | metadata cache >95% | Metadata API responses incomplete | 15m |
 
-## 8. Tempo / Temporal / Pyroscope / Watchdog
+## 8. Temporal / Pyroscope / Watchdog
 
-Source: `prometheusrules/observability/tempo-alerts.yaml`, `prometheusrules/observability/pyroscope-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
+Source: `prometheusrules/observability/pyroscope-alerts.yaml`, `prometheusrules/observability/otel-collector-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
-| TempoDown | warning | `up{tempo}==0` | Traces not ingested; request-path visibility lost | 5m |
 | PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m |
 | TemporalServerDown | critical | `up{temporal}==0` | Durable workflows halt — order fulfilment blocked | 5m |
 | TemporalServiceErrorRateHigh | warning | `service_error_with_type`/`service_requests` >5% | Clients can't submit/query workflows | 10m |
@@ -411,7 +410,7 @@ Source: `prometheusrules/observability/tempo-alerts.yaml`, `prometheusrules/obse
 | TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m |
 | TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m |
 | TemporalWorkerTaskSlotsExhausted | warning | `min(temporal_worker_task_slots_available)==0` | Worker saturated; tasks queue and stall | 10m |
-| OtelCollectorDown | critical | `up{otel-collector}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m |
+| OtelCollectorDown | critical | `up{job=~".*otel-collector.*"}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m |
 | **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — |
 
 Temporal is now monitored at **both** the infra layer (server/service/persistence health) and
@@ -421,7 +420,18 @@ saturation). 2026-08-18 correction: `TemporalServiceErrorRateHigh` had been writ
 never fire. Verified against a live `/metrics` dump and fixed to `service_error_with_type`.
 Both Temporal alert groups are visualized by the **Temporal — Workflows & Activities**
 dashboard (vendored in-repo, SDK + Server rows; local twin validates all of §8's server
-alerts on the compose stack via the `PROMETHEUS_ENDPOINT` scrape). `OtelCollectorDown` and
+alerts on the compose stack via the `PROMETHEUS_ENDPOINT` scrape).
+
+**`OtelCollectorDown` was briefly not deployed.** It shared `tempo-alerts.yaml` with
+`TempoDown`, so retiring Tempo ([RFC-0027](../../proposals/rfc/RFC-0027/README.md)) took it
+along — collateral, not a decision, and this catalog kept listing it as live. Found by the
+RFC-0027 P5 docs audit and restored in its own file,
+`prometheusrules/observability/otel-collector-alerts.yaml`. Note *why* the export-failure
+alerts did not cover the gap: `OtelMetricsPipelineExportFailures` and
+`ClickHouseExporterUnhealthy` both read `otelcol_*` series, which stop existing when the
+collector is down — they go **silent**, not firing.
+
+`OtelCollectorDown` and
 the collector's exporter-failure signals have a local board (`otel-collector-health-local`);
 a cluster twin is a recorded gap. Pyroscope profiling-backend health is covered by
 `PyroscopeDown`.

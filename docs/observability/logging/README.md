@@ -18,7 +18,7 @@ see [ClickHouse](../clickhouse/README.md).
 | **Storage** | VictoriaLogs **VLSingle** `:9428` (`monitoring`, VM Operator CRD) — 7-day retention, 20Gi PVC |
 | **Query** | LogsQL (VictoriaLogs) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
-| **Correlation** | `trace_id` field ↔ Tempo (log→trace and trace→log) |
+| **Correlation** | `trace_id` field ↔ VictoriaTraces. **trace→log is configured** (`tracesToLogsV2`); log→trace has no derived field — see below |
 | **App logging** | How services emit logs (libraries, format, levels, wiring) → [`../../api/logs.md`](../../api/logs.md) |
 
 > This doc is the **architecture** view: the pipeline, why this stack, and how it
@@ -80,7 +80,7 @@ flowchart LR
     VEC -->|"/insert/jsonline"| VL
     VL --> GRAF{{"Grafana Explore<br/>(LogsQL)"}}
     CH --> GRAF
-    GRAF <-. "trace_id ↔ trace store" .-> TEMPO[("Tempo · Jaeger<br/>VictoriaTraces")]
+    GRAF <-. "trace_id ↔ trace store" .-> TEMPO[("VictoriaTraces<br/>ClickHouse otel_traces")]
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
@@ -133,7 +133,7 @@ is a deliberate second store for long-retention SQL, not a second ops system.
 | Index model | Columnar + bounded **streams** | Label index + chunks | Inverted index |
 | High-cardinality fields | Tolerant — put them in the message, not the stream | **Fragile** — high-cardinality labels degrade it | Tolerant but RAM/disk-heavy |
 | Resource footprint | Very low (single small binary) | Low–moderate | High (JVM, shards) |
-| Trace correlation | Native (`trace_id` ↔ Tempo) | Native | Plugin/manual |
+| Trace correlation | Native (`trace_id` ↔ VictoriaTraces) | Native | Plugin/manual |
 | Ops cost | Minimal | Moderate | High |
 
 ### Strengths / weaknesses
@@ -141,7 +141,7 @@ is a deliberate second store for long-retention SQL, not a second ops system.
 **Strengths** — tiny resource footprint; tolerant of high-cardinality fields
 (`trace_id`, `query_id` live in the message, never as stream labels); LogsQL does
 both full-text and structured filtering; single-binary simplicity; native Grafana
-plugin and Tempo correlation; Elasticsearch-compatible ingest endpoint.
+plugin and trace correlation; Elasticsearch-compatible ingest endpoint.
 
 **Weaknesses (honest)** — **VLSingle is single-node**: no replication/HA, so it is
 homelab-grade as deployed; LogsQL is less widely known than LogQL/KQL; the
@@ -190,10 +190,13 @@ trace_id:abc123def456                    # everything for one trace
 _stream:{namespace="product"} _time:5m   # recent, by namespace
 ```
 
-- **Log → trace:** open a log line with a `trace_id` → *Query with Tempo* jumps to
-  the trace.
-- **Trace → log:** in a Tempo span, the **Logs** tab shows the correlated lines
-  (Tempo `tracesToLogsV2` → `victorialogs` datasource).
+- **Trace → log:** in a VictoriaTraces span, the **Logs** tab shows the correlated
+  lines (`tracesToLogsV2` → `victorialogs` datasource, tag `trace_id`). This is
+  configured on `datasource-victoriatraces.yaml`.
+- **Log → trace:** **not wired.** The VictoriaLogs datasource carries no
+  `derivedFields`, so a `trace_id` in a log line is not a clickable link — copy it
+  and search the trace store. A gap, not a feature; it predates
+  [RFC-0027](../../proposals/rfc/RFC-0027/README.md).
 
 More examples, verification commands, and the PG-plan stream are in
 [`README.md#platform-pipeline`](README.md#verification).

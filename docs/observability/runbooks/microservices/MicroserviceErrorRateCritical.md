@@ -62,7 +62,7 @@ kubectl -n "$NS" logs deploy/"$APP" --since=10m | grep -iE "error|panic" | head 
 ### VictoriaLogs / traces
 
 Pull the failing requests with `{app="$APP"}` filtered to 5xx/error lines,
-take a `trace_id`, and open it in Tempo — the failing span names the culprit:
+take a `trace_id`, and open it in VictoriaTraces — the failing span names the culprit:
 its own handler (panic, nil deref), the database
 ([DBClientErrorRate](DBClientErrorRate.md) co-firing?), or a downstream
 gRPC callee.

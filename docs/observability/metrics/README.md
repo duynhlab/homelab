@@ -13,7 +13,7 @@ of code* (see [`../README.md`](../README.md)).
 | **CRDs** | `prometheus-operator-crds` (definitions only) → auto-converted to VM CRDs by the VM Operator |
 | **Rules / alerts** | VMAlert (recording + alerting) → VMAlertmanager; SLO burn-rate via Sloth |
 | **Visualization** | Grafana (VictoriaMetrics datasource) |
-| **Correlation** | Shared `trace_id` field pivots metrics↔logs↔traces (VictoriaLogs + Tempo traces↔logs); VictoriaMetrics does **not** support exemplars (RFC-0014 D-14) |
+| **Correlation** | Shared `trace_id` field pivots metrics↔logs↔traces (VictoriaLogs + VictoriaTraces traces↔logs); VictoriaMetrics does **not** support exemplars (RFC-0014 D-14) |
 
 ---
 
@@ -116,7 +116,7 @@ flowchart LR
     VMA -->|remote write| VMS[("VMSingle :8428")]
     VMS --> GRAF["Grafana"]
     VMS --> VMAL["VMAlert"] --> AM["VMAlertmanager"]
-    SVC -. "trace_id in spans + logs" .-> CORR["Tempo / VictoriaLogs<br/>(no exemplars — D-14)"]
+    SVC -. "trace_id in spans + logs" .-> CORR["VictoriaTraces / VictoriaLogs<br/>(no exemplars — D-14)"]
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;

@@ -571,9 +571,8 @@ Correlation is instead done through the shared `trace_id`:
    log line carries a `trace_id` field (populated because tracing middleware
    runs before logging — see above). This is what P4 fixed: `trace_id` is now a
    first-class, queryable log field.
-3. Follow that `trace_id` into a trace store for the full distributed trace —
-   **Tempo**, **Jaeger** or **VictoriaTraces** all carry the same span, and each
-   links back to logs via `tracesToLogsV2`. Past the 7-day ops window, the same
+3. Follow that `trace_id` into **VictoriaTraces** for the full distributed trace;
+   it links back to logs via `tracesToLogsV2`. Past the 7-day ops window, the same
    `trace_id` joins `otel_logs` ↔ `otel_traces` in **ClickHouse** in one query.
 
 So the loop is metric → logs (by label + time) → `trace_id` → trace, rather than

@@ -3,7 +3,7 @@
 #
 # Pyroscope v2 keeps a local metastore (raft) that must survive restarts, so the
 # chart's PVC is enabled; long-term profile blocks go to the in-cluster RustFS
-# (S3-compatible) bucket pyroscope-profiles with 7d retention — mirroring Tempo.
+# (S3-compatible) bucket pyroscope-profiles with 7d retention.
 # fullnameOverride pins the Service to `pyroscope:4040` so the Grafana datasource
 # and edge route keep working unchanged.
 ---
@@ -85,7 +85,7 @@ spec:
             insecure: true            # RustFS is plain HTTP in-cluster
             force_path_style: true    # RustFS is S3-compatible, not S3-native
         limits:
-          compactor_blocks_retention_period: 168h   # 7 days, matches Tempo/VM
+          compactor_blocks_retention_period: 168h   # 7 days, matches VM/VictoriaTraces
     serviceMonitor:
       enabled: true
     minio:

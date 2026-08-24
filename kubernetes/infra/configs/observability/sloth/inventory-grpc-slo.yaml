@@ -191,7 +191,7 @@ spec:
             contention rather than CPU: check DBClientQueryP95High and
             PgxPoolAcquireWaitHigh for inventory, then pg_stat_activity on
             product-db for lock waits on the balance rows of a hot SKU. Compare
-            against the gRPC span in Tempo to see whether the time is in the DB
+            against the gRPC span in VictoriaTraces to see whether the time is in the DB
             or in the handler.
         pageAlert:
           labels:

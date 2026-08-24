@@ -1010,7 +1010,7 @@ flowchart LR
     OW -- gRPC :7233 --> TC
     Edge[Envoy Gateway] -- temporal.duynh.me --> UI
     TC -- /metrics --> VM[VictoriaMetrics]
-    OW -- OTLP --> Tempo
+    OW -- OTLP --> OTC[OTel Collector]
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
@@ -1018,7 +1018,7 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class Edge edge;
     class OW worker;
-    class HR,TC,UI,VM,Tempo,WC platform;
+    class HR,TC,UI,VM,OTC,WC platform;
     class WD worker;
     class TDB data;
 ```

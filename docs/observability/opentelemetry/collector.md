@@ -48,7 +48,7 @@ three together per signal:
 |-----------|------|---------------|
 | **Receiver** | How data gets in — push (listen on a port) or pull (scrape a target) | `otlp` (gRPC `:4317`, HTTP `:4318`) |
 | **Processor** | Transformations between receive and export; run **in the order listed** | `memory_limiter`, `deltatocumulative`, `batch` |
-| **Exporter** | How data leaves — per backend, with its own retry/queue | **8 defined, 7 wired** (only `debug` is unwired — see below) |
+| **Exporter** | How data leaves — per backend, with its own retry/queue | **6 defined, 5 wired** (only `debug` is unwired — see below) |
 | **Extension** | Cross-cutting services outside the data path | `health_check` `:13133`, `zpages` `:55679` |
 | **Connector** | Joins the *exporter* end of one pipeline to the *receiver* end of another (e.g. deriving span metrics from traces) | none deployed |
 
@@ -70,20 +70,17 @@ flowchart LR
         CHL[("ClickHouse otel_logs")]
     end
     subgraph TRACESTORES["trace stores"]
-        TEMPO[("Tempo :4317")]
-        TEMPOC[("Tempo chart :4317<br/>ADR-040 parallel")]
-        JAE[("Jaeger :4317")]
-        VT[("VictoriaTraces :10428")]
-        CHT[("ClickHouse otel_traces")]
+        VT[("VictoriaTraces :10428<br/>7d")]
+        CHT[("ClickHouse otel_traces<br/>90d")]
     end
+    SM["span_metrics connector"]
 
     BT -->|"logs"| VL
     BT -->|"logs"| CHL
-    BT -->|"traces"| TEMPO
-    BT -->|"traces"| TEMPOC
-    BT -->|"traces"| JAE
     BT -->|"traces"| VT
     BT -->|"traces"| CHT
+    BT -->|"traces"| SM
+    SM -->|"metrics"| VM
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -92,9 +89,9 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class APPS service;
     class EDGE edge;
-    class RCV,ML,D2C,BM,BT,VMA collector;
+    class RCV,ML,D2C,BM,BT,VMA,SM collector;
     class VM metric;
-    class VL,CHL,TEMPO,TEMPOC,JAE,VT,CHT data;
+    class VL,CHL,VT,CHT data;
 ```
 
 ## Deployment patterns — and which one this platform runs
@@ -119,22 +116,26 @@ same Service; only tail-based sampling (not used — head sampling per
 
 | Pipeline | Receivers | Processors (ordered) | Exporters |
 |----------|-----------|----------------------|-----------|
-| `traces` | `otlp` | `memory_limiter` → `batch` | `otlp/tempo` · **`otlp/tempo-chart`** · `otlp/jaeger` · `otlp_http/victoriatraces` · `clickhouse` |
+| `traces` | `otlp` | `memory_limiter` → `batch` | `otlp_http/victoriatraces` · `clickhouse` · **`span_metrics`** (a *connector*, not a store — it feeds the pipeline below) |
 | `logs` | `otlp` | `memory_limiter` → `batch` | `otlp_http/victorialogs` · `clickhouse` |
 | `metrics` | `otlp` | `memory_limiter` → `deltatocumulative` → `batch` | `otlp_http/victoriametrics` |
 
 A `debug` exporter is **defined but wired into no pipeline** — attach it
 temporarily when debugging ingest, never leave it on.
 
-Two non-obvious facts about what is *not* in these pipelines: there are **no
-connectors** — cluster RED metrics come exclusively from the applications'
-own SDK metrics, not from span derivation (local-stack keeps a spanmetrics
-connector as a compatibility path only); and the **raw** Tempo install's
-metrics-generator is configured but writes nowhere (`remote_write: []`), so it
-produces nothing — while the **chart** install's generator is enabled and does
-remote-write span-metrics and service-graphs to vmagent. Nothing consumes those
-series yet: `traces_spanmetrics` / `traces_service_graph` appear in no dashboard,
-alert or recording rule.
+One component here is neither a receiver nor an exporter: **`span_metrics` is a
+connector**. Connectors are the only component type that changes a signal's
+*type* — this one is listed as an **exporter** on the `traces` pipeline and as the
+**receiver** of the `metrics/spanmetrics` pipeline, which is how spans become
+`spanmetrics_calls_total` and `spanmetrics_duration_milliseconds_*` series in
+VictoriaMetrics ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)).
+Its `aggregation_temporality` defaults to cumulative, so this pipeline needs no
+`deltatocumulative` — unlike the app-metrics one.
+
+Service-graph metrics are **not** produced here. `servicegraph` is a separate
+connector and this collector does not run it; the service map comes from
+VictoriaTraces' own background task instead
+([ADR-059](../../proposals/adr/ADR-059-retire-tempo/)).
 
 ### Processors, and why the order is law
 
@@ -212,4 +213,8 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 
 ---
 
-_Last updated: 2026-08-23 — exporter count corrected to 8 defined / 7 wired, `otlp/tempo-chart` added to the traces pipeline, exporter names respelled `otlp_http` to match the manifest, and the metrics-generator note split: raw is inert, chart is live._
+_Last updated: 2026-08-24 — exporters are **6 defined / 5 wired** after RFC-0027 removed
+`otlp/tempo`, `otlp/tempo-chart` and `otlp/jaeger` and added `prometheus_remote_write`. There
+are now **four** pipelines: the new `metrics/spanmetrics` is fed by the `span_metrics`
+connector, which appears twice in `service.pipelines` — as an exporter on `traces` and as the
+receiver of its own metrics pipeline ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/))._

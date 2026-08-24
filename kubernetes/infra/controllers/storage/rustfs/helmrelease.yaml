@@ -125,7 +125,9 @@ spec:
         # 1.5 CPU, but the Zalando->CNPG migration added 3 CNPG clusters' Barman
         # WAL/backup traffic on top of Tempo + Pyroscope, re-saturating it (live
         # ~1281m/1500m → S3 PUT "context deadline exceeded" → Pyroscope 422 again).
-        # Raise to 2.5 CPU (host has ample cores).
+        # Raise to 2.5 CPU (host has ample cores). NOTE: Tempo retired (RFC-0027),
+        # so this headroom is now measured against a lighter write load -- do not
+        # read 2.5 CPU as the requirement for two writers.
         cpu: "2500m"
         # 512Mi was the ceiling it died at: the 2026-08-21 full-disk event ended
         # with the kernel OOM-killing rustfs at anon-rss 520416kB, i.e. exactly

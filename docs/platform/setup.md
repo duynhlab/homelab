@@ -242,7 +242,6 @@ All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on 
 | Temporal UI | https://temporal.duynh.me | - |
 | Grafana | https://grafana.duynh.me | anonymous (Admin org role — login form disabled) |
 | VictoriaMetrics UI | https://vmui.duynh.me | - |
-| Jaeger UI | https://jaeger.duynh.me | - |
 | VictoriaTraces UI | https://victoriatraces.duynh.me | - |
 | VictoriaLogs UI | https://logs.duynh.me | - |
 | Flux UI | https://ui.duynh.me | - |
@@ -497,7 +496,7 @@ homelab/
 7a. `caching-local`: Valkey (product cache-aside, db 0 — the edge does not use it) (depends on `controllers-local`, `monitoring-local`).
 8. `network-policies-local`: Per-namespace NetworkPolicies (depends on `controllers-local`).
 8a. `clickhouse-local`: ClickHouse OLAP for OTel logs+traces SQL (depends on `controllers-local`, `secrets-local`).
-9. `tracing-local`: Tempo + Jaeger + OTel Collector configs (depends on `secrets-local`, `storage-local`, **`clickhouse-local`** — collector `create_schema` needs ClickHouse up first).
+9. `tracing-local`: OTel Collector config — the only workload left after [RFC-0027](../proposals/rfc/RFC-0027/README.md) retired Tempo and Jaeger (depends on `secrets-local`, `storage-local`, **`clickhouse-local`** — collector `create_schema` needs ClickHouse up first).
 10. `profiling-local`: Pyroscope (depends on `secrets-local`, `storage-local`).
 11. `cnpg-barman-plugin-local`: CNPG Barman Cloud Plugin + `ObjectStore` CRD (depends on `controllers-local`, `cert-manager-local`).
 12. `databases-local`: CNPG `platform-db` and `product-db` clusters (depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).

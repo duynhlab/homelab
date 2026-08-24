@@ -7,7 +7,7 @@ Distributed tracing contract for every Go service and worker in the platform ser
 | **SDK** | `obsx.SetupObservability()` — one call in `main()` | — |
 | **Propagation** | W3C Trace Context (`traceparent`), native at the edge and in every service | — |
 | **Sampling** | `ParentBased(TraceIDRatioBased)` — root decides, downstream honours | — |
-| **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — the collector fans every span to **five** sinks: Tempo (raw manifests), Tempo (Helm chart, ADR-040 parallel run), Jaeger, VictoriaTraces, and ClickHouse `otel_traces` | — |
+| **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — the collector fans every span to **two** sinks: VictoriaTraces (7d) and ClickHouse `otel_traces` (90d). Tempo and Jaeger retired, [RFC-0027](../proposals/rfc/RFC-0027/README.md) | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
 | **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) |
 
@@ -320,9 +320,9 @@ Structured logs carry `trace_id` when a span is active (logging middleware runs 
 }
 ```
 
-Grafana Explore → Tempo → search by Trace ID. Tempo is one of four query paths, not
-the only one: Jaeger and VictoriaTraces each carry the same span, and ClickHouse holds it
-for 90 days where it can be joined to `otel_logs` on `trace_id`. Details:
+Grafana Explore → **VictoriaTraces** → search by Trace ID. There are two query
+paths: VictoriaTraces for the first 7 days, and ClickHouse for 90, where the span
+can be joined to `otel_logs` on `trace_id`. Details:
 [Application logging](./logs.md), [Tracing (platform)](../observability/tracing/README.md).
 
 ---

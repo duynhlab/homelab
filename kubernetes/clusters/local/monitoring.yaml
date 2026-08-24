@@ -28,7 +28,8 @@ spec:
       kind: Grafana
       name: grafana
       namespace: monitoring
-    # Tempo readiness is gated by tracing-local now (it's a Deployment there, not a
-    # HelmRelease in this wave). The old `HelmRelease/tempo` check was stale — it
-    # referenced a resource that doesn't exist and would fail monitoring-local.
-    # (debugs.md Bug 6 / Bug 7)
+    # Trace-backend readiness is NOT gated here. It was a `HelmRelease/tempo`
+    # check that referenced a resource which did not exist and would fail
+    # monitoring-local (debugs.md Bug 6 / Bug 7); the gate moved to tracing-local,
+    # and Tempo itself is retired (RFC-0027). Grafana is the only health check this
+    # wave needs.

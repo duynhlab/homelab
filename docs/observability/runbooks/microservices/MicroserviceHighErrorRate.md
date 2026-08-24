@@ -44,6 +44,6 @@ kubectl rollout history deployment/$APP -n $NAMESPACE
 
 ## Mitigation
 1. Identify failing endpoint from per-endpoint error rate
-2. Search the `trace_id` field in VictoriaLogs for the error logs, then open the linked trace in Tempo (traces<->logs correlation). Exemplars are not available -- VictoriaMetrics does not support them (RFC-0014 D-14)
+2. Search the `trace_id` field in VictoriaLogs for the error logs, then open the linked trace in VictoriaTraces (traces<->logs correlation). Exemplars are not available -- VictoriaMetrics does not support them (RFC-0014 D-14)
 3. If new deployment: rollback with `kubectl rollout undo`
 4. If DB issue: check PostgreSQL alerts

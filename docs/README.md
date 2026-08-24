@@ -84,10 +84,10 @@ docs/
 │   │       ├── builtin-metrics.md
 │   │       └── custom-metrics.md
 │   ├── tracing/                  # Pillar 2: Distributed Tracing
-│   │   ├── README.md             # Tracing guide (Tempo + OTel)
-│   │   ├── architecture.md       # Triple backend (Tempo + Jaeger + VictoriaTraces pilot)
-│   │   ├── jaeger.md             # Jaeger UI guide
-│   │   ├── backends-comparison.md # Tempo vs Jaeger vs VictoriaTraces
+│   │   ├── README.md             # Tracing guide (VictoriaTraces + OTel)
+│   │   ├── architecture.md       # Trace topology: VictoriaTraces + ClickHouse
+│   │   ├── jaeger.md             # Jaeger — archived (retired, RFC-0027)
+│   │   ├── backends-comparison.md # Why VictoriaTraces + ClickHouse won
 │   │   └── victoriatraces.md     # VictoriaTraces pilot (3rd backend)
 │   ├── logging/                  # Pillar 3: Structured Logging
 │   │   └── README.md             # Platform pipeline (VictoriaLogs + Vector)
@@ -265,11 +265,11 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
     - Component inventory and correlation workflow
     - Deployment and quick start
 
-2. **[Distributed Tracing](./observability/tracing/README.md)** - Tempo integration guide
-3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Triple backend (Tempo + Jaeger + VictoriaTraces)
-4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
+2. **[Distributed Tracing](./observability/tracing/README.md)** - the VictoriaTraces + ClickHouse fan-out, end to end
+3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Trace topology: VictoriaTraces (7d) + ClickHouse (90d)
+4. **[Jaeger (archived)](./observability/tracing/jaeger.md)** - Frozen history: the in-memory store, and why the Jaeger *query API* outlived the deployment ([RFC-0027](./proposals/rfc/RFC-0027/README.md))
 5. **[Tempo (archived)](./observability/tracing/tempo.md)** - Frozen history: why Tempo ran twice, what its metrics-generator did, and why it was retired ([RFC-0027](./proposals/rfc/RFC-0027/README.md))
-6. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
+6. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - why VictoriaTraces + ClickHouse won, and what retiring Tempo cost
 7. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 8. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 9. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
@@ -365,10 +365,10 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [OpenTelemetry (platform)](./observability/opentelemetry/README.md) - Collector topology, sampling, operations (app policy → [api/observability.md](./api/observability.md))
 - [OpenTelemetry Collector](./observability/opentelemetry/collector.md) - component model, deployment patterns, deployed pipelines + runbook
 - [Histograms & temporality](./observability/metrics/histograms.md) - bucket mechanics, explicit vs exponential, delta vs cumulative
-- [Distributed Tracing](./observability/tracing/README.md) - Tempo integration
-- [Tracing Architecture](./observability/tracing/architecture.md) - Triple backend (Tempo + Jaeger + VictoriaTraces)
-- [Jaeger Guide](./observability/tracing/jaeger.md) - Jaeger UI usage, comparison with Tempo
-- [Backend Comparison](./observability/tracing/backends-comparison.md) - Tempo vs Jaeger vs VictoriaTraces
+- [Distributed Tracing](./observability/tracing/README.md) - VictoriaTraces + ClickHouse fan-out
+- [Tracing Architecture](./observability/tracing/architecture.md) - Trace topology: VictoriaTraces (7d) + ClickHouse (90d)
+- [Jaeger (archived)](./observability/tracing/jaeger.md) - Frozen history; the Jaeger query API is now VictoriaTraces' interface
+- [Backend Comparison](./observability/tracing/backends-comparison.md) - why VictoriaTraces + ClickHouse won
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [ClickHouse OTel OLAP](./observability/clickhouse/README.md) - Deployed supplementary OLAP; OTel logs/traces SQL ([RFC-0019](./proposals/rfc/RFC-0019/))
@@ -511,7 +511,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - **9 Microservices** - All services with v1 API (canonical)
 - **Monitoring Stack** - VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
-- **APM Stack** - Tempo + Jaeger (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)
+- **APM Stack** - VictoriaTraces + ClickHouse (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)
 - **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
 - **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for browser-facing `*.duynh.me`; self-signed `homelab-ca` for future internal mTLS, distributed via trust-manager `homelab-ca-bundle`
 - **Bootstrap-only secrets** - Cloudflare API token (`secret/local/infra/cloudflare/api-token`) is operator-supplied (not in Git, not seeded by `openbao-bootstrap`); re-seed after every fresh cluster

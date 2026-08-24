@@ -72,7 +72,7 @@ kubectl top pod -n "$NS" -l app="$APP"     # CPU near limit = throttling tail
 ### VictoriaLogs / traces
 
 Find the slow requests in VictoriaLogs (`{app="$APP"}`, filter on high
-latency) and open their `trace_id` in Tempo — exemplars are not available
+latency) and open their `trace_id` in VictoriaTraces — exemplars are not available
 (VictoriaMetrics does not support them, RFC-0014 D-14), so the log→trace pivot
 is the path. In the waterfall, tail requests usually show one long span: a
 lock wait, a pool acquire, or a retried downstream call.

@@ -41,6 +41,10 @@ resources:
   - grafana-dashboard-cert-manager.yaml
   # Keycloak — Identity (hand-authored; JSON via configMapGenerator below)
   - grafana-dashboard-keycloak-identity.yaml
+  # ADR-057 consumers: the span-metric series and the collector's own health had
+  # no cluster board until now, which is why that ADR stayed Adoption: Partial
+  - grafana-dashboard-red-spanmetrics.yaml
+  - grafana-dashboard-otel-collector-health.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
@@ -106,6 +110,12 @@ configMapGenerator:
   - name: grafana-dashboard-keycloak-identity
     files:
       - keycloak-identity.json
+  - name: grafana-dashboard-red-spanmetrics
+    files:
+      - red-spanmetrics.json
+  - name: grafana-dashboard-otel-collector-health
+    files:
+      - otel-collector-health.json
   - name: grafana-dashboard-envoy-resources-monitor
     files:
       - envoy-gateway/resources-monitor.gen.json

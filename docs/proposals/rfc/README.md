@@ -127,7 +127,7 @@ for its own sake.
 | [RFC-0024](RFC-0024/) | Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover (executes [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | Accepted |
 | [RFC-0025](RFC-0025/) | Converge the customer SPA on the Admin Portal's stack — one cutover, no mocks (exercises [ADR-049](../adr/ADR-049-admin-portal-tanstack-spa/)'s convergence revisit trigger) | service:frontend | P2 | implemented |
 | [RFC-0026](RFC-0026/) | Adopt the Temporal Worker Controller for versioned workers; KEDA autoscaling designed and recorded (takes up the destination [ADR-030](../adr/ADR-030-temporal-workflow-versioning/) named but deferred) | platform-wide | done | implemented — [ADR-054](../adr/ADR-054-temporal-worker-controller/) controller, [ADR-055](../adr/ADR-055-keda-worker-autoscaling/) KEDA (`Proposed`, not installed). Kind-verified 2026-08-22: `CURRENT` set with no human step, a saga completing Pinned, a Progressive rollout and a rollback both observed |
-| [RFC-0027](RFC-0027/) | Retire Tempo and Jaeger, keeping VictoriaTraces and ClickHouse (five trace sinks to two; the log tier is unchanged by design) | platform-wide | done | implemented — [ADR-058](../adr/ADR-058-retire-jaeger/), [ADR-059](../adr/ADR-059-retire-tempo/) and [ADR-060](../adr/ADR-060-envoy-access-log-transport/) all `Adoption: Complete`; [ADR-057](../adr/ADR-057-span-metrics-in-collector/) stays `Partial` (series exist, nothing reads them) and [ADR-040](../adr/ADR-040-tempo-community-helm-chart/) is `Withdrawn`. Kind-verified 2026-08-24 on a cluster rebuilt from scratch: 0 Tempo/Jaeger workloads, a 31-edge replacement service graph, and the edge's access log reaching the 90-day store for the first time |
+| [RFC-0027](RFC-0027/) | Retire Tempo and Jaeger, keeping VictoriaTraces and ClickHouse (five trace sinks to two; the log tier is unchanged by design) | platform-wide | done | implemented — [ADR-058](../adr/ADR-058-retire-jaeger/), [ADR-059](../adr/ADR-059-retire-tempo/) and [ADR-060](../adr/ADR-060-envoy-access-log-transport/) all `Adoption: Complete`; [ADR-057](../adr/ADR-057-span-metrics-in-collector/) followed on 2026-08-24 once the span metrics had a consumer, and [ADR-040](../adr/ADR-040-tempo-community-helm-chart/) is `Withdrawn`. Kind-verified 2026-08-24 on a cluster rebuilt from scratch: 0 Tempo/Jaeger workloads, a 31-edge replacement service graph, and the edge's access log reaching the 90-day store for the first time |
 
 ## Backlog — candidate RFCs
 
@@ -158,7 +158,8 @@ when someone starts research (owner OK → `research.md` → index `researching`
 _Last updated: 2026-08-24 — **RFC-0027** → `implemented`: Tempo (both installs) and Jaeger are
 retired, VictoriaTraces + ClickHouse are the two trace sinks, and P6 put the edge's access log on
 the OTLP road so it finally reaches the 90-day store. Three of its four ADRs are
-`Adoption: Complete`; ADR-057 stays `Partial` because nothing consumes the span metrics yet, and
+`Adoption: Complete`, ADR-057 included once the `red-spanmetrics` and `otel-collector-health`
+boards were ported to the cluster, and
 ADR-040 is `Withdrawn` — an obligation P4 missed and the P5 docs audit caught. That audit also
 found two defects that were not documentation: a **critical** alert deleted as collateral because
 it shared a file with `TempoDown`, and a Grafana pivot (`tracesToProfiles`) that turns out to be

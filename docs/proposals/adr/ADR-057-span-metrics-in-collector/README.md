@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | #878 (landed ahead of the RFC gate — see History) |
-| **Adoption** | Partial — **verified on Kind 2026-08-24**: 421 `spanmetrics_calls_total` and 5473 duration-bucket series, collector 0 restarts. Still no consumer reads them |
+| **Adoption** | **Complete** — series verified on Kind 2026-08-24 (counts track traffic; 421 `spanmetrics_calls_total` / 5473 duration buckets on a seeded run), collector 0 restarts, and the consumer obligation is met: the **Microservices — RED Span Metrics** board reads them cluster-side, and gate row **K5.5** asserts the leg. No *alert* reads them yet — recorded below, not blocking |
 
 ## Context
 
@@ -152,7 +152,8 @@ the naming question does not arise at all.
   becomes derivable
 - Exemplars survive the change (`exemplars.enabled`), so the metric → one-sample-trace
   jump is preserved
-- local-stack's `red-spanmetrics.json` dashboard becomes portable to the cluster,
+- local-stack's `red-spanmetrics.json` dashboard becomes portable to the cluster
+  (**done** 2026-08-24, and it ported with only a title change),
   because the series names now match
 
 ### Negative consequences and accepted trade-offs
@@ -167,7 +168,7 @@ the naming question does not arise at all.
   `http.route` on top of the built-ins, and a bucket set that differs from
   `pkg/obsx`'s `DurationBuckets` for `http.server.request.duration`. Span-metric
   quantiles therefore interpolate on a different grid than app-metric quantiles
-- A producer with no consumer, until the dashboard obligation below is met
+- A producer with no consumer for the first weeks of its life — closed 2026-08-24
 
 ### Neutral consequences
 
@@ -181,7 +182,8 @@ the naming question does not arise at all.
 |------------|-------|----------|-------------------|
 | Connector + `metrics/spanmetrics` pipeline + remote-write exporter | `duynhne` | #878 | **Done** — merged 2026-08-24 |
 | Verify the series exist and carry the service label | `duynhne` | RFC-0027 P1 window | **Done 2026-08-24** — 421 series, grouped by `service_name`; the four metric names match local-stack exactly, confirming the remote-write choice over the OTLP path |
-| Give the series a consumer | `duynhne` | RFC-0027 | A cluster dashboard reads `spanmetrics_*`; porting local-stack's `red-spanmetrics.json` needs the cluster VictoriaMetrics datasource uid |
+| Give the series a consumer | `duynhne` | RFC-0027 | **Done 2026-08-24** — `red-spanmetrics` and `otel-collector-health` ported to the cluster, and K5.5 gained a fifth leg asserting `spanmetrics_calls_total`. The datasource question resolved differently than expected: the board declares a `type: datasource, query: prometheus` **variable**, not a uid, so nothing needed rewriting — but the cluster has **two** prometheus-type datasources, so the variable's `current` is pinned to `Prometheus`. Its sibling board needed the real fix: 26 selectors said `job="otel-collector"` while the cluster job is `otel-collector-opentelemetry-collector` |
+| Give the series an alert | — | not scheduled | Nothing alerts on `spanmetrics_*`. The RED signals are already alerted from the SDK metrics, so a second source would double-page; revisit only if the SDK leg is ever dropped |
 | Re-derive the K5.5 audit row | `duynhne` | RFC-0027 P5 | K5.5 no longer reads *N/A on the cluster* |
 | Update service contracts | — | N/A — infra-only | No route, RPC or payload changes |
 

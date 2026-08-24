@@ -1,0 +1,37 @@
+# Microservices — RED Span Metrics: rate, errors and duration derived from spans
+# by the collector's `span_metrics` CONNECTOR, not by a trace backend
+# (ADR-057). This board is why that ADR can leave `Adoption: Partial` — the
+# series existed on the cluster from the day the connector shipped, and nothing
+# read them.
+#
+# Ported from the local twin with two changes and no third:
+#   - title drops "— Local"; the uid is deliberately the SAME on both stacks,
+#     matching keycloak-identity.
+#   - the datasource variable's `current` is pinned to `Prometheus` (uid
+#     `prometheus`). The cluster carries TWO prometheus-type datasources
+#     (`prometheus` and `victoriametrics-prometheus`), so a `type: datasource,
+#     query: prometheus` variable would otherwise resolve against whichever
+#     Grafana happens to list first.
+# No job filter to rewrite: this board does not filter on `job`, and the
+# spanmetrics labels it does use — span_kind, service_name, http_route,
+# status_code — are all present on the cluster (verified 2026-08-24: 294
+# `spanmetrics_calls_total` series, 15 services at SPAN_KIND_SERVER).
+#
+# NOTE: no `datasources:` remap block, on purpose. The JSON carries no
+# `__inputs`, so an `inputName:` mapping would be a no-op that reads like
+# working configuration.
+# Local twin: local-stack/observability/grafana/dashboards/Observability/red-spanmetrics.json
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: red-spanmetrics
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Observability"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-red-spanmetrics
+    key: red-spanmetrics.json

@@ -261,6 +261,33 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The span metrics finally have a reader, so ADR-057 is `Adoption: Complete`.**
+  The `span_metrics` connector has produced `spanmetrics_*` on the cluster since
+  #878, and nothing consumed them — the one reason that ADR sat at `Partial`.
+  Ported local-stack's two boards: **Microservices — RED Span Metrics** and **OTel
+  Collector Health**, both into the `Observability` folder via
+  `configMapGenerator` + `GrafanaDashboard` CRs, and gate row **K5.5** gained a
+  fifth leg (`spanmetrics_calls_total`) — the only leg derived from spans rather
+  than emitted by an SDK, so it survives an SDK metrics outage and dies with the
+  traces pipeline.
+- **The collector board would have rendered 13 empty panels.** All 26 of its
+  selectors said `job="otel-collector"`, but the cluster's Helm release names the
+  scrape job **`otel-collector-opentelemetry-collector`** — the literal matched
+  nothing. They now use `job=~".*otel-collector.*"`, which is the same selector
+  `OtelCollectorDown` uses, so board and alert agree by construction and one file
+  works on both stacks. Proven rather than assumed: the old literal returns zero
+  series on the cluster, the regex returns them all.
+- **Neither board gets a `datasources:` remap block, on purpose.** Both carry a
+  `type: datasource` template variable and **no `__inputs`**, so an `inputName:`
+  mapping would be a no-op that reads like working configuration. What they did
+  need is the variable's `current` pinned to `Prometheus`: the cluster has **two**
+  prometheus-type datasources (`prometheus` and `victoriametrics-prometheus`), so
+  a `query: prometheus` variable would otherwise resolve against whichever
+  Grafana lists first. K5.7 confirms both boards' references resolve.
+- **`docs/observability/grafana/README.md` still listed "Tempo self-observability"**
+  in the Observability folder — a board retired with Tempo. Corrected along with
+  the delivery counts for that row.
+
 - **The edge's access log now reaches the 90-day store.**
   [ADR-060](docs/proposals/adr/ADR-060-envoy-access-log-transport/) (RFC-0027 P6)
   adds an `OpenTelemetry` sink beside the existing `File` sink in

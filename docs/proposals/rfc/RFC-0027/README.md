@@ -15,9 +15,9 @@
 - Context7 audit complete (see research footer)
 - Owner approved **ready for RFC** — 2026-08-24, with the three-store shape
 - Mechanism deep-dive is **not** repeated here — see [`./research.md`](./research.md)
-- ADR folders: **not created yet.** Four independent decisions are named under
-  [Resulting decisions](#resulting-decisions); they are created at `Proposed` during
-  architecture review, per [`adr/README.md`](../../adr/README.md)
+- ADR folders: [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/),
+  [`ADR-058`](../../adr/ADR-058-retire-jaeger/), [`ADR-059`](../../adr/ADR-059-retire-tempo/),
+  [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) — all at `Proposed`
 - `docs/api/` files to touch: **N/A — infra-only.** No route, RPC or payload changes; the
   observability pages under [`docs/observability/`](../../../observability/README.md) carry the
   as-built description instead
@@ -178,8 +178,16 @@ flowchart LR
 **How it is enabled.** By deletion, mostly. The collector's `traces` pipeline drops three
 exporters; the Tempo and Jaeger workloads, their datasources, dashboard, alert, ServiceMonitor,
 ExternalSecret, edge route and RustFS buckets are removed. **23 files carry Tempo in live
-configuration** (9 deleted outright, the rest edited); a further 15 mention it only in comments
-that become wrong on removal. Counted with `tempo(?!ral|rar)` — a plain `grep -rli tempo`
+configuration** (9 of them retired outright, the rest edited); a further 15 mention it only in
+comments that become wrong on removal.
+
+**Manifests are retired, not deleted.** The house pattern renames the file to `*.yaml.bak` and
+drops its entry from `kustomization.yaml`, leaving a comment that names the ADR. The reason is
+written into the repository already, in
+`kubernetes/infra/controllers/temporal/kustomization.yaml`, where the Temporal operator was
+retired the same way: the `.bak` suffix *"keeps it out of here and out of `make validate` without
+commenting the file into unreadability."* Documentation follows the matching convention —
+**archived, not deleted** — as `docs/platform/kong-gateway.md` has done since RFC-0024. Counted with `tempo(?!ral|rar)` — a plain `grep -rli tempo`
 returns 94 because it matches inside *Tempo**ral*** and *"**tempo**rarily"*.
 
 **No file under `kubernetes/apps/` is touched.** No service redeploys and no `pkg` bump.
@@ -229,10 +237,15 @@ Three things to watch, all recorded rather than assumed:
   the exact criticism this RFC makes of Tempo. local-stack already ships
   `red-spanmetrics.json`; porting it needs the cluster VictoriaMetrics datasource uid, so it
   waits for a live cluster rather than risking the dangling reference K5.7 exists to catch.
-- **Service graphs have no counterpart.** Tempo runs both `service-graphs` and `span-metrics`
-  processors; `servicegraph` is a **separate** connector that neither environment runs. Removing
-  Tempo drops `traces_service_graph_*` unless that connector is added. Nothing consumes those
-  series today, so this is a choice to make explicitly — it is one of the four decisions below.
+- **Service graphs are replaced, not lost — decided in [ADR-059](../../adr/ADR-059-retire-tempo/).**
+  Tempo runs both `service-graphs` and `span-metrics` processors, and `servicegraph` is a
+  separate connector neither environment runs. Rather than adopt it, topology comes from
+  **VictoriaTraces' Jaeger dependency API** (`/select/jaeger/api/dependencies`, behind
+  `-servicegraph.enableTask`), which Grafana's existing `jaeger` datasource renders natively with
+  its **Dependency graph** query type. That is a capability *gain*: the cluster has no service map
+  today. What it does not give is per-edge failure and latency — for those, the spans are in
+  ClickHouse for 90 days and a documented self-join recovers them. The `service_graph` connector
+  stays a revisit trigger for the one case neither covers: PromQL-alertable per-edge health.
 - **`TempoDown` must go with *both* installs, not one.** It alerts on
   `up{job=~".*tempo.*"}`, and the only scrape producing that label selects `app: tempo` — the
   raw install alone. Removing the raw install while keeping the chart leaves the alert with
@@ -252,8 +265,8 @@ no application traffic depends on any of it.
 | **P1** | Add a Tempo-type datasource at `/select/tempo` **beside** the Jaeger-type one; run the real TraceQL queries and record what fails | Delete the datasource; nothing else changed |
 | **P2** | Remove Jaeger — the cheapest removal in the tree: no alert, dashboard, scrape, secret, PVC, bucket, NetworkPolicy or `dependsOn`. Keep the `type: jaeger` datasource | Re-add one HelmRelease |
 | **P3** | Decide service graphs: add the `servicegraph` connector, or accept the loss in writing | Connector out, or the decision reversed |
-| **P4** | Remove both Tempo installs, both RustFS buckets, `TempoDown`, the ServiceMonitor, the ExternalSecret and the edge route | Re-apply the deleted files; traces inside the 7-day window are not recoverable |
-| **P5** | Correct the 15 comment-only mentions, the hardcoded audit counts, and the observability docs | Docs only |
+| **P4** | Retire both Tempo installs to `*.yaml.bak`, drop them from their kustomizations, and delete both RustFS buckets, `TempoDown`, the ServiceMonitor, the ExternalSecret and the edge route | Rename the `.bak` files back and restore the kustomization entries; traces inside the 7-day window are not recoverable |
+| **P5** | Correct the 15 comment-only mentions, the hardcoded audit counts, and the observability docs. The archived records — [`tracing/tempo.md`](../../../observability/tracing/tempo.md) and [`tracing/jaeger.md`](../../../observability/tracing/jaeger.md) — are written *before* P4, not after | Docs only |
 
 P1 gates P4: if TraceQL parity is unacceptable, this RFC's chosen option fails and option B
 returns to the table.
@@ -271,15 +284,15 @@ returns to the table.
 
 ## Resulting decisions
 
-Four independent decisions. **None of the ADRs exists yet** — they are created at `Proposed`
-during architecture review, per the flow in [`../README.md`](../README.md).
+Four independent decisions, all created at `Proposed` during architecture review per the flow
+in [`../README.md`](../README.md). They become `Accepted` with this RFC, not before.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Retire both Tempo installs, resolving the ADR-032 → ADR-040 lineage rather than extending it | `../../adr/ADR-NNN-retire-tempo/` *(expected)* | not created — architecture review |
-| Retire Jaeger while keeping the Jaeger **datasource type** that VictoriaTraces is queried through | `../../adr/ADR-NNN-retire-jaeger/` *(expected)* | not created — architecture review |
-| Derive RED span metrics in the collector rather than inside a trace backend — **already implemented** in #878, ahead of this gate | `../../adr/ADR-NNN-span-metrics-in-collector/` *(expected)* | not created — architecture review |
-| Send Envoy access logs over an OpenTelemetry sink in addition to stdout, with the `otlp-logs` label closing the double count | `../../adr/ADR-NNN-envoy-access-log-transport/` *(expected)* | not created — architecture review |
+| Retire both Tempo installs, resolving the ADR-032 → ADR-040 lineage rather than extending it; service graphs come from VictoriaTraces' dependency API | [`ADR-059`](../../adr/ADR-059-retire-tempo/) | Proposed |
+| Retire Jaeger while keeping the Jaeger **datasource type** that VictoriaTraces is queried through | [`ADR-058`](../../adr/ADR-058-retire-jaeger/) | Proposed |
+| Derive RED span metrics in the collector rather than inside a trace backend — **already implemented** in #878, ahead of this gate | [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/) | Proposed · Adoption `Partial` |
+| Send Envoy access logs over an OpenTelemetry sink in addition to stdout, with the `otlp-logs` label closing the double count | [`ADR-060`](../../adr/ADR-060-envoy-access-log-transport/) | Proposed |
 
 The first depends on the third: retiring Tempo without a span-metrics producer removes series
 the SLO maths consumes. The other two stand alone.

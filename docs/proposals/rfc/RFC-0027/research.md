@@ -511,18 +511,88 @@ All four remain open. This file does not choose.
 - [ ] **Measure our own compression and volume.** No figure in this research is ours; a
       `system.parts` query over `otel_logs` and `otel_traces` would give real bytes and real
       ratios.
-- [ ] **Decide the service-graph question** — add the `servicegraph` connector, or accept
-      losing `traces_service_graph_*` when Tempo goes. Nothing consumes them today.
 - [ ] **Give the new series a consumer.** The cluster now produces `spanmetrics_*` and no
       cluster dashboard reads them — the same producer-without-consumer shape this research
       criticises Tempo for. local-stack already has `red-spanmetrics.json`; porting it needs the
-      cluster VictoriaMetrics datasource uid, so it is deliberately left out until Kind is up.
-- [ ] **Confirm the log topology stays dual on purpose.** Application logs are stored twice
-      today. Keeping that is a decision worth recording rather than leaving as an accident.
-- [ ] **Decide the Envoy access-log transport** — File only, OTel only, or both — and whether
-      the double-count fix is the label or dropping the File sink.
-- [ ] **Owner input:** does removing both Tempo installs resolve ADR-040 by withdrawal or by
-      supersession?
+      cluster VictoriaMetrics datasource uid, so it waits for a live cluster.
+
+### Closed 2026-08-24
+
+- [x] **Service graphs** — closed by further research, which found a replacement rather than a
+      loss. See [Service graphs after Tempo](#service-graphs-after-tempo) below;
+      decided in [ADR-059](../../adr/ADR-059-retire-tempo/).
+- [x] **Envoy access-log transport** — both paths: keep the `File` sink, add an
+      `OpenTelemetry` sink, and close the double count with the `otlp-logs` label.
+      Decided in [ADR-060](../../adr/ADR-060-envoy-access-log-transport/).
+- [x] **Log topology stays dual on purpose** — recorded as a Non-Goal in the RFC README:
+      application logs remain in both VictoriaLogs and ClickHouse by decision, not by drift.
+- [x] **ADR-040 disposition: withdrawal, not supersession.** The ADR template's own lifecycle
+      is `Proposed → Accepted → (Deprecated | Superseded)` and, separately,
+      `Proposed → Withdrawn`. ADR-040 never reached `Accepted`, so it is withdrawn — matching
+      how [ADR-032](../../adr/ADR-032-tempo-operator-monolithic/) was withdrawn in favour of
+      ADR-040 in the first place. Recorded as an obligation on
+      [ADR-059](../../adr/ADR-059-retire-tempo/).
+
+---
+
+## Service graphs after Tempo
+
+Tempo's generator runs **two** processors; the collector's `span_metrics` connector replaces
+only one of them. Service graphs are metrics about *edges* —
+`traces_service_graph_request_total{client, server}` — derived by pairing a parent span of kind
+`client` with its child span of kind `server`. Span metrics cannot substitute: they answer
+*"how is service X doing"* and have already aggregated away who called whom.
+
+> **In plain terms:** losing service graphs is losing the ability to ask about a *pair* of
+> services, not about a service.
+
+Three replacements were examined. The third is the one that changed the answer.
+
+| Option | Service map | Per-edge failure + latency | Alertable the platform's way | Cost |
+|--------|-------------|----------------------------|------------------------------|------|
+| Accept the loss | ad-hoc SQL only | — | — | none |
+| `service_graph` connector | via a PromQL Node Graph | **yes** — client- and server-side histograms | **yes** | a new component on the hot path; a 2s default pairing window; needs all spans of a trace in one instance, so it locks the collector at one replica unless a `loadbalancing` layer is added |
+| **VictoriaTraces dependency API** | **native** | no — `callCount` only | no | **one flag** |
+
+**The third works end to end with what we already run.** VictoriaTraces implements the Jaeger
+service-dependency endpoint, `/select/jaeger/api/dependencies`, behind
+`-servicegraph.enableTask`; it returns `{parent, child, callCount}`. Grafana's **`jaeger`
+datasource** — which the VictoriaTraces datasource already is — has a **Dependency graph** query
+type that renders exactly that as a Node Graph, nodes for services and edges labelled with call
+counts.
+
+Two things worth stating plainly:
+
+- **This is a gain, not a mitigation.** Tempo emits `traces_service_graph_*` that nothing reads,
+  and the cluster has no service map at all. Enabling a flag produces the first one.
+- **Neither this nor ClickHouse is alertable here.** vmalert evaluates PromQL/MetricsQL against
+  VictoriaMetrics; a Jaeger-shaped JSON API and a ClickHouse table produce no series it can read.
+  Per-edge *alerting* remains the one thing only the connector delivers.
+
+Where per-edge failure and latency are genuinely needed, the spans are still in ClickHouse for
+90 days and the same pairing rule expresses it directly:
+
+```sql
+SELECT c.ServiceName AS parent,
+       s.ServiceName AS child,
+       count()                          AS callCount,
+       countIf(s.StatusCode = 'Error')  AS failed,
+       quantile(0.95)(s.Duration)/1e6   AS p95_ms
+FROM otel.otel_traces AS c
+INNER JOIN otel.otel_traces AS s
+       ON s.TraceId = c.TraceId AND s.ParentSpanId = c.SpanId
+WHERE c.Timestamp >= now() - INTERVAL 1 HOUR
+  AND c.SpanKind = 'Client' AND s.SpanKind = 'Server'
+  AND c.ServiceName != s.ServiceName
+GROUP BY parent, child
+ORDER BY callCount DESC
+```
+
+Column names are the ClickHouse exporter's own (`TraceId`, `SpanId`, `ParentSpanId`,
+`ServiceName`, `SpanKind`, `Duration`, `StatusCode`). **Not yet run** — `StatusCode = 'Error'`
+assumes the exporter's short form, and no query in this file has been executed against live
+data. It is also a self-join over spans with no materialised columns or skip indexes
+([§ schema](#vs-platform-as-built)), so it scans: a deep-dive query, not a dashboard panel.
 
 ---
 

@@ -1,5 +1,36 @@
 # Jaeger Distributed Tracing Guide
 
+> **Archived (RFC-0027, 2026-08-24) — kept deliberately as learning material.**
+> This documents the retired Jaeger install: an all-in-one deployment whose store
+> was an in-memory ring (`memory: max_traces: 100000`), emptied on every pod
+> restart. The live trace stores are
+> [**VictoriaTraces**](victoriatraces.md) (7 days) and
+> **ClickHouse** (90 days, SQL). The body below is **frozen history** — never
+> updated; its URLs and commands no longer resolve anywhere.
+>
+> **The Jaeger *query API* did not retire with it.** VictoriaTraces implements it
+> at `/select/jaeger`, which is why the live Grafana datasource is still
+> `type: jaeger`. Removing this deployment did not remove that interface — see
+> [ADR-058](../../proposals/adr/ADR-058-retire-jaeger/).
+
+## Why we left (known problems)
+
+Recorded so the reasons survive the removal
+([RFC-0027](../../proposals/rfc/RFC-0027/README.md) has the full analysis):
+
+- **The store did not survive a restart.** `memory: max_traces: 100000` is a ring
+  buffer. Every pod restart discarded the window an investigation might need, which
+  makes it unusable as the store you reach for during an incident.
+- **It cost a slot on the hot path.** It occupied one of five exporters on the
+  collector's `traces` pipeline — the pipeline every span passes through — in
+  exchange for a UI over data that was already gone.
+- **Its query interface was redundant.** VictoriaTraces serves the same Jaeger
+  query API from a store that persists to a PVC, so the interface was available
+  without the deployment.
+- **It declared no resource requests or limits**, unlike every other component in
+  the observability stack.
+
+
 ## Overview
 
 Jaeger is an open-source distributed tracing platform that runs alongside Grafana Tempo (and the VictoriaTraces pilot — see [victoriatraces.md](victoriatraces.md)) in this project. All **five** sinks receive the same traces via OpenTelemetry Collector fan-out (Tempo (raw), Tempo (chart), Jaeger, VictoriaTraces and ClickHouse), giving you the flexibility to use either UI.

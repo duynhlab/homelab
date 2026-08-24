@@ -268,12 +268,13 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 2. **[Distributed Tracing](./observability/tracing/README.md)** - Tempo integration guide
 3. **[Tracing Architecture](./observability/tracing/architecture.md)** - Triple backend (Tempo + Jaeger + VictoriaTraces)
 4. **[Jaeger Guide](./observability/tracing/jaeger.md)** - Jaeger UI usage, comparison with Tempo
-5. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
-6. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
-7. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
-8. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
-9. **[Logging](./observability/logging/README.md)** - Platform pipeline: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
-10. **[Application logging](./api/logs.md)** - App-side logging contract (JSON fields, levels, middleware)
+5. **[Tempo (archived)](./observability/tracing/tempo.md)** - Frozen history: why Tempo ran twice, what its metrics-generator did, and why it was retired ([RFC-0027](./proposals/rfc/RFC-0027/README.md))
+6. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - Tempo vs Jaeger vs VictoriaTraces (+ roadmap)
+7. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
+8. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
+9. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
+10. **[Logging](./observability/logging/README.md)** - Platform pipeline: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
+11. **[Application logging](./api/logs.md)** - App-side logging contract (JSON fields, levels, middleware)
     - Platform ingest ops: [Logging § platform pipeline](./observability/logging/README.md#platform-pipeline)
 
 ### API Reference
@@ -286,9 +287,9 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 4. **Service contracts** - [Auth](./api/auth.md), [User](./api/user.md), [Product](./api/product.md), [Inventory](./api/inventory.md), [Cart](./api/cart.md), [Order](./api/order.md), [Review](./api/review.md), [Notification](./api/notification.md), [Shipping](./api/shipping.md), [Checkout](./api/checkout.md), and [Payment](./api/payments.md)
 
-5. **[Temporal workflows](./api/temporal.md)** - all three workflows as built, saga vs 2PC theory, infrastructure, and operations
+6. **[Temporal workflows](./api/temporal.md)** - all three workflows as built, saga vs 2PC theory, infrastructure, and operations
 
-6. **[RFCs — research then decide](./proposals/rfc/)** — owner approves next `RFC-NNNN` → `research.md` (plain-language + Context7) → `README.md` → optional `docs/<area>/` spin-off
+7. **[RFCs — research then decide](./proposals/rfc/)** — owner approves next `RFC-NNNN` → `research.md` (plain-language + Context7) → `README.md` → optional `docs/<area>/` spin-off
 
 ### Databases
 
@@ -331,8 +332,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 2. **[Logging troubleshooting](./observability/logging/README.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
-5. **[Pooler operations](./databases/runbooks/pgdog-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
-6. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
+6. **[Pooler operations](./databases/runbooks/pgdog-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
+7. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
 
 ---
 

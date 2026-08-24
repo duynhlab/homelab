@@ -20,6 +20,7 @@ Track requests as they flow through multiple microservices to understand perform
 - **VictoriaTraces**: pilot (`v0.11.0`, VM-operator-managed, VictoriaLogs engine) — same OTel fan-out; see [victoriatraces.md](victoriatraces.md)
 - **ClickHouse**: `otel_traces`, **90-day** SQL tier with a `trace_id` JOIN against `otel_logs` ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)); see [clickhouse](../clickhouse/README.md)
 - **W3C Trace Context**: Standard for trace propagation between services
+- **Retirement records**: Tempo and Jaeger are proposed for retirement under [RFC-0027](../../proposals/rfc/RFC-0027/README.md). Their consolidated history is archived in [tempo.md](tempo.md) and [jaeger.md](jaeger.md) — frozen, kept as learning material
 
 ---
 

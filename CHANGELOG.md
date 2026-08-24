@@ -551,6 +551,41 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0027 architecture review: four ADRs at `Proposed`, and Tempo's history
+  archived before it is removed.** Splitting the retirement into independent
+  records surfaced that they are not equally ready:
+  [ADR-058](docs/proposals/adr/ADR-058-retire-jaeger/) (Jaeger) can proceed on
+  acceptance, while [ADR-059](docs/proposals/adr/ADR-059-retire-tempo/) (Tempo) is
+  gated on a TraceQL parity experiment that cannot run with the cluster down —
+  the `deprecation-and-migration` bar is that a replacement must be *proven*, not
+  theoretically better. [ADR-057](docs/proposals/adr/ADR-057-span-metrics-in-collector/)
+  is the record catching up to code that already shipped in #878, so its Adoption
+  opens at `Partial`, not `Not started`.
+  [ADR-060](docs/proposals/adr/ADR-060-envoy-access-log-transport/) takes the edge
+  access log to both stores over an OTLP sink.
+  **Service graphs turned from a loss into a gain.** The open question was whether
+  to adopt the `servicegraph` connector or accept losing `traces_service_graph_*`.
+  Neither: VictoriaTraces implements the Jaeger service-dependency endpoint
+  (`/select/jaeger/api/dependencies`, behind `-servicegraph.enableTask`), and
+  Grafana's `jaeger` datasource — which the VictoriaTraces datasource already is —
+  renders it natively with its **Dependency graph** query type. One flag on a store
+  we keep produces the first service map this cluster has ever had; Tempo's
+  equivalent series were read by nothing. What it does not give is per-edge failure
+  and latency, so the ClickHouse self-join that recovers those is documented
+  alongside, and the connector stays a revisit trigger for the only case neither
+  covers — PromQL-alertable per-edge health.
+  Three more open questions closed with answers that already existed: the Envoy
+  transport, the deliberately-dual log topology, and ADR-040's disposition —
+  **withdrawal, not supersession**, because the ADR template's lifecycle sends a
+  never-accepted `Proposed` record to `Withdrawn`, exactly as ADR-032 went.
+  Retirement mechanics follow the house patterns rather than deletion: manifests
+  become `*.yaml.bak` dropped from their kustomization (the convention documented in
+  `controllers/temporal/kustomization.yaml`), and documentation is archived —
+  `tracing/jaeger.md` gains the frozen-history banner and a new
+  `tracing/tempo.md` consolidates what running Tempo twice taught, both following
+  `platform/kong-gateway.md`. **Nothing is removed yet:** no manifest changed, the
+  collector still lists five trace exporters, and the RFC stays `provisional`.
+
 - **RFC-0026 Accepted + ADR-054/ADR-055: the Temporal Worker Controller owns the
   versioned-worker lifecycle.** Research gate passed and the design record landed —
   `RFC-0026/README.md`, **ADR-054** (controller) and **ADR-055** (KEDA, `Proposed`

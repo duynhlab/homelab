@@ -1,10 +1,9 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Tracing stack: Tempo raw (storage) + Tempo chart (ADR-040 phase-1 parallel
-# run, and the only LIVE metrics-generator) + Jaeger (in-memory UI) + OTel
-# Collector (pipeline). VictoriaTraces and ClickHouse are the other two trace
-# sinks and are delivered by the configs layer, not here.
+# Tracing stack: the OTel Collector (pipeline) is the only thing this layer
+# still deploys. Both trace SINKS -- VictoriaTraces (VTSingle) and ClickHouse --
+# are delivered by the configs layer, not here.
 resources:
   - otel-collector/otel-collector.yaml
 # RFC-0027 / ADR-058 + ADR-059: Tempo and Jaeger retired. Their manifests stay

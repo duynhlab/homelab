@@ -39,6 +39,9 @@ resources:
   # helm/temporal-operator.yaml.bak (ADR-030).
   - helm/temporalio.yaml
   - helm/altinity.yaml
-  - helm/grafana-community.yaml
 # RFC-0027 / ADR-058: the jaegertracing Helm repository retired with Jaeger
 # (helm/jaegertracing.yaml.bak).
+# RFC-0027 / ADR-059: grafana-community existed only to ship the Tempo chart
+# (ADR-040). No HelmRelease references it now, so it retired with Tempo
+# (helm/grafana-community.yaml.bak). grafana-mcp is unrelated — it comes from an
+# OCIRepository (sources/oci/grafana-mcp-oci.yaml), not this HTTP repo.

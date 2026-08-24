@@ -8,7 +8,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 | | |
 |---|---|
 | **Status** | **Deployed** — local-stack + cluster (RFC-0019 Phase B) |
-| **Role** | **Supplementary** OLAP for logs+traces SQL. Runs **alongside** VictoriaLogs / Tempo / VictoriaTraces (day-to-day ops primaries), which are **unchanged** |
+| **Role** | **Supplementary** OLAP for logs+traces SQL. Runs **alongside** VictoriaLogs / VictoriaTraces (day-to-day ops primaries), which are **unchanged** |
 | **Engine** | `clickhouse/clickhouse-server:26.7`, MergeTree, single shard × single replica |
 | **Operator** | Altinity `clickhouse-operator` `0.27.3` + a `ClickHouseInstallation` CR |
 | **Ingest** | OTel Collector contrib `clickhouse` exporter — fan-out on the **traces + logs** pipelines (metrics stay on VictoriaMetrics — **never** here) |
@@ -48,8 +48,8 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 
 ## Overview
 
-VictoriaLogs, Tempo, and the VictoriaTraces pilot all cap at **7-day** retention
-and answer **LogsQL / TraceQL only**. There is no cross-day **SQL/OLAP** over
+VictoriaLogs and VictoriaTraces both cap at **7-day** retention and answer
+**LogsQL / the Jaeger query API only**. There is no cross-day **SQL/OLAP** over
 structured log/trace fields (errors by service over weeks, duration percentiles,
 status mixes) and no way to **JOIN** logs↔traces on `trace_id` in one store. RED
 metrics on VictoriaMetrics do not substitute for log/trace search.
@@ -169,8 +169,6 @@ flowchart LR
   Apps["10 services + 2 workers<br/>+ edge"] -->|OTLP| Col["OTel Collector<br/>(contrib)"]
   Col -->|metrics| VM[("VictoriaMetrics")]
   Col -->|logs| VL[("VictoriaLogs")]
-  Col -->|traces| Tempo[("Tempo")]
-  Col -->|traces| Jae["Jaeger"]
   Col -->|traces| VT[("VictoriaTraces")]
   Col -->|"logs + traces (RFC-0019)"| CH[("ClickHouse<br/>otel_logs / otel_traces")]
   CH --> Graf["Grafana<br/>clickhouse datasource"]
@@ -180,7 +178,7 @@ flowchart LR
   classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
   class Apps service;
   class Col collector;
-  class VM,VL,Tempo,VT,CH data;
+  class VM,VL,VT,CH data;
 ```
 
 **Logs-first analytics.** Traces are head-sampled (10% prod / 100% local), so
@@ -205,7 +203,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 | **Dashboards** | 5 provisioned boards in the **ClickHouse** Grafana folder — see [Grafana](#grafana); local-stack via file provider, cluster via `configMapGenerator` → `GrafanaDashboard` CRs |
 | **local-stack** | `clickhouse` compose service (`:8123` HTTP, `:9000` native), collector `clickhouse` exporter, Grafana plugin + provisioned datasource; e2e audit check **C6** (`SELECT count() FROM otel.otel_traces/otel_logs`) |
 
-The Collector's other sinks are untouched: VictoriaLogs/Tempo/Jaeger/VictoriaTraces
+The Collector's other sinks are untouched: VictoriaLogs and VictoriaTraces
 keep receiving, and the metrics pipeline never routes to ClickHouse.
 
 ---
@@ -251,7 +249,7 @@ SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
 | `otel_traces` | 90d | **10.5×** (1.20 MiB → 117 KiB) |
 | `otel_logs` | 90d | **8×** (2.06 MiB → 262 KiB) |
 
-Retention is **90 days** here vs **7 days** on VictoriaLogs/Tempo — the reason
+Retention is **90 days** here vs **7 days** on VictoriaLogs/VictoriaTraces — the reason
 ClickHouse exists on this platform.
 
 ### Query examples
@@ -293,7 +291,7 @@ platform-wide *OTel logs+traces SQL* board.
 3. ClickHouse reachable? `SELECT 1` (see [Playground](#playground--mergetree-by-hand)).
 4. Tables exist? `SHOW TABLES FROM otel` — the exporter creates them on first write
    (`create_schema: true`); a wrong password blocks `CREATE DATABASE`.
-5. VictoriaLogs/Tempo still receiving? They are independent sinks — ClickHouse being
+5. VictoriaLogs/VictoriaTraces still receiving? They are independent sinks — ClickHouse being
    down must not affect them (`sending_queue` isolates backpressure).
 
 ---
@@ -361,7 +359,8 @@ keeps its old shape until dropped.
   `Duration` is nanoseconds — raw SQL panels divide by `1e6` for ms.
 - **Linking**, both directions, rides the shared `TraceId` column: log line →
   "View trace"; span → logs filtered `WHERE TraceId = '<id>'`. One store, one
-  key — no derived-fields bridge like VictoriaLogs↔Tempo needs.
+  key — no derived-fields bridge, which is exactly what the VictoriaLogs↔VictoriaTraces
+  pair lacks (see [logging](../logging/README.md)).
 
 ### Dashboard grammar (raw SQL panels)
 
@@ -683,7 +682,7 @@ SHOW CREATE TABLE otel.otel_traces_trace_id_ts_mv;
 |------|-------|
 | Order/payment source of truth | PostgreSQL (`product-db` / `platform-db`) |
 | RED metrics, alerting | VictoriaMetrics |
-| Live ops log/trace triage | VictoriaLogs / Tempo |
+| Live ops log/trace triage | VictoriaLogs / VictoriaTraces |
 | Long-retention SQL on OTel logs/traces, `trace_id` JOIN | **ClickHouse** |
 
 ---
@@ -702,7 +701,7 @@ CDC, never new public analytics APIs, and Postgres stays authoritative. See
 
 ## FAQ
 
-**Does this replace VictoriaLogs / Tempo?**
+**Does this replace VictoriaLogs / VictoriaTraces?**
 No. They remain the day-to-day ops primaries; ClickHouse is supplementary
 long-retention SQL. All backends run in parallel by design.
 

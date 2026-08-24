@@ -52,7 +52,7 @@ kubectl logs -n identity -l app.kubernetes.io/name=keycloak --tail=100
 
 `{app="keycloak"} level:WARN` — Agroal acquisition-timeout warnings name the
 pool; slow-query log lines name the statement. The `mdc.traceId` field joins a
-slow token request to its edge span in Tempo.
+slow token request to its edge span in VictoriaTraces.
 
 ## Mitigation
 

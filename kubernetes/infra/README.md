@@ -3,7 +3,7 @@
 This directory holds **operators** (`controllers/`) and **workload configs** (`configs/`).
 
 In practice `controllers/` is anything a **chart installs** — operators, but also
-plain platform components (Envoy Gateway, Valkey, OpenBAO, Vector, Jaeger, Temporal) — while
+plain platform components (Envoy Gateway, Valkey, OpenBAO, Vector, Temporal) — while
 `configs/` holds the **CRs and configuration those components consume**. A component
 whose config needs its own ordering gets two Kustomizations: `envoy-gateway-local` →
 `./controllers/envoy-gateway` then `envoy-gateway-config-local` → `./configs/envoy-gateway`;

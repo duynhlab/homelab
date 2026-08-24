@@ -243,7 +243,6 @@ credentials to every namespace that opts in:
 |----------------------|----------------|-------------------|---------|
 | `pg-backup-rustfs-cnpg` | `platform.duynhlab/backup: "cnpg"` | platform, product | CNPG/Barman: `ACCESS_KEY_ID`, `ACCESS_SECRET_KEY` |
 | `clickhouse-credentials` | `platform.duynhlab/clickhouse: "true"` | monitoring | ClickHouse admin login |
-| `tempo-rustfs` | `platform.duynhlab/s3: "tempo"` | monitoring | Tempo S3 (RustFS) credentials |
 | `pyroscope-rustfs` | `platform.duynhlab/s3-pyroscope: "true"` | monitoring | Pyroscope S3 (RustFS) credentials |
 
 Since the Zalando→CNPG migration every cluster backs up via Barman, so `cnpg` is

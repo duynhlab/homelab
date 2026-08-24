@@ -16,12 +16,15 @@ spec:
   path: ./controllers/tracing
   prune: true
   wait: true
-  # Tempo stores traces in RustFS (S3) using the tempo-rustfs-credentials Secret
-  # (ESO-managed, created by secrets-local) and needs RustFS running (storage-local).
   # Kept OUT of controllers-local to avoid a wave deadlock: controllers-local
-  # (wait:true) would block on Tempo, which blocks on a Secret that secrets-local
-  # (dependsOn controllers-local) cannot create until controllers-local is Ready.
-  # See debugs.md Bug 6.
+  # (wait:true) would block on this wave, which transitively needs a Secret that
+  # secrets-local (dependsOn controllers-local) cannot create until
+  # controllers-local is Ready. See debugs.md Bug 6.
+  #
+  # secrets-local + storage-local date from Tempo, which stored blocks in RustFS
+  # (S3) via the ESO-managed tempo-rustfs-credentials Secret. Tempo is retired
+  # (RFC-0027), so nothing in ./controllers/tracing reads RustFS any more and
+  # these two edges are now only needed transitively, through clickhouse-local.
   dependsOn:
     - name: secrets-local
     - name: storage-local

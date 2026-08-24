@@ -154,7 +154,7 @@ spec:
             description: "Host reconciles are erroring — the CHI may be stuck between spec and reality. Check operator logs and recent CHI changes."
 
         # The consumer-side view: the OTel Collector's clickhouse exporter.
-        # Complements OtelCollectorDown (tempo-alerts.yaml) — the collector
+        # Complements OtelCollectorDown (otel-collector-alerts.yaml) — the collector
         # can be perfectly up while its ClickHouse exporter backpressures.
         - alert: ClickHouseExporterUnhealthy
           expr: |

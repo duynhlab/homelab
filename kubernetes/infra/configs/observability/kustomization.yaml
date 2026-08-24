@@ -6,7 +6,7 @@ kind: Kustomization
 # holds their configuration CRs.
 #   metrics/  — VictoriaMetrics CRs, scrape objects, rules, Karma
 #   logging/  — VictoriaLogs storage (Vector ships to it)
-#   tracing/  — VictoriaTraces pilot (Tempo config lives in controllers/tracing)
+#   tracing/  — VictoriaTraces (the collector lives in controllers/tracing)
 #   grafana/  — dashboards + datasources (cross-pillar visualization)
 #   sloth/    — SLO tooling (cross-pillar)
 resources:

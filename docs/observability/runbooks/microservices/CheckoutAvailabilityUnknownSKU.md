@@ -47,7 +47,7 @@ that is deliberate: the body stays opaque, the operator gets the detail.
 ```bash
 # which SKUs?
 kubectl -n checkout logs deploy/checkout --tail=200 | grep "does not track"
-# span attribute, if you are in Grafana/Tempo:
+# span attribute, if you are in Grafana → VictoriaTraces:
 #   checkout.unknown_sku_ids
 ```
 

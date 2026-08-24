@@ -68,7 +68,7 @@ kubectl top pod -n "$NS" -l app="$APP"     # CPU throttling slows every RPC
 ### VictoriaLogs / traces
 
 Find a slow call in VictoriaLogs (`{app="$APP"}`) and open its `trace_id` in
-Tempo. The server span for the RPC shows where the time went — almost always a
+VictoriaTraces. The server span for the RPC shows where the time went — almost always a
 child DB span (`db_client_operation_*` metrics co-moving confirms it) or a
 further downstream call.
 

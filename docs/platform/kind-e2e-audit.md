@@ -698,7 +698,7 @@ that way. Translation table:
 | vmalert `:8880` | `https://vmalert.duynh.me` — **service port is 8080** |
 | Temporal UI | `https://temporal.duynh.me` |
 | — | ~~`https://vm-mcp.duynh.me`, `vl-mcp`, `flux-mcp`, `grafana-mcp`~~ — 💤 MCP off since 2026-08-21, routes commented out ([K4.9](#k4--the-real-edge-and-identity)) |
-| — | `karma`, `jaeger`, `tempo`, `slo`, `source`, `ui`, `openbao` (platform UIs) |
+| — | `karma`, `slo`, `source`, `ui`, `openbao` (platform UIs). `jaeger` and `tempo` were removed with their backends ([RFC-0027](../proposals/rfc/RFC-0027/README.md)) |
 | vmagent `:8429` | **no route** → `kubectl port-forward -n monitoring svc/vmagent-victoria-metrics 8429:8429` |
 | ClickHouse `:8123` | **no route, by design** → `kubectl port-forward -n monitoring svc/clickhouse-clickhouse 8123:8123` |
 
@@ -1042,14 +1042,17 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   > same failure class the `VERIFY-AT-KIND` convention exists for: an expression
   > that names a missing series loads cleanly and is silent forever. `inventory` is gRPC-only with no edge route, so
   its `rpc_*` count is the only metrics evidence it is instrumented at all.
-  **The spanmetrics leg is N/A here.** `spanmetrics_calls_total` and
-  `spanmetrics_duration_milliseconds_*` come from the OTel Collector's
-  **spanmetrics connector**, which exists only in `local-stack/compose.yaml`
-  (`grep -rc spanmetrics kubernetes/` → zero). The cluster enables Tempo's
-  **metrics-generator** (`service-graphs`, `span-metrics`) instead, but no
-  dashboard, alert or recording rule in `kubernetes/infra/configs/observability/`
-  reads its output — so there is nothing to assert and a copied Compose query
-  reports a false FAIL. Do not add a spanmetrics row until a consumer exists.
+  **The spanmetrics leg is live on the cluster now.**
+  [ADR-057](../proposals/adr/ADR-057-span-metrics-in-collector/) added the
+  `span_metrics` **connector** to `otel-collector.yaml`, so
+  `spanmetrics_calls_total` and `spanmetrics_duration_milliseconds_*` are real
+  cluster series — measured at 421 series / 5473 buckets on a seeded Kind run.
+  This replaced Tempo's metrics-generator, which went away with Tempo
+  ([RFC-0027](../proposals/rfc/RFC-0027/README.md)); the old note here said the
+  connector existed "only in `local-stack/compose.yaml`", which is no longer true.
+  Assert the series directly — but check the dashboard side before adding a
+  *dashboard* row: `red-spanmetrics` and `otel-collector-health` are still
+  local-stack-only boards.
 
 - [ ] **K5.6 Profiles.** Pyroscope carries all 10 services; `auth` is absent.
   Asserted as **K5.6** (Connect-RPC `LabelValues` over a one-hour window).

@@ -104,7 +104,9 @@ change is invisible without it.
 The log is not error output. It is span noise from the `s3s` crate at `INFO` —
 a `new`/`close` pair per S3 request signature — so the volume tracks **traffic**,
 not incidents. Barman WAL archiving, Tempo and Pyroscope push objects
-continuously, which on this cluster came to roughly **17 GB/hour**.
+continuously, which on this cluster came to roughly **17 GB/hour**. That
+measurement predates [RFC-0027](../../../../../docs/proposals/rfc/RFC-0027/README.md):
+Tempo is retired, so **two** writers remain and the figure is an upper bound now.
 
 Hourly rotation was already working; the files were named by hour. The cap that
 was missing is the one on **size**, which is why a single hour reached 19 GB.

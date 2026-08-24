@@ -49,11 +49,14 @@ forcing two WAL switches, then restoring it. The full cycle behaved as designed:
 
 Two things worth carrying into an incident. **The alert cannot be trusted to
 appear promptly** — 18 minutes elapsed between the store dying and the page.
-And **Tempo and Pyroscope survived the same outage untouched** (no restarts
-across 19 minutes), because they hold their buckets open and write
-periodically; a crash-looping Tempo means a *missing bucket*, not an
-unreachable store. Do not use Tempo's health as a proxy for object-store
-health.
+And **the other RustFS writers survived the same outage untouched** — at the time
+those were Tempo and Pyroscope, neither of which restarted across 19 minutes,
+because they hold their buckets open and write periodically. A crash-looping
+writer means a *missing bucket*, not an unreachable store. Do not use a writer's
+health as a proxy for object-store health. Tempo has since been retired
+([RFC-0027](../../../proposals/rfc/RFC-0027/README.md)), so **Pyroscope and Barman
+are the remaining writers** — the lesson is unchanged, there is just one fewer
+signal to misread.
 
 ## Impact
 

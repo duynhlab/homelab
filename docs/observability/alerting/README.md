@@ -10,7 +10,7 @@ End-to-end view of how metrics become alerts, from ingestion through evaluation 
 flowchart TD
     subgraph ingestion ["1. Metrics Ingestion"]
         Apps["10 Go services + 2 workers"]
-        Infra["Infra exporters<br/>(PostgreSQL, kube-state,<br/>cAdvisor, Tempo)"]
+        Infra["Infra exporters<br/>(PostgreSQL, kube-state,<br/>cAdvisor, OTel Collector)"]
         OTEL["OTel Collector"]
         VMAgent["VMAgent<br/>(OTLP ingest + scraper)"]
         Apps -->|"OTLP push"| OTEL

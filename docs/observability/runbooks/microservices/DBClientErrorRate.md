@@ -63,7 +63,7 @@ kubectl -n "$NS" get pods -l app="$APP"
 
 The SQLSTATE is on the query span as the `pgx.sql_state` attribute. Find a
 failing request in VictoriaLogs with `{app="$APP"}` filtered to errors, then
-open its `trace_id` in Tempo and read the DB span: `42xxx` is schema drift
+open its `trace_id` in VictoriaTraces and read the DB span: `42xxx` is schema drift
 (migration mismatch), `57014` is a statement timeout, connection-class errors
 point at the pooler or Postgres itself.
 

@@ -2,7 +2,13 @@
 
 ## Overview
 
-This document explains the distributed tracing architecture used in this project, including the five-sink fan-out (Tempo ×2 + Jaeger + VictoriaTraces pilot + ClickHouse), OpenTelemetry Collector fan-out pattern, and SDK-based instrumentation approach.
+This document explains the distributed tracing architecture used in this project, including the two-sink trace fan-out (VictoriaTraces + ClickHouse), the OpenTelemetry
+Collector fan-out pattern, and the SDK-based instrumentation approach.
+
+Tempo (both installs) and Jaeger were retired by
+[RFC-0027](../../proposals/rfc/RFC-0027/README.md) — [ADR-058](../../proposals/adr/ADR-058-retire-jaeger/)
+and [ADR-059](../../proposals/adr/ADR-059-retire-tempo/). Their own docs are kept
+**archived** for the history: [jaeger.md](jaeger.md), [tempo.md](tempo.md).
 
 ## Architecture
 
@@ -23,19 +29,18 @@ flowchart TB
     subgraph collectorNode["OpenTelemetry Collector fan-out"]
         Receiver[/"OTLP receiver<br/>HTTP :4318 · gRPC :4317"/]
         Processors[/"memory_limiter<br/>batch"/]
+        SpanMetrics[/"span_metrics connector<br/>spans in → metrics out"/]
         Receiver --> Processors
+        Processors --> SpanMetrics
     end
 
     subgraph backends["Trace backends"]
-        Tempo[("Tempo raw<br/>primary · RustFS S3")]
-        TempoC[("Tempo chart<br/>ADR-040 parallel run<br/>2nd bucket · live generator")]
-        Jaeger[("Jaeger<br/>in-memory learning UI")]
-        VT[("VictoriaTraces v0.11.0<br/>pilot VTSingle")]
+        VT[("VictoriaTraces<br/>VTSingle · 7d · fast path")]
         CH[("ClickHouse<br/>otel_traces · 90d OLAP")]
     end
+    VM[("VictoriaMetrics<br/>spanmetrics_* series")]
 
     Grafana{{"Grafana"}}
-    JaegerUI{{"Jaeger UI"}}
 
     Client -->|"HTTP"| Edge
     Edge -->|"HTTP + traceparent"| Services
@@ -44,15 +49,12 @@ flowchart TB
     Temporal -->|"task queue"| Workers
     Edge -->|"OTLP/gRPC :4317 edge spans"| Receiver
     Services & Workers -->|"OTLP application spans"| Receiver
-    Processors -->|"OTLP/gRPC"| Tempo
-    Processors -->|"OTLP/gRPC"| TempoC
-    Processors -->|"OTLP/gRPC"| Jaeger
-    Processors -->|"OTLP/HTTP"| VT
-    Processors -->|"native TCP"| CH
-    Tempo --> Grafana
+    Processors -->|"OTLP/HTTP :10428"| VT
+    Processors -->|"native TCP :9000"| CH
+    SpanMetrics -->|"remote_write"| VM
     VT --> Grafana
     CH --> Grafana
-    Jaeger --> JaegerUI
+    VM --> Grafana
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
@@ -61,13 +63,15 @@ flowchart TB
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     class Client,Edge edge;
     class Services service;
     class Workers worker;
-    class Receiver,Processors collector;
-    class Tempo,TempoC,Jaeger,VT trace;
+    class Receiver,Processors,SpanMetrics collector;
+    class VT trace;
     class CH data;
-    class Temporal,Grafana,JaegerUI platform;
+    class VM metric;
+    class Temporal,Grafana platform;
 ```
 
 The trace **begins at the edge**: Envoy Gateway's native tracing opens the root
@@ -95,65 +99,69 @@ behavior that makes this reliable.
 
 **2. OpenTelemetry Collector**
 - **Deployment**: Kubernetes Deployment (1 replica, scalable)
-- **Function**: Fan-out layer — a `traces` pipeline distributing to **five** sinks, plus a `logs` pipeline going to **two** (fleet-wide app `otelzap` tee → VictoriaLogs *and* ClickHouse `otel_logs`). The edge has no OTLP logs path; its only log output is the JSON access log on stdout, tailed separately by Vector
+- **Function**: Fan-out layer — a `traces` pipeline distributing to **two** sinks (plus the `span_metrics` connector), and a `logs` pipeline going to **two** (fleet-wide app `otelzap` tee → VictoriaLogs *and* ClickHouse `otel_logs`). The edge has no OTLP logs path; its only log output is the JSON access log on stdout, tailed separately by Vector
 - **Configuration**: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
 - **Ports**: 4317 (gRPC), 4318 (HTTP), 8888 (metrics)
 
-**3. Tempo (Primary Backend)** — `grafana/tempo:2.10.8`
-- **Purpose**: Durable tracing backend
-- **Storage**: **RustFS S3** (`tempo-traces` bucket), **7-day** block retention
-- **Query**: Via Grafana (TraceQL)
-- **Integration**: Grafana datasource (+ traces↔logs↔metrics correlation)
+**3. VictoriaTraces (fast path)** — `VTSingle` CR, VictoriaMetrics Operator
+- **Purpose**: the interactive trace store — open a trace, follow a request
+- **Storage**: local PVC, **7-day** retention; **no object-storage dependency**
+- **Query**: Grafana, through the **Jaeger datasource type** pointed at
+  `/select/jaeger` — the Jaeger *deployment* is gone, its *query API* is what
+  VictoriaTraces speaks. Also queryable with LogsQL, and a Tempo-compatible API
+  exists at `/select/tempo` (upstream **experimental** — not what our datasource uses)
+- **Service graph**: `-servicegraph.enableTask=true` turns on the background task
+  behind `/select/jaeger/api/dependencies`. It runs on a 1-minute interval with a
+  1-minute lookbehind and is **not retroactive** — enabling it does not build a
+  graph for spans already stored ([ADR-059](../../proposals/adr/ADR-059-retire-tempo/))
+- **Config**: `kubernetes/infra/configs/observability/tracing/victoriatraces/vtsingle.yaml`
 
-**4. Jaeger v2 (Alternative Backend)** — `jaegertracing/jaeger` Helm chart, all-in-one
-- **Purpose**: Alternative UI, learning / comparison
-- **Storage**: **In-memory (100k traces max), ephemeral** — Jaeger has no S3/object-storage backend (persistence would need badger-PVC or external ES/ClickHouse)
-- **Query**: Built-in Jaeger UI (port 16686, `jaeger` Service)
-- **Integration**: Grafana datasource
+**4. ClickHouse (analytics tier)** — `otel_traces` table
+- **Purpose**: SQL over spans, and the long-retention copy
+- **Storage**: **90 days** — the longest of any store on the platform
+- **Query**: Grafana ClickHouse datasource; the only place a `trace_id` JOIN
+  across `otel_logs` ↔ `otel_traces` is possible in a single query
+- **Config**: the collector's `clickhouse` exporter (see below);
+  [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/),
+  [clickhouse](../clickhouse/README.md)
 
-## Why Multiple Backends?
+## Why Two Backends?
 
-The OTel Collector fans out to **five** sinks, each with a distinct role:
+The OTel Collector fans out to **two** trace sinks. They are not redundant — each
+answers a question the other answers badly.
 
 ### Use Cases
 
-1. **Tempo — durable primary**
-   - Day-to-day Grafana workflows (TraceQL, traces↔logs↔metrics correlation)
-   - Durable store on RustFS S3 (`tempo-traces` bucket, 7-day retention)
+1. **VictoriaTraces — the fast path**
+   - Day-to-day work: find a trace, open it, walk the spans
+   - Local PVC, 7-day retention, **no object storage** — managed by the *same*
+     VictoriaMetrics Operator as metrics (`VMSingle`) and logs (`VLSingle`), so
+     one operator owns all three signals
+   - Serves the Jaeger query API, which is how Grafana reaches it
+   - Details: [victoriatraces.md](victoriatraces.md),
+     [backend comparison](backends-comparison.md)
 
-2. **Jaeger — dedicated trace-search UI**
-   - Alternative UI, learning / comparison
-   - In-memory / ephemeral (no S3/object-storage backend)
-
-3. **VictoriaTraces — pilot**
-   - Evaluates the **VM-operator consolidation** story: tracing managed by the
-     *same* VictoriaMetrics Operator and storage engine as metrics (`VMSingle`)
-     and logs (`VLSingle`), with **no object-storage dependency**
-   - `v0.11.0` (0.x, pre-GA) — a pilot, not a replacement; any consolidation is a
-     future ADR gated on ~1.0/GA. See [victoriatraces.md](victoriatraces.md) and
-     the [backend comparison](backends-comparison.md)
-
-4. **Tempo (Helm chart) — ADR-040 phase-1 parallel run**
-   - Same image as the raw install, **second** RustFS bucket (`tempo-chart-traces`)
-   - The **only live metrics-generator** on the cluster: span-metrics +
-     service-graphs remote-written to vmagent with `send_exemplars: true`, while
-     the raw install's generator is inert (`remote_write: []`)
-   - [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/) is still
-     `Proposed`; phase 2 (delete the raw manifests, rename the release) has not
-     started, so both run
-
-5. **ClickHouse — long-retention analytics tier**
-   - `otel_traces`, **90 days** vs 7 on every other store
+2. **ClickHouse — the analytics tier**
+   - `otel_traces`, **90 days** vs 7 on the fast path
+   - Aggregate questions a trace UI cannot answer: *which endpoint regressed
+     this week*, *how many traces touched this customer*
    - The only place a `trace_id` JOIN across `otel_logs` ↔ `otel_traces` is
      possible in one query ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/),
      [clickhouse](../clickhouse/README.md))
 
-### Current Status
+### How it got here
 
-This is a **POC/learning project**, so multiple backends allow:
-- Learning each system
-- Comparing approaches (UI, query language, storage model)
-- Understanding trade-offs
+The fan-out was **five** sinks until 2026-08: Tempo raw, Tempo chart
+([ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/), a phase-1
+parallel run that never reached phase 2), Jaeger, VictoriaTraces and ClickHouse.
+Three of them earned their keep only as *learning* installs, and two of the three
+cost more than they returned: Tempo needed two RustFS buckets and silently failed
+TraceQL, Jaeger's in-memory store lost every trace on restart.
+[RFC-0027](../../proposals/rfc/RFC-0027/README.md) retired all three, keeping the
+one capability Tempo actually owned — the service graph — by turning on
+VictoriaTraces' own service-graph task. See
+[ADR-058](../../proposals/adr/ADR-058-retire-jaeger/) and
+[ADR-059](../../proposals/adr/ADR-059-retire-tempo/).
 
 ## SDK vs Sidecar: Why SDK?
 
@@ -275,9 +283,10 @@ The deployed pipelines (`kubernetes/infra/controllers/tracing/otel-collector/ote
 
 | Pipeline | Processors | Exporters |
 |----------|------------|-----------|
-| `traces` | `memory_limiter` → `batch` | Tempo raw (OTLP gRPC) · **Tempo chart (OTLP gRPC)** · Jaeger (OTLP gRPC) · VictoriaTraces (OTLP HTTP `:10428`) · ClickHouse `otel_traces` |
+| `traces` | `memory_limiter` → `batch` | VictoriaTraces (OTLP HTTP `:10428`) · ClickHouse `otel_traces` · **`span_metrics` connector** |
 | `logs` | `memory_limiter` → `batch` | VictoriaLogs (OTLP HTTP `:9428`) · **ClickHouse** `otel_logs` |
 | `metrics` | `memory_limiter` → `deltatocumulative` → `batch` | vmagent OTLP ingest `:8429` |
+| `metrics/spanmetrics` | `batch` | VictoriaMetrics `prometheus_remote_write` — receives from the `span_metrics` connector ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)) |
 
 Full walkthrough — component model, processor ordering, exporter durability,
 the ClickHouse startup coupling, and the troubleshooting runbook:
@@ -300,9 +309,9 @@ the ClickHouse startup coupling, and the troubleshooting runbook:
 5. **Batch export** every 5 seconds (or when batch full)
 6. **OTLP HTTP** sent to OTel Collector
 7. **Collector processes** (memory limit, batch)
-8. **Fan-out** to Tempo raw + Tempo chart + Jaeger (OTLP gRPC), VictoriaTraces (OTLP HTTP), and ClickHouse (`otel_traces`) — five sinks
+8. **Fan-out** to VictoriaTraces (OTLP HTTP) and ClickHouse (`otel_traces`) — two sinks — while the `span_metrics` connector derives RED metrics from the same spans
 9. **Backends store** traces
-10. **Query** via Grafana (Tempo) or Jaeger UI
+10. **Query** in Grafana: VictoriaTraces via the Jaeger datasource type, ClickHouse via SQL
 
 ### Sampling Strategy
 
@@ -326,23 +335,17 @@ by ratio, downstream honours the parent.
 
 ### Current Limitations
 
-1. **Jaeger Storage**: in-memory **by design** (data lost on restart) — Jaeger has **no S3/object-storage backend**, and Tempo is the durable store (RustFS S3, 7-day retention), so Jaeger is kept ephemeral as the secondary/learning UI.
+1. **Single-node stores**: VictoriaTraces is one `VTSingle` on a PVC and ClickHouse is a single shard — neither is replicated, so a lost volume is lost traces. Acceptable here because traces are diagnostic data with a 7/90-day horizon, not a system of record.
 2. **Collector HA**: Single replica (no redundancy); in-memory exporter queues drop on restart
 3. **Security**: No TLS between components
+4. **Service graph is not retroactive**: it is built by a background task from spans arriving *after* it was enabled ([ADR-059](../../proposals/adr/ADR-059-retire-tempo/))
 
 ### Recommended Improvements
 
-**1. Persistent storage for Jaeger (if ever needed):** Jaeger can't use S3/RustFS — the persistence options are **badger on a PVC** (single-node) or an external **Elasticsearch/OpenSearch/Cassandra/ClickHouse**:
-```yaml
-# kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml (conceptual — NOT deployed)
-backends:
-  primary_store:
-    badger:
-      ephemeral: false      # persist to a PVC
-      directory: /var/lib/jaeger-badger
-```
-- Requires a PVC; data survives pod restarts
-- Currently we keep `memory` and let **Tempo** own durable storage — see [backends-comparison.md](backends-comparison.md)
+**1. Durability for the fast path:** VictoriaTraces has no object-storage tier —
+VictoriaLogs-style S3 support is on the upstream roadmap only. Today the
+durability answer is ClickHouse's 90-day copy of the same spans, not a second
+trace store. Revisit if/when upstream ships object storage.
 
 **2. High Availability:** raise `replicaCount` behind the existing Service —
 head sampling means no trace-ID-aware routing is required. See
@@ -359,102 +362,47 @@ Remaining: a dedicated collector dashboard.
 
 ## Deployment Methods: Helm vs Operator
 
-### Current Approach: Helm Chart
+The tracing stack answers this question **twice**, differently, and on purpose.
 
-**What we use:**
-- Jaeger Helm chart (`jaegertracing/jaeger`)
-- GitOps-managed HelmRelease in this repo: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
-- Reconciled by Flux via the `tracing-local` Kustomization (path `./controllers/tracing`, `dependsOn: [secrets-local, storage-local, clickhouse-local]` — ClickHouse must be up before the collector's `create_schema` runs)
+| Component | How it is deployed | Why |
+|-----------|--------------------|-----|
+| OTel Collector | **Helm chart** (`HelmRelease`) | The config *is* the deliverable — one YAML block of receivers/processors/exporters. A CRD would add a layer without removing one |
+| VictoriaTraces | **CR** (`VTSingle`, VictoriaMetrics Operator) | The operator is already on the cluster for `VMSingle` + `VLSingle`; adding traces means one more CR, not one more controller |
 
-**Why Helm:**
-- ✅ Simple and straightforward
-- ✅ No operator overhead
-- ✅ Direct control over configuration
-- ✅ Perfect for POC/learning environments
-- ✅ Easy to understand and modify
+Both are reconciled by Flux through the `tracing-local` Kustomization
+(path `./controllers/tracing`, `dependsOn: [secrets-local, storage-local, clickhouse-local]`
+— ClickHouse must be up before the collector's `create_schema` runs).
 
-### Alternative: OpenTelemetry Operator
+### Why not the OpenTelemetry Operator
 
-**What it is:**
-- Kubernetes Operator for managing OpenTelemetry Collectors
-- CRD-based deployment (`OpenTelemetryCollector`)
-- Can deploy Jaeger v2 as OTel Collector
+It would buy **auto-instrumentation** (zero-code injection via annotations) and
+multi-collector management across namespaces. Neither is a problem we have: every
+service already calls `pkg/obsx.SetupObservability()`, so instrumentation is
+explicit and version-pinned in `go.mod` rather than injected at admission time —
+and there is exactly one collector. The operator also requires cert-manager for
+its webhooks, which is a dependency edge for no gain here.
 
-**When to use:**
-- Production with 10+ services
-- Need auto-instrumentation (zero-code)
-- GitOps workflow
-- Multiple collectors across namespaces
-- Dynamic scaling requirements
-
-**Example CRD:**
-```yaml
-apiVersion: opentelemetry.io/v1beta1
-kind: OpenTelemetryCollector
-metadata:
-  name: jaeger-instance
-spec:
-  image: jaegertracing/jaeger:latest
-  ports:
-  - name: jaeger
-    port: 16686
-  config:
-    service:
-      extensions: [jaeger_storage, jaeger_query]
-      pipelines:
-        traces:
-          receivers: [otlp]
-          exporters: [jaeger_storage_exporter]
-    # ... rest of config
-```
-
-### Jaeger Operator v1 (Deprecated for v2)
-
-**Status:**
-- ❌ **Deprecated** for Jaeger v2
-- Only for Jaeger v1 deployments
-- Uses CRD: `apiVersion: jaegertracing.io/v1`
-
-**Note:** Jaeger v2 uses OpenTelemetry Operator, not Jaeger Operator.
-
-### Comparison
-
-| Feature | Helm Chart (Current) | OpenTelemetry Operator |
-|---------|---------------------|------------------------|
-| **Complexity** | Low | Medium |
-| **Setup** | Simple | Requires cert-manager |
-| **Auto-instrumentation** | No | Yes |
-| **Scaling** | Manual | Automatic |
-| **GitOps** | Manual | Native CRD |
-| **Best For** | POC, Dev | Production |
-
-### Recommendation
-
-**Current Setup (Helm):**
-- ✅ **Perfect for current needs** - POC/learning project
-- ✅ **No need to change** - Works well
-- ✅ **Simple to maintain** - Easy to understand
-
-**Consider Operator When:**
-- Moving to production
-- Need auto-instrumentation
-- Want GitOps workflow
-- Multiple services and namespaces
+Worth revisiting if the platform ever needs to instrument a service **it does not
+own the source of** — that is the case auto-instrumentation exists for.
 
 ## Related Documentation
 
 - OpenTelemetry Collector manifests: `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml`
-- Jaeger manifests: `kubernetes/infra/controllers/tracing/jaeger/jaeger.yaml`
+- VictoriaTraces manifest: `kubernetes/infra/configs/observability/tracing/victoriatraces/vtsingle.yaml`
 - [APM Overview](./README.md)
-- [Jaeger Guide](./jaeger.md)
+- [VictoriaTraces](./victoriatraces.md) · [backend comparison](./backends-comparison.md)
+- Archived, read-only: [Jaeger](./jaeger.md) · [Tempo](./tempo.md)
 
 ## References
 
 - [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
-- [Jaeger Documentation](https://www.jaegertracing.io/docs/)
-- [Grafana Tempo Documentation](https://grafana.com/docs/tempo/)
+- [Jaeger Documentation](https://www.jaegertracing.io/docs/) — for the **query API**, which VictoriaTraces serves
+- [VictoriaTraces Documentation](https://docs.victoriametrics.com/victoriatraces/)
 - [CNCF Observability Best Practices](https://www.cncf.io/blog/)
-- [Jaeger v2 Deployment Guide](https://www.jaegertracing.io/docs/2.13/deployment/kubernetes/)
 - [OpenTelemetry Operator](https://opentelemetry.io/docs/platforms/kubernetes/operator/)
 
-_Last updated: 2026-08-23 — the fan-out is five sinks: `tempo-chart` (ADR-040 phase-1 parallel run, and the only live metrics-generator) and ClickHouse `otel_traces` were both missing from the counts, the diagram and the pipeline table._
+_Last updated: 2026-08-24 — RFC-0027 retired Tempo (both installs) and Jaeger, so the
+fan-out is **two** trace sinks, not five. Rewritten: the overview, the topology diagram, the
+backend rationale, the pipeline table (now including `metrics/spanmetrics`), the trace
+lifecycle, the production limitations, and the deployment-method section — which described
+deploying Jaeger._

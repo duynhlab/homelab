@@ -35,9 +35,11 @@ started in Go looks identical to one started in Java.
 
 What it deliberately does **not** do: store data or draw dashboards. Storage
 and query belong to backends (here: VictoriaMetrics, VictoriaLogs, ClickHouse,
-Tempo ×2, Jaeger, VictoriaTraces, Pyroscope), and visualization to Grafana. Choosing OTel is what
-lets this platform swap backends (Loki → VictoriaLogs, the VictoriaTraces
-pilot, the ClickHouse OLAP path) **without touching a single service**.
+VictoriaTraces, Pyroscope), and visualization to Grafana. Choosing OTel is what
+lets this platform swap backends (Loki → VictoriaLogs, Tempo + Jaeger →
+VictoriaTraces, the ClickHouse OLAP path) **without touching a single service** —
+[RFC-0027](../../proposals/rfc/RFC-0027/README.md) removed two trace backends and
+changed no application code at all.
 
 A mental model that survives all the jargon — the **central post office**:
 
@@ -200,7 +202,7 @@ flowchart TB
         col[/"OpenTelemetry Collector"/]
         vmN[(VictoriaMetrics)]
         vlN[(VictoriaLogs)]
-        tN[(Tempo · Jaeger · VictoriaTraces)]
+        tN[(VictoriaTraces · ClickHouse)]
         svcN -->|"OTLP push (metrics·logs·traces) :4318"| col
         col -->|"metrics"| vmN
         col -->|"logs (trace_id field)"| vlN
@@ -341,7 +343,7 @@ flowchart LR
     batch -->|"metrics"| vma[/"vmagent :8429<br/>(usePrometheusNaming,<br/>service_name→app relabel)"/]
     vma --> vm[(VictoriaMetrics)]
     batch -->|"logs (VL-Stream-Fields: service.name)"| vl[(VictoriaLogs)]
-    batch -->|"traces"| tr[(Tempo · Jaeger · VictoriaTraces)]
+    batch -->|"traces"| tr[(VictoriaTraces · ClickHouse)]
     classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
     classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
     classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
@@ -380,7 +382,7 @@ exemplars never gave us on VictoriaMetrics (unsupported; accepted as D-14).
 |---|---|---|---|---|---|
 | Metrics | `request_duration_seconds`, scraped `/metrics` | `http_server_request_duration_seconds`, otelgin | OTLP push → vmagent | VictoriaMetrics | `service.name`, time |
 | Logs | 3 log schemas → stdout → Vector | zap + `otelzap` tee | OTLP push (Vector for infra) | VictoriaLogs | `trace_id` field |
-| Traces | already OTel | otelgin/otelgrpc, W3C `traceparent` | OTLP push | Tempo · Jaeger · VictoriaTraces | `trace_id` |
+| Traces | already OTel | otelgin/otelgrpc, W3C `traceparent` | OTLP push | VictoriaTraces · ClickHouse | `trace_id` |
 | Profiles | already Pyroscope | `obsx.SetupProfiling()` | pprof push | Pyroscope | `pyroscope.profile.id` |
 | Liveness | `up{}` (free with pull) | D-4 heartbeat-absence | — | VictoriaMetrics | `app` |
 
@@ -437,13 +439,12 @@ flowchart LR
     a -->|"gRPC + traceparent"| b["service B<br/>(otelgrpc)"]
     a -->|"OTLP"| col[/"OTel Collector"/]
     b -->|"OTLP"| col
-    col --> tempo[(Tempo)]
-    col --> jaeger[(Jaeger)]
     col --> vt[(VictoriaTraces)]
+    col --> ch[(ClickHouse otel_traces)]
     classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
     class col otc;
-    class tempo,jaeger,vt trace;
+    class vt,ch trace;
 ```
 
 Baggage is powerful and dangerous in equal measure — it rides *every*
@@ -464,7 +465,7 @@ sequenceDiagram
     participant A as product (otelgin)
     participant R as review (otelgrpc)
     participant C as OTel Collector
-    participant B as VM · VLogs · Tempo
+    participant B as VM · VLogs · VictoriaTraces
     U->>K: GET /product/v1/public/products/1/details
     K->>A: HTTP + traceparent (root span)
     A->>A: otelgin span + http_server_* metric + zap log (trace_id)
@@ -496,8 +497,11 @@ span. Both are wired centrally in `obsx`.
 | `deployment.environment.name` | `DEPLOYMENT_ENVIRONMENT` | local vs production separation |
 | `pyroscope.profile.id` | `otel-profiling-go` span attr | span ↔ its CPU flame graph |
 
-Grafana wires the pivots: Tempo `tracesToLogsV2` (tag `trace_id`),
-`tracesToProfiles` (`service.name`→`service_name`), and `tracesToMetrics`.
+Grafana wires the pivots on the VictoriaTraces datasource: `tracesToLogsV2` (tag
+`trace_id`) and `tracesToMetrics`. `tracesToProfiles` is **not** available — it is
+a Tempo-datasource-only option, so span→profile is a manual pivot since
+[RFC-0027](../../proposals/rfc/RFC-0027/README.md); see
+[profiling](../profiling/README.md#trace-correlation-platform).
 Exemplars are **not** used because VictoriaMetrics does not support them —
 trace-to-log navigation is exact by `trace_id`; metric-to-trace navigation is
 a scoped search by service and time (D-14). Normative correlation fields:
@@ -523,7 +527,7 @@ never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 | Collector | [collector.md](collector.md) — pipelines, processors, fan-out |
 | Metrics ingest | **vmagent** `:8429` — translates OTLP names to Prometheus style, relabels, remote-writes to VictoriaMetrics; also scrapes infra exporters |
 | Non-SDK logs | **Vector** DaemonSet — ships logs for everything without an OTel SDK (DBs, the edge's access log, PG plans, frontend); skips app pods |
-| Backends | VictoriaMetrics (PromQL) · VictoriaLogs (LogsQL, `trace_id` first-class) · Tempo/Jaeger/VictoriaTraces · ClickHouse OLAP · Pyroscope |
+| Backends | VictoriaMetrics (PromQL) · VictoriaLogs (LogsQL, `trace_id` first-class) · VictoriaTraces · ClickHouse OLAP · Pyroscope |
 | UI | **Grafana** — one pane over all backends; pivots between signals via `trace_id` |
 | Sampling | `ParentBased(TraceIDRatioBased)`, `OTEL_SAMPLE_RATE` — [README.md § Sampling](README.md#sampling) |
 | Views | Pinned histogram buckets — [histograms.md](../metrics/histograms.md) |
@@ -536,4 +540,6 @@ never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 
 ---
 
-_Last updated: 2026-08-23 — the backend enumeration was missing Jaeger and VictoriaTraces._
+_Last updated: 2026-08-24 — trace backends are VictoriaTraces + ClickHouse after RFC-0027.
+The **BEFORE RFC-0014** diagram keeps Tempo/Jaeger on purpose: it is historical. Also corrected
+the pivot list — `tracesToProfiles` does not exist on a jaeger-type datasource._

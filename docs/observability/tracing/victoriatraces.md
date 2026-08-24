@@ -1,33 +1,39 @@
-# VictoriaTraces (pilot)
+# VictoriaTraces
 
-**VictoriaTraces** is deployed as a **pilot** tracing backend. The OTel Collector fans the same
-OTLP traces to **five** sinks — Tempo (raw), Tempo (chart), Jaeger, VictoriaTraces and ClickHouse — see
-[tracing/README.md](./README.md). The point of
-the pilot is to evaluate the **VM-operator consolidation** story: tracing managed by the *same*
-VictoriaMetrics Operator (and *same* storage engine) as metrics (`VMSingle`) and logs (`VLSingle`),
-with **no object-storage dependency**.
+**VictoriaTraces** is the platform's **fast trace path**: the store you open when
+you are following one request. The OTel Collector fans the same OTLP traces to
+**two** sinks — VictoriaTraces (7d) and ClickHouse `otel_traces` (90d) — see
+[tracing/README.md](./README.md). It delivers the **VM-operator consolidation**
+story: tracing managed by the *same* VictoriaMetrics Operator (and *same* storage
+engine) as metrics (`VMSingle`) and logs (`VLSingle`), with **no object-storage
+dependency**.
 
-> **Maturity caveat** — VictoriaTraces is **`v0.11.0` (0.x, pre-GA)**. This is a **pilot**, not a
-> replacement: Tempo (durable on RustFS) + Jaeger stay. Any consolidation onto VictoriaTraces is a
-> future decision (ADR), gated on ~1.0/GA and validating partial TraceQL
-> compatibility against Tempo workflows. See the full [backends comparison](./backends-comparison.md).
+> **It started as a pilot.** Tempo was the primary store and Jaeger the secondary
+> UI until [RFC-0027](../../proposals/rfc/RFC-0027/README.md) retired both
+> ([ADR-058](../../proposals/adr/ADR-058-retire-jaeger/),
+> [ADR-059](../../proposals/adr/ADR-059-retire-tempo/)). VictoriaTraces is
+> still **`v0.x` (pre-GA)** — that risk was accepted rather than eliminated, and
+> the cost we accepted is TraceQL: see
+> [backends-comparison § Trade-offs](./backends-comparison.md#trade-offs-we-accepted).
 
 ## How it fits
 
 ```mermaid
 flowchart LR
   Apps["10 services + 2 workers<br/>OTel SDK"] -->|OTLP| OC["OTel Collector"]
-  OC -->|otlp/tempo| T["Tempo (durable · RustFS)"]
-  OC -->|otlp/jaeger| J["Jaeger (in-memory)"]
-  OC -->|otlp_http/victoriatraces| V["VictoriaTraces VTSingle :10428"]
+  OC -->|otlp_http/victoriatraces| V["VictoriaTraces VTSingle :10428<br/>7d"]
+  OC -->|clickhouse| CH[("ClickHouse otel_traces<br/>90d")]
   V --> G["Grafana (Jaeger datasource → /select/jaeger)"]
+  CH -->|SQL| G
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
   classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
   classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
   classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
   class Apps service;
   class OC collector;
-  class T,J,V trace;
+  class V trace;
+  class CH data;
   class G platform;
 ```
 
@@ -73,7 +79,7 @@ exporters:
     traces_endpoint: http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/insert/opentelemetry/v1/traces
     tls: { insecure: true }
     compression: gzip
-# pipelines.traces.exporters: [otlp/tempo, otlp/tempo-chart, otlp/jaeger, otlp_http/victoriatraces, clickhouse]
+# pipelines.traces.exporters: [otlp_http/victoriatraces, clickhouse, span_metrics]
 ```
 
 ## Querying
@@ -81,11 +87,16 @@ exporters:
 - **Grafana** — a **Jaeger-type** datasource (uid `victoriatraces`, there is no native VT datasource)
   pointed at the Jaeger query API: `http://vtsingle-victoria-traces.monitoring.svc.cluster.local:10428/select/jaeger`.
   `tracesToLogsV2`/`tracesToMetrics` are wired to VictoriaLogs/VictoriaMetrics like the other backends.
-- **Tempo API** — v0.11.0 exposes partial Tempo/TraceQL-compatible search APIs
-  (coverage last assessed on v0.9.4; the 0.10/0.11 releases announce no change here),
-  including Grafana Traces Drilldown support. This platform keeps the proven
-  Jaeger datasource during the pilot; TraceQL metrics and pipelines remain a
-  Tempo-only capability.
+- **Tempo-compatible API** — `/select/tempo` exposes partial TraceQL search
+  (coverage last assessed on v0.9.4; the 0.10/0.11 releases announce no change here)
+  and is marked **experimental** upstream. This platform's datasource does **not**
+  use it — the Jaeger API is the query path. TraceQL metrics and pipelines have no
+  equivalent here at all; that question goes to ClickHouse as SQL.
+- **Service graph** — `/select/jaeger/api/dependencies`, gated on
+  `-servicegraph.enableTask=true` in the CR. The task runs on a 1-minute interval
+  with a 1-minute lookbehind and is **not retroactive**: before it was enabled the
+  endpoint answered `200` with an empty list, which reads exactly like "no
+  dependencies" ([ADR-059](../../proposals/adr/ADR-059-retire-tempo/)).
 - **UI / API** — exposed at `victoriatraces.duynh.me` (the `victoriatraces` HTTPRoute → `:10428`).
 - **LogsQL** (advanced, traces-as-logs) — `POST /select/logsql/query`, e.g.:
 
@@ -115,13 +126,15 @@ Quick ingest check: `curl 'http://localhost:10428/select/jaeger/api/services'`.
 
 ## Status
 
-Pilot, wired in the manifests — the collector's five-sink fan-out exporter and the Grafana
-`victoriatraces` datasource are both deployed config (`otel-collector.yaml`,
-`datasource-victoriatraces.yaml`); v0.11.0 verified standalone (ingests OTLP-HTTP traces; the
-Jaeger API returns them). Tempo stays the documented primary/durable store — and it now runs twice, the raw manifests plus the ADR-040 chart parallel run.
+**Primary trace store.** The collector's `otlp_http/victoriatraces` exporter and the
+Grafana `victoriatraces` datasource are both deployed config (`otel-collector.yaml`,
+`datasource-victoriatraces.yaml`), and the service graph is enabled in the CR —
+measured at 12 edges including database dependencies on the Kind cluster. The
+long-retention copy of the same spans lives in ClickHouse `otel_traces` (90d).
 See [backends-comparison.md](./backends-comparison.md) for the decision context.
 
 ---
-_Last updated: 2026-08-23 — the fan-out is five sinks, not three. The quoted exporter list was wrong three ways: two exporters missing, exporter name spelled `otlphttp` where the manifest says `otlp_http`, and the order differed._
-base — no shell in the container; the operator's HTTP probes and this stack's
-queries are unaffected). Exposure re-documented as the `victoriatraces` HTTPRoute; VictoriaTraces v0.11.0 and VM Operator v0.73.1 compatibility review._
+_Last updated: 2026-08-24 — no longer a pilot. RFC-0027 retired Tempo and Jaeger, so this
+is the primary trace store: the title, the caveat block, the diagram, the exporter list and the
+status section all said otherwise. Added the service-graph endpoint and its not-retroactive
+caveat, and demoted the Tempo-compatible API to what it is — experimental and unused here._

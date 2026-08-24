@@ -3,7 +3,6 @@
 # Runs periodically (idempotent) - safe to re-run
 #
 # Buckets: pg-backups-cnpg (CloudNativePG/Barman),
-#          tempo-traces (Grafana Tempo trace blocks)
 #
 # Chart: cronjobs v0.2.0 from oci://ghcr.io/duyhenryer/charts/cronjobs
 # Verify: kubectl get cronjob -n rustfs

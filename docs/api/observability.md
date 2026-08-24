@@ -17,9 +17,11 @@ Cross-cutting instrumentation contract for every Go service and worker in the pl
 
 Every service and worker shares one instrumentation stack wired through **`pkg/obsx`**. Services never build OTel providers, exporters, or resources by hand. Platform backends and the Collector fan-out are documented under
 [`docs/observability/`](../observability/README.md). The full set the collector writes to
-today is **seven**: VictoriaMetrics (metrics), VictoriaLogs and ClickHouse (logs), and
-Tempo ×2, Jaeger, VictoriaTraces and ClickHouse (traces); Pyroscope receives profiles
-directly from the SDK, not through the collector.
+today is **four**: VictoriaMetrics (metrics, including the `span_metrics` connector's
+output), VictoriaLogs and ClickHouse (logs), and VictoriaTraces and ClickHouse
+(traces). Pyroscope receives profiles directly from the SDK, not through the
+collector. Tempo and Jaeger were retired by
+[RFC-0027](../proposals/rfc/RFC-0027/README.md).
 
 ## Document ownership
 
@@ -518,14 +520,14 @@ Sampling details: [Application tracing](./tracing.md#sampling).
 
 | Field | Signal | Join |
 |-------|--------|------|
-| `trace_id` | Logs, traces | Log → any trace store; Tempo, Jaeger and VictoriaTraces all link back to logs (`tracesToLogsV2` → `victorialogs`). ClickHouse joins `otel_logs` ↔ `otel_traces` on this field in one query |
+| `trace_id` | Logs, traces | VictoriaTraces links back to logs (`tracesToLogsV2` → `victorialogs`); the reverse direction is not wired. ClickHouse joins `otel_logs` ↔ `otel_traces` on this field in one query |
 | `span_id` | Logs | Span-scoped log lines |
-| `pyroscope.profile.id` | Traces, profiles | Span → CPU flame graph — see [profiling.md](./profiling.md) |
+| `pyroscope.profile.id` | Traces, profiles | Span → CPU flame graph, **manual pivot** since RFC-0027 — see [profiling.md](./profiling.md) |
 | `service.name` / `app` | Metrics, traces, logs, profiles | Fleet identity via `OTEL_SERVICE_NAME` |
 
 Exemplars are **not** available on this platform (VictoriaMetrics D-14). Correlation loop:
-metric → logs by label+time → `trace_id` → a trace store (Tempo, Jaeger or VictoriaTraces),
-or a single SQL join in ClickHouse when the question spans more than 7 days — see
+metric → logs by label+time → `trace_id` → **VictoriaTraces**, or a single SQL join
+in ClickHouse when the question spans more than 7 days — see
 [metrics.md](./metrics.md#correlation-metrics--traces--logs).
 
 ---

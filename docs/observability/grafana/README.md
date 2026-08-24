@@ -1,6 +1,6 @@
 # Grafana
 
-Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), Tempo (traces), VictoriaLogs (logs, LogsQL via plugin), Jaeger (traces), and Pyroscope (profiles) through configured datasources.
+Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), VictoriaTraces (traces), VictoriaLogs (logs, LogsQL via plugin), Jaeger (traces), and Pyroscope (profiles) through configured datasources.
 
 ## Deployment
 
@@ -31,9 +31,7 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 | VictoriaMetrics | `victoriametrics-metrics-datasource` | Yes | `vmsingle-victoria-metrics:8428` | Metrics (PromQL/MetricsQL), dashboards, Explore |
 | VictoriaMetrics (Prometheus) | `prometheus` | No | same VMSingle URL | prometheus-TYPE alias — what `query: prometheus` datasource variables (Envoy Gateway, Temporal, cert-manager, VM self-boards) resolve against |
 | VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), trace correlation, [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
-| VictoriaTraces | `jaeger` | No | `vtsingle…:10428/select/jaeger` | Trace queries against the VictoriaTraces pilot (Jaeger query API) |
-| Tempo | `tempo` | No | `tempo:3200` | Trace queries |
-| Jaeger | `jaeger` | No | `jaeger:16686` | Trace search (alternative UI) |
+| VictoriaTraces | `jaeger` | No | `vtsingle…:10428/select/jaeger` | Trace queries + node graph. The **type** stays `jaeger` — that is the query API VictoriaTraces serves, not a leftover deployment ([RFC-0027](../../proposals/rfc/RFC-0027/README.md)) |
 | ClickHouse | `grafana-clickhouse-datasource` | No | `clickhouse…:9000` | SQL over `otel.otel_logs` / `otel.otel_traces` (RFC-0019) |
 | Pyroscope | `grafana-pyroscope-datasource` | No | `pyroscope:4040` | Flamegraphs |
 
@@ -49,8 +47,6 @@ kubernetes/infra/configs/observability/grafana/
 ├── datasource-victoriametrics-prometheus.yaml  # prometheus-TYPE alias (dashboards with `query: prometheus` variables)
 ├── datasource-victorialogs.yaml                # VictoriaLogs plugin
 ├── datasource-victoriatraces.yaml              # VictoriaTraces via the Jaeger query API
-├── datasource-tempo.yaml
-├── datasource-jaeger.yaml
 ├── datasource-clickhouse.yaml                  # grafana-clickhouse-datasource (RFC-0019)
 └── datasource-pyroscope.yaml
 ```
@@ -116,7 +112,7 @@ renders them as ConfigMaps and the `GrafanaDashboard` CRs consume them via
 `configMapRef`, mapping `DS_PROMETHEUS` → `VictoriaMetrics`. **Edit the boards
 in that repo and bump the chart** — the old
 [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards)
-repo is deprecated (its remaining legacy boards — Tempo, K8s overview, the PG
+repo is deprecated (its remaining legacy boards — K8s overview, the PG
 trio, Redis — are still fetched via `spec.url` at their nested
 `dashboard/<area>/<name>.json` paths until they migrate; **Temporal migrated
 in-repo on 2026-08-18** after living unpinned on that repo's `main`).
@@ -146,8 +142,8 @@ kubernetes/infra/configs/observability/grafana/
 ├── grafana.yaml                       # Grafana CR (operator-managed)
 ├── datasource-victoriametrics.yaml    # VictoriaMetrics plugin (default metrics)
 ├── datasource-victorialogs.yaml       # VictoriaLogs plugin datasource
-├── datasource-tempo.yaml
-├── datasource-jaeger.yaml
+├── datasource-victoriatraces.yaml     # VictoriaTraces (type: jaeger)
+├── datasource-clickhouse.yaml         # grafana-clickhouse-datasource
 ├── datasource-pyroscope.yaml
 ├── grafana-service-account-mcp.yaml   # Viewer SA + token Secret for the Grafana MCP server
 ├── dashboards-chart.yaml              # HelmRelease → helm-charts grafana-dashboards chart (RFC-0017 boards as ConfigMaps)

@@ -4,6 +4,12 @@ kind: Kustomization
 resources:
   - pyroscope-alerts.yaml
   - clickhouse-alerts.yaml
+  - otel-collector-alerts.yaml
 # RFC-0027 / ADR-059: TempoDown retired with Tempo (*.yaml.bak). Removing BOTH
 # installs is what makes deleting it correct — dropping one would have left the
 # alert with zero series: loading clean, never firing, reading as healthy forever.
+#
+# That file also held OtelCollectorDown (severity critical), which was NOT part of
+# the decision and went with it. Restored in otel-collector-alerts.yaml — its own
+# file, so a future backend retirement cannot take it along again. Found by the
+# RFC-0027 P5 docs audit: the alert catalog still documented it as live.

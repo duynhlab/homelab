@@ -17,7 +17,7 @@ how this platform uses it today (Collector topology, sampling, operations).
 | Protocol | Services and workers use OTLP/HTTP protobuf on `:4318`; the cluster Collector also accepts OTLP/gRPC on `:4317`, which the edge's tracing provider uses |
 | Propagation | W3C Trace Context (`traceparent`); the edge propagates it natively (Envoy Gateway `telemetry.tracing`, no plugin config) |
 | Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` (see [Sampling](#sampling)) |
-| Trace backends | **Five sinks** — Tempo raw (primary) + Tempo chart (ADR-040 parallel run) + Jaeger (in-memory UI) + VictoriaTraces (pilot) + ClickHouse `otel_traces` (90d SQL) |
+| Trace backends | **Two sinks** — VictoriaTraces (7d, fast path) + ClickHouse `otel_traces` (90d SQL). Tempo and Jaeger retired under [RFC-0027](../../proposals/rfc/RFC-0027/README.md) |
 | Service identity | `OTEL_SERVICE_NAME` + Downward API envs, injected by the app ResourceSets |
 
 ## How to use this area
@@ -53,7 +53,7 @@ Before OpenTelemetry, every vendor had its own agent, wire format, and API —
 switching backends meant re-instrumenting the code. OTel is the CNCF-standard
 answer: **one API, one SDK, one wire protocol (OTLP)**, and any backend that
 speaks it. This platform leans on that portability: the same span stream fans
-out to five trace sinks without touching a line of Go, and RFC-0014
+out to its trace sinks without touching a line of Go, and RFC-0014
 extends the same idea to metrics and logs.
 
 ## The building blocks — and who imports what
@@ -103,7 +103,7 @@ about and keeps backend changes out of service code.
 | Instrumentation API and SDK | `pkg/obsx`, `otelgin`, `otelgrpc`, `otelzap` | Defines and emits signals |
 | Wire protocol | OTLP/HTTP protobuf | Standard transport |
 | Processing and routing | OpenTelemetry Collector | Receives, batches, normalizes, and fans out |
-| Storage and query | VictoriaMetrics, VictoriaLogs, ClickHouse, Tempo ×2, Jaeger, VictoriaTraces | Not an OTel responsibility |
+| Storage and query | VictoriaMetrics, VictoriaLogs, ClickHouse, VictoriaTraces | Not an OTel responsibility |
 | Visualization and alerting | Grafana, VMAlert, VMAlertmanager, Sloth | Consumes backend data; not an OTel responsibility |
 
 ## Platform instrumentation policy (RFC-0014 — normative)
@@ -131,10 +131,10 @@ flowchart LR
     end
     SVC -->|"OTLP/HTTP :4318"| TP
     EDGE -->|"OTLP/gRPC :4317 spans"| TP
-    TP --> TEMPO["Tempo (primary)"]
-    TP --> JAEGER["Jaeger (in-memory UI)"]
-    TP --> VT["VictoriaTraces (pilot)"]
-    TP --> CH[("ClickHouse otel_traces")]
+    TP --> VT["VictoriaTraces (7d)"]
+    TP --> CH[("ClickHouse otel_traces (90d)")]
+    TP --> SM["span_metrics connector"]
+    SM --> VMS0[("VictoriaMetrics<br/>spanmetrics_*")]
     LP --> VL["VictoriaLogs"]
     LP --> CH2[("ClickHouse otel_logs")]
 
@@ -146,10 +146,12 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class SVC app;
     class EDGE edge;
-    class TP,LP otc;
-    class TEMPO,JAEGER,VT trace;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    class TP,LP,SM otc;
+    class VT trace;
     class VL log;
     class CH,CH2 data;
+    class VMS0 metric;
 ```
 
 The edge has **no OTLP logs path** — its only log output is the JSON access
@@ -163,7 +165,7 @@ flowchart LR
     COL2 -->|"otlphttp proto"| VMA["vmagent :8429 OTLP ingest<br/>-opentelemetry.usePrometheusNaming<br/>+ resource-attr allowlist + relabel"]
     VMA --> VMS[("VMSingle")]
     COL2 -->|"VL-Stream-Fields:<br/>service.name"| VLX[("VictoriaLogs<br/>trace_id = queryable field")]
-    COL2 --> T3["Tempo"]
+    COL2 --> T3["VictoriaTraces"]
     COL2 -->|"logs + traces"| CH3[("ClickHouse")]
 
     classDef app fill:#06b6d4,color:#082f49,stroke:#0e7490;
@@ -187,7 +189,7 @@ flowchart LR
 > for metrics today.
 
 - **Traces** — unchanged: every service and worker exports spans via `obsx`;
-  the edge opens the root span; the collector fans out to five sinks.
+  the edge opens the root span; the collector fans out to two sinks.
 - **Metrics** — OTLP push, fleet-wide: services and workers emit semconv
   metrics through the OTel Meter API to the collector, which forwards them to vmagent's OTLP
   ingest and on to VMSingle. The `/metrics` scrape and client_golang RED were
@@ -209,8 +211,8 @@ matters when a local query returns a series that does not exist in the cluster.
 |---------|------------|-------------|
 | Producer sampling | 10% at the edge (`samplingRate: 10`, **planned**) and `0.1` at services | 100% at the edge (`samplingRate: 100`) and `1.0` at services |
 | Collector receivers | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (gRPC receiver enabled for the edge's tracing provider) | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (same reason) |
-| Trace fan-out | Tempo raw, Tempo chart, Jaeger, VictoriaTraces, ClickHouse | VictoriaTraces **and ClickHouse** |
-| RED metrics | Application SDK metrics; no spanmetrics connector | Application SDK metrics plus a spanmetrics compatibility connector |
+| Trace fan-out | VictoriaTraces **and ClickHouse** | VictoriaTraces **and ClickHouse** — the two now match |
+| RED metrics | Application SDK metrics **plus** the `span_metrics` connector ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)) | Application SDK metrics plus a spanmetrics compatibility connector |
 | Infrastructure logs | Vector DaemonSet | Container logging path used by the local stack |
 
 The local spanmetrics connector is a compatibility aid, not the source of the
@@ -244,8 +246,9 @@ Environment variables read by `obsx.ConfigFromEnv`: see
 
 Quick verification:
 
-- **Traces arriving** — Grafana → Explore → **Tempo** → search
-  `service.name = order` (or the Jaeger UI service dropdown).
+- **Traces arriving** — Grafana → Explore → **VictoriaTraces** → pick
+  `service.name = order` from the service dropdown; or straight at the API:
+  `curl -s localhost:10428/select/jaeger/api/services`.
 - **OTLP metrics arriving** — VMSingle/vmui:
   `http_server_request_duration_seconds_bucket{app="<svc>"}` with 13 buckets.
 - **OTLP logs arriving** — Explore → **VictoriaLogs** →
@@ -258,4 +261,6 @@ Quick verification:
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
 - In-house: [OTel fundamentals](fundamentals.md) (concepts + old-vs-new migration story) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/histograms.md](../metrics/histograms.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/envoy-gateway.md](../../platform/envoy-gateway.md)
 
-_Last updated: 2026-08-23 — trace fan-out corrected from three to five sinks; the local-stack column also carried ClickHouse and did not say so._
+_Last updated: 2026-08-24 — trace fan-out is **two** sinks after RFC-0027 retired Tempo and
+Jaeger. The claim corrected here yesterday (three → five) was made true and then made false
+again by the retirement, which is the drift the RFC's P5 phase exists to close._

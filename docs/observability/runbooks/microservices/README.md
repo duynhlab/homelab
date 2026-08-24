@@ -130,7 +130,7 @@ flowchart TD
 
     CheckDashboard --> IdentifyEndpoint["Identify failing endpoint\nfrom per-endpoint error rate"]
 
-    IdentifyEndpoint --> CheckExemplar["Find the request in VictoriaLogs\n-> open its trace_id in Tempo\n(no exemplars, D-14)"]
+    IdentifyEndpoint --> CheckExemplar["Find the request in VictoriaLogs\n-> open its trace_id in VictoriaTraces\n(no exemplars, D-14)"]
 
     CheckExemplar --> ReadTrace["Read trace waterfall:\nWhich span has error status?"]
 
@@ -166,7 +166,7 @@ flowchart TD
     CheckP95 --> IdentifyEndpoint["Find slowest endpoint"]
 
 
-    IdentifyEndpoint --> CheckExemplar["Find the slow request in VictoriaLogs\n-> open its trace_id in Tempo\n(no exemplars, D-14)"]
+    IdentifyEndpoint --> CheckExemplar["Find the slow request in VictoriaLogs\n-> open its trace_id in VictoriaTraces\n(no exemplars, D-14)"]
 
     CheckExemplar --> ReadTrace["Read trace waterfall:\nWhich span is slowest?"]
 
@@ -323,7 +323,7 @@ domain's additions.
 - **Extra quick-facts rows:** `Applies to` (which of the 11 services the alert
   can select) when the expr is label-scoped rather than fleet-wide.
 - **Diagnosis dialect:** start from the alert's `app` label — `$APP` in every
-  query; pivot metric → trace via exemplar `trace_id` into Tempo, and
+  query; pivot metric → trace by taking a `trace_id` from a log line into VictoriaTraces (there are no exemplars), and
   metric → log via `{app="$APP"} | trace_id` in VictoriaLogs.
 - **Dashboards:** Microservices folder (RED per service) plus the Checkout
   funnel board for order-path alerts.

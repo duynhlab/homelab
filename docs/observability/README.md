@@ -44,10 +44,7 @@ flowchart TB
         VMAgent[/"VMAgent :8429<br/>OTLP ingest + infra scrape"/]
         VMSingle[("VictoriaMetrics :8428")]
         VLogs[("VictoriaLogs :9428")]
-        Tempo[("Tempo raw<br/>durable on RustFS")]
-        TempoC[("Tempo chart<br/>ADR-040 parallel run")]
-        Jaeger[("Jaeger<br/>in-memory UI")]
-        VT[("VictoriaTraces :10428<br/>pilot")]
+        VT[("VictoriaTraces :10428<br/>7d fast path")]
         CH[("ClickHouse :9000<br/>otel_logs · otel_traces")]
         Pyro[("Pyroscope :4040")]
     end
@@ -69,9 +66,6 @@ flowchart TB
     Processors -->|"metrics"| VMAgent
     Processors -->|"logs"| VLogs
     Processors -->|"logs + traces"| CH
-    Processors -->|"traces"| Tempo
-    Processors -->|"traces"| TempoC
-    Processors -->|"traces"| Jaeger
     Processors -->|"traces"| VT
     Vector -->|"JSON line ingest"| VLogs
     VMAgent -->|"remote write"| VMSingle
@@ -79,8 +73,6 @@ flowchart TB
 
     VMSingle --> Grafana
     VLogs --> Grafana
-    Tempo --> Grafana
-    Jaeger --> Grafana
     VT --> Grafana
     CH --> Grafana
     Pyro --> Grafana
@@ -101,7 +93,7 @@ flowchart TB
     class Receiver,Processors collector;
     class VMAgent,VMSingle metric;
     class Vector,VLogs log;
-    class Tempo,TempoC,Jaeger,VT trace;
+    class VT trace;
     class CH data;
     class Pyro profile;
     class Sloth,VMAlert,VMAM,Grafana platform;
@@ -179,7 +171,7 @@ packages are the contract for new and migrated code. Details:
 
 ### End-to-End Request with APM
 
-Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching Tempo/Jaeger, app logs are teed to OTLP (Vector still ships the non-instrumented pods), and app metrics are pushed over OTLP (SDK → OTel Collector → VMAgent OTLP ingest → VMSingle) — VMAgent still scrapes the infra exporters (kube-state, cAdvisor, pg_exporter, …).
+Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching VictoriaTraces and ClickHouse, app logs are teed to OTLP (Vector still ships the non-instrumented pods), and app metrics are pushed over OTLP (SDK → OTel Collector → VMAgent OTLP ingest → VMSingle) — VMAgent still scrapes the infra exporters (kube-state, cAdvisor, pg_exporter, …).
 
 ```mermaid
 sequenceDiagram
@@ -190,7 +182,7 @@ sequenceDiagram
     participant Logic as Logic Layer
     participant Core as Core Layer
     participant OTel as OTel Collector
-    participant Tempo
+    participant VictoriaTraces
     participant VLogs as VictoriaLogs
     participant VMAgent
     participant VMSingle
@@ -228,8 +220,8 @@ sequenceDiagram
     MW->>OTel: Complete root span
     Gin-->>Client: HTTP Response
 
-    Note over OTel,Tempo: OTel Collector fan-out
-    OTel->>Tempo: otlp/tempo (4317)
+    Note over OTel,VictoriaTraces: OTel Collector fan-out
+    OTel->>VictoriaTraces: otlp_http/victoriatraces (10428)
     OTel->>VLogs: logs (VL-Stream-Fields: service.name)
 
     Note over OTel,VMSingle: OTLP push metrics
@@ -257,7 +249,7 @@ handler examples.
 | Pillar | Tool | Question It Answers | Platform docs | App contract |
 |--------|------|---------------------|---------------|--------------|
 | **Metrics** | VMSingle + VMAgent | "Is something wrong?" | [metrics/](metrics/README.md) | [api/metrics.md](../api/metrics.md) |
-| **Traces** | **Five sinks** via OTel Collector: Tempo raw + Tempo chart (ADR-040 parallel) + Jaeger + VictoriaTraces (pilot) + ClickHouse `otel_traces` | "Where is it slow?" | [tracing/](tracing/README.md) | [api/tracing.md](../api/tracing.md) |
+| **Traces** | **Two sinks** via OTel Collector: VictoriaTraces (7d, fast path) + ClickHouse `otel_traces` (90d SQL). Tempo and Jaeger retired — [RFC-0027](../proposals/rfc/RFC-0027/README.md) | "Where is it slow?" | [tracing/](tracing/README.md) | [api/tracing.md](../api/tracing.md) |
 | **Logs** | VictoriaLogs 7d (OTLP tee; Vector for infra) **+ ClickHouse `otel_logs` 90d** | "Why is it broken?" | [logging/](logging/README.md) | [api/logs.md](../api/logs.md) |
 | **Profiles** | Pyroscope | "Which code line is the bottleneck?" | [profiling/](profiling/README.md) | [api/profiling.md](../api/profiling.md) |
 
@@ -287,11 +279,12 @@ docs/observability/
 │       └── signals/              # Dashboard-only signal guides
 │
 ├── tracing/                      # Pillar 2: Distributed tracing
-│   ├── README.md                 # Tracing guide (Tempo + OTel)
-│   ├── architecture.md           # Five-sink fan-out (Tempo ×2 + Jaeger + VT + ClickHouse)
-│   ├── jaeger.md                 # Jaeger UI guide
-│   ├── backends-comparison.md    # Tempo vs Jaeger vs VictoriaTraces
-│   └── victoriatraces.md         # VictoriaTraces pilot
+│   ├── README.md                 # Tracing guide (VictoriaTraces + OTel)
+│   ├── architecture.md           # Two-sink fan-out (VictoriaTraces + ClickHouse)
+│   ├── jaeger.md                 # Jaeger — archived (retired, RFC-0027)
+│   ├── backends-comparison.md    # Why VictoriaTraces + ClickHouse won
+│   ├── tempo.md                  # Tempo — archived (retired, RFC-0027)
+│   └── victoriatraces.md         # VictoriaTraces — the fast trace path
 │
 ├── logging/                      # Pillar 3: Structured logging
 │   └── README.md                 # Platform pipeline (VictoriaLogs + Vector)
@@ -373,10 +366,8 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | VMAlert | monitoring | `vmalert-victoria-metrics` | 8080 | Rule evaluation (alerting + recording rules) |
 | VMAlertmanager | monitoring | `vmalertmanager-victoria-metrics` | 9093 | Alert routing and notification |
 | Grafana | monitoring | `grafana-service` | 3000 | Dashboards and visualization |
-| Tempo | monitoring | `tempo` | 3200 | Trace storage (OTLP receiver) |
-| Jaeger | monitoring | `jaeger` | 16686 | Trace query UI (alternative to Tempo) |
-| VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace storage pilot (`v0.11.0`, OTLP HTTP + Jaeger query API) |
-| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (Tempo raw/Tempo chart/Jaeger/VT + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
+| VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace store, 7d — OTLP HTTP ingest + the **Jaeger query API** Grafana reads |
+| OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (VictoriaTraces + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, 7d ops tier — ClickHouse `otel_logs` is the 90d second store) |
 | Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, the edge's access log, PG plans, frontend); app logs go OTLP |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
@@ -390,7 +381,7 @@ The investigation flow from alert to root cause:
 sequenceDiagram
     participant A as Alert fires
     participant M as Metrics (Grafana)
-    participant T as Traces (Tempo/Jaeger/VictoriaTraces)
+    participant T as Traces (VictoriaTraces / ClickHouse)
     participant L as Logs (VictoriaLogs)
     participant P as Profiles (Pyroscope)
 
@@ -407,7 +398,7 @@ sequenceDiagram
 
 - **Metrics → Traces**: exemplars are **not available** (VictoriaMetrics won't-fix, RFC-0014 D-14) — pivot from a metric to traces by service + time window, or via the `trace_id` field now carried on logs (below)
 - **Traces → Logs**: `trace_id` injected into every structured log line by `httpmw.Logging`
-- **Logs → Traces**: VictoriaLogs datasource derived field extracts `trace_id` and links back to Tempo
+- **Logs → Traces**: VictoriaLogs datasource derived field extracts `trace_id` and links back to the VictoriaTraces datasource
 - **Traces → Profiles**: Pyroscope labels match service name for time-correlated flamegraphs
 
 ## Deployment
@@ -424,7 +415,7 @@ make flux-status     # Check status
 Flux reconciliation order:
 1. **Controllers** -- operators, CRDs (VictoriaMetrics Operator, Prometheus CRDs, Grafana Operator, Sloth)
 2. **Configs** -- monitoring stack (VMSingle, VMAgent, VMAlert, Grafana, VictoriaLogs, etc.)
-3. **Tracing / Profiling** -- Tempo (`tracing-local`) and Pyroscope (`profiling-local`), each split out of the controllers wave and `dependsOn: [secrets-local, storage-local]` because they need the RustFS credentials Secret (ESO-managed) and RustFS running before they can start
+3. **Tracing / Profiling** -- the OTel Collector (`tracing-local`) and Pyroscope (`profiling-local`), each split out of the controllers wave to avoid a dependency deadlock. Pyroscope needs the ESO-managed RustFS credentials Secret and RustFS itself; the collector needs **ClickHouse** up first, because its `clickhouse` exporter runs `CREATE TABLE` at start-up and fails the whole collector if the database is unreachable
 4. **Apps** -- microservices (push OTLP metrics to the collector; no ServiceMonitor scrape for app services)
 
 ## Quick Start: Accessing the Stack
@@ -436,8 +427,8 @@ kubectl port-forward svc/grafana-service -n monitoring 3000:3000
 # VMSingle (metrics API, VMUI)
 kubectl port-forward svc/vmsingle-victoria-metrics -n monitoring 8428:8428
 
-# Jaeger (trace search UI)
-kubectl port-forward svc/jaeger -n monitoring 16686:16686
+# VictoriaTraces (trace store; Jaeger query API under /select/jaeger)
+kubectl port-forward svc/vtsingle-victoria-traces -n monitoring 10428:10428
 
 # Pyroscope (flamegraphs)
 kubectl port-forward svc/pyroscope -n monitoring 4040:4040
@@ -460,4 +451,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-08-23 — the Four Pillars table, the file-tree notes and the topology diagram all counted three trace backends; the real number is five (`tempo-chart` and ClickHouse were missing) and logs land in two stores, not one._
+_Last updated: 2026-08-24 — trace sinks are **two**, not five: RFC-0027 retired Tempo (both
+installs) and Jaeger, so the Four Pillars row, the topology diagram, the component table and
+the port-forward all pointed at services that no longer exist._

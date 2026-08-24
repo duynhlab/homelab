@@ -385,7 +385,7 @@ secret/{environment}/{category}/{service}/{resource}
 | `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) — `payment-webhook-hmac` ExternalSecret, ns `payment` only (both workloads run there) |
 | `secret/local/auth/jwt-signing` | `private_key`, `public_key` | **orphaned** — zero consumers since auth-service retired (see note below); recorded cleanup candidate |
 | `secret/local/infra/rustfs/root` | `access_key`, `secret_key` | RustFS root creds — `rustfs-credentials` Secret in ns `rustfs` (`controllers/storage/rustfs/external-secret.yaml`) |
-| `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (all CloudNativePG clusters — bucket `pg-backups-cnpg`) + Tempo/Pyroscope S3 (`cluster-external-secrets/{pg-backup-rustfs-cnpg,tempo-rustfs,pyroscope-rustfs}.yaml`) |
+| `secret/local/infra/rustfs/backup-cnpg` | `access_key_id`, `secret_access_key` | Barman S3 (all CloudNativePG clusters — bucket `pg-backups-cnpg`) + Pyroscope S3 (`cluster-external-secrets/{pg-backup-rustfs-cnpg,pyroscope-rustfs}.yaml`; `tempo-rustfs` retired with Tempo, RFC-0027) |
 | `secret/local/infra/clickhouse/admin` | `username`, `password` | ClickHouse `default` user + Collector exporter + Grafana datasource (`cluster-external-secrets/clickhouse.yaml`) |
 | `secret/local/infra/keycloak/admin` | `username`, `password` | Keycloak bootstrap admin — `keycloak-bootstrap-admin` ExternalSecret, ns `identity` (`controllers/keycloak/external-secret.yaml`) |
 | `secret/local/infra/cloudflare/api-token` ⚠️ | `api_token` | cert-manager `letsencrypt-{staging,prod}` ClusterIssuers (DNS-01 solver) — **prod only**; on local Kind `platform-edge-tls` is `homelab-ca`-issued |

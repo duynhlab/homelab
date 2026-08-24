@@ -14,7 +14,7 @@ stack, and the other layers, start at the [metrics hub](README.md).
 | **East-west** | gRPC RED on the *same* OTLP stream via `pkg/obsx` / `pkg/grpcx` |
 | **App labels** | `http_request_method`, `http_route`, `http_response_status_code` |
 | **Provenance** | `app` / `namespace` from OTLP resource attributes + vmagent relabel |
-| **Correlation** | `trace_id` field in VictoriaLogs + Tempo (exemplars lost — [D-14](../../proposals/rfc/RFC-0014/README.md)) |
+| **Correlation** | `trace_id` field in VictoriaLogs + VictoriaTraces (exemplars lost — [D-14](../../proposals/rfc/RFC-0014/README.md)) |
 | **Dashboard** | Microservices dashboard (see [§ Dashboard](#dashboard)) |
 | **Runbooks** | [`../runbooks/microservices/README.md`](../runbooks/microservices/README.md) (one file per alert + workflows & tuning) |
 

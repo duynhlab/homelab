@@ -140,7 +140,7 @@ This is the most important concept to understand. The cluster runs **two separat
 | Resource | File | Creator |
 |----------|------|---------|
 | `ServiceMonitor/external-secrets` | `configs/observability/metrics/servicemonitors/external-secrets.yaml` | Manual (platform team) |
-| `ServiceMonitor/tempo` | `configs/observability/metrics/servicemonitors/tempo.yaml` | Manual (platform team) |
+| `ServiceMonitor/otel-collector` | `configs/observability/metrics/servicemonitors/otel-collector.yaml` | Manual (platform team) — the collector's self-metrics on `:8888` |
 | `ServiceMonitor/envoy-gateway-controller` | `configs/observability/metrics/servicemonitors/envoy-gateway-controller.yaml` | Manual (platform team) — control-plane metrics on the `metrics` port `:19001` |
 | `PodMonitor/envoy-gateway-proxy` | `configs/observability/metrics/podmonitors/envoy-gateway-proxy.yaml` | Manual (platform team) — data-plane `envoy_*` stats on `:19001` `/stats/prometheus` |
 | `ServiceMonitor/kube-apiserver` | `configs/observability/metrics/servicemonitors/kube-apiserver.yaml` | Manual (platform team) |
@@ -195,7 +195,7 @@ Additionally, the VM Operator **auto-creates** VM resources by converting Promet
 
 | Source (Prometheus CRD) | Auto-created (VM CRD) |
 |-------------------------|-----------------------|
-| `ServiceMonitor/tempo` | `VMServiceScrape/tempo` |
+| `ServiceMonitor/otel-collector` | `VMServiceScrape/otel-collector` |
 | `PodMonitor` (CNPG per cluster, e.g. `platform-db`) | `VMPodScrape` per resource |
 | `PrometheusRule` under `postgres/cnpg/`, `cnpg-platform-db/` | Corresponding `VMRule` per resource |
 | ...all other Prometheus resources | ...corresponding VM resources |
@@ -209,15 +209,15 @@ flowchart LR
     end
 
     subgraph step2 ["Step 2: Resource Created"]
-        SM["ServiceMonitor/tempo<br/>apiVersion: monitoring.coreos.com/v1<br/>created by your YAML"]
+        SM["ServiceMonitor/otel-collector<br/>apiVersion: monitoring.coreos.com/v1<br/>created by your YAML"]
     end
 
     subgraph step3 ["Step 3: VM Operator Watches"]
-        VMOp["VM Operator detects new<br/>ServiceMonitor and creates<br/>VMServiceScrape/tempo"]
+        VMOp["VM Operator detects new<br/>ServiceMonitor and creates<br/>VMServiceScrape/otel-collector"]
     end
 
     subgraph step4 ["Step 4: VMAgent Reads"]
-        VMAgent["VMAgent discovers<br/>VMServiceScrape/tempo<br/>and starts scraping"]
+        VMAgent["VMAgent discovers<br/>VMServiceScrape/otel-collector<br/>and starts scraping"]
     end
 
     CRD --> SM
@@ -544,7 +544,6 @@ flowchart TD
         VMOp["victoria-metrics-operator"]
         GrafanaOp["grafana-operator"]
         Sloth["sloth"]
-        Jaeger["jaeger"]
         OTel["opentelemetry-collector"]
         Vector["vector"]
     end
@@ -563,7 +562,6 @@ flowchart TD
 
     PromCRDs -->|"dependsOn"| VMOp
     VMOp -->|"dependsOn"| Sloth
-    VMOp -->|"dependsOn"| Jaeger
     VMOp -->|"dependsOn"| OTel
     VMOp -->|"dependsOn"| Vector
     controllers -->|"dependsOn"| monitoring
@@ -577,7 +575,7 @@ flowchart TD
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-    class PromCRDs,VMOp,GrafanaOp,Sloth,Jaeger,OTel platform;
+    class PromCRDs,VMOp,GrafanaOp,Sloth,OTel platform;
     class Vector,VLSingle_k log;
     class VMSingle_k,VMAgent_k metric;
     class VMAlert_k,VMAMgr_k platform;
@@ -605,7 +603,6 @@ healthChecks:
 | `prometheus-operator-crds` | Nothing | Must install CRDs first |
 | `victoria-metrics-operator` | `prometheus-operator-crds` | Needs Prometheus CRDs to enable auto-conversion |
 | `sloth` | `victoria-metrics-operator`, `grafana-operator` | Creates PrometheusRules that need CRDs registered |
-| `jaeger` | `victoria-metrics-operator`, `grafana-operator` | Monitoring namespace dependency |
 | `opentelemetry-collector` | `victoria-metrics-operator`, `grafana-operator` | Monitoring namespace dependency |
 | `vector` | `victoria-metrics-operator` | Ships logs to VLSingle |
 
@@ -621,17 +618,17 @@ flowchart LR
         Apps["Microservices<br/>OTLP push (RFC-0014)"]
         PG["PostgreSQL<br/>CNPG built-in :9187"]
         ESO["External Secrets<br/>/metrics"]
-        TempoSvc["Tempo<br/>/metrics"]
+        OTelSvc["OTel Collector<br/>/metrics :8888"]
     end
 
     subgraph promCRD ["Prometheus CRDs (your YAML)"]
         PM1["PodMonitor<br/>CNPG per cluster"]
-        SM2["ServiceMonitor<br/>tempo"]
+        SM2["ServiceMonitor<br/>otel-collector"]
     end
 
     subgraph autoConv ["VM Operator auto-converts"]
         VMPS1["VMPodScrape<br/>CNPG per cluster"]
-        VMSS2["VMServiceScrape<br/>tempo"]
+        VMSS2["VMServiceScrape<br/>otel-collector"]
     end
 
     subgraph vmStack ["VM Stack"]
@@ -655,7 +652,7 @@ flowchart LR
     Apps -->|"OTLP push :8429"| VMAgent_f
     PG -->|scrape| VMAgent_f
     ESO -->|scrape| VMAgent_f
-    TempoSvc -->|scrape| VMAgent_f
+    OTelSvc -->|scrape| VMAgent_f
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
@@ -667,7 +664,7 @@ flowchart LR
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     class Apps service;
-    class PG,ESO,TempoSvc external;
+    class PG,ESO,OTelSvc external;
     class PM1,SM2,VMPS1,VMSS2 data;
     class VMAgent_f,VMSingle_f metric;
     class Grafana_f platform;
@@ -868,7 +865,7 @@ Access URLs after running the script:
 | Grafana | http://localhost:3000 |
 | VictoriaMetrics VMUI | http://localhost:8428/vmui |
 | VictoriaLogs | http://localhost:9428 — query/ops: [logging/README.md#platform-pipeline](../logging/README.md#platform-pipeline) |
-| Jaeger | http://localhost:16686 |
+| VictoriaTraces | http://localhost:10428 — Jaeger query API under `/select/jaeger` |
 
 ---
 
@@ -909,7 +906,7 @@ kubectl api-resources --api-group=monitoring.coreos.com
 
 ### "dependency victoria-metrics-operator is not ready"
 
-**Symptom**: HelmReleases (Sloth, Jaeger, OTel Collector, Vector) are stuck waiting.
+**Symptom**: HelmReleases (Sloth, OTel Collector, Vector) are stuck waiting.
 
 **Cause**: The VM Operator HelmRelease is still installing or failed.
 

@@ -1,8 +1,9 @@
 # Continuous Profiling (Pyroscope)
 
 Continuous, always-on profiling for the platform's Go services with **Grafana
-Pyroscope**, correlated with traces (Tempo) and metrics (VictoriaMetrics) so a slow
-span links straight to the flame graph of the code that ran during it.
+Pyroscope**, labelled to line up with traces (VictoriaTraces) and metrics
+(VictoriaMetrics) so a slow span can be matched to the flame graph of the code
+that ran during it.
 
 | | |
 |---|---|
@@ -10,7 +11,7 @@ span links straight to the flame graph of the code that ran during it.
 | **Client** | `obsx.SetupProfiling()` (`duynhlab/pkg`), `pyroscope-go` SDK — push model |
 | **Storage** | RustFS (S3) bucket `pyroscope-profiles`, 7-day retention; PVC for the v2 metastore |
 | **Datasource** | Grafana `Pyroscope` (`uid: pyroscope`, `grafana-pyroscope-datasource`) |
-| **Correlation** | Tempo `tracesToProfiles` + per-span `pyroscope.profile.id` (`otel-profiling-go`) |
+| **Correlation** | Per-span `pyroscope.profile.id` (`otel-profiling-go`) + matching `service_name` label. The one-click span→profile link is **gone** — see [Trace correlation](#trace-correlation-platform) |
 | **Default** | On in the cluster **and** in local-stack (`PROFILING_ENABLED=true`) |
 
 ---
@@ -30,8 +31,9 @@ linked from individual trace spans.
 - **Attribute cost to code, in production.** Find the function/line responsible for CPU
   burn, heap growth, goroutine leaks, or lock contention — on live traffic, not a staged
   microbenchmark.
-- **Close the trace → profile loop.** From a slow span in Tempo, jump to the flame graph
-  of exactly the code that executed during that span.
+- **Close the trace → profile loop.** From a slow span, reach the flame graph of the
+  code that executed during it — today by service + time window rather than one
+  click, see [Trace correlation](#trace-correlation-platform).
 - **Catch regressions over time.** Because profiles are continuous and labelled, you can
   diff "today vs last week" or "version A vs version B" for a service.
 - **Keep overhead negligible.** Sampling-based profiling is cheap enough to leave on
@@ -74,7 +76,7 @@ flowchart LR
     PYRO -- "profile blocks" --> S3[("RustFS S3<br/>pyroscope-profiles · 7d")]
     PYRO -- "v2 metastore (raft)" --> PVC[("PVC 10Gi")]
     PYRO --> GRAF["Grafana<br/>Explore Profiles"]
-    TEMPO["Tempo"] -. "tracesToProfiles<br/>(service.name → service_name)" .-> PYRO
+    TEMPO["VictoriaTraces"] -. "manual pivot: service_name + time window<br/>(no tracesToProfiles on a jaeger-type datasource)" .-> PYRO
     PYRO -->|"ServiceMonitor /metrics"| VM["VictoriaMetrics<br/>(PyroscopeDown alert)"]
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
@@ -99,11 +101,26 @@ local PVC only holds the v2 metastore (raft) and scratch, so a pod restart loses
 
 ## Trace correlation (platform)
 
-Grafana links Tempo spans to Pyroscope via the datasource config
-(`datasource-tempo.yaml`: `tracesToProfiles` maps `service.name` →
-`service_name`, `profileTypeId: process_cpu:cpu:nanoseconds:cpu:nanoseconds`).
-In Explore → Tempo, open a span → **Profiles for this span** → CPU flame graph
-for that service/time window.
+**Known gap since [RFC-0027](../../proposals/rfc/RFC-0027/README.md).** The
+one-click **Profiles for this span** button was a `tracesToProfiles` block on
+`datasource-tempo.yaml`. Retiring Tempo took it with it, and it cannot simply be
+moved: Grafana implements `tracesToProfiles` (and `serviceMap`) on the **Tempo**
+datasource type only — the Jaeger type that VictoriaTraces is queried through
+supports `tracesToLogsV2`, `tracesToMetrics`, `nodeGraph` and `traceIdTimeParams`,
+and nothing else. Verified against Grafana's datasource provisioning reference.
+
+What still works, and is the current procedure:
+
+1. In the span, read `service.name` and the span's time range — the
+   `pyroscope.profile.id` attribute is still attached by `otel-profiling-go`.
+2. Explore → **Pyroscope** → filter `service_name="<that service>"` and set the
+   time range to the span's window.
+
+The labels line up by construction (`service.name` → `service_name`), so the
+answer is the same; it costs two steps instead of one. Closing this properly needs
+either a Tempo-compatible datasource pointed at VictoriaTraces' experimental
+`/select/tempo` API, or upstream support for `tracesToProfiles` on more datasource
+types — neither is done here.
 
 ## What this platform applies
 
@@ -136,7 +153,7 @@ Verified inventory of the actual deployment:
 | When | Reproduce, then capture a snapshot | Always-on, every 15s |
 | History | Only "now" | Query any point in the 7d window |
 | Context | Bare profile | Labelled (`service_name`, ns, env, version) |
-| Correlation | Manual | Linked from Tempo spans |
+| Correlation | Manual | Labelled to match trace spans (`service_name`) |
 | Prod use | Risky / manual | Designed for it, low overhead |
 
 **SDK push (what we use) vs eBPF auto-instrumentation**
@@ -207,4 +224,7 @@ Per-service env vars and the `PROFILING_ENABLED` toggle:
 - [Traces to profiles](https://grafana.com/docs/grafana/latest/datasources/pyroscope/configure-traces-to-profiles/)
 
 ---
-_Last updated: 2026-08-13 — access row re-documented as the `pyroscope` HTTPRoute; Pyroscope 2.1.0 (Helm, v2/single-binary), RustFS S3 7d retention, `obsx.SetupProfiling` (pkg v0.18.1), local-stack profiling enabled._
+_Last updated: 2026-08-24 — RFC-0027 retired Tempo, which is where `tracesToProfiles`
+lived. The span→profile one-click pivot is a **known gap**: Grafana implements that option on
+the Tempo datasource type only, so it cannot be moved onto the jaeger-type VictoriaTraces
+datasource. The manual procedure that replaces it is documented above._

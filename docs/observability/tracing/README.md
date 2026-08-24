@@ -14,13 +14,11 @@ Track requests as they flow through multiple microservices to understand perform
 
 **Technologies:**
 - **OpenTelemetry**: Industry-standard tracing instrumentation
-- **Grafana Tempo — raw manifests**: documented primary (v2.10.8; metrics-generator configured but **inert**, `remote_write: []`) — durable on **RustFS S3** (`tempo-traces` bucket, **7-day** block retention)
-- **Grafana Tempo — Helm chart**: same image, second bucket (`tempo-chart-traces`), [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/) phase-1 parallel run — and the **only live metrics-generator** (span-metrics + service-graphs → vmagent). See [Tempo runs twice](#tempo-runs-twice)
-- **Jaeger**: secondary UI (Helm chart, all-in-one) — **in-memory / ephemeral** (lost on restart)
-- **VictoriaTraces**: pilot (`v0.11.0`, VM-operator-managed, VictoriaLogs engine) — same OTel fan-out; see [victoriatraces.md](victoriatraces.md)
+- **VictoriaTraces**: the fast trace path (`v0.11.0`, VM-operator-managed, VictoriaLogs engine) — PVC-backed, **7-day** retention, queried through the Jaeger API and, experimentally, TraceQL; see [victoriatraces.md](victoriatraces.md)
 - **ClickHouse**: `otel_traces`, **90-day** SQL tier with a `trace_id` JOIN against `otel_logs` ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)); see [clickhouse](../clickhouse/README.md)
 - **W3C Trace Context**: Standard for trace propagation between services
-- **Retirement records**: Tempo and Jaeger are proposed for retirement under [RFC-0027](../../proposals/rfc/RFC-0027/README.md). Their consolidated history is archived in [tempo.md](tempo.md) and [jaeger.md](jaeger.md) — frozen, kept as learning material
+- **Retired**: Tempo and Jaeger were removed under [RFC-0027](../../proposals/rfc/RFC-0027/README.md) ([ADR-058](../../proposals/adr/ADR-058-retire-jaeger/), [ADR-059](../../proposals/adr/ADR-059-retire-tempo/)). Their manifests stay in the tree as `*.yaml.bak`, and what running them taught is archived in [tempo.md](tempo.md) and [jaeger.md](jaeger.md) — frozen, kept as learning material
+- **Span metrics**: RED series are derived by the collector's `span_metrics` **connector**, not by a trace backend ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)) — so they no longer depend on which store survives
 
 ---
 
@@ -87,23 +85,23 @@ flowchart LR
     C -->|Spans OTLP| O
     D -->|Spans OTLP| O
 
-    O --> E["Tempo (raw)"]
-    O --> E2["Tempo (chart)"]
-    O --> J[Jaeger]
-    O --> V[VictoriaTraces pilot]
+    O --> V["VictoriaTraces · 7d"]
     O --> CH[("ClickHouse otel_traces · 90d")]
 
-    E -->|TraceQL queries| F[Grafana]
+    V -->|"Jaeger query API"| F[Grafana]
+    CH -->|"SQL"| F
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class A,K edge;
     class C,D service;
     class O collector;
-    class E,J,V trace;
+    class V trace;
+    class CH data;
     class F platform;
 ```
 
@@ -113,48 +111,23 @@ flowchart LR
 2. **W3C Trace Context** header (`traceparent`) propagated to the services and downstream
 3. Each service creates **child spans** for its operations (the edge propagates a W3C `traceparent` natively on every proxied request — see [edge→service linkage](architecture.md#edge--service-linkage))
 4. **10% sampling** — the edge (root) decides by ratio (`samplingRate: 10` in the cluster CR, **planned**; `100` in local-stack); each service wraps its ratio in `ParentBased` (`ParentBased(TraceIDRatioBased(rate))`), so downstream hops honour the root's `sampled` flag and traces stay whole — a service's own ratio only applies when it is itself the root (see the [sampling note](architecture.md#edge--service-linkage))
-5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **five** sinks: **Tempo** (raw manifests), **Tempo** (Helm chart — the ADR-040 parallel run), **Jaeger**, **VictoriaTraces**, and **ClickHouse** `otel_traces`
-6. **Grafana** queries Tempo for trace visualization
+5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **two** sinks: **VictoriaTraces** (7d) and **ClickHouse** `otel_traces` (90d)
+6. **Grafana** queries VictoriaTraces through the **Jaeger datasource type**, and ClickHouse with SQL
 
-> **Five sinks, four of them stores.** Read the collector's `service.pipelines` for the
+> **Two sinks, two windows.** Read the collector's `service.pipelines` for the
 > authoritative list — it is the only place the real answer lives.
 >
 > | Sink | Store | Retention | Role |
 > |---|---|---|---|
-> | **Tempo** (raw manifests) | RustFS S3 `tempo-traces` | 7d | Documented as the primary, durable store; queried in Grafana via TraceQL |
-> | **Tempo** (Helm chart) | RustFS S3 `tempo-chart-traces` | 7d | [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/) phase-1 parallel run — see [below](#tempo-runs-twice) |
-> | **Jaeger** | in-memory, `max_traces: 100000` | ephemeral, lost on restart | Alternative trace-search UI; Jaeger has no S3/object-storage backend (see [jaeger.md](jaeger.md#storage--in-memory-here-and-why-vs-tempo-on-rustfs)) |
-> | **VictoriaTraces** `v0.11.0` | PVC 10Gi | 7d | **Pilot** — VM-operator-managed, no object-storage dependency, evaluating consolidation onto the VictoriaMetrics stack (see [victoriatraces.md](victoriatraces.md)) |
+> | **VictoriaTraces** `v0.11.0` | PVC 10Gi | 7d | The fast path: open one trace mid-investigation. Queried via the Jaeger API (`/select/jaeger`), and via TraceQL at `/select/tempo` — the latter is upstream-**experimental**, see [victoriatraces.md](victoriatraces.md) |
 > | **ClickHouse** | `otel_traces` | **90d** | Long-retention SQL and a `trace_id` JOIN against `otel_logs` ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/), [clickhouse](../clickhouse/README.md)) |
 >
-> The multi-backend setup grew from three separate decisions rather than one: Tempo for
-> durable Grafana workflows, Jaeger for its dedicated UI, VictoriaTraces as a consolidation
-> pilot, ClickHouse as the analytics tier — plus one migration (ADR-040) that is half done.
-> See [architecture.md](architecture.md) and the [backend comparison](backends-comparison.md).
-
-### Tempo runs twice
-
-Two Tempo installs receive the same spans, from the same image (`grafana/tempo:2.10.8`),
-into **two different RustFS buckets**. This is [ADR-040](../../proposals/adr/ADR-040-tempo-community-helm-chart/)
-phase 1: the chart-based release (`tempo-chart`) runs alongside the raw manifests during the
-parallel run, and phase 2 — deleting the raw manifests and renaming the release to `tempo` —
-has not started. The ADR is still `Proposed`.
-
-They are **not** interchangeable, and the difference is easy to miss:
-
-| | Tempo (raw manifests) | Tempo (Helm chart) |
-|---|---|---|
-| Bucket | `tempo-traces` | `tempo-chart-traces` |
-| `metrics_generator` | configured but **inert** (`remote_write: []`) | **enabled** — remote-writes to vmagent with `send_exemplars: true` |
-| Processors | — | `service-graphs` + `span-metrics` |
-| Scraped | `ServiceMonitor/tempo` (`app: tempo`) | `serviceMonitor.enabled: false` |
-
-So the chart install is the **only live producer of RED span metrics and service graphs** on
-the cluster. Note also that nothing consumes them yet: `traces_spanmetrics` /
-`traces_service_graph` appear in no dashboard, alert or recording rule, and the Kind audit's
-K5.5 row records the spanmetrics leg as N/A on the cluster. And because `TempoDown` alerts on
-`up{job=~".*tempo.*"}` while only the raw install carries the `app: tempo` label the
-ServiceMonitor selects, that alert watches the raw install alone.
+> It used to be five. Tempo ran twice and Jaeger kept traces in a memory ring, and three of
+> the five answered the same question over the same window — so [RFC-0027](../../proposals/rfc/RFC-0027/README.md)
+> retired both. The service map that Tempo's generator used to feed now comes from
+> VictoriaTraces' own dependency endpoint; what the duplication taught is in
+> [tempo.md](tempo.md). See [architecture.md](architecture.md) and the
+> [backend comparison](backends-comparison.md).
 
 ### Automatic Features
 
@@ -171,7 +144,7 @@ ServiceMonitor selects, that alert watches the raw install alone.
 **Grafana Explore:**
 ```bash
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000
-# Open http://localhost:3000 → Explore → Tempo datasource
+# Open http://localhost:3000 → Explore → VictoriaTraces datasource (type: jaeger)
 ```
 
 **Search Options:**
@@ -204,15 +177,17 @@ See [**Application tracing**](../../api/tracing.md) for:
    kubectl set env deployment/auth OTEL_SAMPLE_RATE=1.0 -n auth
    ```
 
-2. **Tempo not running**:
+2. **Trace store not running**:
    ```bash
-   kubectl get pods -n monitoring -l app=tempo
-   kubectl logs -n monitoring deployment/tempo
+   kubectl get pods -n monitoring -l app.kubernetes.io/name=vtsingle
+   kubectl logs -n monitoring -l app.kubernetes.io/name=vtsingle
    ```
 
-3. **Service not sending traces**:
+3. **Service not sending traces** — check the collector received them at all, since it is
+   the single fan-out point:
    ```bash
-   kubectl logs -n auth -l app=auth | grep -i "trace\|tempo"
+   kubectl logs -n monitoring -l app.kubernetes.io/name=opentelemetry-collector | grep -i error
+   kubectl logs -n checkout -l app=checkout | grep -i trace
    ```
 
 ### Problem: Trace volume too low
@@ -227,9 +202,11 @@ See [**Application tracing**](../../api/tracing.md) for:
 
 2. **Check request filtering** (health checks automatically skipped)
 
-3. **Monitor Tempo ingestion**:
+3. **Monitor span ingestion** — read it at the collector rather than at a store, so the
+   query survives a backend change:
    ```promql
-   rate(tempo_distributor_spans_received_total[5m])
+   rate(otelcol_receiver_accepted_spans[5m])
+   rate(otelcol_exporter_sent_spans[5m])
    ```
 
 ### Problem: High memory usage
@@ -259,12 +236,12 @@ See [**Application tracing**](../../api/tracing.md) for:
 # View traces in Grafana
 kubectl port-forward -n monitoring svc/grafana-service 3000:3000
 
-# Check Tempo metrics
-kubectl port-forward -n monitoring svc/tempo 3200:3200
-curl http://localhost:3200/metrics | grep tempo_spans
+# Check the trace store directly (Jaeger-compatible API)
+kubectl port-forward -n monitoring svc/vtsingle-victoria-traces 10428:10428
+curl -s http://localhost:10428/select/jaeger/api/services
 
 # View service logs with trace IDs
-kubectl logs -n auth -l app=auth | jq '.trace_id'
+kubectl logs -n checkout -l app=checkout | jq '.trace_id'
 
 # Check sampling config
 kubectl describe deployment auth -n auth | grep -A 5 "Environment"
@@ -307,14 +284,13 @@ attribute.String("db.table", "users")
 |--------|-------|-------|
 | Sampling overhead | < 1% CPU | At 10% sampling |
 | Memory overhead | < 50MB | Per service |
-| Export latency | < 100ms P99 | To Tempo |
+| Export latency | < 100ms P99 | To VictoriaTraces |
 | Trace volume reduction | 90% | vs 100% sampling |
 | Request filtering reduction | 30-40% | Health/metrics skipped |
 
 ### External Resources
 
 - [OpenTelemetry Go SDK](https://opentelemetry.io/docs/instrumentation/go/)
-- [Grafana Tempo Docs](https://grafana.com/docs/tempo/latest/)
 - [W3C Trace Context Spec](https://www.w3.org/TR/trace-context/)
 - [OpenTelemetry Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)
 
@@ -323,8 +299,8 @@ attribute.String("db.table", "users")
 
 
 ---
-_Last updated: 2026-08-23 — the fan-out is five sinks, not three: `tempo-chart` and ClickHouse
-were missing, and this page carried two conflicting `Last updated` footers (2026-07-14 and
-2026-08-13) so its freshness could not be read off the page. Previously: trace root
-re-documented as Envoy Gateway's native `telemetry.tracing` (OTLP gRPC :4317, no plugin);
-sampling is `ParentBased(TraceIDRatioBased)` — root decides, downstream honours._
+_Last updated: 2026-08-24 — the fan-out is **two** sinks. RFC-0027 retired Tempo (both
+installs) and Jaeger; the "Tempo runs twice" section moved to the archived
+[tempo.md](tempo.md), and the troubleshooting commands now read span flow at the collector
+(`otelcol_receiver_accepted_spans`) instead of at a store, so they survive the next backend
+change. Two commands also still targeted the `auth` namespace, retired with RFC-0024._

@@ -1626,6 +1626,23 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **A 50m CPU limit was killing `checkout` under gate load, and the nodes were
+  idle while it happened.** CFS throttling measured at **100% of periods**, so
+  `/health` answered in **6.8s** against a `livenessProbe` with
+  `timeoutSeconds: 1` — the kubelet killed the pod 11 times (exit 137) while the
+  four nodes sat at **3-9%** CPU. The edge saw it as `504` with
+  `response_flags: UT` at exactly the 15s route timeout, which is how it was
+  found: those lines were readable in `otel.otel_logs` for the first time, thanks
+  to the access-log sink added in the same train. All ten API services carried the
+  same limit (`kubernetes/apps/domains/*-rs.yaml`); raised to **500m**, with
+  requests 20m → 50m so a pod stays burstable. 300m was tried first and left
+  ~**30%** throttling, so the number was chosen by measurement rather than
+  taste: at 500m the ratio is **0.0-0.014**. `checkout` takes **0 restarts**
+  across a load run plus three suites, and the saga, staff and operator gates
+  went from failing to **9/9, 46/46 and 26/26** at both values. Watch memory next:
+  `order` peaks at **46 MiB against a 64Mi limit**, and faster services do more
+  work per second.
+
 - **Every `/protected/` route answered `503`, and the staff JWKS URL was the
   reason.** `OIDC_STAFF_ISSUER` and `OIDC_STAFF_JWKS_URL` are now declared
   explicitly for the six services that serve `/protected/` (inventory, order,

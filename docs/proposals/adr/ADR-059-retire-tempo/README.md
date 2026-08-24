@@ -173,7 +173,9 @@ component.
   cluster and local-stack finally measure the same shape
 - RustFS trace writers 4 → 2, on the component with 11 restarts in 3h12m
 - The ADR-032 → ADR-040 lineage closes with a decision instead of a third proposal
-- **A working service map for the first time**, from one flag on a store we keep
+- **A working service map for the first time**, from one flag on a store we keep —
+  measured at 12 edges, and richer than Tempo's: it includes database dependencies
+  (`checkout → checkout:postgresql`) alongside the service-to-service graph
 - `TempoDown`'s zero-series trap is removed by deletion rather than left latent
 
 ### Negative consequences and accepted trade-offs
@@ -191,6 +193,13 @@ component.
   Jaeger-type datasource as the primary read path limits exposure to it
 - **`api/search/tags` v1 answers 400**; only the `v2` path works, so a Grafana
   version that calls v1 will show empty autocomplete
+- **The dependency graph is not retroactive.** The background task runs on a 1
+  minute interval with a 1 minute lookbehind, so it aggregates only what is
+  ingested while it runs. Immediately after enabling the flag the endpoint
+  returned **0 edges** for eleven minutes because no traffic had flowed — the map
+  reads as broken when it is merely empty, the same silent shape as the TraceQL
+  gaps above. Anyone enabling this should generate traffic before concluding
+  anything
 - **Per-edge failure and latency metrics are lost.** The dependency API returns
   `callCount` only. Alerting on "edge A→B is failing" is not expressible until and
   unless the `service_graph` connector is adopted
@@ -213,8 +222,8 @@ component.
 |------------|-------|----------|-------------------|
 | Run the TraceQL parity experiment | `duynhne` | RFC-0027 P1 | A Tempo-type datasource against `/select/tempo` exercised with real queries; failures recorded |
 | Consolidate Tempo knowledge into an archived doc | `duynhne` | this PR | `docs/observability/tracing/tempo.md` exists, banner present, body frozen |
-| Enable `-servicegraph.enableTask` on `vtsingle` | `duynhne` | RFC-0027 P3 | `/select/jaeger/api/dependencies` returns edges |
-| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | A Node Graph renders services and call counts |
+| Enable `-servicegraph.enableTask` on `vtsingle` | `duynhne` | RFC-0027 P3 | **Done 2026-08-24** — the pod runs with `-servicegraph.enableTask=true` and the endpoint returns **12 edges**, including database dependencies (`checkout → checkout:postgresql` 2251, `platform.envoy-gateway → checkout` 425, `checkout → checkout-worker` 421) |
+| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | Still open — the data is there; the panel is not |
 | Document the ClickHouse per-edge query | `duynhne` | RFC-0027 P3 | A `docs/observability/` page carries the self-join with failure and p95 per edge |
 | Retire manifests as `.bak`, drop from kustomizations with comments | `duynhne` | RFC-0027 P4 | `make validate` green; `.bak` files present; comments name this ADR |
 | Delete `TempoDown`, the ServiceMonitor, the dashboard, the datasource, the ExternalSecret, both buckets and the edge route | `duynhne` | RFC-0027 P4 | `scripts/edge-isolation-sweep.sh` clean; RustFS bucket list has two entries fewer |

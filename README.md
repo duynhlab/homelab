@@ -39,7 +39,106 @@ edge. Application source lives in separate repositories.
 
 ---
 
+## Platform map
+
+What is installed, grouped by the concern it serves. Deliberately almost
+arrow-free: this answers *what the platform is made of* — not how a request
+travels (**Topology**, below) nor how a change reaches the cluster
+(**GitOps delivery**). Service images come from GHCR pinned by digest or tag,
+never `:latest` — Kyverno rejects that at admission.
+
+```mermaid
+flowchart TB
+    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+
+    subgraph OUT ["Outside the cluster"]
+        direction LR
+        GIT["Git · homelab<br/>manifests + docs"]:::external
+        TOFU["OpenTofu<br/>terraform/"]:::external
+        GHCR["GHCR<br/>service images by digest"]:::external
+        GIT ~~~ TOFU ~~~ GHCR
+    end
+
+    subgraph CLUSTER ["Kind cluster"]
+        direction TB
+
+        subgraph DEL ["Delivery · 23 Kustomizations, dependsOn-ordered"]
+            direction LR
+            FLUX["Flux Operator<br/>+ FluxInstance"]:::platform
+            RS["5 domain ResourceSets<br/>+ 10 InputProviders"]:::platform
+            FLUX --> RS
+        end
+
+        subgraph NET ["Edge & networking"]
+            direction LR
+            EG["Envoy Gateway<br/>Gateway API<br/>the only edge"]:::edge
+            CM["cert-manager<br/>*.duynh.me"]:::platform
+            NP["NetworkPolicy<br/>deny-all-ingress<br/>per namespace"]:::platform
+            EG ~~~ CM ~~~ NP
+        end
+
+        subgraph SEC ["Security & identity"]
+            direction LR
+            KC["Keycloak<br/>2 realms · OIDC"]:::platform
+            BAO["OpenBAO<br/>HA Raft"]:::platform
+            ESO["External Secrets<br/>Operator"]:::platform
+            KYV["Kyverno<br/>+ Policy Reporter"]:::platform
+            KC ~~~ BAO ~~~ ESO ~~~ KYV
+        end
+
+        subgraph OBS ["Observability · four signals, one collector"]
+            direction LR
+            COL["OTel Collector<br/>vmagent · Vector"]:::platform
+            VM["VictoriaMetrics<br/>metrics"]:::platform
+            VL["VictoriaLogs<br/>logs"]:::platform
+            VT["VictoriaTraces<br/>ClickHouse<br/>traces"]:::platform
+            PY["Pyroscope<br/>profiles"]:::platform
+            GR["Grafana<br/>+ Sloth SLOs"]:::platform
+            COL ~~~ VM ~~~ VL ~~~ VT ~~~ PY ~~~ GR
+        end
+
+        subgraph APP ["Applications"]
+            direction LR
+            SVC["10 Go services<br/>identity · catalog<br/>checkout · fulfillment · comms"]:::service
+            WK["checkout-worker<br/>order-worker"]:::worker
+            TMP["Temporal server"]:::platform
+            SPA["Storefront SPA<br/>Back-office portal"]:::service
+            SVC ~~~ WK ~~~ TMP ~~~ SPA
+        end
+
+        subgraph DAT ["Data"]
+            direction LR
+            PGD["PgDog"]:::data
+            PDB[("product-db<br/>CNPG HA + DR")]:::data
+            PGB["CNPG pooler"]:::data
+            PLDB[("platform-db<br/>CNPG HA")]:::data
+            VK[("Valkey")]:::data
+            S3[("RustFS<br/>S3 backups")]:::data
+            PGD ~~~ PDB ~~~ PGB ~~~ PLDB ~~~ VK ~~~ S3
+        end
+
+        DEL ~~~ NET ~~~ SEC ~~~ OBS ~~~ APP ~~~ DAT
+    end
+
+    GIT -.->|"reconciled by Flux"| FLUX
+    TOFU -.->|"bootstrap"| FLUX
+```
+
+Colors follow the house palette: blue = edge, cyan = services, amber = workers,
+purple = platform components, green = data stores, gray = external. The two
+dotted edges are indirect on purpose — Git reaches the cluster through the OCI
+registry, and OpenTofu only bootstraps Flux before handing over to it.
+
+---
+
 ## Topology
+
+How a request travels once the platform is up, and what each hop talks to.
 
 ```mermaid
 flowchart TD
@@ -73,7 +172,7 @@ flowchart TD
     subgraph Obs ["Observability"]
         direction LR
         otel["OTel Collector<br/>+ vmagent · Vector"]:::platform
-        backends["VictoriaMetrics · VictoriaLogs<br/>Tempo · Pyroscope · ClickHouse"]:::platform
+        backends["VictoriaMetrics · VictoriaLogs<br/>VictoriaTraces · Pyroscope · ClickHouse"]:::platform
         grafana["Grafana<br/>+ Sloth SLOs"]:::platform
         otel --> backends --> grafana
     end
@@ -96,8 +195,7 @@ flowchart TD
     eso -.->|"secrets"| SVC
 ```
 
-Colors follow the house palette: blue = edge, cyan = services, amber = workers,
-purple = platform components, green = data stores, gray = external.
+Same palette as the Platform map above.
 
 ---
 

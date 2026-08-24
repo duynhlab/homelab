@@ -6,7 +6,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "Business & Product"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   # inventory-service (the platform's sole stock authority): reservation FSM

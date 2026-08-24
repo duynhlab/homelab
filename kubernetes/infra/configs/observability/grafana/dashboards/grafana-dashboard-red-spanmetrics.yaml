@@ -29,7 +29,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "Microservices / Golden Signals"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:

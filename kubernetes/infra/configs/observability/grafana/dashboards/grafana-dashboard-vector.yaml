@@ -7,7 +7,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "Platform / Infrastructure"
   url: https://grafana.com/api/dashboards/21954/revisions/latest/download
   datasources:
     - inputName: DS_PROMETHEUS

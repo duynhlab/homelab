@@ -28,7 +28,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "Workflows / Async"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:

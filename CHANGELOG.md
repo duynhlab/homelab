@@ -261,6 +261,45 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The collector derives RED span metrics itself now, instead of Tempo doing
+  it after storage.** The chart Tempo install was the **only live producer** of
+  those series on the cluster — the hand-written install declares a
+  `metrics_generator` but pins `remote_write: []`, so it produces nothing — and
+  that single fact is what made removing Tempo impossible without losing the
+  series the SLO and Apdex maths consume. The `span_metrics` **connector** now
+  produces them in the collector, before any trace backend is involved. A
+  connector is the only component type that changes signal type: it is an
+  exporter on the `traces` pipeline and the receiver of a new
+  `metrics/spanmetrics` pipeline, which is visible as the same name appearing
+  twice in `service.pipelines`.
+  Config is a deliberate port of `local-stack/observability/otel-collector-config.yaml`
+  so **both gates emit the same series** — `namespace: spanmetrics` →
+  `spanmetrics_calls_total` and `spanmetrics_duration_*`, the same explicit
+  buckets, `http.method` + `http.route` dimensions on top of the built-ins, and
+  `exemplars.enabled` to keep the metric → one-sample-trace jump that Tempo gave
+  us through `send_exemplars: true`. `metrics_flush_interval: 15s` matches
+  Tempo's `registry.collection_interval`, so the cadence does not change under
+  the swap. Egress is `prometheus_remote_write` to the **same vmagent endpoint
+  Tempo's generator already writes to** (`:8429/api/v1/write`), chosen over the
+  OTLP metrics path on purpose: the OTLP→Prometheus name translation is a second
+  variable that cannot be checked while Kind is down, and this endpoint is
+  already proven for exactly this class of series.
+  **This is a parallel producer, not a swap.** Tempo keeps emitting
+  `traces_spanmetrics_*`; the names differ, so nothing collides and nothing was
+  removed. The new pipeline deliberately omits `delta_to_cumulative` — the
+  connector's `aggregation_temporality` defaults to cumulative, unlike the SDK
+  push path.
+  Two gaps recorded rather than hidden, both in
+  [RFC-0027](docs/proposals/rfc/RFC-0027/research.md): no cluster dashboard reads
+  `spanmetrics_*` yet, which is the same producer-without-consumer shape the
+  research criticises Tempo for (local-stack's `red-spanmetrics.json` needs the
+  cluster VictoriaMetrics datasource uid, so porting waits for Kind); and
+  **service graphs have no counterpart** — Tempo runs both `service-graphs` and
+  `span-metrics` processors, while `servicegraph` is a separate connector that
+  neither environment runs. `make validate` passes, but it does not check
+  collector config semantics and the cluster is down, so nothing here is
+  runtime-verified.
+
 - **Kyverno has signals for the first time: scrape, dashboard, 4 alerts, 4
   runbooks.** The admission webhook sits on the write path of every apply and had
   **none** of them — and the manifest read as if metrics were solved. The values

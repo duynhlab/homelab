@@ -30,9 +30,9 @@ diagram *before* anyone builds it. Examples:
 
 | Artifact | File | Template | Question it answers |
 |----------|------|----------|---------------------|
-| **Template** | [`RFC-0000/`](RFC-0000/) (v2) | Copy source only — **never** a live proposal | — |
+| **Template** | [`RFC-0000/`](RFC-0000/) (v3) | Copy source only — **never** a live proposal | — |
 | **Research** | `RFC-NNNN/research.md` | [`RFC-0000/research.md`](RFC-0000/research.md) | What **real-world problem** are we solving, how does the tech work, and how does it compare to what we run? |
-| **RFC** | `RFC-NNNN/README.md` | [`RFC-0000/README.md`](RFC-0000/README.md) (v2) | What do we decide, target architecture, rollout? |
+| **RFC** | `RFC-NNNN/README.md` | [`RFC-0000/README.md`](RFC-0000/README.md) (v3) | What do we decide, target architecture, rollout? |
 | **Domain doc** (optional) | `docs/<area>/<topic>/README.md` | [`AGENTS.md`](../../../AGENTS.md) docs conventions | How does it work **in this platform**? |
 
 **Flow:** real-world problem in `research.md` → [research review gate](RFC-0000/research.md#research-review-gate)
@@ -57,8 +57,10 @@ Full ADR process: [`adr/README.md`](../adr/README.md).
    [`adr/`](../adr/) at **`Proposed`** (copy [`ADR-0000-template/`](../adr/ADR-0000-template/));
    fill RFC [**Resulting decisions**](RFC-0000/README.md#resulting-decisions) table.
 6. **On approval** — RFC → **`Accepted`**; linked ADR(s) → **`Accepted`**; ADR
-   **Adoption** → **`Not started`**. Legacy index rows labelled **`implementable`** mean
-   the same as **`Accepted`**.
+   **Adoption** → **`Not started`**. Fill
+   [**Decision outcome**](RFC-0000/README.md#decision-outcome) — the chosen option
+   named as § Alternatives names it, plus the rationale against § Goals. Legacy index
+   rows labelled **`implementable`** mean the same as **`Accepted`**.
 7. **Implement** → RFC Status **`implemented`**; ADR **Adoption** → Partial/Complete;
    append **Implementation History** and PR links.
 8. **Sync `docs/api/` (API-touching)** — when Adoption is **Complete** / RFC is

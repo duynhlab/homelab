@@ -652,6 +652,35 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **An RFC never had one place to say what it chose, so every RFC said it
+  somewhere else.** RFC template **v3** adds **§ Decision outcome** between
+  § Other solutions considered and § Architecture & Diagrams: chosen option,
+  rationale against § Goals, and an optional decided-on line. Before this the
+  same content landed in `## Summary` (RFC-0027), prose under `### Alternatives`
+  (RFC-0025), a bolded `**Owner decision (2026-08-10)**` paragraph appended to
+  *research.md*'s Alternatives table (RFC-0024), or a bespoke
+  `## Decisions (resolved in review)` table used by no other RFC (RFC-0009) —
+  which made "what did we pick, and why" the hardest thing to find in an
+  accepted RFC. Per-option **pros/cons deliberately stay in `research.md`
+  § Alternatives** (`| Option | Pros | Cons |`, "decision stays open"); the RFC
+  README's two option sections remain verdict-shaped, so the documented split —
+  research explains, RFC proposes, ADR decides — is unchanged. Recorded in the
+  three places the v2 bump used: the template header comment, the artifact table
+  in `rfc/README.md`, and the historical note plus footer in
+  `docs/proposals/README.md`. No backfill; RFCs on v1/v2 are untouched.
+- **The ADR template was left alone on purpose, and that is worth writing down.**
+  MADR-style `Considered Options` + `Decision Outcome` were considered for it and
+  rejected as duplicates: `## Decision drivers`
+  (`| Priority | Driver | Why it matters |`) already *is* the comparison criteria,
+  `## Alternatives considered` (`| Option | Benefits | Costs / risks | Result |`,
+  `Result: Selected`) already *is* the options table with the choice marked, and
+  `### Why the selected option won` / `### Why the closest alternative lost`
+  already *are* the rationale. Renaming them would also break
+  `adr/README.md`'s append-only protection of those exact headings and the
+  planned `make lint-adr` required-headings check. Note that ADR-001–031 (v1) did
+  use literal `Pros:`/`Cons:` bullets and template v2 replaced them with the
+  table — reintroducing them would be a reversal, not an addition.
+
 - **RFC-0024's design record stopped at its own acceptance date.** Every phase
   had shipped — P1 through P5 plus P6 arm A — while the RFC's Implementation
   History still ended 2026-08-11 and all four "When Status → implemented" boxes

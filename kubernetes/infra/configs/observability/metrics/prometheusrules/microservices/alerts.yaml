@@ -155,17 +155,41 @@ spec:
             description: "{{ $labels.app }} 5xx error rate is {{ $value | humanizePercentage }} (threshold: 15%). Immediate investigation required."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceErrorRateCritical.md"
 
+        # The second clause asks whether there is traffic NOW, not whether there
+        # was traffic in the past hour. That distinction is the whole alert.
+        #
+        # With the old `[1h]` guard this condition was a strict SUPERSET of
+        # MicroserviceNoTraffic's: no requests at all also means no 2xx, so every
+        # time that warning fired this critical fired with it, carrying no extra
+        # information at a severity that pages. On this platform traffic is
+        # bursty (no continuous synthetic load), so every gate run ended in a
+        # 40-minute page -- measured at 8 (app, namespace) pairs on an idle
+        # cluster, 0 with the clause below.
+        #
+        # Idleness is MicroserviceNoTraffic's job (warning, non-paging, and its
+        # runbook explains why `for:` is deliberately short). A service that is
+        # not receiving requests at all is covered at critical by
+        # MicroserviceDown, MicroserviceAllInstancesDown and the edge's
+        # EdgeUpstreamUnhealthy / Edge5xxRatioCritical. What nothing else covers
+        # is the case this alert is named for: requests arriving, none of them
+        # succeeding.
+        #
+        # NOTE: "success" is `2..` only, so a service that served nothing but
+        # redirects for ten minutes would page. That was true of the old
+        # expression too, so it is not a regression -- but if a redirect-only
+        # service ever exists, widen the class to `2..|3..` rather than dropping
+        # the clause.
         - alert: MicroserviceNoSuccessfulRequests
           expr: |
             sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!="", http_response_status_code=~"2.."}[10m])) == 0
-            and sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[1h])) > 0
+            and sum by (app, namespace) (rate(http_server_request_duration_seconds_count{app!=""}[10m])) > 0
           for: 10m
           labels:
             severity: critical
             category: errors
           annotations:
             summary: "No successful requests for {{ $labels.app }} ({{ $labels.namespace }})"
-            description: "{{ $labels.app }} has returned zero 2xx responses in the last 10 minutes but had traffic in the prior hour. All requests may be failing."
+            description: "{{ $labels.app }} is serving requests and none of them are succeeding: zero 2xx responses in the last 10 minutes against non-zero traffic in the same window. Not idleness — that is MicroserviceNoTraffic."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/MicroserviceNoSuccessfulRequests.md"
 
         # NEW (RFC-0014): gRPC east-west finally gets monitoring, on the names

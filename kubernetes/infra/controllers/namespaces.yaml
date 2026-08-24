@@ -58,8 +58,9 @@ metadata:
   labels:
     environment: local
     platform.duynhlab.dev/needs-trust: "true"
-    # Receive the RustFS S3 credentials for Tempo trace + Pyroscope profile storage (ClusterExternalSecret)
-    platform.duynhlab/s3: "tempo"
+    # Receive the RustFS S3 credentials for Pyroscope profile storage (ClusterExternalSecret).
+    # The `platform.duynhlab/s3: "tempo"` selector went with Tempo (RFC-0027 / ADR-059) —
+    # its ClusterExternalSecret is tempo-rustfs.yaml.bak, so the label selected nothing.
     platform.duynhlab/s3-pyroscope: "true"
     # Receive the ClickHouse admin credentials (ClusterExternalSecret → clickhouse-credentials)
     platform.duynhlab/clickhouse: "true"

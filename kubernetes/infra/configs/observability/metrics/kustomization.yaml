@@ -8,7 +8,6 @@ resources:
   - victoriametrics/
   - karma/
   - servicemonitors/external-secrets.yaml
-  - servicemonitors/tempo.yaml
   - servicemonitors/kube-apiserver.yaml
   - servicemonitors/kube-dns.yaml
   - servicemonitors/otel-collector.yaml
@@ -20,3 +19,5 @@ resources:
   - podmonitors/envoy-gateway-proxy.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)
   - prometheusrules/
+# RFC-0027 / ADR-059: the Tempo ServiceMonitor retired with Tempo (*.yaml.bak).
+# It was also the only scrape producing job=~".*tempo.*", which TempoDown alerted on.

@@ -8,7 +8,6 @@ resources:
   - grafana-dashboard-slo-overview.yaml
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml
-  - grafana-dashboard-tempo.yaml
   - grafana-dashboard-temporal.yaml
   - grafana-dashboard-cloudnative-pg.yaml
   - grafana-dashboard-pg-query-performance.yaml
@@ -102,3 +101,4 @@ configMapGenerator:
 
 generatorOptions:
   disableNameSuffixHash: true
+# RFC-0027 / ADR-059: the Tempo dashboard retired with Tempo (*.yaml.bak).

@@ -153,42 +153,6 @@ spec:
         - name: karma
           port: 8080
 ---
-# Jaeger — jaeger.duynh.me (translates Ingress jaeger)
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: jaeger
-  namespace: monitoring
-spec:
-  parentRefs:
-    - name: platform
-      namespace: envoy-gateway
-      sectionName: https
-  hostnames:
-    - jaeger.duynh.me
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      filters:
-        - type: ResponseHeaderModifier
-          responseHeaderModifier:
-            set:
-              - name: X-Content-Type-Options
-                value: nosniff
-              - name: Referrer-Policy
-                value: strict-origin-when-cross-origin
-              - name: X-Frame-Options
-                value: DENY
-              - name: Strict-Transport-Security
-                value: "max-age=31536000; includeSubDomains"
-            remove:
-              - Server
-      backendRefs:
-        - name: jaeger
-          port: 16686
----
 # VictoriaTraces — victoriatraces.duynh.me (translates Ingress victoriatraces;
 # UI + Jaeger query API on :10428)
 apiVersion: gateway.networking.k8s.io/v1
@@ -225,42 +189,6 @@ spec:
       backendRefs:
         - name: vtsingle-victoria-traces
           port: 10428
----
-# Tempo — tempo.duynh.me (translates Ingress tempo)
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: tempo
-  namespace: monitoring
-spec:
-  parentRefs:
-    - name: platform
-      namespace: envoy-gateway
-      sectionName: https
-  hostnames:
-    - tempo.duynh.me
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      filters:
-        - type: ResponseHeaderModifier
-          responseHeaderModifier:
-            set:
-              - name: X-Content-Type-Options
-                value: nosniff
-              - name: Referrer-Policy
-                value: strict-origin-when-cross-origin
-              - name: X-Frame-Options
-                value: DENY
-              - name: Strict-Transport-Security
-                value: "max-age=31536000; includeSubDomains"
-            remove:
-              - Server
-      backendRefs:
-        - name: tempo
-          port: 3200
 ---
 # Pyroscope — pyroscope.duynh.me (translates Ingress pyroscope)
 apiVersion: gateway.networking.k8s.io/v1
@@ -369,3 +297,7 @@ spec:
       backendRefs:
         - name: sloth-ui
           port: 8080
+---
+# RFC-0027 / ADR-058 + ADR-059: the tempo.duynh.me and jaeger.duynh.me routes
+# retired with their backends. victoriatraces.duynh.me above is the trace UI now,
+# and it also serves the Jaeger query API on :10428.

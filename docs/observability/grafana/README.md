@@ -83,7 +83,10 @@ renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), or `spec.url`
 
 | Folder | Boards | Source |
 |--------|--------|--------|
-| Observability | Microservices Observability (~41 panels), Business KPIs, **Keycloak — Identity** (login/token KPIs), Order Saga & Payment — Cutover Baseline, Inventory Service — Stock Authority (both RFC-0021-era), **Temporal — Workflows & Activities** (SDK + Server rows), **Microservices — RED Span Metrics** + **OTel Collector Health** (ADR-057 consumers), K8s cluster overview, Vector | helm-charts ConfigMaps ×2 · in-repo JSON ×6 · `spec.url` ×2 |
+| Platform / Infrastructure | Kubernetes Cluster Overview, **OTel Collector Health** (ADR-057 consumer), Vector Cluster Monitoring, **Keycloak — Identity** (login/token KPIs) | in-repo JSON ×2 · `spec.url` ×2 |
+| Microservices / Golden Signals | Microservices (OTel) (~41 panels), **Microservices — RED Span Metrics** (ADR-057 consumer) | helm-charts ConfigMaps ×1 · in-repo JSON ×1 |
+| Workflows / Async | **Temporal — Workflows & Activities** (SDK + Server rows) | in-repo JSON ×1 |
+| Business & Product | Order Saga & Payment — Cutover Baseline, Microservices — Business KPIs, Inventory Service — Stock Authority (all RFC-0021-era) | helm-charts ConfigMaps ×1 · in-repo JSON ×2 |
 | ClickHouse | Server/Engine, OTel logs+traces SQL, Service deep dive, OTel Overview / Logs Explorer / Trace Explorer | in-repo JSON ×6 (RFC-0019 / ADR-023) |
 | API Gateway | Envoy Global, Envoy Clusters, Envoy Gateway Global, Resources Monitor, **Envoy Gateway — Edge Overview** | in-repo JSON ×4 vendored from `envoyproxy/gateway` v1.9.0 + ×1 hand-authored (golden signals / control plane / infra) |
 | Databases | CloudNativePG, PG query performance, PG maintenance, PgDog | vendored/hand-rolled, external repo (`spec.url`) |

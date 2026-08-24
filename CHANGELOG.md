@@ -261,6 +261,22 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The `Observability` folder became four.** Ten dashboards in one folder made
+  "where does this board live" a guess; they now sit in **Platform /
+  Infrastructure** (4), **Microservices / Golden Signals** (2), **Workflows /
+  Async** (1) and **Business & Product** (3) — the RFC-0021-era boards together.
+  Only the `folder:` field changes in ten `GrafanaDashboard` CRs: no JSON, no uid,
+  no query is touched, which is what makes gate row **K5.7** (every dashboard
+  reference resolves) the proof that nothing broke — it stayed 2/2. Verified on
+  the cluster: 4/2/1/3 boards per folder and the total unchanged at **38**. The
+  now-empty `Observability` folder was deleted by hand — grafana-operator does not
+  garbage-collect folders, so a rebuilt cluster never creates it but a long-lived
+  one keeps it.
+  - local-stack is **not** changed here: it provisions by directory and compose
+    audit row C18 pins uids rather than folders, so the two stacks differ in
+    folder *names* only. Renaming there needs a compose gate run, which is
+    deferred.
+
 - **The span metrics finally have a reader, so ADR-057 is `Adoption: Complete`.**
   The `span_metrics` connector has produced `spanmetrics_*` on the cluster since
   #878, and nothing consumed them — the one reason that ADR sat at `Partial`.

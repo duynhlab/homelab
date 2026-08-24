@@ -6,7 +6,7 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "Observability"
+  folder: "Platform / Infrastructure"
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   url: "https://raw.githubusercontent.com/duynhlab/grafana-dashboards/main/dashboard/kubernetes/kubernetes-cluster-overview.json"

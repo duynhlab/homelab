@@ -3119,6 +3119,13 @@ Skeleton (copy what you need):
 
 #### CI
 
+- **K5.5 no longer flaps on the Temporal SDK metric rename.** The gate asserted
+  `temporal_workflow_endtoend_latency_bucket`, but the fleet's workers straddle
+  SDK versions and the newer one emits the family with a `_seconds` suffix —
+  after a worker restart only the new spelling exists and the row failed on a
+  green stack (two identical 14/15 runs, 2026-08-25). The leg now accepts
+  either spelling; re-run proof: 15/15 rows, 49/49 assertions.
+
 - **The repo publishing the CI/CD policy no longer violates it, and the docs
   stop contradicting their own templates.** `ci.yml`'s three `fluxcd/pkg`
   actions ran on a mutable `@main` ref — the exact vector `cicd.md` §

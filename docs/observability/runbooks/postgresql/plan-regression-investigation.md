@@ -145,15 +145,52 @@ the request's app logs alongside.
 
 ## Mitigation
 
-Cheapest first:
+Cheapest first. Run everything on the **primary** — find it first, don't
+assume `-1`:
 
-1. **`ANALYZE <table>;`** on the affected database — refreshes statistics
-   immediately; the planner re-plans on the next execution. This is the 2am
-   fix.
-2. **Tune autovacuum for the table** so it doesn't recur — per-table storage
-   options (`autovacuum_analyze_scale_factor`, `autovacuum_vacuum_scale_factor`)
-   for large or fast-churning tables; the cluster-wide baseline lives in
-   `instance.yaml` `postgresql.parameters`.
+```bash
+kubectl get cluster.postgresql.cnpg.io product-db -n product \
+  -o jsonpath='{.status.currentPrimary}'   # e.g. product-db-1
+```
+
+1. **Refresh statistics now** — the 2am fix; the planner re-plans on the next
+   execution. Real example (product-db, database `product`, table `products`):
+
+   ```bash
+   kubectl exec -n product product-db-1 -c postgres -- \
+     psql -U postgres -d product -c "ANALYZE VERBOSE public.products;"
+   #   INFO:  analyzing "public.products"
+   #   INFO:  "products": scanned 1 of 1 pages, containing 16 live rows and 6 dead rows; ...
+
+   # Table not pinned down yet? Analyze the whole database (fine at this size):
+   kubectl exec -n product product-db-1 -c postgres -- \
+     psql -U postgres -d product -c "ANALYZE;"
+
+   # Confirm it registered:
+   kubectl exec -n product product-db-1 -c postgres -- \
+     psql -U postgres -d product -Atc \
+     "SELECT relname, last_analyze FROM pg_stat_user_tables WHERE relname='products';"
+   ```
+
+2. **Tune autovacuum for that table** so it doesn't recur — per-table storage
+   options beat cluster-wide knobs for one large/fast-churning table:
+
+   ```bash
+   kubectl exec -n product product-db-1 -c postgres -- \
+     psql -U postgres -d product -c \
+     "ALTER TABLE public.products SET (autovacuum_analyze_scale_factor = 0.02,
+                                       autovacuum_vacuum_scale_factor = 0.05);"
+
+   # Inspect / undo:
+   kubectl exec -n product product-db-1 -c postgres -- \
+     psql -U postgres -d product -Atc \
+     "SELECT reloptions FROM pg_class WHERE relname='products';"
+   ```
+
+   This is applied SQL state, not GitOps — record it in the owning service's
+   schema migrations so a re-bootstrap doesn't lose it. The cluster-wide
+   baseline lives in `instance.yaml` `postgresql.parameters`.
+
 3. **Fix the access path** when the flip is legitimate growth, not stale stats:
    add/adjust the index the query needs, or rewrite the query — that work
    belongs in the owning service repo (schema migrations), not homelab.

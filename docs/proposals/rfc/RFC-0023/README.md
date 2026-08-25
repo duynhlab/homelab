@@ -581,9 +581,9 @@ schema exists anywhere.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | [ADR-047](../../adr/ADR-047-protected-apis-on-owning-services/) *(renumbered 2026-08-11: the identity ADRs took 041–043 and RFC-0024's edge ADRs took 044–046 at acceptance)* | Accepted |
-| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | [ADR-048](../../adr/ADR-048-admin-portal-no-bff/) | Accepted |
-| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui — owner-selected | [ADR-049](../../adr/ADR-049-admin-portal-tanstack-spa/) | Accepted |
+| Backoffice commands go through role-gated `/protected/` APIs on owning services — never `/internal/`, never a DB | [ADR-047](../../adr/ADR-047-protected-apis-on-owning-services/) *(renumbered 2026-08-11: the identity ADRs took 041–043 and RFC-0024's edge ADRs took 044–046 at acceptance)* | Accepted / Adoption **Complete** |
+| The Admin Portal calls owning services directly; an admin BFF is deferred to a read-aggregation trigger | [ADR-048](../../adr/ADR-048-admin-portal-no-bff/) | Accepted / Adoption **Complete** |
+| The Admin Portal is a separate React+Vite SPA on the TanStack stack (Router/Query/Table/Form) with Tailwind v4 + shadcn/ui — owner-selected | [ADR-049](../../adr/ADR-049-admin-portal-tanstack-spa/) | Accepted / Adoption **Complete** |
 
 The MVP write-scope cut (product/inventory only) stays an RFC scope decision, not an ADR.
 
@@ -706,11 +706,21 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
 
 When Status → implemented, confirm:
 - [x] Linked ADR(s) Adoption → Complete — ADR-047/048/049/050/053 on the 2026-08-25 Kind gate
-- [ ] docs/api/ synced — api.md protected conventions; per-service contracts; rollup;
+- [x] docs/api/ synced — api.md protected conventions; per-service contracts; rollup;
       Design records links; `docs/frontend/admin-portal/` created and indexed
-- [ ] Runbooks updated (protected-API ops; OrderManualReviewBacklog runbook points to
-      the portal path when the command ships)
-- [ ] Resulting decisions table reflects final ADR status
+      (2026-08-25 — the area doc was the last missing piece)
+- [x] Runbooks updated — `OrderManualReviewBacklog` opens with *"Diagnosis — start in
+      the portal"* and keeps SQL only as the fallback when the portal or edge is down
+- [x] Resulting decisions table reflects final ADR status — Status **and** Adoption
+
+- 2026-08-25 — **Confirmation checklist closed.** The `docs/api/ synced` box had
+  one piece missing since this RFC was written: the
+  [`docs/frontend/admin-portal/`](../../../frontend/admin-portal/README.md) area
+  this RFC promised in four places. It now exists, alongside a
+  [`docs/frontend/`](../../../frontend/README.md) hub covering both browser apps.
+  The runbook box was already met — `OrderManualReviewBacklog` opens with
+  *"Diagnosis — start in the portal"* — and the Resulting-decisions table now
+  carries Adoption beside Status.
 
 ## Related
 

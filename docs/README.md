@@ -35,6 +35,10 @@ docs/
 │   ├── tracing.md                # Span contract, propagation, sampling
 │   ├── profiling.md              # Profiling contract (pkg/obsx, Pyroscope labels)
 │   └── _template-service.md      # v2 template for a new service contract
+├── frontend/                     # Browser apps at the platform layer (build, expose, watch)
+│   ├── README.md                 # Area hub: storefront + admin portal, the build-arg contract
+│   └── admin-portal/             # The operator portal in depth
+│       └── README.md             # Staff realm fence, edge exposure, delivery, gaps
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
@@ -215,8 +219,8 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | Shipping | [shipping-service](https://github.com/duynhlab/shipping-service) | [shipping.md](./api/shipping.md) | `ghcr.io/duynhlab/shipping-service/shipping-service` | [![CI](https://github.com/duynhlab/shipping-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/shipping-service/actions) |
 | Checkout | [checkout-service](https://github.com/duynhlab/checkout-service) | [checkout.md](./api/checkout.md) | `ghcr.io/duynhlab/checkout-service/checkout-service` | [![CI](https://github.com/duynhlab/checkout-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/checkout-service/actions) |
 | Payment | [payment-service](https://github.com/duynhlab/payment-service) | [payments.md](./api/payments.md) | `ghcr.io/duynhlab/payment-service/payment-service` | [![CI](https://github.com/duynhlab/payment-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/payment-service/actions) |
-| Frontend | [frontend](https://github.com/duynhlab/frontend) | — | `ghcr.io/duynhlab/frontend/frontend` | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
-| Backoffice portal | [admin-service](https://github.com/duynhlab/admin-service) | — (operator SPA; the reads it calls are in each service's contract) | `ghcr.io/duynhlab/admin-service/admin-service` | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
+| Frontend | [frontend](https://github.com/duynhlab/frontend) | [frontend/](./frontend/README.md) — platform view; no API contract of its own | `ghcr.io/duynhlab/frontend/frontend` | [![CI](https://github.com/duynhlab/frontend/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/frontend/actions) |
+| Backoffice portal | [admin-service](https://github.com/duynhlab/admin-service) | [frontend/admin-portal/](./frontend/admin-portal/README.md) — operator SPA; the reads it calls are in each service's contract | `ghcr.io/duynhlab/admin-service/admin-service` | [![CI](https://github.com/duynhlab/admin-service/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/admin-service/actions) |
 
 Clone all repositories: [platform/setup.md](./platform/setup.md).
 
@@ -404,6 +408,11 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Temporal Workflows](./api/temporal.md) - the three workflows as built, saga-vs-2PC learning, Temporal infrastructure, and operations
 - [Checkout](./api/checkout.md) - Session orchestration, fully shipped (local-stack + cluster); the legacy order path was removed in RFC-0021 P5
 - [Payments](./api/payments.md) - Payment API, state machine, ledger, provider, and reconciliation
+
+### Frontend
+
+- [Browser applications](./frontend/README.md) - Area hub: the two SPAs at the platform layer, and the build-arg contract that makes an image tag a deployment contract
+- [Admin Portal](./frontend/admin-portal/README.md) - The operator portal: staff-realm fence, `/protected/` audience, edge exposure, delivery, and its gap list
 
 ### Design records (RFCs and ADRs)
 

@@ -519,9 +519,9 @@ supported at any point.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Adopt Keycloak as the platform identity provider; retire the custom auth-service | [ADR-041](../../adr/ADR-041-keycloak-platform-idp/) | Accepted |
-| Use the single-issuer OIDC subject (`sub`) as the application `user_id` (string, fleet-wide) | [ADR-042](../../adr/ADR-042-oidc-sub-as-user-id/) | Accepted |
-| Browser identity via OIDC; east-west trust stays workload-level (no Client Credentials) | [ADR-043](../../adr/ADR-043-oidc-browser-workload-trust/) | Accepted |
+| Adopt Keycloak as the platform identity provider; retire the custom auth-service | [ADR-041](../../adr/ADR-041-keycloak-platform-idp/) | Accepted / Adoption **Complete** |
+| Use the single-issuer OIDC subject (`sub`) as the application `user_id` (string, fleet-wide) | [ADR-042](../../adr/ADR-042-oidc-sub-as-user-id/) | Accepted / Adoption **Complete** |
+| Browser identity via OIDC; east-west trust stays workload-level (no Client Credentials) | [ADR-043](../../adr/ADR-043-oidc-browser-workload-trust/) | Accepted / Adoption **Complete** |
 
 *(Numbering note 2026-08-11: the reserved 039–040 were consumed by unrelated
 decisions — local-stack Temporal and the Tempo chart — so these landed as
@@ -574,11 +574,18 @@ every domain schema and outlives the choice of IdP.
   JIT profile provisioning kept and the orphaned internal route retired.
 
 When Status → implemented, confirm:
-- [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
-- [ ] docs/api/ synced — `auth.md` retired/archived; `user.md`, `api.md`, per-service
+- [x] Linked ADR(s) Adoption → Complete — ADR-041/042/043 and the ADR-050 amendment, all four on the 2026-08-25 Kind gate pass
+- [x] docs/api/ synced — `auth.md` carries an *"Archived — RFC-0024 P5 executed"* banner; `user.md`, `api.md`, per-service
       contracts and rollup updated; Design records links added
-- [ ] Runbooks updated (Keycloak ops, key-rotation incl. the Kong edge step)
-- [ ] Resulting decisions table reflects final ADR status
+- [x] Runbooks updated — five under `runbooks/keycloak/`; the key-rotation runbook's Kong edge step is gone (`grep kong docs/secrets/openbao.md` returns nothing)
+- [x] Resulting decisions table reflects final ADR status — Status **and** Adoption
+
+- 2026-08-25 — **Confirmation checklist closed.** All four boxes were already
+  satisfied and simply never ticked: ADR-041/042/043 plus the ADR-050 amendment
+  are `Adoption: Complete`, `docs/api/auth.md` carries its archived banner, five
+  Keycloak runbooks exist and the key-rotation runbook's Kong edge step is gone.
+  The Resulting-decisions table now carries Adoption beside Status, so "final ADR
+  status" is literally what it shows.
 
 ## Related
 

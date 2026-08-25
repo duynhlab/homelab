@@ -13,5 +13,8 @@ spec:
   interval: 10m
   url: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator
   ref:
-    # Chart 0.66.2 ships operator v0.73.1 and matching rendered CRDs.
-    semver: "0.66.2"
+    # Chart 0.67.2 ships operator v0.74.0 and matching rendered CRDs
+    # (adds the VLDistributed CRD + VLSingle networkPolicy field; defaults:
+    # VictoriaMetrics v1.148.0, VictoriaLogs v1.52.0 — the bare-filter-pipe
+    # LogsQL fix that local-stack already pins).
+    semver: "0.67.2"

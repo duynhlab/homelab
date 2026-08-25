@@ -186,7 +186,7 @@ Locally there is no operator, so this endpoint **is** the engine view.
 ### 5B. vmagent + vmalert
 
 Two Compose services on the local VM pin (`v1.150.0` — ahead of the cluster's
-operator default `v1.147.0`; see the skew note in
+operator default `v1.148.0`; see the skew note in
 [`docs/observability/README.md`](../../docs/observability/README.md)):
 
 - **vmagent** (`:8429`) scrapes six jobs — `clickhouse:9363`,

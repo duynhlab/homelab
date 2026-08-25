@@ -26,7 +26,7 @@
 | **Supersedes** | — (narrows ADR-041's scope; does not replace it) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0023 program — identity-split train |
-| **Adoption** | Partial — both realm twins carry the split: `duynhlab-staff` holds the operator, the `backoffice_admin` role, and the `admin-portal` client with the staff posture; the customer realm holds customers only. Every `/protected/` route verifies the staff issuer, so a customer token fails at the edge as wrong-issuer (audit A17/A18). Verified in local-stack; the cluster realm import is unverified until the Kind gate |
+| **Adoption** | **Complete** — the cluster realm import carries both realms and the fence holds: `duynhlab-staff` issues the portal's token (K4.7) while a customer token is rejected at the edge on `/protected/` (K4.8), 2026-08-25 |
 
 ## Context
 
@@ -204,6 +204,7 @@ decision requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-13 | Accepted / Not started | Owner decision after meeting the alice dual-role seed in practice; Keycloak realm-separation pattern verified via Context7 |
+| 2026-08-25 | Accepted / **Complete** | Kind gate passed — the cluster realm import, the one item this record's Adoption named, is verified. The History skipped `Partial`: it read `Accepted / Not started` from 2026-08-13 until today. |
 
 ---
-_Last updated: 2026-08-13_
+_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — phases P1/P3/P5 (PR trains) |
-| **Adoption** | Partial — frontend 2.0.0 (keycloak-js) merged; browser flow verified in the audit (B1–B3: PKCE redirect, no token in web storage, end-session logout); cluster pending Kind |
+| **Adoption** | **Complete** — verified in a real browser against the cluster edge 2026-08-25 (K4.6/K4.7): PKCE `code_challenge_method=S256` on both realms, and `localStorage`, `sessionStorage` and cookies all empty while signed in |
 
 ## Context
 
@@ -260,6 +260,7 @@ requires a new ADR that supersedes this one.
 | 2026-08-12 | Accepted / Partial | Frontend cut over to `keycloak-js` (#752); browser flow verified in the compose audit (B1–B3: PKCE redirect, no token in web storage, end-session logout) |
 | 2026-08-14 | Accepted / Partial | [ADR-050](../ADR-050-separate-staff-identity-realm/) extends the same browser model to the Backoffice against a second realm, and [ADR-048](../ADR-048-admin-portal-no-bff/) reaffirms the no-BFF half of this decision |
 | 2026-08-24 | Accepted / Partial | Browser flow and its two consequences (token in JS memory, no central revocation inside the 15-minute TTL) documented in [`docs/api/identity.md`](../../../api/identity.md). Remaining for `Complete`: the Kind gate |
+| 2026-08-25 | Accepted / **Complete** | Kind gate passed — K4.6/K4.7 ran for the first time. They had been unrunnable since 2026-08-17 on an undocumented step: `homelab-ca` must be trusted in the macOS **System** keychain, now written into the runbook and cert-manager.md. |
 
 ---
-_Last updated: 2026-08-24 — appended the History rows that were skipped when Adoption moved to `Partial`; the table had still read `Accepted / Not started`._
+_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

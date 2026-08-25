@@ -82,7 +82,11 @@ validate: ## Validate Kubernetes manifests (Kustomize)
 # read by eye.
 
 .PHONY: e2e
-e2e: e2e-smoke e2e-saga e2e-staff e2e-operator ## Run the k6 gate suite (set GATE=compose|kind)
+e2e: e2e-saga e2e-smoke e2e-staff e2e-operator ## Run the k6 gate suite (set GATE=compose|kind)
+# Order matters: saga runs FIRST. smoke's C6/K5.2 asserts all ten services have
+# spans, and checkout/payment only emit once the saga drives the funnel. Both gates
+# mandate a from-scratch stack, so smoke-before-saga fails that row every first run
+# (measured on compose AND Kind, 2026-08-25).
 
 .PHONY: e2e-smoke
 e2e-smoke: ## Functional + telemetry rows as checks with thresholds

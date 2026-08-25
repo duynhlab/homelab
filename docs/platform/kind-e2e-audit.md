@@ -818,6 +818,28 @@ breaks a command copied from the Compose audit:
   products** — not an empty grid. Run it with the **agent-browser** skill (read it
   from the agent IDE, then `agent-browser skills get core`), the same tool the
   Compose gate's Phase B uses.
+
+  **Trust `homelab-ca` in the SYSTEM keychain first, or this row cannot run.**
+  The edge serves a `homelab-ca`-signed certificate and Chrome refuses it with
+  `net::ERR_CERT_AUTHORITY_INVALID`. Measured 2026-08-25, in this order — the
+  first three do **not** work and are recorded so nobody repeats them:
+  `--ignore-certificate-errors` (modern Chrome ignores it),
+  `--ignore-certificate-errors-spki-list=<leaf or CA SPKI>`, and a dedicated
+  `--profile`. Adding the CA to the **login** keychain makes `curl` trust it
+  while Chrome still refuses — Chrome reads root trust from the System keychain
+  only. The step that works:
+  ```bash
+  kubectl get secret -n cert-manager homelab-ca-secret \
+    -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/homelab-ca.crt
+  sudo security add-trusted-cert -d -r trustRoot \
+    -k /Library/Keychains/System.keychain /tmp/homelab-ca.crt   # prompts for a password
+  ```
+  Remove it at teardown, next to [K6.3](#k6--evidence-and-teardown):
+  ```bash
+  sudo security delete-certificate -c homelab-ca -t /Library/Keychains/System.keychain
+  ```
+  Linux/NSS hosts use `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n homelab-ca
+  -i /tmp/homelab-ca.crt` instead.
   This is not a re-run of Compose Phase B. Compose proved the SPA works against
   services on localhost; what only the cluster can prove is the SPA talking to the
   **real edge** over **self-signed TLS** with an `iss` derived from
@@ -1356,6 +1378,50 @@ cluster.**
 **Rows it could not run:** K4.6, K4.7, K5.1, K5.3, K5.7 and part of K5.5 — all
 for want of seeded data and a browser. [K1.6](#k1--bring-up) and the
 agent-browser skill close that gap; those rows are first-class above.
+
+### 2026-08-25 — the first complete pass
+
+**ELIGIBLE.** The first run in which every K-row was actually executed. A cluster
+built from zero on macOS + podman reported **23/23 Kustomizations Ready**, 101
+pods Running, `kind-seed.sh` 8/8, 13 first-party images matching their pins line
+by line, 41/41 HelmReleases Ready, and `make tf-plan` a zero diff. The compose
+A/B/C audit ran first on the same pinned tags, as the preconditions require.
+
+**Three rows ran for the first time in this repo's history:**
+
+1. **K4.6 / K4.7.** The 2026-08-17 run recorded them as "could not run". They were
+   blocked on a step no document carried: on macOS the edge's `homelab-ca`
+   certificate must be trusted in the **System** keychain. The login keychain is
+   not enough — `curl` accepts it and Chrome still answers
+   `net::ERR_CERT_AUTHORITY_INVALID`, because Chrome reads root trust from the
+   System store only. Three Chrome flag workarounds were measured and all fail:
+   `--ignore-certificate-errors`, `--ignore-certificate-errors-spki-list` (leaf
+   *and* CA SPKI), and a dedicated `--profile`. The working step is now in
+   [K4.6](#k4--the-real-edge-and-identity) and in
+   [`cert-manager.md`](../secrets/cert-manager.md).
+2. **The ADR-045 rate-limit row.** `make e2e-ratelimit GATE=kind` drove under and
+   over the ceiling and returned 429 with draft-03 `X-RateLimit-*` headers. That
+   ADR's own 2026-08-22 amendment admits the row "was never exercised" — it is a
+   separate `make` target from `make e2e`, which is how it stayed unrun.
+3. **SG.4.** Behavior `Pinned`, deployment `order/order-fulfillment`, ran on the
+   Current build id `2.5.0-498f`, no half-finished ramp — ADR-054's proof, and
+   something compose structurally cannot give.
+
+**Outcome:** nine ADRs (041, 042, 043, 044, 045, 048, 049, 050, 053) moved to
+`Adoption: Complete`, and RFC-0023 and RFC-0024 to `implemented`.
+
+**Five findings, all fixed in the same PR:**
+
+| # | Finding |
+|---|---|
+| 1 | **`make e2e` ran its targets in the wrong order**, and it fails on *both* gates. `e2e-smoke` came before `e2e-saga`, but smoke's C6/K5.2 asserts all ten services have spans and `checkout`/`payment` only emit once the saga drives the funnel. Both runbooks mandate a from-scratch stack, so the first `make e2e` always failed that row. Reordered. |
+| 2 | **Compose C13 could only fail.** It queried the Vector leg `_stream:{service="gateway"}`, which holds **0** lines; ADR-060 (#886) moved the edge access log to OTLP — 1540 lines under `service.name="platform.envoy-gateway"`, same field set. Re-pointed. |
+| 3 | **Compose A15 has never been runnable.** `compose.yaml` sets neither `TEMPORAL_DEPLOYMENT_NAME` nor a build id and `git log -S` shows it never has. The runbook called it "the only place the ENV CONTRACT can be gated before Kind"; it is not, and the proof lives at K1.7 + SG.4. Marked. |
+| 4 | **`AGENTS.md`'s Kustomization count was stale** — it said a cluster reports 24. With `mcp-local` commented out since 2026-08-21 it reports **23**. Corrected, with a note to count at run time. |
+| 5 | **K4.6/K4.7's keychain blocker** (above) was undocumented in both this runbook and `cert-manager.md`. Documented, including the three workarounds that do not work. |
+
+**One row deliberately not run:** [K6.3](#k6--evidence-and-teardown) `make down`.
+The owner kept the cluster up to explore it. Nothing else was skipped.
 
 ### 2026-08-20 — the arm64 bring-up
 

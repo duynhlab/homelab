@@ -306,7 +306,7 @@ sequenceDiagram
 |------|---------|
 | Identity source | Read `user_id` from verified JWT claims (`sub`, string UUID), never from a private request body |
 | Authoritative check | Each service verifies the token locally with `pkg/authmw` (v0.37.0: `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL`) |
-| Gateway check | The edge's `SecurityPolicy.jwt` (`remoteJWKS`) verifies **signature and issuer** against the realm's JWKS, with no provisioned key material. It does **not** verify the audience — no policy declares `audiences`, deliberately, so the edge cannot reject a token the services would accept; `aud` is enforced in-service. Verified end-to-end in local-stack; the cluster carries the same policy but it has not yet been exercised on Kind (**planned**) |
+| Gateway check | The edge's `SecurityPolicy.jwt` (`remoteJWKS`) verifies **signature and issuer** against the realm's JWKS, with no provisioned key material. It does **not** verify the audience — no policy declares `audiences`, deliberately, so the edge cannot reject a token the services would accept; `aud` is enforced in-service. Verified end-to-end in local-stack **and on Kind** (K4.1–K4.5, K4.8; gate run 2026-08-25) — [ADR-044](../proposals/adr/ADR-044-envoy-gateway-platform-edge/) |
 | Auth gRPC | Removed; services do not call auth `GetMe` |
 | Failure mode | Missing, invalid, or unverifiable credentials fail closed |
 

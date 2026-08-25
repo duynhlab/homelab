@@ -652,6 +652,24 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **The Kind gate passed — nine ADRs and two RFCs converted in one run.** Both
+  gates ran on 2026-08-25 against the pinned tags: the full compose A/B/C audit
+  first, then K0–K6. A cluster built from zero reported **23/23 Kustomizations**,
+  101 pods, seed 8/8, 13 images matching pins line by line, 41/41 HelmReleases and
+  a zero `tf-plan` diff; every K0–K5 row green (49/49 assertions).
+  **ADR-041/042/043/044/045/048/049/050/053 → `Adoption: Complete`**, each with a
+  dated History row appended in the same edit — the twelve records whose header
+  already contradicts their History did not gain a thirteenth.
+  **RFC-0023 and RFC-0024 → `implemented`.** RFC-0024 keeps one box open: the
+  RFC-0022/0023 Kong cross-references are a separate, larger edit and this change
+  does not claim them.
+  Three rows ran for the first time in the repo's history — **K4.6/K4.7** (blocked
+  since 2026-08-17 on an undocumented System-keychain trust step), **the ADR-045
+  rate-limit row** (a separate `make` target from `make e2e`, which is how it
+  stayed unrun despite that ADR's own amendment admitting it), and **SG.4**
+  (`Pinned` on Current build `2.5.0-498f` — ADR-054's proof, which compose
+  structurally cannot give).
+
 - **An RFC never had one place to say what it chose, so every RFC said it
   somewhere else.** RFC template **v3** adds **§ Decision outcome** between
   § Other solutions considered and § Architecture & Diagrams: chosen option,
@@ -1279,6 +1297,34 @@ Skeleton (copy what you need):
   checks the `temporal-worker-local` dashboard that already ships.
 
 #### Docs
+
+- **The gate run found five things wrong with the gates themselves.** All fixed
+  here. **(1) `make e2e` ran its targets in the wrong order, and it failed on both
+  gates** — `e2e-smoke` before `e2e-saga`, while smoke's C6/K5.2 asserts all ten
+  services have spans and `checkout`/`payment` only emit once the saga drives the
+  funnel; since both runbooks mandate a from-scratch stack, the first `make e2e`
+  always failed that row. **(2) Compose C13 could only ever fail** — it queried the
+  Vector leg `_stream:{service="gateway"}`, which holds **0** lines since ADR-060
+  (#886) moved the edge access log to OTLP; the same field set is on
+  `service.name="platform.envoy-gateway"` (1540 lines measured). **(3) Compose A15
+  has never been runnable** — `compose.yaml` sets neither `TEMPORAL_DEPLOYMENT_NAME`
+  nor a build id and `git log -S` finds no history for either name, yet the runbook
+  called it "the only place the ENV CONTRACT can be gated before Kind"; the proof
+  actually lives at K1.7 + SG.4 on the cluster. **(4) `AGENTS.md` claimed a cluster
+  reports 24 Kustomizations** — with `mcp-local` commented out since 2026-08-21 it
+  reports **23**, now corrected with a note to count at run time. **(5) K4.6/K4.7
+  were blocked by an undocumented step**: on macOS the edge's `homelab-ca` must be
+  trusted in the **System** keychain — the login keychain makes `curl` accept it
+  while Chrome still refuses, and three Chrome flag workarounds
+  (`--ignore-certificate-errors`, `--ignore-certificate-errors-spki-list` with leaf
+  *and* CA SPKI, a dedicated `--profile`) were each measured and each fails. Now in
+  [`kind-e2e-audit.md`](docs/platform/kind-e2e-audit.md) K4.6 and
+  [`cert-manager.md`](docs/secrets/cert-manager.md), with the failures recorded so
+  nobody repeats them.
+- **`docs/api/api.md` links ADR-044.** That ADR's Documentation row requires two
+  files; the 2026-08-24 entry declared it satisfied while only `envoy-gateway.md`
+  linked it. The edge-exposure row now cites ADR-044 and records that the cluster
+  half was verified on Kind rather than reading **planned**.
 
 - **RFC-0024 shipped its code but never its docs, so identity had no contract
   file and no platform file.** Two new docs close the gap the design records

@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | PRs on `feat/k6-e2e-assertions` |
-| **Adoption** | Partial — Kind rows converted and proven; compose rows written and contract-verified, environment untested |
+| **Adoption** | **Complete** — Kind rows converted and proven; compose rows verified on a live local-stack 2026-08-25 (`make e2e GATE=compose` green end to end) |
 
 ## Context
 
@@ -212,7 +212,7 @@ how far careful bash gets: far enough to be valuable, not far enough to fail.
 | Edge limiter asserted both directions | platform | same | `make e2e-ratelimit` proves the ceiling and the headers |
 | Rate-limit sizing corrected + recorded | platform | ADR-045 History | 25/Second in `btp-api.yaml`, amendment written |
 | Compose rows written | platform | `feat/k6-compose-rows` | All 15 remaining `http` rows expressed; every script passes against the cluster |
-| Compose rows verified on compose | platform | follow-up | `make e2e GATE=compose` green on a live local-stack |
+| Compose rows verified on compose | platform | follow-up | **Done 2026-08-25** — `make e2e GATE=compose` green on a live local-stack: smoke 8/8, staff 59/59, operator 26/26, session 11/11, observability 52/52, plus the saga and rate-limit suites. The run also exposed two defects in the gate itself, both fixed in the same pass (see History) |
 | Runbook rows point at the suite | platform | `feat/k6-compose-rows` | Kind `curl` count 32 → 13, and every remaining line is a row the suite does not cover or a Diagnostics entry |
 
 ## Validation and compliance
@@ -249,3 +249,13 @@ Re-open this decision when one or more of the following become true:
 - [ADR-046](../ADR-046-e2e-gate-kind-fallback/) — where the gate runs; the edge-policy boundary
 - [ADR-054](../ADR-054-temporal-worker-controller/) — the worker versioning this suite asserts
 - [ADR-055](../ADR-055-keda-worker-autoscaling/) — the autoscaling proposal this suite gives a signal to
+
+## History
+
+| Date | Status / adoption | Change |
+|------|-------------------|--------|
+| 2026-08-22 | Accepted / Partial | Accepted (#872); the Kind rows were converted to k6 units and proven, and the compose rows were written and contract-verified but never run against a live compose stack |
+| 2026-08-25 | Accepted / **Complete** | The last obligation closed: `make e2e GATE=compose` ran green on a live local-stack — smoke 8/8, staff 59/59, operator 26/26, session 11/11, observability 52/52, plus saga and rate-limit. Running it also proved two things the contract check could not: `make e2e` invoked its suites in an order that let a later suite depend on an earlier one's state, and C13 asserted against a log stream the edge no longer writes. Both were fixed in the same pass (#902), which is the argument for this ADR in miniature — a written row is not a verified row |
+
+---
+_Last updated: 2026-08-25_

@@ -282,6 +282,7 @@ docs/observability/
 │   ├── README.md                 # Tracing guide (VictoriaTraces + OTel)
 │   ├── architecture.md           # Two-sink fan-out (VictoriaTraces + ClickHouse)
 │   ├── jaeger.md                 # Jaeger — archived (retired, RFC-0027)
+│   ├── service-graph.md          # Who calls whom + per-edge RED (ADR-059)
 │   ├── backends-comparison.md    # Why VictoriaTraces + ClickHouse won
 │   ├── tempo.md                  # Tempo — archived (retired, RFC-0027)
 │   └── victoriatraces.md         # VictoriaTraces — the fast trace path

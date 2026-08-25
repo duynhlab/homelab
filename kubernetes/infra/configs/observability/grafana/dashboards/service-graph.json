@@ -1,0 +1,174 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Who calls whom (VictoriaTraces dependency graph) and how each edge is doing (ClickHouse per-edge RED). ADR-059.",
+  "editable": true,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "type": "text",
+      "title": "How to read this board",
+      "id": 1,
+      "transparent": true,
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "This board answers one question: **who calls whom, and how is that call doing?**\n\n- **Service map** comes from the VictoriaTraces dependency API (`/select/jaeger/api/dependencies`). It carries `callCount` only \u2014 that is the whole trade recorded in [ADR-059](https://github.com/duynhlab/homelab/blob/main/docs/proposals/adr/ADR-059-retire-tempo/README.md).\n- **Per-edge RED** comes from the ClickHouse self-join below, which adds failure and p95 that the map cannot show.\n\nThe map is **not retroactive**: VictoriaTraces builds it from a background task on a 1-minute interval, so a freshly rebuilt cluster shows an empty graph until traffic flows. Query and caveats: `docs/observability/tracing/service-graph.md`."
+      }
+    },
+    {
+      "type": "nodeGraph",
+      "title": "Service map \u2014 VictoriaTraces dependency graph",
+      "id": 2,
+      "datasource": {
+        "type": "jaeger",
+        "uid": "victoriatraces"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "description": "Edges are derived by VictoriaTraces from stored spans. callCount only; for failure and latency per edge, use the table below.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "jaeger",
+            "uid": "victoriatraces"
+          },
+          "queryType": "dependencyGraph"
+        }
+      ],
+      "options": {
+        "nodes": {
+          "mainStatUnit": "calls"
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Per-edge RED \u2014 ClickHouse self-join (callCount, failed, p95)",
+      "id": 3,
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "description": "Parent/child span join over otel.otel_traces. `failed` counts a span status of Error at either end of the edge \u2014 see the doc for why it reads 0 on this platform today.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "rawSql": "SELECT\n    caller.ServiceName                                                   AS client,\n    callee.ServiceName                                                   AS server,\n    count()                                                              AS callCount,\n    countIf(caller.StatusCode = 'Error' OR callee.StatusCode = 'Error')  AS failed,\n    round(quantile(0.95)(caller.Duration) / 1e6, 2)                      AS p95_ms\nFROM otel.otel_traces AS caller\nINNER JOIN otel.otel_traces AS callee\n    ON  callee.TraceId      = caller.TraceId\n    AND callee.ParentSpanId = caller.SpanId\nWHERE caller.Timestamp >= $__fromTime AND caller.Timestamp <= $__toTime\n  AND callee.Timestamp >= $__fromTime AND callee.Timestamp <= $__toTime\n  AND caller.SpanKind = 'Client'\n  AND callee.SpanKind = 'Server'\nGROUP BY client, server\nORDER BY callCount DESC",
+          "format": 1,
+          "queryType": "table",
+          "pluginVersion": "4.19.0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95_ms"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "gradient"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [
+          {
+            "displayName": "callCount",
+            "desc": true
+          }
+        ]
+      }
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "tracing",
+    "victoriatraces",
+    "clickhouse",
+    "service-graph"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "",
+  "title": "Service Graph",
+  "uid": "service-graph",
+  "version": 1
+}

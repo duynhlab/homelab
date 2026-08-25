@@ -262,6 +262,15 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The service map has a board again.** ADR-059 retired Tempo and left two
+  obligations open: the dependency data existed, and nothing rendered it. The new
+  **Service Graph** board (`uid: service-graph`, *Microservices / Golden Signals*)
+  puts a Node Graph on the VictoriaTraces dependency API beside a ClickHouse
+  per-edge self-join that adds the failure and p95 the dependency API cannot
+  return. Both verified against a live Kind cluster through Grafana's own query
+  API — 34 edges and 24 service→service rows. The query and its four caveats are
+  documented in [`docs/observability/tracing/service-graph.md`](docs/observability/tracing/service-graph.md).
+
 - **The `Observability` folder became four.** Ten dashboards in one folder made
   "where does this board live" a guess; they now sit in **Platform /
   Infrastructure** (4), **Microservices / Golden Signals** (2), **Workflows /
@@ -651,6 +660,16 @@ Skeleton (copy what you need):
   validated search and replaces the URL when it differs.
 
 #### Proposals
+
+- **Two records caught up with what the cluster can prove.** ADR-056 moves to
+  `Adoption: Complete` — its last obligation was literally "`make e2e
+  GATE=compose` green on a live local-stack", and that ran green (smoke 8/8,
+  staff 59/59, operator 26/26, session 11/11, observability 52/52, plus saga and
+  rate-limit). ADR-059 closes its two remaining P3 obligations against the live
+  Kind cluster. RFC-0008's break-glass finding was re-verified rather than
+  assumed: `bao operator generate-root -init` still returns `403 permission
+  denied` on OpenBAO 2.6.2, eighteen days and a minor version after the original
+  drill, so that slice needs the fix it names.
 
 - **The Kind gate passed — nine ADRs and two RFCs converted in one run.** Both
   gates ran on 2026-08-25 against the pinned tags: the full compose A/B/C audit

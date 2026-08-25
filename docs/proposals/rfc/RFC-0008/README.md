@@ -226,6 +226,15 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
   the AppRole write path this RFC already lists as planned, and then re-run the
   RFC-0012 P2 drill.
 
+- 2026-08-25 — **Re-verified on a fresh Kind cluster: still broken, and not a
+  version artefact.** `bao operator generate-root -init` returns the same
+  `403 permission denied` on `PUT /v1/sys/generate-root-token/attempt`, on
+  OpenBAO **2.6.2** (the 2026-08-07 finding was on 2.6.1) with the same seal
+  shape — awskms seal, shamir recovery seal, 1 share, threshold 1, initialized,
+  unsealed, raft storage. Eighteen days and a minor version later the ceremony
+  has not started working on its own, so this slice needs the fix it names, not
+  another drill.
+
 ## Related
 
 - [Research](./research.md) — plain-language deep dive + auto-unseal PoC + Context7 audit behind this RFC.
@@ -234,4 +243,4 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
 - RFC backlog items this supersedes/absorbs: secret rotation (dynamic creds remove the need), and is adjacent to split-bootstrap + PushSecret.
 
 ---
-_Last updated: 2026-07-19_
+_Last updated: 2026-08-25_

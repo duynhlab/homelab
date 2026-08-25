@@ -45,6 +45,10 @@ resources:
   # no cluster board until now, which is why that ADR stayed Adoption: Partial
   - grafana-dashboard-red-spanmetrics.yaml
   - grafana-dashboard-otel-collector-health.yaml
+  # ADR-059 left the Tempo replacement half-built: the dependency data existed,
+  # no panel read it. This board closes that, and carries the ClickHouse
+  # per-edge self-join beside it.
+  - grafana-dashboard-service-graph.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
@@ -113,6 +117,9 @@ configMapGenerator:
   - name: grafana-dashboard-red-spanmetrics
     files:
       - red-spanmetrics.json
+  - name: grafana-dashboard-service-graph
+    files:
+      - service-graph.json
   - name: grafana-dashboard-otel-collector-health
     files:
       - otel-collector-health.json

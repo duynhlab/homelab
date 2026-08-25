@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| implemented | platform-wide | [./research.md](./research.md) — gate passed, owner signed off 2026-08-11 | 2026-08-10 | 2026-08-24 |
+| implemented | platform-wide | [./research.md](./research.md) — gate passed, owner signed off 2026-08-11 | 2026-08-10 | 2026-08-25 |
 
 > **Every decision is a tradeoff.** This RFC replaces a mature, working edge (Kong OSS
 > 3.9) with Envoy Gateway **and, in the same greenfield program, executes the Keycloak

@@ -102,6 +102,10 @@ spec:
       pg_stat_statements.max: "10000"
       auto_explain.log_min_duration: "1s"
       auto_explain.log_analyze: "on"
+      # Vector's parse_pg_auto_explain parses the payload after "plan:" as
+      # JSON (Plan / Query Text / Planning Time keys) — the PG default `text`
+      # sends every plan to the pg_parse_failures debug sink instead.
+      auto_explain.log_format: "json"
       hot_standby_feedback: "on"
       sync_replication_slots: "on"
 

@@ -91,25 +91,130 @@ edge of the pipeline, not in the store.
 
 ## PostgreSQL pipeline
 
-CloudNativePG wraps every PostgreSQL log line in JSON, and all CNPG clusters
-run `auto_explain` — so slow-query execution plans arrive as JSON embedded in a
-`"duration: X.X ms  plan: {...}"` message. The three `pg_*` transforms turn that
-into a dedicated queryable stream:
+The most elaborate thing Vector does here: turn PostgreSQL **`auto_explain`**
+output — the execution plan of every query slower than `1s`, logged by the
+server itself — into a dedicated, queryable VictoriaLogs stream keyed by
+`cluster_name` / `database` / `query_id`. This section walks the record through
+every hop, because two format contracts have to hold for it to work at all.
 
-1. `parse_pg_json` unwraps the CNPG JSON (only for `postgres` containers of
-   `cnpg.io/cluster` pods).
-2. `filter_pg_auto_explain` keeps the `plan:` lines.
-3. `parse_pg_auto_explain` splits the message at `plan:`, parses the plan JSON,
-   and promotes the metadata that becomes the stream + query fields:
-   `cluster_name`, `namespace`, `database`, `query_id`, plus `pod_name`, `user`,
-   `query_text`, `plan_json`, `duration_ms`, `planning_time_ms`,
-   `execution_time_ms`. Kubernetes metadata is deleted at the end to keep the
-   stored record small.
+### The two format contracts
 
-Any record the parser cannot handle is not silently dropped: `reroute_dropped`
-routes it — with a structured warn/error from the parser itself — to
-`victorialogs_pg_parse_failures`, so the parser's own failure modes are
-debuggable from Grafana.
+1. **CloudNativePG logs JSON.** CNPG always wraps every PostgreSQL log line in
+   its own JSON envelope (`record.message` carries the original PG message) —
+   that part needs no configuration.
+2. **auto_explain must log JSON too.** The parser reads the payload after
+   `plan:` with `parse_json` and extracts JSON-format keys (`Plan`,
+   `Query Text`, `Planning Time`, `Execution Time`) — so every CNPG cluster
+   that preloads `auto_explain` **must set `auto_explain.log_format: "json"`**
+   (`platform-db` and `product-db` `instance.yaml` do). The PostgreSQL default
+   is `text`, and with it the pipeline fails *silently and completely*: the
+   filter still matches (`plan:` is present), the JSON parse fails, and **every
+   plan lands in the `victorialogs_pg_parse_failures` debug sink instead of the
+   plans stream**. That is not hypothetical — the 2026-08-25 audit found
+   exactly this live (plans stream **0** records over 6h, failure stream 8)
+   because the parameter was missing; adding it fixed the pipeline within one
+   config reload, no restart.
+
+### The record, hop by hop
+
+```mermaid
+sequenceDiagram
+    participant PG as postgres container<br/>(CNPG pod)
+    participant SRC as kubernetes_logs<br/>source
+    participant PJ as parse_pg_json
+    participant F as filter_pg_auto_explain
+    participant P as parse_pg_auto_explain
+    participant VL as VictoriaLogs :9428
+
+    PG->>SRC: stdout line (CNPG JSON envelope)
+    SRC->>PJ: event (.message = envelope)
+    Note over PJ: postgres container + cnpg.io/cluster label?<br/>parse_json(.message) → .log, del(.message)
+    PJ->>F: event (.log.record.*)
+    Note over F: .log.record.message contains "plan:"?
+    alt no "plan:" (ordinary line, pgaudit, …)
+        F-->>VL: (not this pipeline) add_labels → victorialogs_all
+    else auto_explain line
+        F->>P: event
+        Note over P: split at "plan:" → parse_json →<br/>promote metadata, del(.kubernetes), del(.log)
+        alt plan parses (log_format = json)
+            P->>VL: victorialogs_pg_plans<br/>stream: cluster_name,namespace,database,query_id
+        else parse fails (log_format = text, malformed, …)
+            P-->>VL: victorialogs_pg_parse_failures<br/>(reroute_dropped) + structured parser error
+        end
+    end
+```
+
+**Hop 0 — what PostgreSQL writes** (real line from `product-db-1`, abridged;
+note the PG message is a *string embedded in* CNPG's envelope, and `query_id`
+is already there because `compute_query_id = auto` + `pg_stat_statements`
+preloaded turns it on):
+
+```json
+{"level":"info","logger":"postgres","msg":"record","logging_pod":"product-db-1",
+ "record":{"user_name":"postgres","database_name":"postgres",
+   "message":"duration: 1301.086 ms  plan:\n{\n  \"Query Text\": \"select pg_sleep(1.3);\",\n  \"Plan\": {\n    \"Node Type\": \"Result\", ... \"Actual Total Time\": 1301.070 ... }\n}",
+   "query_id":"-5191732810777595558"}}
+```
+
+**Hop 1 — `parse_pg_json`.** Scoped to `container_name == "postgres"` on pods
+labelled `cnpg.io/cluster`: parses the envelope into `.log` and **deletes
+`.message`**. This deletion matters later: a record that dies downstream
+carries no `message` field, which is why failure-sink records render as
+`missing _msg field` in VictoriaLogs.
+
+**Hop 2 — `filter_pg_auto_explain`.** Keeps only events whose
+`.log.record.message` contains `plan:` — the auto_explain signature. Everything
+else from the postgres container (startup chatter, **pgaudit** rows) simply
+doesn't enter this pipeline; it still reaches VictoriaLogs via `add_labels` →
+`victorialogs_all`, because both transforms read from the same source.
+
+**Hop 3 — `parse_pg_auto_explain`**, the parser, condensed from its 10 VRL
+steps:
+
+1. Read `.log.record.message`; abort (→ failure sink) if missing.
+2. Split it at `plan:` — the left half holds `duration: X ms`, the right half
+   is the plan payload.
+3. `parse_json` the payload — **the step that hard-requires
+   `log_format: json`**; abort with a structured `json_parse_failure` error on
+   anything else.
+4. Promote the metadata that becomes the record's identity and query fields:
+
+   | Field | Source |
+   |---|---|
+   | `cluster_name` | pod label `cnpg.io/cluster` |
+   | `namespace`, `pod_name` | pod metadata |
+   | `database`, `user`, `query_id` | `.log.record.*` (CNPG envelope) |
+   | `query_text`, `plan_json` | plan JSON (`Query Text`, `Plan`) |
+   | `duration_ms` | regex on the left half (`duration: (…) ms`) |
+   | `planning_time_ms`, `execution_time_ms` | plan JSON, when present |
+
+5. Build a human `message` (`Query plan for queryid=… (duration=…ms)`).
+6. `del(.kubernetes)`, `del(.log)` — the stored record keeps only the fields
+   above.
+
+**Hop 4 — the sink.** `victorialogs_pg_plans` ships with `VL-Msg-Field:
+plan_json` and `VL-Stream-Fields: cluster_name,namespace,database,query_id` —
+so in Grafana the *plan itself* is the log body, and the stream identity is
+the query, not the pod. The record that lands (real, after the fix):
+
+```json
+{"_stream":"{cluster_name=\"product-db\",database=\"postgres\",namespace=\"product\",query_id=\"-5191732810777595558\"}",
+ "_msg":"{\"Node Type\":\"Result\", ... \"Actual Total Time\":1301.07 ...}",
+ "duration_ms":"1301.086","query_text":"select pg_sleep(1.3);",
+ "pod_name":"product-db-1","user":"postgres",
+ "message":"Query plan for queryid=-5191732810777595558 (duration=1301.086ms)"}
+```
+
+### The failure path is a feature
+
+Anything the parser aborts on is **not** lost: `drop_on_error` +
+`reroute_dropped` route the original event to `victorialogs_pg_parse_failures`
+(stream: `kubernetes.container_name`, `kubernetes.pod_name`), and the parser
+also `log()`s a structured warn/error naming the failing step
+(`missing_field` / `split_failure` / `json_parse_failure`) with the cluster and
+a 100-char `json_preview`. So "plans are missing" is always diagnosable from
+Grafana: **read the failure stream first** — if plans are landing there, the
+parser is telling you which contract broke.
 
 **pgaudit** rows (`pgaudit.log = 'ddl, write'`, enabled on all CNPG clusters)
 take the ordinary path instead: they are CNPG-JSON like everything else from the
@@ -164,11 +269,30 @@ carrying `platform.duynhlab.dev/otlp-logs=true` is deliberately not tailed
 
 ### PostgreSQL plans not appearing
 
-1. `auto_explain` enabled in the cluster's PostgreSQL parameters?
-2. The filter/parser active? `kubectl logs -n kube-system -l app.kubernetes.io/name=vector | grep -i pg_auto_explain`
-3. Check the failure stream: `_stream:{"kubernetes.container_name"!=""}` in
-   Grafana surfaces records the parser rejected, with the parser's own error.
-4. Generate a slow query to trigger a plan: `SELECT pg_sleep(1);` on `product-db`.
+Checklist in root-cause order (1 and 3 are what the 2026-08-25 audit actually
+found and used):
+
+1. **`auto_explain.log_format` must be `json`** — the [format contract](#the-two-format-contracts).
+   With the PG default `text`, *every* plan silently lands in the failure sink
+   and the plans stream stays at zero:
+   ```bash
+   kubectl exec -n product product-db-1 -c postgres -- \
+     psql -U postgres -Atc "show auto_explain.log_format;"   # must print: json
+   ```
+2. **auto_explain loaded and the threshold reachable?**
+   `show shared_preload_libraries;` must include `auto_explain`, and the test
+   query must exceed `log_min_duration` (1s here) — use
+   `SELECT pg_sleep(1.3);`, not `pg_sleep(1)` sitting exactly on the threshold.
+3. **Read the failure stream first** — the parser says *why* it dropped:
+   ```logsql
+   _stream:{"kubernetes.container_name"="postgres"} _time:1h
+   ```
+   Plans landing here instead of `_stream:{cluster_name!=""}` is diagnostic by
+   itself; the parser's own warn/error (`error_type`: `missing_field` /
+   `split_failure` / `json_parse_failure`, plus a `json_preview`) is in the
+   Vector pod logs.
+4. **Transform active?**
+   `kubectl logs -n kube-system -l app.kubernetes.io/name=vector | grep -i pg_auto_explain`
 
 ### High memory usage
 
@@ -191,8 +315,10 @@ Query-side symptoms (logs ingested but blank in Grafana) are
 
 ---
 
-_Last updated: 2026-08-25 — split out of the logging README. States what the
-manifest actually runs: the exclusion-label mechanics and rollback path, the
-control-plane toleration story, per-sink batch/buffer numbers, the parse-failure
-reroute, and that dashboard 21954 is GitOps-provisioned (it was described as
-merely "pre-built")._
+_Last updated: 2026-08-25 — split out of the logging README, then the PostgreSQL
+pipeline section was rebuilt hop-by-hop after a live audit found the pipeline
+broken: `auto_explain.log_format` was unset (PG default `text`), so every plan
+failed the JSON parse and landed in the `pg_parse_failures` sink — 0 plans vs 8
+failures over 6h. The parameter is now set on platform-db/product-db and the
+section documents both format contracts, the parser walk, and the failure path;
+the troubleshooting checklist was reordered to root-cause order._

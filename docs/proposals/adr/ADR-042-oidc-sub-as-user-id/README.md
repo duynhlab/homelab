@@ -23,7 +23,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — phases P1/P3/P5 (PR trains) |
-| **Adoption** | Partial — all seven services + workers merged and tagged (2.0.0 wave) with the string subject verified to the column in the audit (A16); cluster greenfield reset pending Kind |
+| **Adoption** | **Complete** — the string subject survives the whole cluster path: the fulfillment saga completed on Kind with a UUID `sub` (SG.1–SG.3, K4.10) and the operator ledger records `actor: d0e00000-0000-4000-8000-000000000001` |
 
 ## Context
 
@@ -247,6 +247,7 @@ requires a new ADR that supersedes this one.
 | 2026-08-12 | Accepted / Partial | Local-stack cut over (#752): the string subject verified to the column in the compose audit (A16) |
 | 2026-08-13 | Accepted / Partial | Fleet pinned to the cutover tags (#756) — five INTEGER columns, the notification and payment protos, `pkg/idempotency` and Temporal inputs all carry the string `sub`. Adoption recorded in #757 |
 | 2026-08-24 | Accepted / Partial | Contract documented in [`docs/api/identity.md`](../../../api/identity.md); the per-service `VARCHAR(255)` rows already cite this ADR. Remaining for `Complete`: the cluster greenfield reset, which is part of the Kind gate |
+| 2026-08-25 | Accepted / **Complete** | Kind gate passed — the cluster greenfield reset happened as part of the 2026-08-25 bring-up; the subject round-trips HTTP → gRPC → DB → Temporal without conversion. |
 
 ---
-_Last updated: 2026-08-24 — appended the History rows that were skipped when Adoption moved to `Partial`; the table had still read `Accepted / Not started`._
+_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

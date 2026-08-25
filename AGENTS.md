@@ -110,7 +110,7 @@ flowchart LR
 | Secrets / policy / high stakes | `doubt-driven-development`, `security-and-hardening` | Kyverno catalog |
 | Observability change | `observability-and-instrumentation` | alert catalog + runbook |
 | CI workflows | `ci-cd-and-automation` | often `gha-workflows` repo |
-| E2E Phase B (browser) | **`agent-browser`** ([vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser)) | [`local-stack` E2E audit](local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-2-min); `agent-browser skills get core` |
+| E2E Phase B (browser) | **`agent-browser`** ([vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser)) | [`local-stack` E2E audit](local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-8-min); `agent-browser skills get core` |
 | GitOps incident | `gitops-cluster-debug` (fluxcd pack, if installed) | `make flux-status` |
 | Before PR | `code-review-and-quality` | one change per branch |
 | Rollout / deprecation | `shipping-and-launch`, `deprecation-and-migration` | Flux chain + CHANGELOG |
@@ -141,7 +141,7 @@ flowchart TD
 
 **E2E Phase B:** read the **agent-browser** skill from the agent IDE, run
 `agent-browser skills get core`, then execute Phase B commands in
-[`local-stack` E2E audit](local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-2-min).
+[`local-stack` E2E audit](local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-8-min).
 Complements `browser-testing-with-devtools` in the Verify phase where applicable.
 
 ## Contribution workflow
@@ -336,9 +336,11 @@ Every manifest applied to the cluster must satisfy admission:
   kyverno-policies → policy-reporter
   apps-local (depends: databases + monitoring + temporal)
   ```
-  (23 Kustomization CRs in `clusters/local/`; a cluster reports **24** because
-  `flux-system` itself is created by the FluxInstance, not by this directory —
-  full graph in
+  (23 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
+  commented out of its kustomization since 2026-08-21, so 22 apply; `flux-system`
+  is created by the FluxInstance rather than this directory, and a cluster
+  therefore reports **23** — verified on the 2026-08-25 gate run. Count them at run
+  time rather than trusting this number; full graph in
   [`docs/platform/setup.md`](docs/platform/setup.md).)
 - **CHANGELOG.** Entries grouped **`### Category` → `#### Component`** per the hidden template comment at the top of `CHANGELOG.md` (categories, fixed order: `Breaking Change`/`Feature`/`Bugfix`/`Performance`/`Dependency`/`Deprecation`; components: GitOps, Gateway, Observability, Databases, Secrets, Security, Services, Temporal, Local-stack, Docs, Proposals, CI). New entries go at the **top** of the matching group in `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history (older releases keep the format they shipped with). Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` under the template comment.
 - **Image naming:** `ghcr.io/duynhlab/<repo>/<image>` (multi-level). The `mop` chart renders `<name>-service/<name>-service`; migrations reuse that same image, so there is no second image per service.

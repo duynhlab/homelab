@@ -25,7 +25,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — P2/P4/P5 trains |
-| **Adoption** | Partial — local bucket live and verified (one catch-all rule, X-RateLimit-* headers, in-process bucket); cluster BackendTrafficPolicies merged, unverified on Kind |
+| **Adoption** | **Complete** — measured on a cluster for the first time 2026-08-25: `make e2e-ratelimit GATE=kind` drove under and over the ceiling and returned **429 with draft-03 `X-RateLimit-*` headers** |
 
 ## Context
 
@@ -214,6 +214,7 @@ new ADR that supersedes this one.
 | 2026-08-10 | Proposed / Not started | Proposed inside the RFC-0024 review |
 | 2026-08-11 | Accepted / Not started | Accepted with RFC-0024; numbering assigned 044–046 because ADR-039/040 were consumed by unrelated decisions (RFC text had said 045–047) |
 | 2026-08-22 | Accepted / Partial | **Amendment — API route sizing raised from 2/Second to 25/Second per instance** (`policies/btp-api.yaml`, ~50/s across two replicas). The mechanism is unchanged: still `rateLimit.local`, still exactly one rule without `clientSelectors`, still no RLS and no Redis. What changed is the number, because the original sizing compared two things that are not comparable. The pre-cutover limit was billed **per client**; local mode has no client dimension, so halving it for two replicas produced an **aggregate** shared by every client, every identity and every route this policy targets. At ~4/s fleet-wide a single SPA page fanning out parallel calls could exhaust the bucket and see its own 429, and nothing measured it: this ADR's own validation row ("429 observed at the per-instance threshold on Kind") was never exercised, and the Kind runbook did not mention rate limiting at all. The new number matches the compose edge so a measurement means the same on both gates. Measured on Kind before and after: 25/s went from heavily limited to clean, while 200/s still returns 429 with the `X-RateLimit` draft-03 headers — raised, not disabled. Enforcement is now asserted by [`scripts/k6/ratelimit.js`](../../../../scripts/k6/ratelimit.js) ([ADR-056](../ADR-056-k6-e2e-assertion-layer/)). Note for anyone tempted to exempt a caller instead: a second rule **cannot** loosen the limit — Envoy Gateway applies every matching rule and rejects if any triggers, so `clientSelectors` can only ever make a subset stricter. |
+| 2026-08-25 | Accepted / **Complete** | Kind gate passed — the validation row this ADR's own 2026-08-22 amendment admitted 'was never exercised' is now exercised. `make e2e-ratelimit` is a separate target from `make e2e`, which is why it had been missed. |
 
 ---
-_Last updated: 2026-08-22 — sizing amended; the limiter is now measured rather than assumed._
+_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

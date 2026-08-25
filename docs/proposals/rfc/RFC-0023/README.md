@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) | 2026-08-10 | 2026-08-14 |
+| implemented | platform-wide | [./research.md](./research.md) | 2026-08-10 | 2026-08-14 |
 
 > **Every decision is a tradeoff.** This RFC creates a second browser application that
 > calls owning services directly through Kong on a new `/protected/` audience. We accept
@@ -700,7 +700,7 @@ The MVP write-scope cut (product/inventory only) stays an RFC scope decision, no
   Still open: the cluster remains unverified until the Kind gate.
 
 When Status → implemented, confirm:
-- [ ] Linked ADR(s) Adoption → Complete (or Partial with note)
+- [x] Linked ADR(s) Adoption → Complete — ADR-047/048/049/050/053 on the 2026-08-25 Kind gate
 - [ ] docs/api/ synced — api.md protected conventions; per-service contracts; rollup;
       Design records links; `docs/frontend/admin-portal/` created and indexed
 - [ ] Runbooks updated (protected-API ops; OrderManualReviewBacklog runbook points to
@@ -718,4 +718,4 @@ When Status → implemented, confirm:
 - [OrderManualReviewBacklog runbook](../../../observability/runbooks/microservices/OrderManualReviewBacklog.md) — the raw-SQL path this RFC retired to break-glass
 
 ---
-_Last updated: 2026-08-19 — ADR-053 decides the slice-B stock-bootstrap gap_
+_Last updated: 2026-08-25 — Status → `implemented`: the Kind gate passed, verifying the portal against the cluster edge (K4.7) and the realm fence (K4.8). ADR-048/049/050/053 all reached `Complete`._

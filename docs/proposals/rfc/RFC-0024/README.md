@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed, owner signed off 2026-08-11 | 2026-08-10 | 2026-08-24 |
+| implemented | platform-wide | [./research.md](./research.md) — gate passed, owner signed off 2026-08-11 | 2026-08-10 | 2026-08-24 |
 
 > **Every decision is a tradeoff.** This RFC replaces a mature, working edge (Kong OSS
 > 3.9) with Envoy Gateway **and, in the same greenfield program, executes the Keycloak
@@ -444,6 +444,14 @@ edge ADRs took 044–046; RFC-0023's future ADRs shift to 047–049.
   ceiling) and fixed data-plane placement; #792 corrected rate-limit policies
   that were making every targeted route answer 500; #798/#799 purged the last
   Kong residue and bumped Envoy Gateway to v1.9.0 / Gateway API v1.6.1.
+- 2026-08-25 — **Kind gate passed: ELIGIBLE.** Both gates ran on the pinned tags —
+  the full compose A/B/C audit first, then K0–K6. All six linked ADRs reached
+  `Adoption: Complete`, and RFC-0023 reached `implemented` on the same run. The
+  gate also produced five findings, each fixed in the same PR: `make e2e` ran
+  smoke before saga (C6/K5.2 fails on any from-scratch stack), compose C13
+  queried a Vector stream ADR-060 had emptied, compose A15 was never runnable,
+  the `AGENTS.md` Kustomization count was stale, and K4.6/K4.7 were blocked by
+  an undocumented keychain step.
 - 2026-08-24 — **Docs obligations closed.**
   [`docs/platform/keycloak.md`](../../../platform/keycloak.md) created (the
   deliverable named by ADR-041 and RFC-0022) and
@@ -453,14 +461,17 @@ edge ADRs took 044–046; RFC-0023's future ADRs shift to 047–049.
   verifies issuer and signature but **not** the audience — no SecurityPolicy
   declares `audiences`, deliberately, and `api.md` had claimed otherwise.
 
-**Remaining before Status → `implemented`: the Kind gate.** Every phase above is
-merged, and the compose gate passes. What has not happened is a full end-to-end
-K-row pass on Kind, which is the single blocker named by the `Partial` Adoption
-row of ADR-041, 042, 043, 044 and 045. It is an engineering step, not paperwork —
-do not flip this RFC or those ADRs without it.
+**The Kind gate passed 2026-08-25 — Status → `implemented`.** A cluster built
+from zero reported 23/23 Kustomizations, 101 pods, seed 8/8 and 13 images matching
+their pins; every K0–K5 row is green (49/49 assertions). Three rows ran for the
+first time: **K4.6/K4.7** (blocked since 2026-08-17 on an undocumented
+System-keychain trust step, now documented), **the ADR-045 rate-limit row**, and
+**SG.4**. `make down` was deliberately deferred — the owner kept the cluster up.
+The one box still open is the RFC-0022/0023 Kong cross-references, which is a
+separate edit.
 
 When Status → implemented, confirm:
-- [ ] Linked ADR(s) Adoption → Complete (or Partial with note) — blocked on the Kind gate
+- [x] Linked ADR(s) Adoption → Complete — all six on the 2026-08-25 Kind gate pass
 - [x] `docs/api/api.md` edge-exposure prose updated; `docs/platform/envoy-gateway.md`
       created; `docs/platform/kong-gateway.md` archived banner in place
 - [x] Runbooks: edge runbook replaced; alert catalog §2 rewritten; rotation runbook
@@ -478,4 +489,4 @@ When Status → implemented, confirm:
 - [`docs/platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) · [`docs/platform/keycloak.md`](../../../platform/keycloak.md) · [`docs/api/identity.md`](../../../api/identity.md) — the as-built platform and contract docs
 
 ---
-_Last updated: 2026-08-24 — Implementation History filled in for P1–P5 and P6 arm A (it had stopped at the acceptance date), ADR-050's post-acceptance two-realm amendment recorded, docs checklist items 2 and 3 ticked, and the remaining blocker named explicitly as the Kind gate. Status stays `Accepted`: five ADRs are still `Partial` on that gate._
+_Last updated: 2026-08-25 — Status → `implemented` on the Kind gate pass; all six ADRs Complete; the remaining open box is the RFC-0022/0023 Kong cross-references._

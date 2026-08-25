@@ -419,7 +419,19 @@ spec:
    kubectl get certificate -A
    kubectl get secret platform-edge-tls -n envoy-gateway
    ```
-6. **Browser test**: `https://local.duynh.me` (after `sudo ./scripts/setup-hosts.sh`). On **local Kind** the cert is `homelab-ca`-signed, so expect an untrusted-CA warning unless `homelab-ca` is added to the trust store. On **prod** it shows a green padlock with a Let's Encrypt-issued cert covering `*.duynh.me`.
+6. **Browser test**: `https://local.duynh.me` (after `sudo ./scripts/setup-hosts.sh`). On **local Kind** the cert is `homelab-ca`-signed, so expect an untrusted-CA warning until `homelab-ca` is trusted. On macOS it must go in the **System** keychain — the login keychain makes `curl` trust it while Chrome still refuses, because Chrome reads root trust from the System store only:
+
+   ```bash
+   kubectl get secret -n cert-manager homelab-ca-secret \
+     -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/homelab-ca.crt
+   sudo security add-trusted-cert -d -r trustRoot \
+     -k /Library/Keychains/System.keychain /tmp/homelab-ca.crt
+   # undo:
+   sudo security delete-certificate -c homelab-ca -t /Library/Keychains/System.keychain
+   ```
+
+   Chrome's `--ignore-certificate-errors` and `--ignore-certificate-errors-spki-list`
+   flags do **not** work as a substitute (measured 2026-08-25). On **prod** it shows a green padlock with a Let's Encrypt-issued cert covering `*.duynh.me`.
 
 ---
 

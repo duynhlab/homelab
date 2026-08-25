@@ -25,7 +25,7 @@
 | **Supersedes** | [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) (vehicle only — the edge-coarse/service-authoritative split is preserved) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0024 program — P2/P4/P5 trains |
-| **Adoption** | Partial — Kong is deleted from main and Envoy Gateway is the only edge in both config sets; local standalone edge verified end to end (trace root, access log, edge JWT); cluster edge not yet run on Kind |
+| **Adoption** | **Complete** — Envoy Gateway is the only edge and the Kind gate passed 2026-08-25: K4.1 plain HTTP redirects, K4.2 TLS is `homelab-ca`, K4.3 routing is by Host header, K4.8 the realm fence holds |
 
 ## Context
 
@@ -490,6 +490,7 @@ new ADR that supersedes this one.
 | 2026-08-17 | Accepted / Partial | Amended: CRD delivery moves from a HelmRelease to vendored manifests applied server-side, after the first Kind bring-up proved the Helm path exceeds the 1 MiB `Secret` limit |
 | 2026-08-18 | Accepted / Partial | Amended: Envoy Gateway v1.8.3 → v1.9.0 with Gateway API v1.6.1 (mandatory for the TCPRoute/UDPRoute `v1` move); adopted `crds.enabled: false`; re-verified Amendment #1's subchart rejection against both chart packages and recorded the upstream evidence |
 | 2026-08-24 | Accepted / Partial | Documentation validation row satisfied: [`docs/platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) now links this ADR (and 045/046) and carries a Design decisions section for both amendments — it had linked neither since it was created. Its resource counts were also trued up against the manifests, and both amendments' live constraints written down. Remaining for `Complete`: the Kind K-row gate pass |
+| 2026-08-25 | Accepted / **Complete** | Kind gate passed. **The Documentation row is closed for real this time** — `docs/api/api.md` now links this ADR; the 2026-08-24 entry claimed that row was satisfied while only `envoy-gateway.md` linked it. |
 
 ---
-_Last updated: 2026-08-24 — records that `envoy-gateway.md` finally links this ADR, closing this record's own Documentation validation row._
+_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

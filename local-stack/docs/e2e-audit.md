@@ -693,10 +693,24 @@ docker compose exec -T postgres psql -U postgres -d cart -t -A -c \
          "SELECT user_id, product_id FROM cart_items ORDER BY id DESC LIMIT 5" </dev/null; }
 
 # A15. Worker Deployment Versioning drill (ADR-030, mechanism now ADR-054).
+#      *** NOT RUNNABLE ON COMPOSE AS THE STACK IS WIRED TODAY. ***
+#      Measured 2026-08-25: the drill needs a registered Worker Deployment, and
+#      compose.yaml's order-worker sets NEITHER `TEMPORAL_DEPLOYMENT_NAME` nor a
+#      build id. `git log -S` finds no history for either name, under the current
+#      name or the retired `TEMPORAL_WORKER_DEPLOYMENT_NAME` — so this row has
+#      never passed here. Every `temporal worker-deployment` call answers
+#      `no Worker Deployment found with name 'order-fulfillment'`.
+#
+#      The versioning proof therefore lives on the CLUSTER, not here: K1.7 (the
+#      Current version activates with no human step) and SG.4 (a workflow reports
+#      `Pinned` on the Current build id, no half-finished ramp) both passed on the
+#      2026-08-25 Kind gate. The sentence that used to sit here — "the only place
+#      the ENV CONTRACT can be gated before Kind" — was not true.
+#
+#      To make this row real, compose's order-worker needs the versioning env; that
+#      is a compose change, not an audit change, and is deliberately not made here.
 #      CONDITIONAL: run it when a change touches worker versioning, the saga's
-#      activity set, or the rollout runbook. It is the only rehearsal of a pinned
-#      drain outside the cluster — Compose has no Kubernetes, so it is also the
-#      only place the ENV CONTRACT can be gated before Kind.
+#      activity set, or the rollout runbook.
 #
 #      The variable is TEMPORAL_DEPLOYMENT_NAME, Temporal's own name: the Worker
 #      Controller injects it, Temporal's reference worker reads it, and
@@ -1809,22 +1823,28 @@ curl -s http://localhost:9428/select/logsql/stream_field_values \
   --data-urlencode 'query=_time:45m' --data-urlencode 'field=service.name'
 # want every service Phase A drove.
 
-# C13. EDGE ACCESS LOGS, Vector leg. The second-most important row in this phase:
+# C13. EDGE ACCESS LOGS, OTLP leg. The second-most important row in this phase:
 #      the edge's JSON access log is the only structured record of what the edge
 #      did, and the field set is contracted in gateway/eg/envoyproxy.yaml.
 #
-#      `_stream:{service="gateway"}` alone is NOT enough — that same stream also
-#      carries the control plane's own debug logs (xDS snapshots, JWKS fetches),
-#      which are far more numerous. `upstream_cluster` and `route_name` exist only
-#      on access-log lines, so requiring both is the discriminator.
+#      THE STREAM MOVED. Until ADR-060 (#886, 2026-08-24) this row read the Vector
+#      leg, `_stream:{service="gateway"}`. That leg now carries ZERO lines — the
+#      access log goes out over OTLP instead, landing under
+#      `_stream:{"service.name"="platform.envoy-gateway"}` with the same field set.
+#      Measured on the 2026-08-25 gate run: Vector leg 0, OTLP leg 1540, every one
+#      of them carrying `upstream_cluster` and `route_name`. The old query could
+#      only ever fail, which is exactly the "an expression that cannot pass reads
+#      as coverage" failure this audit exists to catch.
+#
+#      `upstream_cluster` and `route_name` exist only on access-log lines, so
+#      requiring both still discriminates them from the control plane's own logs.
 curl -s "$VL" --data-urlencode \
-  'query=_time:45m _stream:{service="gateway"} upstream_cluster:* route_name:* | count()'
+  'query=_time:45m _stream:{"service.name"="platform.envoy-gateway"} upstream_cluster:* route_name:* | count()'
 # want a non-zero count(*). Then pin the specific request driven in C0:
 curl -s "$VL" --data-urlencode \
-  "query=_time:45m _stream:{service=\"gateway\"} upstream_cluster:* uri:\"audit=$TAG\"" \
+  "query=_time:45m _stream:{\"service.name\"=\"platform.envoy-gateway\"} upstream_cluster:* uri:\"audit=$TAG\"" \
   --data-urlencode 'limit=1'
-# want ONE line, whose `_stream` is {container_name="local-stack-gateway-1",
-# service="gateway"} and whose parsed fields are the CR's contract:
+# want ONE line whose parsed fields are the CR's contract:
 #   uri=/product/v1/public/products?audit=$TAG  status=200  method=GET
 #   upstream_cluster=httproute/envoy-gateway-system/api-product/rule/0
 #   route_name=.../match/0/*  upstream=<ip:8080>  duration=<ms>  request_id=<uuid>

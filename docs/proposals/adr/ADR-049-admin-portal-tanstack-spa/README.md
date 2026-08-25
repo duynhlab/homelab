@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0023 program — SPA foundation + page trains |
-| **Adoption** | Partial — `admin-service` runs the chosen stack as-built (TanStack Router/Query/Table v9 + Form, zod, Tailwind v4, shadcn preset, keycloak-js), with URL-owned list state and one shared table/detail convention across every screen. Verified locally (Playwright + axe against the live stack); the cluster deployment is merged but unverified until the Kind gate |
+| **Adoption** | **Complete** — the portal runs the chosen stack against the cluster edge and holds **no token in web storage**: `localStorage` and `sessionStorage` both empty while signed in (K4.7, 2026-08-25) |
 
 ## Context
 
@@ -184,8 +184,8 @@ decision requires a new ADR that supersedes this one.
 | 2026-08-10 | Proposed / Not started | Owner selected the TanStack stack during RFC-0023 review (as draft ADR-044, renumbered 049 on 2026-08-11) |
 | 2026-08-13 | Accepted / Not started | Accepted with RFC-0023 |
 | 2026-08-15 | Accepted / Partial | Revisit trigger *"the customer SPA completes a migration onto an overlapping stack"* is being exercised by [RFC-0025](../../rfc/RFC-0025/) / [ADR-052](../ADR-052-converge-the-customer-spa-on-the-portal-stack/). This decision is unchanged — it still governs the Admin Portal — but the negative consequence *"two frontend convention sets … until/unless the customer SPA converges"* is on a path to closing, and the standing "reuse the customer SPA stack" alternative is now moot in the other direction |
-
 | 2026-08-15 | Accepted / Complete | The convergence landed: the customer SPA shipped as `frontend` v3.0.0 on this stack ([RFC-0025](../../rfc/RFC-0025/) / [ADR-052](../ADR-052-converge-the-customer-spa-on-the-portal-stack/)). The negative consequence *"two frontend convention sets … until/unless the customer SPA converges"* is **closed** — there is one set now. The Alternatives text below still describes the customer SPA as react-router/SWR because that is what it was when this decision was made; it is a record, not a claim about today |
+| 2026-08-25 | Accepted / **Complete** | Kind gate passed — the cluster deployment this record was waiting on is verified. The 2026-08-15 `Complete` row above was about the SPA convergence, not the gate, so the header's `Partial` was the accurate field until now. |
 
 ---
-_Last updated: 2026-08-15 — the customer SPA converged (frontend v3.0.0), closing this ADR's two-convention-sets consequence; the decision itself is untouched._
+_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

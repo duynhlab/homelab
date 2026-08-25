@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implementable | infra | 2026-06-29 | 2026-07-19 |
+| implementable | infra | 2026-06-29 | 2026-08-25 |
 
 > **Research:** [`./research.md`](./research.md) — plain-language deep dive behind this
 > RFC (auto-unseal spine), including a **local PoC** proving `seal "awskms"` auto-unseal

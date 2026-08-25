@@ -262,6 +262,19 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The database IO layer is observable: pg_stat_io + sampled wait events.**
+  The DB-monitoring audit found the deployed set strong (4 boards, 9 custom
+  queries, ~25 alerts) with two real gaps — PG18's `pg_stat_io` (who does the
+  IO: checkpointer vs autovacuum vs clients; zero references repo-wide despite
+  the live view) and wait events (no series at all). Two new custom queries on
+  both clusters export `cnpg_pg_stat_io_*` (fixed-enum cardinality, `*_time`
+  real because `track_io_timing=on`) and `cnpg_pg_wait_events_active_backends`
+  (honestly documented as scrape-interval sampling — `pg_wait_sampling` is not
+  in the operand image and image-volume extensions need K8s ≥ 1.35). New
+  **PostgreSQL — IO & Waits** board (`uid: pg-io-waits`, Databases folder)
+  renders them; observe-first, no alerts yet (recorded in the alert catalog's
+  gap list). Docs: custom-metrics gains the § IO & waits entries.
+
 - **The service map has a board again.** ADR-059 retired Tempo and left two
   obligations open: the dependency data existed, and nothing rendered it. The new
   **Service Graph** board (`uid: service-graph`, *Microservices / Golden Signals*)

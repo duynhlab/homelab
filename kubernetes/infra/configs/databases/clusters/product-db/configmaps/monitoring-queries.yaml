@@ -283,3 +283,80 @@ data:
         - num_dead_item_ids:
             usage: "GAUGE"
             description: "Dead item identifiers collected since the last index vacuum cycle"
+
+    # Instance-wide IO by backend type/context (PG16+ pg_stat_io; PG18 adds the
+    # *_bytes columns). Cardinality is a fixed enum product (backend_type x
+    # object x context, ~79 rows/instance) — safe by design. track_io_timing is
+    # on, so the *_time columns carry real milliseconds. Answers "who is doing
+    # the IO" (checkpointer vs autovacuum vs client backends) — the question
+    # pg_stat_statements (per-query) cannot. Feeds the "PostgreSQL - IO & Waits"
+    # dashboard; observe-first, no alert yet (deliberate).
+    pg_stat_io:
+      query: "SELECT backend_type, object, context,
+                 COALESCE(reads, 0) AS reads, COALESCE(read_bytes, 0) AS read_bytes, COALESCE(read_time, 0) AS read_time,
+                 COALESCE(writes, 0) AS writes, COALESCE(write_bytes, 0) AS write_bytes, COALESCE(write_time, 0) AS write_time,
+                 COALESCE(extends, 0) AS extends, COALESCE(fsyncs, 0) AS fsyncs, COALESCE(fsync_time, 0) AS fsync_time,
+                 COALESCE(hits, 0) AS hits, COALESCE(evictions, 0) AS evictions, COALESCE(reuses, 0) AS reuses
+               FROM pg_stat_io"
+      metrics:
+        - backend_type:
+            usage: "LABEL"
+            description: "Backend type doing the IO (client backend, checkpointer, autovacuum worker, ...)"
+        - object:
+            usage: "LABEL"
+            description: "Target of the IO (relation, temp relation, wal)"
+        - context:
+            usage: "LABEL"
+            description: "IO context (normal, vacuum, bulkread, bulkwrite)"
+        - reads:
+            usage: "COUNTER"
+            description: "Number of read operations"
+        - read_bytes:
+            usage: "COUNTER"
+            description: "Bytes read"
+        - read_time:
+            usage: "COUNTER"
+            description: "Time spent in read operations, in milliseconds"
+        - writes:
+            usage: "COUNTER"
+            description: "Number of write operations"
+        - write_bytes:
+            usage: "COUNTER"
+            description: "Bytes written"
+        - write_time:
+            usage: "COUNTER"
+            description: "Time spent in write operations, in milliseconds"
+        - extends:
+            usage: "COUNTER"
+            description: "Number of relation extend operations"
+        - fsyncs:
+            usage: "COUNTER"
+            description: "Number of fsync calls"
+        - fsync_time:
+            usage: "COUNTER"
+            description: "Time spent in fsync calls, in milliseconds"
+        - hits:
+            usage: "COUNTER"
+            description: "Shared-buffer hits (IO avoided)"
+        - evictions:
+            usage: "COUNTER"
+            description: "Buffer evictions (pressure: a buffer was reused for another page)"
+        - reuses:
+            usage: "COUNTER"
+            description: "Ring-buffer reuses in bulk contexts"
+
+    # Sampled wait-state of active backends. This is scrape-interval sampling
+    # of pg_stat_activity — NOT pg_wait_sampling (not in the operand image;
+    # image-volume extensions need K8s >= 1.35): a wait that starts and ends
+    # between two scrapes is invisible. 'CPU' means active with no wait event
+    # (on-CPU). Good for "where are active sessions stuck" trends, not for
+    # microsecond wait profiling.
+    pg_wait_events:
+      query: "SELECT COALESCE(wait_event_type, 'CPU') AS wait_event_type, count(*) AS active_backends FROM pg_stat_activity WHERE state = 'active' AND pid <> pg_backend_pid() GROUP BY 1"
+      metrics:
+        - wait_event_type:
+            usage: "LABEL"
+            description: "Wait-event class the backend is in (Lock, IO, LWLock, Client, ... or CPU when running)"
+        - active_backends:
+            usage: "GAUGE"
+            description: "Active backends currently in this wait class (sampled at scrape time)"

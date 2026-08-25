@@ -6,10 +6,10 @@ matters operationally, and how to query and alert on it.
 | Quick facts | |
 |---|---|
 | Source | CNPG built-in exporter (`:9187`), per-cluster custom-queries ConfigMap |
-| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 9 queries, different `target_databases` |
-| Per-db scope | platform: auth, user, notification, shipping, review · product: product, cart, order |
+| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 11 queries, different `target_databases` |
+| Per-db scope | platform: user, notification, shipping, review · product: product, cart, order |
 | **Gap** | payment, checkout, temporal, temporal_visibility — no per-db custom metrics yet |
-| Live queries | **9** (see reference below) |
+| Live queries | **11** (see reference below) |
 | Metric prefix | `cnpg_` — the exporter prepends it to every series (`cnpg_pg_stat_statements_calls`) |
 | Related alerts | [`alert-catalog.md` §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Runbooks | [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) |
@@ -21,7 +21,8 @@ health metrics, each cluster loads a custom-queries ConfigMap
 (`spec.monitoring.customQueriesConfigMap`) that turns hand-written SQL into
 Prometheus metrics. This page documents that custom set — it is the source of
 truth for the `pg-query-performance` and `pg-maintenance` Grafana boards and the
-deep-signal alerts.
+deep-signal alerts. (The `pg-io-waits` board reads the two `[cluster]` IO/wait
+queries below.)
 
 ## Naming convention
 
@@ -157,6 +158,49 @@ label. `[cluster]` = runs once per instance (instance-wide view).
   `idx_scan`, `idx_tup_read`, `idx_tup_fetch`; gauge `index_bytes`.
 - **Why** — unused indexes — see [signals/index-hygiene.md](signals/index-hygiene.md).
 - **PromQL** — `cnpg_pg_stat_user_indexes_index_bytes and (cnpg_pg_stat_user_indexes_idx_scan == 0)`
+
+### IO & waits
+
+#### `pg_stat_io` `[cluster]`
+
+- **What** — instance-wide IO by **backend type × object × context**
+  (PG16+ view; PG18 adds the `*_bytes` columns). Fixed-enum cardinality
+  (~79 rows/instance) — safe by design.
+- **Columns** — labels `backend_type, object, context`; counters `reads`,
+  `read_bytes`, `read_time`, `writes`, `write_bytes`, `write_time`, `extends`,
+  `fsyncs`, `fsync_time`, `hits`, `evictions`, `reuses` (`*_time` live because
+  `track_io_timing=on`).
+- **Why** — answers the question `pg_stat_statements` (per-query) cannot:
+  **who is doing the IO** — checkpointer vs autovacuum vs client backends —
+  and whether shared buffers are under pressure (`evictions` climbing while
+  `hits` flatten).
+- **PromQL**
+  ```promql
+  # Read ops/s by backend
+  sum by (backend_type) (rate(cnpg_pg_stat_io_reads{cnpg_io_cluster="product-db"}[5m]))
+  # Buffer pressure: evictions vs hits
+  sum(rate(cnpg_pg_stat_io_evictions[5m])) / clamp_min(sum(rate(cnpg_pg_stat_io_hits[5m])), 1)
+  ```
+- **Alerts** — none yet, deliberately observe-first
+  ([alert catalog § coverage gaps](../../alerting/alert-catalog.md#coverage-gaps--recommended-additions)).
+  Board: `pg-io-waits`.
+
+#### `pg_wait_events` `[cluster]`
+
+- **What** — active backends grouped by `wait_event_type` (`Lock`, `IO`,
+  `LWLock`, `Client`, … or `CPU` = running, no wait), sampled from
+  `pg_stat_activity` at scrape time.
+- **Columns** — label `wait_event_type`; gauge `active_backends`.
+- **Why** — the trend of *where active sessions are stuck*. **Honest limit:**
+  this is scrape-interval sampling, not `pg_wait_sampling` (that extension is
+  not in the operand image; CNPG image-volume extensions need K8s ≥ 1.35) — a
+  wait that starts and ends between two scrapes is invisible.
+- **PromQL**
+  ```promql
+  sum by (wait_event_type) (cnpg_pg_wait_events_active_backends{cnpg_io_cluster="product-db"})
+  ```
+- **Alerts** — none; `CNPGBlockedQueries` already alerts on the `Lock` class
+  via its own query. Board: `pg-io-waits`.
 
 ### Storage & checkpoints
 

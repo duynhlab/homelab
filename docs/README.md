@@ -392,7 +392,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Temporal Workflows](./api/temporal.md) - the three workflows as built, saga-vs-2PC learning, Temporal infrastructure, and operations
 - [Checkout](./api/checkout.md) - Session orchestration, fully shipped (local-stack + cluster); the legacy order path was removed in RFC-0021 P5
 - [Payments](./api/payments.md) - Payment API, state machine, ledger, provider, and reconciliation
-- [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Implemented (all six phases); supersedes ADR-003 via ADR-006
+- [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Implemented (all six phases); supersedes ADR-003 via ADR-006. **Superseded in part** by [RFC-0022](./proposals/rfc/RFC-0022/) (Keycloak replaces the custom issuer) and [RFC-0024](./proposals/rfc/RFC-0024/) (Envoy Gateway replaces the Kong vehicle) — the defense-in-depth shape survives both
 - [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011
 - [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
 - [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implemented (P0–P4); per-service triplets on CNPG `DatabaseRole`/`Database` CRDs + pg_hba isolation

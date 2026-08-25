@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented (live-cluster drill pending) | platform-wide | 2026-07-08 | 2026-07-10 |
+| implemented (live-cluster drill pending) | platform-wide | 2026-07-08 | 2026-08-25 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC deliberately accepts
 > a large, measured blast radius (every metrics consumer is renamed) in
@@ -159,6 +159,15 @@ flowchart TB
 
 **Cluster pipeline** (extends the existing otel-collector HelmRelease — traces
 and logs pipelines already exist there):
+
+> **Two nodes below are historical.** `kong` in the infra-exporter box is gone —
+> [RFC-0024](../RFC-0024/README.md) replaced the edge with Envoy Gateway
+> ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)), which is the
+> scrape target today; `grep -ril kong kubernetes/` now returns nothing. `Tempo
+> (+Jaeger, …)` is also retired, by [RFC-0027](../RFC-0027/README.md) — that
+> record owns the trace-sink story, and VictoriaTraces plus ClickHouse are the two
+> sinks left. The metrics pipeline this RFC actually decides is unchanged by
+> either.
 
 ```mermaid
 flowchart LR
@@ -382,4 +391,4 @@ one PR wave.
   [vmagent](https://docs.victoriametrics.com/victoriametrics/vmagent/)
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-08-25_

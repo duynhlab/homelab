@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-07-22 | 2026-07-22 | 2026-07-22 |
+| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-07-22 | 2026-07-22 | 2026-08-25 |
 
 > **Don't forget: every decision is a tradeoff.** This RFC buys encrypted, identity-verified
 > internal transport at the cost of per-tier certificate wiring, strict rollout ordering, and
@@ -98,6 +98,13 @@ finding open; NetworkPolicy answers "who may connect", never "which service is t
 
 Target state — every leaf signed by the same root (adapted from
 [research § Core mechanism](./research.md#core-mechanism); all internal leaves **planned**):
+
+> **The edge node predates the RFC-0024 cutover.** The `Kong edge cert` leaf
+> below is now the Envoy Gateway listener certificate
+> ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)). The leaf itself
+> stays in scope for this RFC — only the workload holding it changed. The
+> internal leaves, which are what this RFC is about, are unaffected and still
+> **planned**.
 
 ```mermaid
 flowchart TD
@@ -213,4 +220,4 @@ falls back to its current direct-TLS connection string.
 - [`docs/secrets/cert-manager.md`](../../../secrets/cert-manager.md) — deployed PKI chain
 
 ---
-_Last updated: 2026-07-22_
+_Last updated: 2026-08-25_

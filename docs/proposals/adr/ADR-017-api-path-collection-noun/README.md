@@ -98,6 +98,10 @@ the per-service route inventories live in the
   Kong webhook prefix (`/payment/v1/public/webhooks/`, cluster Ingress +
   local-stack kong.yml), and flip the local-stack A7 audit from
   "aliases 200" to "aliases 404".
+- *2026-08-25 — edge translation:* the Kong prefixes and
+  `local-stack/gateway/kong.yml` named above are now Envoy Gateway `HTTPRoute`
+  matches ([ADR-044](../ADR-044-envoy-gateway-platform-edge/)). The path shape
+  this ADR decides is unchanged by that move.
 
 ## References
 
@@ -106,4 +110,4 @@ the per-service route inventories live in the
 - [ADR-003](../ADR-003-jwt-validation-in-services-not-kong/) · [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) — the auth-path surfaces this rename touches
 - Google API Design Guide (collections & custom methods)
 
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-25_

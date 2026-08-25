@@ -2,7 +2,19 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-07-04 | 2026-07-04 |
+| provisional | infra | 2026-07-04 | 2026-08-25 |
+
+> **Gateway decision reversed (2026-08-11).** The Non-Goals below reject Envoy
+> Gateway outright — *"Kong (DB-less) stays; Envoy Gateway is explicitly
+> rejected"* — and the Alternatives table concludes **"Keep Kong"** on the
+> grounds that *"Kong runs fine today. Switching means relearning config for no
+> gain."* [RFC-0024](../RFC-0024/README.md) reversed both: the platform edge is
+> Envoy Gateway ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)),
+> Kong is decommissioned, and its manifests are deleted. The **hardware**
+> migration this RFC is actually about — Kind to bare-metal Talos, 1 → 3 nodes —
+> is untouched by that and remains `provisional`. Body kept unchanged below for
+> history; read every gateway row as the 2026-07-04 position, not the current
+> one.
 
 > **Origin:** converted from a May 2026 planning discussion (formerly
 > `docs/platform/homelab-migration-plan.md`), triggered by OpenBAO PVC pain on
@@ -444,4 +456,4 @@ Pre-purchase checklist:
   [haraldkoch/kochhaus-home](https://github.com/haraldkoch/kochhaus-home)
 
 ---
-_Last updated: 2026-07-04_
+_Last updated: 2026-08-25_

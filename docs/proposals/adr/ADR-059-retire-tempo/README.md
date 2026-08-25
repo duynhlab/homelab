@@ -279,8 +279,9 @@ a new ADR that supersedes this one.
   that accepting the Tempo retirement is impossible without answering what happens
   to `traces_service_graph_*`.
 - **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.
-- **2026-08-25** — both open P3 obligations closed while the Kind cluster from the
-  K0–K6 gate was still up. The **Service Graph** board now renders the dependency
+- **2026-08-25** — **Accepted / Adoption Complete** (unchanged): both open P3
+  obligations closed while the Kind cluster from the K0–K6 gate was still up. The
+  **Service Graph** board now renders the dependency
   graph (34 edges) beside the ClickHouse self-join (24 service→service edges), and
   the query is documented in
   [`docs/observability/tracing/service-graph.md`](../../../observability/tracing/service-graph.md).
@@ -288,7 +289,6 @@ a new ADR that supersedes this one.
   `failed` reads **0** on every edge because no `Server`-kind span on this platform
   has ever carried `StatusCode = 'Error'`, and the dependency API reports more
   edges than the SQL (34 vs 24) because it includes database dependencies.
-  Status stays **Accepted**, Adoption stays **Complete**.
 
 ---
 _Last updated: 2026-08-25_

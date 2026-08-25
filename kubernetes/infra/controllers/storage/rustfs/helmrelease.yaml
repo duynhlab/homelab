@@ -132,4 +132,10 @@ spec:
         # 512Mi was the ceiling it died at: the 2026-08-21 full-disk event ended
         # with the kernel OOM-killing rustfs at anon-rss 520416kB, i.e. exactly
         # at the limit, while it was writing the 17 GB/hour log flood above.
-        memory: 1Gi
+        # 1Gi died the same way on 2026-08-25: OOMKilled (Last State) in a loop
+        # while the scanner swept the accumulated pyroscope-profiles segment
+        # folders during a Pyroscope upload burst -- every restart dropped the
+        # segment-writer's uploads, surfacing as 422 "service is unavailable"
+        # in every Go service's pyroscope client. 2Gi held through a full
+        # e2e gate after the live bump (steady-state ~520Mi, spikes past 1Gi).
+        memory: 2Gi

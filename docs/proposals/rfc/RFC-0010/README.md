@@ -2,7 +2,18 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-07-03 | 2026-07-14 |
+| implemented | platform-wide | 2026-07-03 | 2026-08-25 |
+
+> **Edge translation (2026-08-11).** This RFC's text predates
+> [RFC-0024](../RFC-0024/README.md)'s edge cutover, so every Kong mechanism it
+> names reads as its Envoy Gateway equivalent
+> ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)): the payment
+> Ingress and its webhook prefix are now `HTTPRoute` matches, and the edge JWT
+> check is a `jwt-edge` SecurityPolicy (`remoteJWKS`) rather than the Kong OSS
+> `jwt` plugin. The phrase *"matching today's Kong reality"* in the
+> webhook-audience note means *as of 2026-07-03*. Payment's own design — the
+> PaymentIntent state machine, the double-entry ledger, the outbox, the saga
+> step — is unaffected.
 
 > **Progress:** **P1–P4 ✅** have landed — scaffold + API + state machine
 > + idempotency (P1); double-entry ledger ([ADR-007](../../adr/ADR-007-double-entry-payment-ledger/)),
@@ -627,4 +638,4 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
     auto-heal of the lost-capture-response window (landed)
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-25_

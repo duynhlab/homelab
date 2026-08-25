@@ -2051,6 +2051,27 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The records that named Kong now say so.** RFC-0024 replaced the edge with
+  Envoy Gateway, but the design records that *named* Kong were never annotated —
+  so RFC-0011 still read as a live decision to **"Keep Kong"** with Envoy Gateway
+  *"explicitly rejected"*, and RFC-0006's and RFC-0021's diagrams claimed Kong was
+  deployed **today**. Closed by **annotation, not rewriting**: the 851 Kong
+  references across `docs/proposals/` were accurate on the day each record was
+  written, and rewriting them inside accepted records would be a rewrite of the
+  record rather than a correction. What changed is the frame — a supersession
+  banner where the *decision* was reversed (RFC-0011) or the scope boundary named
+  the old edge (RFC-0006); an edge-translation note where the design survives and
+  only the vehicle moved (RFC-0010, RFC-0015, RFC-0022); a pointer to the note
+  RFC-0023 already carried in its own History; and a corrected lead-in on the
+  four diagrams whose surrounding text claimed the present tense (RFC-0006,
+  RFC-0014, RFC-0021, RFC-0022). RFC-0014's turned out to be doubly stale — it
+  lists `kong` as a live scrape target and `Tempo (+Jaeger)` as a live sink, and
+  `grep -ril kong kubernetes/` now returns nothing. ADR-017 and ADR-027 name the
+  old edge in passing and get one clause each, not a banner: neither decision is
+  about the gateway. This closes RFC-0024's last open checklist box, and every
+  record in the tree that mentions Kong is now either annotated, one of the
+  migration records, or a dated historical entry — no fourth category.
+
 - **The design records stopped contradicting themselves.** A full audit of the
   RFC/ADR tree found the same defect in four shapes, and this clears all four.
   Twelve ADRs had no `_Last updated:` footer at all — added, each dated by the

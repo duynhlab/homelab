@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed with the RFC-0024 review, 2026-08-11 | 2026-08-09 | 2026-08-11 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed with the RFC-0024 review, 2026-08-11 | 2026-08-09 | 2026-08-25 |
 
 > **⚠ Implementation absorbed into [RFC-0024](../RFC-0024/README.md)** (owner
 > decision 2026-08-10): this RFC remains the platform's **identity design record** —
@@ -10,6 +10,14 @@
 > auth-service retirement — but it does **not** run as a standalone implementation.
 > Its rollout executes as phases P1/P3/P5 of RFC-0024's combined greenfield cutover,
 > where the new edge trusts the Keycloak realm from first deployment.
+
+> **The "current state" this RFC describes is now history (2026-08-11).** Its
+> Current-state diagrams draw `auth-service` behind Kong — both are retired.
+> auth-service is gone by this RFC's own design; Kong is gone by
+> [RFC-0024](../RFC-0024/README.md), which replaced the edge with Envoy Gateway
+> ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)). Read those diagrams as the 2026-08-09 baseline the cutover
+> started from; the Target-state diagrams and the identity design itself are
+> current.
 
 > **Every decision is a tradeoff.** This RFC removes a custom authentication service
 > and delegates credential, session, token, role, and signing-key management to
@@ -191,7 +199,7 @@ migration cost); email/username as `user_id` (rejected — mutable, reusable).
 
 ## Architecture & Diagrams
 
-### Current state (deployed)
+### Current state as of 2026-08-09 (both halves now retired)
 
 ```mermaid
 flowchart LR
@@ -585,4 +593,4 @@ When Status → implemented, confirm:
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) · [`docs/secrets/openbao.md`](../../../secrets/openbao.md)
 
 ---
-_Last updated: 2026-08-11_
+_Last updated: 2026-08-25_

@@ -2,7 +2,17 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| implemented | platform-wide | 2026-07-11 | 2026-08-07 |
+| implemented | platform-wide | 2026-07-11 | 2026-08-25 |
+
+> **Edge translation (2026-08-11).** This RFC's text predates
+> [RFC-0024](../RFC-0024/README.md)'s edge cutover. Where it says Kong — the
+> only thing that dials into checkout, the edge JWT on `/private/` routes, the
+> NetworkPolicy ingress, the shared rate-limiting configuration — read Envoy
+> Gateway ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)):
+> `HTTPRoute` for the routes, a `jwt-edge` SecurityPolicy (`remoteJWKS`) for the
+> token check, and a BackendTrafficPolicy local rate limit. What this RFC
+> actually decides — checkout as a client-only service, gRPC for every east-west
+> edge, order as the single writer — is unchanged by that move.
 
 > **Don't forget: every decision is a tradeoff.** The headline tradeoffs in this
 > RFC: checkout does **not** own orders or the saga (it pays an extra internal
@@ -720,4 +730,4 @@ Phased P1→P6 as above. Blast-radius notes:
   [`docs/README.md` § Repositories](../../../README.md#repositories).
 
 ---
-_Last updated: 2026-08-07_
+_Last updated: 2026-08-25_

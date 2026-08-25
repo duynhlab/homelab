@@ -59,7 +59,10 @@ aggregation, and must not own on-hand, reservations, or allocation.
   variant model without a contract break.
 - **Contract:** an additive `inventory.v1` gRPC package
   (`BatchGetAvailability`, `CheckAvailability`, `Reserve`, `Release`, `Commit`,
-  `GetReservation`), served internally on `:9090` with no Kong route. Its
+  `GetReservation`), served internally on `:9090` with no edge route (`Kong` at the time of
+  writing; Envoy Gateway since
+  [ADR-044](../ADR-044-envoy-gateway-platform-edge/) — the gRPC surface is
+  edge-exposed under neither). Its
   data/behaviour model is recorded in [ADR-028](../ADR-028-inventory-reservation-model/).
 - **Realized incrementally (RFC-0021):** phase 1 ships the foundation (service,
   schema, contract, GitOps, local-stack) with **no live write traffic**; phase 2
@@ -125,4 +128,4 @@ marked *deployed, no live caller*.
 - [`docs/api/inventory.md`](../../../api/inventory.md) · [`product.md`](../../../api/product.md)
 
 ---
-_Last updated: 2026-07-24_
+_Last updated: 2026-08-25_

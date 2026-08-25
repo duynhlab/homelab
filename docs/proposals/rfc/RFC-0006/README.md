@@ -2,7 +2,15 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | infra | 2026-06-26 | 2026-07-21 |
+| provisional | infra | 2026-06-26 | 2026-08-25 |
+
+> **Edge predates the RFC-0024 cutover (2026-08-11).** The scope boundary below
+> — *"the mesh, if adopted, governs east-west only; Kong stays the edge
+> gateway"* — was written when Kong was the edge. It is now Envoy Gateway
+> ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)). The boundary
+> itself is what matters here and is unchanged: a mesh would still govern
+> east-west only, and the edge would still be a separate concern. Kept as
+> history; the mesh evaluation and its recommendation are unaffected.
 
 > **Provisional.** This RFC *evaluates* a service mesh and makes a recommendation;
 > it proposes **no implementation**. It is the forward-looking sibling of the
@@ -105,7 +113,9 @@ toolkit one waypoint away.
 
 ## Architecture & Diagrams
 
-**Today** — NetworkPolicy fence + per-service gRPC over headless Services
+**As of 2026-06-26** (the `Kong` node is historical — the edge is now Envoy
+Gateway, [ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)) —
+NetworkPolicy fence + per-service gRPC over headless Services
 (`round_robin`), telemetry via `pkg/obsx`; identity gap pending RFC-0020's in-process mTLS:
 
 ```mermaid
@@ -256,4 +266,4 @@ TBD — provisional; deferred, no implementation. Revisit per the criteria above
 - Origin: platform planning backlog; tracked as RFC-0006 (defer).
 
 ---
-_Last updated: 2026-07-21_
+_Last updated: 2026-08-25_

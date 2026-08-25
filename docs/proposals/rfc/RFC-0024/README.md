@@ -467,8 +467,15 @@ their pins; every K0–K5 row is green (49/49 assertions). Three rows ran for th
 first time: **K4.6/K4.7** (blocked since 2026-08-17 on an undocumented
 System-keychain trust step, now documented), **the ADR-045 rate-limit row**, and
 **SG.4**. `make down` was deliberately deferred — the owner kept the cluster up.
-The one box still open is the RFC-0022/0023 Kong cross-references, which is a
-separate edit.
+The last open box — the RFC-0022/0023 Kong cross-references — closed on
+2026-08-25. It closed by **annotation rather than rewriting**: 851 Kong
+references survive across `docs/proposals/`, and they were accurate on the day
+each record was written. Rewriting them inside accepted records would be a
+rewrite of the record, not a correction. What changed is the frame — a
+supersession banner on the records whose *decision* named Kong, an edge
+translation note where the design survives and only the vehicle moved, and a
+corrected lead-in on the three diagrams whose surrounding text claimed the
+present tense.
 
 When Status → implemented, confirm:
 - [x] Linked ADR(s) Adoption → Complete — all six on the 2026-08-25 Kind gate pass
@@ -476,8 +483,12 @@ When Status → implemented, confirm:
       created; `docs/platform/kong-gateway.md` archived banner in place
 - [x] Runbooks: edge runbook replaced; alert catalog §2 rewritten; rotation runbook
       edge step deleted from `docs/secrets/openbao.md`
-- [ ] RFC-0022/0023 cross-references updated to the as-built edge — RFC-0022 still
-      describes Kong as the edge; RFC-0023 carries ~20 Kong references
+- [x] RFC-0022/0023 cross-references updated to the as-built edge — closed
+      2026-08-25 by annotation, not rewriting: RFC-0022's banner now says its
+      Current-state diagrams are the 2026-08-09 baseline, and RFC-0023 surfaces
+      the edge-translation note it already carried in its own History. The audit
+      that closed this box found the same staleness in eight more records and
+      annotated all of them
 
 ## Related
 
@@ -489,4 +500,4 @@ When Status → implemented, confirm:
 - [`docs/platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) · [`docs/platform/keycloak.md`](../../../platform/keycloak.md) · [`docs/api/identity.md`](../../../api/identity.md) — the as-built platform and contract docs
 
 ---
-_Last updated: 2026-08-25 — Status → `implemented` on the Kind gate pass; all six ADRs Complete; the remaining open box is the RFC-0022/0023 Kong cross-references._
+_Last updated: 2026-08-25 — Status → `implemented` on the Kind gate pass; all six ADRs Complete; the last open box (RFC-0022/0023 Kong cross-references) closed by annotation the same day._

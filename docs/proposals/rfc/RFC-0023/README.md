@@ -12,6 +12,11 @@
 > deferred until audit, permissions, and operator workflows justify them. Costs are
 > stated in **Design Details → Drawbacks**.
 
+> **Reading this after RFC-0024:** the text says Kong throughout because it
+> predates the edge cutover. Every Kong mechanism here has a named Envoy Gateway
+> equivalent — the mapping is in this RFC's own History, under the
+> [2026-08-13 edge translation note](#implementation-history). Nothing in the design changes.
+
 ## Prerequisites
 
 - [research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked

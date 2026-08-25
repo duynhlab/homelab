@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| implemented | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-06 |
+| implemented | platform-wide | [./research.md](./research.md) — gate passed 2026-07-23 | 2026-07-23 | 2026-08-25 |
 
 > **Supersedes [RFC-0003](../RFC-0003/README.md)** (*Inventory ownership and stock
 > semantics*), which ratified product-service as the inventory owner. RFC-0003's own
@@ -117,7 +117,10 @@ owner chose one umbrella registry entry (2026-07-23), mitigated by per-phase gat
 ## Architecture & Diagrams
 
 **Target state — platform topology after the overhaul** (Inventory and its edges are
-**planned**; everything else is deployed today):
+**planned**; everything else was deployed at the time of writing). The `Kong`
+node is historical: [RFC-0024](../RFC-0024/README.md) replaced the edge with
+Envoy Gateway ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)) on
+2026-08-11. Everything behind the edge is unchanged:
 
 ```mermaid
 flowchart TB
@@ -564,4 +567,4 @@ count and retention hit zero.
   refund identity)
 
 ---
-_Last updated: 2026-08-06_
+_Last updated: 2026-08-25_

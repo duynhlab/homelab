@@ -228,4 +228,4 @@ Owned here (replaces the roadmap previously inline in `temporal.md` §9):
 - East-west transport: [shared API guide](../../../api/api.md#grpc-runtime-model).
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-07-28_

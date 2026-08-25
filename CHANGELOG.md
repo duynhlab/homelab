@@ -2051,6 +2051,24 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The design records stopped contradicting themselves.** A full audit of the
+  RFC/ADR tree found the same defect in four shapes, and this clears all four.
+  Twelve ADRs had no `_Last updated:` footer at all — added, each dated by the
+  file's last real content change rather than today, so the date means something.
+  Nine ADRs had a header that disagreed with their own History: ADR-026 had no
+  History section, ADR-030 carried its adoption state *only* in the index (the
+  record itself never claimed it), ADR-038/040/047/052 stopped at `Proposed`
+  while the header read `Accepted` or `Withdrawn`, ADR-054/055 used a History
+  table with no status column, and ADR-057/058/060 use a bullet list that
+  structurally cannot carry one. Nine RFCs had a header date and a footer date
+  that differed — RFC-0007 by 42 days; both now carry the later of the two. Six
+  `research.md` files still said `researching` after their gate had passed.
+  Finally, six index rows were repaired against the records they point at:
+  RFC-0004 was listed `Accepted` while the RFC says `provisional — not yet
+  implementable`, RFC-0017 was credited with W0/W1 when W0–W4 shipped, RFC-0009
+  and ADR-006 lost their supersession qualifiers, and ADR-040's Related-RFC cell
+  disagreed with the index.
+
 - **RFC-0027 P5 docs audit — 40 files.** Every doc that still described the
   five-sink trace fan-out now describes the two that exist (VictoriaTraces 7d +
   ClickHouse 90d). Rewritten rather than patched: `tracing/architecture.md`

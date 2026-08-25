@@ -207,6 +207,7 @@ decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Decision recorded during RFC-0023 review (as draft ADR-042, renumbered 047 on 2026-08-11) |
 | 2026-08-13 | Accepted / Not started | Accepted with RFC-0023; edge mechanics restated EG-native per ADR-044 (RFC text predates the Kong retirement) |
+| 2026-08-14 | Accepted / **Complete** | Slice B pinned and the protected audience marked adopted (#779) — the owning services verify `aud` themselves, which is the whole of this decision |
 
 ---
-_Last updated: 2026-08-13_
+_Last updated: 2026-08-25_

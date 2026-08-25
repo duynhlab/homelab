@@ -422,4 +422,4 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 - **DR unchanged:** [`docs/databases/010.3-cross-region-dr.md`](../../../databases/010.3-cross-region-dr.md) (product line)
 
 ---
-_Last updated: 2026-07-17_
+_Last updated: 2026-08-07_

@@ -217,6 +217,9 @@ and re-deriving per-version selectors — more moving parts than the thing it re
 
 ## History
 
-| Date | Change |
-|------|--------|
-| 2026-08-21 | Proposed with RFC-0026 at architecture review. Recorded, not installed. |
+| Date | Status / adoption | Change |
+|------|-------------------|--------|
+| 2026-08-21 | Proposed / Not started | Proposed with RFC-0026 at architecture review. Recorded, not installed. |
+
+---
+_Last updated: 2026-08-25_

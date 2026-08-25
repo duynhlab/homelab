@@ -109,3 +109,6 @@ rehearsed on Kind (swap `endpoint` for prod).
 
 - [RFC-0008](../../rfc/RFC-0008/) · [research.md](../../rfc/RFC-0008/research.md) (auto-unseal spine + PoC)
 - [`docs/secrets/openbao.md`](../../../secrets/openbao.md) · [ADR-005 (OpenBAO HA Raft)](../ADR-005-openbao-ha-raft/)
+
+---
+_Last updated: 2026-07-20_

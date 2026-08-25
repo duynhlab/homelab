@@ -200,3 +200,7 @@ a new ADR that supersedes this one.
 
 - **2026-08-24** — created at `Proposed` during RFC-0027 architecture review.
 - **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.
+- **2026-08-25** — restated for the record because this History is a bullet list and carries no `Status / adoption` column: the decision stands at **Accepted / Adoption Complete**, on the evidence above — the Jaeger install is retired and no datasource, dashboard or alert refers to it. No new change; the header and this list now say the same thing.
+
+---
+_Last updated: 2026-08-25_

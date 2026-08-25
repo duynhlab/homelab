@@ -267,8 +267,11 @@ per-bring-up failure.
 
 ## History
 
-| Date | Change |
-|------|--------|
-| 2026-08-21 | Proposed with RFC-0026 at architecture review. |
-| 2026-08-21 | Accepted; implementation merged in #866–#869. |
-| 2026-08-22 | Adoption **Complete** — verified on a Kind cluster built from zero. The Kind gate also surfaced two defects this decision did not cause: the `identity` NetworkPolicy admitted no service namespace to the JWKS (every `private` route 401'd), and the six staff verifiers default to a public issuer URL no pod can use (every `protected` route 503s). Both are recorded as findings, not as consequences of this ADR. |
+| Date | Status / adoption | Change |
+|------|-------------------|--------|
+| 2026-08-21 | Proposed / Not started | Proposed with RFC-0026 at architecture review. |
+| 2026-08-21 | Accepted / Not started | Accepted; implementation merged in #866–#869. |
+| 2026-08-22 | Accepted / **Complete** | Verified on a Kind cluster built from zero. The Kind gate also surfaced two defects this decision did not cause: the `identity` NetworkPolicy admitted no service namespace to the JWKS (every `private` route 401'd), and the six staff verifiers default to a public issuer URL no pod can use (every `protected` route 503s). Both are recorded as findings, not as consequences of this ADR. |
+
+---
+_Last updated: 2026-08-25_

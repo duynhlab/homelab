@@ -232,3 +232,7 @@ a new ADR that supersedes this one.
   the implementation, not the other way around.
 - **2026-08-24** — created at `Proposed` during RFC-0027 architecture review.
 - **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.
+- **2026-08-25** — restated for the record because this History is a bullet list and carries no `Status / adoption` column: the decision stands at **Accepted / Adoption Complete**, on the evidence above — the span-metric series exist on the cluster and the RED Span Metrics board reads them. No new change; the header and this list now say the same thing.
+
+---
+_Last updated: 2026-08-25_

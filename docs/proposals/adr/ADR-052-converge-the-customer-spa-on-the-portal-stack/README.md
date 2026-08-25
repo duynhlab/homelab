@@ -258,6 +258,7 @@ decision requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-15 | Proposed / Not started | Opened with RFC-0025; owner decisions recorded up front (full stack not UI-only, no mocks, redesign, design direction approved before UI code) |
+| 2026-08-15 | Accepted / **Complete** | Accepted and adopted in the same day: checkout 0.7.1 and frontend 3.1.0 pinned (#787), which is the converged stack this decision asked for |
 
 ---
-_Last updated: 2026-08-15_
+_Last updated: 2026-08-25_

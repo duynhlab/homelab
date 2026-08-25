@@ -682,4 +682,4 @@ The original open questions were resolved on 2026-06-30:
   [shared API guide](../../../api/api.md#http-url-model).
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-11_

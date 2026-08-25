@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **RFC** | RFC-0021 |
-| **Status** | researching |
+| **Status** | researching → gate passed with README |
 | **Scope** | platform-wide |
 | **Created** | 2026-07-23 |
 | **Last updated** | 2026-07-23 |

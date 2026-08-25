@@ -254,7 +254,7 @@ Every multi-decision RFC should link its ADRs explicitly. Add to the RFC body (s
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| {one-line decision} | [ADR-NNN](../../adr/ADR-NNN-slug/) | Proposed |
+| {one-line decision} | `ADR-NNN-slug/` | Proposed |
 ```
 
 On approval: RFC → **Accepted**; each linked ADR → **Accepted**; Adoption →
@@ -381,7 +381,7 @@ and extend Adoption instead.
 | [ADR-003](ADR-003-jwt-validation-in-services-not-kong/) | Keep JWT validation in services, not the Kong gateway | Superseded by [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | Complete | — |
 | [ADR-004](ADR-004-enable-openbao-audit-logging/) | Enable OpenBAO audit logging | Accepted | Complete | — |
 | [ADR-005](ADR-005-openbao-ha-raft/) | Run OpenBAO HA (Raft) instead of Vault dev mode | Accepted | Complete | — |
-| [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | Adopt RS256 signed JWTs + Kong edge authentication | Accepted | Complete | [RFC-0009](../rfc/RFC-0009/) |
+| [ADR-006](ADR-006-rs256-jwt-kong-edge-auth/) | Adopt RS256 signed JWTs + Kong edge authentication | Accepted (implemented); Kong vehicle superseded by [ADR-044](ADR-044-envoy-gateway-platform-edge/) | Complete | [RFC-0009](../rfc/RFC-0009/) |
 | [ADR-007](ADR-007-double-entry-payment-ledger/) | Record money movement in an append-only double-entry ledger | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-008](ADR-008-mockpay-standalone-provider/) | Run the mock payment provider as a standalone process | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
 | [ADR-009](ADR-009-saga-authorize-early-capture-late/) | Authorize payment early, capture late in the order saga | Accepted | Complete | [RFC-0010](../rfc/RFC-0010/) |
@@ -446,4 +446,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-22 — ADR-056 accepted (k6 assertion layer; ADR-045 sizing amended alongside it, and ADR-055 finally has an observed backlog to scale on). Previously: ADR-054 and ADR-055 created at `Proposed` with [RFC-0026](../rfc/RFC-0026/)_
+_Last updated: 2026-08-25 — ADR-056 accepted (k6 assertion layer; ADR-045 sizing amended alongside it, and ADR-055 finally has an observed backlog to scale on). Previously: ADR-054 and ADR-055 created at `Proposed` with [RFC-0026](../rfc/RFC-0026/)_

@@ -101,3 +101,13 @@ comparison on identical workloads.
 - [ADR-015](../ADR-015-pg-hba-connection-isolation/) (pg_hba reject — the interaction to verify)
 - [ADR-025](../ADR-025-pgdog-passthrough-dynamic-db-creds/) (dynamic creds via PgDog passthrough — auth_query is the PgBouncer counterpart)
 - [`docs/databases/008-pooler.md`](../../../databases/008-pooler.md), [`007-architecture.md`](../../../databases/007-architecture.md)
+
+## History
+
+| Date | Status / adoption | Change |
+|------|-------------------|--------|
+| 2026-07-20 | Accepted / Not started | Decision date recorded in the header; the pilot was decided before it was applied |
+| 2026-08-07 | Accepted / **Complete** | Accepted and adopted in the same change (#707), which also retired the PgDog story on `platform-db` |
+
+---
+_Last updated: 2026-08-25_

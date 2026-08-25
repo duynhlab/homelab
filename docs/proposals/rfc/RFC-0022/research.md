@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **RFC** | RFC-0022 |
-| **Status** | researching |
+| **Status** | researching → gate passed with README |
 | **Scope** | platform-wide |
 | **Created** | 2026-08-09 |
 | **Last updated** | 2026-08-10 |
@@ -268,12 +268,12 @@ assumptions into audited facts.
 
 | Aspect | Platform today (deployed) | Keycloak (candidate) |
 |--------|---------------------------|----------------------|
-| Issuer | Custom `auth-service` 1.4.2, HTTP-only, ns `auth`, domain `identity` ([`kubernetes/apps/services/auth.yaml`](../../../../kubernetes/apps/services/auth.yaml)) | Keycloak realm `duynhlab` (planned) |
+| Issuer | Custom `auth-service` 1.4.2, HTTP-only, ns `auth`, domain `identity` (`kubernetes/apps/services/auth.yaml` — retired by the Keycloak cutover) | Keycloak realm `duynhlab` (planned) |
 | Endpoints | `/auth/v1/public/auth/{login,register,refresh,logout,jwks}` + deprecated flat aliases ([`docs/api/auth.md`](../../../api/auth.md)) | Standard OIDC endpoints under `/realms/duynhlab/protocol/openid-connect/` |
 | Access token | RS256, 1 h, claims above; `kid` = hash of public key | RS256 realm key; default 5 min lifespan — decided: **15 min** (see Open questions #1) |
 | Refresh token | Opaque 32-byte, SHA-256-hashed at rest, **family rotation with reuse detection**: replay ⇒ whole family deleted (`auth-service/internal/logic/v1/service.go:283-433`) | JWT refresh token tied to the SSO session. **`revokeRefreshToken` defaults to `false`** — rotation/reuse-revocation must be switched on (`Revoke Refresh Token` + `refreshTokenMaxReuse: 0`) to keep today's guarantee |
 | Session model | None beyond the refresh family (stateless by design, RFC-0009 Phase 5 dropped `sessions`) | Server-side SSO session (idle 30 min / max 10 h defaults) — a new stateful concept to configure deliberately |
-| Signing key custody | OpenBAO `secret/local/auth/jwt-signing`, ESO fan-out to auth (`JWT_PRIVATE_KEY_PEM`) and Kong (consumer credential) ([`kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml`](../../../../kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml)) | Realm-managed key providers; rotation = add higher-priority key, old stays passive; JWKS serves all enabled keys |
+| Signing key custody | OpenBAO `secret/local/auth/jwt-signing`, ESO fan-out to auth (`JWT_PRIVATE_KEY_PEM`) and Kong (consumer credential) (`kubernetes/infra/configs/secrets/auth-jwt-external-secrets.yaml` — retired by the Keycloak cutover) | Realm-managed key providers; rotation = add higher-priority key, old stays passive; JWKS serves all enabled keys |
 | Rotation procedure | Manual, three systems, documented in [`docs/secrets/openbao.md`](../../../secrets/openbao.md#jwt-signing-key-auth--kong) — JWKS refresh covers services **but not Kong** | Realm console/API for issuer keys; the Kong static-key step **remains** (below) |
 
 ### Verification path
@@ -282,7 +282,7 @@ assumptions into audited facts.
 |--------|---------------------------|----------------------|
 | Service middleware | [`pkg/authmw`](https://github.com/duynhlab/pkg) v0.36.1 in 7 services — **already issuer-neutral**: `NewVerifier(jwksURL, issuer, audience)`, keyfunc/v3 cached JWKS, RS256 pinned, validates `iss`/`aud`/`exp`, puts `user_id`(=`sub`)/`username`/`email` in context | Same package, retargeted by env (`AUTH_JWKS_URL`, `JWT_ISSUER`, `JWT_AUDIENCE`). Gaps: `aud` may arrive as an **array** (jwt/v5 `WithAudience` handles arrays — verify in a spike); `preferred_username` vs today's `username` claim; **roles are nested**, and authmw reads no roles at all today |
 | Roles | `roles: []` hardcoded in the signer, never read by any consumer — there is **no authorization model to port**; Keycloak roles are net-new capability | `realm_access.roles` / `resource_access.<client>.roles`; needs a normalization decision in authmw (flatten to `[]string`) |
-| Edge | Kong OSS `jwt` plugin `jwt-edge`: `key_claim_name: iss`, `claims_to_verify: [exp]`, static `rsa_public_key` on `KongConsumer auth-issuer` ([`kubernetes/infra/configs/kong/plugins.yaml`](../../../../kubernetes/infra/configs/kong/plugins.yaml), mirrored in [`local-stack/gateway/kong.yml`](../../../../local-stack/gateway/kong.yml)) | Same plugin, key material becomes the realm public key. Kong OSS `jwt` does **no JWKS discovery**, and the `openid-connect` plugin is **Enterprise-tier only** (verified 2026-08-09) — so the edge keeps a static-copy constraint; because the credential is looked up by `iss`, only **one key per issuer** can be active at the edge at a time, which shapes the rotation runbook. **Note (2026-08-10): Kong OSS itself is now a frozen 3.9 maintenance line — see [Gateway distribution risk](#gateway-distribution-risk-kong-oss--added-2026-08-10)** |
+| Edge | Kong OSS `jwt` plugin `jwt-edge`: `key_claim_name: iss`, `claims_to_verify: [exp]`, static `rsa_public_key` on `KongConsumer auth-issuer` (`kubernetes/infra/configs/kong/plugins.yaml`, mirrored in `local-stack/gateway/kong.yml`) | Same plugin, key material becomes the realm public key. Kong OSS `jwt` does **no JWKS discovery**, and the `openid-connect` plugin is **Enterprise-tier only** (verified 2026-08-09) — so the edge keeps a static-copy constraint; because the credential is looked up by `iss`, only **one key per issuer** can be active at the edge at a time, which shapes the rotation runbook. **Note (2026-08-10): Kong OSS itself is now a frozen 3.9 maintenance line — see [Gateway distribution risk](#gateway-distribution-risk-kong-oss--added-2026-08-10)** |
 | Route classes | `public`/`private`/`protected`/`internal` ([`docs/api/api.md`](../../../api/api.md)); `protected` is defined but **unused** — reserved for exactly the role-gated routes this work enables | unchanged vocabulary; `backoffice_admin` becomes the first real `protected` gate — the routes themselves are designed in [RFC-0023](../RFC-0023/) |
 
 ### Gateway distribution risk (Kong OSS) — added 2026-08-10
@@ -350,7 +350,7 @@ an opaque UUID string, while today's identity is the integer `auth.users.id`:
 | Frontend auth | Custom: `POST …/login`, tokens in `localStorage`, silent 401-refresh with in-tab shared promise + cross-tab `navigator.locks` — built specifically around family reuse detection (`frontend/src/api/client.ts`) | standard OIDC client (e.g. `keycloak-js`, PKCE S256 default since KC 24) replaces the entire custom token layer; `getStoredUser()` already coerces `id` to string |
 | Profile ownership | `user-service` owns name/phone/address; username/email come from **verified JWT claims**, not DB joins ([`docs/api/user.md`](../../../api/user.md)) | unchanged — this boundary was designed for exactly this swap |
 | Registration → profile | `POST /user/v1/internal/users` is documented as "called by auth-service" but is **orphaned** — auth-service makes zero outbound calls; private profile reads tolerate a missing row and `PUT` upserts | the tolerant-read + upsert behavior already makes Keycloak self-registration work with no provisioning hook; the orphaned route should be retired or repurposed |
-| Auth DB | Database `auth` on CNPG `platform-db`; **its role/secret double as the cluster's `bootstrap.initdb` credentials** ([`…/databases/clusters/platform-db/services/auth.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/services/auth.yaml)) | retiring `auth` is **not** a plain DB drop — the bootstrap contract moves to a neutral `platform_owner` role first (Open questions #5); Keycloak's own database lands on `platform-db`, connected direct, not via the transaction-mode pooler (#8) |
+| Auth DB | Database `auth` on CNPG `platform-db`; **its role/secret double as the cluster's `bootstrap.initdb` credentials** (`…/databases/clusters/platform-db/services/auth.yaml` — retired by the Keycloak cutover) | retiring `auth` is **not** a plain DB drop — the bootstrap contract moves to a neutral `platform_owner` role first (Open questions #5); Keycloak's own database lands on `platform-db`, connected direct, not via the transaction-mode pooler (#8) |
 
 ---
 

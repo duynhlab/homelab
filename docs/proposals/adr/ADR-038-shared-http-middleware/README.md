@@ -243,3 +243,7 @@ tracing→logging order stops being a per-repo convention.
 | Date | Status | Note |
 |------|--------|------|
 | 2026-08-08 | Proposed | Written from the telemetry audit's F-1/F-2 findings. Direction only — the F-1/F-2 fix lands as eleven in-place patches first, so this decision is not on the critical path for stopping the log noise. |
+| 2026-08-17 | Accepted / Partial | Accepted (#788) once `pkg/httpmw` existed and the portal joined local-stack. Adoption is **Partial** because the module is written and the fleet has not migrated onto it — that gap is the record's open obligation, not a stale status |
+
+---
+_Last updated: 2026-08-25_

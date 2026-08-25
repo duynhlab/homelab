@@ -27,7 +27,7 @@
 | **Deciders** | `duynhne` |
 | **Scope** | Delivery mechanism of the primary trace backend (Tempo) in the cluster |
 | **Affected components** | Tempo, OTel Collector, Grafana datasource, Kong ingress, ESO secret, RustFS bucket, Flux `tracing-local` wave, ServiceMonitor + PrometheusRule for Tempo |
-| **Related RFC** | — |
+| **Related RFC** | — when decided; withdrawn by [RFC-0027](../../rfc/RFC-0027/) |
 | **Related research** | — |
 | **Related ADR** | [ADR-032](../ADR-032-tempo-operator-monolithic/) (superseded — same problem, operator-based delivery), [ADR-023](../ADR-023-clickhouse-observability-olap/) |
 | **Supersedes** | [ADR-032](../ADR-032-tempo-operator-monolithic/) (withdrawn before adoption) |
@@ -410,6 +410,7 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-10 | Proposed / Not started | Initial draft; supersedes ADR-032 |
 | 2026-08-20 | Proposed / Partial | Adoption corrected to Partial (phase 1 shipped: #744, #802, #825). Amended: Tempo 3.x is blocked upstream — the single-binary chart has no 3.x appVersion and 3.0 needs an `ingester`/`compactor` config migration; Renovate PR #694 not merged; `grafana/tempo` held to `<3` in `.renovaterc.json5`; one phase-1 obligation (`-config.expand-env`) recorded as unmet |
+| 2026-08-24 | **Withdrawn** / Partial, then reverted | Withdrawn in favour of [ADR-059](../ADR-059-retire-tempo/) when RFC-0027 P4 removed the install this decision was about (#887). Phase 1 had shipped and phase 2 never started, so the adoption reads *partial, then reverted* rather than complete or abandoned |
 
 ---
-_Last updated: 2026-08-20_
+_Last updated: 2026-08-25_

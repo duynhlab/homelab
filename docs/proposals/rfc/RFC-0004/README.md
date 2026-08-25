@@ -2,7 +2,7 @@
 
 | Status | Scope | Created | Last updated |
 |--------|-------|---------|--------------|
-| provisional | platform-wide | 2026-06-26 | 2026-06-26 |
+| provisional | platform-wide | 2026-06-26 | 2026-07-07 |
 
 > **Provisional.** This RFC frames a platform-wide caching contract; it is **not yet
 > implementable**. It absorbs the [RFC-0001 *cache-bust on reserve*](../RFC-0001/README.md#future-work)

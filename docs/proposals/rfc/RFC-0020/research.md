@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **RFC** | RFC-0020 |
-| **Status** | researching |
+| **Status** | researching → gate passed with README |
 | **Scope** | platform-wide |
 | **Created** | 2026-07-21 |
 | **Last updated** | 2026-07-22 |

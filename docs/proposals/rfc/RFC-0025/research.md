@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **RFC** | RFC-0025 |
-| **Status** | researching |
+| **Status** | researching → gate passed with README |
 | **Scope** | service:frontend |
 | **Created** | 2026-08-15 |
 | **Last updated** | 2026-08-15 |

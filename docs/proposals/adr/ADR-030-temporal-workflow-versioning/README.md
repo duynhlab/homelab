@@ -9,6 +9,14 @@ Worker Versioning requires.
 |--------|------|-------------|------------------|
 | Accepted | 2026-07-28 | [RFC-0021](../../rfc/RFC-0021/) | [RFC-0021 research.md](../../rfc/RFC-0021/research.md) |
 
+| Attribute | Value |
+|-----------|-------|
+| **Adoption** | **Complete** — the re-platform onto the official chart is done and Worker Versioning has been live since 2026-07-30. The **rollout mechanism** is partly superseded by [ADR-054](../ADR-054-temporal-worker-controller/) (2026-08-21): the build id is now derived by the Worker Controller and appears nowhere in git, so the manifest-pinned build id this ADR described no longer exists. The versioning decision stands; the vehicle changed |
+
+> This record predates the `Adoption` field, and until 2026-08-25 the only place
+> that state was written down was the ADR index — which made the index the sole
+> source of truth for a claim the record itself never made.
+
 > Supersedes the deployment half of
 > [ADR-002](../ADR-002-deploy-temporal-via-operator/) (deploy Temporal via the
 > alexandrevilain operator). ADR-001 (adopt Temporal) stands unchanged.
@@ -315,4 +323,4 @@ the copy-paste without building machinery the controller would replace.
 | 2026-08-21 | Amended: a build id freezes the code, not the image — `order-service:1.13.2` was amd64-only and could not be re-tagged, so the order saga had no poller on arm64; the escape hatch is a new build id, cheap when the replay corpus is green (gen3 replays on 2.4.0). Also recorded: `DrainageStatus` is the machine-checkable retirement gate; activation is a per-bring-up step on a rebuilt cluster, not only per-release; `set-ramping-version` exists and is unused; the unversioned fallback is sanctioned by upstream **only** if patching replaces it; and the Temporal Worker Controller is the recorded destination (own RFC). Decision unchanged. See § Amendments. |
 ---
 
-_Last updated: 2026-08-21_
+_Last updated: 2026-08-25_

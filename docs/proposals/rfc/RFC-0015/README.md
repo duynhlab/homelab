@@ -720,4 +720,4 @@ Phased P1→P6 as above. Blast-radius notes:
   [`docs/README.md` § Repositories](../../../README.md#repositories).
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-07_

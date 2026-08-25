@@ -1,0 +1,23 @@
+# Service Graph — the ADR-059 replacement surface for Tempo's service map.
+# Two panels, two sources, because no single one carries both halves:
+#   - Node Graph on the VictoriaTraces (jaeger-type) datasource, queryType
+#     `dependencyGraph` — the topology, `callCount` only.
+#   - Table on ClickHouse — the parent/child span self-join that adds `failed`
+#     and `p95` per edge, which the dependency API cannot return.
+# ADR-059 left both of these open ("the data is there; the panel is not"). The
+# query is documented in docs/observability/tracing/service-graph.md; keep the
+# two in step when either changes.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: service-graph
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Microservices / Golden Signals"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-service-graph
+    key: service-graph.json

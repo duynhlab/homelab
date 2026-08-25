@@ -223,8 +223,8 @@ component.
 | Run the TraceQL parity experiment | `duynhne` | RFC-0027 P1 | A Tempo-type datasource against `/select/tempo` exercised with real queries; failures recorded |
 | Consolidate Tempo knowledge into an archived doc | `duynhne` | this PR | `docs/observability/tracing/tempo.md` exists, banner present, body frozen |
 | Enable `-servicegraph.enableTask` on `vtsingle` | `duynhne` | RFC-0027 P3 | **Done 2026-08-24** — the pod runs with `-servicegraph.enableTask=true` and the endpoint returns **12 edges**, including database dependencies (`checkout → checkout:postgresql` 2251, `platform.envoy-gateway → checkout` 425, `checkout → checkout-worker` 421) |
-| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | **Still open** — the data is there (31 edges measured 2026-08-24); the panel is not. `nodeGraph.enabled: true` is set on the datasource, so Explore renders the graph; a dashboard panel is the gap |
-| Document the ClickHouse per-edge query | `duynhne` | RFC-0027 P3 | A `docs/observability/` page carries the self-join with failure and p95 per edge |
+| Add a Dependency graph panel on the existing VictoriaTraces datasource | `duynhne` | RFC-0027 P3 | **Done 2026-08-25** — the **Service Graph** board (`uid: service-graph`) carries a Node Graph panel with `queryType: dependencyGraph` on the `victoriatraces` datasource. Verified against the live Kind cluster through Grafana's own datasource proxy: **34 edges**, `platform.envoy-gateway -> product` at 513 calls |
+| Document the ClickHouse per-edge query | `duynhne` | RFC-0027 P3 | **Done 2026-08-25** — [`docs/observability/tracing/service-graph.md`](../../../observability/tracing/service-graph.md) carries the self-join, and the same query runs as the board's second panel. Verified via Grafana `/api/ds/query`: **24** service→service edges with `callCount`, `failed` and `p95_ms` |
 | Retire manifests as `.bak`, drop from kustomizations with comments | `duynhne` | RFC-0027 P4 | **Done** (#881) — `make validate` green; `.bak` files present; comments name this ADR |
 | Delete `TempoDown`, the ServiceMonitor, the dashboard, the datasource, the ExternalSecret, both buckets and the edge route | `duynhne` | RFC-0027 P4 | **Done, with one over-reach corrected in P5** — `TempoDown` shared its file with `OtelCollectorDown`, so `.bak`-ing the file deleted a **critical** alert that was not part of this decision. Restored as `otel-collector-alerts.yaml` (#882). RustFS bucket list has two entries fewer |
 | **On acceptance: flip [ADR-040](../ADR-040-tempo-community-helm-chart/) to `Withdrawn` in favour of this record** | `duynhne` | RFC-0027 P4 | **Done 2026-08-24, late** — missed in P4 and caught by the P5 docs audit, which found ADR-040 still at `Status: Proposed` with `Adoption: Partial` while nothing from it was running. ADR-040 now carries the banner and `Superseded by: ADR-059`, matching how ADR-032 was withdrawn |
@@ -279,3 +279,16 @@ a new ADR that supersedes this one.
   that accepting the Tempo retirement is impossible without answering what happens
   to `traces_service_graph_*`.
 - **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.
+- **2026-08-25** — both open P3 obligations closed while the Kind cluster from the
+  K0–K6 gate was still up. The **Service Graph** board now renders the dependency
+  graph (34 edges) beside the ClickHouse self-join (24 service→service edges), and
+  the query is documented in
+  [`docs/observability/tracing/service-graph.md`](../../../observability/tracing/service-graph.md).
+  Two facts surfaced while proving it and are recorded there rather than here:
+  `failed` reads **0** on every edge because no `Server`-kind span on this platform
+  has ever carried `StatusCode = 'Error'`, and the dependency API reports more
+  edges than the SQL (34 vs 24) because it includes database dependencies.
+  Status stays **Accepted**, Adoption stays **Complete**.
+
+---
+_Last updated: 2026-08-25_

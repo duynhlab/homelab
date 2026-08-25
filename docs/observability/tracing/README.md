@@ -69,6 +69,10 @@ Track requests as they flow through multiple microservices to understand perform
 - Plan deployment order: update `Shipping` before `Order`
 - Monitor impact with trace sampling
 
+The deployed surface is the **Service Graph** board — topology from the
+VictoriaTraces dependency API, per-edge failure and latency from a ClickHouse
+self-join. See [service-graph.md](service-graph.md).
+
 ---
 
 ## How It Works

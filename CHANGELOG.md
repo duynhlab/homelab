@@ -661,6 +661,32 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **The frontend area RFC-0023 promised now exists.** That RFC named
+  `docs/frontend/admin-portal/` in four places — its research even said outright
+  *"`docs/frontend/` does not exist yet and this RFC creates it"* — and it never
+  got created, which is why the RFC's `docs/api/ synced` box stayed open. New
+  [`docs/frontend/`](docs/frontend/README.md) hub covers **both** browser apps at
+  the platform layer (the storefront had no platform doc at all), and
+  [`admin-portal/`](docs/frontend/admin-portal/README.md) is the deep one. Both
+  document what homelab actually owns — build, exposure, config, delivery,
+  signals — not components or screens. The one mechanism worth the space is the
+  **build-arg contract**: four `ARG`s become `VITE_*` at image-build time, the
+  `mop` chart passes none of them, so a tag is only deployable if its build
+  carried the right four; otherwise the portal loads and then talks to
+  `localhost` from the operator's browser. Four gaps are recorded rather than
+  glossed: neither namespace has a NetworkPolicy (the `identity` policy names the
+  omission itself), no dashboard and no alert exist for either app, no policy
+  targets the `backoffice` route, and compose serves the portal directly on
+  `:3009` so its edge behaviour can only be exercised on Kind.
+- **Seven confirmation boxes closed on RFC-0022 and RFC-0023.** Both RFCs read
+  `Accepted`/`implemented` with unticked "when Status → implemented, confirm"
+  boxes. Checked one at a time: **all four of RFC-0022's were already satisfied**
+  and simply never ticked (ADR-041/042/043 + the ADR-050 amendment all
+  `Complete`, `auth.md` archived, five Keycloak runbooks, the key-rotation Kong
+  step gone), and two of RFC-0023's were too. Only one was genuinely open — the
+  frontend area above. Both Resulting-decisions tables now carry Adoption beside
+  Status, so "final ADR status" is what they actually show.
+
 - **Two records caught up with what the cluster can prove.** ADR-056 moves to
   `Adoption: Complete` — its last obligation was literally "`make e2e
   GATE=compose` green on a live local-stack", and that ran green (smoke 8/8,

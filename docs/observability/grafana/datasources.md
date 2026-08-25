@@ -116,7 +116,7 @@ Logs use a **single-backend** pattern (Vector → VictoriaLogs), unrelated to th
 
 | Datasource | Type | Backend | Query language | Best for |
 |------------|------|---------|----------------|----------|
-| **VictoriaLogs** | `victoriametrics-logs-datasource` | VLSingle `:9428` | LogsQL | Dashboards, trace correlation, VM plugin workflow, [`logging/README.md#platform-pipeline`](../logging/README.md#platform-pipeline) |
+| **VictoriaLogs** | `victoriametrics-logs-datasource` | VLSingle `:9428` | LogsQL | Dashboards, trace correlation, VM plugin workflow, [`logging/victorialogs.md`](../logging/victorialogs.md#grafana-datasource--trace-correlation) |
 
 **CRD**: `datasource-victorialogs.yaml`.
 

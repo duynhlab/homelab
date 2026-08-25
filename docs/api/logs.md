@@ -217,7 +217,7 @@ Legacy adapters (`zerolog`, `clog`) accepted the same four `LOG_LEVEL` strings b
 - otelzap maps the zap `message` to the OTLP log body and attaches fields as attributes.
 - The Collector's VictoriaLogs exporter sets `VL-Stream-Fields: service.name` (one stream per service) and keeps `trace_id` as a queryable field.
 
-Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [Logging (platform)](../observability/logging/README.md#platform-pipeline).
+Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [VictoriaLogs (platform)](../observability/logging/victorialogs.md#per-sender-ingest-contract).
 
 ---
 

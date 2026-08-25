@@ -288,7 +288,10 @@ docs/observability/
 │   └── victoriatraces.md         # VictoriaTraces — the fast trace path
 │
 ├── logging/                      # Pillar 3: Structured logging
-│   └── README.md                 # Platform pipeline (VictoriaLogs + Vector)
+│   ├── README.md                 # Hub: the two log paths, architecture, edge, why VictoriaLogs
+│   ├── victorialogs.md           # The store: streams model, VLSingle, ingest contracts, retention
+│   ├── vector.md                 # The infra pipeline: DaemonSet, transforms, PG plans/pgaudit
+│   └── logsql-guide.md           # LogsQL: streams on this platform, filters, pipes, recipes
 │
 ├── profiling/                    # Pillar 4: Continuous profiling
 │   └── README.md                 # Pyroscope (CPU, heap, goroutine)
@@ -399,7 +402,7 @@ sequenceDiagram
 
 - **Metrics → Traces**: exemplars are **not available** (VictoriaMetrics won't-fix, RFC-0014 D-14) — pivot from a metric to traces by service + time window, or via the `trace_id` field now carried on logs (below)
 - **Traces → Logs**: `trace_id` injected into every structured log line by `httpmw.Logging`
-- **Logs → Traces**: VictoriaLogs datasource derived field extracts `trace_id` and links back to the VictoriaTraces datasource
+- **Logs → Traces**: **not wired** — the VictoriaLogs datasource carries no derived field, so copy the `trace_id` from the log line and search the trace store ([details](logging/victorialogs.md#grafana-datasource--trace-correlation))
 - **Traces → Profiles**: Pyroscope labels match service name for time-correlated flamegraphs
 
 ## Deployment

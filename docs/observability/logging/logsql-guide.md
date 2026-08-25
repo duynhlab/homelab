@@ -271,6 +271,10 @@ _stream:{pod_name="platform-db-1"} level:error _time:1h
 
 ### PostgreSQL plans (from the [Vector PG pipeline](vector.md#postgresql-pipeline))
 
+The investigation that strings these recipes together — metrics find the
+queryid, this stream shows the plan it ran at the time — is the
+[plan-regression runbook](../runbooks/postgresql/plan-regression-investigation.md).
+
 **Slow plans with the columns that matter:**
 
 ```logsql

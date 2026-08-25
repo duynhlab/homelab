@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| implemented | platform-wide | [./research.md](./research.md) | 2026-08-10 | 2026-08-14 |
+| implemented | platform-wide | [./research.md](./research.md) | 2026-08-10 | 2026-08-25 |
 
 > **Every decision is a tradeoff.** This RFC creates a second browser application that
 > calls owning services directly through Kong on a new `/protected/` audience. We accept

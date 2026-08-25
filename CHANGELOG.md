@@ -659,6 +659,19 @@ Skeleton (copy what you need):
   search schema is not a fallback but a write — the router re-stringifies the
   validated search and replaces the URL when it differs.
 
+#### Docs
+
+- **The logging area now matches its siblings — a hub plus sub-docs instead of
+  one 534-line stitch.** `docs/observability/logging/README.md` keeps the
+  architecture view (two paths, edge access logs, why VictoriaLogs, scaling);
+  the ops half that used to be pasted below it moved into three new docs:
+  `victorialogs.md` (streams model, VLSingle, per-sender ingest contracts —
+  including the previously undocumented `victorialogs_pg_parse_failures`
+  stream), `vector.md` (pipeline internals, PG plans/pgaudit, self-monitoring,
+  troubleshooting), and `logsql-guide.md` (LogsQL filters, pipes, and runnable
+  recipes addressed to streams that exist here — the promql-guide counterpart).
+  Fifteen inbound `#platform-pipeline`/`#troubleshooting` links retargeted.
+
 #### Proposals
 
 - **The frontend area RFC-0023 promised now exists.** That RFC named
@@ -2107,6 +2120,20 @@ Skeleton (copy what you need):
   neither cap, so neither exhausted branch was reachable from a request.
 
 #### Docs
+
+- **The logging README's examples and config snippet had drifted from the
+  cluster.** `_stream:{service="auth"}` could never match — auth-service is
+  retired (RFC-0024) *and* app services stream on `"service.name"` (the
+  collector's `VL-Stream-Fields`), not `service`, which only exists on the
+  Vector path; the VLSingle snippet still showed `removePvcAfterDelete: true`,
+  a field deliberately removed from the manifest because VLSingle v1 never
+  defined it; the PVC-fill weakness now names its caveat
+  (`KubePersistentVolumeFillingUp` is inactive on Kind); the edge section
+  documents the CEL probe-drop filter; dashboard `21954` is stated as
+  GitOps-provisioned, not "pre-built"; the architecture diagram no longer draws
+  the edge into Vector (ADR-060 moved its access log to OTLP→Collector — the
+  prose said so, the arrow didn't); and the observability hub's claim that
+  log→trace derived-field linking works is corrected (it was never wired).
 
 - **Seven links to `api.md`'s protected-route section were dead.** The heading read
   *"Protected route conventions **(planned)**"* while its own first line said

@@ -292,9 +292,12 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 7. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 8. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 9. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
-10. **[Logging](./observability/logging/README.md)** - Platform pipeline: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
+10. **[Logging](./observability/logging/README.md)** - Hub: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
+    - [VictoriaLogs store](./observability/logging/victorialogs.md) - streams model, VLSingle, ingest contracts, retention
+    - [Vector pipeline](./observability/logging/vector.md) - DaemonSet, transforms, PG plans/pgaudit, self-monitoring
+    - [LogsQL guide](./observability/logging/logsql-guide.md) - streams on this platform, filters, pipes, recipes
 11. **[Application logging](./api/logs.md)** - App-side logging contract (JSON fields, levels, middleware)
-    - Platform ingest ops: [Logging § platform pipeline](./observability/logging/README.md#platform-pipeline)
+    - Platform ingest ops: [VictoriaLogs store](./observability/logging/victorialogs.md)
 
 ### API Reference
 
@@ -350,7 +353,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 ### Runbooks & Troubleshooting
 
 1. **[PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md)** - Backup and restore procedures (CNPG Barman)
-2. **[Logging troubleshooting](./observability/logging/README.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
+2. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
 6. **[Pooler operations](./databases/runbooks/pgdog-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
@@ -513,7 +516,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Kind E2E audit](./platform/kind-e2e-audit.md) - The cluster release gate (K0–K6), twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [k6 assertion layer](./testing/k6.md) - One suite for both gates: rows as thresholds, saga over HTTP, edge limiter, Temporal backlog
 - [PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md) - Backup and restore procedures
-- [Logging troubleshooting](./observability/logging/README.md#troubleshooting) - Missing/blank Kubernetes logs
+- [Logging troubleshooting](./observability/logging/vector.md#troubleshooting) - Missing/blank Kubernetes logs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
 - [Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation
 

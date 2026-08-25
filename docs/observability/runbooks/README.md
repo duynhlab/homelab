@@ -15,7 +15,7 @@ runbook links it via its `runbook_url` annotation.
 | [Valkey runbooks](valkey/README.md) | Per-alert investigation for the cache (7 files) | On-call, when a Valkey alert fires |
 | [Kyverno runbooks](kyverno/README.md) | Per-alert investigation for the admission webhook (4 files) | On-call, when a Kyverno alert fires |
 | [Keycloak runbooks](keycloak/) | Per-alert investigation for the identity provider (5 files, no folder README yet) | On-call, when a Keycloak alert fires |
-| [Logging troubleshooting](../logging/README.md#troubleshooting) | Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana) | On-call, when logs are missing in Grafana |
+| [Logging troubleshooting](../logging/vector.md#troubleshooting) | Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana) | On-call, when logs are missing in Grafana |
 
 Not yet covered by per-alert runbooks (a recorded gap): Flux/GitOps,
 cert-manager, and observability-stack self-monitoring alerts — they

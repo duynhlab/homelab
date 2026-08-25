@@ -12,6 +12,7 @@ resources:
   - grafana-dashboard-cloudnative-pg.yaml
   - grafana-dashboard-pg-query-performance.yaml
   - grafana-dashboard-pg-maintenance.yaml
+  - grafana-dashboard-pg-io-waits.yaml
   - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-redis.yaml
   - grafana-dashboard-kubernetes-cluster-overview.yaml

@@ -12,7 +12,7 @@ runbooks for the platform database layer.
 | **Not in per-db queries** | platform: temporal, temporal_visibility · product: payment, checkout |
 | Alerts | 53 rules — [alert catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Runbooks | [postgresql/](../../runbooks/postgresql/README.md) (one file per alert) |
-| Dashboards | pg-query-performance, pg-maintenance, CloudNativePG Cluster Overview |
+| Dashboards | pg-query-performance, pg-maintenance, pg-io-waits, CloudNativePG Cluster Overview |
 
 ## Learning path
 

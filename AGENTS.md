@@ -284,7 +284,11 @@ homelab, **`docs/api/` wins** (file a drift fix in homelab or the service repo).
 [`docs/README.md` § Repositories](docs/README.md#repositories). GitOps domain
 labels → [`application-delivery.md`](docs/platform/application-delivery.md) +
 manifests. **Frontend** has no contract file — gateway-facing behavior is in
-platform/gateway docs + the service repo.
+platform/gateway docs + the service repo. The **Backoffice portal** has no
+contract file either, because it serves nothing; what it does have is a
+**consumer index**, [`docs/api/admin.md`](docs/api/admin.md) — the operations it
+*calls*, with every contract still owned by the serving service. Platform view
+for both apps: [`docs/frontend/`](docs/frontend/README.md).
 
 **Routing:**
 

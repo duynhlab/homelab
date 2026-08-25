@@ -7,6 +7,7 @@ rejected at the edge as wrong-issuer before any role logic runs.
 | Fact | Value |
 |------|-------|
 | **Repository** | `admin-service` (a browser app, despite the name) |
+| **Stack** | React 19 · TypeScript strict · Vite · TanStack Router/Query/Table/Form · Tailwind v4 + shadcn/ui ([ADR-049](../../proposals/adr/ADR-049-admin-portal-tanstack-spa/)) |
 | **Image** | `ghcr.io/duynhlab/admin-service/admin-service` — Nginx + static bundle, port **80** |
 | **Cluster** | ns `backoffice`, `HTTPRoute` on `backoffice.duynh.me` |
 | **local-stack** | `:3009` — served directly, **not** through the edge |
@@ -135,6 +136,36 @@ Tags also move in lockstep with the services they read: `backoffice-rs.yaml`
 records that `0.3.0` must not land before order-service `2.2.0`, because the case
 view reads `version` and `status_history` that only the newer service returns.
 
+## Stack
+
+Chosen in [ADR-049](../../proposals/adr/ADR-049-admin-portal-tanstack-spa/), which
+holds the authority table and the decision rules. The short version:
+
+| Concern | Choice |
+|---------|--------|
+| Runtime | **React 19** · **TypeScript** (strict) · **Vite** — a static bundle, no SSR |
+| Routing and URL state | **TanStack Router**, file-based, `validateSearch` with zod, `_authenticated` layout guard |
+| Server state | **TanStack Query** — key factories, targeted invalidation, `AbortSignal` |
+| Tables | **TanStack Table** — `manualPagination`, server-side sort and filter |
+| Forms | **TanStack Form** + **zod** |
+| Styling | **Tailwind CSS v4** + **shadcn/ui** |
+| Session | **`keycloak-js`** — PKCE `S256`, `updateToken` with a `login()` fallback |
+| Business truth | The owning Go services — never the SPA |
+
+Two properties of that stack matter at the platform layer, and only two:
+
+- **Tokens live in memory only.** Nothing is written to `localStorage` or a
+  cookie, so a page reload re-runs the Authorization Code flow rather than
+  reading a token back. An operator who reloads mid-task is silently
+  re-authenticated, and a stolen bundle carries no credential.
+- **Server-side pagination, sort and filter.** Tables ask the owning service for
+  a page rather than fetching a set and slicing it in the browser, which is why
+  the `/protected/` list routes all take pagination parameters. Nothing about a
+  screen's size is a client-side concern.
+
+Everything else — component structure, design tokens, form composition — lives
+in the `admin-service` repository and is out of scope here.
+
 ## Surface as built
 
 Thirteen authenticated screens, plus `login` and `forbidden`:
@@ -194,6 +225,7 @@ Each verified against the manifests:
 ## References
 
 - [Browser applications](../README.md) — the area hub, and the build-arg contract in full
+- [Admin Portal API consumption](../../api/admin.md) — the 26 operations it calls, by service and screen
 - [Identity and tokens](../../api/identity.md) — edge vs in-service verification
 - [Keycloak](../../platform/keycloak.md) — realms, clients, and the one-shot import
 - [Envoy Gateway](../../platform/envoy-gateway.md) — routes, SecurityPolicy, CORS

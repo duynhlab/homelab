@@ -153,7 +153,7 @@ from the issuer, hairpins to the public host, resolves in-cluster to
 `127.0.0.1`, and the fail-closed verifier answers every guarded request
 `503 Authentication temporarily unavailable`. This shipped as a live defect and
 was fixed 2026-08-22 — the incident detail is in
-[api.md § Protected route conventions](./api.md#protected-route-conventions-planned).
+[api.md § Protected route conventions](./api.md#protected-route-conventions).
 
 Which services carry which:
 

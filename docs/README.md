@@ -13,6 +13,7 @@ docs/
 │   ├── api.md                    # Canonical shared HTTP + gRPC conventions and call graph
 │   ├── microservices.md          # Feature ownership, techniques, dependencies, known gaps
 │   ├── identity.md               # Identity contract — two realms, edge vs in-service verification, OIDC_* env, sub as user_id
+│   ├── admin.md                  # Consumer index: what the Backoffice portal calls (not a contract)
 │   ├── auth.md                   # Archived — the retired token issuer's contract (RFC-0024 P5)
 │   ├── user.md                   # User profile contract
 │   ├── product.md                # Catalog, price gRPC contract, aggregation
@@ -402,6 +403,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [API area hub](./api/README.md) - Learning path, document ownership, deployment rollup, and all service contracts
 - [Shared API and communication guide](./api/api.md) - HTTP/gRPC conventions, call graph, user journeys, load balancing, security, and observability
 - [Identity and tokens](./api/identity.md) - The verification contract: two realms, edge vs in-service checks, `OIDC_*` env, `sub` as `user_id`
+- [Admin Portal API consumption](./api/admin.md) - Consumer index (not a contract): the 26 `/protected/` operations the Backoffice calls, by service and screen
 - [Microservices catalog](./api/microservices.md) - Feature ownership, techniques, dependencies, and known gaps
 - [Service contracts](./api/README.md#service-contracts) - Platform deployment rollup and one file per Go service
 - [Workflow registry](./api/workflows.md) - Temporal workflows: owners, workers, task queues, and participants

@@ -28,6 +28,7 @@ platform view; the code lives in its own repository per app.
 | **Realm · client** | `duynhlab` · `customer-spa` | `duynhlab-staff` · `admin-portal` |
 | **Audience it calls** | `/private/` and `/public/` | `/protected/` |
 | **Deep doc** | — (this hub is the whole platform view) | [admin-portal/](admin-portal/README.md) |
+| **API consumption** | `public` + `private`, covered by [api.md](../api/api.md) journeys | [admin.md](../api/admin.md) — 26 operations, 6 services |
 
 The naming trap is worth stating once: **the operator portal's repository is
 `admin-service`**, which reads like a Go microservice and is not one. The compose
@@ -102,6 +103,7 @@ Verified against the manifests, not assumed:
 - [Admin Portal](admin-portal/README.md) — the operator portal in depth
 - [Envoy Gateway](../platform/envoy-gateway.md) — the edge both apps sit behind
 - [Keycloak](../platform/keycloak.md) — realms, clients, and how they are imported
+- [Admin Portal API consumption](../api/admin.md) — the 26 `/protected/` operations the portal calls, by service and screen
 - [Identity and tokens](../api/identity.md) — the verification contract these apps obtain tokens for
 - [Application delivery](../platform/application-delivery.md) — ResourceSets and the Flux chain
 - [RFC-0023](../proposals/rfc/RFC-0023/README.md) · [RFC-0025](../proposals/rfc/RFC-0025/README.md) — the portal, and the storefront's convergence onto its stack

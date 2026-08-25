@@ -21,9 +21,11 @@ flowchart TD
     Hub --> Workflows["workflows.md<br/>Temporal workflow registry"]
     Hub --> Saga["temporal.md<br/>3 workflows + saga theory"]
     Hub --> Pkg["pkg.md<br/>shared Go modules + layering"]
+    Hub --> Consumer["admin.md<br/>Backoffice consumer index"]
     Shared --> Journeys["api.md § End-to-end user journeys"]
     Contracts --> Basic["Auth · User · Product · Inventory · Cart<br/>Order · Review · Notification · Shipping"]
     Contracts --> Deep["Checkout · Payment<br/>state-machine deep dives"]
+    Consumer -.->|"links, never restates"| Contracts
     Shared --> Contracts
     Catalog --> Contracts
     Journeys --> Contracts
@@ -38,7 +40,7 @@ flowchart TD
     classDef contract fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef workflow fill:#f59e0b,color:#451a03,stroke:#b45309;
     class Hub hub;
-    class Shared,Catalog,Rollup,Journeys,Template,Pkg guide;
+    class Shared,Catalog,Rollup,Journeys,Template,Pkg,Consumer guide;
     class Contracts,Basic,Deep,Order,Payment contract;
     class Saga,Workflows workflow;
 ```
@@ -197,6 +199,7 @@ Per-service **At a glance** tables hold deployment detail; this rollup is the pl
 |----------|--------|----------------|
 | [api.md](./api.md) | HTTP and gRPC architecture, call graph, user journeys, HTTP/2 load balancing, security, observability | Implemented |
 | [identity.md](./identity.md) | Two realms, edge vs in-service verification, `sub` as `user_id`, the `OIDC_*` env contract, browser flow | Implemented |
+| [admin.md](./admin.md) | **Consumer index, not a contract:** the 26 `/protected/` operations the Admin Portal calls, by service and screen | Implemented |
 | [microservices.md](./microservices.md) | Service feature matrix, ownership, dependencies, and known gaps | Living reference |
 | [temporal.md](./temporal.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
 | [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | Implemented — P1-P5 shipped; the legacy order path was removed in RFC-0021 P5 |

@@ -223,10 +223,13 @@ ingest paths create **different stream fields** — full guide with runnable
 recipes: [**LogsQL guide**](logsql-guide.md). The shape:
 
 ```logsql
-_stream:{"service.name"="checkout"} level:error   # a Go service (OTLP path)
-_stream:{namespace="product"} _time:5m            # a namespace (Vector path)
-trace_id:abc123def456                             # everything for one trace
+_stream:{"service.name"="checkout"} severity_text:error  # a Go service (OTLP path)
+_stream:{namespace="product"} level:error _time:5m       # a namespace (Vector path)
+trace_id:abc123def456                                    # everything for one trace
 ```
+
+(Severity is also per-path: app records follow the OTel model and carry
+`severity_text`; only Vector-shipped records carry `level`.)
 
 - **Trace → log:** in a VictoriaTraces span, the **Logs** tab shows the correlated
   lines (`tracesToLogsV2` → `victorialogs` datasource, tag `trace_id`).

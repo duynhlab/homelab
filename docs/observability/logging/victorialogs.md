@@ -121,9 +121,12 @@ What actually lands in the store, by stream identity:
 
 **pgaudit** records ride the infra stream, not a dedicated one: all CNPG
 clusters enable `pgaudit` (`pgaudit.log = 'ddl, write'`), CNPG formats the rows
-as JSON, and they land via `victorialogs_all` carrying `logger: pgaudit` (CNPG
-parsing strips the literal `AUDIT:` prefix). Verified live for `platform-db`
-and `product-db`. Query: `_stream:{namespace="platform"} logger:pgaudit`.
+as JSON, and they land via `victorialogs_all` — the whole CNPG envelope is the
+`_msg`, with `"logger":"pgaudit"` a key *inside* it (not a queryable field).
+Verified live for `platform-db` and `product-db`. Query with a word filter,
+`unpack_json` for structure:
+`_stream:{namespace="platform"} "pgaudit" | unpack_json | filter logger:=pgaudit`
+([recipe](logsql-guide.md#pgaudit-rides-the-infra-stream-as-raw-cnpg-json)).
 
 ## Grafana datasource & trace correlation
 

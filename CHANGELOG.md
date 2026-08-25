@@ -1343,6 +1343,37 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`docs/api/admin.md` — what the Backoffice portal actually calls.** `api.md`
+  owned the `/protected/` *conventions* and each service file owned its
+  *contract*, but the **fan-out** had no home: which operations the portal calls,
+  and which screen needs each. That is worth seeing in one place precisely
+  because [ADR-048](docs/proposals/adr/ADR-048-admin-portal-no-bff/) made the
+  fan-out a decision (no BFF). **26 operations over 23 paths across 6 services**,
+  grouped by the source's own `src/features/{module}/api.ts` layout, with method,
+  path and screen — and deliberately **nothing else**: no payloads, no error
+  tables, no semantics, because those belong to the serving service and
+  duplicating them is how two files start disagreeing. The file opens by saying
+  it is a consumer index and not a contract. It does not follow
+  `_template-service.md` verbatim: that template asks for HTTP server, gRPC
+  server, Owns, Database and Temporal participation, and a client answers `None`
+  to all five — a document that is mostly `None` reads as unfinished rather than
+  accurate. Verified rather than transcribed: every one of the 26 operations was
+  matched against its owning `docs/api/{service}.md` on **method and path** —
+  26/26, no contract gap — and the source confirmed the portal calls no `public`,
+  `private` or `internal` route. `AGENTS.md`'s *"Frontend has no contract file"*
+  rule is amended to name the exception rather than be quietly contradicted.
+- **The Admin Portal doc now says what it is built with.** `docs/frontend/admin-portal/`
+  documented delivery, exposure and the trust boundary but never the stack. A
+  short table now carries React 19 · TypeScript strict · Vite, the four TanStack
+  libraries, Tailwind v4 + shadcn/ui and `keycloak-js`, then links
+  [ADR-049](docs/proposals/adr/ADR-049-admin-portal-tanstack-spa/) for the
+  authority table instead of copying it. Two properties are called out because
+  they are platform-visible: **tokens live in memory only** — verified, the
+  source contains no `localStorage`, `sessionStorage` or `document.cookie`, so a
+  reload re-runs the Authorization Code flow — and pagination, sort and filter
+  are all server-side, which is why every `/protected/` list route takes
+  pagination parameters.
+
 - **The gate run found five things wrong with the gates themselves.** All fixed
   here. **(1) `make e2e` ran its targets in the wrong order, and it failed on both
   gates** — `e2e-smoke` before `e2e-saga`, while smoke's C6/K5.2 asserts all ten
@@ -2076,6 +2107,14 @@ Skeleton (copy what you need):
   neither cap, so neither exhausted branch was reachable from a request.
 
 #### Docs
+
+- **Seven links to `api.md`'s protected-route section were dead.** The heading read
+  *"Protected route conventions **(planned)**"* while its own first line said
+  **"Status: live"** — so the real anchor was `#protected-route-conventions-planned`,
+  and six files linked the plain form. Dropped `(planned)` from the heading, which
+  matches what the section already claimed and makes those six resolve; the one
+  file that had linked the `-planned` form was repointed. Found while adding a
+  seventh link from `admin.md`.
 
 - **The docs index stopped being a second, stale record index.** `docs/README.md`
   enumerated **19 ADRs and 7 RFCs** and then stopped dead at ADR-021 — while

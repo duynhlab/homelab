@@ -390,7 +390,7 @@ An idempotency key identifies one logical command, not one network attempt.
 Checkout, order, and payment have additional crash-recovery rules described in
 their service documents.
 
-### Protected route conventions (planned)
+### Protected route conventions
 
 **Status: live** — [RFC-0023](../proposals/rfc/RFC-0023/) /
 [ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/). The

@@ -74,10 +74,10 @@ spec:
           # OTLP logs sink (RFC-0014 P4): the 10 Go services' + 2 workers' otelzap tee posts
           # OTLP logs here; re-export to VictoriaLogs. VL-Stream-Fields makes
           # service.name the log-stream identity; trace_id stays a queryable
-          # regular field. Envoy Gateway access logs arrive here too since
-          # ADR-060 (service.name=platform.envoy-gateway); their JSON keys are
-          # log-record ATTRIBUTES, not a body, so VictoriaLogs shows no _msg for
-          # them -- query by stream, not free text.
+          # regular field. The edge's access logs do NOT land here anymore:
+          # ADR-061 made them ClickHouse-only (filter/drop_edge_logs in the
+          # logs/victorialogs pipeline) — they were attributes-only records
+          # (no _msg) that LogsQL free-text could never see anyway.
           logs_endpoint: http://vlsingle-victoria-logs.monitoring.svc.cluster.local:9428/insert/opentelemetry/v1/logs
           headers:
             VL-Stream-Fields: "service.name"
@@ -148,6 +148,17 @@ spec:
           send_batch_max_size: 1024
           send_batch_size: 512
           timeout: 5s
+        # ADR-061: the edge's access logs are ClickHouse-only. They are
+        # attributes-only records (no body -> useless to LogsQL free-text) and
+        # the noisiest OTLP log stream, while every real question about them is
+        # analytical (status dist, latency percentiles, JOIN otel_traces on
+        # TraceId). This filter sits ONLY in the logs/victorialogs pipeline;
+        # logs/clickhouse keeps receiving everything. Edge *runtime* logs reach
+        # VictoriaLogs via a dedicated Vector source instead (same ADR).
+        filter/drop_edge_logs:
+          error_mode: ignore
+          log_conditions:
+            - resource.attributes["service.name"] == "platform.envoy-gateway"
         memory_limiter:
           # Bumped for the RFC-0019 clickhouse exporter (4th trace + 2nd log sink);
           # keep headroom below resources.limits.memory (1Gi) so backpressure trips
@@ -181,9 +192,26 @@ spec:
             - batch
             receivers:
             - otlp
+          # ADR-061: the single dual-export logs pipeline is split so the edge's
+          # access logs can be dropped from the VictoriaLogs leg only. The otlp
+          # receiver fans out to both pipelines; each gets its own copy.
+          # DELIBERATELY keeps the key name `logs` for the VictoriaLogs leg:
+          # the chart ships a default `logs` pipeline (exporters: [debug]) and
+          # helm deep-merges values over defaults — dropping the key would
+          # resurrect the default pipeline (and helm's null-removal is buggy as
+          # a subchart, see the chart's own values.yaml note on helm#12879).
+          # Same-key shadowing is how `metrics` and `traces` below already work.
           logs:
             exporters:
             - otlp_http/victorialogs
+            processors:
+            - memory_limiter
+            - filter/drop_edge_logs
+            - batch
+            receivers:
+            - otlp
+          logs/clickhouse:
+            exporters:
             - clickhouse
             processors:
             - memory_limiter

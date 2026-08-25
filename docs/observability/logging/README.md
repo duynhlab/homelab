@@ -5,17 +5,21 @@ The **logs pillar** of the platform — the "**why is it broken?**" signal
 profiles "which line of code?"; see [`../README.md`](../README.md)). Logs reach
 VictoriaLogs by **two complementary paths**: instrumented Go services ship over
 **OTLP** (otelzap → OpenTelemetry Collector), and everything not OTel-instrumented
-(databases, the frontend, system pods) is tailed by **Vector**. The edge left that road in
-ADR-060 — see [Edge access logs](#edge-access-logs-two-sinks-one-road).
-Both land in **VictoriaLogs**, queryable with LogsQL and correlated to traces by
-`trace_id`. The OTLP path additionally writes to **ClickHouse** `otel_logs` — a second
-store on purpose, for 90-day SQL ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/));
-see [ClickHouse](../clickhouse/README.md).
+(databases, the frontend, system pods, the edge's *runtime* lines) is tailed by
+**Vector**. Both land in **VictoriaLogs**, queryable with LogsQL and correlated
+to traces by `trace_id`. The app-log OTLP path additionally writes to
+**ClickHouse** `otel_logs` — a second store on purpose, for 90-day SQL
+([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)); see
+[ClickHouse](../clickhouse/README.md). The one stream that does **not** follow
+this shape is the edge's **access log**: it is ClickHouse-**only**
+([ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) — see
+[Edge logs](#edge-logs-adr-061-access--clickhouse-runtime--victorialogs).
 
 | | |
 |---|---|
-| **App-log path** | otelzap tee → OTLP (`otlploghttp`) → **OpenTelemetry Collector** → VictoriaLogs (fleet-wide since RFC-0014 P4) |
-| **Infra-log path** | Vector — one cluster-wide **DaemonSet** (`kube-system`), `kubernetes_logs` source — DBs, PG `auto_explain`, frontend, system pods. **Not** the edge (ADR-060) → [`vector.md`](vector.md) |
+| **App-log path** | otelzap tee → OTLP (`otlploghttp`) → **OpenTelemetry Collector** → VictoriaLogs + ClickHouse (fleet-wide since RFC-0014 P4) |
+| **Infra-log path** | Vector — one cluster-wide **DaemonSet** (`kube-system`) — DBs, PG `auto_explain`, frontend, system pods, **edge runtime lines** (ADR-061) → [`vector.md`](vector.md) |
+| **Edge access log** | OTLP sink → Collector → **ClickHouse only** (90d, JOINs `otel_traces`) — filtered out of the VictoriaLogs leg ([ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) |
 | **Storage** | VictoriaLogs **VLSingle** `:9428` (`monitoring`, VM Operator CRD) — 7-day retention, 20Gi PVC → [`victorialogs.md`](victorialogs.md) |
 | **Query** | LogsQL → [`logsql-guide.md`](logsql-guide.md) |
 | **Visualization** | Grafana — `victorialogs` datasource (`victoriametrics-logs-datasource`) |
@@ -50,7 +54,9 @@ The platform has **two log paths**, and the OTLP one lands in **two stores**:
   the frontend, and system pods — is tailed by a single **Vector** DaemonSet and
   shipped over the jsonline endpoint. Vector explicitly **excludes the app pods
   and the Envoy pods** (all of them carry `platform.duynhlab.dev/otlp-logs=true`),
-  so the two paths never double-ingest.
+  so the two paths never double-ingest. One deliberate carve-out (ADR-061): a
+  dedicated Vector source tails the proxy pods again for their **runtime lines
+  only** — access-log JSON is filtered out because it travels the OTLP road.
 
 VictoriaLogs is the **ops** log backend and the only one Vector writes to (Loki was
 removed). It is **not** the only log store: the collector's `logs` pipeline also exports to
@@ -70,15 +76,16 @@ flowchart LR
     end
     subgraph infra["Non-instrumented workloads"]
         CNPG["CloudNativePG<br/>auto_explain plans"]
-        EDGE["Envoy Gateway edge<br/>access log (JSON stdout)"]
+        EDGE["Envoy Gateway edge<br/>access log + runtime log"]
         FE["Frontend + system pods"]
     end
-    OTLP[/"OTLP logs :4318"/] --> COL[/"OpenTelemetry Collector<br/>logs pipeline"/]
-    CNPG --> VEC["Vector DaemonSet · kube-system<br/>(excludes app + edge pods)"]
+    OTLP[/"OTLP logs :4318"/] --> COL[/"OpenTelemetry Collector<br/>2 logs pipelines (ADR-061)"/]
+    CNPG --> VEC["Vector DaemonSet · kube-system<br/>(excludes app + edge pods;<br/>edge runtime carve-out)"]
     EDGE -->|"accessLog OTLP sink<br/>gRPC :4317 (ADR-060)"| COL
+    EDGE -->|"runtime lines only<br/>(ADR-061)"| VEC
     FE --> VEC
-    COL -->|"/insert/opentelemetry/v1/logs<br/>VL-Stream-Fields: service.name"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
-    COL -->|"native :9000<br/>otel_logs"| CH[("ClickHouse<br/>monitoring · 90d SQL")]
+    COL -->|"app logs only — edge filtered<br/>VL-Stream-Fields: service.name"| VL[("VictoriaLogs VLSingle :9428<br/>monitoring · 7d / 20Gi")]
+    COL -->|"everything · native :9000<br/>otel_logs"| CH[("ClickHouse<br/>monitoring · 90d SQL")]
     VEC -->|"/insert/jsonline"| VL
     VL --> GRAF{{"Grafana Explore<br/>(LogsQL)"}}
     CH --> GRAF
@@ -99,56 +106,63 @@ flowchart LR
     class GRAF platform;
 ```
 
-**Two paths, no double-ingest — and two stores on the OTLP leg.** App logs travel over OTLP; Vector
-handles only the workloads OTel can't instrument. Vector still runs two pipelines
-of its own — the *infra* pipeline (label + ship) and the *PostgreSQL* pipeline
-(extract `auto_explain` execution plans into their own stream) — and
+**Two paths, no double-ingest — and the edge routed by class.** App logs travel over OTLP; Vector
+handles the workloads OTel can't instrument. Vector runs three pipelines
+of its own — the *infra* pipeline (label + ship), the *PostgreSQL* pipeline
+(extract `auto_explain` execution plans into their own stream), and the
+*edge-runtime* carve-out (ADR-061) — and
 VictoriaLogs itself is the operator-managed `VLSingle` CRD (no Helm-chart
 collector is deployed), so Vector remains the single agent for that path. App pods are excluded from Vector by label
 (`platform.duynhlab.dev/otlp-logs=true`), which is the double-ingest guard.
 Pipeline internals live in [`vector.md`](vector.md); the store's ingest
 contracts and stream catalog live in [`victorialogs.md`](victorialogs.md).
 
-### Edge access logs (two sinks, one road)
+### Edge logs (ADR-061): access → ClickHouse, runtime → VictoriaLogs
 
-`EnvoyProxy.spec.telemetry.accessLog` declares **one format and two sinks**
-([ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/)):
+The edge is the one workload whose logs are **routed by class**
+([ADR-061](../../proposals/adr/ADR-061-edge-log-routing/), refining
+[ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/)):
 
-| Sink | Destination | Why it exists |
-|------|-------------|---------------|
-| `OpenTelemetry` | collector `:4317` → VictoriaLogs **and** ClickHouse | puts edge logs in the 90-day store, so SQL can relate edge behaviour to application spans on `trace_id` |
-| `File` | `/dev/stdout` | `kubectl logs` on the edge pod keeps working — the fallback that survives the collector being the broken thing |
+| Edge log class | Store | Path | Why |
+|---|---|---|---|
+| **Access log** (request records, TraceId) | **ClickHouse only** — 90d | `EnvoyProxy.spec.telemetry.accessLog` OTLP sink → collector `:4317`; `filter/drop_edge_logs` removes it from the VictoriaLogs pipeline | attributes-only records (no `_msg` → LogsQL free-text blind) whose every real question is SQL: status distributions, latency percentiles, `JOIN otel_traces ON TraceId` |
+| **Runtime log** (Envoy process: startup, config rejects, upstream warnings) | **VictoriaLogs** — 7d | dedicated Vector source scoped to the proxy pods, keeping only non-JSON lines → [`vector.md`](vector.md#pipeline) | the ops signal; before ADR-061 it was collected **nowhere** (the pod-level label exclusion silenced it) |
+| **stdout** (`File` sink) | no store | `kubectl logs` | the fallback that survives the collector being the broken thing |
 
-**Vector no longer tails the Envoy pods.** They carry
-`platform.duynhlab.dev/otlp-logs=true`, the selector Vector's `kubernetes_logs`
-source excludes. That label is load-bearing: remove it and VictoriaLogs silently
-holds every edge line twice. stdout keeps being *written* either way — Vector
-stops *reading*, which is why `kubectl logs` is unaffected.
+Three mechanics keep the split honest:
 
-**Successful probe traffic is dropped at the source.** A CEL `matches` filter
-on the same `settings[]` entry suppresses lines for `/health` / `/ready` paths
-and `kube-probe` user agents **answered 2xx** — the observability audit's
-biggest log-volume item, closed before the line is even written. It is
-deliberately conservative: a *failing* probe request still logs. So don't
-debug "my health checks don't appear in VictoriaLogs" — the successful ones
-are filtered on purpose, on both sinks (the filter sits beside the format, so
-stdout and OTLP always describe the same request set).
+- **One `settings[]` entry, one format, one filter, two sinks** — the `File`
+  and `OpenTelemetry` sinks share the JSON format and the CEL filter, so
+  stdout and OTLP always describe the same request set.
+- **Successful probe traffic is dropped at the source.** The CEL `matches`
+  filter suppresses `/health` / `/ready` / kube-probe lines **answered 2xx** on
+  both sinks; a *failing* probe still logs (measured: a 404 on `/health` landed).
+- **The label guard stays.** Proxy pods carry
+  `platform.duynhlab.dev/otlp-logs=true`, so Vector's main source never tails
+  them — the runtime carve-out is a second source whose filter keeps only
+  lines not starting with `{` (access logs are our declared JSON format;
+  runtime lines start `[ts][level][component]`). `spec.logging.level.default:
+  warn` is pinned so the now-collected runtime stream stays sparse.
 
-**Querying edge logs is not free-text.** The JSON format maps its keys to log
-record **attributes** rather than a body, so VictoriaLogs renders `_msg` as
-`missing _msg field` and a free-text search returns nothing. Query by stream:
+**Querying edge logs:**
 
-```logsql
-_stream:{"service.name"="platform.envoy-gateway"} _time:15m
+```sql
+-- Access logs: ClickHouse (Grafana → ClickHouse datasource / otel-logs-explorer)
+SELECT LogAttributes['status'] AS status, count() AS hits
+FROM otel.otel_logs
+WHERE ServiceName = 'platform.envoy-gateway' AND TimestampTime > now() - INTERVAL 1 HOUR
+GROUP BY status ORDER BY hits DESC
 ```
 
-Every field is there, plus `k8s.pod.name`, `k8s.namespace.name`, `cluster_name`
-and `log_name=otel_envoy_accesslog`, which Envoy Gateway attaches on its own.
+```logsql
+# Runtime logs: VictoriaLogs (stream service falls back to the proxy pod name)
+_stream:{pod_name=~"envoy-envoy-gateway.*"} _time:1h
+```
 
-Field names are a parse contract for Grafana panels: `time`, `client`,
+Access-log field names remain a parse contract (15 fields: `time`, `client`,
 `method`, `uri`, `status`, `response_flags`, `bytes`, `duration`,
 `upstream_time`, `upstream`, `upstream_cluster`, `route_name`, `host`,
-`request_id`, `user_agent`. Config:
+`request_id`, `user_agent`). Config:
 [`kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml`](../../../kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml).
 
 ## Why VictoriaLogs (and why not Loki / ELK)
@@ -284,13 +298,10 @@ blank-Grafana-panel case in
 
 ---
 
-_Last updated: 2026-08-25 — the area now matches its siblings: this README is the
-hub, and the ops half that used to be stitched below it moved to
-[`victorialogs.md`](victorialogs.md) (store) and [`vector.md`](vector.md)
-(pipeline), with a new [`logsql-guide.md`](logsql-guide.md). Accuracy fixes
-carried with the split: the example queries no longer address the retired `auth`
-service (and use the right stream field per path), the architecture diagram no
-longer draws the edge into Vector (its access log has gone OTLP→Collector since
-ADR-060 — the text said so, the arrow didn't), the edge section documents the
-CEL probe-drop filter, and the PVC-fill weakness names its inactive-on-Kind
-alert caveat._
+_Last updated: 2026-08-25 — ADR-061 routes the edge's logs by class: the access
+log is now **ClickHouse-only** (filtered out of the VictoriaLogs pipeline — it was
+an attributes-only record LogsQL free-text could never see, and the noisiest OTLP
+stream), while the proxy's **runtime** lines — previously collected nowhere — reach
+VictoriaLogs through a dedicated Vector source. Same day, earlier: the area was
+split into this hub + [`victorialogs.md`](victorialogs.md) + [`vector.md`](vector.md)
++ [`logsql-guide.md`](logsql-guide.md)._

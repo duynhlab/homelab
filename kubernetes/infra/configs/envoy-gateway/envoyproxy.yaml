@@ -72,6 +72,11 @@ spec:
     metrics:
       prometheus: {}
     accessLog:
+      # NOTE (ADR-061): these access logs are ClickHouse-only downstream — the
+      # collector's logs/victorialogs pipeline filters them out, and Envoy
+      # *runtime* logs are collected into VictoriaLogs by a dedicated Vector
+      # source instead. spec.logging below pins the runtime level now that
+      # those lines are actually stored.
       settings:
         # Structured JSON access log to stdout — Vector's DaemonSet tails pod
         # stdout to ship these lines. Field names cover the standard request
@@ -170,3 +175,11 @@ spec:
           environment:
             name: ENVOY_POD_NAMESPACE
             defaultValue: "envoy-gateway"
+  # ADR-061: pin the proxy runtime-log level explicitly. Unset, stdout carried
+  # [debug] lines; now that runtime lines are collected into VictoriaLogs (the
+  # dedicated Vector source), the volume is bounded at the source. warn is the
+  # documented ProxyLogging default — pinned so a future default change cannot
+  # silently flood the store.
+  logging:
+    level:
+      default: warn

@@ -262,6 +262,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ADR-061: the edge's logs are routed by class.** The access log — an
+  attributes-only record LogsQL free-text could never see, and the noisiest
+  OTLP stream (5,941 records/6h under a gate run) — is now **ClickHouse-only**:
+  a `filter/drop_edge_logs` OTTL condition in the collector's split
+  `logs/victorialogs` pipeline drops `service.name=platform.envoy-gateway`
+  while `logs/clickhouse` keeps receiving everything (90d, JOINs
+  `otel_traces` on TraceId). The proxy's **runtime** lines — previously
+  collected nowhere because the `otlp-logs=true` exclusion silenced the whole
+  pod — now reach VictoriaLogs via a dedicated Vector source (existence
+  selector on the owning-gateway label; filter keeps only non-`{` lines), and
+  `EnvoyProxy.spec.logging.level.default: warn` is pinned so the new stream
+  stays sparse. ADR-060's OTLP sink, File-sink fallback, and label guard are
+  unchanged. Gate-measured evidence in [ADR-061](docs/proposals/adr/ADR-061-edge-log-routing/)
+  § Verification and the implementing PR.
+
 - **The database IO layer is observable: pg_stat_io + sampled wait events.**
   The DB-monitoring audit found the deployed set strong (4 boards, 9 custom
   queries, ~25 alerts) with two real gaps — PG18's `pg_stat_io` (who does the

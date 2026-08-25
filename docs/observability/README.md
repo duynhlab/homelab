@@ -28,8 +28,8 @@ flowchart TB
     end
 
     subgraph nonSdk["Workloads without an OTel SDK"]
-        Infra["Databases · frontend<br/>edge access log · PG plans"]
-        Edge["Envoy Gateway edge<br/>telemetry.tracing"]
+        Infra["Databases · frontend<br/>PG plans · edge runtime lines"]
+        Edge["Envoy Gateway edge<br/>telemetry: tracing + accessLog"]
     end
 
     subgraph collectorNode["OpenTelemetry Collector"]
@@ -62,10 +62,10 @@ flowchart TB
     Services & Workers -->|"OTLP metrics · logs · traces"| Receiver
     Services & Workers -->|"pprof push"| Pyro
     Infra -->|"stdout / files"| Vector
-    Edge -->|"OTLP/gRPC :4317 spans"| Receiver
+    Edge -->|"OTLP/gRPC :4317<br/>spans + access logs"| Receiver
     Processors -->|"metrics"| VMAgent
-    Processors -->|"logs"| VLogs
-    Processors -->|"logs + traces"| CH
+    Processors -->|"app logs<br/>(edge filtered — ADR-061)"| VLogs
+    Processors -->|"all logs + traces"| CH
     Processors -->|"traces"| VT
     Vector -->|"JSON line ingest"| VLogs
     VMAgent -->|"remote write"| VMSingle
@@ -377,7 +377,7 @@ cluster-scoped CRDs would make upgrades ambiguous.
 | VictoriaTraces | monitoring | `vtsingle-victoria-traces` | 10428 | Trace store, 7d — OTLP HTTP ingest + the **Jaeger query API** Grafana reads |
 | OTel Collector | monitoring | `otel-collector-opentelemetry-collector` | 4317/4318 | OTLP ingress (gRPC + HTTP) — metrics (→ vmagent), logs (app tee → VictoriaLogs + ClickHouse), trace fan-out (VictoriaTraces + ClickHouse, incl. the edge's gRPC spans) — see [collector.md](opentelemetry/collector.md) |
 | VictoriaLogs | monitoring | `vlsingle-victoria-logs` | 9428 | Log storage and query (LogsQL, 7d ops tier — ClickHouse `otel_logs` is the 90d second store) |
-| Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, PG plans, frontend); app logs **and the edge's access log** go OTLP ([ADR-060](../proposals/adr/ADR-060-envoy-access-log-transport/)) |
+| Vector | kube-system | DaemonSet | -- | Log shipping for **non-instrumented** pods (DBs, PG plans, frontend) **+ the edge's runtime lines** ([ADR-061](../proposals/adr/ADR-061-edge-log-routing/)); app logs go OTLP, and the edge's access log is **ClickHouse-only** |
 | Pyroscope | monitoring | `pyroscope` | 4040 | Continuous profiling |
 | Sloth | monitoring | operator | -- | SLO-to-PrometheusRule generator |
 
@@ -459,8 +459,9 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-08-25 — VM Operator bumped to chart 0.67.2 / app v0.74.0:
-cluster VictoriaLogs converges with local-stack at v1.52.0, cluster VM moves to
-v1.148.0 (compose still deliberately ahead at v1.150.0), VTSingle's explicit
-v0.11.0 pin unaffected. Earlier (2026-08-24): trace sinks are **two**, not five —
-RFC-0027 retired Tempo (both installs) and Jaeger._
+_Last updated: 2026-08-25 — ADR-061: the edge's access log is ClickHouse-only
+(filtered from the VictoriaLogs pipeline) and its runtime lines are now collected
+by a dedicated Vector source; the topology diagram also stops drawing the edge
+access log through Vector (stale since ADR-060). Earlier the same day: VM Operator
+bumped to chart 0.67.2 / app v0.74.0 — cluster VictoriaLogs converges with
+local-stack at v1.52.0, VTSingle's explicit v0.11.0 pin unaffected._

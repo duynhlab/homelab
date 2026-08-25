@@ -114,7 +114,7 @@ What actually lands in the store, by stream identity:
 | Stream | Fields | Content |
 |---|---|---|
 | **App services** | `service.name` = `product`, `cart`, `checkout`, … + workers `order-worker`, `checkout-worker` | zapx JSON via otelzap tee → Collector; `trace_id` a regular field |
-| **Edge** | `service.name` = `platform.envoy-gateway` | Envoy access log via the Collector (ADR-060); attributes only, **no `_msg`** — see [hub § edge](README.md#edge-access-logs-two-sinks-one-road) |
+| **Edge runtime** | `namespace`, `service` (= proxy pod name), `pod_name`, `container_name` | Envoy *process* lines via the dedicated Vector source (ADR-061). The edge **access log is not in this store** — it is ClickHouse-only; see [hub § edge](README.md#edge-logs-adr-061-access--clickhouse-runtime--victorialogs) |
 | **Infra / everything else** | `namespace`, `service`, `pod_name`, `container_name` | Vector-tailed stdout: databases, frontend, system pods. `service` comes from the pod's `app` label (pod name as fallback) |
 | **PG query plans** | `cluster_name`, `namespace`, `database`, `query_id` | Parsed `auto_explain` execution plans (`plan_json` as message); requires `auto_explain.log_format: "json"` on the CNPG cluster (set on platform-db/product-db) — see [`vector.md § PostgreSQL pipeline`](vector.md#postgresql-pipeline) |
 | **PG parse failures** | `kubernetes.container_name`, `kubernetes.pod_name` | Records the plan parser dropped, for debugging the parser itself |

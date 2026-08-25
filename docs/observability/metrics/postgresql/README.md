@@ -7,8 +7,8 @@ runbooks for the platform database layer.
 |---|---|
 | Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`), DR `product-db-replica` |
 | Exporter | CNPG built-in `:9187` — prefix `cnpg_` on all series |
-| Custom queries | **9** SQL definitions per cluster ConfigMap |
-| Per-db scope | platform: auth, user, notification, shipping, review · product: product, cart, order |
+| Custom queries | **11** SQL definitions per cluster ConfigMap |
+| Per-db scope | platform: user, notification, shipping, review · product: product, cart, order |
 | **Not in per-db queries** | platform: temporal, temporal_visibility · product: payment, checkout |
 | Alerts | 53 rules — [alert catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Runbooks | [postgresql/](../../runbooks/postgresql/README.md) (one file per alert) |

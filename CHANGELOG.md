@@ -661,6 +661,19 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The auto_explain plan history has its incident runbook:**
+  [`plan-regression-investigation.md`](docs/observability/runbooks/postgresql/plan-regression-investigation.md)
+  — the cross-signal workflow the pipeline exists for: metrics
+  (`cnpg_pg_stat_statements_*`) name the queryid and the onset, the
+  VictoriaLogs plans stream shows the plan that query *actually ran at the
+  time* (same `queryid` — `compute_query_id` stamps both sides), and
+  `pg_stat_user_tables` confirms or clears stale statistics. States the
+  machine's honest limits: the 1s threshold records only the bad side of a
+  plan flip, and a fixed query *disappears* from the history. Every
+  PromQL/LogsQL/psql command executed live before landing; indexed from the
+  postgresql runbooks folder (new "Investigation workflows" section) and
+  linked from the Vector pipeline doc and the LogsQL guide.
+
 - **The logging area now matches its siblings — a hub plus sub-docs instead of
   one 534-line stitch.** `docs/observability/logging/README.md` keeps the
   architecture view (two paths, edge access logs, why VictoriaLogs, scaling);

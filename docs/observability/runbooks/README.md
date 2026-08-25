@@ -10,7 +10,7 @@ runbook links it via its `runbook_url` annotation.
 |---------|---------|-------------|
 | [Microservices runbooks](microservices/README.md) | Per-alert investigation (50 files) + cross-signal workflows, threshold tuning | On-call, when an application alert fires |
 | [Envoy Gateway runbooks](envoy-gateway/README.md) | Per-alert investigation for the edge (9 files covering 11 `Edge*` / `EnvoyGateway*` alerts) | On-call, when an edge alert fires |
-| [PostgreSQL runbooks](postgresql/README.md) | Per-alert CNPG runbooks (chart + deep-signal), 33 files | On-call, when a PostgreSQL/CNPG alert fires |
+| [PostgreSQL runbooks](postgresql/README.md) | Per-alert CNPG runbooks (chart + deep-signal), 33 files, + the [plan-regression investigation workflow](postgresql/plan-regression-investigation.md) | On-call, when a PostgreSQL/CNPG alert fires — or a query got slower and you need the plan it ran at the time |
 | [Kubernetes runbooks](kubernetes/README.md) | Per-alert investigation for pods, workloads, storage, nodes, API server, network (21 files) | On-call, when a Kubernetes infra alert fires |
 | [Valkey runbooks](valkey/README.md) | Per-alert investigation for the cache (7 files) | On-call, when a Valkey alert fires |
 | [Kyverno runbooks](kyverno/README.md) | Per-alert investigation for the admission webhook (4 files) | On-call, when a Kyverno alert fires |

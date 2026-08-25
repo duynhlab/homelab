@@ -53,6 +53,14 @@ alerts, and operator health. One file per alert name — each file covers both
 | CNPGIdleInTransaction | warning | deep-signal | active | [CNPGIdleInTransaction.md](CNPGIdleInTransaction.md) |
 | CNPGInstanceMetricsAbsent | — | chart upstream | not deployed | — |
 
+## Investigation workflows
+
+Cross-signal procedures that are not tied to one alert:
+
+| Workflow | Question it answers | Entry |
+|---|---|---|
+| [Plan regression investigation](plan-regression-investigation.md) | "This query got 10× slower — what plan did it run *at the time*, and why did it flip?" | latency/SLO alerts with a slow DB span, `CNPGAutovacuumFallingBehind`, or manual |
+
 ## Template
 
 New runbooks follow the canonical [`../_TEMPLATE.md`](../_TEMPLATE.md) — one

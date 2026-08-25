@@ -96,6 +96,9 @@ output — the execution plan of every query slower than `1s`, logged by the
 server itself — into a dedicated, queryable VictoriaLogs stream keyed by
 `cluster_name` / `database` / `query_id`. This section walks the record through
 every hop, because two format contracts have to hold for it to work at all.
+What the stream is **for** — the 2am "this query got 10× slower, what plan did
+it run at the time?" investigation — is the
+[plan-regression runbook](../runbooks/postgresql/plan-regression-investigation.md).
 
 ### The two format contracts
 

@@ -65,6 +65,21 @@ spec:
             - "**/*.tmp"
             - "**/*.log.*"
             - "**/containers/*/checkpoints/**"
+        # ADR-061: the proxy pods are excluded from kubernetes_logs above (they
+        # carry otlp-logs=true), which also silenced Envoy's *runtime* logs —
+        # startup, config rejects, upstream warnings had no collector at all.
+        # This source tails ONLY the EG proxy pods (existence selector on the
+        # owning-gateway label — app pods never match it) and the
+        # filter_envoy_runtime transform keeps just the runtime lines.
+        envoy_proxy_logs:
+          type: kubernetes_logs
+          extra_field_selector: ""
+          extra_label_selector: "gateway.envoyproxy.io/owning-gateway-name"
+          exclude_paths_glob_patterns:
+            - "**/*.gz"
+            - "**/*.tmp"
+            - "**/*.log.*"
+            - "**/containers/*/checkpoints/**"
         internal_metrics:
           type: internal_metrics
 
@@ -73,12 +88,29 @@ spec:
       # ========================================================================
       transforms:
         # ----------------------------------------------------------------------
+        # Transform: filter_envoy_runtime (ADR-061) — keep only Envoy RUNTIME
+        # lines from the proxy pods. The discriminator is the access-log format
+        # contract we declare in configs/envoy-gateway/envoyproxy.yaml: access
+        # logs are JSON and always start with "{"; runtime lines always start
+        # with "[ts][level][component]". Access logs already travel OTLP →
+        # ClickHouse, so letting a "{" line through here would double-store it.
+        # ----------------------------------------------------------------------
+        filter_envoy_runtime:
+          type: filter
+          inputs:
+            - envoy_proxy_logs
+          condition: '!starts_with(string!(.message), "{")'
+
+        # ----------------------------------------------------------------------
         # Transform: add_labels (stream fields for VictoriaLogs)
         # ----------------------------------------------------------------------
         add_labels:
           type: remap
           inputs:
             - kubernetes_logs
+            # ADR-061: edge runtime lines get the same stream fields; their
+            # `service` falls back to pod_name (proxy pods carry no `app` label).
+            - filter_envoy_runtime
           source: |
             # Extract service from kubernetes.pod_labels.app
             if exists(.kubernetes.pod_labels."app") {

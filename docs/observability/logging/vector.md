@@ -5,12 +5,13 @@ DaemonSet that tails the stdout of everything **not** OTel-instrumented —
 databases (including parsed PostgreSQL `auto_explain` plans), the frontend, and
 system pods — and ships it to [VictoriaLogs](victorialogs.md). App pods and the
 Envoy edge ship their own logs over OTLP and are excluded here by label
-([hub](README.md#overview)).
+([hub](README.md#overview)), with one deliberate carve-out since ADR-061: a
+dedicated source tails the proxy pods again for their **runtime lines only**.
 
 | | |
 |---|---|
 | **Deployment** | Helm chart `vector` `0.57.0`, `role: Agent` (DaemonSet), ns `kube-system` |
-| **Source** | `kubernetes_logs` with `extra_label_selector: platform.duynhlab.dev/otlp-logs!=true` |
+| **Sources** | `kubernetes_logs` (`extra_label_selector: platform.duynhlab.dev/otlp-logs!=true`) + `envoy_proxy_logs` (ADR-061: proxy pods only, runtime lines only) |
 | **Sinks** | 3 × VictoriaLogs jsonline (`all`, `pg_plans`, `pg_parse_failures`) + `prometheus_exporter` `:9090` |
 | **Resources** | requests `20m` / `32Mi`, limits `200m` / `256Mi` |
 | **Self-monitoring** | `podMonitor` → VMPodScrape → VMAgent; Grafana dashboard `21954` (provisioned) |
@@ -38,12 +39,23 @@ that *can't* do that. Two configuration decisions make the split safe:
   pinned there). The gateway access log — the first thing you reach for when a
   route misbehaves — never reached VictoriaLogs, while the Envoy *control-plane*
   pod on a worker was collected normally and masked the gap.
+- **The edge-runtime carve-out (ADR-061).** The label exclusion silenced Envoy's
+  *runtime* logs along with the access log — but only the access log has an
+  OTLP sink, so runtime warnings were collected nowhere. A second
+  `kubernetes_logs` source (`envoy_proxy_logs`) selects **only** the proxy pods
+  via an existence selector on `gateway.envoyproxy.io/owning-gateway-name`
+  (app pods never match it), and `filter_envoy_runtime` keeps only lines not
+  starting with `{` — access logs are our declared JSON format and travel
+  OTLP → ClickHouse, so a `{` line here would be a double-store.
 
 ## Pipeline
 
 ```mermaid
 flowchart LR
     K8S["Node stdout<br/>(pods without otlp-logs=true)"] --> SRC[/"kubernetes_logs source"/]
+    EGP["Proxy pod stdout<br/>(otlp-logs=true)"] --> ESRC[/"envoy_proxy_logs source<br/>(ADR-061)"/]
+    ESRC --> ERT["filter_envoy_runtime<br/>keep lines not starting {"]
+    ERT --> AL
     SRC --> AL["add_labels<br/>stream fields + level"]
     SRC --> PJ["parse_pg_json<br/>CNPG postgres containers"]
     PJ --> FAE["filter_pg_auto_explain<br/>keep lines containing plan:"]
@@ -57,8 +69,8 @@ flowchart LR
     classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    class K8S external;
-    class SRC,AL,PJ,FAE,PAE,IM collector;
+    class K8S,EGP external;
+    class SRC,ESRC,ERT,AL,PJ,FAE,PAE,IM collector;
     class ALL,PLANS,FAILS,VL log;
     class PE,VM metric;
 ```
@@ -68,6 +80,7 @@ flowchart LR
 | Transform | Type | What it does |
 |---|---|---|
 | `add_labels` | remap | Builds the stream fields: `service` from the pod's `app` label (pod name as fallback, `"system"` last resort), `namespace`, `pod_name`, `container_name`; keeps `stream` (stdout/stderr) as a regular field; parses the message as JSON to lift `level` when present |
+| `filter_envoy_runtime` | filter | ADR-061: from the `envoy_proxy_logs` source, keeps only Envoy *runtime* lines (`!starts_with(.message, "{")`) — the access-log JSON travels OTLP → ClickHouse instead |
 | `parse_pg_json` | remap | For CNPG `postgres` containers (label `cnpg.io/cluster`): parses the CloudNativePG JSON wrapper into `.log` |
 | `filter_pg_auto_explain` | filter | Keeps only records whose `log.record.message` contains `plan:` — the `auto_explain` signature |
 | `parse_pg_auto_explain` | remap | Extracts the execution plan and its metadata (below); `drop_on_error` + `reroute_dropped` sends parse failures to their own sink instead of losing them |
@@ -321,10 +334,10 @@ Query-side symptoms (logs ingested but blank in Grafana) are
 
 ---
 
-_Last updated: 2026-08-25 — split out of the logging README, then the PostgreSQL
-pipeline section was rebuilt hop-by-hop after a live audit found the pipeline
-broken: `auto_explain.log_format` was unset (PG default `text`), so every plan
-failed the JSON parse and landed in the `pg_parse_failures` sink — 0 plans vs 8
-failures over 6h. The parameter is now set on platform-db/product-db and the
-section documents both format contracts, the parser walk, and the failure path;
-the troubleshooting checklist was reordered to root-cause order._
+_Last updated: 2026-08-25 — ADR-061 adds the edge-runtime carve-out: a second
+`kubernetes_logs` source scoped to the EG proxy pods whose filter keeps only
+non-JSON runtime lines (the access log is ClickHouse-only now). Earlier the same
+day: the PostgreSQL pipeline section was rebuilt hop-by-hop after a live audit
+found `auto_explain.log_format` unset — every plan had been failing the JSON
+parse into the `pg_parse_failures` sink; the parameter is now set and the
+troubleshooting checklist runs in root-cause order._

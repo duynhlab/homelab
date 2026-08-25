@@ -44,7 +44,7 @@ record's *shape* differs too:
 | You want logs from… | Path | Query by | Severity field |
 |---|---|---|---|
 | A Go service (`product`, `cart`, `checkout`, …) or worker (`order-worker`, `checkout-worker`) | OTLP (otelzap → Collector) | `_stream:{"service.name"="checkout"}` | `severity_text` (`error`, `warn`, …) |
-| The Envoy edge | OTLP (ADR-060) | `_stream:{"service.name"="platform.envoy-gateway"}` | none — access logs carry `status` instead (`severity_text` reads `Unspecified`) |
+| The Envoy edge — **runtime lines** (access logs are ClickHouse-only, [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) | Vector (dedicated source) | `_stream:{pod_name=~"envoy-envoy-gateway.*"}` | `level` (when the line parses) |
 | A database, the frontend, a system pod | Vector | `_stream:{namespace="product"}` or `_stream:{service="frontend"}` (`service` = the pod's `app` label) | `level` (lifted from the JSON message when present) |
 | PostgreSQL `auto_explain` plans | Vector (PG pipeline) | `_stream:{cluster_name="product-db"}` — fields: `cluster_name`, `namespace`, `database`, `query_id` | none — these are plans, not messages |
 
@@ -204,54 +204,38 @@ _stream:{"service.name"!=""} _time:6h | uniq by (severity_text) with hits
 _time:6h | stats by ("service.name") count() as n | sort by (n desc) | limit 10
 ```
 
-### Edge (Envoy access logs — attributes, no `_msg`)
+### Edge (ADR-061: access logs in ClickHouse, runtime lines here)
 
-Edge records carry attributes but **no `_msg`**
-([hub § edge](README.md#edge-access-logs-two-sinks-one-road)) — free-text
-returns nothing; always address the stream and its fields. Successful probe
-traffic is CEL-filtered at the source, so don't look for healthy `/health` hits.
+Since [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/) the edge's
+**access logs are not in VictoriaLogs** — they are ClickHouse-only, where the
+questions they answer live (SQL aggregations + `JOIN otel_traces ON TraceId`;
+[hub § edge](README.md#edge-logs-adr-061-access--clickhouse-runtime--victorialogs)).
+One representative SQL (Grafana → ClickHouse datasource / otel-logs-explorer):
 
-**Status distribution** (this cluster during a k6 run: 4890×200, 853×429):
-
-```logsql
-_stream:{"service.name"="platform.envoy-gateway"} _time:6h
-  | stats by (status) count() as hits | sort by (hits desc)
+```sql
+SELECT LogAttributes['status'] AS status, count() AS hits
+FROM otel.otel_logs
+WHERE ServiceName = 'platform.envoy-gateway' AND TimestampTime > now() - INTERVAL 1 HOUR
+GROUP BY status ORDER BY hits DESC
 ```
 
-**Who is being rate-limited** (429 by client IP):
+What VictoriaLogs **does** hold for the edge (both on the Vector path):
+
+**Proxy runtime lines** — Envoy process warnings/errors (startup, config
+rejects, upstream trouble), collected since ADR-061; `service` falls back to
+the pod name:
 
 ```logsql
-_stream:{"service.name"="platform.envoy-gateway"} status:429 _time:6h
-  | stats by (client) count() as hits | sort by (hits desc)
+_stream:{pod_name=~"envoy-envoy-gateway.*"} _time:1h
+
+# warnings and worse only
+_stream:{pod_name=~"envoy-envoy-gateway.*"} _msg:~"\[(warning|error|critical)\]" _time:6h
 ```
 
-**Edge latency percentiles** (`duration` is ms; long-lived streaming
-connections dominate `max`):
+**Controller (control-plane) lines** — the EG operator pod:
 
 ```logsql
-_stream:{"service.name"="platform.envoy-gateway"} _time:6h
-  | stats quantile(0.5, duration) p50, quantile(0.95, duration) p95, max(duration) max_ms
-```
-
-**Hottest routes:**
-
-```logsql
-_stream:{"service.name"="platform.envoy-gateway"} _time:6h | top 5 (route_name)
-```
-
-**5xx by route** (route_name is the HTTPRoute's generated name):
-
-```logsql
-_stream:{"service.name"="platform.envoy-gateway"} status:>499 _time:1h
-  | stats by (route_name) count() as hits | sort by (hits desc)
-```
-
-**Derived fields with `math`** — slowest requests, duration in seconds:
-
-```logsql
-_stream:{"service.name"="platform.envoy-gateway"} _time:1h
-  | math duration / 1000 as duration_s
-  | fields _time, uri, status, duration_s | sort by (duration_s desc) | limit 10
+_stream:{namespace="envoy-gateway", container_name="envoy-gateway"} _time:1h
 ```
 
 ### Infra / Vector path (`level` works here)
@@ -345,8 +329,10 @@ curl -G 'http://localhost:9428/select/logsql/query' \
 3. **Only stream fields belong inside `_stream:{...}`.** A regular field there
    (e.g. `_stream:{level="error"}`) matches nothing — filter it outside:
    `_stream:{...} level:error`.
-4. **Edge logs have no `_msg`.** VictoriaLogs renders `missing _msg field`;
-   query by stream + attributes, never free text.
+4. **Edge access logs are not in this store at all** ([ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) —
+   `_stream:{"service.name"="platform.envoy-gateway"}` returns nothing new;
+   query ClickHouse for request records. VictoriaLogs holds only the edge's
+   *runtime* and controller lines.
 5. **pgaudit's `logger` is inside the JSON text, not a field.** Use a word
    filter (`"pgaudit"`) or `unpack_json` — see the recipe above.
 6. **Substring filters are case-sensitive** (`*Error*` ≠ `*error*`); word

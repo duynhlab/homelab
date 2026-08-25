@@ -334,7 +334,12 @@ const UNITS = [
         // No `_seconds` in this name. The Go SDK emits it without, and the
         // query that asked for the longer name reported NO SERIES on every run
         // -- indistinguishable from a dead exporter.
-        ['Temporal SDK', 'count(temporal_workflow_endtoend_latency_bucket)'],
+        // Both spellings: the Go SDK renamed the family with a _seconds
+        // suffix, and the two workers currently straddle SDK versions —
+        // task_execution shows BOTH names live, endtoend only the new one.
+        // Asserting one spelling makes the row flap with worker restarts
+        // (caught 2026-08-25: two identical 14/15 runs on a green stack).
+        ['Temporal SDK', 'count(temporal_workflow_endtoend_latency_bucket or temporal_workflow_endtoend_latency_seconds_bucket)'],
         ['edge Envoy stats', 'sum(envoy_http_downstream_rq_total)'],
         // The connector leg. Derived from spans by the collector rather than
         // emitted by an SDK, so it is the one leg that survives an SDK metrics

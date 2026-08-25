@@ -1798,6 +1798,17 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### GitOps
+
+- **RustFS memory limit 1Gi → 2Gi — the 422s came back, as OOM this time.**
+  Live on 2026-08-25: RustFS OOMKilled in a loop (Last State) while its
+  scanner swept the accumulated `pyroscope-profiles` segment folders during a
+  Pyroscope upload burst; every restart dropped the segment-writer's uploads
+  and every Go service's pyroscope client logged 422 "service is unavailable"
+  — the same symptom the manifest's comment trail already records twice for
+  CPU. 2Gi held through a full e2e gate after a live bump (steady-state
+  ~520Mi, spikes past 1Gi).
+
 #### Local-stack
 
 - **Two stale claims in the local-stack tree, and the one runbook step that

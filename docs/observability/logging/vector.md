@@ -219,8 +219,11 @@ parser is telling you which contract broke.
 **pgaudit** rows (`pgaudit.log = 'ddl, write'`, enabled on all CNPG clusters)
 take the ordinary path instead: they are CNPG-JSON like everything else from the
 `postgres` container but contain no `plan:`, so they flow through `add_labels` →
-`victorialogs_all` carrying `logger: pgaudit`. There are **no per-cluster logging
-sidecars** — one DaemonSet covers audit rows and plans alike.
+`victorialogs_all` **unparsed** — the CNPG envelope (with its
+`"logger":"pgaudit"` key) is the stored `_msg`, surfaced at query time via
+`unpack_json` ([recipe](logsql-guide.md#pgaudit-rides-the-infra-stream-as-raw-cnpg-json)).
+There are **no per-cluster logging sidecars** — one DaemonSet covers audit rows
+and plans alike.
 
 ## Self-monitoring
 

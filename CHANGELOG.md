@@ -2135,6 +2135,20 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Two logging field-contract claims matched nothing when actually run.**
+  Re-executing every logsql-guide query against the live cluster caught them:
+  app-path (OTLP) records carry `severity_text` per the OTel LogRecord model —
+  there is no `level` field on that path, so the guide's and hub's
+  `_stream:{"service.name"=…} level:error` examples returned zero rows
+  (corrected to `severity_text:error`; `level` remains correct on the Vector
+  path); and pgaudit's `logger` is a key *inside* the raw CNPG `_msg`, not a
+  queryable field, so `logger:pgaudit` also returned zero rows (corrected to a
+  word filter + `unpack_json | filter logger:=pgaudit`, verified to surface
+  `record.audit.command`/`statement`). The guide itself grew from a first cut
+  to per-stream-family recipes with the full pipe/stats table (`top`, `first`,
+  `unpack_json`, `extract`, `math`, `stream_context`, `quantile`,
+  `count_uniq`) — every recipe executed on the cluster before landing.
+
 - **The root README's Local access table listed 7 of the 17 live hostnames.**
   Rebuilt from the deployed HTTPRoutes: adds the observability UIs (vmui,
   vmalert, karma, logs, victoriatraces, pyroscope, slo) and infra UIs (source →

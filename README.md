@@ -254,12 +254,29 @@ TLS is a wildcard `*.duynh.me` cert — self-signed `homelab-ca` on local Kind
 | URL | Purpose |
 |-----|---------|
 | https://local.duynh.me | Storefront SPA |
+| https://backoffice.duynh.me | Back-office portal |
 | https://gateway.duynh.me | API gateway |
 | https://id.duynh.me | Keycloak (OIDC) |
-| https://backoffice.duynh.me | Back-office portal |
-| https://grafana.duynh.me | Dashboards |
+| https://grafana.duynh.me | Grafana dashboards |
+| https://vmui.duynh.me | VictoriaMetrics VMUI (metrics) |
+| https://vmalert.duynh.me | VMAlert (alerting + recording rules) |
+| https://karma.duynh.me | Karma (Alertmanager dashboard) |
+| https://logs.duynh.me | VictoriaLogs (LogsQL) |
+| https://victoriatraces.duynh.me | VictoriaTraces (traces) |
+| https://pyroscope.duynh.me | Pyroscope (profiling) |
+| https://slo.duynh.me | Sloth UI (SLOs) |
 | https://temporal.duynh.me | Temporal UI |
-| https://ui.duynh.me | Flux UI |
+| https://ui.duynh.me | Flux Operator UI |
+| https://source.duynh.me | RustFS (S3 object store) |
+| https://openbao.duynh.me | OpenBAO UI |
+| https://kyverno.duynh.me | Policy Reporter UI (Kyverno) |
+
+Four MCP hosts (`flux-mcp` / `grafana-mcp` / `vl-mcp` / `vm-mcp .duynh.me`)
+are declared in `routes/mcp.yaml` but **not deployed** — the `mcp-local`
+Kustomization is commented out. `tempo.duynh.me` and `jaeger.duynh.me` are
+retired (RFC-0027). Re-grep
+[`kubernetes/infra/configs/envoy-gateway/routes/`](kubernetes/infra/configs/envoy-gateway/routes/)
+rather than trusting this table's count.
 
 Demo login: `alice` / `password123` (by username).
 

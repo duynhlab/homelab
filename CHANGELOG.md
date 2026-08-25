@@ -2135,6 +2135,13 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The root README's Local access table listed 7 of the 17 live hostnames.**
+  Rebuilt from the deployed HTTPRoutes: adds the observability UIs (vmui,
+  vmalert, karma, logs, victoriatraces, pyroscope, slo) and infra UIs (source →
+  RustFS, openbao, kyverno → Policy Reporter); notes the four MCP hosts as
+  declared-but-not-deployed (`mcp-local` commented out) and tempo/jaeger as
+  retired (RFC-0027).
+
 - **The Vector PostgreSQL-pipeline section is now a hop-by-hop deep dive.**
   Rebuilt from the audit above: the two format contracts (CNPG JSON envelope +
   `auto_explain.log_format: json`), a sequence diagram of the record through

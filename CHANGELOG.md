@@ -3213,6 +3213,18 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **VM Operator chart 0.66.2 → 0.67.2 (app v0.73.1 → v0.74.0) — the cluster's
+  VictoriaLogs converges with local-stack.** The operator's embedded defaults
+  move VLSingle v1.51.0 → **v1.52.0** (the LogsQL bare-filter-pipe fix the
+  compose pin has carried all along) and VMSingle/VMAgent/VMAlert v1.147.0 →
+  v1.148.0 (compose stays deliberately ahead at v1.150.0). Verified against
+  the chart artifacts, not release notes: the 0.66.2→0.67.2 CRD diff is
+  additive only — one new `VLDistributed` CRD and a `networkPolicy` field on
+  `VLSingle` (still no `removePvcAfterDelete`, so its earlier removal stands);
+  no values-schema breaks (the v0.66.0 converter-env change was already
+  crossed). The explicit `VTSingle` v0.11.0 pin outranks the operator's
+  v0.10.0 default by design and does not move.
+
 - **The VictoriaMetrics family moves as one reviewed set** (#731, #732, #733,
   #807, #808): victoria-metrics + vmagent + vmalert **v1.150.0**,
   victoria-logs **v1.52.0**, victoria-traces **v0.9.4 → v0.11.0** (the CR and

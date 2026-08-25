@@ -133,10 +133,10 @@ _time:5m | stats
   max(duration) max_ms
 ```
 
-> **Version note:** the cluster runs VictoriaLogs `v1.51.0`, which rejects
-> *bare filter pipes* — write `| filter host:*foo*` with the explicit `filter`
-> keyword, not `| host:*foo*`. local-stack's `v1.52.0` accepts both
-> ([component inventory](../README.md#component-inventory)).
+> **Style note:** both the cluster and local-stack run VictoriaLogs
+> `v1.52.0`+, which accepts *bare filter pipes* (`| host:*foo*`) — this guide
+> still writes the explicit `filter` keyword because it reads unambiguously
+> and survives older versions ([component inventory](../README.md#component-inventory)).
 
 ## Recipes
 

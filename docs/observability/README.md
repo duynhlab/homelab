@@ -344,22 +344,26 @@ trace pilot remains explicit so a future operator bump cannot move it silently.
 
 | Layer | Version | Pin source |
 |-------|---------|------------|
-| VM Operator | chart `0.66.2`, app `v0.73.1` | Flux `OCIRepository` |
-| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.147.0`, local-stack `v1.150.0` | operator defaults on the cluster; the three compose images are pinned explicitly and now run **ahead** — see the skew note below |
-| VictoriaLogs (`VLSingle`) | cluster `v1.51.0`, local-stack `v1.52.0` | same shape: operator default vs the explicit compose image |
+| VM Operator | chart `0.67.2`, app `v0.74.0` | Flux `OCIRepository` |
+| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.148.0`, local-stack `v1.150.0` | operator defaults on the cluster; the three compose images are pinned explicitly and still run **ahead** — see the skew note below |
+| VictoriaLogs (`VLSingle`) | `v1.52.0` in both places | operator default on the cluster now matches the explicit compose image |
 | VictoriaTraces (`VTSingle`) | `v0.11.0` | explicit CR and local-stack image |
 | Grafana VM / VL datasources | `v0.25.2` / `v0.29.0` | Grafana CR and datasource CRs |
 | VM / VL MCP charts | `0.3.0` / `0.1.0` | Flux `OCIRepository` |
 
 **The local-stack VM images run ahead of the cluster on purpose.** The compose
 pins take upstream bugfixes as soon as they are gated here (v1.150.0 carries a
-vmagent persistent-queue corruption fix, v1.52.0 restores LogsQL bare-filter
-pipes that v1.51.0 rejected); the cluster follows whenever the VM operator's
-defaults move. The trace pilot stays in lockstep instead — `VTSingle` is pinned
-by an explicit CR, so `v0.11.0` is the version in both places.
+vmagent persistent-queue corruption fix); the cluster follows whenever the VM
+operator's defaults move — which is exactly how VictoriaLogs converged: the
+operator bump to v0.74.0 moved the cluster's default to v1.52.0 (the LogsQL
+bare-filter-pipe fix local-stack had pinned since v1.51.0 rejected them), so
+VL now matches in both places while VM remains ahead. The trace pilot stays in
+lockstep instead — `VTSingle` is pinned by an explicit CR, so `v0.11.0` is the
+version in both places regardless of the operator's own default (v0.10.0 as of
+v0.74.0).
 
-The standalone `victoria-metrics-operator-crds` chart `0.13.1` targets the
-same operator `v0.73.1`, but is not installed here: the operator chart already
+The standalone `victoria-metrics-operator-crds` chart targets the same
+operator version as the operator chart, but is not installed here: the operator chart already
 renders and upgrades its matching CRDs. Two Helm owners for the same
 cluster-scoped CRDs would make upgrades ambiguous.
 
@@ -455,6 +459,8 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-08-24 — trace sinks are **two**, not five: RFC-0027 retired Tempo (both
-installs) and Jaeger, so the Four Pillars row, the topology diagram, the component table and
-the port-forward all pointed at services that no longer exist._
+_Last updated: 2026-08-25 — VM Operator bumped to chart 0.67.2 / app v0.74.0:
+cluster VictoriaLogs converges with local-stack at v1.52.0, cluster VM moves to
+v1.148.0 (compose still deliberately ahead at v1.150.0), VTSingle's explicit
+v0.11.0 pin unaffected. Earlier (2026-08-24): trace sinks are **two**, not five —
+RFC-0027 retired Tempo (both installs) and Jaeger._

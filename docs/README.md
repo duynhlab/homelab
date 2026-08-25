@@ -23,18 +23,28 @@ docs/
 │   ├── shipping.md               # Tracking, quotes, shipment gRPC contract
 │   ├── checkout.md               # P1-P5 checkout subsystem; P6 planned
 │   ├── payments.md               # Payment contract, ledger, reconciliation
+│   ├── inventory.md              # Inventory gRPC contract — the sole stock authority
 │   ├── graceful-shutdown.md      # Cross-service shutdown contract (drain, timeouts)
-│   └── temporal.md # 3 Temporal workflows as built + saga vs 2PC + ops
+│   ├── caching.md                # Cache-Aside app contract: keys, TTLs, invalidation
+│   ├── pkg.md                     # Which shared Go modules exist and how they layer
+│   ├── workflows.md              # Temporal workflow registry: owners, workers, queues
+│   ├── temporal.md               # 3 Temporal workflows as built + saga vs 2PC + ops
+│   ├── observability.md          # What a service must emit, and where it lands
+│   ├── metrics.md                # App metric contract (names, labels, semconv)
+│   ├── logs.md                   # Structured log contract + trace correlation
+│   ├── tracing.md                # Span contract, propagation, sampling
+│   ├── profiling.md              # Profiling contract (pkg/obsx, Pyroscope labels)
+│   └── _template-service.md      # v2 template for a new service contract
 ├── proposals/                    # Design proposals & decisions
 │   ├── README.md                 # umbrella: ADR vs RFC + flow + links
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-016     # Temporal ×2, JWT-in-services (superseded), OpenBAO audit/HA, RS256+edge-auth, payment ledger, mockpay, saga authorize/capture, shared idempotency, detect-only recon, recon auto-heal, CNPG triplets ×3, OTel metrics cutover
+│   │   └── ADR-001 … ADR-060     # 60 records; status per record in the ADR index
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
-│   │   └── RFC-0001 … RFC-0021   # reserve number → research.md → README.md
+│   │   └── RFC-0001 … RFC-0027   # 26 records; reserve number → research.md → README.md
 ├── databases/                    # Database documentation
 │   ├── 002-database-integration.md               # PostgreSQL architecture
 │   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
@@ -144,11 +154,13 @@ docs/
 │   ├── runbooks/                 # Add, rotate, bootstrap, troubleshoot secrets
 │   └── cert-manager.md           # cert-manager + Let's Encrypt + trust-manager (§11 CA bundle)
 │                                 # (production hardening → README § Current boundaries + RFC-0008)
-└── security/                     # Admission control & network segmentation
-    ├── README.md                 # Security hub: the two fences (admission + network)
-    ├── policy-catalog.md         # Kyverno ClusterPolicy catalog (tiers, modes, NetworkPolicy generate)
-    ├── policy-exceptions.md      # PolicyException register (owner + TTL)
-    └── network-policies.md       # East-west NetworkPolicy caller matrix + topology diagram
+├── security/                     # Admission control & network segmentation
+│   ├── README.md                 # Security hub: the two fences (admission + network)
+│   ├── policy-catalog.md         # Kyverno ClusterPolicy catalog (tiers, modes, NetworkPolicy generate)
+│   ├── policy-exceptions.md      # PolicyException register (owner + TTL)
+│   └── network-policies.md       # East-west NetworkPolicy caller matrix + topology diagram
+└── testing/                      # Test strategy: the k6 assertion layer behind both E2E gates
+    └── k6.md                     # Suites, GATE=compose|kind, and which runbook row each asserts
 ```
 
 ---
@@ -392,37 +404,32 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [Temporal Workflows](./api/temporal.md) - the three workflows as built, saga-vs-2PC learning, Temporal infrastructure, and operations
 - [Checkout](./api/checkout.md) - Session orchestration, fully shipped (local-stack + cluster); the legacy order path was removed in RFC-0021 P5
 - [Payments](./api/payments.md) - Payment API, state machine, ledger, provider, and reconciliation
-- [RFC-0009: Production-grade API gateway (signed JWT + Kong edge auth)](./proposals/rfc/RFC-0009/) - Implemented (all six phases); supersedes ADR-003 via ADR-006. **Superseded in part** by [RFC-0022](./proposals/rfc/RFC-0022/) (Keycloak replaces the custom issuer) and [RFC-0024](./proposals/rfc/RFC-0024/) (Envoy Gateway replaces the Kong vehicle) — the defense-in-depth shape survives both
-- [RFC-0010: Payment service (PaymentIntent, ledger, charge/refund saga step)](./proposals/rfc/RFC-0010/) - Implemented; P1–P6 landed (ledger, outbox, mockpay, webhooks, saga wiring, reconciliation, cluster GitOps, frontend read path) → ADR-007…011
-- [RFC-0011: Homelab migration — Kind to bare-metal Talos](./proposals/rfc/RFC-0011/) - Provisional; 1 → 3 node HA path
-- [RFC-0012: Declarative CNPG role & database management](./proposals/rfc/RFC-0012/) - Implemented (P0–P4); per-service triplets on CNPG `DatabaseRole`/`Database` CRDs + pg_hba isolation
-- [RFC-0014: Full OpenTelemetry adoption](./proposals/rfc/RFC-0014/) - Implemented (live-cluster pod-kill drill pending); OTLP push for metrics/logs/traces + semconv naming, consumer tracking table
-- [RFC-0019: ClickHouse for OTel logs/traces SQL](./proposals/rfc/RFC-0019/) - Implemented (Phase B) — Collector→ClickHouse OLAP deployed in local-stack + cluster; Phase A commerce facts stays optional
-- [RFC-0021: Platform overhaul — inventory extraction, order aggregate, payment hardening](./proposals/rfc/RFC-0021/) - Implemented (P0–P7); supersedes RFC-0003. Inventory is the sole stock authority and product's stock is gone from code, contract and schema; order gained a status FSM with cancellation; payment can say it does not know. → ADR-027…031, ADR-033…037, [GameDay record](./proposals/rfc/RFC-0021/gameday.md)
-- [RFCs](./proposals/rfc/) - Propose & track substantial changes (process + index + backlog)
 
-### Decisions (ADRs)
+### Design records (RFCs and ADRs)
 
-- [ADR index](./proposals/adr/README.md) - Architecture Decision Records (the *why* behind significant choices)
-- [ADR-001: Adopt Temporal for order fulfillment](./proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/)
-- [ADR-002: Deploy Temporal via the operator](./proposals/adr/ADR-002-deploy-temporal-via-operator/)
-- [ADR-003: Keep JWT validation in services, not at Kong](./proposals/adr/ADR-003-jwt-validation-in-services-not-kong/) - **Superseded by ADR-006**
-- [ADR-004: Enable OpenBAO audit logging](./proposals/adr/ADR-004-enable-openbao-audit-logging/) - Accepted
-- [ADR-005: Run OpenBAO HA (Raft) instead of Vault dev mode](./proposals/adr/ADR-005-openbao-ha-raft/) - Accepted
-- [ADR-006: Adopt RS256 signed JWTs + Kong edge authentication](./proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) - Accepted; implements [RFC-0009](./proposals/rfc/RFC-0009/)
-- [ADR-007: Append-only double-entry payment ledger](./proposals/adr/ADR-007-double-entry-payment-ledger/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
-- [ADR-008: Run the mock payment provider as a standalone process](./proposals/adr/ADR-008-mockpay-standalone-provider/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
-- [ADR-009: Authorize payment early, capture late in the order saga](./proposals/adr/ADR-009-saga-authorize-early-capture-late/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
-- [ADR-010: Extract idempotency into a shared pkg/idempotency library](./proposals/adr/ADR-010-shared-idempotency-library/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
-- [ADR-011: Ship reconciliation detect-only; defer auto-heal](./proposals/adr/ADR-011-detect-only-reconciliation/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/)
-- [ADR-012: Auto-heal one reconciliation class (lost-capture-response window)](./proposals/adr/ADR-012-reconciliation-auto-heal/) - Accepted; from [RFC-0010](./proposals/rfc/RFC-0010/); supersedes the detect-only stance of ADR-011 for a single drift class (off by default)
-- [ADR-013: Per-service database triplet on product-db](./proposals/adr/ADR-013-per-service-db-triplet/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); ExternalSecret + DatabaseRole + Database, one file per service
-- [ADR-014: PgDog pooler credentials via Flux valuesFrom](./proposals/adr/ADR-014-pooler-credentials-valuesfrom/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-user targetPath injection from ESO Secrets, no credentials in Helm values
-- [ADR-015: Connection isolation via declarative pg_hba](./proposals/adr/ADR-015-pg-hba-connection-isolation/) - Accepted; from [RFC-0012](./proposals/rfc/RFC-0012/); per-pair allow + trailing reject, applied by reload
-- [ADR-016: OTel metrics cutover](./proposals/adr/ADR-016-otel-metrics-cutover/) - Accepted; from [RFC-0014](./proposals/rfc/RFC-0014/); apps ServiceMonitor deleted (checkout never integrated — no fence), D-4 absence alerts activated in the same commit
-- [ADR-017: Collection-noun API paths](./proposals/adr/ADR-017-api-path-collection-noun/) - Accepted; the segment after the audience is a service-owned collection noun; 13 routes renamed (expand→contract)
-- [ADR-020: Checkout re-validation policy](./proposals/adr/ADR-020-checkout-revalidation-policy/) - Accepted; from [RFC-0015](./proposals/rfc/RFC-0015/); product is the checkout price authority, stock checked never reserved
-- [ADR-021: Cart gRPC read surface](./proposals/adr/ADR-021-cart-grpc-read-surface/) - Accepted; from [RFC-0015](./proposals/rfc/RFC-0015/); read-only GetCart for the checkout snapshot, writes stay REST
+The **owning indexes are complete and are the only place a record's status is
+maintained.** This page deliberately does not duplicate them — a partial copy
+here is how an index starts disagreeing with the records it points at.
+
+- [**ADR index**](./proposals/adr/README.md) — all **60** decisions, each with
+  its `Status` and `Adoption`. The *why* behind significant choices.
+- [**RFC index**](./proposals/rfc/README.md) — all **26** proposals, plus the
+  process (research gate → RFC → ADR) and the backlog.
+- [Proposals hub](./proposals/) — templates and how to open a new record.
+
+**Start here** — a reading path, *not* an index. These eight decisions shape
+most of what the rest of the platform does; all are `Accepted` and adopted.
+
+| Decision | Why it matters |
+|---|---|
+| [ADR-044](./proposals/adr/ADR-044-envoy-gateway-platform-edge/) — Envoy Gateway as the platform edge | Every north-south request enters here; replaced Kong (RFC-0024) |
+| [ADR-041](./proposals/adr/ADR-041-keycloak-platform-idp/) — Keycloak as the platform IdP | The only token issuer; retired the custom `auth-service` |
+| [ADR-047](./proposals/adr/ADR-047-protected-apis-on-owning-services/) — administrative commands on `/protected/` | Operators go through role-gated APIs on owning services, never a DB |
+| [ADR-030](./proposals/adr/ADR-030-temporal-workflow-versioning/) — Temporal Worker Versioning | Why a running saga survives a worker deploy |
+| [ADR-054](./proposals/adr/ADR-054-temporal-worker-controller/) — the Worker Controller owns that lifecycle | The build id is derived, and appears nowhere in git |
+| [ADR-023](./proposals/adr/ADR-023-clickhouse-observability-olap/) — ClickHouse as OLAP for OTel logs and traces | The 90-day SQL surface beside the fast path |
+| [ADR-059](./proposals/adr/ADR-059-retire-tempo/) — retire Tempo, take service graphs from VictoriaTraces | Why the trace tier is two sinks and not five |
+| [ADR-056](./proposals/adr/ADR-056-k6-e2e-assertion-layer/) — assert the E2E gates with k6 | A written gate row is not a verified one |
 
 ### Payments
 

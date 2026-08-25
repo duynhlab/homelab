@@ -2051,6 +2051,23 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The docs index stopped being a second, stale record index.** `docs/README.md`
+  enumerated **19 ADRs and 7 RFCs** and then stopped dead at ADR-021 — while
+  `docs/proposals/adr/README.md` and `rfc/README.md` are **complete, 60/60 and
+  26/26**. So it was not an index with holes; it was a partial copy of a complete
+  one, and #907 had already had to repair a row in it. Filling it to 88 entries
+  would have created a third source that must agree with both the records and the
+  owning index — the defect #905 and #907 spent two PRs undoing. The enumeration
+  is replaced by pointers to the two owning indexes plus a **"Start here"** table
+  of eight load-bearing decisions, labelled a reading path so nobody maintains it
+  as an index; the seven RFC entries that had been sitting among the `api/*.md`
+  links moved out of § API with them. The directory tree also matches disk again:
+  **10 missing `docs/api/*.md`** rows added (`pkg.md`, `workflows.md`,
+  `inventory.md`, `caching.md`, the four signal contracts, `profiling.md`,
+  `_template-service.md`), `docs/testing/` added — it was absent entirely — and
+  the two stale range rows corrected from `ADR-001 … ADR-016` and
+  `RFC-0001 … RFC-0021`.
+
 - **The records that named Kong now say so.** RFC-0024 replaced the edge with
   Envoy Gateway, but the design records that *named* Kong were never annotated —
   so RFC-0011 still read as a live decision to **"Keep Kong"** with Envoy Gateway

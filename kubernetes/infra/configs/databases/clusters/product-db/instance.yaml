@@ -131,6 +131,10 @@ spec:
       # auto_explain
       auto_explain.log_min_duration: "1s"
       auto_explain.log_analyze: "on"
+      # Vector's parse_pg_auto_explain parses the payload after "plan:" as
+      # JSON (Plan / Query Text / Planning Time keys) — the PG default `text`
+      # sends every plan to the pg_parse_failures debug sink instead.
+      auto_explain.log_format: "json"
 
       # Replication slot sync (PostgreSQL 18 native)
       hot_standby_feedback: "on"

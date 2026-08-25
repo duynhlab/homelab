@@ -2119,7 +2119,30 @@ Skeleton (copy what you need):
   apply-promo coverage and could not have had: the test fake's promo carried
   neither cap, so neither exhausted branch was reachable from a request.
 
+#### Databases
+
+- **auto_explain plans never reached their VictoriaLogs stream — every plan was
+  silently landing in the `pg_parse_failures` debug sink.** `platform-db` and
+  `product-db` enabled `auto_explain` without `auto_explain.log_format`, so
+  PostgreSQL emitted `text` plans while Vector's `parse_pg_auto_explain`
+  hard-requires JSON (it `parse_json`s the payload after `plan:`). Live audit
+  2026-08-25: plans stream `_stream:{cluster_name!=""}` held **0** records over
+  6h while the failure stream held every attempt. Both `instance.yaml`s now set
+  `auto_explain.log_format: "json"` (reload-applied, no restart); verified live —
+  a `pg_sleep(1.3)` lands as a parsed record carrying `plan_json`,
+  `duration_ms`, `query_id`, `query_text`, and the failure stream stopped
+  growing under a full `make e2e GATE=kind` run.
+
 #### Docs
+
+- **The Vector PostgreSQL-pipeline section is now a hop-by-hop deep dive.**
+  Rebuilt from the audit above: the two format contracts (CNPG JSON envelope +
+  `auto_explain.log_format: json`), a sequence diagram of the record through
+  source → `parse_pg_json` → filter → parser → plans/failure sinks, real
+  captured records at each hop, the promoted-field table, why failure-sink
+  records render `missing _msg field`, and a troubleshooting checklist
+  reordered to root-cause order (`show auto_explain.log_format` first, read the
+  failure stream second).
 
 - **The logging README's examples and config snippet had drifted from the
   cluster.** `_stream:{service="auth"}` could never match — auth-service is

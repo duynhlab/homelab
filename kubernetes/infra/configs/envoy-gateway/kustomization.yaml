@@ -9,6 +9,10 @@ resources:
   - envoyproxy.yaml
   - certificate.yaml
   - gateway.yaml
+  # Issuer hairpin (ADR-062): stable Service for the proxy fleet + the CoreDNS
+  # rewrite that maps id.duynh.me onto it for in-cluster consumers.
+  - edge-service.yaml
+  - coredns.yaml
   # Routes — one HTTPRoute per exposed host (+ the new keycloak surface)
   - routes/api.yaml
   - routes/monitoring.yaml

@@ -470,6 +470,7 @@ homelab/
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration
 │           ├── secrets.yaml            # Secrets bootstrap configs
+│           ├── openbao-oidc-config.yaml # OpenBAO staff OIDC configurator (ADR-062)
 │           ├── cert-manager-config.yaml / cnpg-barman-plugin.yaml
 │           ├── gateway-api-crds.yaml / envoy-gateway.yaml / envoy-gateway-config.yaml
 │           ├── keycloak.yaml
@@ -490,7 +491,8 @@ homelab/
 3a. `keycloak-local`: the `duynhlab` realm — Keycloak on `platform-db` with the deterministic realm import (depends on `controllers-local`, `databases-local`, `secrets-local`, `monitoring-local` — the keycloak scrape needs the ServiceMonitor CRD).
 4. `gateway-api-crds-local`: Gateway API CRDs chart (depends on `controllers-local`).
 5. `envoy-gateway-local`: the Envoy Gateway controller (depends on `gateway-api-crds-local`, `cert-manager-local`).
-5a. `envoy-gateway-config-local`: GatewayClass + Gateway + HTTPRoutes + SecurityPolicies + BackendTrafficPolicies + the `platform-edge-tls` Certificate, with the local `homelab-ca` issuer patch (depends on `envoy-gateway-local`, `cert-manager-local`, `keycloak-local` — the JWT SecurityPolicy's `remoteJWKS` endpoint must resolve).
+5a. `envoy-gateway-config-local`: GatewayClass + Gateway + HTTPRoutes + SecurityPolicies + BackendTrafficPolicies + the `platform-edge-tls` Certificate, with the local `homelab-ca` issuer patch (depends on `envoy-gateway-local`, `cert-manager-local`, `keycloak-local` — the JWT SecurityPolicy's `remoteJWKS` endpoint must resolve). Also carries the ADR-062 issuer hairpin: the stable `edge` Service and the CoreDNS rewrite that resolves `id.duynh.me` onto it in-cluster.
+5b. `openbao-oidc-config-local`: the OpenBAO staff-OIDC configurator Job (ADR-062) — writes `auth/oidc/config` + the team external groups via the `oidc-configurator` k8s-auth role, no root token. Depends on `secrets-local` (role + KV client secret) and `envoy-gateway-config-local` (the discovery fetch hairpins `id.duynh.me` through the edge, with Keycloak behind it).
 6. `monitoring-local`: Observability **configs** — Grafana dashboards, VMAlert rules, Sloth **PrometheusServiceLevel** CRs (depends on `controllers-local`; Sloth **operator** is in `controllers-local`).
 7. `storage-local`: Provisions RustFS (S3) object storage (depends on `controllers-local`, `secrets-local`).
 7a. `caching-local`: Valkey (product cache-aside, db 0 — the edge does not use it) (depends on `controllers-local`, `monitoring-local`).

@@ -1,0 +1,31 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: openbao-oidc-config-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  # First run can wait through a slow Keycloak boot behind the retry loops.
+  timeout: 10m
+  retryInterval: 2m
+
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+
+  path: ./configs/secrets/openbao-oidc-config
+
+  prune: true
+  wait: true
+
+  # ADR-062: this wave exists because auth/oidc/config validates the discovery
+  # URL at write time. The fetch goes to https://id.duynh.me, which CoreDNS
+  # rewrites onto the edge Service — so the Gateway (and Keycloak behind it,
+  # a dependency of envoy-gateway-config) must be serving first. secrets-local
+  # supplies the oidc-configurator k8s-auth role and the KV client secret.
+  dependsOn:
+    - name: secrets-local
+    - name: envoy-gateway-config-local

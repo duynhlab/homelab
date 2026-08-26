@@ -12,6 +12,7 @@ resources:
   - envoy-gateway.yaml       # Envoy Gateway control plane (depends on gateway-api-crds + cert-manager)
   - envoy-gateway-config.yaml # Gateway/HTTPRoutes/policies (depends on envoy-gateway + cert-manager + keycloak)
   - secrets.yaml         # Vault + ESO (Must be before databases)
+  - openbao-oidc-config.yaml # OpenBAO staff OIDC (ADR-062; depends on secrets + envoy-gateway-config)
   - caching.yaml         # Valkey (depends on monitoring-local for ServiceMonitor CRD)
   - storage.yaml         # RustFS (depends on secrets-local for ESO-managed credentials)
   - tracing.yaml         # OTel Collector (depends on clickhouse-local; Tempo/Jaeger retired, RFC-0027)

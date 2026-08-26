@@ -6,6 +6,7 @@ kind: Kustomization
 # deliberately excluded from controllers/kustomization.yaml.
 resources:
   - external-secret.yaml
+  - external-secret-oidc-clients.yaml
   - configmap-realm.yaml
   - deployment.yaml
   - service.yaml

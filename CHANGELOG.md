@@ -229,6 +229,24 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Security
+
+- **The staff realm grows teams (ADR-062 train 1/4).** `duynhlab-staff` now
+  carries the `infra-team`/`sre-team`/`dev-team` groups (`duyne` →
+  `/infra-team`), two **confidential** clients — `grafana` and `openbao` —
+  each with an `oidc-group-membership-mapper` emitting the `groups` claim,
+  and realm events (`eventsEnabled` + `adminEventsEnabled`, jboss-logging →
+  VictoriaLogs). Client secrets never touch git: the openbao-bootstrap Job
+  seeds random values at `secret/local/infra/keycloak/oidc-clients`, the new
+  `keycloak-oidc-clients` ExternalSecret feeds them to the Deployment, and the
+  realm import resolves `${GRAFANA_CLIENT_SECRET}`/`${OPENBAO_CLIENT_SECRET}`
+  placeholders. `local-stack`'s staff realm carries the same shape with
+  dev-only placeholder secrets. Consumers (OpenBAO `auth/oidc`, Grafana
+  `generic_oauth`) land in trains 2–3;
+  [ADR-062](docs/proposals/adr/ADR-062-staff-groups-sso/) is the decision.
+  **One-shot import caveat:** an existing cluster needs the realm reseed
+  procedure in [`docs/platform/keycloak.md`](docs/platform/keycloak.md).
+
 #### GitOps
 
 - **`scripts/new-worker-build.sh` — stage a versioned Temporal worker build

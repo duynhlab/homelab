@@ -5,8 +5,8 @@ cleans up, and exits when Kubernetes (or compose) says stop. A sibling of
 [observability.md](observability.md)'s instrumentation policy — the code
 lives in the service repos; this page owns the shared behavior.
 
-| | |
-|---|---|
+| Attribute | Value |
+|-----------|-------|
 | **Applies to** | The 10 Go HTTP services (workers follow a Temporal-specific lifecycle — a recorded gap below) |
 | **Contract env vars** | `READINESS_DRAIN_DELAY` (default 5s) · `SHUTDOWN_TIMEOUT` (default 10s) |
 | **Pod budget** | `terminationGracePeriodSeconds` — defaults come from the `mop` chart (`duynhlab/helm-charts`); homelab pins none per-service |

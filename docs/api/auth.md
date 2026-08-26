@@ -15,22 +15,28 @@ Auth turns credentials into short-lived RS256 access tokens and rotating refresh
 > designed — and compare with the realm that replaced it. The repository
 > itself is archived separately by the owner. It describes nothing deployed.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | none — surface deleted (RFC-0024 P5) | Archived |
-| **HTTP** | none — `api-auth-public` deleted; `/auth/v1/*` 404s at both edges | Archived |
-| **gRPC server** | None | None |
-| **gRPC client** | None | None |
-| **Worker** | None | None |
-| **Temporal** | None · [workflows.md](./workflows.md) | None |
-| **Technical debt** | None — the decommission is complete | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | None; service, namespace, database, and secrets deleted in RFC-0024 P5 | Archived | [RFC-0024](../proposals/rfc/RFC-0024/) · [live replacement](./identity.md) |
+| **Runtime modes** | Historical `api` + `migrate` + `seed` binary | Archived | [Code map](#code-map) |
+| **HTTP server** | Historical public issuer API on `:8080` | Archived | [HTTP API](#http-api) |
+| **Edge exposure** | None; `/auth/v1/*` is unmatched at both edges | Archived | [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) · [live replacement](./identity.md) |
+| **gRPC server** | None | None | — |
+| **gRPC clients** | None | None | — |
+| **Worker** | None | None | — |
+| **Temporal** | None | None | — |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service) | — |
-| **Owns** | Login credentials, password hashes, refresh-token families, JWT signing key | — |
-| **Database** | `auth` on `platform-db` (via `platform-db-pooler-rw`) | — |
-| **Design record** | — | [RFC-0009](../proposals/rfc/RFC-0009/) |
+Known gaps: [none; decommission complete](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Historical credentials, password hashes, refresh-token families, and JWT signing key; owns nothing live |
+| **Does not own** | Current realms, credentials, token issuance, or identity claims; Keycloak owns the live identity contract |
+| **Database** | None; former `auth` database removed in RFC-0024 P5 |
+| **Cache** | None |
+| **Sensitive data** | Historical password hashes, refresh-token hashes, and signing key material; no deployed store remains |
+| **Design records** | [RFC-0009](../proposals/rfc/RFC-0009/) (historical issuer) · [RFC-0024](../proposals/rfc/RFC-0024/) (Keycloak cutover and decommission) |
 
 ## Temporal participation
 
@@ -305,4 +311,4 @@ Paths in [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service). Tr
 - [RFC-0009: RS256 JWT and edge authentication](../proposals/rfc/RFC-0009/)
 - [ADR-006: Kong edge JWT](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) · [ADR-017: collection-noun migration](../proposals/adr/ADR-017-api-path-collection-noun/)
 
-_Last updated: 2026-08-24 — the banner and this footer disagreed: P5 has executed, so the archive is complete rather than pending. The live replacement contract is [identity.md](./identity.md)._
+_Last updated: 2026-08-26 — separates capability availability, evidence, and ownership metadata while preserving the completed archive. Previously 2026-08-24 — the banner and footer were aligned with the executed P5 decommission._

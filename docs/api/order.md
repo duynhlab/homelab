@@ -3,21 +3,28 @@
 Order turns a validated basket into a durable, money-safe fulfillment: it is the
 only writer of orders and the only place the fulfillment saga starts.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private · `:8080` · Edge `/order/v1/private/` (audience-scoped in both environments) · edge JWT | Partial |
-| **gRPC server** | `OrderService/CreateOrder` · `:9090` | Implemented |
-| **gRPC client** | shipping (`GetShipmentByOrder`), payment (`GetPayment`), inventory (`GetReservation`) — enrichment reads | Implemented |
-| **Worker** | `order-worker` · queue `order-fulfillment` | Implemented |
-| **Temporal** | Orchestrator · `OrderFulfillmentWorkflow` + `CancellationWorkflow` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`order.yaml`](../../kubernetes/apps/services/order.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) + `worker` | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [Operations](#operations) |
+| **HTTP server** | private + protected · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/order/v1/private/` and `/protected/`, each with its realm-specific JWT policy | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | `OrderService/CreateOrder` · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | shipping, payment, and inventory enrichment reads | Implemented | [Callers & dependencies](#callers--dependencies) |
+| **Worker** | `order-worker` · queue `order-fulfillment` | Implemented | [Temporal participation](#temporal-participation) |
+| **Temporal** | Orchestrates fulfillment and cancellation workflows | Implemented | [Temporal participation](#temporal-participation) · [registry](./workflows.md#order-fulfillment) |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/order-service`](https://github.com/duynhlab/order-service) | — |
-| **Owns** | Orders, order items, totals components, idempotency records, status history, processing projection, cancellation requests | — |
-| **Database** | `order` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
-| **Design record** | — | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) · [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (P5) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) |
+Known gaps: [accepted cancellation and startup limits](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Orders, item/totals snapshots, idempotency records, status history, processing projection, and cancellation requests |
+| **Does not own** | Current inventory, shipment state, payment state, notifications, or cart contents |
+| **Database** | `order` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` |
+| **Cache** | None |
+| **Sensitive data** | Customer subject, order history, money totals, and opaque payment-method token |
+| **Design records** | [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-033](../proposals/adr/ADR-033-order-status-cancellation/) · [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) |
 
 ## Temporal participation
 
@@ -418,4 +425,4 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [ADR-051](../proposals/adr/ADR-051-trusted-operator-resolution/) — why the resolve command trusts the operator, and what it records instead
 - [OrderManualReviewBacklog runbook](../observability/runbooks/microservices/OrderManualReviewBacklog.md) — operating the parked queue
 
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-14 — RFC-0023 Train 7: the `manual_review` resolve command ships (ADR-051); the case view gains the external truths, the transition history, and `version`._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-22 — RFC-0026/ADR-054 assigned versioned-worker lifecycle to the Temporal Worker Controller._

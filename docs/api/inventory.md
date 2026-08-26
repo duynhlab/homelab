@@ -15,30 +15,28 @@ elsewhere.
 > is the platform's **sole** stock authority; there is nothing to fail over to, which
 > is deliberate and is why callers fail closed.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster — **sole stock authority**; callers: order saga, checkout, product `/details` | Implemented |
-| **Runtime modes** | `api` (serve) + `migrate` + `seed` (dev-only) | Implemented |
-| **HTTP server** | `:8080` · operational (`/health`, `/ready`) + **protected Backoffice group** (RFC-0023) | Implemented |
-| **Edge exposure** | `api-inventory-protected` → `/inventory/v1/protected` only (edge JWT); east-west stays gRPC, no other audience routed | Implemented |
-| **gRPC server** | `inventory.v1.InventoryService/{BatchGetAvailability,CheckAvailability,Reserve,Release,Commit,GetReservation}` · `:9090` | Implemented |
-| **gRPC clients** | None | None |
-| **Worker** | None | None |
-| **Temporal** | None · [workflows.md](./workflows.md) | None |
-| **Async / events** | None | None |
-| **Technical debt** | None | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster — sole stock authority | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`inventory.yaml`](../../kubernetes/apps/services/inventory.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) | Implemented | [Operations](#operations) |
+| **HTTP server** | operational + protected Backoffice group · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/inventory/v1/protected/` only; east-west stays gRPC | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | availability + reservation RPCs · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | None | None | — |
+| **Worker** | None | None | — |
+| **Temporal** | Stock-step gRPC participant; order-worker performs the calls | Implemented | [Temporal participation](#temporal-participation) |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/inventory-service`](https://github.com/duynhlab/inventory-service) | — |
-| **Domain** | Fulfillment (GitOps `platform.duynhlab.dev/domain: fulfillment`) | — |
-| **Owns** | Warehouses, per-`(sku, warehouse)` balances (`on_hand`/`reserved`/`safety_stock`), reservation FSM, warehouse allocation, movement ledger, safety stock | — |
-| **Does not own** | Catalog, descriptions, selling price ([product](./product.md)); order status ([order](./order.md)); checkout snapshot/totals ([checkout](./checkout.md)) | — |
-| **Database** | `inventory` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432`; migrations direct to `product-db-rw` | — |
-| **Cache** | None | — |
-| **Sensitive data** | None (no PII; SKU/warehouse/quantity only) | — |
-| **Contract sources** | gRPC `pkg/proto/inventory/v1/inventory.proto`; HTTP health only | — |
-| **Design records** | — | [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) · [ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/) (balance bootstrap ownership) |
+Known gaps: [operator bootstrap and planned mTLS](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Warehouses, per-warehouse balances, reservation FSM, allocation, movement ledger, and safety stock |
+| **Does not own** | Catalog or price ([product](./product.md)); order status ([order](./order.md)); checkout snapshots or totals ([checkout](./checkout.md)) |
+| **Database** | `inventory` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432`; migrations connect directly |
+| **Cache** | None |
+| **Sensitive data** | None; SKU, warehouse, and quantity data only |
+| **Design records** | [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) · [ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/) |
 
 ## Temporal participation
 
@@ -367,4 +365,4 @@ Transport peers call `logic/v1`; logic calls `core` only
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
 
-_Last updated: 2026-08-14 — ADR-050: the protected group verifies the workforce realm (`OIDC_STAFF_*`); the customer realm can no longer reach it._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — ADR-050 moved the protected group to the workforce realm._

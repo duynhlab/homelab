@@ -2,22 +2,28 @@
 
 Shipping turns "an order that must move" into a tracked shipment — and turns "where is my package / what will it cost" into two public reads. It is the platform's quote authority (checkout prices delivery through it) and the order-fulfillment saga's shipment step.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public only · `:8080` · edge `/shipping/v1/public/` (no JWT) | Implemented |
-| **gRPC server** | `ShippingService/GetQuote, GetShipmentByOrder, CreateShipment, CancelShipment` · `:9090` | Implemented |
-| **gRPC client** | None | None |
-| **Worker** | None | None |
-| **Temporal** | Participant (gRPC) · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
-| **Technical debt** | Pre-v3 aliases (ADR-017) · [Known gaps](#known-gaps) | Technical debt |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`shipping.yaml`](../../kubernetes/apps/services/shipping.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [Code map](#code-map) |
+| **HTTP server** | public + internal + protected · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/shipping/v1/public/` and `/protected/`; internal lookup stays off-edge | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | quote and shipment RPCs · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | None | None | — |
+| **Worker** | None | None | — |
+| **Temporal** | Shipment-step gRPC participant | Implemented | [Temporal participation](#temporal-participation) |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-service) | — |
-| **Owns** | Shipments, tracking numbers, shipment status, and the quote rate table (static, in-code) | — |
-| **Database** | `shipping` on `platform-db` via `platform-db-pooler-rw.platform:5432` | — |
-| **Design record** | — | [RFC-0003](../proposals/rfc/RFC-0003/) (saga participant) · [RFC-0015](../proposals/rfc/RFC-0015/) (quote authority, P3) |
+Known gaps: [no-caller route, aliases, and unpersisted address](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Quote rate table, shipments, tracking numbers, and shipment status |
+| **Does not own** | Orders, payment state, inventory, or customer profiles |
+| **Database** | `shipping` on `platform-db` via `platform-db-pooler-rw.platform:5432` |
+| **Cache** | None |
+| **Sensitive data** | Tracking number and order linkage; request address is accepted but not persisted |
+| **Design records** | [RFC-0003](../proposals/rfc/RFC-0003/) (saga participant) · [RFC-0015](../proposals/rfc/RFC-0015/) (quote authority) |
 
 ## Temporal participation
 
@@ -296,4 +302,4 @@ Paths in [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-serv
 - [checkout.md](./checkout.md) · [order.md](./order.md) — quote and enrichment callers
 - [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

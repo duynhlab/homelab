@@ -1,11 +1,9 @@
-# Admin Portal API consumption
+# Backoffice Admin Service
 
-> **This is a consumer index, not a contract.** The Admin Portal serves no API of
-> its own. Every endpoint below is owned, specified and versioned by the service
-> that serves it — method, payload, errors and semantics live in that service's
-> file, and this page deliberately repeats none of them. Paths appear here
-> because they *are* the answer to "what does the portal call"; when a path
-> changes, the owning file is authoritative and this index follows it.
+> **This is an application-service contract and consumer index, not a business
+> API contract.** `admin-service` is a deployed React/Nginx workload, but it
+> serves no API of its own. Every operation below remains owned, specified and
+> versioned by the service that serves it.
 
 The Backoffice ("Admin Portal") is a browser client. Because
 [ADR-048](../proposals/adr/ADR-048-admin-portal-no-bff/) chose **no BFF**, the
@@ -14,18 +12,28 @@ consequence worth being able to see in one place.
 
 ## At a glance
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Role** | HTTP **client** only — a static bundle behind Nginx | Implemented |
-| **Serves** | Nothing. No HTTP API, no gRPC, no database, no Temporal participation | None |
-| **Consumes** | **26 operations** over **23 distinct paths**, across **6 services** | Implemented |
-| **Audience** | `/protected/` **only** — verified: the source contains no `public`, `private` or `internal` path | Implemented |
-| **Identity** | Realm `duynhlab-staff`, client `admin-portal` ([ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) | Implemented |
-| **Authorization** | Realm role `backoffice_admin`, enforced **in-service**; the edge checks issuer and signature only | Implemented |
-| **Token transport** | `Authorization: Bearer` on every call; base URL baked at build time | Implemented |
-| **Repository** | [`duynhlab/admin-service`](https://github.com/duynhlab/admin-service) — a browser app despite the name | — |
-| **Platform doc** | [`docs/frontend/admin-portal/`](../frontend/admin-portal/README.md) — delivery, exposure, stack, gaps | — |
-| **Design records** | [ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/) · [ADR-048](../proposals/adr/ADR-048-admin-portal-no-bff/) · [ADR-049](../proposals/adr/ADR-049-admin-portal-tanstack-spa/) · [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/) | `RFC-0023` |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster (`backoffice` namespace) | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`backoffice-rs.yaml`](../../kubernetes/apps/backoffice-rs.yaml) |
+| **Runtime** | React static bundle served by Nginx on `:80` | Implemented | [Platform contract](../frontend/admin-portal/README.md#deployment) |
+| **HTTP server** | Static assets + `/health`; no business API | Implemented | [Platform contract](../frontend/admin-portal/README.md#deployment) |
+| **Edge exposure** | `backoffice.duynh.me` · `PathPrefix /` | Implemented | [`backoffice.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/backoffice.yaml) |
+| **API served** | None | None | — |
+| **API clients** | 26 operations over 23 paths across 6 owning services | Implemented | [Consumer matrix](#what-it-calls-by-feature) |
+| **Worker** | None | None | — |
+| **Temporal** | None | None | — |
+| **Events** | None | None | — |
+
+Known gaps: [three platform gaps](../frontend/admin-portal/README.md#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Operator UX, browser-side routing/query orchestration, and the inventory of protected operations it consumes |
+| **Does not own** | Business data, protected API behavior, authorization decisions, or a BFF; those stay with the six serving services |
+| **Database** | None |
+| **Cache** | None authoritative; TanStack Query holds disposable browser state only |
+| **Sensitive data** | Staff access token, held in browser memory only and sent as `Authorization: Bearer` |
+| **Design records** | [RFC-0023](../proposals/rfc/RFC-0023/) · [ADR-047](../proposals/adr/ADR-047-protected-apis-on-owning-services/) · [ADR-048](../proposals/adr/ADR-048-admin-portal-no-bff/) · [ADR-049](../proposals/adr/ADR-049-admin-portal-tanstack-spa/) · [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/) |
 
 ## The fan-out
 
@@ -182,4 +190,4 @@ matched their owning file on method *and* path.
 - [RFC-0023](../proposals/rfc/RFC-0023/README.md) — the RFC that introduced the portal and `/protected/`
 
 ---
-_Last updated: 2026-08-25_
+_Last updated: 2026-08-26 — recognizes `admin-service` as the deployed Backoffice application service while preserving its no-BFF consumer boundary._

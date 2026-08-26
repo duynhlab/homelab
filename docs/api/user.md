@@ -5,22 +5,28 @@ phone, and address fields while the identity provider — the Keycloak realm
 `duynhlab` since the RFC-0024 P3 cutover — remains the sole owner of credentials
 and identity claims.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public + private · `:8080` · edge `/user/v1/public/` and `/user/v1/private/` (`jwt-edge` SecurityPolicy on private) | Implemented |
-| **gRPC server** | None | None |
-| **gRPC client** | None | None |
-| **Worker** | None | None |
-| **Temporal** | None · [workflows.md](./workflows.md) | None |
-| **Technical debt** | None | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`user.yaml`](../../kubernetes/apps/services/user.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) | Implemented | [Operations](#operations) |
+| **HTTP server** | public + private + protected · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/user/v1/public/`, `/private/`, and `/protected/`; JWT policy on authenticated groups | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | None | None | — |
+| **gRPC clients** | None | None | — |
+| **Worker** | None | None | — |
+| **Temporal** | None | None | — |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/user-service`](https://github.com/duynhlab/user-service) | — |
-| **Owns** | `user_profiles` data: first/last name, phone, address — **not** passwords, username uniqueness, email identity, or JWT issuance (auth's boundary) | — |
-| **Database** | `user` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) | — |
-| **Design record** | — | None |
+Known gaps: [one stored field is API-unreachable](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | `user_profiles` data: first/last name, phone, and address |
+| **Does not own** | Credentials, username/email uniqueness, token issuance, or Keycloak identity claims |
+| **Database** | `user` on `platform-db` via `platform-db-pooler-rw.platform:5432` |
+| **Cache** | None |
+| **Sensitive data** | Profile PII: name, phone, and address; public responses deliberately exclude private fields |
+| **Design records** | None |
 
 ## Temporal participation
 
@@ -280,4 +286,4 @@ Paths in [`duynhlab/user-service`](https://github.com/duynhlab/user-service). Tr
 - [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

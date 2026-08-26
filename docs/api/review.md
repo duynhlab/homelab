@@ -4,22 +4,28 @@ Review turns a shopper's opinion into exactly one durable rating per user per
 product, and serves that data to both the browser and product-service's
 details aggregation.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public + private · `:8080` · edge `/review/v1/public/` and `/review/v1/private/` (`jwt-edge` SecurityPolicy on private) | Implemented |
-| **gRPC server** | `ReviewService/GetProductReviews` · `:9090` | Implemented |
-| **gRPC client** | None | None |
-| **Worker** | None | None |
-| **Temporal** | None · [workflows.md](./workflows.md) | None |
-| **Technical debt** | None | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`review.yaml`](../../kubernetes/apps/services/review.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) | Implemented | [Operations](#operations) |
+| **HTTP server** | public + private · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/review/v1/public/` and `/private/`; JWT policy on private writes | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | `ReviewService/GetProductReviews` · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | None | None | — |
+| **Worker** | None | None | — |
+| **Temporal** | None | None | — |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/review-service`](https://github.com/duynhlab/review-service) | — |
-| **Owns** | Product reviews and star ratings (the only writer of the `reviews` table) | — |
-| **Database** | `review` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) | — |
-| **Design record** | — | None |
+Known gaps: [none scheduled; two accepted limits](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Product reviews and star ratings; the sole writer of the `reviews` table |
+| **Does not own** | Product catalog data or customer profiles |
+| **Database** | `review` on `platform-db` via `platform-db-pooler-rw.platform:5432` |
+| **Cache** | None |
+| **Sensitive data** | User subject plus user-generated review title and comment |
+| **Design records** | None |
 
 ## Temporal participation
 
@@ -308,4 +314,4 @@ Paths in [`duynhlab/review-service`](https://github.com/duynhlab/review-service)
 - [product.md](./product.md) — the details aggregation that calls `GetProductReviews`
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (Keycloak `sub`), `OIDC_*` verification env, subject `strconv` (and its swallowed error) removed._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved `user_id` and verification to Keycloak._

@@ -5,22 +5,28 @@ the multi-step purchase funnel as a short-lived, auditable **session**, makes
 sure the price you see is the price you pay, and hands a validated order to
 order-service — which remains the only writer of orders.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private only · `:8080` · edge `/checkout/v1/private/` (`jwt-edge` SecurityPolicy) | Implemented |
-| **gRPC server** | None — client only | None |
-| **gRPC client** | cart (`GetCart`), product (`BatchGetCurrentPrices`), inventory (`CheckAvailability`), shipping (`GetQuote`), order (`CreateOrder`) | Implemented |
-| **Worker** | `checkout-worker` · queue `checkout` | Implemented |
-| **Temporal** | Orchestrator · `AbandonedCheckoutWorkflow` · [workflows.md](./workflows.md#abandoned-checkout) | Implemented |
-| **Technical debt** | None | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`checkout.yaml`](../../kubernetes/apps/services/checkout.yaml) |
+| **Runtime modes** | `api` + `migrate` + `worker` | Implemented | [Operations](#operations) · [Code map](#code-map) |
+| **HTTP server** | private only · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/checkout/v1/private/` with customer-realm JWT policy | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | None; client only | None | — |
+| **gRPC clients** | cart, product, inventory, shipping, and order | Implemented | [gRPC API](#grpc-api) |
+| **Worker** | `checkout-worker` · queue `checkout` | Implemented | [Temporal participation](#temporal-participation) |
+| **Temporal** | Orchestrates `AbandonedCheckoutWorkflow` | Implemented | [Temporal participation](#temporal-participation) · [registry](./workflows.md#abandoned-checkout) |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-service) | — |
-| **Owns** | Checkout sessions: funnel state, price snapshots, confirm idempotency ledger, tax rules, promo codes | — |
-| **Database** | `checkout` on `product-db` via PgDog (`pgdog-product.product:6432`) | — |
-| **Design record** | — | [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) (inventory is the only availability authority; fail-closed) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) (re-validation) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) (cart read surface) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) (sole stock authority) · [ADR-019](../proposals/adr/ADR-019-session-expiry-model/) (session expiry model) · [ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/) (untracked SKU = `409 ITEM_NOT_ORDERABLE`) |
+Known gaps: [contention and planned mTLS](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Checkout sessions, funnel state, price snapshots, confirm idempotency ledger, tax rules, and promo codes |
+| **Does not own** | Cart contents, current prices, inventory, shipping rates, orders, or payment state |
+| **Database** | `checkout` on `product-db` via PgDog `pgdog-product.product:6432` |
+| **Cache** | None |
+| **Sensitive data** | Customer subject, shipping address, and opaque payment-method token; PAN-shaped input is rejected |
+| **Design records** | [RFC-0015](../proposals/rfc/RFC-0015/) · [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-019](../proposals/adr/ADR-019-session-expiry-model/) · [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) · [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) · [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) · [ADR-053](../proposals/adr/ADR-053-untracked-sku-operator-data-not-outage/) |
 
 ## Temporal participation
 
@@ -389,4 +395,4 @@ Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-serv
 - [cart.md](./cart.md) · [product.md](./product.md) · [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (Keycloak `sub`) in sessions and the idempotency ledger, `OIDC_*` verification env._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved session identity and verification to Keycloak._

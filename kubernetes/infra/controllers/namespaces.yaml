@@ -153,10 +153,6 @@ kind: Namespace
 metadata:
   labels:
     environment: local
-    # ADR-062: trust-manager projects the homelab-ca-bundle ConfigMap here —
-    # the openbao-oidc-config Job passes it as oidc_discovery_ca_pem so the
-    # OIDC discovery fetch trusts the edge's locally-signed wildcard.
-    platform.duynhlab.dev/needs-trust: "true"
   name: openbao
 ---
 apiVersion: v1

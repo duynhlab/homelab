@@ -689,6 +689,13 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The trusted API guides now have non-overlapping ownership.**
+  `api.md` owns shared contracts, topology, the exact call graph, and current
+  user journeys; `microservices.md` is a compact feature-ownership and known-gap
+  catalog instead of a second deployment, route, RPC, and technique inventory.
+  Stale auth, Inventory, Product → Inventory, Backoffice, and edge-JWT claims
+  were corrected against the current contracts and manifests.
+
 - **API service summaries now separate current shape, availability, and
   verification evidence.** The v2 template, all eleven API contracts, and the
   Backoffice application-service contract use one capability table; ownership

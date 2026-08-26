@@ -17,7 +17,7 @@ service or the Backoffice application service at a time.
 flowchart TD
     Hub["API documentation hub"] --> Shared["api.md<br/>shared HTTP + gRPC rules"]
     Hub --> Rollup["Service contracts rollup<br/>deployment + CI"]
-    Hub --> Catalog["microservices.md<br/>ownership + feature matrix"]
+    Hub --> Catalog["microservices.md<br/>feature ownership + gaps"]
     Hub --> Contracts["11 API contract files"]
     Hub --> Workflows["workflows.md<br/>Temporal workflow registry"]
     Hub --> Saga["temporal.md<br/>3 workflows + saga theory"]
@@ -55,7 +55,7 @@ shown in [api.md](./api.md#current-east-west-call-graph).
 |------|------|-----------------|
 | 1 | [api.md](./api.md) | How URLs, audiences, auth, errors, pagination, HTTP, and gRPC work |
 | 2 | [api.md § End-to-end user journeys](./api.md#end-to-end-user-journeys) | How one user journey (login, browse, checkout, fulfillment) travels through the services |
-| 3 | [microservices.md](./microservices.md) | Which service owns each feature and how services call one another |
+| 3 | [microservices.md](./microservices.md) | Which component owns each feature and where current cross-service gaps live |
 | 4 | One service file below | Exact HTTP routes, gRPC methods, payload examples, and service rules |
 | 5 | [workflows.md](./workflows.md) | Which Temporal workflows exist, who orchestrates them, and who participates |
 | 6 | [temporal.md](./temporal.md) | What each of the three workflows does, why Saga instead of 2PC, and how compensation works |
@@ -206,7 +206,7 @@ not its availability. Record them under the service's **Known gaps** section.
 | [api.md](./api.md) | HTTP and gRPC architecture, call graph, user journeys, HTTP/2 load balancing, security, observability | Implemented |
 | [identity.md](./identity.md) | Two realms, edge vs in-service verification, `sub` as `user_id`, the `OIDC_*` env contract, browser flow | Implemented |
 | [admin.md](./admin.md) | Backoffice application-service contract plus the 26 `/protected/` operations it consumes; no BFF or business API | Implemented |
-| [microservices.md](./microservices.md) | Service feature matrix, ownership, dependencies, and known gaps | Living reference |
+| [microservices.md](./microservices.md) | Feature/data ownership, composition boundaries, and current known-gap rollup | Living reference |
 | [temporal.md](./temporal.md) | Saga vs 2PC learning plus the live order workflow and Temporal operations | Implemented |
 | [checkout.md](./checkout.md) | Checkout FSM, price re-validation, totals, promo, confirm, and abandonment | Implemented — P1-P5 shipped; the legacy order path was removed in RFC-0021 P5 |
 | [payments.md](./payments.md) | Money state machine, idempotency, ledger, provider, and reconciliation | Implemented |
@@ -249,4 +249,4 @@ GitOps manifests — that evidence is how a claim is verified, not a competing
 source to prefer. Mark designed but undeployed behavior as **planned**, and when
 the two disagree, classify it first: [Resolving a mismatch](#resolving-a-mismatch).
 
-_Last updated: 2026-08-26 — separates capability availability from known-gap lifecycle, adds per-capability evidence, and recognizes `admin-service` as the deployed Backoffice application service._
+_Last updated: 2026-08-26 — separates capability availability from known-gap lifecycle, adds per-capability evidence, recognizes `admin-service` as the deployed Backoffice application service, and sharpens the `api.md` / `microservices.md` ownership boundary._

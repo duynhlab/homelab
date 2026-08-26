@@ -4,11 +4,11 @@ One place to learn how HTTP and gRPC contracts work across the duynhlab platform
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
-| **Status** | Implemented; checkout P1-P5 runs in local-stack and the cluster | — |
+| **Status** | Living shared contract for behavior deployed in local-stack and the cluster | — |
 | **Scope** | Shared HTTP conventions, gRPC conventions, and the current service call graph | — |
 | **Public transport** | HTTP/JSON through the edge (Envoy Gateway) on `:8080` | — |
 | **Internal transport** | gRPC on `:9090`; one documented cart REST exception remains (worker cart clear) | — |
-| **Contract source** | HTTP routers in each service repo; protobufs in `duynhlab/pkg` | — |
+| **Canonical contract** | `docs/api/`; service routers, protobufs, manifests, and tests are verification evidence | — |
 | **Audience** | Readers learning the platform and engineers changing an API | — |
 | **Design record** | — | None |
 
@@ -26,6 +26,12 @@ not transfer that ownership. For example, checkout can ask shipping for a
 quote, but only shipping defines the quote; checkout can ask order to create an
 order, but only order writes the order.
 
+`docs/api/` is the platform contract that every service repository follows.
+A service README or code comment does not override it. When implementation
+evidence disagrees, record and fix the drift in the owning contract or service;
+do not silently create a second source of truth. Cross-service feature authority
+is indexed in [microservices.md](./microservices.md).
+
 ## Architecture
 
 ### Platform API Topology
@@ -33,14 +39,16 @@ order, but only order writes the order.
 ```mermaid
 flowchart TB
     %% ===== Layer 1: External actors =====
-    Internet((Internet))
+    Internet((Shoppers / operators))
     Provider["MockPay / payment provider"]
 
-    %% ===== Layer 2: Client =====
-    Internet --> Browser["React SPA"]
+    %% ===== Layer 2: Clients =====
+    Internet --> Storefront["Storefront SPA"]
+    Internet --> Backoffice["Backoffice SPA"]
 
     %% ===== Layer 3: Gateway =====
-    Browser -->|"HTTP/JSON"| Edge["Envoy Gateway<br/>edge"]
+    Storefront -->|"HTTP/JSON"| Edge["Envoy Gateway<br/>edge"]
+    Backoffice -->|"HTTP/JSON"| Edge
     Provider -->|"signed webhook"| Edge
 
     %% ===== Layer 4: Application platform =====
@@ -49,6 +57,7 @@ flowchart TB
 
         subgraph Identity["Identity domain"]
             User["user"]
+            Keycloak["Keycloak"]
         end
 
         subgraph Catalog["Catalog domain"]
@@ -60,6 +69,7 @@ flowchart TB
             Cart["cart"]
             Checkout["checkout"]
             Order["order"]
+            Payment["payment"]
             CheckoutWorker["checkout-worker"]
             OrderWorker["order-worker"]
         end
@@ -70,7 +80,6 @@ flowchart TB
 
         subgraph Comms["Comms domain"]
             Shipping["shipping"]
-            Payment["payment"]
             Notification["notification"]
         end
 
@@ -79,6 +88,7 @@ flowchart TB
 
     %% Edge -> domain entry points
     Edge -->|"HTTP :8080"| User
+    Edge -->|"OIDC"| Keycloak
     Edge -->|"HTTP :8080"| Product
     Edge -->|"HTTP :8080"| Review
     Edge -->|"HTTP :8080"| Cart
@@ -87,28 +97,13 @@ flowchart TB
     Edge -->|"HTTP :8080"| Shipping
     Edge -->|"HTTP :8080"| Payment
     Edge -->|"HTTP :8080"| Notification
-
-    %% Synchronous cross-service calls
-    Product -->|"gRPC reviews"| Review
-    Checkout -->|"gRPC GetCart"| Cart
-    Checkout -->|"gRPC BatchGetCurrentPrices (prices)"| Product
-    Checkout -->|"gRPC CheckAvailability (stock)"| Inventory
-    Checkout -->|"gRPC GetQuote"| Shipping
-    Checkout -->|"gRPC CreateOrder"| Order
-    Order -->|"gRPC GetShipmentByOrder"| Shipping
-    Order -->|"gRPC GetPayment"| Payment
+    Edge -->|"protected HTTP :8080"| Inventory
 
     %% Async / workflow layer
     Checkout -->|"start abandonment workflow"| Temporal
     Order -->|"start order workflow"| Temporal
     Temporal -->|"checkout task queue"| CheckoutWorker
     Temporal -->|"order task queue"| OrderWorker
-
-    OrderWorker -->|"gRPC stock"| Inventory
-    OrderWorker -->|"gRPC shipment"| Shipping
-    OrderWorker -->|"gRPC money"| Payment
-    OrderWorker -->|"gRPC email"| Notification
-    OrderWorker -.->|"REST cart clear"| Cart
 
     %% Outbound call to external payment provider
     Payment -->|"provider HTTP"| Provider
@@ -122,6 +117,7 @@ flowchart TB
     end
 
     User --> PlatformDB
+    Keycloak --> PlatformDB
     Review --> PlatformDB
     Shipping --> PlatformDB
     Notification --> PlatformDB
@@ -142,10 +138,10 @@ flowchart TB
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     classDef external fill:#64748b,color:#fff,stroke:#334155;
-    class Browser,Edge edge;
+    class Storefront,Backoffice,Edge edge;
     class User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification service;
     class CheckoutWorker,OrderWorker worker;
-    class Temporal platform;
+    class Keycloak,Temporal platform;
     class PlatformDB,ProductDB,Valkey data;
     class Internet,Provider external;
 ```
@@ -169,16 +165,16 @@ graph LR
     classDef external fill:#64748b,color:#fff,stroke:#334155;
 ```
 
-Read the diagram **top-down**: Internet → React SPA → the edge → HTTP services and
-workflows → data stores. It names every deployed service and worker. Solid arrows
-are current HTTP, gRPC, workflow, or data-store paths; the dotted arrow is the
-one documented cart REST exception (the worker's cart clear). Exact RPC names are in
-[Current East-West Call Graph](#current-east-west-call-graph), and each service
-file explains its own callers and data authority.
+Read the diagram **top-down**: shoppers and operators → their application
+services → the edge → identity, Go services, and workflows → data stores. It
+names every deployed application service, Go service, and worker. Exact
+east-west edges are intentionally shown only in
+[Current East-West Call Graph](#current-east-west-call-graph); feature and data
+authority lives in [microservices.md](./microservices.md).
 
 ### Inside Each Service
 
-Every service follows the same dependency direction. HTTP and gRPC are
+Every Go microservice follows the same dependency direction. HTTP and gRPC are
 transport peers: both validate input and call the logic layer.
 
 ```mermaid
@@ -305,7 +301,7 @@ sequenceDiagram
 | Rule | Meaning |
 |------|---------|
 | Identity source | Read `user_id` from verified JWT claims (`sub`, string UUID), never from a private request body |
-| Authoritative check | Each service verifies the token locally with `pkg/authmw` (v0.37.0: `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL`) |
+| Authoritative check | Each service verifies the token locally with `pkg/authmw` using `OIDC_ISSUER`/`OIDC_AUDIENCE`/`OIDC_JWKS_URL` |
 | Gateway check | The edge's `SecurityPolicy.jwt` (`remoteJWKS`) verifies **signature and issuer** against the realm's JWKS, with no provisioned key material. It does **not** verify the audience — no policy declares `audiences`, deliberately, so the edge cannot reject a token the services would accept; `aud` is enforced in-service. Verified end-to-end in local-stack **and on Kind** (K4.1–K4.5, K4.8; gate run 2026-08-25) — [ADR-044](../proposals/adr/ADR-044-envoy-gateway-platform-edge/) |
 | Auth gRPC | Removed; services do not call auth `GetMe` |
 | Failure mode | Missing, invalid, or unverifiable credentials fail closed |
@@ -432,53 +428,56 @@ unless an ADR documents a reason not to.
 
 ## Current East-West Call Graph
 
-The order-worker and checkout-worker edges below are Temporal saga activities;
-the workflow registry (owners, task queues, participants) is
-[workflows.md](./workflows.md).
+The order-worker edges below are Temporal activities. Checkout's edges are on
+the synchronous request path; checkout-worker has no service edge because its
+expiry activity is DB-local. The workflow registry (owners, task queues, and
+participants) is [workflows.md](./workflows.md).
 
 ```mermaid
-flowchart LR
-    Product -->|"GetProductReviews"| Review
-    OrderAPI["order API"] -->|"GetShipmentByOrder"| Shipping
-    OrderAPI -->|"GetPayment"| Payment
-    Worker["order worker"] -->|"Reserve / Commit / Release stock"| Inventory
-    Worker -->|"Create / Cancel shipment"| Shipping
-    Worker -->|"Send email"| Notification
-    Worker -->|"Authorize / Capture / Void / Refund"| Payment
-    Checkout -->|"GetCart"| Cart
-    Checkout -->|"BatchGetCurrentPrices (prices)"| Product
-    Checkout -->|"CheckAvailability (stock)"| Inventory
-    Checkout -->|"GetQuote"| Shipping
-    Checkout -->|"CreateOrder"| OrderAPI
-    OrderAPI -->|"GetReservation (enrich)"| Inventory
-    Worker -.->|"legacy REST clear"| Cart
+flowchart TB
+    subgraph Reads["Read composition"]
+        direction LR
+        ProductRead["product"] -->|"GetProductReviews"| ReviewRead["review"]
+        ProductRead -->|"BatchGetAvailability"| InventoryProduct["inventory"]
+        OrderRead["order API"] -->|"GetShipmentByOrder"| ShippingRead["shipping"]
+        OrderRead -->|"GetPayment"| PaymentRead["payment"]
+        OrderRead -->|"GetReservation"| InventoryOrder["inventory"]
+    end
+
+    subgraph Purchase["Checkout validation and handoff"]
+        direction LR
+        Checkout -->|"GetCart"| CartRead["cart"]
+        Checkout -->|"BatchGetCurrentPrices"| ProductPrice["product"]
+        Checkout -->|"CheckAvailability"| InventoryCheck["inventory"]
+        Checkout -->|"GetQuote"| ShippingQuote["shipping"]
+        Checkout -->|"CreateOrder"| OrderCreate["order API"]
+    end
+
+    subgraph FulfillmentCalls["Fulfillment worker activities"]
+        direction LR
+        Worker["order worker"] -->|"Reserve / Commit / Release / GetReservation"| InventoryWork["inventory"]
+        Worker -->|"CreateShipment / CancelShipment"| ShippingWork["shipping"]
+        Worker -->|"SendEmail"| NotificationWork["notification"]
+        Worker -->|"Authorize / Capture / Void / Refund"| PaymentWork["payment"]
+        Worker -.->|"REST clear exception"| CartClear["cart"]
+    end
 
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    class Product,Review,OrderAPI,Shipping,Payment,Notification,Checkout,Cart,Inventory service;
+    class ProductRead,ReviewRead,InventoryProduct,OrderRead,ShippingRead,PaymentRead,InventoryOrder service;
+    class Checkout,CartRead,ProductPrice,InventoryCheck,ShippingQuote,OrderCreate service;
+    class InventoryWork,ShippingWork,NotificationWork,PaymentWork,CartClear service;
     class Worker worker;
 ```
 
-| Caller | Callee | Contract | Transport | Deployment |
-|--------|--------|----------|-----------|------------|
-| Product | Review | `GetProductReviews` | gRPC | Cluster and local-stack |
-| Order API | Shipping | `GetShipmentByOrder` | gRPC | Cluster and local-stack |
-| Order API | Payment | `GetPayment` | gRPC | Cluster and local-stack |
-| Order worker | Inventory | `Reserve`, `Commit`, `Release`, `GetReservation` | gRPC | Cluster and local-stack |
-| Order API | Inventory | `GetReservation` (`/details` enrichment) | gRPC | Cluster and local-stack |
-| Order worker | Shipping | `CreateShipment`, `CancelShipment` | gRPC | Cluster and local-stack |
-| Order worker | Notification | `SendEmail` (`SendSMS` is served but has no live caller) | gRPC | Cluster and local-stack |
-| Order worker | Payment | `Authorize`, `Capture`, `Void`, `Refund` | gRPC | Cluster and local-stack |
-| Checkout | Cart | `GetCart` | gRPC | Cluster and local-stack |
-| Checkout | Product | `BatchGetCurrentPrices` | gRPC | Cluster and local-stack |
-| Checkout | Inventory | `CheckAvailability` | gRPC | Cluster and local-stack |
-| Checkout | Shipping | `GetQuote` | gRPC | Cluster and local-stack |
-| Checkout | Order | `CreateOrder` | gRPC | Cluster and local-stack |
-| Order worker | Cart | Clear cart | REST exception | Current |
+Every solid edge is current in local-stack and the cluster and uses gRPC. The
+dotted order-worker → cart edge is the one current REST exception. Implemented
+RPCs without a caller are not drawn; they remain documented under the serving
+service's **Known gaps**. A service box may repeat across groups so each caller's
+contract stays readable without crossed edges.
 
-The order→cart pricing read died with the legacy REST create (RFC-0021 P5,
-order-service v1.11.0); the worker's clear-cart is the one remaining REST
-exception on the order side.
+The order→cart pricing read died with the legacy REST create (RFC-0021 P5);
+the worker's clear-cart is the one remaining REST exception on the order side.
 
 Auth has no gRPC server. The former `auth.GetMe` dependency was retired when
 services moved to local JWT verification.
@@ -505,7 +504,7 @@ services moved to local JWT verification.
 
 ## End-to-end user journeys
 
-Four user journeys — register, browse, checkout, fulfill — traced as sequence
+Four user journeys — sign in, browse, checkout, fulfill — traced as sequence
 diagrams across every service they touch. HTTP edges use the canonical shape
 `/{service}/v1/{audience}/{resource...}` (see [HTTP URL Model](#http-url-model));
 east-west edges use gRPC on `:9090` (see [gRPC Runtime Model](#grpc-runtime-model)).
@@ -517,38 +516,34 @@ The four flows chain into one shopping journey: a JWT from flow 1 authorizes the
 cart writes in flow 2, the cart becomes a checkout session in flow 3, and the
 confirmed order drives the saga in flow 4.
 
-### 1. Register / login → JWT
+### 1. Sign in with PKCE → authenticated API call
 
-Owner: [§ Authentication](#authentication) — the SPA logs in against the
-Keycloak realm (`keycloak-js` PKCE,
-[ADR-043](../proposals/adr/ADR-043-oidc-browser-workload-trust/)) and services
-verify realm tokens only. **The diagram below is historical** (auth-service,
-retired by RFC-0024 P5 — no `/auth/v1/*` route exists at either edge; the
-archived contract stays readable in [auth.md](./auth.md)); it is kept because
-the token-rotation shape it teaches carried over to the realm flow.
+Owner: [identity.md](./identity.md). Storefront and Backoffice both use
+Authorization Code + PKCE through `keycloak-js`; the selected realm and client
+differ, but the browser trust model is the same. No password grant, auth-service,
+or BFF participates.
 
 ```mermaid
 sequenceDiagram
-    participant SPA as Browser SPA
-    participant Edge as Edge gateway
-    participant Auth as auth
+    participant B as Browser
+    participant SPA as Storefront or Backoffice SPA
+    participant K as Keycloak realm
+    participant E as Edge gateway
+    participant S as Owning service
 
-    SPA->>Edge: POST /auth/v1/public/auth/register
-    Edge->>Auth: pass-through (public — no edge JWT)
-    Auth-->>SPA: 201 access_token (RS256) + refresh_token
-
-    SPA->>Edge: POST /auth/v1/public/auth/login
-    Edge->>Auth: pass-through
-    Auth-->>SPA: 200 access_token + refresh_token
-
-    Note over SPA,Auth: access token expires → rotate
-    SPA->>Edge: POST /auth/v1/public/auth/refresh
-    Edge->>Auth: pass-through
-    Auth-->>SPA: 200 new pair (old refresh token retired)
-
-    Note over SPA,Edge: all later /private/ calls carry Bearer access_token
-    SPA->>Edge: GET /cart/v1/private/cart (Bearer)
-    Note over Edge: jwt-edge SecurityPolicy: RS256 signature + iss check
+    B->>SPA: Open an authenticated screen
+    SPA->>K: Authorization request + PKCE S256 challenge
+    K-->>B: Login and consent UI
+    B->>K: Submit realm credentials
+    K-->>SPA: Redirect with authorization code
+    SPA->>K: Exchange code + PKCE verifier
+    K-->>SPA: RS256 access token + rotating refresh token
+    Note over SPA: Tokens stay in adapter memory
+    SPA->>E: API request + Authorization: Bearer
+    E->>E: Verify issuer + signature
+    E->>S: Forward request
+    S->>S: Verify issuer + signature + audience + expiry
+    S-->>SPA: Owner-scoped response
 ```
 
 ### 2. Browse → cart CRUD
@@ -561,6 +556,7 @@ sequenceDiagram
     participant Edge as Edge gateway
     participant Prod as product
     participant Rev as review
+    participant Inv as inventory
     participant Cart as cart
 
     SPA->>Edge: GET /product/v1/public/products?page=1
@@ -571,6 +567,8 @@ sequenceDiagram
     Edge->>Prod: pass-through
     Prod->>Rev: gRPC ReviewService/GetProductReviews
     Rev-->>Prod: reviews + summary (soft-fail to [])
+    Prod->>Inv: gRPC InventoryService/BatchGetAvailability
+    Inv-->>Prod: availability (soft-fail to status unknown)
     Prod-->>SPA: 200 product + stock + reviews + related
 
     SPA->>Edge: POST /cart/v1/private/cart (Bearer)
@@ -769,7 +767,7 @@ Signal-by-signal matrix:
 
 | Control | Current state | Purpose |
 |---------|---------------|---------|
-| Edge JWT (`SecurityPolicy.jwt`) | Active on private HTTP routes in local-stack; cluster manifests carry the same policy but are unverified on Kind (**planned**) | Coarse rejection before service work |
+| Edge JWT (`SecurityPolicy.jwt`) | Active on private and protected HTTP routes in both environments; verified on Kind in the 2026-08-25 gate | Coarse rejection before service work |
 | Service JWT verification | Active | Authoritative identity and claims check |
 | NetworkPolicy on `:9090` | Active for deployed service edges | Restrict which namespaces may call each gRPC server |
 | TLS for external traffic | Terminated at the cluster `Gateway` https listener; plain HTTP in local-stack | Protect north-south traffic |
@@ -868,4 +866,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-23 — the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-22 — the staff verifier's issuer and JWKS URL are declared, not derived._
+_Last updated: 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._

@@ -37,6 +37,13 @@ because it is much less than Keycloak can do:
 - Publish a JWKS per realm, which the edge and ten services fetch to verify
   signatures.
 - Hold realm roles (`customer`, `backoffice_admin`) and the demo users.
+- **Staff SSO for infra tools** ([ADR-062](../proposals/adr/ADR-062-staff-groups-sso/)):
+  the staff realm carries the team groups (`infra-team`/`sre-team`/`dev-team`)
+  and two confidential clients — `grafana` (generic_oauth, groups → org role)
+  and `openbao` (auth/oidc, groups → external groups → team policies). Their
+  secrets are realm-import `${ENV}` placeholders fed from OpenBAO via ESO —
+  never literals in git. Login and admin **events are enabled** on the staff
+  realm and land in VictoriaLogs through the JSON console log.
 
 Deliberately **not** used: self-registration, password recovery, identity
 brokering, user federation, fine-grained authorization services, and the Envoy
@@ -320,7 +327,8 @@ Stated plainly, because none of these are hidden by the manifests:
 | No egress NetworkPolicy for `identity` | Outbound traffic from Keycloak is unrestricted. |
 | No log parsing, trace-based signals, or recording rules | Logs land in VictoriaLogs unparsed; spans are collected but nothing alerts on them. |
 | `OTEL_RESOURCE_ATTRIBUTES` says `deployment.environment.name=production` | Set on the **local** cluster, to satisfy the vmagent promote allowlist. Misleading when read at face value. |
-| local-stack realm JSONs have drifted | Their `redirectUris`/`webOrigins` differ from the cluster ConfigMap while a compose comment still calls them verbatim copies. |
+| local-stack realm JSONs have drifted | Their `redirectUris`/`webOrigins` differ from the cluster ConfigMap while a compose comment still calls them verbatim copies. (The ADR-062 groups/clients/events shape IS carried in both.) |
+| Local Grafana/OpenBAO client secrets in local-stack are dev literals | The cluster generates them randomly in OpenBAO; the compose realm uses placeholder strings — same class as the other committed dev creds below. |
 | Credentials are committed in git | The OpenBAO bootstrap ConfigMap and realm JSONs carry dev-only passwords in plaintext. Acceptable for a demo platform, disqualifying for anything real. |
 
 ## References
@@ -335,4 +343,4 @@ Stated plainly, because none of these are hidden by the manifests:
 
 ---
 
-_Last updated: 2026-08-24 — first version. Closes the `docs/platform/keycloak.md` deliverable named by ADR-041 and RFC-0022, and absorbs the cluster half of the retired `identity-cutover-runbook.md` as the realm reset procedure._
+_Last updated: 2026-08-26 — added the ADR-062 staff-SSO consumers (groups, confidential clients, realm events). First version 2026-08-24 closed the deliverable named by ADR-041 and RFC-0022 and absorbed the retired `identity-cutover-runbook.md` as the realm reset procedure._

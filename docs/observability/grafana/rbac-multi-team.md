@@ -61,7 +61,7 @@ Official: [Team sync](https://grafana.com/docs/grafana/latest/administration/tea
 | SRE full control, others read-only | Named users: SRE = **Admin** or **Editor**; engineers = **Viewer**; use folder permissions for exceptions |
 | Per-team dashboard ownership | **Teams** + folder **Editor** for that team’s folder |
 | Break-glass without SSO | **Local users** in Grafana DB (store passwords via Secret if automated) |
-| Production-grade | **OAuth/OIDC** + **Team sync** or group → role mapping |
+| Production-grade | **OAuth/OIDC** + **Team sync** or group → role mapping — **this is what the repo runs since [ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/)** (see [This repository](#this-repository-homelab-defaults)) |
 
 ---
 
@@ -82,15 +82,33 @@ The Grafana instance is configured in:
 
 `kubernetes/infra/configs/observability/grafana/grafana.yaml`
 
-Relevant settings (verify in file for exact values):
+Since [ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/) this is the
+"production-grade" row of the table above, implemented with Keycloak:
 
-- **`auth.anonymous.enabled`**: `true` — no login required via UI when reachable.
-- **`auth.anonymous.org_role`**: **`Admin`** — **anyone** who reaches Grafana has org Admin until changed.
-- **`auth.disable_login_form`**: `true` — login form disabled; combined with anonymous, **named users cannot use the login UI** until you re-enable the form and configure users/SSO.
+- **`auth.generic_oauth`**: enabled against the `duynhlab-staff` realm.
+  Split URLs on purpose — the browser-facing `auth_url` is the public issuer
+  host (`id.duynh.me`), while `token_url`/`api_url` are backchannel calls from
+  the Grafana pod and take the in-cluster Service (the same shape the JWT
+  SecurityPolicies and `pkg/authmw` use).
+- **Group → org role** via JMESPath `role_attribute_path`:
+  `infra-team` → **Admin**, `sre-team` → **Editor**, any other staff login →
+  **Viewer**. Changing someone's access = changing their Keycloak group;
+  Grafana config never names a person.
+- **`auth.anonymous.org_role`**: **`Viewer`** — dashboards stay readable on
+  the LAN and while Keycloak is down, but editing needs a person.
+- **`auth.disable_login_form`**: `true` — the Keycloak button is the only
+  human door (owner call). Local `admin` has no UI door; break-glass = flip
+  this flag in git and let Flux reconcile.
+- The client secret is never in git: ExternalSecret `grafana-oidc-client`
+  reads the OpenBAO value the realm import consumed and feeds
+  `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET`.
 
-**Security note:** With port-forward, treat Grafana as **sensitive**. For multi-team or shared networks: set anonymous to **Viewer** or disable anonymous and enable OAuth/login.
+**Team Sync caveat:** mapping Keycloak groups to Grafana **Teams** (for folder
+permissions) is an Enterprise feature — OSS stops at the org-role mapping
+above. Team/folder scoping in OSS means provisioning teams and folder
+permissions by hand, per the patterns earlier in this document.
 
-**VMAuth** ([VictoriaMetrics stack doc — VMAuth planned](../metrics/victoriametrics.md#vmauth--vmauth-planned)) does **not** change the above: it protects VictoriaMetrics APIs, not Grafana’s anonymous Admin.
+**VMAuth** ([VictoriaMetrics stack doc — VMAuth planned](../metrics/victoriametrics.md#vmauth--vmauth-planned)) is orthogonal: it protects VictoriaMetrics APIs, not the Grafana UI.
 
 ---
 
@@ -158,4 +176,4 @@ flowchart TD
 - [VMAuth and vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned)
 
 ---
-_Last updated: 2026-07-14_
+_Last updated: 2026-08-26_

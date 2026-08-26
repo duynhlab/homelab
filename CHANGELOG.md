@@ -752,6 +752,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **ADR-062 docs sync (train 5/5).** `rbac-multi-team.md` § "This repository"
+  now describes the deployed staff SSO instead of anonymous-Admin;
+  `openbao.md` §4 rewritten from the GitHub/Google reference sketch to the
+  Keycloak reality (deployed diagrams + hairpin sequence) and its
+  current-state banner gains an "Auth (humans)" row; `keycloak.md` names the
+  two new SSO consumers and realm events in "what Keycloak is used for" +
+  known-gaps. ADR-062 itself flips **Proposed → Accepted / Complete** with the
+  gate evidence and the as-built mechanics (two-wave OpenBAO config, login
+  form kept hidden per owner call).
+
 - **The trusted API guides now have non-overlapping ownership.**
   `api.md` owns shared contracts, topology, the exact call graph, and current
   user journeys; `microservices.md` is a compact feature-ownership and known-gap

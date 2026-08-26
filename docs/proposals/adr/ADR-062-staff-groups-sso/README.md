@@ -10,8 +10,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-26 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Which identity source authorizes humans in platform infra tools (Grafana, OpenBAO), and the group taxonomy that source exposes; not customer-facing auth, not service-to-service auth |
@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | this ADR's PR train (realm → OpenBAO ∥ Grafana → docs) |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — verified live on Kind 2026-08-26: Grafana SSO login (302 → staff realm, PKCE), realm groups/clients imported with substituted secrets, OpenBAO OIDC via the hairpin (evidence in PRs #928–#933) |
 
 ## Context
 
@@ -107,13 +107,18 @@ Mechanics — one identity, two translations, no new components:
 - **Grafana** (`grafana.yaml` CR): `[auth.generic_oauth]` against the staff
   realm; `role_attribute_path` (JMESPath) maps groups → org role;
   `server.root_url` becomes `https://grafana.duynh.me`; anonymous drops to
-  Viewer and the login form returns.
-- **OpenBAO** (bootstrap ConfigMap,
-  `kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml`): a new
-  idempotent phase enables `auth/oidc` against the staff realm
-  (`groups_claim="groups"`), creates one **external** identity group per team
-  with a group-alias on the OIDC mount, and attaches policies to the groups.
-  The `devops-admin` policy is renamed `infra-team` in the same phase.
+  Viewer. (As accepted the login form was to return; after the first SSO login
+  the owner chose to keep it hidden — the Keycloak button is the only human
+  door, break-glass = flip `disable_login_form` in git. PR #931.)
+- **OpenBAO**, in two waves because `auth/oidc/config` validates the discovery
+  URL at write time and Keycloak (plus the edge hairpin `id.duynh.me` resolves
+  through — PR #930) comes up later than the secrets wave: the **bootstrap**
+  enables the `oidc` mount offline, renames `devops-admin` → `infra-team`,
+  adds `sre-team`, and mints an `oidc-configurator` k8s-auth role; the
+  **`openbao-oidc-config` Job** (new Flux wave after `envoy-gateway-config`,
+  second ADR-025 pattern-A configurator — no root token) writes the OIDC
+  config (`groups_claim="groups"`), the `staff` role, and one **external**
+  identity group per team with a group-alias on the OIDC mount.
 
 ### Decision rules
 
@@ -256,6 +261,8 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-26 | Proposed / Not started | Initial draft |
+| 2026-08-26 | Accepted / Partial | Owner merged the ADR (#927) and approved the train; realm (#928), Grafana (#929, #931), hairpin (#930), OpenBAO (#932, trust fix #933) landed the same day |
+| 2026-08-26 | Accepted / Complete | Fresh `make up` verified end-to-end: Grafana SSO 302 with PKCE + form hidden, OpenBAO `auth/oidc` written through the hairpin, external groups + aliases live, auth_url generation returns the Keycloak authorize endpoint |
 
 ---
 _Last updated: 2026-08-26_

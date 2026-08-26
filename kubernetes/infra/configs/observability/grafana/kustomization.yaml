@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - grafana.yaml
+  - external-secret-oidc.yaml
   - dashboards-chart.yaml
   - datasource-victorialogs.yaml
   - datasource-victoriatraces.yaml

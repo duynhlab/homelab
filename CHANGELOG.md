@@ -62,6 +62,24 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Secrets
+
+- **The OIDC configurator trusted a CA that no longer exists.** The
+  `openbao-oidc-config` Job read its trust from the trust-manager
+  `homelab-ca-bundle` — which is built from a **static, committed** copy of
+  `homelab-ca` (`configs/cert-manager/ca-source/`, by design for staged
+  rollover). Every `make up` regenerates the real CA, so on a rebuilt cluster
+  the discovery fetch died with `x509: ECDSA verification failure …
+  candidate authority "homelab-ca"` — and a second bug hid the first: passing
+  the 141-cert bundle as a shell arg tripped `ARG_MAX` ("Argument list too
+  long") while `2>/dev/null` swallowed both errors into an endless
+  "discovery not ready" loop. Fix: a `openbao-idp-trust` Certificate issued
+  by the LIVE `homelab-ca` ClusterIssuer (its `ca.crt` matches the edge chain
+  by construction, every rebuild), system CAs concatenated at runtime,
+  `oidc_discovery_ca_pem=@file`, and retry errors now print. The stale
+  committed CA copy remains a standing platform gap for every *other* bundle
+  consumer on a rebuilt cluster.
+
 #### <Component>
 - ...
 

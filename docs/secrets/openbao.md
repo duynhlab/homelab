@@ -13,18 +13,20 @@
 > |---|---|---|
 > | Storage / HA | ✅ OpenBAO HA, 3-node Raft, PVC | same |
 > | App secret delivery | ✅ ESO + **KV v2 static** secrets (`refreshInterval: 1h`) for most services; **notification reads a DB-engine static role** via the `openbao-db` store | per-request dynamic DB creds |
-> | Auth (ESO) | ✅ Kubernetes auth, least-privilege `eso-read` policy | + OIDC for humans |
+> | Auth (ESO) | ✅ Kubernetes auth, least-privilege `eso-read` policy | same |
+> | Auth (humans) | ✅ **OIDC via the `duynhlab-staff` realm** ([ADR-062](../proposals/adr/ADR-062-staff-groups-sso/)): UI button + `bao login -method=oidc`; groups → external groups → team policies (`infra-team`, `sre-team`) | same, real IdP hostname |
 > | Audit | ⚠ `file → stdout` **best-effort** (enablement is not fail-closed; `auditStorage` off) | durable, fail-closed |
 > | **Database secrets engine** | ✅ **enabled — pattern-A pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)): static role `notification` on `platform-db` (`rotation_period` 720h), read through the dedicated `openbao-db` ClusterSecretStore. Per-request dynamic roles and other services: §5.2, §6, §10 — still *planned* | per-request dynamic roles, more services |
 > | Unseal | ⚠️ **awskms auto-unseal via the floci KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot; `openbao-init-keys` holds only a break-glass recovery key; **root token revoked**. floci is a loose, zero-auth emulator (parity/rehearsal, not real crypto) | Real cloud KMS (`awskms`/`gcpckms`, IRSA/Workload Identity) |
 > | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager |
 > | Credentials | ❌ dev passwords **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
-> | Root token | ✅ **revoked** after bootstrap (verified by exit code, node-pinned); inert copy left in `openbao-init-keys` (BusyBox `wget` can't PATCH it out). Break-glass **recovery key** remains = full admin via `generate-root`, so a Secret read is still high-value | revoked; OIDC / AppRole; recovery key sharded offline |
+> | Root token | ✅ **revoked** after bootstrap (verified by exit code, node-pinned); inert copy left in `openbao-init-keys` (BusyBox `wget` can't PATCH it out). Break-glass **recovery key** remains = full admin via `generate-root`, so a Secret read is still high-value. **Human access no longer depends on it** — OIDC login is live (ADR-062) | revoked; OIDC / AppRole; recovery key sharded offline |
 >
 > **These local-only choices are unsafe for production.** The hardening path and a
 > local-vs-prod parity/testing matrix live in [RFC-0008](../proposals/rfc/RFC-0008/).
 > The database engine's **static-role pilot is deployed** (§5.2); any section below
-> describing *per-request dynamic* credentials, leases, or OIDC is **planned**, not deployed.
+> describing *per-request dynamic* credentials or leases is **planned**, not deployed;
+> **OIDC is deployed** for staff since [ADR-062](../proposals/adr/ADR-062-staff-groups-sso/).
 
 ---
 
@@ -68,9 +70,10 @@ form the quorum behind the in-cluster service; External Secrets Operator (ESO)
 logs in with a Kubernetes service account, reads the KV engine, and materializes
 Kubernetes Secrets that pods consume. **Auto-unseal is deployed on Kind via the floci
 KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot. The database engine
-is live with one **static role** (`notification`, ADR-025 pilot). Dashed **(planned)**
-nodes/edges are designed but not yet deployed (per-request dynamic DB creds,
-OIDC/AppRole, real cloud KMS); everything else is live on local Kind.
+is live with one **static role** (`notification`, ADR-025 pilot). **OIDC is live** — staff log in through the
+`duynhlab-staff` realm and group membership maps to team policies (ADR-062).
+Dashed **(planned)** nodes/edges are designed but not yet deployed (per-request
+dynamic DB creds, AppRole, real cloud KMS); everything else is live on local Kind.
 
 ### High-Level Overview
 
@@ -98,7 +101,7 @@ flowchart TD
         end
         subgraph authm["Auth methods"]
             k8sauth["kubernetes/<br/>ESO service accounts"]:::platform
-            oidc["oidc/ (planned)"]:::planned
+            oidc["oidc/<br/>Keycloak duynhlab-staff<br/>groups → team policies (ADR-062)"]:::platform
             approle["approle/ (planned)"]:::planned
         end
     end
@@ -116,7 +119,7 @@ flowchart TD
     eso -->|"materialize"| k8ssecret
     k8ssecret --> pods
     floci -->|"unwrap root key (awskms)"| raft
-    operators -.->|"planned"| oidc
+    operators -->|"SSO — Keycloak staff realm"| oidc
     cicd -.->|"planned"| approle
     db -->|"rotate notification password"| cnpg
     dyn -.->|"per-request creds (planned)"| cnpg
@@ -270,31 +273,31 @@ sequenceDiagram
 flowchart TD
     subgraph consumers["Consumers"]
         eso_sa["ESO ServiceAccount\nexternal-secrets/external-secrets-system"]
-        dev["Developer\n(GitHub / Google SSO)"]
-        data["Data Analyst\n(GitHub / Google SSO)"]
-        devops["DevOps Engineer\n(GitHub / Google SSO — admin)"]
-        gha["GitHub Actions\n(CI/CD pipeline)"]
+        infra["infra-team member\n(Keycloak staff realm SSO)"]
+        sre["sre-team member\n(Keycloak staff realm SSO)"]
+        devx["dev-team member\n(Keycloak staff realm SSO)"]
+        gha["GitHub Actions\n(CI/CD — planned)"]
     end
 
     subgraph authmethods["OpenBAO Auth Methods"]
         k8sauth["Kubernetes Auth\nauth/kubernetes/\nValidates K8s SA tokens\nvia TokenReview API"]
-        oidcauth["OIDC Auth\nauth/oidc/\nGitHub OAuth / Google Workspace\nGroup claims → policies"]
-        approlauth["AppRole Auth\nauth/approle/\nrole_id + secret_id\nfor CI/CD automation"]
+        oidcauth["OIDC Auth — auth/oidc/ (ADR-062)\nKeycloak realm duynhlab-staff\ngroups claim → external identity groups"]
+        approlauth["AppRole Auth\nauth/approle/ (planned)\nrole_id + secret_id for CI/CD"]
     end
 
     subgraph policies["Policies Issued"]
         p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/static-creds/notification"]
-        p_dev_rw["dev-team-rw\nread/write dev KV\ndynamic DB creds (rw)"]
-        p_data_ro["data-team-ro\ndynamic DB creds (ro only)"]
-        p_admin["devops-admin\nfull access"]
-        p_cicd["cicd-deploy\nwrite deploy artifacts\nno DB access"]
+        p_infra["infra-team\nfull access (renamed from devops-admin)"]
+        p_sre["sre-team\nread-only secret/local/infra/*"]
+        p_default["default only\n(dev-team maps to no policy — deliberate)"]
+        p_cicd["cicd-deploy (planned)"]
     end
 
     eso_sa --> k8sauth --> p_eso
-    dev --> oidcauth --> p_dev_rw
-    data --> oidcauth --> p_data_ro
-    devops --> oidcauth --> p_admin
-    gha --> approlauth --> p_cicd
+    infra --> oidcauth --> p_infra
+    sre --> oidcauth --> p_sre
+    devx --> oidcauth --> p_default
+    gha -.->|"planned"| approlauth -.-> p_cicd
 ```
 
 ### Kubernetes Auth — ESO Integration
@@ -323,27 +326,33 @@ sequenceDiagram
 >
 > If you instead pass `token_reviewer_jwt=@/var/run/secrets/.../token` from the bootstrap Job's pod, that token is bound by `BoundServiceAccountTokenVolume` to ~1 h. After it expires every login fails with `permission denied` and ESO breaks platform-wide. See [Reviewer JWT auth failure](./runbooks/reviewer-jwt-auth-failure.md) for the runtime recovery procedure.
 
-### OIDC Auth — Developer / Data Team
+### OIDC Auth — staff SSO (deployed, ADR-062)
+
+One identity for every infra tool: the same staff-realm token model Grafana
+uses. The server-side discovery fetch reaches the PUBLIC issuer host through
+the in-cluster hairpin (CoreDNS rewrite → `edge` Service), trusted via the
+trust-manager `homelab-ca-bundle` — because OpenBAO's single
+`oidc_discovery_url` must equal the token issuer and cannot split URLs the way
+Grafana does. Config is written by the `openbao-oidc-config` Job (the second
+[ADR-025] pattern-A configurator — k8s auth, no root token), one Flux wave
+after the edge is serving.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Dev as Developer (CLI)
+    participant Op as Operator (UI or CLI)
     participant BAO as OpenBAO
-    participant GitHub as GitHub OIDC
-    participant PG as PostgreSQL
+    participant KC as Keycloak (realm duynhlab-staff)
 
-    Dev->>BAO: bao login -method=oidc role="dev-team"
-    BAO-->>Dev: Open browser: https://github.com/login/oauth/authorize?...
-    Dev->>GitHub: Authorize (SSO)
-    GitHub-->>BAO: ID token (claims: groups=[engineering])
-    BAO->>BAO: groups claim → Identity Group "dev-team"\nAssign policy: dev-team-rw
-    BAO-->>Dev: Vault token (TTL: 8h, policy: dev-team-rw)
-    Dev->>BAO: bao read database/creds/product-app-rw
-    BAO->>PG: CREATE ROLE "v-k8s-product-app-rw-1711584000"\nWITH LOGIN PASSWORD '...' VALID UNTIL '...'
-    BAO-->>Dev: {username: "v-k8s-product-app-rw-...", password: "Xk9mN3..."}
-    Dev->>PG: psql -U v-k8s-product-app-rw-1711584000 -d product
-    note over Dev,PG: Credentials auto-expire after 8h\nAudit log tracks every access
+    Op->>BAO: UI: Method "OIDC" · CLI: bao login -method=oidc
+    BAO->>KC: fetch .well-known/openid-configuration<br/>(https://id.duynh.me — CoreDNS hairpin → edge)
+    BAO-->>Op: Redirect browser to authorization_endpoint
+    Op->>KC: Login duyne / password (staff realm)
+    KC-->>BAO: code → tokens (claims: groups=["infra-team"])
+    BAO->>BAO: groups claim → external identity group infra-team<br/>(group-alias on the oidc mount)
+    BAO-->>Op: token {policies: default + infra-team, ttl: 1h}
+    Op->>BAO: bao token lookup → identity_policies: [infra-team]
+    note over Op,BAO: sre-team → read-only infra KV<br/>dev-team → default only (deliberate)
 ```
 
 ---
@@ -1048,4 +1057,4 @@ gantt
 
 ---
 
-_Last updated: 2026-08-19 — synced to ADR-024 (awskms/floci) + ADR-025 (database engine pilot) reality; auth-service section removed_
+_Last updated: 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

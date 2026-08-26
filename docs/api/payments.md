@@ -4,22 +4,28 @@ Payment turns an order's opaque `tok_` token into settled money — a
 Stripe-style auth/capture state machine, a double-entry ledger, and a
 reconciliation loop that proves the books match the provider.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private + public webhooks · `:8080` · Edge `/payment/v1/private/` (JWT) + `/payment/v1/public/payments/webhooks/` (HMAC, anonymous) + deprecated alias `/payment/v1/public/webhooks/` (ADR-017) | Implemented |
-| **gRPC server** | `PaymentService/GetPayment, Authorize, Capture, Void, Refund` · `:9090` | Implemented |
-| **gRPC client** | None | None |
-| **Worker** | None | None |
-| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
-| **Technical debt** | Deprecated webhook alias (ADR-017) · [Known gaps](#known-gaps) | Technical debt |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster; mockpay provider in both | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`payment.yaml`](../../kubernetes/apps/services/payment.yaml) |
+| **Runtime modes** | `api` + `migrate` + `mockpay` | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [Code map](#code-map) |
+| **HTTP server** | private + public webhook + internal + protected · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | private, signed public webhook, and protected groups; internal reconciliation stays off-edge | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | read + authorize/capture/void/refund RPCs · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | None; provider calls use HTTP | None | — |
+| **Worker** | None; outbox and reconciliation loops run in the API process | None | — |
+| **Temporal** | Money-step gRPC participant | Implemented | [Temporal participation](#temporal-participation) |
+| **Events** | Transactional outbox + signed inbound mockpay webhooks | Implemented | [Ledger + outbox](#ledger--outbox-settle-once-tell-everyone-at-least-once) · [Webhook HMAC](#mockpay--webhook-hmac) |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/payment-service`](https://github.com/duynhlab/payment-service) | — |
-| **Owns** | Payment state, refunds, the double-entry ledger, webhook records, reconciliation reports | — |
-| **Database** | `payment` on `product-db` — **direct** `product-db-rw.product:5432`, `sslmode=require` (bypasses PgDog: no pooler TLS yet) | — |
-| **Design record** | — | [RFC-0010](../proposals/rfc/RFC-0010/) · [RFC-0021](../proposals/rfc/RFC-0021/) P6 · [ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/) · [ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/) · [ADR-036](../proposals/adr/ADR-036-single-writer-lease/) · [ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/) |
+Known gaps: [aliases, pooler, and reconciliation limits](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Payment/refund state, double-entry ledger, provider attempts, webhook records, and reconciliation reports |
+| **Does not own** | Orders, provider-side truth, inventory, or customer identity |
+| **Database** | `payment` on `product-db`, direct to `product-db-rw.product:5432` with `sslmode=require` |
+| **Cache** | None |
+| **Sensitive data** | Customer subject, financial ledger and provider references; only opaque `tok_` methods are accepted, never PAN data |
+| **Design records** | [RFC-0010](../proposals/rfc/RFC-0010/) · [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/) · [ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/) · [ADR-036](../proposals/adr/ADR-036-single-writer-lease/) · [ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/) |
 
 ## Temporal participation
 
@@ -513,4 +519,4 @@ Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-servic
 - [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 
-_Last updated: 2026-08-14 — RFC-0023 Train 3: the protected Backoffice reads ship (staff-realm guard chain)._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

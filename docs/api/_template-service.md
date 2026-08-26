@@ -10,10 +10,12 @@ Documentation language: English only.
 Diagrams: Mermaid only, using the palette defined in AGENTS.md.
 Shared rules belong in api.md; service-specific behavior belongs here.
 
-Implementation status vocabulary:
-Implemented / Partial / Technical debt / No caller / Planned / None.
+Availability vocabulary:
+Implemented / Partial / Planned / None / Archived.
 
-Status describes implementation availability, never runtime business state.
+Availability describes whether a capability exists, never runtime business
+state. Technical debt, deprecated surfaces, and no-caller surfaces belong in
+Known gaps because they can coexist with an implemented capability.
 
 Depth guide:
 - Simple HTTP-only service: 180–300 lines.
@@ -47,22 +49,25 @@ CI badges live in hub rollup + docs/README.md § Repositories, not here.
 <!--
 Part 2 — At a glance.
 
-Keep cells short. Detail belongs in later sections.
+Keep cells short. Detail belongs in later sections. Evidence links to the
+smallest stable proof: this document's detailed section, a homelab manifest,
+the workflow registry, or a code-map path. Use `—` when the capability is absent.
 Use the same rows in every service document.
 -->
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **Runtime modes** | `api` <!-- + migrate / seed / worker / reaper --> | Implemented |
-| **HTTP server** | {public/private/protected/internal/none} · `:8080` | Implemented |
-| **Edge exposure** | Edge `HTTPRoute` on `{canonical prefixes}`; `{internal prefixes}` off-edge | Implemented |
-| **gRPC server** | None <!-- or `package.Service/RPCs` · `:9090` --> | None |
-| **gRPC clients** | None <!-- or short callee list --> | None |
-| **Worker** | None <!-- or `{worker}` · queue `{queue}` --> | None |
-| **Temporal** | None · [workflows.md](./workflows.md) <!-- or role + workflow --> | None |
-| **Async / events** | None <!-- or published/consumed event families --> | None |
-| **Technical debt** | None <!-- or short item + Known gaps link --> | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · `kubernetes/apps/services/{service}.yaml` |
+| **Runtime modes** | `api` <!-- + migrate / seed / worker / reaper --> | Implemented | [Code map](#code-map) |
+| **HTTP server** | {public/private/protected/internal/none} · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | Edge `HTTPRoute` on `{canonical prefixes}`; `{internal prefixes}` off-edge | Implemented | [HTTP API](#http-api) · [edge routes](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | None <!-- or `package.Service/RPCs` · `:9090` --> | None | — |
+| **gRPC clients** | None <!-- or short callee list --> | None | — |
+| **Worker** | None <!-- or `{worker}` · queue `{queue}` --> | None | — |
+| **Temporal** | None | None | — |
+| **Events** | None <!-- or published/consumed event families --> | None | — |
+
+Known gaps: [None](#known-gaps).
 
 <!--
 Part 3 — Stable identity and ownership metadata.
@@ -73,17 +78,14 @@ mistake.
 Versioning: link api.md § versioning — do not duplicate platform policy here.
 -->
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | `duynhlab/{service}-service` <!-- link it once {service} is filled in --> | — |
-| **Domain** | {bounded context / subdomain} | — |
-| **Owns** | {authoritative data and business rules} | — |
-| **Does not own** | {adjacent data and rules owned elsewhere} | — |
-| **Database** | `{db}` on `{cluster}` via `{pooler/direct}` <!-- or None --> | — |
-| **Cache** | None <!-- or cache name, purpose, authority rule --> | — |
-| **Sensitive data** | None <!-- or PII/token/financial classification --> | — |
-| **Contract sources** | HTTP `{router/types paths}` · gRPC `{proto repository/path}` | — |
-| **Design records** | — | `RFC-NNNN` <!-- link ../proposals/rfc/RFC-NNNN/ once numbered, or None --> |
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | {authoritative data and business rules} |
+| **Does not own** | {adjacent data and rules owned elsewhere} |
+| **Database** | `{db}` on `{cluster}` via `{pooler/direct}` <!-- or None --> |
+| **Cache** | None <!-- or cache name, purpose, authority rule --> |
+| **Sensitive data** | None <!-- or PII/token/financial classification --> |
+| **Design records** | `RFC-NNNN` <!-- link ../proposals/rfc/RFC-NNNN/ once numbered, or None --> |
 
 ## Temporal participation
 
@@ -320,7 +322,7 @@ present-tense sentence.
 - [ ] Edge exposure matches the `HTTPRoute`s actually configured (`kubernetes/infra/configs/envoy-gateway/routes/`, `local-stack/gateway/eg/routes.yaml`)
 - [ ] Deployment claims match kubernetes/apps/ — image, probes, env
 - [ ] Call-graph edges owned by api.md are not redrawn here, only linked
-- [ ] Deployment status uses the hub vocabulary, and Planned is used for
+- [ ] Capability availability uses the hub vocabulary, and Planned is used for
       anything not running
 - [ ] Every link resolves, and each service contract is linked directly
 - [ ] `_Last updated` says what changed, not only when

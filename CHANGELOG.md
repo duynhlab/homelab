@@ -689,6 +689,12 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **API service summaries now separate current shape, availability, and
+  verification evidence.** The v2 template, all eleven API contracts, and the
+  Backoffice application-service contract use one capability table; ownership
+  metadata no longer carries an almost-empty RFC/ADR column, and lifecycle
+  gaps no longer masquerade as availability states.
+
 - **The auto_explain plan history has its incident runbook:**
   [`plan-regression-investigation.md`](docs/observability/runbooks/postgresql/plan-regression-investigation.md)
   — the cross-signal workflow the pipeline exists for: metrics

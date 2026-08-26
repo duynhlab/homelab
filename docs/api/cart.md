@@ -2,22 +2,28 @@
 
 Cart turns browsing intent into a per-user, mutable basket — and hands checkout a read-only, minor-units snapshot of it.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private + internal clear · `:8080` · edge `/cart/v1/private/` · edge JWT | Implemented |
-| **gRPC server** | `CartService/GetCart` · `:9090` | Implemented |
-| **gRPC client** | None | None |
-| **Worker** | None | None |
-| **Temporal** | Participant (REST) · `ClearCart` · [workflows.md](./workflows.md#order-fulfillment) | Implemented |
-| **Technical debt** | None · [Known gaps](#known-gaps) | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`cart.yaml`](../../kubernetes/apps/services/cart.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [Code map](#code-map) |
+| **HTTP server** | private + internal clear · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/cart/v1/private/` only; tokenless internal clear stays off-edge | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | `CartService/GetCart` · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | None | None | — |
+| **Worker** | None | None | — |
+| **Temporal** | REST participant via `ClearCart` | Implemented | [Temporal participation](#temporal-participation) |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service) | — |
-| **Owns** | Per-user cart and cart items (product/quantity selection + denormalized add-time price snapshot) | — |
-| **Database** | `cart` on `product-db` via PgDog (`pgdog-product.product:6432`) | — |
-| **Design record** | — | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) — cart gRPC read surface |
+Known gaps: [planned gRPC mTLS](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Per-user cart items, quantities, and denormalized add-time price snapshots |
+| **Does not own** | Current catalog prices, inventory availability, checkout sessions, or orders |
+| **Database** | `cart` on `product-db` via PgDog `pgdog-product.product:6432` |
+| **Cache** | None |
+| **Sensitive data** | User-scoped shopping intent keyed by the Keycloak subject |
+| **Design records** | [ADR-021](../proposals/adr/ADR-021-cart-grpc-read-surface/) |
 
 ## Temporal participation
 
@@ -305,4 +311,4 @@ Paths in [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service). Tr
 - [checkout.md](./checkout.md) · [product.md](./product.md) · [order.md](./order.md) — neighbor contracts
 - [temporal.md](./temporal.md) — saga deep dive
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: `user_id` is the Keycloak `sub` (string UUID), verification env is `OIDC_*` (pkg v0.37.0), smoke tokens come from the realm._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved `user_id` and verification to Keycloak._

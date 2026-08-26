@@ -5,22 +5,28 @@ outbound email and SMS attempt as an owned, readable notification row — and it
 does so best-effort, so a failed notice never rolls back the order that
 triggered it.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | private · `:8080` · edge `/notification/v1/private/` (edge JWT) | Implemented |
-| **gRPC server** | `NotificationService/SendEmail`, `SendSMS` · `:9090` | Implemented |
-| **gRPC client** | None | None |
-| **Worker** | None | None |
-| **Temporal** | Participant (gRPC) · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | Implemented |
-| **Technical debt** | None | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`notification.yaml`](../../kubernetes/apps/services/notification.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) | Implemented | [Operations](#operations) |
+| **HTTP server** | private + internal send twins · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/notification/v1/private/` only; internal send routes stay off-edge | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | `NotificationService/SendEmail`, `SendSMS` · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | None | None | — |
+| **Worker** | None | None | — |
+| **Temporal** | Post-pivot gRPC participant | Implemented | [Temporal participation](#temporal-participation) |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/notification-service`](https://github.com/duynhlab/notification-service) | — |
-| **Owns** | Notification records (inbox) and their read state | — |
-| **Database** | `notification` on `platform-db` (via `platform-db-pooler-rw.platform:5432`) | — |
-| **Design record** | — | None |
+Known gaps: [provider, dedupe, and no-caller surfaces](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Notification inbox records, message content, and read state |
+| **Does not own** | Order state, customer identity, or an external email/SMS provider |
+| **Database** | `notification` on `platform-db` via `platform-db-pooler-rw.platform:5432` |
+| **Cache** | None |
+| **Sensitive data** | User subject, recipient address or phone, subject, and message body |
+| **Design records** | None |
 
 ## Temporal participation
 
@@ -297,4 +303,4 @@ Paths in [`duynhlab/notification-service`](https://github.com/duynhlab/notificat
 - [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
 
-_Last updated: 2026-08-12 — RFC-0024 P3 identity cutover: string `user_id` (column and proto, was `int32`), `OIDC_*` verification env, realm-minted smoke tokens._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved `user_id` and verification to Keycloak._

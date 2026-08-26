@@ -7,23 +7,28 @@ authority to inventory-service, and phase 4 finished the job: the stock RPCs, th
 read-contract fields, and the schema itself are all gone. The product page shows
 availability, but it *asks inventory* for it.
 
-| Dimension | Value | Status |
-|-----------|-------|--------|
-| **Deployment** | local-stack + cluster | Implemented |
-| **HTTP** | public (+ one internal route, never at the edge) · `:8080` · edge `/product/v1/public/` | Implemented |
-| **gRPC server** | `BatchGetCurrentPrices` · `:9090` — the only RPC. `GetProducts`, `ReserveStock`, `ReleaseStock` were **removed** in RFC-0021 P4 | Implemented |
-| **gRPC client** | review (`ReviewService/GetProductReviews`), inventory (`InventoryService/BatchGetAvailability`) | Implemented |
-| **Worker** | None | None |
-| **Temporal** | None — former participant; the saga's stock steps moved to inventory · [workflows.md#order-fulfillment](./workflows.md#order-fulfillment) | None |
-| **Technical debt** | None | None |
+| Capability | Current shape | Availability | Evidence |
+|------------|---------------|--------------|----------|
+| **Deployment** | local-stack + cluster | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [`product.yaml`](../../kubernetes/apps/services/product.yaml) |
+| **Runtime modes** | `api` + `migrate` + `seed` (dev-only) | Implemented | [`compose.yaml`](../../local-stack/compose.yaml) · [Code map](#code-map) |
+| **HTTP server** | public + internal + protected · `:8080` | Implemented | [HTTP API](#http-api) |
+| **Edge exposure** | `/product/v1/public/` and `/protected/`; internal create remains off-edge | Implemented | [HTTP API](#http-api) · [`api.yaml`](../../kubernetes/infra/configs/envoy-gateway/routes/api.yaml) |
+| **gRPC server** | `BatchGetCurrentPrices` · `:9090` | Implemented | [gRPC API](#grpc-api) |
+| **gRPC clients** | review `GetProductReviews` · inventory `BatchGetAvailability` | Implemented | [Callers & dependencies](#callers--dependencies) |
+| **Worker** | None | None | — |
+| **Temporal** | None; former stock participant removed | None | — |
+| **Events** | None | None | — |
 
-| Attribute | Value | RFC / ADR |
-|-----------|-------|-----------|
-| **Repository** | [`duynhlab/product-service`](https://github.com/duynhlab/product-service) | — |
-| **Owns** | Products, categories, current prices | — |
-| **No longer owns** | Stock — **removed, not just unused**. `products.stock_quantity` and `stock_reservations` were dropped by migration `000006` (product 1.10.0) after being frozen at the RFC-0021 W7 write cutover (2026-07-30). Inventory-service is the authority ([inventory.md](./inventory.md)) | Removed |
-| **Database** | `product` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` | — |
-| **Design record** | — | [RFC-0003](../proposals/rfc/RFC-0003/) (superseded) → [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program |
+Known gaps: [platform mTLS and cache tradeoffs](#known-gaps).
+
+| Attribute | Value |
+|-----------|-------|
+| **Owns** | Products, categories, lifecycle, and current prices |
+| **Does not own** | Stock or reservations ([inventory](./inventory.md)); reviews ([review](./review.md)); checkout or order state |
+| **Database** | `product` on `product-db` (CNPG) via PgDog `pgdog-product.product:6432` |
+| **Cache** | Valkey cache-aside for catalog reads; PostgreSQL remains authoritative and checkout price reads bypass cache |
+| **Sensitive data** | None; catalog and pricing data only |
+| **Design records** | [RFC-0003](../proposals/rfc/RFC-0003/) (superseded) → [RFC-0021](../proposals/rfc/RFC-0021/) (inventory extraction) |
 
 ## Temporal participation
 
@@ -357,4 +362,4 @@ Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-servic
 - [Caching (platform)](../caching/README.md) — Valkey deployment and ops
 - [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics
 
-_Last updated: 2026-08-11 — product is no longer a saga participant, and both edges expose only `/product/v1/public/`._
+_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-11 — product left the saga and the public edge surface was recorded._

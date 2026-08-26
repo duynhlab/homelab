@@ -2200,6 +2200,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Repository metadata now has one clear source of truth.** The placeholder
+  logo and metadata note are removed, and the root README keeps CI as its only
+  repository-health badge instead of duplicating Renovate status.
+
 - **Two logging field-contract claims matched nothing when actually run.**
   Re-executing every logsql-guide query against the live cluster caught them:
   app-path (OTLP) records carry `severity_text` per the OTel LogRecord model —
@@ -3157,6 +3161,11 @@ Skeleton (copy what you need):
   counter's park/resolve ambiguity is fixed.
 
 #### CI
+
+- **The managed label catalog is reduced to five durable labels:** `bug`,
+  `enhancement`, `documentation`, `dependencies`, and `github-actions`.
+  Unused triage, workflow, and area taxonomies leave label-sync while
+  automation-owned size and review labels remain untouched.
 
 - **K5.5 no longer flaps on the Temporal SDK metric rename.** The gate asserted
   `temporal_workflow_endtoend_latency_bucket`, but the fleet's workers straddle

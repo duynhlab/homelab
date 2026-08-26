@@ -244,6 +244,22 @@ Skeleton (copy what you need):
   verbatim + one rewrite block; the default `reload` plugin picks edits up
   live).
 
+#### Secrets
+
+- **OpenBAO grew an OIDC door (ADR-062 train 4/4).** The bootstrap now enables
+  the `oidc` auth mount offline, renames the pre-created break-glass policy
+  `devops-admin` → `infra-team` (policies are named after teams), adds a
+  read-only `sre-team` policy, and mints an `oidc-configurator` k8s-auth role.
+  A new wave — `openbao-oidc-config-local`, after `envoy-gateway-config` —
+  runs the second ADR-025 pattern-A configurator Job: it writes
+  `auth/oidc/config` against `https://id.duynh.me/realms/duynhlab-staff`
+  (validated server-side through the CoreDNS hairpin, trusted via the
+  trust-manager `homelab-ca-bundle` — the `openbao` namespace now carries the
+  `needs-trust` label), the `staff` role, and external identity groups
+  `infra-team`/`sre-team` with mount aliases — group membership in Keycloak
+  IS the OpenBAO policy set. `dev-team` deliberately maps to nothing. No root
+  token anywhere; the Kustomization count moves 23 → 24 (AGENTS/setup updated).
+
 #### Security
 
 - **Grafana logs people in (ADR-062 train 3/4).** `auth.generic_oauth` against

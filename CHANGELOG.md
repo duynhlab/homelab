@@ -728,6 +728,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-062 (Proposed): infra tools get humans, humans get one identity.**
+  Grafana today is anonymous-Admin-for-the-whole-LAN and OpenBAO has no working
+  human login at all (the RFC-0008 `generate-root` gap) —
+  [ADR-062](docs/proposals/adr/ADR-062-staff-groups-sso/) proposes making the
+  `duynhlab-staff` realm's `groups` claim the single authority: `infra-team` /
+  `sre-team` / `dev-team` map to Grafana org roles via `role_attribute_path`
+  and to OpenBAO policies via OIDC external groups (the pre-created
+  `devops-admin` policy renamed `infra-team`). Realm events + `bao audit`
+  ride the same change; decision only — no manifest changes yet.
 - **The frontend area RFC-0023 promised now exists.** That RFC named
   `docs/frontend/admin-portal/` in four places — its research even said outright
   *"`docs/frontend/` does not exist yet and this RFC creates it"* — and it never

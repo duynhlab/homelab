@@ -1,0 +1,34 @@
+# Stable in-cluster name for the Envoy proxy fleet (ADR-062 issuer hairpin).
+#
+# Envoy Gateway generates its NodePort Service with a hashed name, so nothing
+# in git can reference the fleet by DNS. This Service selects the same proxy
+# pods under a FIXED name — edge.envoy-gateway.svc.cluster.local — which the
+# CoreDNS rewrite (coredns.yaml) maps id.duynh.me onto.
+#
+# Why it exists: OpenBAO's auth/oidc is the one issuer consumer that cannot
+# split URLs (its single oidc_discovery_url must equal the token issuer, and
+# Keycloak's issuer is always the public hostname — hostname-backchannel-dynamic
+# changes backend endpoints only). Every other consumer (JWT SecurityPolicies,
+# pkg/authmw, Grafana generic_oauth) splits public issuer / internal fetch and
+# does NOT need this path.
+#
+# targetPort 10443: Envoy Gateway shifts privileged listener ports by +10000
+# inside the proxy container (443 -> 10443), same mapping the generated
+# Service uses.
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge
+  namespace: envoy-gateway
+  labels:
+    app.kubernetes.io/name: edge
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    gateway.envoyproxy.io/owning-gateway-name: platform
+  ports:
+    - name: https
+      port: 443
+      targetPort: 10443
+      protocol: TCP

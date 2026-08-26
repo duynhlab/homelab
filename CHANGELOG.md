@@ -229,6 +229,21 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Gateway
+
+- **In-cluster consumers can now reach the public issuer (ADR-062 hairpin).**
+  Two small pieces: a stable `edge` Service in `envoy-gateway` selecting the
+  proxy fleet (the EG-generated Service has a hashed name nothing in git can
+  reference), and a CoreDNS `rewrite` mapping `id.duynh.me` →
+  `edge.envoy-gateway.svc` — split-horizon DNS, the homelab equivalent of a
+  private hosted zone. Exists for the one issuer consumer that cannot split
+  URLs: OpenBAO's `oidc_discovery_url` must equal the token issuer, and
+  Keycloak's issuer is always the public hostname
+  (`hostname-backchannel-dynamic` changes backend endpoints only). Flux takes
+  ownership of the kubeadm-created `coredns` ConfigMap (Corefile captured
+  verbatim + one rewrite block; the default `reload` plugin picks edits up
+  live).
+
 #### Security
 
 - **Grafana logs people in (ADR-062 train 3/4).** `auth.generic_oauth` against

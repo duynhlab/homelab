@@ -1,0 +1,50 @@
+# CoreDNS Corefile with the public-issuer hairpin rewrite (ADR-062).
+#
+# OWNERSHIP: kubeadm creates this ConfigMap at cluster init; Flux takes it
+# over here (server-side apply). On a cluster rebuild kubeadm writes its
+# default again and Flux converges it back within one reconcile. The Corefile
+# below is kubeadm's default for this cluster verbatim (captured live,
+# 2026-08-26) PLUS the one rewrite block — if a future Kind/kubeadm bump
+# changes the default Corefile, re-capture and re-apply the delta.
+#
+# The rewrite: in-cluster lookups of id.duynh.me resolve to the fleet's
+# stable Service (edge-service.yaml) instead of leaving the cluster, so pods
+# reach the PUBLIC issuer URL over the edge listener — TLS served from the
+# platform-edge-tls wildcard (locally signed by homelab-ca; consumers pin
+# that CA, e.g. OpenBAO's oidc_discovery_ca_pem). `answer auto` rewrites the
+# response name back so strict resolvers accept it. The `reload` plugin is in
+# the default Corefile, so edits here go live without a CoreDNS restart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        rewrite stop {
+           name exact id.duynh.me edge.envoy-gateway.svc.cluster.local
+           answer auto
+        }
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30 {
+           disable success cluster.local
+           disable denial cluster.local
+        }
+        loop
+        reload
+        loadbalance
+    }

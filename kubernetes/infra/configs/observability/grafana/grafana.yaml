@@ -8,12 +8,19 @@ metadata:
 spec:
   config:
     # ADR-062 staff SSO. Anonymous drops Admin→Viewer (dashboards stay readable
-    # on the LAN and when Keycloak is down), the login form returns, and
-    # generic_oauth maps the staff realm's `groups` claim to org roles — the
-    # tool translates, Keycloak owns membership. The client secret is NOT here:
+    # on the LAN and when Keycloak is down), and generic_oauth maps the staff
+    # realm's `groups` claim to org roles — the tool translates, Keycloak owns
+    # membership. The client secret is NOT here:
     # GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET env below (ESO ← OpenBAO).
+    #
+    # disable_login_form: the user/password form is hidden ON PURPOSE (owner
+    # call after the first SSO login, 2026-08-26): Keycloak is the only human
+    # door, so the page shows just the "Sign in with Keycloak" button. Local
+    # `admin` therefore has NO UI door — break-glass = flip this flag in git
+    # and let Flux reconcile (anonymous Viewer keeps dashboards readable while
+    # Keycloak is down).
     auth:
-      disable_login_form: "false"
+      disable_login_form: "true"
     auth.anonymous:
       enabled: "true"
       org_role: Viewer

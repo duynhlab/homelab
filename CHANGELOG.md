@@ -238,7 +238,9 @@ Skeleton (copy what you need):
   `role_attribute_path` mapping `infra-team`→Admin / `sre-team`→Editor /
   else Viewer, PKCE on. `server.root_url` finally points at
   `https://grafana.duynh.me` (the localhost value blocked any OAuth redirect),
-  **anonymous drops Admin→Viewer** and the login form returns. The client
+  **anonymous drops Admin→Viewer**, and after the first successful SSO login
+  the user/password form was hidden again (owner call) — the Keycloak button is
+  the only human door; break-glass = flip `disable_login_form` in git. The client
   secret rides ESO (`grafana-oidc-client` ← the same OpenBAO value the realm
   import consumed) as `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET`. The identity
   NetworkPolicy gains monitoring→:8080 for the backchannel — without it the

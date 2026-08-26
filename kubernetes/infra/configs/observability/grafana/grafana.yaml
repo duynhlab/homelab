@@ -7,18 +7,46 @@ metadata:
     dashboards: grafana
 spec:
   config:
+    # ADR-062 staff SSO. Anonymous drops Admin→Viewer (dashboards stay readable
+    # on the LAN and when Keycloak is down), the login form returns, and
+    # generic_oauth maps the staff realm's `groups` claim to org roles — the
+    # tool translates, Keycloak owns membership. The client secret is NOT here:
+    # GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET env below (ESO ← OpenBAO).
     auth:
-      disable_login_form: "true"
+      disable_login_form: "false"
     auth.anonymous:
       enabled: "true"
-      org_role: Admin
+      org_role: Viewer
+    auth.generic_oauth:
+      enabled: "true"
+      name: Keycloak
+      allow_sign_up: "true"
+      client_id: grafana
+      scopes: openid email profile
+      login_attribute_path: username
+      email_attribute_path: email
+      # Split URLs on purpose (same shape as the JWT SecurityPolicies and
+      # pkg/authmw): the browser-facing auth_url is the public issuer host;
+      # token_url/api_url are backchannel calls from the Grafana pod and take
+      # the in-cluster Service — no hairpin through the edge.
+      auth_url: https://id.duynh.me/realms/duynhlab-staff/protocol/openid-connect/auth
+      token_url: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/token
+      api_url: http://keycloak.identity.svc.cluster.local:8080/realms/duynhlab-staff/protocol/openid-connect/userinfo
+      use_pkce: "true"
+      groups_attribute_path: groups
+      # infra-team → Admin, sre-team → Editor, anyone else with a staff login →
+      # Viewer. Changing a person's access = changing their Keycloak group.
+      role_attribute_path: contains(groups[*], 'infra-team') && 'Admin' || contains(groups[*], 'sre-team') && 'Editor' || 'Viewer'
     log:
       level: info
       mode: console
     plugins:
       allow_loading_unsigned_plugins: victoriametrics-metrics-datasource,victoriametrics-logs-datasource
     server:
-      root_url: http://localhost:3000
+      # OAuth redirect_uri is derived from root_url — localhost here is what
+      # blocked any SSO before ADR-062. Must match the realm client's
+      # redirectUris (https://grafana.duynh.me/login/generic_oauth).
+      root_url: https://grafana.duynh.me
     users:
       default_theme: dark
   deployment:
@@ -31,6 +59,15 @@ spec:
             imagePullPolicy: IfNotPresent
             name: grafana
             env:
+            # ADR-062: the `grafana` client's secret — same OpenBAO value the
+            # realm import consumed, via ExternalSecret grafana-oidc-client.
+            # Grafana env overrides beat ini config, so the secret never
+            # touches the rendered ConfigMap.
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-oidc-client
+                  key: grafana_client_secret
             - name: GF_INSTALL_PLUGINS
               value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.25.2/victoriametrics-metrics-datasource-v0.25.2.zip;victoriametrics-metrics-datasource,https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v0.29.0/victoriametrics-logs-datasource-v0.29.0.zip;victoriametrics-logs-datasource,grafana-clickhouse-datasource 4.20.0"
             resources:

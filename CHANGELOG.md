@@ -231,6 +231,18 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Grafana logs people in (ADR-062 train 3/4).** `auth.generic_oauth` against
+  the staff realm with the platform's usual split URLs (browser → public
+  `id.duynh.me` auth_url; pod → in-cluster Service for token/userinfo — same
+  shape as the JWT SecurityPolicies and `pkg/authmw`), JMESPath
+  `role_attribute_path` mapping `infra-team`→Admin / `sre-team`→Editor /
+  else Viewer, PKCE on. `server.root_url` finally points at
+  `https://grafana.duynh.me` (the localhost value blocked any OAuth redirect),
+  **anonymous drops Admin→Viewer** and the login form returns. The client
+  secret rides ESO (`grafana-oidc-client` ← the same OpenBAO value the realm
+  import consumed) as `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET`. The identity
+  NetworkPolicy gains monitoring→:8080 for the backchannel — without it the
+  code exchange dies at kindnet.
 - **The staff realm grows teams (ADR-062 train 1/4).** `duynhlab-staff` now
   carries the `infra-team`/`sre-team`/`dev-team` groups (`duyne` →
   `/infra-team`), two **confidential** clients — `grafana` and `openbao` —

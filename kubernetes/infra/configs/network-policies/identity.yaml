@@ -36,6 +36,17 @@ spec:
       ports:
         - protocol: TCP
           port: 9000
+    # ADR-062 staff SSO: Grafana (monitoring ns) → Keycloak app HTTP for the
+    # generic_oauth BACKCHANNEL calls (token_url + api_url point at the
+    # in-cluster Service). Without this, the OAuth code exchange times out and
+    # every SSO login fails after the Keycloak redirect.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
     # RFC-0024 P2.3 edge cutover: Envoy Gateway edge → Keycloak app HTTP for the
     # id.duynh.me route AND the SecurityPolicy remoteJWKS fetches
     # (/realms/duynhlab/protocol/openid-connect/certs). Verified by

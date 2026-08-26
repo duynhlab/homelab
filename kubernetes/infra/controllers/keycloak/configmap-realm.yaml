@@ -37,6 +37,16 @@
 # ADR-050 (the operator lives in duynhlab-staff as d0e00000-…-001 `duyne`).
 # password123 is the local demo password (dev-only realm-import placeholder,
 # never a committed prod value).
+#
+# ADR-062: the staff realm additionally carries the team groups
+# (infra-team/sre-team/dev-team) and two CONFIDENTIAL clients (`grafana`,
+# `openbao`), each with an oidc-group-membership-mapper emitting the `groups`
+# claim — the single authority for infra-tool authorization. Their secrets are
+# NOT in this file: `${GRAFANA_CLIENT_SECRET}` / `${OPENBAO_CLIENT_SECRET}`
+# are Keycloak realm-import placeholders resolved from the Deployment's env
+# (Secret keycloak-oidc-clients, ESO-synced from OpenBAO, value generated
+# randomly by the openbao-bootstrap Job). Realm events (login + admin) are on
+# so access changes land in VictoriaLogs via the JSON console log.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -230,6 +240,25 @@ data:
       "ssoSessionMaxLifespan": 36000,
       "revokeRefreshToken": true,
       "refreshTokenMaxReuse": 0,
+      "eventsEnabled": true,
+      "eventsExpiration": 604800,
+      "eventsListeners": ["jboss-logging"],
+      "adminEventsEnabled": true,
+      "adminEventsDetailsEnabled": true,
+      "groups": [
+        {
+          "name": "infra-team",
+          "path": "/infra-team"
+        },
+        {
+          "name": "sre-team",
+          "path": "/sre-team"
+        },
+        {
+          "name": "dev-team",
+          "path": "/dev-team"
+        }
+      ],
       "roles": {
         "realm": [
           {
@@ -282,6 +311,95 @@ data:
               }
             }
           ]
+        },
+        {
+          "clientId": "grafana",
+          "name": "Grafana (staff SSO per ADR-062)",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": false,
+          "secret": "${GRAFANA_CLIENT_SECRET}",
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "redirectUris": [
+            "https://grafana.duynh.me/login/generic_oauth",
+            "http://localhost:3000/login/generic_oauth"
+          ],
+          "webOrigins": [
+            "https://grafana.duynh.me",
+            "http://localhost:3000"
+          ],
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "profile",
+            "roles",
+            "basic",
+            "email"
+          ],
+          "protocolMappers": [
+            {
+              "name": "groups",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-group-membership-mapper",
+              "consentRequired": false,
+              "config": {
+                "claim.name": "groups",
+                "full.path": "false",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "introspection.token.claim": "true"
+              }
+            }
+          ]
+        },
+        {
+          "clientId": "openbao",
+          "name": "OpenBAO UI + CLI (staff SSO per ADR-062)",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": false,
+          "secret": "${OPENBAO_CLIENT_SECRET}",
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "redirectUris": [
+            "https://openbao.duynh.me/ui/vault/auth/oidc/oidc/callback",
+            "http://localhost:8200/ui/vault/auth/oidc/oidc/callback",
+            "http://localhost:8250/oidc/callback"
+          ],
+          "webOrigins": [
+            "https://openbao.duynh.me",
+            "http://localhost:8200"
+          ],
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "profile",
+            "roles",
+            "basic",
+            "email"
+          ],
+          "protocolMappers": [
+            {
+              "name": "groups",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-group-membership-mapper",
+              "consentRequired": false,
+              "config": {
+                "claim.name": "groups",
+                "full.path": "false",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "introspection.token.claim": "true"
+              }
+            }
+          ]
         }
       ],
       "users": [
@@ -300,6 +418,9 @@ data:
           ],
           "realmRoles": [
             "backoffice_admin"
+          ],
+          "groups": [
+            "/infra-team"
           ],
           "firstName": "Duy",
           "lastName": "Ne",

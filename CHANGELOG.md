@@ -57,6 +57,18 @@ Skeleton (copy what you need):
 - ...
 
 ### Feature
+#### GitOps
+
+- **checkout-worker joins the Worker Controller (ADR-064).**
+  `kubernetes/apps/checkout-worker.yaml` is no longer a HelmRelease: a
+  `Connection` (ns `checkout`) + `WorkerDeployment checkout-abandon` now own
+  the lifecycle — derived build id, Progressive rollout, sunset windows, build
+  id exported as `service.version`, exactly the order-worker shape. The four
+  hand-written replay-safety essays the old manifest accumulated retire with
+  it; the safety net is checkout-service's new replay corpus
+  (`CHECKOUT_RELEASE_GATE`). Pins move in the same train: checkout **v0.9.2**
+  (API + worker pair rule), order **v2.6.0** (API + worker).
+
 #### Proposals
 
 - **ADR-063 + ADR-064 (Proposed): the Temporal deep-dive becomes two decisions.**
@@ -76,6 +88,27 @@ Skeleton (copy what you need):
 - ...
 
 ### Bugfix
+
+#### Observability
+
+- **Every `temporal_*` consumer now queries names that exist.** ADR-063's
+  monotonic counters rename SDK counters with `_total` on the OTLP→Prometheus
+  path — measured on the compose gate (both workers emit an identical 49-name
+  set), then applied in one sweep: 4 alerts in
+  `configs/temporal/prometheusrule.yaml` (the failure-ratio pair queried
+  suffix-less names and would have gone silently blind),
+  `grafana/dashboards/temporal.json` + its local twin (15 renames each, incl.
+  `sticky_cache_total_forced_eviction` → `sticky_cache_forced_eviction_total`
+  — a reorder, not a suffix), and k6 K5.5 drops the 2026-08-25 dual-spelling
+  `or`-clause for one name. K5.4 now asserts `service_version` splits for BOTH
+  workers.
+- **Local Grafana folders mirror the cluster for real.** The compose
+  provisioning claimed to mirror the cluster's `GrafanaDashboard` folders but
+  had drifted to 3 catch-alls; it now runs one provider per folder with
+  explicit names ("API Gateway", "Business & Product", "Platform /
+  Infrastructure", "Microservices / Golden Signals", "Workflows / Async",
+  "ClickHouse") — names with `/` and `&` can never come from directory
+  structure, which is how the drift started.
 
 #### Docs
 
@@ -122,6 +155,16 @@ Skeleton (copy what you need):
 - ...
 
 ### Dependency
+#### Services
+
+- **Temporal fleet on one SDK again (ADR-063):** checkout v0.9.2 and order
+  v2.6.0 both pin `pkg/temporalx` + `pkg/obsx` **v0.38.0** — Temporal SDK
+  **1.48.0** everywhere (checkout jumped from 1.44.1), telemetry on the
+  `contrib/opentelemetry-v2` plugin, `go 1.26.7`, and builder images
+  `golang:1.26.7-alpine` (ride-along rule: a pkg go-directive bump moves the
+  Dockerfile in the same PR, or the container build silently downloads a
+  toolchain).
+
 #### <Component>
 - ...
 

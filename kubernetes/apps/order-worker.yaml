@@ -120,7 +120,7 @@ spec:
           # skew is a real (if narrow) coupling -- widen it only when the replay
           # corpus and the migrations both say it is safe. The retired per-build
           # manifest carried this caveat and it was worth keeping.
-          image: ghcr.io/duynhlab/order-service/order-service:2.5.0
+          image: ghcr.io/duynhlab/order-service/order-service:2.6.0
           imagePullPolicy: IfNotPresent
           args: ["worker"]
           ports:

@@ -10,8 +10,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-27 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | How Temporal SDK telemetry (traces + SDK metrics) is wired, and the fleet rule for `temporalx` pins; not the collector, the stores, or application (non-SDK) metrics |
@@ -254,6 +254,7 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-27 | Proposed / Not started | Initial draft, from the owner-reviewed deep-dive |
+| 2026-08-27 | Accepted / Partial | Owner merged #936 and the train shipped same-day: pkg v0.38.0 (pkg#84), services (checkout#79, order#219, tags v0.9.2/v2.6.0), compose gate green, fleet metric convergence measured (identical 49-name set per worker) |
 
 ---
 _Last updated: 2026-08-27_

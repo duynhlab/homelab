@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-27 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Which lifecycle mechanism owns Temporal worker deployments platform-wide; not the controller's internals (ADR-054), not autoscaling (ADR-055) |
@@ -229,6 +229,7 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-27 | Proposed / Not started | Initial draft, from the owner-reviewed deep-dive |
+| 2026-08-27 | Accepted / Partial | Owner merged #936; registration code shipped inert in checkout#79 (verified: "worker versioning off" on compose); WorkerDeployment manifest in the homelab train PR |
 
 ---
 _Last updated: 2026-08-27_

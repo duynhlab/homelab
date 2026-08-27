@@ -242,7 +242,7 @@ both paths:
 
 ```
 kubernetes/infra/configs/observability/grafana/dashboards/clickhouse-server-engine.json
-local-stack/observability/grafana/dashboards/ClickHouse/clickhouse-server-engine.json
+local-stack/observability/grafana/dashboards/clickhouse/clickhouse-server-engine.json
 ```
 
 The generator lives at the platform side; regenerate and copy rather than

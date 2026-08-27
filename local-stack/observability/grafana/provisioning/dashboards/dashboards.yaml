@@ -1,13 +1,59 @@
-# Loads dashboard JSON from /var/lib/grafana/dashboards (mounted from ./observability/grafana/dashboards).
-# First-level subdirectory names become Grafana folders (ClickHouse/, Observability/),
-# mirroring the cluster's GrafanaDashboard CR `folder:` values.
+# Loads dashboard JSON from /var/lib/grafana/dashboards (mounted from
+# ./observability/grafana/dashboards). One provider PER FOLDER with an explicit
+# `folder:` name so the Grafana folder names match the cluster's
+# GrafanaDashboard CR `folder:` values EXACTLY — several cluster names carry
+# "/" or "&" ("Workflows / Async", "Business & Product"), which directory
+# names cannot, so foldersFromFilesStructure could never mirror them (that
+# earlier setup claimed to mirror the cluster and drifted to 3 catch-all
+# folders — caught in the ADR-063/064 train review, 2026-08-27). Directory
+# slugs below are the provider paths; the folder names are the UI truth.
 apiVersion: 1
 providers:
-  - name: local-stack
+  - name: local-api-gateway
     orgId: 1
     type: file
+    folder: "API Gateway"
     disableDeletion: false
     allowUiUpdates: true
     options:
-      path: /var/lib/grafana/dashboards
-      foldersFromFilesStructure: true
+      path: /var/lib/grafana/dashboards/api-gateway
+  - name: local-clickhouse
+    orgId: 1
+    type: file
+    folder: "ClickHouse"
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/clickhouse
+  - name: local-business-product
+    orgId: 1
+    type: file
+    folder: "Business & Product"
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/business-product
+  - name: local-platform-infrastructure
+    orgId: 1
+    type: file
+    folder: "Platform / Infrastructure"
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/platform-infrastructure
+  - name: local-microservices-golden-signals
+    orgId: 1
+    type: file
+    folder: "Microservices / Golden Signals"
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/microservices-golden-signals
+  - name: local-workflows-async
+    orgId: 1
+    type: file
+    folder: "Workflows / Async"
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/workflows-async

@@ -162,7 +162,12 @@ validate_production() {
 # comparison exits non-zero. A guard that silently compares nothing is worse than
 # no guard, because its green line reads as proof.
 validate_worker_versioning() {
-  local wd="kubernetes/apps/order-worker.yaml"
+  # ADR-064: EVERY Temporal worker is a WorkerDeployment under the controller,
+  # so both files get the same checks. (Until 2026-08-27 checkout-worker was a
+  # HelmRelease and this function policed that it stayed UNversioned; that
+  # asymmetry is retired.)
+  local wd
+  for wd in kubernetes/apps/order-worker.yaml kubernetes/apps/checkout-worker.yaml; do
 
   if [[ ! -f "${wd}" ]]; then
     echo "ERROR - ${wd} is missing; cannot verify the Worker Versioning wiring" >&2
@@ -174,7 +179,7 @@ validate_worker_versioning() {
   # and the loser is whichever reconciles second.
   local -a legacy=()
   local f
-  for f in kubernetes/apps/order-worker-*.yaml; do
+  for f in "${wd%.yaml}"-*.yaml; do
     [[ -f "${f}" ]] && legacy+=("${f}")
   done
   if [[ ${#legacy[@]} -gt 0 ]]; then
@@ -212,27 +217,9 @@ validate_worker_versioning() {
     exit 1
   fi
 
-  # --- Unversioned workers must stay unversioned. checkout-worker is not under
-  # versioning (RFC-0026 deferred it), and an in-place env flip is the proven
-  # silent-hang mistake.
-  local unversioned="kubernetes/apps/checkout-worker.yaml"
-  if [[ -f "${unversioned}" ]]; then
-    local env_count uv_stray
-    # Existence first: with .spec.values.env absent the select below returns 0
-    # rather than erroring, and the check would pass while reading nothing.
-    env_count=$(yq '.spec.values.env | length' "${unversioned}")
-    if [[ -z "${env_count}" || "${env_count}" == "null" || "${env_count}" -eq 0 ]]; then
-      echo "ERROR - ${unversioned}: .spec.values.env is missing or empty; the versioning check cannot read anything" >&2
-      exit 1
-    fi
-    uv_stray=$(yq '[.spec.values.env[] | select(.name == "TEMPORAL_DEPLOYMENT_NAME" or .name == "TEMPORAL_WORKER_BUILD_ID" or .name == "TEMPORAL_WORKER_DEPLOYMENT_NAME")] | length' "${unversioned}")
-    if [[ "${uv_stray}" -ne 0 ]]; then
-      echo "ERROR - ${unversioned}: carries Worker Versioning env but is not a WorkerDeployment. Versioning is the controller's to grant (ADR-054); setting it here polls as a version nothing routes to." >&2
-      exit 1
-    fi
-  fi
+  echo "INFO - $(basename "${wd}" .yaml) versioning: single WorkerDeployment wired to Connection '${conn_name}', no per-build manifests, no hand-set version identity"
 
-  echo "INFO - order-worker versioning: single WorkerDeployment wired to Connection '${conn_name}', no per-build manifests, no hand-set version identity"
+  done
 }
 
 # Kyverno policy behaviour. kubeconform only checks SHAPE, and it runs with

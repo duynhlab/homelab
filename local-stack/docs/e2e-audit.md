@@ -1945,7 +1945,7 @@ want = {'microservices-otel-local','business-otel-local','temporal-worker-local'
         # control plane + process infra), cluster twin under
         # kubernetes/infra/configs/observability/grafana/dashboards/:
         'eg-edge',
-        # Observability/ — Keycloak Identity (login/token KPIs), cluster twin
+        # platform-infrastructure/ — Keycloak Identity (login/token KPIs), cluster twin
         # same uid:
         'keycloak-identity'}
 got = {d['uid'] for d in json.load(sys.stdin)}

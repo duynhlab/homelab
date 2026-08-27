@@ -438,8 +438,8 @@ and extend Adoption instead.
 | [ADR-060](ADR-060-envoy-access-log-transport/) | Send Envoy access logs over OTLP in addition to stdout | Accepted | **Complete** — edge rows in `otel_logs` 0 → 30, Vector path to 0 | [RFC-0027](../rfc/RFC-0027/) |
 | [ADR-061](ADR-061-edge-log-routing/) | Route edge access logs to ClickHouse only; collect edge runtime logs into VictoriaLogs | Accepted | **Complete** — gate-measured: 0 new edge rows in VL, runtime stream live, JOIN by TraceId | — |
 | [ADR-062](ADR-062-staff-groups-sso/) | Authorize infra tools through staff-realm groups | Proposed | Not started | — |
-| [ADR-063](ADR-063-temporal-otel-v2/) | Adopt the OpenTelemetry v2 integration for Temporal telemetry | Proposed | Not started | — |
-| [ADR-064](ADR-064-all-workers-under-controller/) | Run every Temporal worker under the Worker Controller | Proposed | Not started | — |
+| [ADR-063](ADR-063-temporal-otel-v2/) | Adopt the OpenTelemetry v2 integration for Temporal telemetry | Accepted | Partial — pkg + services shipped, Kind gate pending | — |
+| [ADR-064](ADR-064-all-workers-under-controller/) | Run every Temporal worker under the Worker Controller | Accepted | Partial — code shipped inert, manifest in train PR | — |
 
 Principles:
 

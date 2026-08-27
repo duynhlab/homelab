@@ -2029,6 +2029,19 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The Temporal dashboard's SDK half was blank on the cluster — vmagent was
+  overwriting the SDK's own `namespace` label.** The RFC-0014 D-3 relabel rule
+  copied `k8s_namespace_name` onto `namespace` unconditionally, clobbering the
+  Temporal SDK's `namespace="mop"` datapoint attribute on every OTLP series —
+  so 21 of the dashboard's 29 queries (and its `$namespace` variable, default
+  `mop`) matched nothing, while the byte-identical compose twin worked because
+  compose series carry no k8s labels. Metric names were all correct (29/29
+  measured). The rule is now non-clobbering (`source_labels: [namespace,
+  k8s_namespace_name]; regex: ";(.+)"` — fire only when `namespace` is empty);
+  k8s context stays on those series as `k8s_namespace_name` + `app`, and the
+  dashboards need zero changes on either side. Temporal alerts were never
+  affected (they don't filter this label).
+
 - **Every `temporal_*` consumer now queries names that exist.** ADR-063's
   monotonic counters rename SDK counters with `_total` on the OTLP→Prometheus
   path — measured on the compose gate (both workers emit an identical 49-name

@@ -28,14 +28,24 @@ spec:
   # copy them onto the app/namespace labels every alert, recording rule and
   # dashboard groups by. regex (.+) guards scraped series (empty source label
   # never matches, so their existing app/namespace values are untouched).
+  #
+  # The namespace rule is NON-CLOBBERING (fixed 2026-08-27): it fires only
+  # when the series does not already carry a `namespace` label. The Temporal
+  # SDK stamps its own `namespace` datapoint attribute (the TEMPORAL namespace
+  # "mop"); the old unconditional replace overwrote it with the k8s namespace,
+  # which blanked every SDK-side panel of the temporal dashboard on the
+  # cluster while the identical compose twin worked (no k8s labels there).
+  # k8s context stays available on those series as k8s_namespace_name + app.
+  # Mechanics: source labels join with ";", so `^;(.+)$` matches exactly
+  # "namespace empty AND k8s_namespace_name present".
   inlineRelabelConfig:
     - action: replace
       source_labels: [service_name]
       regex: "(.+)"
       target_label: app
     - action: replace
-      source_labels: [k8s_namespace_name]
-      regex: "(.+)"
+      source_labels: [namespace, k8s_namespace_name]
+      regex: ";(.+)"
       target_label: namespace
 
   extraArgs:

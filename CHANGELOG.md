@@ -804,6 +804,18 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The SSO-client procedures that lived only in one session are now docs**
+  (owner review of the flux-web rollout: end state clean, process messy — the
+  live-fix tooling existed nowhere). `keycloak.md` gains "Add a confidential
+  client to a live realm" (the kcadm path exercised for `flux-web`, next to
+  the nuclear reseed), the four-owner chain diagram every confidential client
+  crosses (bootstrap seed → KV → ESO ×2 → realm placeholder / app config),
+  and the two scope rules learned as live login failures (`groups` is a
+  mapper, not a scope; `offline_access` needs a realm role staff users don't
+  hold). The live-seed runbook gains the headless-OIDC variant (no bao CLI on
+  the host) with its two measured traps (KV-v2 merge-patch doesn't merge —
+  read-modify-write; the recovery-key ceremony still 403s).
+
 - **ADR-062 docs sync (train 5/5).** `rbac-multi-team.md` § "This repository"
   now describes the deployed staff SSO instead of anonymous-Admin;
   `openbao.md` §4 rewritten from the GitHub/Google reference sketch to the

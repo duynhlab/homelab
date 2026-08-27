@@ -170,6 +170,24 @@ console (which then drifts from git) or the reset procedure below.
 That is the single biggest operational limitation of this deployment. It is
 acceptable today because the realms hold only demo users.
 
+### One SSO client, four owners
+
+Every confidential client (`grafana`, `openbao`, `flux-web`) crosses four
+GitOps owners; this is the whole chain — nothing else holds secret material:
+
+```mermaid
+flowchart LR
+  seed["openbao-bootstrap Job<br/>seeds random secret"]:::platform --> kv[("OpenBAO KV<br/>oidc-clients")]:::data
+  kv -->|ESO| kcs["Secret keycloak-oidc-clients<br/>(identity)"]:::data
+  kv -->|ESO| app["App config Secret<br/>(tool namespace)"]:::data
+  kcs -->|"${ENV} placeholder"| realm["realm import<br/>configmap-realm.yaml"]:::service
+  app --> tool["Tool (Grafana / OpenBAO UI /<br/>Flux web UI)"]:::service
+  realm -.->|"live realm: one-shot —<br/>kcadm procedure below"| tool
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+```
+
 ### Network reachability
 
 `kubernetes/infra/configs/network-policies/identity.yaml` — `deny-all-ingress`
@@ -250,6 +268,54 @@ ExternalSecrets (one per namespace). Rotate at the source, let both refresh, the
 restart the Deployment — Keycloak reads `KC_DB_PASSWORD` from env at startup, so
 a synced secret alone changes nothing. See
 [openbao.md](../secrets/openbao.md).
+
+### Add a confidential client to a live realm
+
+The realm import is one-shot, so a client added to
+`configmap-realm.yaml` never reaches an already-imported realm — and the
+reset procedure below is a full cluster rebuild. The non-nuclear path,
+exercised for `flux-web` (2026-08-27), is to make the live realm match git
+with `kcadm`. Order matters: seed the client secret in OpenBAO first (the
+[live-seed runbook](../secrets/runbooks/add-secret-live-cluster.md)), let ESO
+sync it, then create the client with that same value so both sides agree.
+
+```bash
+POD=$(kubectl get pod -n identity -l app.kubernetes.io/name=keycloak -o name | head -1)
+KU=$(kubectl get secret keycloak-bootstrap-admin -n identity -o jsonpath='{.data.username}' | base64 -d)
+KP=$(kubectl get secret keycloak-bootstrap-admin -n identity -o jsonpath='{.data.password}' | base64 -d)
+SECRET=$(kubectl get secret keycloak-oidc-clients -n identity -o jsonpath='{.data.<client>_client_secret}' | base64 -d)
+kc() { kubectl exec -n identity "$POD" -- /opt/keycloak/bin/kcadm.sh "$@"; }
+
+kc config credentials --server http://localhost:8080 --realm master --user "$KU" --password "$KP"
+
+# Idempotent: bail if it already exists
+kc get clients -r duynhlab-staff -q clientId=<client> --fields id --format csv --noquotes
+
+ID=$(kc create clients -r duynhlab-staff -i \
+  -s clientId=<client> -s enabled=true -s protocol=openid-connect \
+  -s publicClient=false -s "secret=$SECRET" \
+  -s standardFlowEnabled=true -s implicitFlowEnabled=false \
+  -s directAccessGrantsEnabled=false -s serviceAccountsEnabled=false \
+  -s 'redirectUris=["https://<host>/oauth2/callback"]' \
+  -s 'webOrigins=["https://<host>"]')
+
+# groups membership mapper — identical to the other staff clients
+kc create "clients/$ID/protocol-mappers/models" -r duynhlab-staff \
+  -s name=groups -s protocol=openid-connect \
+  -s protocolMapper=oidc-group-membership-mapper -s consentRequired=false \
+  -s 'config."claim.name"=groups' -s 'config."full.path"=false' \
+  -s 'config."id.token.claim"=true' -s 'config."access.token.claim"=true' \
+  -s 'config."userinfo.token.claim"=true'
+```
+
+Verify the result matches git field-for-field (`kc get clients -r
+duynhlab-staff -q clientId=<client>`), because from here on the ConfigMap and
+the live realm are reconciled by hand until the next rebuild.
+
+Two scope rules every staff client follows (both learned as live login
+failures on flux-web): request only `openid profile email` — `groups` is not
+a client scope here (the claim comes from the mapper above), and
+`offline_access` needs a realm role staff users are deliberately not granted.
 
 ### Reset and reseed the realms
 
@@ -346,4 +412,4 @@ Stated plainly, because none of these are hidden by the manifests:
 
 ---
 
-_Last updated: 2026-08-26 — added the ADR-062 staff-SSO consumers (groups, confidential clients, realm events). First version 2026-08-24 closed the deliverable named by ADR-041 and RFC-0022 and absorbed the retired `identity-cutover-runbook.md` as the realm reset procedure._
+_Last updated: 2026-08-27 — live-realm client procedure (kcadm, exercised for flux-web) + the four-owner chain diagram + the two scope rules. Previously: added the ADR-062 staff-SSO consumers (groups, confidential clients, realm events). First version 2026-08-24 closed the deliverable named by ADR-041 and RFC-0022 and absorbed the retired `identity-cutover-runbook.md` as the realm reset procedure._

@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Flux Operator web UI SSO (Keycloak, ADR-062 recipe): the rendered Web
+# Config, the live-CA trust anchor, and the group→role bindings. The operator
+# itself is Terraform-installed (terraform/main.tf wires configSecretName +
+# the CA mount); the Keycloak client half lives in controllers/keycloak.
+resources:
+  - certificate.yaml
+  - external-secret.yaml
+  - rbac.yaml

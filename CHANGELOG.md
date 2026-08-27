@@ -262,6 +262,24 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **The Flux Operator web UI now requires staff SSO** (`ui.duynh.me`; ADR-062
+  recipe, third confidential client of the `duynhlab-staff` realm — the
+  taxonomy is unchanged, so the ADR is not reopened). Until now the UI had no
+  authentication at all, only the admin CIDR fence (kept). New `flux-web-local`
+  wave (`configs/flux-web`) delivers the rendered Web Config Secret (OIDC
+  against `https://id.duynh.me/realms/duynhlab-staff`, client secret from the
+  same OpenBAO path the bootstrap seeds — no literal in git), the
+  `flux-web-idp-trust` live-CA Certificate (same fix class as
+  `openbao-idp-trust`; reached via `SSL_CERT_DIR`, not `SSL_CERT_FILE`, so the
+  operator keeps the system roots it needs for ghcr.io), and the group→role
+  ClusterRoleBindings (`infra-team` → `flux-web-admin`, `sre`/`dev-team` →
+  `flux-web-user` — the UI impersonates the OIDC identity, so these gate every
+  request). The operator chart is now pinned (0.58.1, was implicit latest) and
+  takes `web.configSecretName` + the CA mount via `terraform/main.tf`.
+  Live-cluster rollout needs the two ADR-062 one-shot steps (seed the new KV
+  key via `bao login -method=oidc`; realm reseed per keycloak.md) or a fresh
+  `make up`; local-stack carries the realm-parity client (no flux in compose).
+
 - **Grafana logs people in (ADR-062 train 3/4).** `auth.generic_oauth` against
   the staff realm with the platform's usual split URLs (browser → public
   `id.duynh.me` auth_url; pod → in-cluster Service for token/userinfo — same

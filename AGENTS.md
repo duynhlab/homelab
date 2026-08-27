@@ -336,16 +336,17 @@ Every manifest applied to the cluster must satisfy admission:
   network-policies) → {databases-cnpg-dr, keycloak, temporal}
   envoy-gateway-config (after envoy-gateway + cert-manager + keycloak)
   openbao-oidc-config (after secrets + envoy-gateway-config) — ADR-062
+  flux-web (after secrets + cert-manager) — Flux web UI SSO objects
   monitoring → {kyverno-policies, mcp, caching}
   temporal → temporal-config
   kyverno-policies → policy-reporter
   apps-local (depends: databases + monitoring + temporal-config)
   ```
-  (24 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
-  commented out of its kustomization since 2026-08-21, so 23 apply; `flux-system`
+  (25 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
+  commented out of its kustomization since 2026-08-21, so 24 apply; `flux-system`
   is created by the FluxInstance rather than this directory, and a cluster
-  therefore reports **24** — 23 was the gate-verified figure before
-  `openbao-oidc-config-local` landed (ADR-062, 2026-08-26). Count them at run
+  therefore reports **25** — 24 was the figure before `flux-web-local` landed
+  (Flux web UI SSO, 2026-08-27). Count them at run
   time rather than trusting this number; full graph in
   [`docs/platform/setup.md`](docs/platform/setup.md).)
 - **CHANGELOG.** Entries grouped **`### Category` → `#### Component`** per the hidden template comment at the top of `CHANGELOG.md` (categories, fixed order: `Breaking Change`/`Feature`/`Bugfix`/`Performance`/`Dependency`/`Deprecation`; components: GitOps, Gateway, Observability, Databases, Secrets, Security, Services, Temporal, Local-stack, Docs, Proposals, CI). New entries go at the **top** of the matching group in `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history (older releases keep the format they shipped with). Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` under the template comment.

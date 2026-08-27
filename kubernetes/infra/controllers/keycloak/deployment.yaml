@@ -91,6 +91,11 @@ spec:
                 secretKeyRef:
                   name: keycloak-oidc-clients
                   key: openbao_client_secret
+            - name: FLUX_WEB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-oidc-clients
+                  key: flux_web_client_secret
             - name: KC_HOSTNAME
               value: https://id.duynh.me
             - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC

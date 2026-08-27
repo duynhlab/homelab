@@ -122,6 +122,48 @@
       ]
     },
     {
+      "clientId": "flux-web",
+      "name": "Flux Operator web UI (staff SSO per ADR-062; no flux runs in compose - realm parity only, dev-only placeholder secret)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "flux-web-local-dev-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:9080/oauth2/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:9080"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "basic",
+        "email"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "openbao",
       "name": "OpenBAO (staff SSO per ADR-062; no OpenBAO in local-stack — shape parity only, dev-only placeholder secret)",
       "enabled": true,

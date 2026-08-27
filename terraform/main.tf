@@ -18,6 +18,41 @@ module "flux_operator_bootstrap" {
 
   gitops_resources = {
     instance_yaml = file("${path.root}/../kubernetes/clusters/${var.cluster_name}/flux-system/instance.yaml")
+
+    operator_chart = {
+      # Pinned (was implicit latest): the values below depend on the web UI's
+      # Web Config API, so the chart must move deliberately, not on rebuild.
+      version = "0.58.1"
+      # Keycloak SSO for the web UI at ui.duynh.me (ADR-062 recipe, third
+      # staff client). The operator reads the rendered Web Config document
+      # from the flux-web-config Secret (ExternalSecret in
+      # kubernetes/infra/configs/flux-web/ — no secret literal here or in
+      # git). The CA mount is the live-issuer trust anchor for the
+      # https://id.duynh.me issuer (flux-web-idp-trust Certificate, same fix
+      # class as openbao-idp-trust). SSL_CERT_DIR — not SSL_CERT_FILE — on
+      # purpose: Go ADDS the dir's certs to the default system FILES, whereas
+      # SSL_CERT_FILE would replace them and break the operator's own TLS to
+      # ghcr.io (distribution manifests). Both Secrets are created by the
+      # flux-web-local wave, which reconciles AFTER bootstrap — the operator
+      # tolerates a missing config secret at start (UI serves anonymous-off
+      # until it appears).
+      values_yaml = <<-YAML
+        web:
+          configSecretName: flux-web-config
+        extraEnvs:
+          - name: SSL_CERT_DIR
+            value: /etc/flux-web-idp-trust
+        extraVolumes:
+          - name: flux-web-idp-trust
+            secret:
+              secretName: flux-web-idp-trust
+              optional: true
+        extraVolumeMounts:
+          - name: flux-web-idp-trust
+            mountPath: /etc/flux-web-idp-trust
+            readOnly: true
+      YAML
+    }
   }
 
   # PRODUCTION (manage the OCI/Git pull secret declaratively from an external

@@ -36,6 +36,32 @@ Then force the ExternalSecret to pick it up:
 kubectl annotate externalsecret <name> -n <ns> force-sync="$(date +%s)" --overwrite
 ```
 
+## Variant — no `bao` CLI on the host (headless OIDC)
+
+The OIDC login can be replayed with curl alone (the `keycloak-token.sh`
+technique), exercised 2026-08-27 to seed `flux_web_client_secret`:
+
+```bash
+B=https://openbao.duynh.me
+NONCE=$(head -c 16 /dev/urandom | base64 | tr -d '/+=')
+# 1. auth_url for role `staff`, CLI-style redirect
+AUTH_URL=$(curl -sk -X POST "$B/v1/auth/oidc/oidc/auth_url" \
+  -d "{\"role\":\"staff\",\"redirect_uri\":\"http://localhost:8250/oidc/callback\",\"client_nonce\":\"$NONCE\"}" \
+  | jq -r .data.auth_url)
+# 2. drive the Keycloak login form with a cookie jar (extract the form action,
+#    POST username/password), capture the 302 Location's code+state
+# 3. complete: curl -sk "$B/v1/auth/oidc/oidc/callback?<query-from-302>&client_nonce=$NONCE"
+#    -> .auth.client_token
+```
+
+Two traps, both measured:
+
+- **KV-v2 HTTP merge-patch does not merge here** — it bumped the version and
+  dropped the new key. Read the full data map, add the key, POST the whole
+  map back (`v1/secret/data/<path>`).
+- The recovery-key ceremony below still answers **403** (re-confirmed
+  2026-08-27) — do not plan on it.
+
 ## Fallback — recovery-key ceremony (issuer down)
 
 If Keycloak or the edge is down, the designed break-glass is minting a

@@ -3318,6 +3318,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-062's index row said `Proposed / Not started` while the record itself
+  has been Accepted / Complete since 2026-08-26** — the flip train updated the
+  ADR but not `adr/README.md`. Caught in the owner-requested review of
+  ADR-062/063/064 (all three verified genuinely closed). Same sweep: ADR-063's
+  "tighten `AllowInvalidParentSpans` later" caveat is retired as deliberately
+  NOT executed (pkg#86 — `false` fails workflow tasks on a bad tracing
+  header), and both 062/063 histories take rows for today's follow-ons (the
+  `flux-web` third client; the keep-permanently decision).
+
 - **ADR-040 sat at `Status: Proposed` for two weeks after nothing from it was
   running.** [ADR-059](docs/proposals/adr/ADR-059-retire-tempo/) carries an explicit
   obligation to withdraw it on acceptance, due in RFC-0027 P4; P4 shipped without

@@ -203,7 +203,10 @@ pays most of A's migration cost for a fraction of its value.
 - checkout-service jumps SDK 1.44.1 → 1.48.0 as a prerequisite; its replay
   safety is covered by the new replay-corpus test shipping in the same PR.
 - `AllowInvalidParentSpans` stays on until both workers run v2, then can be
-  tightened.
+  tightened. *(Superseded 2026-08-27, after convergence: kept `true`
+  permanently — with `false`, a tracing header that fails to parse errors out
+  of the interceptor and fails the workflow task, so a telemetry defect would
+  take down the workload it observes; pkg#86 records it in the code.)*
 
 ## Implementation obligations
 
@@ -230,8 +233,9 @@ Re-open this decision when one or more of the following become true:
 
 - `contrib/opentelemetry-v2` publishes a breaking change `temporalx` cannot
   absorb behind its stable API.
-- The module graduates from experimental — tighten
-  `AllowInvalidParentSpans` and re-check this record's caveats.
+- The module graduates from experimental — re-check this record's caveats
+  (`AllowInvalidParentSpans` stays `true` regardless; see Neutral
+  consequences).
 - A Temporal service demonstrably needs the span→profile link more than
   workflow-interior spans.
 - OTel or Temporal ships first-class support for wrapping the replay-safe
@@ -256,6 +260,7 @@ requires a new ADR that supersedes this one.
 | 2026-08-27 | Proposed / Not started | Initial draft, from the owner-reviewed deep-dive |
 | 2026-08-27 | Accepted / Partial | Owner merged #936 and the train shipped same-day: pkg v0.38.0 (pkg#84), services (checkout#79, order#219, tags v0.9.2/v2.6.0), compose gate green, fleet metric convergence measured (identical 49-name set per worker) |
 | 2026-08-27 | Accepted / Complete | Kind final gate green on the train PR: 25 rows / 144 assertions incl. the redefined K5.4/K5.5; alerts+dashboards+k6 moved to compose-measured names |
+| 2026-08-27 | Accepted / Complete | Fleet converged, and the tighten-`AllowInvalidParentSpans` caveat was deliberately retired instead of executed (pkg#86, comment-only): `false` turns a bad tracing header into a failed workflow task — the failure class the plugin's `OnError` override already guards against |
 
 ---
 _Last updated: 2026-08-27_

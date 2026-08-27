@@ -437,7 +437,7 @@ and extend Adoption instead.
 | [ADR-059](ADR-059-retire-tempo/) | Retire both Tempo installs and take service graphs from VictoriaTraces | Accepted | **Complete** — 31 service-graph edges measured | [RFC-0027](../rfc/RFC-0027/) |
 | [ADR-060](ADR-060-envoy-access-log-transport/) | Send Envoy access logs over OTLP in addition to stdout | Accepted | **Complete** — edge rows in `otel_logs` 0 → 30, Vector path to 0 | [RFC-0027](../rfc/RFC-0027/) |
 | [ADR-061](ADR-061-edge-log-routing/) | Route edge access logs to ClickHouse only; collect edge runtime logs into VictoriaLogs | Accepted | **Complete** — gate-measured: 0 new edge rows in VL, runtime stream live, JOIN by TraceId | — |
-| [ADR-062](ADR-062-staff-groups-sso/) | Authorize infra tools through staff-realm groups | Proposed | Not started | — |
+| [ADR-062](ADR-062-staff-groups-sso/) | Authorize infra tools through staff-realm groups | Accepted | **Complete** — Grafana + OpenBAO SSO live (2026-08-26); third client `flux-web` joined 2026-08-27 (#940) | — |
 | [ADR-063](ADR-063-temporal-otel-v2/) | Adopt the OpenTelemetry v2 integration for Temporal telemetry | Accepted | **Complete** — fleet on one SDK, consumers on measured names, Kind gate green | — |
 | [ADR-064](ADR-064-all-workers-under-controller/) | Run every Temporal worker under the Worker Controller | Accepted | **Complete** — checkout-abandon WorkerDeployment live, runs pinned to derived builds | — |
 
@@ -450,4 +450,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-25 — ADR-056 accepted (k6 assertion layer; ADR-045 sizing amended alongside it, and ADR-055 finally has an observed backlog to scale on). Previously: ADR-054 and ADR-055 created at `Proposed` with [RFC-0026](../rfc/RFC-0026/)_
+_Last updated: 2026-08-27 — ADR-062's index row caught up with the record itself (Accepted/Complete since 2026-08-26; the flux-web third client landed 2026-08-27). Previously: ADR-056 accepted (k6 assertion layer; ADR-045 sizing amended alongside it, and ADR-055 finally has an observed backlog to scale on). Previously: ADR-054 and ADR-055 created at `Proposed` with [RFC-0026](../rfc/RFC-0026/)_

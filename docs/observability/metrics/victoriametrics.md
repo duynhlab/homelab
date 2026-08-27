@@ -496,7 +496,7 @@ CR fields: [VMAuth](https://docs.victoriametrics.com/operator/resources/vmauth/)
 | **Grafana** (org roles, Teams, folders) | **Grafana UI**, dashboards, datasource access | [rbac-multi-team.md](../grafana/rbac-multi-team.md) |
 | **VMAuth / vmauth** | **HTTP APIs** (PromQL, remote write, VictoriaLogs) outside the Grafana→ClusterIP path | Ingress or direct API clients (planned) |
 
-[VMAuth does not fix anonymous Grafana Admin](../grafana/rbac-multi-team.md).
+[VMAuth does not fence the Grafana UI — the staff SSO from ADR-062 does](../grafana/rbac-multi-team.md).
 
 #### Access paths
 

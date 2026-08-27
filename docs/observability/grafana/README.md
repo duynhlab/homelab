@@ -1,6 +1,6 @@
 # Grafana
 
-Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), VictoriaTraces (traces), VictoriaLogs (logs, LogsQL via plugin), Jaeger (traces), and Pyroscope (profiles) through configured datasources.
+Grafana is the unified visualization layer for all 4 observability pillars. It connects to VMSingle (metrics), VictoriaTraces (traces, via its Jaeger-compatible query API — ADR-058), VictoriaLogs (logs, LogsQL via plugin), ClickHouse (long-retention SQL), and Pyroscope (profiles) through configured datasources.
 
 ## Deployment
 
@@ -9,18 +9,20 @@ Grafana is deployed via the **Grafana Operator** using a `Grafana` CR:
 - **CR**: `kubernetes/infra/configs/observability/grafana/grafana.yaml`
 - **Image**: `grafana/grafana:13.2.0`
 - **Namespace**: `monitoring`
-- **Access**: anonymous login with Admin role (dev mode)
+- **Access**: **staff SSO** ([ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/)) — "Sign in with Keycloak" at https://grafana.duynh.me; the staff realm's `groups` claim maps `infra-team`→Admin, `sre-team`→Editor, else Viewer. Anonymous access remains, as read-only **Viewer**; the user/password form is hidden.
 
 ```bash
 kubectl port-forward svc/grafana-service -n monitoring 3000:3000
-# Open http://localhost:3000
+# Open http://localhost:3000 — anonymous Viewer only. The Keycloak sign-in
+# does NOT work over a port-forward: server.root_url pins the OAuth
+# redirect to https://grafana.duynh.me, so use the edge URL to log in.
 ```
 
 ## Security and access control
 
-One named identity exists alongside anonymous access: a `GrafanaServiceAccount` (`grafana-service-account-mcp.yaml`) with role **Viewer**, whose operator-minted token (Secret `grafana-mcp-token`) is consumed by the [Grafana MCP server](../../platform/mcp-servers.md#4-grafana-mcp). It exists to *narrow* the MCP below the anonymous `Admin` it would otherwise inherit.
+Humans authenticate through the staff realm (ADR-062): group membership in Keycloak decides the org role, no per-tool accounts. One machine identity exists besides that: a `GrafanaServiceAccount` (`grafana-service-account-mcp.yaml`) with role **Viewer**, whose operator-minted token (Secret `grafana-mcp-token`) is consumed by the [Grafana MCP server](../../platform/mcp-servers.md#4-grafana-mcp). Since ADR-062 that token is an *equal* of anonymous access (both Viewer), not a narrowing of an anonymous Admin — the historical rationale is in the MCP doc.
 
-Grafana **organization roles**, **Teams**, and **anonymous** access are documented in [rbac-multi-team.md](rbac-multi-team.md). That page explains why anonymous `Admin` does not provide per-team separation and how this differs from **[VMAuth / vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned)** (HTTP proxy for VictoriaMetrics APIs—not the Grafana UI).
+Grafana **organization roles**, **Teams**, and the group→role mapping are documented in [rbac-multi-team.md](rbac-multi-team.md), including the Team Sync (Enterprise) caveat and how this differs from **[VMAuth / vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned)** (HTTP proxy for VictoriaMetrics APIs—not the Grafana UI).
 
 ## Datasources
 
@@ -166,7 +168,7 @@ kubernetes/infra/configs/observability/grafana/
 
 ## Related Documentation
 
-- [RBAC and multi-team access](rbac-multi-team.md) -- Viewer/Editor/Admin, Teams, anonymous vs named users
+- [RBAC and multi-team access](rbac-multi-team.md) -- staff-SSO group→role mapping (ADR-062), Teams, folder permissions
 - [VMAuth and vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned) -- API-layer auth for VictoriaMetrics (separate from Grafana UI)
 - [Datasource Strategy](datasources.md) -- VictoriaMetrics plugin metrics DS
 - [Dashboard Reference](dashboard-reference.md) -- panel-by-panel reference
@@ -175,4 +177,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-08-18 — dashboard inventory rewritten to the real 31 CRs / 9 folders (it listed 3), the in-repo `configMapGenerator` pattern documented, Temporal vendored in-repo, cert-manager board added, and the datasource table/tree completed (prometheus alias, VictoriaTraces, ClickHouse)._
+_Last updated: 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

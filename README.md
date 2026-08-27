@@ -277,6 +277,11 @@ rather than trusting this table's count.
 
 Demo login: `alice` / `password123` (by username).
 
+Staff login (realm `duynhlab-staff`, dev-only placeholder): `duyne` /
+`p@ss1234` — one identity for the Back-office portal, **Grafana** (Sign in
+with Keycloak; `infra-team`→Admin) and the **OpenBAO UI** (Method OIDC), per
+[ADR-062](docs/proposals/adr/ADR-062-staff-groups-sso/).
+
 ---
 
 ## Local stack

@@ -263,6 +263,7 @@ requires a new ADR that supersedes this one.
 | 2026-08-26 | Proposed / Not started | Initial draft |
 | 2026-08-26 | Accepted / Partial | Owner merged the ADR (#927) and approved the train; realm (#928), Grafana (#929, #931), hairpin (#930), OpenBAO (#932, trust fix #933) landed the same day |
 | 2026-08-26 | Accepted / Complete | Fresh `make up` verified end-to-end: Grafana SSO 302 with PKCE + form hidden, OpenBAO `auth/oidc` written through the hairpin, external groups + aliases live, auth_url generation returns the Keycloak authorize endpoint |
+| 2026-08-27 | Accepted / Complete | The decision absorbed its third consumer without reopening (taxonomy unchanged, as the revisit trigger requires): the Flux Operator web UI at ui.duynh.me became the staff realm's third confidential client (`flux-web`, #940) — same recipe end-to-end (OpenBAO seed → realm `${ENV}` placeholder → ESO → app; groups impersonated as Kubernetes groups → flux-web-admin/-user bindings) |
 
 ---
-_Last updated: 2026-08-26_
+_Last updated: 2026-08-27_

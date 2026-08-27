@@ -57,6 +57,21 @@ Skeleton (copy what you need):
 - ...
 
 ### Feature
+#### Proposals
+
+- **ADR-063 + ADR-064 (Proposed): the Temporal deep-dive becomes two decisions.**
+  [ADR-063](docs/proposals/adr/ADR-063-temporal-otel-v2/) moves Temporal
+  telemetry onto `contrib/opentelemetry-v2` (replay-safe global provider,
+  corrected span parenting, monotonic SDK counters, workflow-interior spans)
+  and sets the fleet rule "one `temporalx` pin" — ending the SDK split
+  (1.44.1/1.48.0) whose dual metric names already flapped gate row K5.5
+  (#921). [ADR-064](docs/proposals/adr/ADR-064-all-workers-under-controller/)
+  puts every Temporal worker under the Worker Controller with Pinned
+  versioning — checkout-worker's manifest carries four hand-written
+  replay-safety essays that Pinned routing deletes, and its
+  CaN-every-30-minutes shape drains old builds in about one timer cycle.
+  Decisions only — implementation train follows owner review.
+
 #### <Component>
 - ...
 

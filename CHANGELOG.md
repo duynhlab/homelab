@@ -671,6 +671,24 @@ Skeleton (copy what you need):
 
 #### Temporal
 
+- **Every execution now carries its business key, a one-line summary, and live
+  progress** (Phase-4 conformance wave of ADR-063/064; order#220 + checkout#80,
+  temporalx `v0.39.0`). Custom Search Attributes `OrderId`/`SessionId` (Keyword)
+  are registered on namespace `mop` by the new `temporal-search-attributes` Job
+  in `configs/temporal` — the chart cannot do it, its namespace job only runs
+  `namespace create` — and services stamp them in start options only, so
+  recorded histories replay unchanged. The saga adds `StaticSummary` (order,
+  items, total, participant) and mirrors every `recordStage` boundary into
+  `workflow.SetCurrentDetails`; the abandon watch adds its session + TTL
+  summary. `CommitInventory` finally heartbeats (10s `HeartbeatTimeout` against
+  a 30s StartToClose), so a worker death mid-attempt is retried in ~10s instead
+  of spending the full attempt timeout out of the 30m budget. Registration is
+  part of the namespace contract — a start naming an unregistered attribute is
+  rejected — so `apps-local` now `dependsOn: temporal-config-local` (chain doc
+  updated in AGENTS.md + setup.md; SA contract in `docs/api/temporal.md`
+  § Finding and Reading Executions). Both workers' SDK log lines (poller
+  lifecycle, task failures) now emit as structured zap JSON via
+  `temporalx.WithLogger` instead of plain-text stderr.
 - **The Worker Controller owns the versioned-worker lifecycle; 638 lines of hand
   operation retired** (RFC-0026 / ADR-054). Two HelmReleases land in the existing
   `temporal` namespace and the existing `temporal-local` Kustomization — CRDs chart
@@ -711,6 +729,12 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **`temporal-bootstrap` registers the custom Search Attributes** right after it
+  creates namespace `mop` (`OrderId`/`SessionId`, Keyword) — the compose twin of
+  the cluster's `temporal-search-attributes` Job, and it must run before any
+  workflow traffic because a start naming an unregistered attribute is
+  rejected. `search-attribute create` is idempotent per name, so the run-once
+  service stays restart-safe.
 - **The portal's attention cards now have a gate row of their own** (`A22`,
   `scripts/k6/staff.js`). B6 proves the five cards *render* a numeral, but only
   in a browser, and a dash tells nobody which of the six reads broke. A22 issues

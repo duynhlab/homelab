@@ -339,7 +339,7 @@ Every manifest applied to the cluster must satisfy admission:
   monitoring → {kyverno-policies, mcp, caching}
   temporal → temporal-config
   kyverno-policies → policy-reporter
-  apps-local (depends: databases + monitoring + temporal)
+  apps-local (depends: databases + monitoring + temporal-config)
   ```
   (24 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
   commented out of its kustomization since 2026-08-21, so 23 apply; `flux-system`

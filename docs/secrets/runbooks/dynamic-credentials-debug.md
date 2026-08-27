@@ -24,9 +24,10 @@ kubectl delete job openbao-db-config -n platform
 flux reconcile kustomization databases-local -n flux-system --with-source
 ```
 
-For direct engine reads, mint a temporary root token via the
-[generate-root ceremony](./add-secret-live-cluster.md) (steps 1–3, inside
-`openbao-0` — no standing admin credential exists), then:
+For direct engine reads, log in with the staff OIDC method
+(`bao login -method=oidc`, `infra-team` — [ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/));
+the [generate-root ceremony](./add-secret-live-cluster.md) is the fallback
+when the issuer is down. Then:
 
 ```bash
 # 3. Inspect the engine (inside openbao-0, BAO_TOKEN exported)
@@ -52,4 +53,4 @@ If the store or ExternalSecret is not Ready, see
 
 ---
 
-_Last updated: 2026-08-19 — Rewritten from a planned-feature stub to the deployed ADR-025 static-role pilot with runnable commands._
+_Last updated: 2026-08-27 — admin access via ADR-062 staff OIDC login. 2026-08-19: rewritten to the deployed ADR-025 pilot._

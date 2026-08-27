@@ -14,9 +14,11 @@ stuck sealed therefore means OpenBAO **could not reach floci (or the KMS
 alias) when it started** — the fix is to repair the floci path and restart the
 pods so they retry auto-unseal, not to type an unseal key.
 
-The `recovery_key` is **not an unseal key**. It cannot unseal anything; its
-only use is driving the `bao operator generate-root` ceremony for day-2 admin
-access — see
+The `recovery_key` is **not an unseal key**. It cannot unseal anything; it
+exists to drive the `bao operator generate-root` ceremony — since
+[ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/) that ceremony is the
+**fallback** for day-2 admin access (normal path: staff OIDC login,
+`bao login -method=oidc`) — see
 [Add or write a KV secret on a live cluster](./add-secret-live-cluster.md).
 
 ```mermaid
@@ -123,4 +125,4 @@ production points the same `seal "awskms"` stanza at a real cloud KMS.
 
 ---
 
-_Last updated: 2026-08-19 — Rewritten for awskms auto-unseal via floci (ADR-024); the manual Shamir unseal procedure never applied to this platform._
+_Last updated: 2026-08-27 — recovery-key purpose updated: generate-root is the fallback behind the ADR-062 OIDC login. 2026-08-19: rewritten for awskms auto-unseal (ADR-024)._

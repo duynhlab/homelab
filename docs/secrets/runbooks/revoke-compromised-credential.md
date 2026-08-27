@@ -2,16 +2,17 @@
 
 Use this during incident response when a token, static secret, or database credential is suspected compromised.
 
-Revocation commands are authenticated, and no standing admin credential exists —
-the bootstrap Job revoked the root token (the `root_token` copy in
-`openbao-init-keys` is inert).
+Revocation commands are authenticated. Root was revoked at bootstrap (the
+`root_token` copy in `openbao-init-keys` is inert) — under incident pressure
+the fast path is the **staff OIDC login**
+([ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/)); the recovery-key
+ceremony is the fallback when Keycloak itself is down.
 
 ```bash
-# 0. Obtain a short-lived root token via the generate-root ceremony
-#    (steps 1–3 of ./add-secret-live-cluster.md, inside openbao-0):
-kubectl exec -it -n openbao openbao-0 -- sh
-export BAO_ADDR=http://127.0.0.1:8200
-export BAO_TOKEN=<generated-root-token>
+# 0. Log in as an infra-team member (one command, opens a browser):
+export BAO_ADDR=https://openbao.duynh.me   # or a port-forward to :8200
+bao login -method=oidc
+# Fallback (issuer down): generate-root ceremony per ./add-secret-live-cluster.md.
 
 # 1a. Compromised ADR-025 static-role password (deployed pilot: notification):
 #     static-creds are rotated, not lease-revoked — force an immediate rotation,
@@ -30,7 +31,7 @@ bao lease revoke -prefix <mount>/creds/<role>/
 # 2. Compromised OpenBAO token:
 bao token revoke <token>
 
-# 3. Revoke the temporary root token when done
+# 3. Revoke your token when done (mandatory for a ceremony root)
 bao token revoke -self
 ```
 
@@ -43,4 +44,4 @@ kubectl exec -n platform platform-db-1 -- psql -U postgres -c "\du" | grep notif
 
 ---
 
-_Last updated: 2026-08-19 — Added the generate-root ceremony (step 0) and final revoke; examples aligned with the deployed ADR-025 static-role pilot instead of undeployed dynamic leases._
+_Last updated: 2026-08-27 — step 0 is the ADR-062 staff OIDC login (one command beats a multi-party ceremony under incident pressure); generate-root demoted to issuer-down fallback. 2026-08-19: ceremony added, ADR-025 alignment._

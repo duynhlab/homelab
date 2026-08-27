@@ -15,8 +15,14 @@ Use this when ESO works after bootstrap but starts failing about one hour later 
 **Verify**:
 
 ```bash
-ROOT=$(kubectl get secret openbao-init-keys -n openbao -o jsonpath='{.data.root_token}' | base64 -d)
-kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT bao read auth/kubernetes/config"
+# Admin token via the staff OIDC login (ADR-062) — NOTE: the root_token copy in
+# openbao-init-keys is INERT (revoked at bootstrap); it authenticates nothing.
+# OIDC auth is independent of the broken kubernetes auth, so it still works
+# during this incident.
+export BAO_ADDR=https://openbao.duynh.me
+bao login -method=oidc            # infra-team member
+TOKEN="$(bao print token)"
+kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$TOKEN bao read auth/kubernetes/config"
 # Expect: token_reviewer_jwt_set=false, disable_local_ca_jwt=false
 ```
 
@@ -24,7 +30,7 @@ kubectl exec -n openbao openbao-0 -- sh -c "BAO_TOKEN=$ROOT bao read auth/kubern
 
 ```bash
 kubectl exec -n openbao openbao-0 -- sh -c \
-  "BAO_TOKEN=$ROOT bao write auth/kubernetes/config \
+  "BAO_TOKEN=$TOKEN bao write auth/kubernetes/config \
     kubernetes_host=https://10.96.0.1:443 \
     kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
     disable_local_ca_jwt=false token_reviewer_jwt=''"
@@ -53,4 +59,4 @@ curl -s http://openbao.openbao.svc.cluster.local:8200/v1/auth/kubernetes/login \
 # In Grafana (VictoriaLogs, LogsQL): _stream:{namespace="openbao"} stream:=stdout | unpack_json | type:=response error:!=""
 ```
 
-_Last updated: 2026-07-14 - Split from `docs/secrets/README.md` during the runbook refactor._
+_Last updated: 2026-08-27 — fixed a broken credential: the commands read the inert root_token (403 since ADR-024); they now use an ADR-062 staff OIDC token, which also survives this incident because OIDC auth does not depend on kubernetes auth. 2026-07-14: split from the secrets README._

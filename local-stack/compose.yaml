@@ -290,6 +290,15 @@ services:
           temporal operator namespace create --namespace mop --retention 168h \
             --description "duynhlab platform workflows (order-fulfillment saga)"
         fi
+        # Custom Search Attributes (business-key lookup in UI/CLI: OrderId for
+        # the saga, SessionId for the abandoned-checkout watch). Part of the
+        # namespace contract — services set them in StartWorkflowOptions, and
+        # a start referencing an unregistered attribute is REJECTED, so this
+        # must run before any workflow traffic. Mirrors the cluster's
+        # temporal-search-attributes Job. `create` is idempotent per name
+        # (already-exists is reported and skipped, exit 0).
+        temporal operator search-attribute create --namespace mop \
+          --name OrderId --type Keyword --name SessionId --type Keyword
     depends_on:
       temporal: { condition: service_healthy }
 

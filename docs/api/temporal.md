@@ -1239,6 +1239,34 @@ How to deploy the worker, run the saga locally, and watch it in production.
   (shard count partitions throughput, not behaviour), and `docker compose down` still wipes
   everything, because the `postgres` service holds no data volume.
 
+### Finding and Reading Executions
+
+Three UI/CLI affordances ride every execution (Phase-4 conformance wave of
+ADR-063/064; SDK ≥ 1.47):
+
+- **Custom Search Attributes** — namespace `mop` registers two `Keyword`
+  attributes, and services stamp them in `StartWorkflowOptions` (start options
+  only — no mid-workflow upsert, so recorded histories replay unchanged):
+
+  | Attribute | Stamped by | On | List filter |
+  |---|---|---|---|
+  | `OrderId` | order-service | `OrderFulfillmentWorkflow` | `OrderId = '8'` |
+  | `SessionId` | checkout-service | `AbandonedCheckoutWorkflow` | `SessionId = '<uuid>'` |
+
+  Registration is part of the namespace contract — a start referencing an
+  unregistered attribute is **rejected** — and is owned by
+  `temporal-bootstrap` (local-stack) and the `temporal-search-attributes` Job
+  in `configs/temporal` (cluster; `apps-local` dependsOn
+  `temporal-config-local` so apps never race it).
+- **StaticSummary** — a fixed one-liner on the execution-list row: the saga
+  shows order id, item count, total, and stock participant; the abandon watch
+  shows session id and TTL.
+- **Current details** — the saga mirrors every `recordStage` boundary into
+  `workflow.SetCurrentDetails` (stage, plus failure reason while
+  compensating), so the UI answers "where is this saga?" without opening
+  event history. Served from the workflow-metadata query; not a history
+  event.
+
 ### Operations and Observability
 
 - **Temporal Web UI** — `temporal.duynh.me` (cluster) / `localhost:8233` (local-stack): every
@@ -1270,4 +1298,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-08-27 — ADR-063: `pkg/temporalx` bullet rewritten for the OTel v2 plugin (monotonic `_total` counters, replay-safe workflow spans); ADR-064 puts checkout-worker under the controller (see workflows.md). 2026-08-21: ADR-054 lifecycle move._
+_Last updated: 2026-08-27 — Phase-4 conformance wave: § Finding and Reading Executions added (Search Attributes OrderId/SessionId + StaticSummary + SetCurrentDetails), CommitInventory heartbeat, SDK logs through zap. Previous: 2026-08-27 — ADR-063: `pkg/temporalx` bullet rewritten for the OTel v2 plugin (monotonic `_total` counters, replay-safe workflow spans); ADR-064 puts checkout-worker under the controller (see workflows.md). 2026-08-21: ADR-054 lifecycle move._

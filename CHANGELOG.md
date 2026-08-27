@@ -57,95 +57,10 @@ Skeleton (copy what you need):
 - ...
 
 ### Feature
-#### GitOps
-
-- **checkout-worker joins the Worker Controller (ADR-064).**
-  `kubernetes/apps/checkout-worker.yaml` is no longer a HelmRelease: a
-  `Connection` (ns `checkout`) + `WorkerDeployment checkout-abandon` now own
-  the lifecycle — derived build id, Progressive rollout, sunset windows, build
-  id exported as `service.version`, exactly the order-worker shape. The four
-  hand-written replay-safety essays the old manifest accumulated retire with
-  it; the safety net is checkout-service's new replay corpus
-  (`CHECKOUT_RELEASE_GATE`). Pins move in the same train: checkout **v0.9.2**
-  (API + worker pair rule), order **v2.6.0** (API + worker).
-
-#### Proposals
-
-- **ADR-063 + ADR-064 (Proposed): the Temporal deep-dive becomes two decisions.**
-  [ADR-063](docs/proposals/adr/ADR-063-temporal-otel-v2/) moves Temporal
-  telemetry onto `contrib/opentelemetry-v2` (replay-safe global provider,
-  corrected span parenting, monotonic SDK counters, workflow-interior spans)
-  and sets the fleet rule "one `temporalx` pin" — ending the SDK split
-  (1.44.1/1.48.0) whose dual metric names already flapped gate row K5.5
-  (#921). [ADR-064](docs/proposals/adr/ADR-064-all-workers-under-controller/)
-  puts every Temporal worker under the Worker Controller with Pinned
-  versioning — checkout-worker's manifest carries four hand-written
-  replay-safety essays that Pinned routing deletes, and its
-  CaN-every-30-minutes shape drains old builds in about one timer cycle.
-  Decisions only — implementation train follows owner review.
-
 #### <Component>
 - ...
 
 ### Bugfix
-
-#### Observability
-
-- **Every `temporal_*` consumer now queries names that exist.** ADR-063's
-  monotonic counters rename SDK counters with `_total` on the OTLP→Prometheus
-  path — measured on the compose gate (both workers emit an identical 49-name
-  set), then applied in one sweep: 4 alerts in
-  `configs/temporal/prometheusrule.yaml` (the failure-ratio pair queried
-  suffix-less names and would have gone silently blind),
-  `grafana/dashboards/temporal.json` + its local twin (15 renames each, incl.
-  `sticky_cache_total_forced_eviction` → `sticky_cache_forced_eviction_total`
-  — a reorder, not a suffix), and k6 K5.5 drops the 2026-08-25 dual-spelling
-  `or`-clause for one name. K5.4 now asserts `service_version` splits for BOTH
-  workers.
-- **Local Grafana folders mirror the cluster for real.** The compose
-  provisioning claimed to mirror the cluster's `GrafanaDashboard` folders but
-  had drifted to 3 catch-alls; it now runs one provider per folder with
-  explicit names ("API Gateway", "Business & Product", "Platform /
-  Infrastructure", "Microservices / Golden Signals", "Workflows / Async",
-  "ClickHouse") — names with `/` and `&` can never come from directory
-  structure, which is how the drift started.
-
-#### Docs
-
-- **Truth-sweep after ADR-062: 20 files stopped describing the old world.**
-  The most-read access rows sent operators to an anonymous Grafana Admin that
-  no longer exists and to an OpenBAO root token inert since ADR-024
-  (`setup.md`); the Grafana hub and the Grafana-MCP rationale argued from
-  `org_role: Admin`; all eight OpenBAO runbooks treated the generate-root
-  ceremony as the only admin path (now: `bao login -method=oidc` step 0,
-  ceremony = issuer-down fallback — and `reviewer-jwt-auth-failure.md`'s
-  commands authenticated with the inert root token, a real bug);
-  `network-policies.md` missed the monitoring→:8080 allow and drew seven
-  JWKS arrows where ten exist; `identity.md` said "both public, PKCE" of a
-  client set that now includes two confidential ones; `envoy-gateway.md`'s
-  inventory missed the hairpin (`edge` Service + CoreDNS takeover);
-  Kustomization counts said 22/23 where 24 is true; `cert-manager.md` §11.5
-  now states the committed-CA-goes-stale-every-rebuild trap plainly (it broke
-  the OIDC configurator once) with a matching troubleshooting row; the
-  local-stack README marks compose's anonymous Grafana as a deliberate
-  divergence. Historical records (RFC-0008, dated gate evidence) untouched.
-#### Secrets
-
-- **The OIDC configurator trusted a CA that no longer exists.** The
-  `openbao-oidc-config` Job read its trust from the trust-manager
-  `homelab-ca-bundle` — which is built from a **static, committed** copy of
-  `homelab-ca` (`configs/cert-manager/ca-source/`, by design for staged
-  rollover). Every `make up` regenerates the real CA, so on a rebuilt cluster
-  the discovery fetch died with `x509: ECDSA verification failure …
-  candidate authority "homelab-ca"` — and a second bug hid the first: passing
-  the 141-cert bundle as a shell arg tripped `ARG_MAX` ("Argument list too
-  long") while `2>/dev/null` swallowed both errors into an endless
-  "discovery not ready" loop. Fix: a `openbao-idp-trust` Certificate issued
-  by the LIVE `homelab-ca` ClusterIssuer (its `ca.crt` matches the edge chain
-  by construction, every rebuild), system CAs concatenated at runtime,
-  `oidc_discovery_ca_pem=@file`, and retry errors now print. The stale
-  committed CA copy remains a standing platform gap for every *other* bundle
-  consumer on a rebuilt cluster.
 
 #### <Component>
 - ...
@@ -155,16 +70,6 @@ Skeleton (copy what you need):
 - ...
 
 ### Dependency
-#### Services
-
-- **Temporal fleet on one SDK again (ADR-063):** checkout v0.9.2 and order
-  v2.6.0 both pin `pkg/temporalx` + `pkg/obsx` **v0.38.0** — Temporal SDK
-  **1.48.0** everywhere (checkout jumped from 1.44.1), telemetry on the
-  `contrib/opentelemetry-v2` plugin, `go 1.26.7`, and builder images
-  `golang:1.26.7-alpine` (ride-along rule: a pkg go-directive bump moves the
-  Dockerfile in the same PR, or the container build silently downloads a
-  toolchain).
-
 #### <Component>
 - ...
 
@@ -388,6 +293,16 @@ Skeleton (copy what you need):
   procedure in [`docs/platform/keycloak.md`](docs/platform/keycloak.md).
 
 #### GitOps
+
+- **checkout-worker joins the Worker Controller (ADR-064).**
+  `kubernetes/apps/checkout-worker.yaml` is no longer a HelmRelease: a
+  `Connection` (ns `checkout`) + `WorkerDeployment checkout-abandon` now own
+  the lifecycle — derived build id, Progressive rollout, sunset windows, build
+  id exported as `service.version`, exactly the order-worker shape. The four
+  hand-written replay-safety essays the old manifest accumulated retire with
+  it; the safety net is checkout-service's new replay corpus
+  (`CHECKOUT_RELEASE_GATE`). Pins move in the same train: checkout **v0.9.2**
+  (API + worker pair rule), order **v2.6.0** (API + worker).
 
 - **`scripts/new-worker-build.sh` — stage a versioned Temporal worker build
   without retyping it.** A build bump changes exactly **six** values in a
@@ -671,6 +586,24 @@ Skeleton (copy what you need):
 
 #### Temporal
 
+- **Every execution now carries its business key, a one-line summary, and live
+  progress** (Phase-4 conformance wave of ADR-063/064; order#220 + checkout#80,
+  temporalx `v0.39.0`). Custom Search Attributes `OrderId`/`SessionId` (Keyword)
+  are registered on namespace `mop` by the new `temporal-search-attributes` Job
+  in `configs/temporal` — the chart cannot do it, its namespace job only runs
+  `namespace create` — and services stamp them in start options only, so
+  recorded histories replay unchanged. The saga adds `StaticSummary` (order,
+  items, total, participant) and mirrors every `recordStage` boundary into
+  `workflow.SetCurrentDetails`; the abandon watch adds its session + TTL
+  summary. `CommitInventory` finally heartbeats (10s `HeartbeatTimeout` against
+  a 30s StartToClose), so a worker death mid-attempt is retried in ~10s instead
+  of spending the full attempt timeout out of the 30m budget. Registration is
+  part of the namespace contract — a start naming an unregistered attribute is
+  rejected — so `apps-local` now `dependsOn: temporal-config-local` (chain doc
+  updated in AGENTS.md + setup.md; SA contract in `docs/api/temporal.md`
+  § Finding and Reading Executions). Both workers' SDK log lines (poller
+  lifecycle, task failures) now emit as structured zap JSON via
+  `temporalx.WithLogger` instead of plain-text stderr.
 - **The Worker Controller owns the versioned-worker lifecycle; 638 lines of hand
   operation retired** (RFC-0026 / ADR-054). Two HelmReleases land in the existing
   `temporal` namespace and the existing `temporal-local` Kustomization — CRDs chart
@@ -711,6 +644,12 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **`temporal-bootstrap` registers the custom Search Attributes** right after it
+  creates namespace `mop` (`OrderId`/`SessionId`, Keyword) — the compose twin of
+  the cluster's `temporal-search-attributes` Job, and it must run before any
+  workflow traffic because a start naming an unregistered attribute is
+  rejected. `search-attribute create` is idempotent per name, so the run-once
+  service stays restart-safe.
 - **The portal's attention cards now have a gate row of their own** (`A22`,
   `scripts/k6/staff.js`). B6 proves the five cards *render* a numeral, but only
   in a browser, and a dash tells nobody which of the six reads broke. A22 issues
@@ -895,6 +834,19 @@ Skeleton (copy what you need):
   Fifteen inbound `#platform-pipeline`/`#troubleshooting` links retargeted.
 
 #### Proposals
+
+- **ADR-063 + ADR-064 (Proposed): the Temporal deep-dive becomes two decisions.**
+  [ADR-063](docs/proposals/adr/ADR-063-temporal-otel-v2/) moves Temporal
+  telemetry onto `contrib/opentelemetry-v2` (replay-safe global provider,
+  corrected span parenting, monotonic SDK counters, workflow-interior spans)
+  and sets the fleet rule "one `temporalx` pin" — ending the SDK split
+  (1.44.1/1.48.0) whose dual metric names already flapped gate row K5.5
+  (#921). [ADR-064](docs/proposals/adr/ADR-064-all-workers-under-controller/)
+  puts every Temporal worker under the Worker Controller with Pinned
+  versioning — checkout-worker's manifest carries four hand-written
+  replay-safety essays that Pinned routing deletes, and its
+  CaN-every-30-minutes shape drains old builds in about one timer cycle.
+  Decisions only — implementation train follows owner review.
 
 - **ADR-062 (Proposed): infra tools get humans, humans get one identity.**
   Grafana today is anonymous-Admin-for-the-whole-LAN and OpenBAO has no working
@@ -2077,6 +2029,25 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Every `temporal_*` consumer now queries names that exist.** ADR-063's
+  monotonic counters rename SDK counters with `_total` on the OTLP→Prometheus
+  path — measured on the compose gate (both workers emit an identical 49-name
+  set), then applied in one sweep: 4 alerts in
+  `configs/temporal/prometheusrule.yaml` (the failure-ratio pair queried
+  suffix-less names and would have gone silently blind),
+  `grafana/dashboards/temporal.json` + its local twin (15 renames each, incl.
+  `sticky_cache_total_forced_eviction` → `sticky_cache_forced_eviction_total`
+  — a reorder, not a suffix), and k6 K5.5 drops the 2026-08-25 dual-spelling
+  `or`-clause for one name. K5.4 now asserts `service_version` splits for BOTH
+  workers.
+- **Local Grafana folders mirror the cluster for real.** The compose
+  provisioning claimed to mirror the cluster's `GrafanaDashboard` folders but
+  had drifted to 3 catch-alls; it now runs one provider per folder with
+  explicit names ("API Gateway", "Business & Product", "Platform /
+  Infrastructure", "Microservices / Golden Signals", "Workflows / Async",
+  "ClickHouse") — names with `/` and `&` can never come from directory
+  structure, which is how the drift started.
+
 - **A `critical` alert whose condition was a strict superset of a `warning`
   one.** `MicroserviceNoSuccessfulRequests` guarded on `rate(total[1h]) > 0` —
   *had* traffic — so whenever `MicroserviceNoTraffic` (warning, non-paging) fired,
@@ -2376,6 +2347,24 @@ Skeleton (copy what you need):
   growing under a full `make e2e GATE=kind` run.
 
 #### Docs
+
+- **Truth-sweep after ADR-062: 20 files stopped describing the old world.**
+  The most-read access rows sent operators to an anonymous Grafana Admin that
+  no longer exists and to an OpenBAO root token inert since ADR-024
+  (`setup.md`); the Grafana hub and the Grafana-MCP rationale argued from
+  `org_role: Admin`; all eight OpenBAO runbooks treated the generate-root
+  ceremony as the only admin path (now: `bao login -method=oidc` step 0,
+  ceremony = issuer-down fallback — and `reviewer-jwt-auth-failure.md`'s
+  commands authenticated with the inert root token, a real bug);
+  `network-policies.md` missed the monitoring→:8080 allow and drew seven
+  JWKS arrows where ten exist; `identity.md` said "both public, PKCE" of a
+  client set that now includes two confidential ones; `envoy-gateway.md`'s
+  inventory missed the hairpin (`edge` Service + CoreDNS takeover);
+  Kustomization counts said 22/23 where 24 is true; `cert-manager.md` §11.5
+  now states the committed-CA-goes-stale-every-rebuild trap plainly (it broke
+  the OIDC configurator once) with a matching troubleshooting row; the
+  local-stack README marks compose's anonymous Grafana as a deliberate
+  divergence. Historical records (RFC-0008, dated gate evidence) untouched.
 
 - **Repository metadata now has one clear source of truth.** The placeholder
   logo and metadata note are removed, and the root README keeps CI as its only
@@ -3070,6 +3059,22 @@ Skeleton (copy what you need):
 
 #### Secrets
 
+- **The OIDC configurator trusted a CA that no longer exists.** The
+  `openbao-oidc-config` Job read its trust from the trust-manager
+  `homelab-ca-bundle` — which is built from a **static, committed** copy of
+  `homelab-ca` (`configs/cert-manager/ca-source/`, by design for staged
+  rollover). Every `make up` regenerates the real CA, so on a rebuilt cluster
+  the discovery fetch died with `x509: ECDSA verification failure …
+  candidate authority "homelab-ca"` — and a second bug hid the first: passing
+  the 141-cert bundle as a shell arg tripped `ARG_MAX` ("Argument list too
+  long") while `2>/dev/null` swallowed both errors into an endless
+  "discovery not ready" loop. Fix: a `openbao-idp-trust` Certificate issued
+  by the LIVE `homelab-ca` ClusterIssuer (its `ca.crt` matches the edge chain
+  by construction, every rebuild), system CAs concatenated at runtime,
+  `oidc_discovery_ca_pem=@file`, and retry errors now print. The stale
+  committed CA copy remains a standing platform gap for every *other* bundle
+  consumer on a rebuilt cluster.
+
 - **The External Secrets webhook was starved at 50m CPU, and it stalled the
   entire Flux chain for hours while looking like nine unrelated problems.**
   Measured on 2026-08-21: the webhook pod sat at **51m against a 50m limit** with
@@ -3372,6 +3377,23 @@ Skeleton (copy what you need):
   stated plainly.
 
 ### Dependency
+
+#### Services
+
+- Fleet pins for the Phase-4 Temporal conformance wave: `order` **v2.7.0**
+  (order#220) and `checkout` **v0.10.0** (checkout#80, worker rides the same
+  tag — pair rule), both on `temporalx v0.39.0` (`WithLogger`). Compose gate
+  2026-08-27 on the exact PR images: 17 rows PASS + SG.4 (Kind-only),
+  122/122 assertions — run twice, the second on checkout's final commit.
+
+- **Temporal fleet on one SDK again (ADR-063):** checkout v0.9.2 and order
+  v2.6.0 both pin `pkg/temporalx` + `pkg/obsx` **v0.38.0** — Temporal SDK
+  **1.48.0** everywhere (checkout jumped from 1.44.1), telemetry on the
+  `contrib/opentelemetry-v2` plugin, `go 1.26.7`, and builder images
+  `golang:1.26.7-alpine` (ride-along rule: a pkg go-directive bump moves the
+  Dockerfile in the same PR, or the container build silently downloads a
+  toolchain).
+
 
 #### GitOps
 

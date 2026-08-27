@@ -22,9 +22,14 @@ spec:
   dependsOn:
     - name: databases-local
     - name: monitoring-local
-    # The order-worker dials Temporal at startup (fatal if unreachable), so apps
-    # must not deploy until the Temporal cluster is Ready.
-    - name: temporal-local
+    # The order-worker dials Temporal at startup (fatal if unreachable), so
+    # apps must not deploy until the Temporal cluster is Ready. The CONFIG half
+    # (not just the chart) because it carries the search-attributes Job, and a
+    # workflow start referencing an unregistered attribute is rejected — the
+    # attributes are part of the namespace contract the apps assume.
+    # temporal-config-local itself dependsOn temporal-local, so this edge
+    # covers both.
+    - name: temporal-config-local
 
   # Health checks for apps (per-domain ResourceSets)
   healthChecks:

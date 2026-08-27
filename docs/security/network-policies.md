@@ -19,11 +19,15 @@
   that admit callers only to the service pods themselves — in `product` because
   PgDog also listens on `:9090` (openmetrics) and a namespace-wide `:9090` allow
   would hand the metrics port to app callers.
-- **Keycloak (`identity` namespace) is the token issuer** (RFC-0024). Three
+- **Keycloak (`identity` namespace) is the token issuer** (RFC-0024). Four
   sources hold an ingress allow into `identity`: `envoy-gateway` on `:8080`
   (the `id.duynh.me` route **and** the edge SecurityPolicy `remoteJWKS` fetches
   of `/realms/duynhlab/protocol/openid-connect/certs`), `monitoring` on `:9000`
-  (Keycloak management/metrics), and — **added 2026-08-22** — the **ten service
+  (Keycloak management/metrics) **and on `:8080`** (added with
+  [ADR-062](../proposals/adr/ADR-062-staff-groups-sso/): Grafana's
+  `generic_oauth` backchannel — `token_url`/`api_url` hit the in-cluster
+  Service; without it every SSO code exchange dies at kindnet), and —
+  **added 2026-08-22** — the **ten service
   namespaces that run `pkg/authmw`** on `:8080`, for their own JWKS fetch.
   That third allow corrects a documented contradiction rather than widening a
   boundary casually. This page used to say *"no service namespace is admitted —
@@ -91,7 +95,7 @@ traffic; the rest mirror the east-west call graph. Ports are TCP.
 
 | Callee ns | Allowed callers (policy) | Why |
 |-----------|--------------------------|-----|
-| **identity** (Keycloak) | `envoy-gateway` → `:8080`; `monitoring` → `:9000`; the ten `pkg/authmw` namespaces → `:8080` | The edge serves the `id.duynh.me` route and fetches the JWKS for its `remoteJWKS` SecurityPolicy; VMAgent scrapes the management interface. The **ten `pkg/authmw` services fetch the same JWKS themselves** — their verifier is the authoritative one ([`api.md`](../api/api.md)) and is fail-closed, so without this allow every `private` route 401s. The list first held seven, scoped by enumerating the Deployments that carried `OIDC_JWKS_URL`, and excluded `product`/`shipping`/`inventory` as having "no in-service verifier". **Corrected 2026-08-22:** all three build `pkg/authmw` in `cmd/main.go`; what they lacked was the env pair, so they used compiled defaults pointing at the public host. Enumerating by which manifest happened to set a variable found the symptom rather than the set. Still **not** `frontend`/`backoffice` (SPAs — the browser holds the token). `:9000` stays `monitoring`-only. |
+| **identity** (Keycloak) | `envoy-gateway` → `:8080`; `monitoring` → `:9000` **and `:8080`** (ADR-062 Grafana OAuth backchannel); the ten `pkg/authmw` namespaces → `:8080` | The edge serves the `id.duynh.me` route and fetches the JWKS for its `remoteJWKS` SecurityPolicy; VMAgent scrapes the management interface. The **ten `pkg/authmw` services fetch the same JWKS themselves** — their verifier is the authoritative one ([`api.md`](../api/api.md)) and is fail-closed, so without this allow every `private` route 401s. The list first held seven, scoped by enumerating the Deployments that carried `OIDC_JWKS_URL`, and excluded `product`/`shipping`/`inventory` as having "no in-service verifier". **Corrected 2026-08-22:** all three build `pkg/authmw` in `cmd/main.go`; what they lacked was the env pair, so they used compiled defaults pointing at the public host. Enumerating by which manifest happened to set a variable found the symptom rather than the set. Still **not** `frontend`/`backoffice` (SPAs — the browser holds the token). `:9000` remains reachable from `monitoring` alone; since ADR-062 `monitoring` also holds `:8080` for Grafana's OAuth backchannel. |
 | **user** | `envoy-gateway` → `:8080` | Browser-only today; no service-to-service caller. |
 | **product** | `envoy-gateway` → `:8080`; `checkout` → `:9090` (**pod-scoped** `allow-product-grpc`) | Checkout re-validates prices via `product.v1` (RFC-0015). `order` was deliberately **removed** from the gRPC allow — RFC-0021 P4 deleted the saga's product stock activities, and keeping the allow would let a rolled-back build silently reserve stock at product again. DB-tier allows: [table below](#db-tier-allows). |
 | **cart** | `envoy-gateway`, `order` → `:8080`; `checkout` → `:9090` | `order` reads the cart during checkout; the checkout service reads it over `cart.v1` gRPC only (RFC-0015), never the HTTP API. |
@@ -158,10 +162,14 @@ flowchart LR
     EDGE -->|"id.duynh.me + remoteJWKS"| IDP
     EDGE -->|":8080 Backoffice only"| INV
 
-    %% The seven pkg/authmw services fetch the JWKS themselves (added 2026-08-22).
+    %% The ten pkg/authmw services fetch the JWKS themselves (added 2026-08-22).
     %% Their verifier is the authoritative one and is fail-closed, so this is not
     %% redundancy with the edge -- without it every private route answers 401.
-    USER & CART & ORDER & CHECKOUT & REVIEW & NOTIF & PAYMENT -->|":8080 JWKS"| IDP
+    USER & CART & ORDER & CHECKOUT & REVIEW & NOTIF & PAYMENT & PRODUCT & INV & SHIP -->|":8080 JWKS"| IDP
+
+    %% Staff SSO backchannel (ADR-062): Grafana exchanges the OAuth code and
+    %% reads userinfo against the in-cluster Service.
+    MON[monitoring] -->|":9000 metrics · :8080 OAuth backchannel"| IDP
 
     %% East-west business calls
     ORDER -->|read cart| CART
@@ -182,7 +190,7 @@ flowchart LR
 ```
 
 > Note the arrow that does **not** exist: nothing → `checkout` on `:9090` (it is a
-> gRPC client, never a server to the mesh). The seven `pkg/authmw` namespaces
+> gRPC client, never a server to the mesh). The ten `pkg/authmw` namespaces
 > **do** reach `identity:8080` since 2026-08-22 — that arrow was missing from
 > both this diagram and the policy, and its absence 401'd every authenticated
 > route on the cluster. The
@@ -261,4 +269,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-08-19 — rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._
+_Last updated: 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._

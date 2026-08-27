@@ -617,8 +617,16 @@ kubectl get secret homelab-ca-v2-secret -n cert-manager \
 ### 11.5 Bootstrap (fresh cluster)
 
 `ca-source/homelab-ca.crt` is committed for the current cluster's CA. A fresh
-cluster generates a new CA key, so re-export once cert-manager has issued
-`homelab-ca-secret`:
+cluster generates a new CA key, so **on every `make down && make up` the
+committed copy — and therefore the bundle's `homelab-ca` entry — is stale
+until this re-export runs.** This is not cosmetic: it already bit once — the
+ADR-062 OpenBAO OIDC configurator originally trusted the bundle and failed
+`x509: ECDSA verification failure … candidate authority "homelab-ca"` on a
+rebuilt cluster (fixed in PR #933 by trusting a live-issuer Certificate
+instead; that consumer-side pattern — a throwaway Certificate from the
+`homelab-ca` ClusterIssuer whose `ca.crt` is current by construction — is the
+right choice for anything that must verify the edge in-cluster). Re-export
+once cert-manager has issued `homelab-ca-secret`:
 
 ```bash
 kubectl get secret homelab-ca-secret -n cert-manager \
@@ -643,6 +651,7 @@ kubectl describe bundle homelab-ca-bundle
 | ConfigMap not appearing in target ns | Namespace missing `platform.duynhlab.dev/needs-trust=true` |
 | ConfigMap exists but is empty | trust-manager pod logs — most often the Mozilla pkg image failed to pull |
 | Old CA still in bundle after rotation | Rebuild not triggered — `flux reconcile kustomization cert-manager-local --with-source` |
+| In-cluster TLS to `*.duynh.me` fails `x509: … candidate authority "homelab-ca"` after a cluster rebuild | The committed `ca-source/homelab-ca.crt` predates this cluster's CA — re-export per §11.5, or have the consumer trust a live-issuer Certificate instead (the ADR-062 / PR #933 pattern) |
 
 ---
 
@@ -656,4 +665,4 @@ kubectl describe bundle homelab-ca-bundle
 
 ---
 
-_Last updated: 2026-08-19 — edge-Certificate status corrected: `envoy-gateway-config-local` reconciled on Kind with the RFC-0024 bring-up (#791), K-row gate pass pending; earlier same day: trust-distribution.md dissolved into §11 (architecture, opt-in, mounting, CA rotation, bootstrap, troubleshooting; the stale `auth` namespace row dropped — only `monitoring` carries `needs-trust`); inline HelmRelease copy synced with the deployed `prometheus.servicemonitor` block. Previously 2026-08-13 — edge Certificate `platform-edge-tls` (ns `envoy-gateway`), LE DNS-01 on prod / `homelab-ca` on local Kind (planned)._
+_Last updated: 2026-08-27 — §11.5 now states plainly that the committed CA is stale on every rebuilt cluster (it broke the ADR-062 OIDC configurator once; PR #933's live-issuer Certificate is the consumer-side pattern) and §11.6 gains the matching troubleshooting row. 2026-08-19 — edge-Certificate status corrected: `envoy-gateway-config-local` reconciled on Kind with the RFC-0024 bring-up (#791), K-row gate pass pending; earlier same day: trust-distribution.md dissolved into §11 (architecture, opt-in, mounting, CA rotation, bootstrap, troubleshooting; the stale `auth` namespace row dropped — only `monitoring` carries `needs-trust`); inline HelmRelease copy synced with the deployed `prometheus.servicemonitor` block. Previously 2026-08-13 — edge Certificate `platform-edge-tls` (ns `envoy-gateway`), LE DNS-01 on prod / `homelab-ca` on local Kind (planned)._

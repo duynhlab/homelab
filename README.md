@@ -64,7 +64,7 @@ flowchart TB
     subgraph CLUSTER ["Kind cluster"]
         direction TB
 
-        subgraph DEL ["Delivery · 23 Kustomizations, dependsOn-ordered"]
+        subgraph DEL ["Delivery · 24 Kustomizations, dependsOn-ordered"]
             direction LR
             FLUX["Flux Operator<br/>+ FluxInstance"]:::platform
             RS["5 domain ResourceSets<br/>+ 10 InputProviders"]:::platform

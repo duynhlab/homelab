@@ -79,7 +79,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     k8ssecret -->|"env / volume / secretKeyRef"| apps
     eso -->|"syncs DNS-01 token"| cfsecret
     cfsecret -->|"Cloudflare API token"| cm
-    cm -->|"local: homelab-ca (planned)<br/>prod: Let's Encrypt DNS-01"| edgecert
+    cm -->|"local: homelab-ca (reconciled)<br/>prod: Let's Encrypt DNS-01"| edgecert
     cm -->|"homelab CA source"| tm
     tm -->|"namespaceSelector: needs-trust=true"| cabundle
     cabundle -->|"mounted PEM trust store"| trusted

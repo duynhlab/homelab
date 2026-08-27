@@ -62,6 +62,25 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Docs
+
+- **Truth-sweep after ADR-062: 20 files stopped describing the old world.**
+  The most-read access rows sent operators to an anonymous Grafana Admin that
+  no longer exists and to an OpenBAO root token inert since ADR-024
+  (`setup.md`); the Grafana hub and the Grafana-MCP rationale argued from
+  `org_role: Admin`; all eight OpenBAO runbooks treated the generate-root
+  ceremony as the only admin path (now: `bao login -method=oidc` step 0,
+  ceremony = issuer-down fallback — and `reviewer-jwt-auth-failure.md`'s
+  commands authenticated with the inert root token, a real bug);
+  `network-policies.md` missed the monitoring→:8080 allow and drew seven
+  JWKS arrows where ten exist; `identity.md` said "both public, PKCE" of a
+  client set that now includes two confidential ones; `envoy-gateway.md`'s
+  inventory missed the hairpin (`edge` Service + CoreDNS takeover);
+  Kustomization counts said 22/23 where 24 is true; `cert-manager.md` §11.5
+  now states the committed-CA-goes-stale-every-rebuild trap plainly (it broke
+  the OIDC configurator once) with a matching troubleshooting row; the
+  local-stack README marks compose's anonymous Grafana as a deliberate
+  divergence. Historical records (RFC-0008, dated gate evidence) untouched.
 #### Secrets
 
 - **The OIDC configurator trusted a CA that no longer exists.** The

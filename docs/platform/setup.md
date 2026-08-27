@@ -465,7 +465,7 @@ homelab/
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind local environment (22 Kustomization CRs — see kustomization.yaml; a cluster shows 23, incl. flux-system)
+│       └── local/                      # Kind local environment (24 Kustomization CRs declared — see kustomization.yaml; mcp commented out, a cluster shows 24 incl. flux-system)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration
@@ -523,4 +523,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed platform (Keycloak login flow, anonymous Grafana, 22 Kustomizations, 7 ResourceSets, inventory; auth-service rows removed)._
+_Last updated: 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

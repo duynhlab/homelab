@@ -355,12 +355,16 @@ machinery they have in common.
 | **Ends as** | `confirmed` · `failed` · `compensated` · `manual_review` | `cancelled` · `manual_review` | `expired` · `gone` · finalized |
 | **Versioned** | **Pinned** (ADR-030) | **Pinned** (ADR-030) | **not versioned** |
 
-The asymmetry in that last row is deliberate and worth understanding before
-reading further. The two order workflows hold money and stock while they run, so
-they are pinned to the worker build that started them: a rolling replacement would
-hand a half-finished saga to code that may disagree about what it already did.
-The checkout timer holds nothing — its only authority is a timestamp in a database
-row — so it runs unversioned and a rolling deploy is safe.
+The contrast in that last row is worth understanding before reading further.
+The two order workflows hold money and stock while they run, so they are pinned
+to the worker build that started them: a rolling replacement would hand a
+half-finished saga to code that may disagree about what it already did. The
+checkout timer holds nothing — its only authority is a timestamp in a database
+row — which is why it COULD run unversioned for a year. Since
+[ADR-064](../proposals/adr/ADR-064-all-workers-under-controller/) it is Pinned
+under the controller anyway: not because a rolling deploy became unsafe, but
+because "safe" had to be re-argued by hand in the manifest on every tag move,
+and Pinned routing plus the replay corpus replaced those essays with machinery.
 
 ```mermaid
 flowchart LR
@@ -969,8 +973,12 @@ introduced in `v0.7.0`), all **idempotent** so activity retries are safe:
 
 - **inventory** — `Reserve(reservation_id, lines)` · `Release(reservation_id)` · `Commit(reservation_id)`, plus `GetReservation` for the cancellation disposition. The saga's only stock authority since RFC-0021 P4; product's `ReserveStock`/`ReleaseStock` are no longer called by anything.
 - **shipping** — `CreateShipment(order_id, address)` · `CancelShipment(order_id)`.
-- **`pkg/temporalx`** — shared Temporal client + worker bootstrap (mirrors `grpcx`/`obsx`) with the
-  OpenTelemetry tracing interceptor, so workflow/activity spans join the originating request's trace.
+- **`pkg/temporalx`** — shared Temporal client + worker bootstrap (mirrors `grpcx`/`obsx`). Since
+  v0.38.0 (ADR-063) telemetry rides the SDK's **OpenTelemetry v2 plugin**: workflow/activity spans
+  join the originating request's trace with corrected parenting, SDK counters export as monotonic
+  sums (`_total` names), and workflow code may create replay-safe spans via `temporalx.Tracer`.
+  Precondition wired in each service main: the global tracer provider is
+  `temporalx.NewReplaySafeTracerProvider`, installed through `obsx.WithTracerProviderFactory`.
 
 **Checkout is async.** After [checkout confirm](./checkout.md), checkout calls
 `order.v1/CreateOrder` over gRPC; order-service persists the row as **`pending`**
@@ -1262,4 +1270,4 @@ How to deploy the worker, run the saga locally, and watch it in production.
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-08-21 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle. § Worker Deployment Versioning, the in-cluster deploy bullet and the topology diagram all move off the per-build manifest model; the build id is derived and named nowhere in git._
+_Last updated: 2026-08-27 — ADR-063: `pkg/temporalx` bullet rewritten for the OTel v2 plugin (monotonic `_total` counters, replay-safe workflow spans); ADR-064 puts checkout-worker under the controller (see workflows.md). 2026-08-21: ADR-054 lifecycle move._

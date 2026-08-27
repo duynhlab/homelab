@@ -67,19 +67,21 @@ spec:
             summary: "Temporal persistence error rate high (>2%)"
             description: "Temporal persistence error ratio has exceeded 2% for >10m — platform-db (CNPG) may be degraded; durable state writes are at risk."
 
-    # Worker-side (SDK) RED metrics from the order-fulfillment worker, arriving
-    # via OTLP push through the otel-collector (the order-worker PodMonitor was
+    # Worker-side (SDK) RED metrics from BOTH Temporal workers, arriving via
+    # OTLP push through the otel-collector (the order-worker PodMonitor was
     # retired at RFC-0014 P3). Names are the Temporal Go SDK OTel metrics
-    # (pkg/temporalx) — note the SDK exports "counters" as gauges (no _total), so
-    # rate() is applied to the cumulative gauges. Denominators use clamp_min so the
+    # (pkg/temporalx). Since ADR-063 the metrics handler exports monotonic
+    # counters (UseMonotonicCounters), so the OTLP→Prometheus path names them
+    # with a `_total` suffix — the fleet's 49-name set was MEASURED on the
+    # compose gate 2026-08-27, not inferred. Denominators use clamp_min so the
     # ratios never divide by zero / false-fire when the worker is idle.
     - name: temporal-worker
       interval: 30s
       rules:
         - alert: TemporalWorkflowFailureRateHigh
           expr: |
-            sum(rate(temporal_workflow_failed[10m]))
-              / clamp_min(sum(rate(temporal_workflow_completed[10m])) + sum(rate(temporal_workflow_failed[10m])), 1) > 0.05
+            sum(rate(temporal_workflow_failed_total[10m]))
+              / clamp_min(sum(rate(temporal_workflow_completed_total[10m])) + sum(rate(temporal_workflow_failed_total[10m])), 1) > 0.05
           for: 10m
           labels:
             severity: warning
@@ -90,7 +92,7 @@ spec:
 
         - alert: TemporalActivityFailureRateHigh
           expr: |
-            sum(rate(temporal_activity_execution_failed[10m]))
+            sum(rate(temporal_activity_execution_failed_total[10m]))
               / clamp_min(sum(rate(temporal_activity_execution_latency_seconds_count[10m])), 1) > 0.05
           for: 10m
           labels:
@@ -102,7 +104,7 @@ spec:
 
         - alert: TemporalWorkerRequestErrorRateHigh
           expr: |
-            sum(rate(temporal_request_failure[5m])) / clamp_min(sum(rate(temporal_request[5m])), 1) > 0.05
+            sum(rate(temporal_request_failure_total[5m])) / clamp_min(sum(rate(temporal_request_total[5m])), 1) > 0.05
           for: 10m
           labels:
             severity: warning

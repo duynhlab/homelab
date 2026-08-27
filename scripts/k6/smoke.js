@@ -308,18 +308,21 @@ const UNITS = [
           [`${svc} is its own service_name`]: () => (byService[svc] || 0) >= 1,
         });
       }
-      // More than one order-worker process is EXPECTED while a version is
-      // inside its sunset window -- two versions of one worker share a
-      // service_name, which is exactly what service_version exists to split.
-      const byVersion = promqlCountBy(
-        target.vm,
-        'count by (service_name, service_version) (go_goroutine_count{service_name="order-worker"})',
-        'service_version'
-      );
-      const versions = Object.keys(byVersion).filter((v) => v && v !== 'undefined');
-      rowCheck(id, null, {
-        'order-worker splits by service_version': () => versions.length >= 1,
-      });
+      // More than one worker process is EXPECTED while a version is inside
+      // its sunset window -- two versions of one worker share a service_name,
+      // which is exactly what service_version exists to split. Since ADR-064
+      // BOTH workers run under the controller, so both must split.
+      for (const w of ['order-worker', 'checkout-worker']) {
+        const byVersion = promqlCountBy(
+          target.vm,
+          `count by (service_name, service_version) (go_goroutine_count{service_name="${w}"})`,
+          'service_version'
+        );
+        const versions = Object.keys(byVersion).filter((v) => v && v !== 'undefined');
+        rowCheck(id, null, {
+          [`${w} splits by service_version`]: () => versions.length >= 1,
+        });
+      }
     },
   },
   {
@@ -331,15 +334,12 @@ const UNITS = [
       const legs = [
         ['app HTTP semconv', 'sum(http_server_request_duration_seconds_count)'],
         ['app gRPC semconv', 'sum(rpc_server_call_duration_seconds_count{service_name="inventory"})'],
-        // No `_seconds` in this name. The Go SDK emits it without, and the
-        // query that asked for the longer name reported NO SERIES on every run
-        // -- indistinguishable from a dead exporter.
-        // Both spellings: the Go SDK renamed the family with a _seconds
-        // suffix, and the two workers currently straddle SDK versions —
-        // task_execution shows BOTH names live, endtoend only the new one.
-        // Asserting one spelling makes the row flap with worker restarts
-        // (caught 2026-08-25: two identical 14/15 runs on a green stack).
-        ['Temporal SDK', 'count(temporal_workflow_endtoend_latency_bucket or temporal_workflow_endtoend_latency_seconds_bucket)'],
+        // ONE spelling again. The 2026-08-25 straddle (two workers on two
+        // SDKs emitting two names for one family) ended with ADR-063: both
+        // workers run temporalx v0.38.0, and the fleet's 49-name temporal_*
+        // set was measured identical per worker on the compose gate
+        // (2026-08-27) — histograms uniformly `_seconds`, counters `_total`.
+        ['Temporal SDK', 'count(temporal_workflow_endtoend_latency_seconds_bucket)'],
         ['edge Envoy stats', 'sum(envoy_http_downstream_rq_total)'],
         // The connector leg. Derived from spans by the collector rather than
         // emitted by an SDK, so it is the one leg that survives an SDK metrics

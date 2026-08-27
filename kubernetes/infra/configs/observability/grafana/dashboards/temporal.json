@@ -103,13 +103,13 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(temporal_workflow_completed{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) by (workflow_type, service_name)",
+          "expr": "sum(rate(temporal_workflow_completed_total{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) by (workflow_type, service_name)",
           "range": true,
           "refId": "A",
           "legendFormat": "{{workflow_type}} ({{service_name}})"
         }
       ],
-      "description": "SDK counter temporal_workflow_completed (bare name — the Go SDK exports counters without _total; verified live 2026-08-18)."
+      "description": "SDK counter temporal_workflow_completed_total (bare name — the Go SDK exports counters without _total; verified live 2026-08-18)."
     },
     {
       "datasource": {
@@ -180,13 +180,13 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "(sum(rate(temporal_workflow_failed{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(temporal_workflow_completed{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) + (sum(rate(temporal_workflow_failed{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) or vector(0)), 1)",
+          "expr": "(sum(rate(temporal_workflow_failed_total{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(temporal_workflow_completed_total{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) + (sum(rate(temporal_workflow_failed_total{namespace=~\"$namespace\",service_name=~\"$service_name\",workflow_type=~\"$workflow_type\"}[$__rate_interval])) or vector(0)), 1)",
           "range": true,
           "refId": "A",
           "legendFormat": "failure ratio"
         }
       ],
-      "description": "temporal_workflow_failed is failure-only: it has NO series until a workflow fails, so the numerator carries `or vector(0)` — a healthy stack reads 0, not 'No data'."
+      "description": "temporal_workflow_failed_total is failure-only: it has NO series until a workflow fails, so the numerator carries `or vector(0)` — a healthy stack reads 0, not 'No data'."
     },
     {
       "datasource": {
@@ -498,7 +498,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(temporal_workflow_task_queue_poll_succeed{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (task_queue)",
+          "expr": "sum(rate(temporal_workflow_task_queue_poll_succeed_total{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (task_queue)",
           "range": true,
           "refId": "A",
           "legendFormat": "succeed {{task_queue}}"
@@ -508,7 +508,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(temporal_workflow_task_queue_poll_empty{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (task_queue)",
+          "expr": "sum(rate(temporal_workflow_task_queue_poll_empty_total{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (task_queue)",
           "range": true,
           "refId": "B",
           "legendFormat": "empty {{task_queue}}"
@@ -671,7 +671,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "(sum(rate(temporal_activity_execution_failed{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(temporal_activity_execution_latency_seconds_count{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])), 1)",
+          "expr": "(sum(rate(temporal_activity_execution_failed_total{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(temporal_activity_execution_latency_seconds_count{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])), 1)",
           "range": true,
           "refId": "A",
           "legendFormat": "failure ratio"
@@ -1066,7 +1066,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "(sum(rate(temporal_request_failure{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(temporal_request{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])), 1)",
+          "expr": "(sum(rate(temporal_request_failure_total{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(temporal_request_total{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])), 1)",
           "range": true,
           "refId": "A",
           "legendFormat": "error ratio"
@@ -1224,7 +1224,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(temporal_sticky_cache_hit{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (service_name)",
+          "expr": "sum(rate(temporal_sticky_cache_hit_total{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (service_name)",
           "range": true,
           "refId": "B",
           "legendFormat": "hit/s {{service_name}}"
@@ -1234,7 +1234,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(temporal_sticky_cache_total_forced_eviction{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (service_name)",
+          "expr": "sum(rate(temporal_sticky_cache_forced_eviction_total{namespace=~\"$namespace\",service_name=~\"$service_name\"}[$__rate_interval])) by (service_name)",
           "range": true,
           "refId": "C",
           "legendFormat": "evictions/s {{service_name}}"
@@ -1823,7 +1823,7 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(temporal_workflow_completed{namespace=~\"$namespace\"}, workflow_type)",
+        "definition": "label_values(temporal_workflow_completed_total{namespace=~\"$namespace\"}, workflow_type)",
         "hide": 0,
         "includeAll": true,
         "multi": false,
@@ -1831,7 +1831,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(temporal_workflow_completed{namespace=~\"$namespace\"}, workflow_type)",
+          "query": "label_values(temporal_workflow_completed_total{namespace=~\"$namespace\"}, workflow_type)",
           "refId": "var-workflow_type"
         },
         "refresh": 2,

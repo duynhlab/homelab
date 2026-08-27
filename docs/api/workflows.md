@@ -37,7 +37,7 @@ flowchart TD
   subgraph wf["Workflows"]
     OFW["OrderFulfillmentWorkflow<br/>Pinned"]
     CW["CancellationWorkflow<br/>Pinned"]
-    ACW["AbandonedCheckoutWorkflow<br/>unversioned"]
+    ACW["AbandonedCheckoutWorkflow<br/>Pinned (ADR-064)"]
   end
 
   subgraph srv["Temporal — namespace mop"]
@@ -105,18 +105,21 @@ worker's lifecycle · green = Temporal and the stores activities write to · gre
 Temporal subgraph because the server owns them · dashed white = **planned**, not installed. Dotted edges are task dispatch
 (the server chooses the worker; nothing pushes) and the planned scaling path.
 
-> **In plain terms:** three workflows, two queues, and two workers whose lifecycles are
-> owned by different things — that asymmetry is the thing to carry away.
+> **In plain terms:** three workflows, two queues, two workers — and since
+> [ADR-064](../proposals/adr/ADR-064-all-workers-under-controller/) ONE lifecycle:
+> the Temporal Worker Controller owns both. (Until 2026-08-27 checkout-worker was a
+> plain HelmRelease and the asymmetry was the thing to carry away; what retired it
+> was the cost ledger — every checkout tag move owed a hand-written replay-safety
+> essay, four of which had accumulated in its manifest.)
 >
 > Both order workflows share **one** queue and therefore one worker, so a build that
-> refuses one of them refuses both. That worker exists in the plural: the Current build
+> refuses one of them refuses both. Each worker exists in the plural: the Current build
 > takes new workflows while a draining build keeps serving only the executions stamped
 > with it, and a controller — not a person — decides when the draining one may go.
 >
 > `AbandonedCheckoutWorkflow` sits alone on its own queue and touches nothing but its
-> own rows. That isolation is exactly why it could stay unversioned: there is no
-> cross-service state for a mid-flight code change to strand, so a tag move needs no
-> determinism argument.
+> own rows — and it Continue-as-News every ≤30 minutes, so under Pinned versioning an
+> old build drains in about one timer cycle: the cheapest drain on the platform.
 >
 > KEDA is drawn because the shape is decided, not because it runs. Nothing scales
 > today: every worker is one replica, and the backlog it would read is already scraped
@@ -145,8 +148,9 @@ touches no other service and holds nothing: the deadline on the row is the only
 clock, so a lost signal delays an expiry rather than causing a wrong one.
 
 Both workers run in local-stack (`local-stack/compose.yaml`) and in-cluster on
-namespace `mop`, and each is **one** manifest — but for different reasons, and the
-difference is versioned vs unversioned, not one file vs many.
+namespace `mop`, and each is **one** manifest for the same reason since ADR-064:
+one `WorkerDeployment` per worker, forever — a release edits the image tag line
+(`kubernetes/apps/order-worker.yaml`, `kubernetes/apps/checkout-worker.yaml`).
 
 Order is **versioned** and its lifecycle belongs to the Temporal Worker Controller
 (ADR-054): a single `WorkerDeployment` declares the worker, the controller derives
@@ -218,4 +222,4 @@ resolves it.
 - [temporal.md](./temporal.md) — the three workflows as built, plus saga theory and operations
 - [Service contracts](README.md#service-contracts) — platform deployment rollup
 
-_Last updated: 2026-08-21 — RFC-0026/ADR-054: the Temporal Worker Controller owns the order worker's lifecycle, so there is one `WorkerDeployment` and the build id is derived rather than named here. The product-participant refusal stays attributed to the order 1.13.0 floor rather than to any running build._
+_Last updated: 2026-08-27 — ADR-064: checkout-worker joins the controller (Pinned); the versioned-vs-unversioned asymmetry this file existed to teach is retired and recorded as history above. 2026-08-21: ADR-054 gave order the controller._

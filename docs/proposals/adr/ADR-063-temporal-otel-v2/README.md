@@ -10,8 +10,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-27 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | How Temporal SDK telemetry (traces + SDK metrics) is wired, and the fleet rule for `temporalx` pins; not the collector, the stores, or application (non-SDK) metrics |
@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | this ADR's PR train (pkg → services + compose gate → homelab pins/k6/dashboards → Kind gate) |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — Kind gate 2026-08-27: 25/25 rows, 144 assertions (K5.5 single-spelling Temporal leg 5/5, K5.4 both workers split by service_version); fleet emits one measured 49-name `temporal_*` set; consumers (4 alerts, 2 dashboards, k6) on measured names |
 
 ## Context
 
@@ -254,6 +254,8 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-27 | Proposed / Not started | Initial draft, from the owner-reviewed deep-dive |
+| 2026-08-27 | Accepted / Partial | Owner merged #936 and the train shipped same-day: pkg v0.38.0 (pkg#84), services (checkout#79, order#219, tags v0.9.2/v2.6.0), compose gate green, fleet metric convergence measured (identical 49-name set per worker) |
+| 2026-08-27 | Accepted / Complete | Kind final gate green on the train PR: 25 rows / 144 assertions incl. the redefined K5.4/K5.5; alerts+dashboards+k6 moved to compose-measured names |
 
 ---
 _Last updated: 2026-08-27_

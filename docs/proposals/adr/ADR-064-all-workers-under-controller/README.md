@@ -9,8 +9,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-08-27 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | Which lifecycle mechanism owns Temporal worker deployments platform-wide; not the controller's internals (ADR-054), not autoscaling (ADR-055) |
@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | this ADR's train: registration code rides the ADR-063 checkout PR; manifest flip is its own homelab PR |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — checkout-abandon WorkerDeployment live on Kind (Current 0.9.2-cd4f, controller-derived); a live gate run carries `VERSIONING_BEHAVIOR_PINNED, version=checkout/checkout-abandon.0.9.2-cd4f`; SG.4 5/5 |
 
 ## Context
 
@@ -229,6 +229,8 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-27 | Proposed / Not started | Initial draft, from the owner-reviewed deep-dive |
+| 2026-08-27 | Accepted / Partial | Owner merged #936; registration code shipped inert in checkout#79 (verified: "worker versioning off" on compose); WorkerDeployment manifest in the homelab train PR |
+| 2026-08-27 | Accepted / Complete | Kind: WorkerDeployment checkout-abandon Ready first bring-up; live run pinned to the derived build; flux-validate guard now polices both workers |
 
 ---
 _Last updated: 2026-08-27_

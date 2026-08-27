@@ -1,177 +1,202 @@
-# Abandoned-checkout Temporal worker — a SECOND release of the checkout image
-# that runs its `worker` subcommand (no HTTP API traffic, no Service). It polls
-# the `checkout` task queue and runs AbandonedCheckoutWorkflow's activity
-# (MarkSessionExpired — RFC-0015 P2, timer + lazy-backstop expiry). Modelled on
-# the order worker (then order-worker-2-4-0.yaml; since ADR-054 a WorkerDeployment in order-worker.yaml): same image as `checkout`, `args: ["worker"]`,
-# `service.enabled: false`. Deployed directly (not via the checkout ResourceSet)
-# because its shape is a one-off — no Service, no migrations, Temporal env.
+# Abandoned-checkout Temporal worker — a WorkerDeployment under the Temporal
+# Worker Controller (ADR-064), replacing the plain HelmRelease this file held
+# since RFC-0015 P2. Same image as the checkout API on the SAME TAG (the pair
+# rule), `args: ["worker"]`, no Service; it polls the `checkout` task queue and
+# runs AbandonedCheckoutWorkflow's activity (ExpireIfDue — timer +
+# lazy-backstop expiry, ADR-019).
+#
+# WHY THE LIFECYCLE CHANGED (ADR-064): every tag move of the old HelmRelease
+# owed a hand-written replay-safety essay — four of them accumulated in this
+# file (0.6.0 · 0.6.3 · 0.8.0 · 0.9.0), each arguing "internal/workflow/
+# changed by N lines ⇒ an in-flight AbandonedCheckoutWorkflow replays without
+# a non-determinism error". Pinned versioning deletes that analysis class:
+# in-flight runs stay on their build, new runs (and each ContinueAsNew reset)
+# take the new one. This workflow CaNs every ≤30 minutes, so an old build
+# drains in about one timer cycle — comfortably inside the sunset window.
+# The safety net that replaces the essays is the replay corpus in
+# checkout-service (internal/workflow/testdata, CHECKOUT_RELEASE_GATE).
+#
+# Everything ADR-054 established for order-worker.yaml applies verbatim —
+# derived Build ID (an env/resource edit also mints a version), controller-
+# injected TEMPORAL_DEPLOYMENT_NAME/TEMPORAL_WORKER_BUILD_ID (hand-setting is
+# forbidden; guard: scripts/flux-validate.sh), server-side name
+# "<namespace>/<resource-name>" — this resource registers as
+# `checkout/checkout-abandon`. A release edits ONE line: image below.
 ---
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
+apiVersion: temporal.io/v1alpha1
+kind: Connection
 metadata:
-  name: checkout-worker
+  name: temporal-mop
   namespace: checkout
+  labels:
+    app.kubernetes.io/component: workflow-engine
+    platform.duynhlab.dev/adr: "064"
 spec:
-  interval: 10m
-  timeout: 10m
-  chartRef:
-    kind: OCIRepository
-    name: mop-chart-oci
-    namespace: flux-system
-  releaseName: checkout-worker
-  install:
-    remediation:
-      retries: 3
-  upgrade:
-    remediation:
-      retries: 3
-  values:
-    name: checkout-worker
-    # Architectural component → app.kubernetes.io/component: worker (mop default
-    # is "api"). Metrics reach VictoriaMetrics over OTLP push (RFC-0014 P3),
-    # so no scrape object is needed.
-    component: worker
-    replicaCount: 1
-    image:
-      # Same image as the checkout API — just a different subcommand — and it must
-      # stay on the SAME TAG. It had drifted to 0.3.1 while the API moved to 0.6.0:
-      # three minors of the shared binary, including every base-layer CVE patch that
-      # trivy gates the API on but never re-checked here.
-      #
-      # Safe to move in one step, verified rather than assumed: between those tags
-      # `internal/workflow/` changed by exactly one test file, so the workflow
-      # DEFINITION is byte-identical and an in-flight AbandonedCheckoutWorkflow
-      # (30-minute timer) replays without a non-determinism error. This worker is
-      # NOT under versioning — only order is (ADR-030 decided it; ADR-054 owns the mechanism) — so there is no build id to
-      # activate and no side-by-side step. `repo.ExpireDue`, the only activity it
-      # runs, is also unchanged.
-      repository: ghcr.io/duynhlab/checkout-service/checkout-service
-      # 0.6.3 verified the same way as the previous move: between v0.6.2 and
-      # v0.6.3 `internal/workflow/` changed by ZERO lines, so the workflow
-      # DEFINITION is byte-identical and an in-flight AbandonedCheckoutWorkflow
-      # replays without a non-determinism error. The delta is middleware/logging
-      # only (telemetry audit F-1/F-2), which the worker uses for its own probe
-      # endpoints.
-      #
-      # 0.8.0 moves for the same reason: ADR-038 replaced the per-service
-      # middleware/ package with pkg/httpmw, and the worker only uses it for its
-      # own /health and /ready. No workflow or activity code changed, so no
-      # execution pinned to this build can hit a non-determinism error. This is
-      # not an argument from reading the diff — the Compose gate ran the worker
-      # on exactly this code: AbandonedCheckoutWorkflow fired its timer
-      # (expired|timer, not the lazy backstop) and the fulfillment saga
-      # completed.
-      #
-      # 0.9.0 moves in lockstep with checkout (the pair rule): ADR-053 changed
-      # only the web transport arms — no workflow or activity code — so no
-      # pinned execution can hit a non-determinism error. The compose gate ran
-      # this worker on exactly this code (A13 expired|timer, saga completed).
-      tag: "0.9.1"
-      pullPolicy: IfNotPresent
-    # Run the worker subcommand; it serves /health, /ready, /metrics on :8080 but
-    # no app traffic, so the Service is skipped.
-    args: ["worker"]
-    service:
-      enabled: false
-    # RFC-0014 P4: the worker ships its own logs over OTLP — Vector skips
-    # pods carrying this label (double-ingest guard).
-    labels:
-      platform.duynhlab.dev/otlp-logs: "true"
-    env:
-      - name: OTEL_LOGS_ENABLED
-        value: "true"
-      - name: SERVICE_NAME
-        value: checkout-worker
-      - name: PORT
-        value: "8080"
-      - name: ENV
-        value: "production"
-      - name: OTEL_COLLECTOR_ENDPOINT
-        value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
-      - name: OTEL_SAMPLE_RATE
-        value: "0.1"
-      # OTel SDK reads OTEL_SERVICE_NAME (not SERVICE_NAME); without it
-      # service.name falls back to brittle hostname parsing.
-      - name: OTEL_SERVICE_NAME
-        value: checkout-worker
-      - name: POD_NAME
-        valueFrom:
-          fieldRef:
-            fieldPath: metadata.name
-      - name: POD_NAMESPACE
-        valueFrom:
-          fieldRef:
-            fieldPath: metadata.namespace
-      - name: OTEL_RESOURCE_ATTRIBUTES
-        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME)"
-      # RFC-0014 D-2: obsx reads these exact names for the Kubernetes resource
-      # attributes on the OTLP path.
-      - name: K8S_NAMESPACE_NAME
-        valueFrom:
-          fieldRef:
-            fieldPath: metadata.namespace
-      - name: K8S_POD_NAME
-        valueFrom:
-          fieldRef:
-            fieldPath: metadata.name
-      - name: DEPLOYMENT_ENVIRONMENT
-        value: "production"
-      - name: PYROSCOPE_ENDPOINT
-        value: http://pyroscope.monitoring.svc.cluster.local:4040
-      - name: LOG_LEVEL
-        value: info
-      - name: LOG_FORMAT
-        value: json
-      - name: TRACING_ENABLED
-        value: "true"
-      - name: PROFILING_ENABLED
-        value: "true"
-      # DB — the worker's MarkSessionExpired activity updates checkout_sessions
-      # (same pooler as the checkout API).
-      - name: DB_HOST
-        value: pgdog-product.product.svc.cluster.local
-      - name: DB_PORT
-        value: "6432"
-      - name: DB_NAME
-        value: checkout
-      - name: DB_USER
-        value: checkout
-      - name: DB_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: product-db-checkout-secret
-            key: password
-      - name: DB_SSLMODE
-        value: disable
-      - name: DB_POOL_MAX_CONNECTIONS
-        value: "10"
-      - name: DB_POOL_MODE
-        value: transaction
-      # Temporal — what the worker connects to and the queue it polls.
-      - name: TEMPORAL_HOSTPORT
-        value: temporal-frontend.temporal.svc.cluster.local:7233
-      - name: TEMPORAL_NAMESPACE
-        value: mop
-      - name: TASK_QUEUE
-        value: checkout
-    resources:
-      requests:
-        memory: "48Mi"
-        cpu: "20m"
-      limits:
-        memory: "128Mi"
-        cpu: "300m"
-    livenessProbe:
-      enabled: true
-      httpGet:
-        path: /health
-        port: 8080
-      initialDelaySeconds: 30
-      periodSeconds: 10
-    readinessProbe:
-      enabled: true
-      httpGet:
-        path: /ready
-        port: 8080
-      initialDelaySeconds: 5
-      periodSeconds: 5
+  # Same frontend the worker has always dialled; Connection is
+  # namespace-scoped, so each worker namespace carries its own copy.
+  hostPort: temporal-frontend.temporal.svc.cluster.local:7233
+---
+apiVersion: temporal.io/v1alpha1
+kind: WorkerDeployment
+metadata:
+  name: checkout-abandon
+  namespace: checkout
+  labels:
+    app.kubernetes.io/name: checkout-worker
+    app.kubernetes.io/component: worker
+    platform.duynhlab.dev/adr: "064"
+spec:
+  replicas: 1
+
+  workerOptions:
+    connectionRef:
+      name: temporal-mop
+    temporalNamespace: mop
+
+  # Same bounded Progressive schedule as order-worker.yaml, for the same
+  # reason: apps-local runs `wait: true` with `timeout: 10m`, and a rollout
+  # longer than that fails the whole app wave.
+  rollout:
+    strategy: Progressive
+    steps:
+      - rampPercentage: 10
+        pauseDuration: 30s
+      - rampPercentage: 50
+        pauseDuration: 30s
+
+  # Chart-default retirement policy, stated explicitly (order-worker.yaml has
+  # the full rationale). For THIS workflow the drain is naturally fast: every
+  # run ContinueAsNews within its ≤30-minute timer, and the continuation
+  # routes to the Current version.
+  sunset:
+    scaledownDelay: 1h
+    deleteDelay: 24h
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: checkout-worker
+        app.kubernetes.io/component: worker
+        # RFC-0014 P4: the worker ships its own logs over OTLP — Vector skips
+        # pods carrying this label (double-ingest guard).
+        platform.duynhlab.dev/otlp-logs: "true"
+    spec:
+      containers:
+        - name: worker
+          # Same repository AND TAG as services/checkout.yaml — the pair rule:
+          # one shared binary, two subcommands, one CVE surface.
+          #
+          # THE ONE LINE a release edits.
+          image: ghcr.io/duynhlab/checkout-service/checkout-service:0.9.2
+          imagePullPolicy: IfNotPresent
+          args: ["worker"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: OTEL_LOGS_ENABLED
+              value: "true"
+            - name: SERVICE_NAME
+              value: checkout-worker
+            - name: PORT
+              value: "8080"
+            - name: ENV
+              value: "production"
+            - name: OTEL_COLLECTOR_ENDPOINT
+              value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
+            - name: OTEL_SAMPLE_RATE
+              value: "0.1"
+            # OTel SDK reads OTEL_SERVICE_NAME (not SERVICE_NAME); without it
+            # service.name falls back to brittle hostname parsing.
+            - name: OTEL_SERVICE_NAME
+              value: checkout-worker
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # service.version carries the Build ID so signals split by worker
+            # version during a drain — read from the label the controller
+            # stamps, never typed here (order-worker.yaml has the rationale).
+            - name: BUILD_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['temporal.io/build-id']
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=$(BUILD_ID)"
+            # RFC-0014 D-2: obsx reads these exact names for the Kubernetes
+            # resource attributes on the OTLP path.
+            - name: K8S_NAMESPACE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: DEPLOYMENT_ENVIRONMENT
+              value: "production"
+            - name: PYROSCOPE_ENDPOINT
+              value: http://pyroscope.monitoring.svc.cluster.local:4040
+            - name: LOG_LEVEL
+              value: info
+            - name: LOG_FORMAT
+              value: json
+            - name: TRACING_ENABLED
+              value: "true"
+            - name: PROFILING_ENABLED
+              value: "true"
+            # DB — the worker's ExpireIfDue activity updates checkout_sessions
+            # (same pooler as the checkout API).
+            - name: DB_HOST
+              value: pgdog-product.product.svc.cluster.local
+            - name: DB_PORT
+              value: "6432"
+            - name: DB_NAME
+              value: checkout
+            - name: DB_USER
+              value: checkout
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-checkout-secret
+                  key: password
+            - name: DB_SSLMODE
+              value: disable
+            - name: DB_POOL_MAX_CONNECTIONS
+              value: "10"
+            - name: DB_POOL_MODE
+              value: transaction
+            # Temporal — the address checkout-service reads (not the injected
+            # TEMPORAL_ADDRESS), and the queue it polls.
+            - name: TEMPORAL_HOSTPORT
+              value: temporal-frontend.temporal.svc.cluster.local:7233
+            - name: TEMPORAL_NAMESPACE
+              value: mop
+            - name: TASK_QUEUE
+              value: checkout
+          # Kyverno require-probes and require-resources match the `checkout`
+          # namespace — admission requirements, not hygiene.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "48Mi"
+              cpu: "20m"
+            limits:
+              memory: "128Mi"
+              cpu: "300m"

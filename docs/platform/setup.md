@@ -240,12 +240,12 @@ All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on 
 | API Gateway | https://gateway.duynh.me | Keycloak realm token — `local-stack/scripts/keycloak-token.sh` or sign in through the SPA |
 | Keycloak (issuer) | https://id.duynh.me | realm `duynhlab` — demo users below |
 | Temporal UI | https://temporal.duynh.me | - |
-| Grafana | https://grafana.duynh.me | anonymous (Admin org role — login form disabled) |
+| Grafana | https://grafana.duynh.me | **Sign in with Keycloak** — `duyne` / `p@ss1234` (staff realm; `infra-team`→Admin, ADR-062). Anonymous = read-only Viewer; user/password form hidden |
 | VictoriaMetrics UI | https://vmui.duynh.me | - |
 | VictoriaTraces UI | https://victoriatraces.duynh.me | - |
 | VictoriaLogs UI | https://logs.duynh.me | - |
 | Flux UI | https://ui.duynh.me | - |
-| OpenBAO UI | https://openbao.duynh.me | root token from `openbao-init-keys` secret |
+| OpenBAO UI | https://openbao.duynh.me | Method **OIDC** → Keycloak `duyne` / `p@ss1234` (policy `infra-team` via group, ADR-062); CLI: `bao login -method=oidc` |
 
 This table is a selection — the full host inventory (22 hostnames) lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
 
@@ -465,7 +465,7 @@ homelab/
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind local environment (22 Kustomization CRs — see kustomization.yaml; a cluster shows 23, incl. flux-system)
+│       └── local/                      # Kind local environment (24 Kustomization CRs declared — see kustomization.yaml; mcp commented out, a cluster shows 24 incl. flux-system)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration
@@ -523,4 +523,4 @@ For persistence layer details, refer to [002-database-integration.md](../databas
 
 ---
 
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed platform (Keycloak login flow, anonymous Grafana, 22 Kustomizations, 7 ResourceSets, inventory; auth-service rows removed)._
+_Last updated: 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

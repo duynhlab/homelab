@@ -23,7 +23,7 @@ governs **alert** runbooks only and does not apply here.
 | When to use | Runbook |
 |---|---|
 | Add a new static secret synced by ESO | [Add ESO-managed secret](./add-eso-secret.md) |
-| Write a KV secret on a live cluster (break-glass generate-root ceremony) | [Add or write a KV secret on a live cluster](./add-secret-live-cluster.md) |
+| Write a KV secret on a live cluster (staff OIDC login; ceremony = issuer-down fallback) | [Add or write a KV secret on a live cluster](./add-secret-live-cluster.md) |
 | Rotate a static OpenBAO KV v2 secret | [Rotate static secret](./rotate-static-secret.md) |
 | Put another service's DB password under OpenBAO rotation (ADR-025 pilot) | [Add service dynamic credentials](./add-service-dynamic-credentials.md) |
 | Revoke a token or credential after compromise | [Revoke compromised credential](./revoke-compromised-credential.md) |

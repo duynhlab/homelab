@@ -528,14 +528,15 @@ Two independent controls, both narrower than the alternative:
    of what the credential could do.
 2. **`role: Viewer`** on the Grafana service account.
 
-The second one is the interesting half. Grafana here runs with
-`auth.anonymous.enabled: true` and `org_role: Admin`
-([grafana.yaml](../../kubernetes/infra/configs/observability/grafana/grafana.yaml)),
-so an **unauthenticated** in-cluster caller already has Admin. Handing the MCP a
-token is therefore not about granting access it lacks — it is about *taking
-access away*: a Viewer token is strictly less than the anonymous Admin the
-server would otherwise inherit by making no credential decision at all. Read
-the token as a downgrade, not a grant. Confirmed on the 2026-08-20 Kind run:
+The second one changed meaning with [ADR-062](../proposals/adr/ADR-062-staff-groups-sso/).
+When this section was written, Grafana ran anonymous with `org_role: Admin`,
+so the Viewer token was a *downgrade* from what an unauthenticated caller
+already had. Since ADR-062, anonymous is **Viewer**
+([grafana.yaml](../../kubernetes/infra/configs/observability/grafana/grafana.yaml))
+and Admin requires a staff SSO login — the MCP's Viewer token is now simply
+the least-privilege machine identity it needs, equal to anonymous, and the
+control that matters is the explicit role pin surviving any future change to
+the anonymous policy. Confirmed on the 2026-08-20 Kind run:
 `tools/list` returned 59 tools and **not one** `create_*`/`update_*`/`delete_*`
 among them, so `--disable-write` removes the capability rather than merely
 refusing it at call time.
@@ -759,4 +760,4 @@ CR, or delete the CR and let it be recreated.
 | Grafana Operator Docs | https://grafana.github.io/grafana-operator/ |
 
 ---
-_Last updated: 2026-08-20 — Grafana MCP added as the fourth server: chart 0.20.0 (mcp-grafana 1.1.0), entrypoint override + `--allowed-hosts` + tcpSocket probes explained, Viewer service-account token read as a downgrade from anonymous Admin, and the two convention divergences stated plainly (operator-minted credential outside OpenBAO; no caller auth behind the CIDR fence). `grafana-operator-oci` pin 5.24.0 recorded. Verified live on Kind the same day: operator v5.24.0 ships the CRD, the SA synchronized, the token landed, 59 tools with no write tool, handshake 200 in-cluster and via the gateway, wrong-`Host` 403._
+_Last updated: 2026-08-27 — Grafana token rationale re-read under ADR-062 (anonymous is Viewer now; the Viewer token is least-privilege, no longer a downgrade from anonymous Admin). 2026-08-20: Grafana MCP added as the fourth server: chart 0.20.0 (mcp-grafana 1.1.0), entrypoint override + `--allowed-hosts` + tcpSocket probes explained, Viewer service-account token read as a downgrade from anonymous Admin, and the two convention divergences stated plainly (operator-minted credential outside OpenBAO; no caller auth behind the CIDR fence). `grafana-operator-oci` pin 5.24.0 recorded. Verified live on Kind the same day: operator v5.24.0 ships the CRD, the SA synchronized, the token landed, 59 tools with no write tool, handshake 200 in-cluster and via the gateway, wrong-`Host` 403._

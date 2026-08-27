@@ -113,7 +113,7 @@ docs/
 │   │   └── README.md             # OLAP fundamentals, MergeTree, schema + ops, Grafana chapter
 │   ├── grafana/                  # Visualization layer
 │   │   ├── README.md             # Grafana overview + plugins
-│   │   ├── rbac-multi-team.md    # Org roles, Teams, anonymous vs named users
+│   │   ├── rbac-multi-team.md    # Staff-SSO group→role mapping (ADR-062), Teams, folder permissions
 │   │   ├── datasources.md        # Dual datasource strategy (case study)
 │   │   ├── dashboard-reference.md # Microservices dashboard (40 panels)
 │   │   └── variables.md          # Dashboard variables & regex

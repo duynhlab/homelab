@@ -67,8 +67,11 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     cabundle[(ConfigMap<br/>ca-bundle.pem)]:::data
     trusted(Trust-enabled Workloads):::service
 
+    staff(Operators<br/>staff OIDC login — ADR-062):::service
+
     flux -->|"applies manifests"| bootstrap
     bootstrap -->|"init, seed KV v2, policies, revoke root"| bao
+    staff -->|"auth/oidc → team policies"| bao
     bao -->|"Kubernetes auth + KV v2 reads"| css
     css -->|"store reference"| eso
     eso -->|"reconciles app secrets"| es
@@ -76,7 +79,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     k8ssecret -->|"env / volume / secretKeyRef"| apps
     eso -->|"syncs DNS-01 token"| cfsecret
     cfsecret -->|"Cloudflare API token"| cm
-    cm -->|"local: homelab-ca (planned)<br/>prod: Let's Encrypt DNS-01"| edgecert
+    cm -->|"local: homelab-ca (reconciled)<br/>prod: Let's Encrypt DNS-01"| edgecert
     cm -->|"homelab CA source"| tm
     tm -->|"namespaceSelector: needs-trust=true"| cabundle
     cabundle -->|"mounted PEM trust store"| trusted
@@ -162,7 +165,8 @@ root token revoked; production target is a real cloud KMS. See
 | Step | Component | What happens |
 |---|---|---|
 | 1 | Flux | Applies OpenBAO, ESO, cert-manager, trust-manager, and their config Kustomizations in dependency order |
-| 2 | OpenBAO bootstrap | Ensures the floci KMS alias, initializes OpenBAO (**awskms auto-unseal** — pods self-unseal), enables KV v2, Kubernetes auth, policies, seeds learning secrets, then **revokes the root token** |
+| 2 | OpenBAO bootstrap | Ensures the floci KMS alias, initializes OpenBAO (**awskms auto-unseal** — pods self-unseal), enables KV v2, Kubernetes auth, the `oidc` mount, policies (`eso-read`, `infra-team`, `sre-team`, `db-configurator`, `oidc-configurator`), seeds learning secrets, then **revokes the root token** |
+| 2b | openbao-oidc-config Job | A later Flux wave (after the edge) writes `auth/oidc/config` against the staff realm + team external groups — the ADR-062 human door; no root token (k8s-auth role from step 2) |
 | 3 | ClusterSecretStore | Points ESO at `http://openbao.openbao.svc.cluster.local:8200` with Kubernetes auth role `eso-reader` |
 | 4 | ESO | Reads OpenBAO paths and materializes Kubernetes Secrets with `refreshInterval: 1h` |
 | 5 | cert-manager | Uses `cloudflare-api-token` only for prod Let's Encrypt DNS-01; local Kind patches `platform-edge-tls` to `homelab-ca` (the patch in `envoy-gateway-config.yaml` has reconciled on Kind — RFC-0024 bring-up) |
@@ -305,7 +309,7 @@ kubectl get clustersecretstore
 | Current | Planned / not yet deployed |
 |---|---|
 | KV v2 static secrets + database engine **static-role pilot** (notification, 720h rotation — [ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)) | Extend database-engine credentials to the remaining services; per-request dynamic roles |
-| Kubernetes auth for ESO | OIDC for humans and AppRole for CI/CD |
+| Kubernetes auth for ESO **+ OIDC for humans (shipped — [ADR-062](../proposals/adr/ADR-062-staff-groups-sso/))** | AppRole for CI/CD |
 | Best-effort audit to stdout | Durable, fail-closed audit storage |
 | Local floci KMS emulator (`awskms` auto-unseal, root token revoked — [ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap `endpoint`) |
 | HTTP in-cluster OpenBAO listener | TLS listener and ESO `caBundle` |
@@ -323,7 +327,7 @@ so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
 | TLS for OpenBAO | Prevent plaintext OpenBAO traffic and allow ESO `caBundle` validation | [RFC-0008](../proposals/rfc/RFC-0008/) |
 | Real cloud KMS | Swap the floci emulator's `endpoint` for a managed KMS (auto-unseal itself shipped — ADR-024) | [RFC-0008](../proposals/rfc/RFC-0008/) |
 | Database-engine credentials fleet-wide | Replace the remaining long-lived KV passwords with rotated/leased users (pilot shipped — ADR-025) | [OpenBAO §5.2](./openbao.md#52-database-secrets-engine--dynamic-credentials) |
-| OIDC human access | Remove day-to-day break-glass ceremony use | [OpenBAO Architecture](./openbao.md) |
+| ~~OIDC human access~~ **shipped** (ADR-062) — day-to-day ceremony use is gone; ceremony is the issuer-down fallback | Remove day-to-day break-glass ceremony use | [OpenBAO Architecture](./openbao.md) |
 | Durable audit | Make secret access reconstructable after incidents | [ADR-004](../proposals/adr/ADR-004-enable-openbao-audit-logging/) |
 | Cloudflare token handling | Keep production DNS-01 token outside Git and re-seed fresh clusters safely | [Seed bootstrap-only token](./runbooks/openbao-initial-setup.md) |
 
@@ -334,8 +338,8 @@ so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
 | Notification DB creds | Database-engine static role | Automatic, `rotation_period=720h` | Same, fleet-wide |
 | Other service DB creds (KV) | Static | Manual — [rotate-static-secret](./runbooks/rotate-static-secret.md) | Database-engine roles |
 | ESO OpenBAO token | Kubernetes-auth service token | Auto (auth TTL) | Same |
-| S3/backup creds (KV) | Static | Manual (`bao kv put` via ceremony) | Static roles where supported |
-| Break-glass root token | Generated per ceremony | Revoked after each use | Same |
+| S3/backup creds (KV) | Static | Manual (`bao kv put` via staff OIDC login) | Static roles where supported |
+| Break-glass root token | Generated per ceremony (issuer-down fallback only since ADR-062) | Revoked after each use | Same |
 
 ### Doc wording guardrail
 
@@ -355,4 +359,4 @@ present as active).
 
 ---
 
-_Last updated: 2026-08-19 — production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._
+_Last updated: 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._

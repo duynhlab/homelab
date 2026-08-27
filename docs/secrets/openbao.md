@@ -796,9 +796,9 @@ flowchart TD
     root_policy["root policy\n(initial setup only — then revoked)"]
 
     subgraph human["Human Access Policies"]
-        devops_admin["devops-admin\nFull read/write all namespaces\nManage auth methods, policies\nUsed by: DevOps team via OIDC"]
-        dev_rw["dev-team-rw\nRead/write secret/local/services/*\nRead database/creds/*-app-rw\nRead database/creds/*-readonly\nUsed by: Developers via OIDC"]
-        data_ro["data-team-ro\nRead database/creds/*-readonly only\nUsed by: Data analysts via OIDC"]
+        devops_admin["infra-team (deployed, ADR-062)\npath * incl. sudo\nUsed by: infra-team via staff OIDC\n(renamed from devops-admin)"]
+        sre_ro["sre-team (deployed, ADR-062)\nRead-only secret/local/infra/*\nUsed by: sre-team via staff OIDC"]
+        dev_rw["dev-team-rw (reference, not deployed)\nRead/write secret/local/services/*\nRead database/creds/* (dynamic — planned)"]
     end
 
     subgraph service["Service Policies"]
@@ -811,7 +811,7 @@ flowchart TD
     end
 
     root_policy -.->|"revoked after bootstrap"| devops_admin
-    devops_admin & dev_rw & data_ro & eso_read & svc_product & cicd_deploy
+    devops_admin & sre_ro & dev_rw & eso_read & svc_product & cicd_deploy
 ```
 
 ### Policy Syntax Example

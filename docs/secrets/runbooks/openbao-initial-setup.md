@@ -7,10 +7,11 @@ Use this after a fresh local Kind deployment or when verifying that OpenBAO, ESO
 | Init / unseal | Automatic — the `openbao-bootstrap` Job inits with a recovery key; pods auto-unseal via the floci KMS (`awskms` seal, ADR-024) |
 | Configuration | Automatic — the same Job enables KV v2, Kubernetes auth, policies, and seeds KV secrets |
 | Root token | Revoked by the Job at the end of its first run; the `root_token` copy left in `openbao-init-keys` is **inert** |
-| Break-glass | `recovery_key` in Secret `openbao/openbao-init-keys` → [generate-root ceremony](./add-secret-live-cluster.md) |
+| Day-2 admin access | staff OIDC login — `bao login -method=oidc`, `infra-team` policy ([ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/)); configured post-bootstrap by the `openbao-oidc-config` Job |
+| Break-glass (issuer down) | `recovery_key` in Secret `openbao/openbao-init-keys` → [generate-root ceremony](./add-secret-live-cluster.md) |
 
 Everything below is **verification** — there is nothing to init, unseal, or
-log in to by hand.
+configure by hand (human login exists, but it is SSO — nothing to set up).
 
 ```bash
 # 1. Check cluster status after deployment
@@ -50,21 +51,22 @@ flux reconcile kustomization secrets-local -n flux-system --with-source
 **A re-run seeds nothing on an already-bootstrapped cluster** — the script's
 `bao kv put` lines need root, which was revoked at the end of the first run;
 the re-run prints "already bootstrapped (revoked). Done." and exits 0. To add
-a secret to a live cluster use the
-[break-glass generate-root ceremony](./add-secret-live-cluster.md). Only a
+a secret to a live cluster use an `infra-team` OIDC login — or the break-glass
+ceremony if the issuer is down — per
+[add-secret-live-cluster.md](./add-secret-live-cluster.md). Only a
 fresh cluster (`make up`) seeds the full script.
 
 ## Step 6 — Seed bootstrap-only Cloudflare token (operator)
 
 **Local Kind:** nothing to do — `openbao-bootstrap` seeds a **dev placeholder** (`api_token="dev-cloudflare-placeholder"`) so the ExternalSecret syncs. Local `platform-edge-tls` is `homelab-ca`-issued (reconciled on Kind with the RFC-0024 bring-up), so the (failing) DNS-01 challenge is irrelevant.
 
-**Prod:** the real Cloudflare API token used by cert-manager DNS-01 is **operator-supplied** — **not** in Git. The stored `root_token` is inert, so mint a
-temporary root first via the
-[generate-root ceremony](./add-secret-live-cluster.md) (steps 1–3, inside
-`openbao-0`), then:
+**Prod:** the real Cloudflare API token used by cert-manager DNS-01 is **operator-supplied** — **not** in Git. The stored `root_token` is inert; log in
+with the staff OIDC method (`bao login -method=oidc`, `infra-team`) — or the
+[generate-root ceremony](./add-secret-live-cluster.md) if the issuer is
+down — then:
 
 ```bash
-# Inside openbao-0, with $BAO_TOKEN from the ceremony:
+# With $BAO_TOKEN from the OIDC login (or the ceremony):
 bao kv put secret/local/infra/cloudflare/api-token api_token=cfut_...
 bao token revoke -self   # revoke the temporary root when done
 
@@ -84,7 +86,7 @@ Verify: `kubectl get secret cloudflare-api-token -n cert-manager` should exist w
 # OpenBAO cluster health
 kubectl exec -n openbao openbao-0 -- bao status
 
-# Raft peers (authenticated call — needs a ceremony token, see break-glass runbook)
+# Raft peers (authenticated call — infra-team OIDC token, see add-secret runbook)
 kubectl exec -n openbao openbao-0 -- bao operator raft list-peers
 
 # ESO sync status
@@ -98,4 +100,4 @@ kubectl describe externalsecret product-db-secret -n product
 
 ---
 
-_Last updated: 2026-08-19 — Rewritten for the automated bootstrap Job (init + awskms auto-unseal + config + root revoke); manual init/unseal/login steps removed, Cloudflare seeding now uses the generate-root ceremony._
+_Last updated: 2026-08-27 — day-2 admin access is the ADR-062 staff OIDC login; ceremony demoted to issuer-down fallback throughout. 2026-08-19: rewritten for the automated bootstrap Job._

@@ -39,10 +39,11 @@ path "database/static-creds/<service>" { capabilities = ["read"] }
 ```
 
 **Live cluster:** the bootstrap Job cannot re-apply policies (root is revoked;
-a re-run exits "already bootstrapped"). Apply the updated policy by hand with a
-[generate-root ceremony](./add-secret-live-cluster.md) token
-(`bao policy write eso-read <file>`). Fresh clusters pick it up from the
-configmap automatically.
+a re-run exits "already bootstrapped"). Apply the updated policy by hand with
+an `infra-team` OIDC token (`bao login -method=oidc`, then
+`bao policy write eso-read <file>` — [ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/));
+the [generate-root ceremony](./add-secret-live-cluster.md) is the issuer-down
+fallback. Fresh clusters pick it up from the configmap automatically.
 
 ## 3. Create the ExternalSecret
 
@@ -75,4 +76,4 @@ Deeper checks (engine reads, forced rotation):
 
 ---
 
-_Last updated: 2026-08-19 — Rewritten from a planned-feature stub to the deployed ADR-025 static-role onboarding flow (extend the notification pattern); dynamic creds remain planned._
+_Last updated: 2026-08-27 — live-cluster policy edits via ADR-062 staff OIDC login. 2026-08-19: rewritten to the ADR-025 onboarding flow; dynamic creds remain planned._

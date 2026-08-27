@@ -11,7 +11,7 @@ The verification contract every service and worker follows — two Keycloak real
 |-----------|-------|-----------|
 | **Issuer** | Keycloak — the only issuer fleet-wide; `auth-service` is deleted | [RFC-0024](../proposals/rfc/RFC-0024/) P3/P5 |
 | **Realms** | `duynhlab` (customers) · `duynhlab-staff` (workforce) | [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/) |
-| **Clients** | `customer-spa` · `admin-portal` — both public, PKCE `S256` | — |
+| **Clients** | Browser: `customer-spa` · `admin-portal` (public, PKCE `S256`). Infra-tool SSO: `grafana` · `openbao` (staff realm, **confidential**, secrets via OpenBAO/ESO) | [ADR-062](../proposals/adr/ADR-062-staff-groups-sso/) |
 | **Audience** | `duynhlab-platform`, stamped by an audience mapper; enforced **in-service only** | — |
 | **Access token** | RS256, 900 s (15 min), refresh rotation with reuse revocation | — |
 | **`user_id`** | The token `sub`, a string UUID, `VARCHAR(255)` in every schema | [ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/) |
@@ -46,7 +46,8 @@ the role gate.
 | | `duynhlab` | `duynhlab-staff` |
 |---|---|---|
 | Audience | Storefront customers | Back-office operators |
-| Client | `customer-spa` | `admin-portal` |
+| Browser client | `customer-spa` | `admin-portal` |
+| Infra-tool clients (ADR-062) | — | `grafana` · `openbao` (confidential; groups claim → tool roles) |
 | Realm role | `customer` | `backoffice_admin` |
 | Issuer | `https://id.duynh.me/realms/duynhlab` | `https://id.duynh.me/realms/duynhlab-staff` |
 | Access token | 900 s | 900 s |
@@ -54,13 +55,21 @@ the role gate.
 | Brute-force protection | off | **on** |
 | Self-registration | off | off |
 
-Both realms share the deliberate parts: public client with
-`pkce.code.challenge.method: S256`, standard flow only, **Direct Access Grants
-disabled** (so there is no password-grant shortcut — see
+Both realms share the deliberate parts for their **browser clients**: public
+client with `pkce.code.challenge.method: S256`, standard flow only, **Direct
+Access Grants disabled** (so there is no password-grant shortcut — see
 [Getting a token](#getting-a-token-for-tests)), implicit flow off, service
 accounts off, `revokeRefreshToken: true` with `refreshTokenMaxReuse: 0`, and a
 `platform-audience` mapper putting `duynhlab-platform` in the access token but
 not the ID token.
+
+The staff realm's two **infra-tool clients** ([ADR-062](../proposals/adr/ADR-062-staff-groups-sso/))
+differ on purpose: `grafana` and `openbao` are **confidential** (server-side
+apps that can keep a secret; values live in OpenBAO and reach Keycloak as
+realm-import `${ENV}` placeholders via ESO — never in git), each with an
+`oidc-group-membership-mapper` emitting the `groups` claim that the tools map
+to roles/policies. They serve tools, not the platform APIs — no
+`platform-audience` mapper.
 
 Realm JSON is imported, not managed live —
 `kubernetes/infra/controllers/keycloak/configmap-realm.yaml` holds both realms.
@@ -222,4 +231,4 @@ demo identities in `scripts/k6/lib/config.js`. Demo login is by **username**
 
 ---
 
-_Last updated: 2026-08-24 — first version: the identity contract had no home in `docs/api/`, so realms, the `sub`-as-`user_id` rule, and the `OIDC_*` env pair were scattered across `api.md`, `pkg.md`, and seven service files. Records that the edge does **not** verify `aud`._
+_Last updated: 2026-08-27 — staff realm's confidential infra-tool clients (grafana, openbao — ADR-062) added to the client rows. 2026-08-24 — first version: the identity contract had no home in `docs/api/`, so realms, the `sub`-as-`user_id` rule, and the `OIDC_*` env pair were scattered across `api.md`, `pkg.md`, and seven service files. Records that the edge does **not** verify `aud`._

@@ -244,7 +244,7 @@ All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on 
 | VictoriaMetrics UI | https://vmui.duynh.me | - |
 | VictoriaTraces UI | https://victoriatraces.duynh.me | - |
 | VictoriaLogs UI | https://logs.duynh.me | - |
-| Flux UI | https://ui.duynh.me | - |
+| Flux UI | https://ui.duynh.me | Keycloak SSO (`duynhlab-staff`; infra-team → flux-web-admin, sre/dev-team → flux-web-user) |
 | OpenBAO UI | https://openbao.duynh.me | Method **OIDC** → Keycloak `duyne` / `p@ss1234` (policy `infra-team` via group, ADR-062); CLI: `bao login -method=oidc` |
 
 This table is a selection — the full host inventory (22 hostnames) lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
@@ -493,6 +493,7 @@ homelab/
 5. `envoy-gateway-local`: the Envoy Gateway controller (depends on `gateway-api-crds-local`, `cert-manager-local`).
 5a. `envoy-gateway-config-local`: GatewayClass + Gateway + HTTPRoutes + SecurityPolicies + BackendTrafficPolicies + the `platform-edge-tls` Certificate, with the local `homelab-ca` issuer patch (depends on `envoy-gateway-local`, `cert-manager-local`, `keycloak-local` — the JWT SecurityPolicy's `remoteJWKS` endpoint must resolve). Also carries the ADR-062 issuer hairpin: the stable `edge` Service and the CoreDNS rewrite that resolves `id.duynh.me` onto it in-cluster.
 5b. `openbao-oidc-config-local`: the OpenBAO staff-OIDC configurator Job (ADR-062) — writes `auth/oidc/config` + the team external groups via the `oidc-configurator` k8s-auth role, no root token. Depends on `secrets-local` (role + KV client secret) and `envoy-gateway-config-local` (the discovery fetch hairpins `id.duynh.me` through the edge, with Keycloak behind it).
+5c. `flux-web-local`: the Flux web UI SSO objects (`configs/flux-web` — rendered Web Config Secret, `flux-web-idp-trust` live-CA trust Certificate, group→role ClusterRoleBindings). Depends on `secrets-local` (ESO) and `cert-manager-local` (ClusterIssuer). The operator consumes the Secret via `--web-config-secret-name`, wired in `terraform/main.tf`.
 6. `monitoring-local`: Observability **configs** — Grafana dashboards, VMAlert rules, Sloth **PrometheusServiceLevel** CRs (depends on `controllers-local`; Sloth **operator** is in `controllers-local`).
 7. `storage-local`: Provisions RustFS (S3) object storage (depends on `controllers-local`, `secrets-local`).
 7a. `caching-local`: Valkey (product cache-aside, db 0 — the edge does not use it) (depends on `controllers-local`, `monitoring-local`).

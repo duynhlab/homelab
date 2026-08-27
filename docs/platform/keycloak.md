@@ -39,8 +39,11 @@ because it is much less than Keycloak can do:
 - Hold realm roles (`customer`, `backoffice_admin`) and the demo users.
 - **Staff SSO for infra tools** ([ADR-062](../proposals/adr/ADR-062-staff-groups-sso/)):
   the staff realm carries the team groups (`infra-team`/`sre-team`/`dev-team`)
-  and two confidential clients — `grafana` (generic_oauth, groups → org role)
-  and `openbao` (auth/oidc, groups → external groups → team policies). Their
+  and three confidential clients — `grafana` (generic_oauth, groups → org
+  role), `openbao` (auth/oidc, groups → external groups → team policies) and
+  `flux-web` (the Flux Operator web UI at ui.duynh.me: Web Config OIDC,
+  groups impersonated as Kubernetes groups → flux-web-admin/-user
+  ClusterRoleBindings). Their
   secrets are realm-import `${ENV}` placeholders fed from OpenBAO via ESO —
   never literals in git. Login and admin **events are enabled** on the staff
   realm and land in VictoriaLogs through the JSON console log.

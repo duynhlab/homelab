@@ -1,0 +1,44 @@
+# Keycloak group → Flux web UI permission mapping (ADR-062 taxonomy: the
+# `groups` claim is the single authority; a mapping rule may name groups,
+# never people). The ClusterRoles are created by the flux-operator chart
+# (web.rbac.createRoles, default true): flux-web-admin can run GitOps actions
+# (reconcile/suspend/resume), flux-web-user is read-only. The UI impersonates
+# the OIDC identity (userActions.access: Impersonated), so these bindings are
+# what actually gates every request.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-web-admin-infra-team
+  labels:
+    app.kubernetes.io/name: flux-web-rbac
+    app.kubernetes.io/component: gitops
+subjects:
+  - kind: Group
+    name: infra-team
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: flux-web-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+# sre-team and dev-team read the same UI without action rights — mirrors
+# Grafana's infra→Admin / sre→Editor / else Viewer ladder at the two levels
+# the flux-web roles offer.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-web-user-staff
+  labels:
+    app.kubernetes.io/name: flux-web-rbac
+    app.kubernetes.io/component: gitops
+subjects:
+  - kind: Group
+    name: sre-team
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: dev-team
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: flux-web-user
+  apiGroup: rbac.authorization.k8s.io

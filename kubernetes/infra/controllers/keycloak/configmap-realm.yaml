@@ -357,6 +357,48 @@ data:
           ]
         },
         {
+          "clientId": "flux-web",
+          "name": "Flux Operator web UI (staff SSO per ADR-062)",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": false,
+          "secret": "${FLUX_WEB_CLIENT_SECRET}",
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "redirectUris": [
+            "https://ui.duynh.me/oauth2/callback"
+          ],
+          "webOrigins": [
+            "https://ui.duynh.me"
+          ],
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "profile",
+            "roles",
+            "basic",
+            "email"
+          ],
+          "protocolMappers": [
+            {
+              "name": "groups",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-group-membership-mapper",
+              "consentRequired": false,
+              "config": {
+                "claim.name": "groups",
+                "full.path": "false",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "introspection.token.claim": "true"
+              }
+            }
+          ]
+        },
+        {
           "clientId": "openbao",
           "name": "OpenBAO UI + CLI (staff SSO per ADR-062)",
           "enabled": true,

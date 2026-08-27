@@ -1,0 +1,29 @@
+# Live-CA trust anchor for the Flux Operator web UI's OIDC issuer fetch —
+# the same fix class as openbao-idp-trust (ADR-062): the issuer is
+# https://id.duynh.me through the edge, whose chain is signed by the LIVE
+# homelab-ca, and every `make up` regenerates that CA, so the committed
+# ca-source copy (and any bundle built from it) can never be trusted to match.
+# This Certificate is issued by the live homelab-ca ClusterIssuer, so its
+# secret's ca.crt is the current cluster's CA by construction, on every
+# rebuild. The leaf itself is unused — only ca.crt is: the secret is mounted
+# into the flux-operator pod and reached via SSL_CERT_DIR (terraform/main.tf
+# — DIR, not FILE, so the system roots the operator needs for ghcr.io stay).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: flux-web-idp-trust
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: flux-web-idp-trust
+    app.kubernetes.io/component: gitops
+spec:
+  secretName: flux-web-idp-trust
+  commonName: flux-web-idp-trust.flux-system.svc
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca

@@ -129,6 +129,7 @@ for its own sake.
 | [RFC-0024](RFC-0024/) | Replatform edge and identity: Envoy Gateway + Keycloak, one greenfield cutover (executes [RFC-0022](RFC-0022/); supersedes the Kong vehicle of [RFC-0009](RFC-0009/)/[ADR-006](../adr/ADR-006-rs256-jwt-kong-edge-auth/)) | platform-wide | P1 | **implemented** — P1–P5 + P6 arm A shipped, and the **Kind gate passed 2026-08-25** (ELIGIBLE): all six linked ADRs are `Adoption: Complete`. The two-realm split arrived after acceptance via [ADR-050](../adr/ADR-050-separate-staff-identity-realm/). Still open: the RFC-0022/0023 Kong cross-references |
 | [RFC-0025](RFC-0025/) | Converge the customer SPA on the Admin Portal's stack — one cutover, no mocks (exercises [ADR-049](../adr/ADR-049-admin-portal-tanstack-spa/)'s convergence revisit trigger) | service:frontend | P2 | implemented |
 | [RFC-0026](RFC-0026/) | Adopt the Temporal Worker Controller for versioned workers; KEDA autoscaling designed and recorded (takes up the destination [ADR-030](../adr/ADR-030-temporal-workflow-versioning/) named but deferred) | platform-wide | done | implemented — [ADR-054](../adr/ADR-054-temporal-worker-controller/) controller, [ADR-055](../adr/ADR-055-keda-worker-autoscaling/) KEDA (`Proposed`, not installed). Kind-verified 2026-08-22: `CURRENT` set with no human step, a saga completing Pinned, a Progressive rollout and a rollback both observed |
+| [RFC-0028](RFC-0028/) | ClickHouse replication + least-privilege access (research reaches sharding/Distributed — explicitly not built) | infra | researching | research 2026-08-28; owner-numbered same day. Rungs: schema ownership (two verified options) → 3-user model → CHK + 1×3 ReplicatedMergeTree; sharding stays a documented trigger table, not a deliverable |
 | [RFC-0027](RFC-0027/) | Retire Tempo and Jaeger, keeping VictoriaTraces and ClickHouse (five trace sinks to two; the log tier is unchanged by design) | platform-wide | done | implemented — [ADR-058](../adr/ADR-058-retire-jaeger/), [ADR-059](../adr/ADR-059-retire-tempo/) and [ADR-060](../adr/ADR-060-envoy-access-log-transport/) all `Adoption: Complete`; [ADR-057](../adr/ADR-057-span-metrics-in-collector/) followed on 2026-08-24 once the span metrics had a consumer, and [ADR-040](../adr/ADR-040-tempo-community-helm-chart/) is `Withdrawn`. Kind-verified 2026-08-24 on a cluster rebuilt from scratch: 0 Tempo/Jaeger workloads, a 31-edge replacement service graph, and the edge's access log reaching the 90-day store for the first time |
 
 ## Backlog — candidate RFCs
@@ -157,7 +158,7 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-08-25 — the Kind gate passed and **RFC-0023** and **RFC-0024** both
+_Last updated: 2026-08-28 — **RFC-0028** opened at `researching` (ClickHouse replication + least-privilege; sharding researched-not-built). Previously 2026-08-25 — the Kind gate passed and **RFC-0023** and **RFC-0024** both
 reached `implemented`, converting nine ADRs to `Adoption: Complete` in one run; a docs audit
 over the whole tree followed, correcting index rows that had drifted from the records they
 point at (this row among them). 2026-08-24 — **RFC-0027** → `implemented`: Tempo (both installs) and Jaeger are

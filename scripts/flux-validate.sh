@@ -247,6 +247,41 @@ validate_worker_versioning() {
 #
 # Pin the CLI to the engine the cluster runs (chart 3.8.2 -> v1.18.2). A CLI
 # ahead of the engine can agree with itself and disagree with admission.
+# The schema bootstrap Job asserts a replica count, and that number is stated in
+# two files: the CHI's layout and the Job's EXPECTED_REPLICAS. Discovering it at
+# runtime instead was tried and failed — the operator publishes the cluster
+# definition asynchronously, so the Job "verified" 2 of 2 on a 3-replica store
+# and went green (RFC-0028). Duplicating the intent is the safer trade, provided
+# nothing lets the two drift. This is that guard.
+validate_clickhouse_replica_count() {
+  echo "INFO - Validating ClickHouse replica count agreement"
+  local chi="kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml"
+  local job="kubernetes/infra/configs/clickhouse-schema/job.yaml"
+  if [[ ! -f "$chi" || ! -f "$job" ]]; then
+    echo "  SKIP - ClickHouse manifests not found"
+    return 0
+  fi
+  local want got
+  want=$(yq e '.spec.configuration.clusters[0].layout.replicasCount' "$chi")
+  got=$(yq e '.spec.template.spec.containers[0].env[] | select(.name == "EXPECTED_REPLICAS") | .value' "$job")
+  if [[ -z "$want" || "$want" == "null" ]]; then
+    echo "ERROR - could not read replicasCount from $chi" >&2
+    exit 1
+  fi
+  if [[ -z "$got" || "$got" == "null" ]]; then
+    echo "ERROR - could not read EXPECTED_REPLICAS from $job" >&2
+    exit 1
+  fi
+  if [[ "$want" != "$got" ]]; then
+    echo "ERROR - replica count drift: CHI layout says $want, schema Job expects $got" >&2
+    echo "        The Job asserts total_replicas against its own number, so a" >&2
+    echo "        mismatch either fails the wave or, worse, passes on the wrong" >&2
+    echo "        topology. Update both." >&2
+    exit 1
+  fi
+  echo "  CHI replicasCount=$want matches schema Job EXPECTED_REPLICAS=$got"
+}
+
 validate_kyverno_policies() {
   local dir="kubernetes/infra/configs/kyverno/tests"
   if [[ ! -d "$dir" ]]; then
@@ -275,5 +310,6 @@ validate_standalone_manifests
 validate_kustomize_overlays
 validate_worker_versioning
 validate_kyverno_policies
+validate_clickhouse_replica_count
 validate_production
 echo "INFO - All validations passed"

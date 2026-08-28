@@ -4,9 +4,15 @@
 # create_schema: false. Why that matters is in the ConfigMap's header; what
 # matters here is the shape of the work:
 #
-#   1. Discover the replicas from system.clusters rather than hardcoding three.
-#      A scale-out then repairs itself on the next run of this Job instead of
-#      needing an edit.
+#   1. Assert against the INTENDED replica count, not a discovered one. The first
+#      version trusted `system.clusters`, and a clean bring-up proved that wrong
+#      twice over: the operator publishes the cluster definition asynchronously,
+#      so at the moment this Job starts — after clickhouse-local is Ready, after
+#      all three StatefulSets report ready — the definition can still list two
+#      hosts. The Job then "verified" 2 of 2 and went green on a 2-replica store.
+#      It also returns DUPLICATE rows per host (5 rows for 3 hosts, measured), so
+#      any count must be DISTINCT. EXPECTED_REPLICAS below is the intent, and
+#      `make validate` fails if it drifts from the CHI's replicasCount.
 #   2. Create the DATABASE on every replica individually — no ON CLUSTER, so the
 #      distributed-DDL queue that lost replica 2 twice is never involved.
 #   3. Create the TABLES once. The Replicated database engine propagates them.
@@ -62,6 +68,14 @@ spec:
           # text(tokenizer = ...) index syntax in the logs DDL is 26.x-only.
           image: clickhouse/clickhouse-server:26.7
           env:
+            # Must equal spec.configuration.clusters[0].layout.replicasCount in
+            # configs/clickhouse/clickhouseinstallation.yaml. Duplicated on
+            # purpose: the alternative is discovering it at runtime, which is
+            # exactly what shipped a green Job over a 2-replica store. The
+            # duplication is policed statically — scripts/flux-validate.sh fails
+            # when the two numbers disagree.
+            - name: EXPECTED_REPLICAS
+              value: "3"
             - name: CLICKHOUSE_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -84,10 +98,24 @@ spec:
                 sleep 5
               done
 
-              HOSTS=$(cli "$LB" -q "SELECT host_name FROM system.clusters WHERE cluster='otel' ORDER BY replica_num FORMAT TSV")
-              [ -n "$HOSTS" ] || { echo "FAIL: cluster 'otel' has no hosts"; exit 1; }
-              EXPECTED=$(echo "$HOSTS" | wc -l | tr -d ' ')
-              echo "==> cluster otel has $EXPECTED replicas:"; echo "$HOSTS" | sed 's/^/    /'
+              EXPECTED=$EXPECTED_REPLICAS
+              echo "==> intended replicas: $EXPECTED"
+
+              # The operator publishes remote_servers asynchronously, so wait for
+              # the cluster definition to CATCH UP with the intent rather than
+              # trusting whatever it says right now. DISTINCT because the
+              # generated config lists each host more than once.
+              echo "==> waiting for the cluster definition to list $EXPECTED distinct hosts"
+              n=0
+              while :; do
+                HOSTS=$(cli "$LB" -q "SELECT DISTINCT host_name FROM system.clusters WHERE cluster='otel' ORDER BY host_name FORMAT TSV" 2>/dev/null || true)
+                got=$(printf '%s\n' "$HOSTS" | grep -c . || true)
+                [ "$got" = "$EXPECTED" ] && break
+                n=$((n+1))
+                [ "$n" -ge 60 ] && { echo "FAIL: cluster 'otel' lists $got distinct hosts, want $EXPECTED"; echo "$HOSTS" | sed 's/^/    /'; exit 1; }
+                sleep 5
+              done
+              echo "==> cluster otel lists $EXPECTED hosts:"; echo "$HOSTS" | sed 's/^/    /'
 
               echo "==> waiting for every replica to answer, not just the Service"
               for h in $HOSTS; do

@@ -865,6 +865,17 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0028 research gate passed and the README authored at `provisional`,
+  the same day it opened.** The owner resolved every open question in-session
+  — fresh tables (nothing is a real deployment yet), straight to 3+3, the
+  default `{uuid}` replica path, keep the default access mode — and signed the
+  central decision: **schema stays exporter-owned (Option B)**, `cluster_name`
+  + `table_engine: ReplicatedMergeTree`, zero new components beyond the
+  Keeper. Option A's two advantages are recorded as standing revisit triggers
+  (the first schema ALTER; a real startup-coupling incident). The README
+  carries the proposed topology (CHK ×3 + CHI 1×3), rollout with a deliberate
+  old-table drop, a kill drill, and the expected single ADR for review.
+
 - **RFC-0028 opened at `researching`: ClickHouse replication** (owner-numbered
   2026-08-28; the least-privilege user model was demoted the same day to an
   optional side-rung on owner review — documented and costed, required by

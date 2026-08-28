@@ -865,6 +865,18 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0028 opened at `researching`: ClickHouse replication + least-privilege
+  access** (owner-numbered 2026-08-28). The research covers three rungs —
+  as-built 1×1, the replicated target (schema ownership decided between two
+  VERIFIED options: a git-owned migration Job vs the exporter's own
+  `cluster_name` + `table_engine`, checked template-by-template in contrib's
+  `internal/sqltemplates`; a 3-user least-privilege model; CHK + 1×3
+  ReplicatedMergeTree) — and **sharding + the Distributed engine researched
+  only far enough to know its trigger signals** (a metrics table readable from
+  the native `:9363` endpoint), explicitly not a deliverable. Ships with a
+  Vietnamese reading companion (`research.vi.md`); the quick-win items (system
+  -table TTLs, `:9363`, image pin, PVC Retain) stay outside the RFC gate.
+
 - **ADR-063 + ADR-064 (Proposed): the Temporal deep-dive becomes two decisions.**
   [ADR-063](docs/proposals/adr/ADR-063-temporal-otel-v2/) moves Temporal
   telemetry onto `contrib/opentelemetry-v2` (replay-safe global provider,

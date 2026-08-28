@@ -13,7 +13,12 @@
 - [x] Context7 audit complete (see research § Context7 audit log)
 - [x] Owner approved **ready for RFC** (2026-08-28, in-session)
 - Mechanism deep-dive lives in [./research.md](./research.md) — this file only decides
-- When Status → **`Accepted`**: expected ADR — `ADR-NNN-clickhouse-replicated-topology/` (one decision: 1×3 + CHK with exporter-owned replicated schema). `docs/api/`: N/A — infra-only
+- When Status → **`Accepted`**: expected ADR — `ADR-NNN-clickhouse-replicated-topology/` (one decision: 1×3 + CHK with exporter-owned replicated schema). `docs/api/`: N/A — no service contract touches ClickHouse. **Platform docs that MUST move at implementation** (infra-only ≠ docs-free):
+  - `docs/observability/clickhouse/README.md` — quick-facts row ("MergeTree, single shard × single replica"), deployment inventory, and the DDL section (engine becomes `ReplicatedMergeTree`)
+  - `docs/observability/tracing/architecture.md` — the accepted-gap line "ClickHouse is a single shard … lost volume is lost traces" is retired for the ClickHouse half (VictoriaTraces stays single-node by design)
+  - `docs/platform/setup.md` — the `clickhouse-local` wave description gains the CHK
+  - `docs/observability/alerting/alert-catalog.md` — `ClickHouseZooKeeperExceptions` re-enabled + per-replica reachability
+  - CHANGELOG, as always
 
 ## Summary
 
@@ -230,4 +235,4 @@ applies when Status → implemented)*
 - Quick-win PR (system-table TTLs, `:9363`, image pin, PVC Retain) — independent of this RFC's gate
 
 ---
-_Last updated: 2026-08-28_
+_Last updated: 2026-08-28 — owner review: the bare “docs/api: N/A” hid the real docs impact; the platform-docs checklist above now names every page that must move at implementation._

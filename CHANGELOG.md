@@ -865,13 +865,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
-- **RFC-0028 opened at `researching`: ClickHouse replication + least-privilege
-  access** (owner-numbered 2026-08-28). The research covers three rungs —
+- **RFC-0028 opened at `researching`: ClickHouse replication** (owner-numbered
+  2026-08-28; the least-privilege user model was demoted the same day to an
+  optional side-rung on owner review — documented and costed, required by
+  nothing). The research covers three rungs —
   as-built 1×1, the replicated target (schema ownership decided between two
   VERIFIED options: a git-owned migration Job vs the exporter's own
   `cluster_name` + `table_engine`, checked template-by-template in contrib's
-  `internal/sqltemplates`; a 3-user least-privilege model; CHK + 1×3
-  ReplicatedMergeTree) — and **sharding + the Distributed engine researched
+  `internal/sqltemplates`; CHK + 1×3
+  ReplicatedMergeTree; optional 3-user side-rung) — and **sharding + the Distributed engine researched
   only far enough to know its trigger signals** (a metrics table readable from
   the native `:9363` endpoint), explicitly not a deliverable. Ships with a
   Vietnamese reading companion (`research.vi.md`); the quick-win items (system

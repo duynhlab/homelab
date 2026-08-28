@@ -304,10 +304,15 @@ verified options:
 | Cost | One Job + SQL files + Flux ordering (dependsOn already models it) | Zero new parts |
 | Residual check | — | Argument-free `ReplicatedMergeTree()` relies on `default_replica_path/name` + macros; macros are operator-provided, one live confirm needed |
 
-Proposed direction: **Option A**, because both of its advantages are exactly
-the failure classes this platform has already paid for elsewhere (startup
-coupling; config-not-in-git), and the owner's original design chose it too.
-Option B is documented as the legitimate lighter path, one `values` block away.
+**DECIDED 2026-08-28 (owner, at the research gate): Option B.** It is the
+coherent set with the other gate decisions — recreate-from-scratch and the
+default `{uuid}` replica path are exactly the conditions under which B is
+safe, and it adds zero new moving parts. Option A's two advantages become
+**revisit triggers**, recorded in the RFC README: (1) the first time the
+schema needs an ALTER (new column, TTL change, index) — that DDL has no owner
+under B; (2) a real startup-coupling incident (collector restart during a
+ClickHouse outage taking down all telemetry sinks). Either firing re-opens
+the Job as the known, already-designed fallback.
 
 **Optional side-rung — user model (owner-declared not required).** If taken,
 three users rather than the EKS design's six: no Vector writes ClickHouse
@@ -358,9 +363,10 @@ bind the RFC:
    Option B cannot pass engine args at all. One implementation check remains:
    `SELECT * FROM system.server_settings WHERE name LIKE 'default_replica%'`
    to confirm the defaults on our build.
-4. **(Only if the optional user-model rung is ever taken)** Grafana
-   `readonly=2` compatibility with the current datasource plugin version —
-   one login test. *(Still open — the rung itself is optional.)*
+4. **Grafana access mode** — **DECIDED 2026-08-28: keep the default** (the
+   current `default`-user datasource, no `readonly` work). The question
+   dissolves with the optional user-model rung; if that rung is ever taken,
+   re-open this as its first implementation check.
 5. **Do the operator-generated `remote_servers` need anything for a future
    Distributed table?** — **DECIDED: no action.** Verified in operator docs
    (`internal_replication: true`, cluster generated from the CHI layout); the
@@ -419,10 +425,10 @@ Option B is on the table at all.
 
 ## Research review gate
 
-- [ ] Owner has read the problem statement and the two schema-ownership options
-- [ ] Scope fence accepted: replication in, sharding/Distributed research-only
-- [ ] Open questions' proposed directions accepted or amended
-- [ ] Quick-win PR (TTLs, `:9363`, pin, Retain) may ship independently of this gate
-- [ ] On pass: copy `RFC-0000/README.md` → `RFC-0028/README.md` (proposed architecture + rollout), index status `researching` → per lifecycle
+- [x] Owner has read the problem statement and the two schema-ownership options — **Option B chosen (2026-08-28)**
+- [x] Scope fence accepted: replication in, sharding/Distributed research-only; user model demoted to optional (2026-08-28)
+- [x] Open questions resolved: recreate · straight to 3+3 · default replica path · keep default access · no remote_servers action (2026-08-28)
+- [x] Quick-win PR (TTLs, `:9363`, pin, Retain) may ship independently of this gate
+- [x] **Gate passed 2026-08-28** → `README.md` authored in this folder (status `provisional`)
 
-_Last updated: 2026-08-28 — owner resolved open questions 1/2/3/5 (recreate; straight to 3+3; default replica path; no remote_servers action). Same day: user model demoted to optional; research opened._
+_Last updated: 2026-08-28 — gate PASSED: Option B chosen, Q4 closed (keep default access), checklist ticked, README.md authored. Earlier same day: owner resolved open questions 1/2/3/5 (recreate; straight to 3+3; default replica path; no remote_servers action). Same day: user model demoted to optional; research opened._

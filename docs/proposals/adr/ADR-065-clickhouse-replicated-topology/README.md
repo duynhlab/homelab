@@ -216,6 +216,21 @@ either one fires.
   chronically, that is a separate decision with its own migration.
 - **The single `default` user remains** the whole access control story for the
   store, shared by the collector and Grafana.
+- **A half-created schema is now possible, and it is silent.** The exporter's
+  `CREATE ... ON CLUSTER` only reaches the replicas that have already joined the
+  distributed-DDL queue; a host that joins later **skips earlier queue entries**,
+  and `IF NOT EXISTS` makes every subsequent retry a no-op. Measured on the first
+  Kind bring-up: the `otel` database existed on replica 0 alone while all six pods
+  read `Running` and every table read `ReplicatedMergeTree` there. Nothing but
+  `system.replicas` (`total_replicas=1`) and a cross-replica read exposed it. The
+  ordering guarantee this decision depends on is therefore stronger than "the
+  store is up" — it is "every replica has joined the DDL queue before the first
+  DDL runs" — and Flux can only express it through health checks on the
+  operator-created StatefulSets.
+- **Recovery from that state is manual and destructive**: drop the database
+  `ON CLUSTER` and restart the collector so the exporter recreates the schema.
+  Cheap while the data is disposable, which is true today by the fresh-tables
+  decision and will not be true forever.
 
 ### Neutral consequences
 
@@ -252,6 +267,8 @@ either one fires.
 | A dead keeper is survivable | Keeper-kill drill: quorum holds at 2/3, writes continue, no replica goes read-only |
 | The collector is not collateral damage | The otel-collector Deployment records zero restarts across both drills |
 | Alerts reference series that exist | The `VERIFY-AT-KIND` markers on the Keeper and read-only rules are closed by querying the series, not by assuming it |
+| Every replica joined the DDL queue | `system.distributed_ddl_queue` carries a status row **per host** for each of the exporter's `CREATE` statements — a single-host entry means the schema is half-created and will never self-heal |
+| The wave really gates | `clickhouse-local` must not carry `wait: true`: it is mutually exclusive with `healthChecks` and wins, and this overlay applies only custom resources whose status kstatus cannot assess. Measured with `wait` set: reconcile finished in 371 ms with zero StatefulSets in existence |
 | Documentation | `docs/observability/clickhouse/README.md` and the tracing architecture doc describe the replicated topology; this ADR is linked from RFC-0028 |
 
 ## Revisit triggers
@@ -262,6 +279,12 @@ Re-open this decision when one or more of the following become true:
   Under this decision that DDL has no owner, which is Option B's cue.
 - **A real startup-coupling incident occurs** — a collector restart during a
   ClickHouse outage takes the telemetry plane down. Also Option B's cue.
+- **A second half-created schema occurs**, or the data in the store stops being
+  disposable. Under Option B the only repair is drop-and-recreate; a migration
+  Job owns its DDL explicitly and can be re-run against a cluster whose replicas
+  arrived in any order. The first Kind bring-up produced exactly this failure —
+  the ordering fix holds it off, but the sharp edge belongs to the decision, not
+  to the wave.
 - **Any sharding trigger signal fires chronically** rather than transiently:
   `ClickHouseTooManyParts` sustained, the disk pair firing after TTL, ingest rate
   flat while the collector's queue grows, or heavy scans hitting

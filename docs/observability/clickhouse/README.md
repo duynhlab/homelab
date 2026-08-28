@@ -201,6 +201,8 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 | **Security** | `runAsNonRoot`, `runAsUser: 101`, `fsGroup: 101`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault`; `/ping` liveness+readiness; pinned image (PSS-baseline + no-latest) |
 | **Access** | Grafana datasource `uid: clickhouse` (`clickhouse-clickhouse.monitoring.svc.cluster.local:9000`, native, password via `valuesFrom`); **not** on any public Ingress; the `default` password is the access control (no NetworkPolicy — `monitoring` has no default-deny and netpol is inert on kindnet; a `:9000`/`:8123` NetworkPolicy is a follow-up for an enforcing CNI) |
 | **Startup ordering** | The collector's clickhouse exporter runs `CREATE DATABASE/TABLE` in `start()` (`create_schema`), so an unreachable ClickHouse fails the **whole** collector at startup. Ordered ClickHouse-first: local-stack via `depends_on: service_healthy`, cluster via `tracing-local dependsOn clickhouse-local`. `sending_queue`/`retry` isolate only *runtime* backpressure |
+| **Ordering is stricter than "up"** | Replication raised the bar: the DDL is `ON CLUSTER`, so it must not run until **every replica has joined the distributed-DDL queue**. `clickhouse-local` therefore carries no `wait: true` (it wins over `healthChecks` and, since this overlay applies only custom resources, made the wave report Ready in 371ms with zero pods) and gates on all six operator-created StatefulSets instead. Get this wrong and the schema is created on one replica only — silently, and permanently ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)) |
+| **DDL timeout** | The exporter DSN sets `distributed_ddl_task_timeout=30`. `CREATE ... ON CLUSTER` waits for **all** hosts even with `IF NOT EXISTS`, and the 180s default × five statements would hang the collector — and with it VictoriaTraces and VictoriaLogs — long past its own probes |
 | **Dashboards** | 5 provisioned boards in the **ClickHouse** Grafana folder — see [Grafana](#grafana); local-stack via file provider, cluster via `configMapGenerator` → `GrafanaDashboard` CRs |
 | **local-stack** | `clickhouse` compose service (`:8123` HTTP, `:9000` native), collector `clickhouse` exporter, Grafana plugin + provisioned datasource; e2e audit check **C6** (`SELECT count() FROM otel.otel_traces/otel_logs`) |
 
@@ -558,11 +560,34 @@ the operator's reconcile counters.
 
 ### Runbook stubs
 
-- **ClickHouseServerUnreachable** — `kubectl -n monitoring get po -l
-  clickhouse.altinity.com/chi=clickhouse`, then pod logs. If the pod is up but
-  fetch fails, check the `clickhouse-credentials` Secret sync (ESO). Remember
-  the blast radius: collector restarts block on `create_schema` until the
-  store returns — do not bounce collectors while this fires.
+- **ClickHouseReplicaUnreachable / ClickHouseAllReplicasUnreachable** —
+  `kubectl -n monitoring get po -l clickhouse.altinity.com/chi=clickhouse`, then
+  pod logs. If the pod is up but fetch fails, check the
+  `clickhouse-credentials` Secret sync (ESO). Remember the blast radius:
+  collector restarts block on `create_schema` until the store returns — do not
+  bounce collectors while this fires.
+- **A table that reports `total_replicas: 1`** — the schema is half-created, and
+  it will not heal on its own. This happens when the exporter's `ON CLUSTER` DDL
+  ran before every replica had joined the distributed-DDL queue: a host that
+  joins later **skips earlier queue entries**, and `IF NOT EXISTS` turns every
+  retry into a no-op. Confirm it, then repair it:
+
+  ```sql
+  -- confirm: an entry with a status row for only ONE host is the fingerprint
+  SELECT entry, host, status, exception_code FROM system.distributed_ddl_queue ORDER BY entry, host;
+  -- and the symptom itself
+  SELECT table, total_replicas, active_replicas FROM system.replicas;
+  ```
+  ```bash
+  # repair (destructive — acceptable only while the data is disposable):
+  #   drop ON CLUSTER, then let the exporter recreate the schema on boot
+  kubectl -n monitoring exec chi-clickhouse-otel-0-0-0 -c clickhouse -- \
+    clickhouse-client --password "$PW" -q "DROP DATABASE IF EXISTS otel ON CLUSTER 'otel' SYNC"
+  kubectl -n monitoring rollout restart deploy/otel-collector-opentelemetry-collector
+  ```
+  Verify the repair with a cross-replica read, not with pod status: insert on one
+  replica, read from another. Every other signal — pod readiness, engine name,
+  quorum health — stays green through this failure.
 - **ClickHouseDiskCritical** — `SELECT sum(bytes_on_disk) FROM system.parts
   GROUP BY table` to find the eater; drop the oldest partitions
   (`ALTER TABLE … DROP PARTITION …`) or grow the PVC. The 30-day TTL cannot

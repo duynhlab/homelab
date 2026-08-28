@@ -2044,6 +2044,23 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **The `clickhouse-local` wave gated on nothing, and had never gated on
+  anything.** `wait` and `healthChecks` are mutually exclusive in Flux and
+  `wait` wins, so `wait: true` waited on the health of what the overlay applies
+  — two custom resources whose status kstatus cannot assess, and therefore calls
+  Current immediately. Measured on a fresh Kind bring-up: **the wave reconciled
+  in 371ms and reported success while zero StatefulSets existed**; the operator
+  created the first one a minute later, and `tracing-local` applied on that green
+  light. The single health check the wave carried before this was inert for the
+  same reason. What that cost, once the store had three replicas: the collector
+  ran `CREATE ... ON CLUSTER` before replicas 1 and 2 joined the
+  distributed-DDL queue, a host that joins later skips earlier entries, and
+  `IF NOT EXISTS` makes every retry a no-op — so the `otel` schema existed on
+  replica 0 alone, permanently and silently, while six pods read `Running` and
+  every table read `ReplicatedMergeTree`. Dropping `wait` is what makes health
+  checks on operator-created StatefulSets evaluate at all. The trap is now a
+  gotcha in `AGENTS.md`, because any wave that applies only CRs can hit it.
+
 - **RustFS memory limit 1Gi → 2Gi — the 422s came back, as OOM this time.**
   Live on 2026-08-25: RustFS OOMKilled in a loop (Last State) while its
   scanner swept the accumulated `pyroscope-profiles` segment folders during a

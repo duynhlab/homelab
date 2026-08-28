@@ -247,6 +247,33 @@ also recreates plain tables, which is the same fresh-start move in reverse).
   the store being down, so it paged; with three replicas it is a degraded member,
   and a new `ClickHouseAllReplicasUnreachable` carries the page instead.
 
+- 2026-08-28 — **The first Kind bring-up produced a half-created schema, and
+  finding out why invalidated this RFC's ordering assumption.** Every check
+  passed except one: six pods `Running`, all three tables `ReplicatedMergeTree`
+  on replica 0 — and `system.replicas` reporting `total_replicas=1`. The `otel`
+  database existed on replica 0 alone. `system.distributed_ddl_queue` showed the
+  exporter's six `CREATE` statements with a status row for host `0` only: the
+  collector had run its DDL before replicas 1 and 2 joined the distributed-DDL
+  queue, and **a host that joins later skips earlier entries** while
+  `IF NOT EXISTS` makes every retry a no-op. Only inserting on one replica and
+  reading from another exposed it.
+
+  The cause was upstream of ClickHouse. `clickhouse-local` carried both
+  `wait: true` and `healthChecks`, which are **mutually exclusive in Flux with
+  `wait` winning** — so `wait` waited for the health of what the overlay applies,
+  two custom resources whose status kstatus cannot assess and therefore calls
+  Current immediately. Measured: the wave reconciled in **371 ms** and reported
+  success while zero StatefulSets existed; the operator created the first one a
+  minute later, and `tracing-local` applied on that green light. The single
+  health check this wave carried before this RFC was inert for the same reason —
+  it had never gated on anything. Dropping `wait` is what makes health checks on
+  operator-created StatefulSets evaluate at all.
+
+  Recorded in [ADR-065](../../adr/ADR-065-clickhouse-replicated-topology/) as a
+  negative consequence and a revisit trigger, because the sharp edge belongs to
+  exporter-owned schema (Option B), not to the wave: a migration Job owns its DDL
+  explicitly and can be re-run against replicas that arrived in any order.
+
 ## Related
 
 - [./research.md](./research.md) — plain-language research and Context7 audit trail (gate passed 2026-08-28)

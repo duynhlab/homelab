@@ -325,6 +325,14 @@ Every manifest applied to the cluster must satisfy admission:
 
 ## Gotchas & non-obvious rules
 
+- **`wait: true` silently disables `healthChecks`.** They are mutually exclusive
+  in Flux and `wait` wins. `wait` checks only the resources the Kustomization
+  *applies*, so an overlay that applies only custom resources whose status kstatus
+  cannot assess reports Ready instantly — measured 2026-08-28 on
+  `clickhouse-local`: **371ms, zero StatefulSets in existence**, downstream
+  released. If a wave must gate on objects an operator creates later (StatefulSets
+  behind a CR), list them in `healthChecks` and **omit `wait`**. A wave carrying
+  both is a wave that gates on nothing.
 - **Flux enforces deployment order via `dependsOn`** — apps won't start until infra is ready. Chain (in `kubernetes/clusters/local/`):
   ```
   flux-system → controllers-local → {secrets, monitoring, network-policies,

@@ -339,27 +339,33 @@ a lookup.
 
 ## Open questions
 
-Each with a proposed direction (owner decides at the RFC):
+Owner resolved four of five on 2026-08-28; the decisions are recorded here and
+bind the RFC:
 
-1. **Convert or recreate the existing 90-day tables?** Proposed: convert
-   (`ATTACH ... AS REPLICATED` path) on the first replica, let peers clone —
-   rehearse on local-stack first; fall back to fresh tables if the rehearsal
-   bites (greenfield contract allows it).
-2. **Full 3+3 or frugal 2+1 first?** Proposed: 2+1 as the first landing
-   (teaches the mechanics, +2 pods), 3+3 as the follow-up flip once the RAM
-   picture on the 16GB VM is observed for a few days.
-3. **Does the operator set `default_replica_path`, or do we pass explicit
-   engine args?** Proposed: use the explicit macro path in our DDL (Option A
-   makes this trivial) so nothing depends on server defaults; confirm the
-   defaults anyway with one `SELECT * FROM system.server_settings` during
-   implementation.
-4. **(Only if the optional user-model rung is taken)** Grafana `readonly=2`
-   compatibility with the current datasource plugin version — one login test.
+1. **Convert or recreate the existing 90-day tables?** — **DECIDED: recreate
+   from scratch.** Nothing here is a real deployment yet; the greenfield
+   contract applies, and fresh tables skip the convert ceremony entirely. (The
+   `ATTACH ... AS REPLICATED` path stays documented above as the technique a
+   real deployment would need.)
+2. **Full 3+3 or frugal 2+1 first?** — **DECIDED: straight to 3+3.** The +5
+   pods / ~7.5Gi memory ceiling is accepted; watch actual usage after landing.
+3. **Explicit engine args or server-default replica path?** — **DECIDED: use
+   the default (argument-free `ENGINE = ReplicatedMergeTree`).** With
+   recreate-from-scratch chosen, the default's `{uuid}`-based path is actually
+   the better fit: every CREATE mints a fresh Keeper znode, so drop/recreate
+   cycles can never collide with stale replica paths (the classic explicit
+   -path failure). It also keeps both schema-ownership options viable —
+   Option B cannot pass engine args at all. One implementation check remains:
+   `SELECT * FROM system.server_settings WHERE name LIKE 'default_replica%'`
+   to confirm the defaults on our build.
+4. **(Only if the optional user-model rung is ever taken)** Grafana
+   `readonly=2` compatibility with the current datasource plugin version —
+   one login test. *(Still open — the rung itself is optional.)*
 5. **Do the operator-generated `remote_servers` need anything for a future
-   Distributed table** (cluster name reuse, `internal_replication`)?
-   Proposed: no action now; note that the generated cluster is already
-   correctly shaped (verified in operator docs), which is what makes Rung 4 a
-   config change rather than a migration when its day comes.
+   Distributed table?** — **DECIDED: no action.** Verified in operator docs
+   (`internal_replication: true`, cluster generated from the CHI layout); the
+   Distributed material in this file exists purely as the reference to reach
+   for if the system ever grows big enough to shard.
 
 ---
 
@@ -419,4 +425,4 @@ Option B is on the table at all.
 - [ ] Quick-win PR (TTLs, `:9363`, pin, Retain) may ship independently of this gate
 - [ ] On pass: copy `RFC-0000/README.md` → `RFC-0028/README.md` (proposed architecture + rollout), index status `researching` → per lifecycle
 
-_Last updated: 2026-08-28_
+_Last updated: 2026-08-28 — owner resolved open questions 1/2/3/5 (recreate; straight to 3+3; default replica path; no remote_servers action). Same day: user model demoted to optional; research opened._

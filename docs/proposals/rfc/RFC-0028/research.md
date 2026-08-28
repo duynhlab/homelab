@@ -1,4 +1,4 @@
-# RFC-0028 — Research: ClickHouse replication and least-privilege access (with a scouted path to sharding)
+# RFC-0028 — Research: ClickHouse replication (optional least-privilege hardening; scouted path to sharding)
 
 | | |
 |---|---|
@@ -13,11 +13,12 @@
 > for the owner — `*.vi.md` is gitignored by design; this file is the source
 > of truth.
 >
-> **Scope fence, stated up front:** this research covers three rungs — the
-> current single-node deployment, the replicated deployment we intend to
-> propose, and **sharding + the Distributed engine, which we research only to
-> know when we would need it. Sharding is explicitly NOT part of what RFC-0028
-> will propose to build.**
+> **Scope fence, stated up front:** this research covers the current
+> single-node deployment, the replicated deployment we intend to propose, and
+> **sharding + the Distributed engine, researched only to know when we would
+> need it — explicitly NOT proposed for building.** The least-privilege user
+> model is an **optional side-rung** (owner call, 2026-08-28): documented,
+> costed, required by nothing.
 
 ---
 
@@ -47,8 +48,8 @@
 
 | | |
 |---|---|
-| **Situation** | The platform's long-retention log/trace store (ClickHouse, ADR-023) runs as ONE replica on ONE PVC. `docs/observability/tracing/architecture.md` already records the consequence plainly: *lost volume = lost traces* — 90 days of edge access logs and every trace older than VictoriaTraces' window, gone with one bad disk. Separately, the only access control is a single `default` user open to `0.0.0.0/0` — the kind of finding a security review writes up in the first hour. |
-| **Who feels it** | On-call (a ClickHouse incident becomes unrecoverable data loss instead of a failover); platform (every consumer shares one credential, so nothing can be revoked or rate-limited per client); a future auditor. |
+| **Situation** | The platform's long-retention log/trace store (ClickHouse, ADR-023) runs as ONE replica on ONE PVC. `docs/observability/tracing/architecture.md` already records the consequence plainly: *lost volume = lost traces* — 90 days of edge access logs and every trace older than VictoriaTraces' window, gone with one bad disk. A secondary observation, recorded but NOT a driver: access control is a single `default` user open to `0.0.0.0/0` — acceptable for a lab, and addressed here only as an optional hardening rung. |
+| **Who feels it** | On-call (a ClickHouse incident becomes unrecoverable data loss instead of a failover); platform. (The shared-credential observation would additionally concern an auditor — relevant only if the optional hardening rung is taken.) |
 | **Why now** | The owner's own EKS-shaped research (2026-08-27) already designed the target: 1 shard × 3 replicas, Keeper, a layered user model. This research validates that design against current upstream docs and against what the homelab actually runs, and scouts the next rung (sharding) far enough to know its trigger conditions — **without** proposing to build it. |
 
 > **In plain terms:** today the log warehouse is one building with one key
@@ -62,7 +63,8 @@
 2. Who should own the schema once tables must be `ReplicatedMergeTree` —
    a migration Job, or the otel-collector exporter itself (it CAN do it —
    verified against its SQL templates; the question is *should* it).
-3. What a least-privilege user model looks like at homelab scale.
+3. What an OPTIONAL least-privilege user model would look like at homelab
+   scale — a side-rung, not a condition for anything else.
 4. **When sharding + Distributed would become necessary** — concrete trigger
    signals readable from our own metrics — so the day one fires, the decision
    is a lookup, not a research project. (Out of scope to build.)
@@ -249,7 +251,7 @@ only Keeper itself loses HA (a 1-node "quorum"). On a cluster that is rebuilt
 routinely, that teaches ~90% of the lesson at ~40% of the price, and moving to
 3+3 later is a two-number change in the CRs.
 
-**The failure the user model prevents:** today a leaked Grafana datasource
+**The failure the OPTIONAL user model would prevent** (context for the side-rung, not a requirement): today a leaked Grafana datasource
 credential IS the ingest credential IS the admin credential. With the layered
 model, the blast radius of any single leak is one verb in one database — and
 because Kind's CNI (kindnet) enforces no NetworkPolicies, the users' own
@@ -267,7 +269,7 @@ Live-measured inventory (kubectl + repo, 2026-08-27/28):
 | Topology | CHI `clickhouse` (ns `monitoring`), 1 shard × 1 replica, no Keeper | 1 × 3 + CHK ×3 |
 | Engine | plain `MergeTree` (exporter default) | `ReplicatedMergeTree` |
 | Schema owner | otel-collector exporter, `create_schema: true`, DDL runs in `start()` | one of two options — see Integration paths |
-| Users | one: `default`, networks `0.0.0.0/0`, shared by collector + Grafana | `otel_writer` (ingest profile, db `otel`) / `grafana` (readonly=2, read quota) / `admin` (break-glass, `access_management`) — all with pod-CIDR `networks/ip`, passwords via the existing OpenBAO→ClusterExternalSecret path |
+| Users | one: `default`, networks `0.0.0.0/0`, shared by collector + Grafana | unchanged by default; OPTIONAL hardening rung: `otel_writer` / `grafana` (readonly=2) / `admin` with pod-CIDR `networks/ip` — passwords via the existing OpenBAO→ClusterExternalSecret path |
 | Image | `clickhouse/clickhouse-server:26.7` — floating minor tag | pinned patch (the 25.8.10→.15 K8s-only DDL regression, CH#89693, is the cautionary tale; fixed in CH#92339 / Altinity Stable 25.8.16.10001 — 26.x unaffected) |
 | Operator | Altinity 0.27.3 — every 0.27 feature this research relies on is already deployed; **it auto-creates the PDB** (verified live, ownerRef on the CHI) | unchanged |
 | Metrics | operator exporter `:8888` only; local-stack twin already scrapes native `:9363` | native `:9363` on both (quick-win train) |
@@ -284,9 +286,9 @@ design decision in them):
 ```mermaid
 flowchart LR
   QW["Quick-win PR (no RFC):<br/>system-table TTLs · :9363 native<br/>pin image patch · PVC Retain"]:::data --> A
-  A["Rung 1 — schema ownership<br/>decided by this RFC"]:::planned --> B["Rung 2 — user model<br/>otel_writer / grafana / admin<br/>planned"]:::planned
-  B --> C["Rung 3 — CHK ×3 + CHI 1×3<br/>ReplicatedMergeTree<br/>planned"]:::planned
-  C -.-> D["Rung 4 — sharding + Distributed<br/>OUT OF SCOPE — trigger table above<br/>reference, not deployed"]:::planned
+  A["Rung 1 — schema ownership<br/>decided by this RFC"]:::planned --> C["Rung 2 — CHK ×3 + CHI 1×3<br/>ReplicatedMergeTree<br/>planned"]:::planned
+  A -.->|"optional side-rung,<br/>any time or never"| B["user model<br/>otel_writer / grafana / admin<br/>optional — planned"]:::planned
+  C -.-> D["Rung 3 — sharding + Distributed<br/>OUT OF SCOPE — trigger table above<br/>reference, not deployed"]:::planned
   classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 ```
@@ -307,18 +309,18 @@ the failure classes this platform has already paid for elsewhere (startup
 coupling; config-not-in-git), and the owner's original design chose it too.
 Option B is documented as the legitimate lighter path, one `values` block away.
 
-**Rung 2 — user model.** Three users, not the EKS design's six: no Vector
-writes ClickHouse here, `analyst` folds into the owner's use of
-`grafana`/`admin`, `migrator` exists only if Option A wins. Profiles carry the
-ingest/readonly split (async insert budget vs `readonly=2` + row/memory
-ceilings scaled to the 2Gi pods, not the EKS 16Gi numbers); quotas make a
-leaked credential loud (error-rate ceilings).
+**Optional side-rung — user model (owner-declared not required).** If taken,
+three users rather than the EKS design's six: no Vector writes ClickHouse
+here, `analyst` folds into the owner's use of `grafana`/`admin`, `migrator`
+exists only if Option A wins. Profiles carry the ingest/readonly split; quotas
+make a leaked credential loud. Nothing on the replication path depends on
+this rung — it can land any time, or never.
 
-**Rung 3 — replication.** CHK ×3 (or the frugal 1) + `replicasCount: 3`,
+**Rung 2 — replication.** CHK ×3 (or the frugal 1) + `replicasCount: 3`,
 convert-or-recreate per the Open questions, pod anti-affinity by
 `kubernetes.io/hostname` (Kind has no zones).
 
-**Rung 4 — sharding + Distributed: not built.** The deliverable is the
+**Rung 3 — sharding + Distributed: not built.** The deliverable is the
 trigger-signal table above plus this recorded play, so the future decision is
 a lookup.
 
@@ -351,8 +353,8 @@ Each with a proposed direction (owner decides at the RFC):
    makes this trivial) so nothing depends on server defaults; confirm the
    defaults anyway with one `SELECT * FROM system.server_settings` during
    implementation.
-4. **Grafana `readonly=2` compatibility with the current datasource plugin
-   version** — one login test during implementation.
+4. **(Only if the optional user-model rung is taken)** Grafana `readonly=2`
+   compatibility with the current datasource plugin version — one login test.
 5. **Do the operator-generated `remote_servers` need anything for a future
    Distributed table** (cluster name reuse, `internal_replication`)?
    Proposed: no action now; note that the generated cluster is already

@@ -375,9 +375,10 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       # Built-in Prometheus endpoint (engine self-view; scraped by vmagent).
-      # The cluster deliberately does NOT enable this at 1×1 — there the
-      # Altinity exporter carries the engine signals; locally there is no
-      # operator, so this endpoint IS the engine view.
+      # The cluster enables the same endpoint since RFC-0028, scraped per pod so
+      # its three replicas can be told apart. Locally there is no operator and
+      # no exporter, so this endpoint is the ONLY engine view — which is why it
+      # was enabled here first.
       - ./observability/clickhouse/metrics.xml:/etc/clickhouse-server/config.d/metrics.xml:ro
     ports:
       - "8123:8123" # HTTP interface (SQL over curl — the C6 audit check)

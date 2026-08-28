@@ -8,12 +8,15 @@
      asynchronous_metrics / errors. (status_info existed in older servers and
      is gone — do not re-add it.)
 
-     The cluster does NOT enable this endpoint: with one shard × one replica
-     the Altinity metrics-exporter's /chi already carries the engine signals
-     there, and the per-pod endpoint is recorded as the thing to enable with
-     the first extra replica (docs/observability/clickhouse/README.md
-     § Metrics & alerting). Locally there is no operator and no exporter, so
-     this endpoint IS the engine view. -->
+     The cluster now enables this endpoint too (RFC-0028): at one shard × one
+     replica the Altinity metrics-exporter's /chi carried the engine signals
+     there and a second scrape would have duplicated them, but with three
+     replicas the per-pod series are what say WHICH replica is sick — and
+     ClickHouseMetrics_ReadonlyReplica has no equivalent in the exporter's
+     view at all. Locally there is no operator and no exporter, so this
+     endpoint is the only engine view, which is why it was enabled here first.
+     Local-stack stays single-node with no keeper: the divergence is
+     deliberate, and the exporter's cluster options are cluster-only values. -->
 <clickhouse>
   <prometheus>
     <endpoint>/metrics</endpoint>

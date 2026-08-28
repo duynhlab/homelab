@@ -1,0 +1,164 @@
+# ClickHouseKeeperInstallation — the coordination quorum that makes the CHI's
+# tables replicated (RFC-0028 / ADR-065). Three keeper replicas hold the
+# ReplicatedMergeTree metadata: which parts exist, which replica has them, and
+# the replication queue each replica drains. Without a quorum a replicated table
+# is readable but read-only for writes, so this resource is what turns "three
+# ClickHouse pods" into "one table with three copies".
+#
+# The CHI references this by name (spec.configuration.zookeeper.keeper.name),
+# available since operator 0.27.1 — the operator resolves the endpoint list
+# itself. Note it does NOT re-reconcile the CHI when that endpoint set changes:
+# `onKeeperResourceUpdate` defaults to `none` in the operator config. Harmless at
+# a fixed replica count; it will matter the day someone scales this quorum.
+#
+# Both CRs live in this same directory and therefore the same clickhouse-local
+# wave. The operator waits for the referenced CHK's pods before resolving keeper
+# endpoints (`reconcile.coordination.keeper.readyTimeout`, default 120s) and
+# fails the CHI reconcile with an ErrKeeperNotReady Event if they are not up in
+# time. On a cold Kind node pulling two images that will happen at least once and
+# retry — the wave's 25m timeout is sized for it, and such an Event on a first
+# bring-up is expected rather than a defect.
+#
+# Sizing is the owner's decision at the RFC-0028 research gate: straight to
+# 3 keepers rather than a frugal 1, accepting the extra pods. A 3-node quorum
+# survives losing one member, which is exactly what the gate's keeper drill
+# proves. Storage is deliberately small — Keeper stores coordination metadata
+# and its raft log, not table data.
+---
+apiVersion: clickhouse-keeper.altinity.com/v1
+kind: ClickHouseKeeperInstallation
+metadata:
+  name: keeper
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: coordination
+    app.kubernetes.io/part-of: observability
+spec:
+  defaults:
+    templates:
+      podTemplate: keeper
+      # Load-bearing, not decoration. The operator mounts whatever
+      # dataVolumeClaimTemplate names at /var/lib/clickhouse-keeper; a
+      # volumeClaimTemplate that nothing references is simply not mounted, and
+      # the raft log plus snapshots would live on the container filesystem. Every
+      # keeper restart would then lose coordination state while the pod still
+      # reported Ready — the keeper drill would pass while proving nothing.
+      dataVolumeClaimTemplate: keeper-data-volume
+      serviceTemplate: keeper-svc
+  configuration:
+    clusters:
+      - name: keeper
+        layout:
+          replicasCount: 3
+    settings:
+      # storage_path and its log/snapshot siblings already come from the
+      # operator's own keeper default config — restating them is noise. Only
+      # real overrides belong here.
+      keeper_server/tcp_port: "2181"
+      # `ruok` is required, not optional: the operator's DEFAULT liveness probe
+      # is the ruok/imok four-letter-word handshake, so narrowing this list
+      # without it would CrashLoopBackOff the whole quorum. `mntr` is what the
+      # keeper drill reads (zk_server_state, zk_synced_followers). Deliberately
+      # not "*".
+      keeper_server/four_letter_word_white_list: "ruok,mntr,srvr,stat,conf"
+      keeper_server/coordination_settings/raft_logs_level: information
+      # Keeper serves Prometheus itself — there is no metrics-exporter for
+      # Keeper the way there is for the CHI. Enabling the operator chart's
+      # keeperMetrics ServiceMonitor without this (and without the port named in
+      # the serviceTemplate below) yields a ServiceMonitor with zero targets,
+      # which reads as coverage and is worse than no scrape at all.
+      prometheus/endpoint: /metrics
+      prometheus/port: "7000"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+  templates:
+    serviceTemplates:
+      # A serviceTemplate REPLACES the operator's generated port list rather than
+      # adding to it, so `zk` and `raft` are re-declared here. Dropping either
+      # one silently breaks the CHI's keeper reference or raft peering between
+      # keepers — both are verified by the gate (system.zookeeper_connection on
+      # every replica, and `mntr` showing one leader with two synced followers).
+      - name: keeper-svc
+        spec:
+          type: ClusterIP
+          ports:
+            - name: zk
+              port: 2181
+              targetPort: 2181
+            - name: raft
+              port: 9444
+              targetPort: 9444
+            - name: prometheus
+              port: 7000
+              targetPort: 7000
+    podTemplates:
+      - name: keeper
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+            seccompProfile:
+              type: RuntimeDefault
+          # One keeper per node: a quorum whose members share a node cannot
+          # survive that node. Kind runs three workers, which is exactly enough,
+          # so `required` is the honest expression — an unschedulable keeper is
+          # information, not something to hide behind `preferred`.
+          # The label key is the operator's CR-name label for CHK resources, the
+          # keeper-side twin of `clickhouse.altinity.com/chi` on the CHI. Read
+          # off the operator's labeler rather than guessed; the gate still checks
+          # one-pod-per-node with `-o wide`, because a selector that matches
+          # nothing makes this term silently vacuous.
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      clickhouse-keeper.altinity.com/chk: keeper
+          containers:
+            - name: clickhouse-keeper
+              # The operator's built-in default image floats on `latest`, which
+              # the no-latest policy forbids and which would drift the quorum
+              # version on every pod recreate. Pinned to the server's line.
+              image: clickhouse/clickhouse-keeper:26.7
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                # A keeper OOM costs the quorum, which is worse than a ClickHouse
+                # OOM costing one replica — so this limit has headroom over the
+                # request rather than sitting on top of it.
+                limits:
+                  memory: 1Gi
+              # NO livenessProbe or readinessProbe here, deliberately. The
+              # operator fills probes only when it finds them nil, and its
+              # defaults are strictly better than anything expressible in this
+              # file: liveness is the ruok/imok handshake, which catches a hung
+              # keeper that still accepts TCP, and readiness is an HTTP GET on
+              # the keeper's /ready control endpoint, which reflects RAFT QUORUM.
+              # A tcpSocket probe on 2181 would report Ready for a keeper that is
+              # listening but out of quorum — making both the Flux health check
+              # and the keeper drill unfalsifiable.
+    volumeClaimTemplates:
+      - name: keeper-data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 2Gi
+      # No log volume on purpose: the operator's default keeper config logs to
+      # console, so /var/log/clickhouse-keeper stays empty and a PVC there would
+      # be a volume nobody writes to.

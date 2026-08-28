@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | infra | [./research.md](./research.md) — gate passed 2026-08-28 | 2026-08-28 | 2026-08-28 |
+| Accepted | infra | [./research.md](./research.md) — gate passed 2026-08-28 | 2026-08-28 | 2026-08-28 |
 
 > **Don't forget: every decision is a tradeoff.** The two costs of the chosen
 > schema path are named below as revisit triggers, not hidden.
@@ -13,7 +13,7 @@
 - [x] Context7 audit complete (see research § Context7 audit log)
 - [x] Owner approved **ready for RFC** (2026-08-28, in-session)
 - Mechanism deep-dive lives in [./research.md](./research.md) — this file only decides
-- When Status → **`Accepted`**: expected ADR — `ADR-NNN-clickhouse-replicated-topology/` (one decision: 1×3 + CHK with exporter-owned replicated schema). `docs/api/`: N/A — no service contract touches ClickHouse. **Platform docs that MUST move at implementation** (infra-only ≠ docs-free):
+- Status → **`Accepted`** 2026-08-28. ADR: [`ADR-065`](../../adr/ADR-065-clickhouse-replicated-topology/) — created at `Accepted` with this review (one decision: 1×3 + CHK with exporter-owned replicated schema). `docs/api/`: N/A — no service contract touches ClickHouse. **Platform docs that MUST move at implementation** (infra-only ≠ docs-free):
   - `docs/observability/clickhouse/README.md` — quick-facts row ("MergeTree, single shard × single replica"), deployment inventory, and the DDL section (engine becomes `ReplicatedMergeTree`)
   - `docs/observability/tracing/architecture.md` — the accepted-gap line "ClickHouse is a single shard … lost volume is lost traces" is retired for the ClickHouse half (VictoriaTraces stays single-node by design)
   - `docs/platform/setup.md` — the `clickhouse-local` wave description gains the CHK
@@ -66,7 +66,8 @@ whose exporter templates carry `ON CLUSTER` + `ENGINE` slots on every table.
    PVCs) lands in `kubernetes/infra/configs/clickhouse/` — same directory,
    same `clickhouse-local` wave; the operator already handles both CRs.
 2. **CHI**: `replicasCount: 1 → 3`, plus `zookeeper.keeper.name: keeper`
-   (the 0.27.0 by-name reference) and pod anti-affinity on
+   (the by-name reference; the operator docs date it to 0.27.1, not 0.27.0 —
+   either way 0.27.3 is deployed) and pod anti-affinity on
    `kubernetes.io/hostname` (Kind has no zones). The operator keeps
    auto-creating the PDB; macros and `remote_servers` regenerate themselves.
 3. **Schema (Option B)**: the collector's clickhouse exporter gains
@@ -116,10 +117,10 @@ topology):
 
 ```mermaid
 flowchart TD
-  subgraph WRITE["Ghi"]
+  subgraph WRITE["Write"]
     OC["otel-collector<br/>create_schema: true<br/>cluster_name + table_engine:<br/>ReplicatedMergeTree"]
   end
-  subgraph READ["Đọc"]
+  subgraph READ["Read"]
     GF["Grafana datasource<br/>user: default (unchanged)"]
   end
   subgraph CH["CHI clickhouse — 1 shard × 3 replicas"]
@@ -220,19 +221,38 @@ also recreates plain tables, which is the same fresh-start move in reverse).
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| 1×3 replicated ClickHouse with CHK quorum, exporter-owned replicated schema (fresh start, default replica path) | `../../adr/ADR-NNN-clickhouse-replicated-topology/` — create at architecture review | pending review |
+| 1×3 replicated ClickHouse with CHK quorum, exporter-owned replicated schema (fresh start, default replica path) | [ADR-065](../../adr/ADR-065-clickhouse-replicated-topology/) | Accepted 2026-08-28 |
 
 ## Implementation History
 
-*(empty — fills at implementation; the checklist in the template comment
-applies when Status → implemented)*
+- 2026-08-28 — **Status → `Accepted`.** [ADR-065](../../adr/ADR-065-clickhouse-replicated-topology/)
+  created at `Accepted` with this review, carrying the one decision this RFC
+  frames. Implementation runs in the same pull request, so the gate that proves
+  it is also the gate that closes the ADR's adoption.
+
+  Three repo facts found while planning it, none of them in this RFC's own text,
+  each of which would have produced green-but-false evidence:
+  `clickhouse-local` health-checked **one** StatefulSet, so `wait: true` would
+  have reported Ready on one replica of three and released `tracing-local`
+  early; the CHK **CRD was not health-checked** at all, so the wave could race
+  the CRD it needs; and `make validate` **never built** the ClickHouse overlay
+  (absent from `flux-validate.sh`), so a malformed CHK would have passed
+  validation and failed on the cluster. All three are fixed here.
+
+  Two scope calls made at implementation. The **`:9363` per-pod scrape is folded
+  in** — this RFC deferred it to a "quick-win PR" that turned out never to have
+  been created, which left `ClickHouseMetrics_ReadonlyReplica`, named in this
+  RFC's own rollout watch list, with no series at all. And
+  `ClickHouseServerUnreachable` is **re-graded**: at 1×1 one unreachable host was
+  the store being down, so it paged; with three replicas it is a degraded member,
+  and a new `ClickHouseAllReplicasUnreachable` carries the page instead.
 
 ## Related
 
 - [./research.md](./research.md) — plain-language research and Context7 audit trail (gate passed 2026-08-28)
 - [ADR-023](../../adr/ADR-023-clickhouse-observability-olap/) — why ClickHouse exists here; [ADR-061](../../adr/ADR-061-edge-log-routing/) — edge logs are ClickHouse-only
 - [RFC-0019](../RFC-0019/) — the observability OLAP program this extends
-- Quick-win PR (system-table TTLs, `:9363`, image pin, PVC Retain) — independent of this RFC's gate
+- Quick-win train (system-table TTLs, image pin, PVC Retain) — independent of this RFC's gate; the `:9363` scrape was pulled out of it and shipped here instead
 
 ---
-_Last updated: 2026-08-28 — owner review: the bare “docs/api: N/A” hid the real docs impact; the platform-docs checklist above now names every page that must move at implementation._
+_Last updated: 2026-08-28 — Status → `Accepted`; ADR-065 created at `Accepted` and implementation opened in the same PR (the `:9363` scrape folded in, since the quick-win PR it was deferred to had never been created). Earlier same day: owner review — the bare “docs/api: N/A” hid the real docs impact, so the platform-docs checklist names every page that must move at implementation._

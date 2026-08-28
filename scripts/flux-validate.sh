@@ -17,8 +17,16 @@ set -o pipefail
 
 kustomize_flags=("--load-restrictor=LoadRestrictionsNone")
 
-kubeconform_flags=("-skip=Secret")
-kubeconform_flags=("-skip=Secret")
+# ClickHouseInstallation is skipped, and the reason is a stale upstream schema
+# rather than a shortcut: the datree CRDs-catalog copy of
+# clickhouseinstallation_v1.json declares spec.configuration.zookeeper with
+# additionalProperties:false and without the `keeper` property that operator
+# 0.27.1 added, so it rejects a CORRECT manifest
+# ("additional properties 'keeper' not allowed" — reproduced 2026-08-28).
+# -ignore-missing-schemas does not help: the schema is found, it is just old.
+# The ClickHouseKeeperInstallation schema IS current and does validate, which is
+# the CR this train adds and the one a typo would most likely land in.
+kubeconform_flags=("-skip=Secret,ClickHouseInstallation")
 kubeconform_config=(
   "-strict" 
   "-ignore-missing-schemas" 
@@ -49,6 +57,12 @@ kustomize_overlays=(
   # reason (its own Kustomization, keycloak-local) — validate it explicitly.
   "kubernetes/infra/controllers/keycloak"
   "kubernetes/infra/configs/temporal"
+  # clickhouse/ has its own Kustomization (clickhouse-local), so a build of
+  # configs/ never reached it — before RFC-0028 it got nothing but a bare
+  # yq syntax check, so a structurally broken overlay passed validate. The
+  # ClickHouseKeeperInstallation is now really schema-validated here; the CHI is
+  # skipped by kubeconform_flags for the stale-schema reason recorded above.
+  "kubernetes/infra/configs/clickhouse"
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/observability"
   "kubernetes/infra/configs/secrets"

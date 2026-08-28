@@ -17,6 +17,8 @@ resources:
   - podmonitors/podmonitor-flux-system.yaml
   # Envoy Gateway data plane (proxy fleet, job="envoy-gateway") — RFC-0024 P4
   - podmonitors/envoy-gateway-proxy.yaml
+  # ClickHouse server pods (engine-native :9363, per replica) — RFC-0028
+  - podmonitors/clickhouse-server.yaml
   # PrometheusRules — organized by domain (see prometheusrules/kustomization.yaml)
   - prometheusrules/
 # RFC-0027 / ADR-059: the Tempo ServiceMonitor retired with Tempo (*.yaml.bak).

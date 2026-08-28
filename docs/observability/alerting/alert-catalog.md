@@ -19,10 +19,10 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**218 statically-defined alerts** across 10 domains (re-derive with
+**221 statically-defined alerts** across 10 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
-— by domain: postgres 53, microservices 52, victoriametrics 31, kubernetes 29,
-envoy-gateway 12, gitops 9, valkey 7, observability 15, keycloak 5, kyverno 4,
+— by domain: postgres 54, microservices 52, victoriametrics 31, kubernetes 29,
+observability 17, envoy-gateway 12, gitops 9, valkey 7, keycloak 5, kyverno 4,
 + the watchdog), plus **68 Sloth-generated** SLO
 burn-rate alerts (2 × 34 SLOs). The 34 SLOs cover all 11 Go services plus Keycloak:
 30 rendered by the `mop` chart through the five domain ResourceSets, plus inventory's 2
@@ -32,7 +32,12 @@ marked inline below.
 
 The count is re-derived from the manifests (`- alert:` occurrences under
 `prometheusrules/**`), never incremented by hand — and re-deriving on 2026-08-21
-showed why that rule exists. The page had said **202** with `observability 3`,
+showed why that rule exists. One caveat the command itself carries: it has no
+`--include`, so it also counts the **2 alerts in the retired
+`observability/tempo-alerts.yaml.bak`**, which nothing deploys. The deployed
+number is therefore **219**. Re-deriving on 2026-08-28 also found two offsetting
+per-domain errors that had left the total right for the wrong reasons: postgres
+was 54, not 53, and observability was 14, not 15. The page had said **202** with `observability 3`,
 while that directory holds **15**: the ClickHouse and tracing rules of §8/§8b
 landed without the Summary being re-derived. This change adds 4 (§6b Kyverno),
 and the honest total is **218**, not 206. Incrementing would have carried the
@@ -443,9 +448,15 @@ a cluster twin is a recorded gap. Pyroscope profiling-backend health is covered 
 ## 8b. ClickHouse (OTel OLAP engine)
 
 Source: `prometheusrules/observability/clickhouse-alerts.yaml`. Series come from
-the Altinity operator's metrics Service (`/metrics` = operator control plane,
-`/chi` = metrics-exporter engine view), scraped by the chart's ServiceMonitor
-(`controllers/clickhouse-operator`). **Verified on Kind 2026-08-22** — 920
+three producers since [RFC-0028](../../proposals/rfc/RFC-0028/): the Altinity
+operator's metrics Service (`/metrics` = operator control plane, `/chi` =
+metrics-exporter engine view), scraped by the chart's ServiceMonitor
+(`controllers/clickhouse-operator`), and — new with replication — the server's
+own `:9363` endpoint scraped **per pod** by `podmonitors/clickhouse-server.yaml`
+(`job="clickhouse-server"`, label `replica`), which publishes the
+`ClickHouseMetrics_*` families. The exporter aggregates by CHI and cannot say
+which replica is sick; that is what the per-pod scrape is for.
+**Verified on Kind 2026-08-22** — 920
 `chi_*`/`clickhouse` series present, and the three `VERIFY-AT-KIND` markers are
 closed. Two expressions were correct as written (`chi_clickhouse_metric_fetch_errors`,
 `chi_clickhouse_metric_PartsActive`). **Three alerts were deleted** because the
@@ -458,16 +469,30 @@ moved from the non-existent `event_DelayedInserts` to the real
 gauge. The parts→delay→reject chain keeps its first two links alerted; nothing
 reaches the third without passing them.
 
+**Changed with replication (2026-08-28).** `ClickHouseServerUnreachable` is
+gone as a name: at 1×1 one unreachable host *was* the store being down, so it
+paged. With three replicas behind a round-robin Service it is a degraded quorum
+member whose peers keep serving, so it became the warning-level
+`ClickHouseReplicaUnreachable`, and a new critical
+`ClickHouseAllReplicasUnreachable` carries the page. Two replication rules were
+added: `ClickHouseZooKeeperExceptions` (re-enabled — it was written for exactly
+this topology and sat commented out until it existed) and
+`ClickHouseReadonlyReplica`, which catches the failure nothing else notices,
+because a replica that has lost its Keeper session keeps answering reads while
+silently refusing writes and falling behind. Both carry `VERIFY-AT-KIND`
+markers: neither series has ever been observed here, since there has never been
+a Keeper to produce them and nothing scraped `:9363`.
+
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
-| ClickHouseServerUnreachable | critical | exporter fetch errors >0 | OTel logs/traces store down; collector `create_schema` blocks every collector restart | 5m |
+| ClickHouseReplicaUnreachable | warning | exporter fetch errors >0 | One replica of three cannot be fetched; peers still serve reads and writes, but it stops catching up | 5m |
+| ClickHouseAllReplicasUnreachable | critical | `count(fetch errors >0) >= 3` | OTel logs/traces store down; edge access logs (ClickHouse-only) dropped; collector `create_schema` blocks every collector restart | 5m |
+| ClickHouseZooKeeperExceptions | warning | Keeper exception rate >0 | A replica cannot reach the quorum: no writes, no part fetches, silent drift | 5m |
+| ClickHouseReadonlyReplica | warning | `ClickHouseMetrics_ReadonlyReplica >0` | Replica lost its Keeper session — still answers reads, so nothing else notices | 5m |
 | ClickHouseOperatorDown | warning | `up{clickhouse-operator}==0` | CHI reconciles frozen (server keeps serving) | 10m |
 | ClickHouseDiskAlmostFull | warning | free/total <15% | MergeTree refuses writes near full; TTL cleanup can't outrun sustained ingest | 15m |
 | ClickHouseDiskCritical | critical | free/total <5% | Write failures imminent | 5m |
 | ClickHouseTooManyParts | warning | active parts >300 | Merge backlog → delayed → rejected inserts | 10m |
-| ClickHouseInsertsRejected | warning | rejected-inserts rate >0 | Collector retries then drops | 5m |
-| ClickHouseInsertsFailing | warning | failed-insert rate >0 | Telemetry rows lost at the door | 5m |
-| ClickHouseMergesFailing | warning | failed-merges rate >0 | Parts accumulate toward insert throttling | 10m |
 | ClickHouseInsertsDelayed | info | delayed-inserts rate >0 | The step before rejection | 10m |
 | ClickHouseServerErrorsElevated | info | `system.errors` sum-rate >5/s | Broad server error census | 10m |
 | ClickHouseOperatorReconcileErrors | warning | host-reconcile errors >0 | CHI stuck between spec and reality | 15m |
@@ -692,4 +717,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._
+_Last updated: 2026-08-28 — §8b re-graded for a replicated ClickHouse ([RFC-0028](../../proposals/rfc/RFC-0028/) / [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)): `ClickHouseServerUnreachable` split into a warning `ClickHouseReplicaUnreachable` plus a critical `ClickHouseAllReplicasUnreachable`, and two replication rules added (`ClickHouseZooKeeperExceptions` re-enabled, `ClickHouseReadonlyReplica` new on the per-pod `:9363` scrape) — both carrying `VERIFY-AT-KIND` markers because neither series has ever been observed here. The §8b table also still listed the three alerts deleted in August; they are gone. Summary re-derived to **221** (219 deployed — the canonical command counts 2 alerts in a retired `.bak`), which surfaced two offsetting per-domain errors. Previously 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._

@@ -1,0 +1,46 @@
+# PodMonitor for the ClickHouse SERVER pods — the engine's own view of itself
+# (RFC-0028 / ADR-065).
+#
+# Until replication there was deliberately no per-pod scrape: with one shard x
+# one replica the Altinity metrics-exporter's chi_* series carried every engine
+# signal and a second scrape would have duplicated them. Three replicas change
+# the question. The exporter aggregates by CHI, so it cannot say WHICH replica
+# is sick, and the one metric that matters most in a replicated topology —
+# ClickHouseMetrics_ReadonlyReplica, a replica that lost its Keeper connection
+# and can no longer accept writes — has no equivalent in the exporter's view at
+# all.
+#
+# A PodMonitor, not a ServiceMonitor: the operator-generated Services carry only
+# the native (9000), HTTP (8123) and interserver (9009) ports, so there is no
+# Service port to scrape :9363 through — the same reason the Envoy proxy fleet
+# is scraped per-pod. The endpoint itself is enabled by settings.prometheus/* on
+# the CHI, and the container port is named `metrics` there.
+#
+# The metric families this adds (ClickHouseMetrics_*, ClickHouseProfileEvents_*,
+# ClickHouseAsyncMetrics_*, ClickHouseErrorMetric_*) are the ones the local-stack
+# twin has scraped since 2026-08-13, and the ones the 18 blank expressions on the
+# `clickhouse-server-engine` dashboard were written against.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: clickhouse-server
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - monitoring
+  selector:
+    matchLabels:
+      clickhouse.altinity.com/chi: clickhouse
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        # Stable job name for rules; the per-replica identity lives in the pod
+        # label below, which is the whole point of scraping per pod.
+        - targetLabel: job
+          replacement: clickhouse-server
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: replica

@@ -353,6 +353,39 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The ClickHouse observability store is replicated: 1 shard x 3 replicas on a
+  3-node ClickHouse Keeper quorum.** One lost PVC used to erase 90 days of edge
+  access logs — ClickHouse-only since ADR-061 — and every long-retention trace;
+  the tracing architecture doc recorded that as an accepted gap in the words
+  *"a lost volume is lost traces."* It is now a failover. The `otel` tables are
+  `ReplicatedMergeTree` created `ON CLUSTER` by the collector's own exporter
+  (`cluster_name` + `table_engine`, argument-free so the server's `{uuid}`
+  replica path applies), which keeps the delta at one new resource: no
+  migration Job, no new wave, no second schema owner
+  ([RFC-0028](docs/proposals/rfc/RFC-0028/) /
+  [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/)).
+  Three fixes landed with it because without them the gate would have passed on
+  false evidence: the wave health-checked **one** StatefulSet, so `wait: true`
+  reported Ready on one replica of three and released `tracing-local` early; the
+  Keeper **CRD was not health-checked**, so the wave could race the CRD it
+  needs; and `make validate` **never built** the ClickHouse overlay, so a
+  malformed CR would have passed validation and failed on the cluster.
+  The engine-native `:9363` endpoint is finally scraped, per pod — deferred to a
+  "quick-win PR" that turned out never to have been created, which had left
+  `ClickHouseMetrics_ReadonlyReplica`, named in the RFC's own rollout watch
+  list, with no series at all. Alerts follow the new failure shape:
+  `ClickHouseServerUnreachable` is now the warning-level
+  `ClickHouseReplicaUnreachable` (one of three, peers still serving) with a new
+  critical `ClickHouseAllReplicasUnreachable` carrying the page, plus
+  `ClickHouseZooKeeperExceptions` (re-enabled — written for exactly this
+  topology and commented out until it existed) and `ClickHouseReadonlyReplica`,
+  which catches the failure nothing else notices: a replica that lost its Keeper
+  session keeps answering reads while silently refusing writes. Both carry
+  `VERIFY-AT-KIND` markers, because neither series has ever been observed here.
+  Accepted costs, unchanged from the decision: DDL still runs in the collector's
+  `start()`, the exporter never `ALTER`s, and memory and storage triple.
+  local-stack stays single-node with no keeper.
+
 - **ADR-061: the edge's logs are routed by class.** The access log — an
   attributes-only record LogsQL free-text could never see, and the noisiest
   OTLP stream (5,941 records/6h under a gate run) — is now **ClickHouse-only**:
@@ -864,6 +897,20 @@ Skeleton (copy what you need):
   Fifteen inbound `#platform-pipeline`/`#troubleshooting` links retargeted.
 
 #### Proposals
+
+- **RFC-0028 is `Accepted` and ADR-065 is created at `Accepted` with it.**
+  [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/) carries
+  the one decision the RFC frames — 1x3 replicated ClickHouse on a Keeper
+  quorum, with the exporter owning the replicated schema — and records the
+  runner-up honestly: the migration Job that would own DDL is not wrong, it is
+  early, so both of its advantages (the `ALTER` lifecycle, startup decoupling)
+  stand as revisit triggers rather than as prose about complexity.
+  Implementation ships in the same pull request, so the gate that proves the
+  topology is also the gate that closes the ADR's adoption. Two RFC defects
+  fixed on the way through: its index row had the status sitting in the
+  Priority column and the row itself sat out of numeric order in an index that
+  declares itself number-ordered, and its topology diagram carried
+  non-English node labels.
 
 - **RFC-0028 research gate passed and the README authored at `provisional`,
   the same day it opened.** The owner resolved every open question in-session

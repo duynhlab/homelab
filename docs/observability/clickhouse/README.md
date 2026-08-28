@@ -197,12 +197,13 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 | **Coordination** | `ClickHouseKeeperInstallation` `keeper`, 3 replicas, referenced by name (`zookeeper.keeper.name`); holds the replication metadata. A replica that loses its Keeper session serves reads and refuses writes |
 | **Storage** | PVC `standard` `10Gi` per replica (`volumeClaimTemplates`) + keeper data `2Gi` / log `1Gi`; local-stack uses a named `clickhouse-data` volume |
 | **Credentials** | `default` user password from OpenBAO `secret/local/infra/clickhouse/admin` via the `clickhouse-credentials` `ClusterExternalSecret` → Secret in `monitoring` (selector label `platform.duynhlab/clickhouse`); local-stack uses an inline dev password |
-| **Ingest** | Collector contrib `clickhouse` exporter appended to the `traces` + `logs` pipelines; `create_schema: true` + `cluster_name: otel` + `table_engine: ReplicatedMergeTree` bootstraps the replicated tables `ON CLUSTER` (argument-free engine → server-default `{uuid}` replica path); `ttl: 2160h` (90d); `async_insert`, `sending_queue`, `retry_on_failure`; password via `${env:CLICKHOUSE_PASSWORD}` (`extraEnvs` secretKeyRef) |
+| **Ingest** | Collector contrib `clickhouse` exporter appended to the `traces` + `logs` pipelines, **INSERT-only** (`create_schema: false`); `async_insert`, `sending_queue`, `retry_on_failure`; password via `${env:CLICKHOUSE_PASSWORD}` (`extraEnvs` secretKeyRef) |
+| **Schema owner** | The `clickhouse-schema` **Job**, SQL committed in `kubernetes/infra/configs/clickhouse-schema/` ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). It creates the `otel` database with `ENGINE = Replicated` on each replica, then the tables once; the database's Keeper log propagates them. TTL 90d lives in that DDL |
 | **Security** | `runAsNonRoot`, `runAsUser: 101`, `fsGroup: 101`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault`; `/ping` liveness+readiness; pinned image (PSS-baseline + no-latest) |
 | **Access** | Grafana datasource `uid: clickhouse` (`clickhouse-clickhouse.monitoring.svc.cluster.local:9000`, native, password via `valuesFrom`); **not** on any public Ingress; the `default` password is the access control (no NetworkPolicy — `monitoring` has no default-deny and netpol is inert on kindnet; a `:9000`/`:8123` NetworkPolicy is a follow-up for an enforcing CNI) |
-| **Startup ordering** | The collector's clickhouse exporter runs `CREATE DATABASE/TABLE` in `start()` (`create_schema`), so an unreachable ClickHouse fails the **whole** collector at startup. Ordered ClickHouse-first: local-stack via `depends_on: service_healthy`, cluster via `tracing-local dependsOn clickhouse-local`. `sending_queue`/`retry` isolate only *runtime* backpressure |
-| **Ordering is stricter than "up"** | Replication raised the bar: the DDL is `ON CLUSTER`, so it must not run until **every replica has joined the distributed-DDL queue**. `clickhouse-local` therefore carries no `wait: true` (it wins over `healthChecks` and, since this overlay applies only custom resources, made the wave report Ready in 371ms with zero pods) and gates on all six operator-created StatefulSets instead. Get this wrong and the schema is created on one replica only — silently, and permanently ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)) |
-| **DDL timeout** | The exporter DSN sets `distributed_ddl_task_timeout=30`. `CREATE ... ON CLUSTER` waits for **all** hosts even with `IF NOT EXISTS`, and the 180s default × five statements would hang the collector — and with it VictoriaTraces and VictoriaLogs — long past its own probes |
+| **Startup ordering** | `clickhouse-local` → `clickhouse-schema-local` (the Job, `wait: true`) → `tracing-local`. The collector runs no DDL, so it must not start before the schema exists — it can no longer create what it is missing. In local-stack, which is single-node, the exporter still creates its own schema via `depends_on: service_healthy` |
+| **Why the store's wave has no `wait`** | `wait` and `healthChecks` are mutually exclusive in Flux and `wait` wins. `configs/clickhouse` applies only custom resources, whose status kstatus cannot assess, so `wait: true` made that wave report Ready in **371ms with zero pods** and released downstream early. It gates on the six operator-created StatefulSets instead. The schema wave is the opposite case — it applies a Job, which kstatus does assess, so it uses `wait: true` |
+| **Why the Job, not the exporter** | Exporter-owned `ON CLUSTER` DDL cannot reach a replica that joins the distributed-DDL queue later, and `IF NOT EXISTS` blocks every repair. Measured twice: schema on 1 of 3, then 2 of 3 replicas after the ordering fix. The Job sidesteps the queue entirely — database per replica, tables once inside a `Replicated` database |
 | **Dashboards** | 5 provisioned boards in the **ClickHouse** Grafana folder — see [Grafana](#grafana); local-stack via file provider, cluster via `configMapGenerator` → `GrafanaDashboard` CRs |
 | **local-stack** | `clickhouse` compose service (`:8123` HTTP, `:9000` native), collector `clickhouse` exporter, Grafana plugin + provisioned datasource; e2e audit check **C6** (`SELECT count() FROM otel.otel_traces/otel_logs`) |
 
@@ -215,12 +216,15 @@ keep receiving, and the metrics pipeline never routes to ClickHouse.
 
 ### Deployed schema (real DDL)
 
-The contrib exporter created this `ON CLUSTER otel` — note the replicated
-engine, the sort key, day-partitioning, 90-day TTL, per-column codecs, and
-skipping indexes:
+This DDL is **committed**, in
+`kubernetes/infra/configs/clickhouse-schema/configmap-schema.yaml`, and applied
+by the `clickhouse-schema` Job. It was captured with `SHOW CREATE TABLE` from a
+cluster the exporter itself had built, so it matches what the exporter expects
+to INSERT into — note the replicated engine, the sort key, day-partitioning,
+90-day TTL, per-column codecs, and skipping indexes:
 
 ```sql
-CREATE TABLE otel.otel_traces ON CLUSTER otel
+CREATE TABLE IF NOT EXISTS otel.otel_traces
 (
     `Timestamp` DateTime64(9) CODEC(Delta(8), ZSTD(1)),
     `TraceId` String CODEC(ZSTD(1)),
@@ -249,8 +253,15 @@ SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
   `default_replica_path` (`/clickhouse/tables/{uuid}/{shard}`) and
   `default_replica_name` (`{replica}`) apply, so every `CREATE` mints a fresh
   Keeper znode and a drop-and-recreate can never collide with a stale replica
-  path. The exporter cannot pass engine arguments, which is part of why this
-  style was chosen ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)).
+  path ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)).
+- **No `ON CLUSTER`, on purpose.** The database is `ENGINE = Replicated`, so DDL
+  run on one replica propagates through the database's own Keeper log. That is
+  what makes the bootstrap immune to the failure that `ON CLUSTER` caused: a host
+  joining the distributed-DDL queue late skips earlier entries forever. A replica
+  added later initialises its own tables.
+- **The database is created per replica** (`00-database.sql`, applied by the Job
+  to each host in turn), which is the one statement that cannot be replicated by
+  the thing it creates.
 
 ### Retention & compression
 
@@ -299,8 +310,10 @@ platform-wide *OTel logs+traces SQL* board.
 2. Collector export errors: `otelcol_exporter_send_failed_*` for the `clickhouse`
    exporter, or `kubectl logs -n monitoring deploy/otel-collector | grep -i clickhouse`.
 3. ClickHouse reachable? `SELECT 1` (see [Playground](#playground--mergetree-by-hand)).
-4. Tables exist? `SHOW TABLES FROM otel` — the exporter creates them on first write
-   (`create_schema: true`); a wrong password blocks `CREATE DATABASE`.
+4. Tables exist? `SHOW TABLES FROM otel` — created by the `clickhouse-schema`
+   Job, not by the exporter. If they are missing, read
+   `kubectl -n monitoring logs job/clickhouse-schema`: a wrong password or an
+   unreachable replica fails the Job loudly rather than leaving a partial schema.
 5. VictoriaLogs/VictoriaTraces still receiving? They are independent sinks — ClickHouse being
    down must not affect them (`sending_queue` isolates backpressure).
 
@@ -564,30 +577,42 @@ the operator's reconcile counters.
   `kubectl -n monitoring get po -l clickhouse.altinity.com/chi=clickhouse`, then
   pod logs. If the pod is up but fetch fails, check the
   `clickhouse-credentials` Secret sync (ESO). Remember the blast radius:
-  collector restarts block on `create_schema` until the store returns — do not
-  bounce collectors while this fires.
-- **A table that reports `total_replicas: 1`** — the schema is half-created, and
-  it will not heal on its own. This happens when the exporter's `ON CLUSTER` DDL
-  ran before every replica had joined the distributed-DDL queue: a host that
-  joins later **skips earlier queue entries**, and `IF NOT EXISTS` turns every
-  retry into a no-op. Confirm it, then repair it:
+  a collector restart no longer blocks on DDL (`create_schema: false`), so
+  bouncing collectors is safe — but the ClickHouse sink will backpressure and
+  then drop until the store returns.
+- **A table that reports fewer replicas than the topology has** — historically
+  this meant the exporter's `ON CLUSTER` DDL had run before every replica joined
+  the distributed-DDL queue, which no retry could repair. Since the schema moved
+  to the `clickhouse-schema` Job that path is gone, and the repair is to re-run
+  the Job rather than to drop anything:
+
+  ```bash
+  kubectl -n monitoring delete job clickhouse-schema
+  flux -n flux-system reconcile kustomization clickhouse-schema-local
+  kubectl -n monitoring logs job/clickhouse-schema
+  ```
+  The Job asserts `total_replicas` on every replica before exiting 0, so a green
+  Job is now evidence rather than a guess. Confirm with:
 
   ```sql
-  -- confirm: an entry with a status row for only ONE host is the fingerprint
+  -- the symptom, read on EVERY replica (loop the pods; see § Playground)
+  SELECT table, is_readonly, total_replicas, active_replicas FROM system.replicas;
+  -- the database must be Replicated; Atomic means table DDL will not propagate
+  SELECT name, engine FROM system.databases WHERE name = 'otel';
+  -- should be EMPTY for schema objects: the bootstrap deliberately avoids
+  -- ON CLUSTER, so an entry here means someone reintroduced it
   SELECT entry, host, status, exception_code FROM system.distributed_ddl_queue ORDER BY entry, host;
-  -- and the symptom itself
-  SELECT table, total_replicas, active_replicas FROM system.replicas;
   ```
-  ```bash
-  # repair (destructive — acceptable only while the data is disposable):
-  #   drop ON CLUSTER, then let the exporter recreate the schema on boot
-  kubectl -n monitoring exec chi-clickhouse-otel-0-0-0 -c clickhouse -- \
-    clickhouse-client --password "$PW" -q "DROP DATABASE IF EXISTS otel ON CLUSTER 'otel' SYNC"
-  kubectl -n monitoring rollout restart deploy/otel-collector-opentelemetry-collector
-  ```
-  Verify the repair with a cross-replica read, not with pod status: insert on one
-  replica, read from another. Every other signal — pod readiness, engine name,
-  quorum health — stays green through this failure.
+
+  Verify any repair with a cross-replica read, never with pod status: insert on
+  one replica, read from another. Every other signal — pod readiness, engine
+  name, quorum health — stayed green through the original failure, which is why
+  it survived two bring-ups unnoticed.
+
+  Dropping the database is **no longer** part of this procedure. If it is ever
+  necessary, remember it must be dropped on each replica (`DROP DATABASE IF
+  EXISTS otel SYNC` per pod) and then re-created by the Job — the collector will
+  not rebuild it.
 - **ClickHouseDiskCritical** — `SELECT sum(bytes_on_disk) FROM system.parts
   GROUP BY table` to find the eater; drop the oldest partitions
   (`ALTER TABLE … DROP PARTITION …`) or grow the PVC. The 30-day TTL cannot
@@ -795,4 +820,4 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-08-28 — the store is replicated: 1 shard × 3 replicas on a ClickHouse Keeper quorum, `ReplicatedMergeTree` created `ON CLUSTER` by the exporter, and the engine-native `:9363` scrape finally enabled per replica ([RFC-0028](../../proposals/rfc/RFC-0028/) / [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). Two corrections found while writing it: the per-pod endpoint is `:9363`, not `:8001`, and the alert count in § Alerts had been stale since three rules were deleted in August. Earlier: trace-sink ordinal corrected from 4th to 5th (that note predated ADR-040's parallel run)._
+_Last updated: 2026-08-28 — **schema ownership moved out of the collector**: a committed-DDL bootstrap Job now creates the `otel` database as `ENGINE = Replicated` and its tables, and the exporter runs `create_schema: false` ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). Exporter-owned `ON CLUSTER` DDL was measured reaching 1 of 3 then 2 of 3 replicas, and upstream recommends `create_schema: false` for production to prevent exactly that startup race. Earlier the same day: the store became 1 shard × 3 replicas on a ClickHouse Keeper quorum with the engine-native `:9363` scrape enabled per replica; two corrections found while writing it — the per-pod endpoint is `:9363`, not `:8001`, and the § Alerts count had been stale since three rules were deleted in August._

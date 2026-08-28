@@ -2,11 +2,12 @@
 
 > **Decision summary:** We will run the ClickHouse observability store as one
 > shard with three `ReplicatedMergeTree` replicas coordinated by a three-node
-> ClickHouse Keeper quorum, and let the OTel Collector's clickhouse exporter own
-> that replicated schema. We accept that DDL keeps running inside the collector's
-> startup path, that the exporter can never `ALTER` a table, and that memory and
-> storage triple, in exchange for turning the loss of a disk from unrecoverable
-> data loss into a failover.
+> ClickHouse Keeper quorum, in a `Replicated` database whose schema is owned by a
+> bootstrap Job in git rather than by the OTel Collector. We accept a new Job, SQL
+> committed beside the manifests, and a schema that must stay compatible with the
+> exporter's INSERT contract across collector upgrades, in exchange for turning
+> the loss of a disk from unrecoverable data loss into a failover — without the
+> startup race that exporter-owned DDL cannot avoid at more than one replica.
 
 | Attribute | Value |
 |-----------|-------|
@@ -20,7 +21,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0028/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | One homelab PR: CHK + CHI topology + exporter options + per-pod scrape + alerts + platform docs, gated by a full Kind run with the replica-kill and keeper-kill drills |
+| **Implementation tracking** | One homelab PR: CHK + CHI topology + a schema bootstrap Job + per-pod scrape + alerts + platform docs, gated by a full Kind run with the replica-kill and keeper-kill drills |
 | **Adoption** | Not started |
 
 ## Context
@@ -93,11 +94,15 @@ mechanism to close it sits installed and unused.
 We will run the ClickHouse observability store as **one shard with three
 replicas**, coordinated by a **three-node ClickHouse Keeper quorum** declared as
 a `ClickHouseKeeperInstallation` named `keeper`, referenced from the CHI by name.
-The `otel` tables will be **`ReplicatedMergeTree`**, created **`ON CLUSTER` by the
-OTel Collector's clickhouse exporter** through `cluster_name` plus
-`table_engine`, with **no engine arguments**, so the server's default replica path
-(`/clickhouse/tables/{uuid}/{shard}`) applies. The existing plain-`MergeTree`
-tables will be **dropped and recreated**, not converted.
+
+The `otel` database will use **`ENGINE = Replicated`**, and its schema will be
+owned by a **bootstrap Job whose SQL is committed to git**. The collector runs
+**`create_schema: false`** and only INSERTs. The Job creates the database on
+**each replica individually** (no `ON CLUSTER`) and the tables **once** (also no
+`ON CLUSTER`), letting the database's own Keeper log propagate them. Tables stay
+`ReplicatedMergeTree` with **no engine arguments**, so the server's default
+replica path (`/clickhouse/tables/{uuid}/{shard}`) applies. The existing
+plain-`MergeTree` tables will be **dropped and recreated**, not converted.
 
 Three replicas each hold a full copy of every part; Keeper holds the metadata
 that says which parts exist and which replica has them. A replica that loses its
@@ -116,74 +121,94 @@ which is what makes exporter-owned schema viable at all.
 
 | Rule | Required behavior |
 |------|-------------------|
-| **Ownership** | The otel-collector's clickhouse exporter is the sole author of `otel.*` DDL. No migration Job, no hand-run `CREATE`, no schema in git |
-| **Write path** | Only the collector writes `otel.*` data, through the round-robin Service. Replication between replicas is Keeper-coordinated and must never be simulated by writing to each replica |
+| **Ownership** | The bootstrap Job is the sole author of `otel.*` DDL, and its SQL lives in git. The collector must never create schema (`create_schema: false`); no hand-run `CREATE` outside the Job's SQL |
+| **Write path** | Only the collector writes `otel.*` data, through the round-robin Service. DDL goes through the Job. Replication between replicas is Keeper-coordinated and must never be simulated by writing to each replica |
 | **Read path** | Grafana and operators read through the same Service and must not assume which replica answers; per-replica questions go to `system.replicas` per pod, never to a Grafana query |
 | **Boundary** | ClickHouse holds logs and traces only. Metrics stay on VictoriaMetrics. No `Distributed` table exists while `shardsCount` is 1 |
 | **Failure behavior** | Losing one replica or one keeper is a failover, not an outage: reads and writes continue. A replica without a quorum goes read-only and must be alerted on, because it still answers reads while falling behind |
-| **Compatibility** | Engine arguments stay absent, so replica paths remain `{uuid}`-derived. Any future explicit path is a breaking change requiring table recreation |
+| **Compatibility** | Engine arguments stay absent, so replica paths remain `{uuid}`-derived. The committed DDL must satisfy the exporter's INSERT column lists — a collector image bump requires re-checking upstream `logs_insert.sql` / `traces_insert.sql`, because a mismatch fails at insert time under traffic, not at apply time |
 
 ### Decision view
 
 ```mermaid
 flowchart LR
-    OC["otel-collector<br/>clickhouse exporter<br/>owns the DDL"] -->|"INSERT + CREATE ... ON CLUSTER"| SVC["clickhouse-clickhouse<br/>round-robin Service"]
-    SVC --> R0[("replica 0")]
-    SVC --> R1[("replica 1")]
-    SVC --> R2[("replica 2")]
+    JOB["schema bootstrap Job<br/>SQL in git<br/>owns all DDL"] -->|"CREATE DATABASE per replica<br/>no ON CLUSTER"| R0[("replica 0<br/>db: Replicated")]
+    JOB --> R1[("replica 1<br/>db: Replicated")]
+    JOB --> R2[("replica 2<br/>db: Replicated")]
+    JOB -->|"CREATE TABLE once"| R0
+    OC["otel-collector<br/>create_schema: false<br/>INSERT only"] -->|"INSERT"| SVC["clickhouse-clickhouse<br/>round-robin Service"]
+    SVC --> R0 & R1 & R2
     R0 <-->|"part fetch"| R1
     R1 <-->|"part fetch"| R2
-    R0 <-->|"part fetch"| R2
+    R0 -.->|"table DDL via the database's own Keeper log"| R1
     R0 -.->|"replication metadata"| K["ClickHouse Keeper<br/>3-node quorum"]
     R1 -.->|"replication metadata"| K
     R2 -.->|"replication metadata"| K
-    JOB["migration Job"] -.->|"rejected: must not own DDL"| SVC
 
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
     class OC edge;
+    class JOB worker;
     class SVC service;
     class K platform;
     class R0,R1,R2 data;
-    class JOB planned;
 ```
 
 ## Alternatives considered
 
 | Option | Benefits | Costs / risks | Result |
 |--------|----------|---------------|--------|
-| **A — Exporter owns the replicated schema** (`create_schema: true` + `cluster_name` + `table_engine`) | Zero new parts; verified template-by-template against the exporter's own SQL templates | DDL stays in collector `start()`; the exporter only ever `CREATE ... IF NOT EXISTS`, never `ALTER` | Selected |
-| **B — Migration Job owns the DDL** (`create_schema: false`) | Removes startup coupling entirely; `ALTER`s live in git beside the `CREATE` | A new Job, SQL files, and Flux ordering to maintain, for a schema that has not changed once | Rejected |
+| **A — A bootstrap Job owns the DDL in a `Replicated` database** (`create_schema: false`) | Removes the startup race *and* the startup coupling; `ALTER`s live in git beside the `CREATE`; a replica added later initialises its own tables | A new Job, SQL files, and Flux ordering to maintain; the committed schema must track the exporter's INSERT contract | Selected |
+| **B — Exporter owns the replicated schema** (`create_schema: true` + `cluster_name` + `table_engine`) | Zero new parts | **Cannot produce a complete schema at three replicas.** The exporter issues `CREATE ... ON CLUSTER` at startup; a host that joins the distributed-DDL queue later skips earlier entries and `IF NOT EXISTS` makes every retry a no-op. Measured on two fresh Kind bring-ups: **1 of 3** replicas, then **2 of 3** after the Flux ordering was fixed. Upstream recommends against it for production, naming this exact failure | Rejected |
 | **C — Convert the existing tables** (`ATTACH ... AS REPLICATED`) | Preserves the current dataset | Ceremony and risk to protect demo data from gate runs | Rejected |
 | **D — Frugal 2 replicas + 1 keeper first** | Two fewer pods, lower memory | A one-node quorum survives nothing; the drill it would pass proves less than the drill it would fail | Rejected |
 | **E — Stay 1×1 and add backups** | Cheapest; honest for a lab | Restores lose the tail and take hours; leaves the recorded data-loss gap permanent and teaches nothing about replication | Rejected |
 
 ### Why the selected option won
 
-The other gate decisions remove exactly the risks that made a migration Job
-attractive. Recreate-from-scratch means there is no data to migrate carefully, and
-the default `{uuid}` replica path means repeated drop-and-recreate cycles cannot
-collide with stale znodes. What remains of Option B's advantage is schema
-evolution — and this schema has never evolved. Against that, Option A adds no new
-component, no new wave, no new ordering constraint, and no second schema owner to
-disagree with the first. It satisfies driver 2 outright while giving up nothing
-that is needed today.
+It is the only option that produces a complete schema. That is not a preference;
+it is the measurement. Owning the DDL also removes the race at its root rather
+than narrowing the window: the database is created per replica so the
+cluster-wide DDL queue is never involved, and the `Replicated` database engine
+means table DDL run once propagates through the database's own Keeper log —
+including to a replica that appears later, which is what makes a future
+`replicasCount` increase safe. Measured on this platform: `0` entries in
+`system.distributed_ddl_queue` for the bootstrap, and `total_replicas = 3` on all
+three replicas with a table created only once.
+
+Two things the platform wanted anyway come along with it. The collector no longer
+runs DDL in `start()`, so a restart during a ClickHouse outage costs the
+ClickHouse sink instead of the whole collector — and with it VictoriaTraces and
+VictoriaLogs. And `ALTER` finally has an owner, in git, next to the `CREATE`.
 
 ### Why the closest alternative lost
 
-Option B loses on timing, not on merit. Its two real benefits are the `ALTER`
-lifecycle and startup decoupling, and neither is needed yet: the tables have never
-been altered, and the startup coupling is already mitigated for cold start by
-`tracing-local` depending on `clickhouse-local`. Its cost is paid immediately and
-permanently — a Job, SQL files in git, and a second place where the schema is
-defined, which is a real source of drift between what the exporter would create
-and what the Job did create. So the Job is not wrong; it is early. Both of its
-benefits are recorded below as revisit triggers, and the design is ready the day
-either one fires.
+Option B did not lose on cost — it was genuinely cheaper, and that is why it was
+chosen at the research gate. It lost on a fact the gate did not have: the
+exporter's `ON CLUSTER` DDL cannot reach a replica that has not yet joined the
+distributed-DDL queue, and `IF NOT EXISTS` guarantees no later attempt repairs
+it. The result is a silent partial schema — every pod `Running`, every table
+present on the replica the collector happened to talk to, `system.replicas`
+reporting fewer copies than the topology claims. Fixing Flux ordering moved it
+from one replica to two and could not reach three, because "pod Ready" is not
+"joined the DDL queue".
+
+The exporter's own README states the position plainly, and quoting it matters
+because it shows this was knowable in advance:
+
+> **Schema management** — "While the exporter can automatically create databases
+> and tables, it is recommended for production environments to manage schemas
+> manually by setting `create_schema` to false. This approach prevents race
+> conditions during startup and simplifies future upgrades. When manual schema
+> management is enabled, the exporter only executes INSERT statements, allowing
+> users to customize indexes, TTL, and partitioning as needed."
+
+"Prevents race conditions during startup" is the sentence. The research compared
+the two options on parts-count and schema-evolution and never surfaced it.
 
 ## Consequences
 
@@ -199,15 +224,28 @@ either one fires.
   topology is the reason the per-pod scrape was worth enabling.
 - The platform gains a rehearsed answer to "what happens when a replica dies",
   proven by drill rather than asserted by design.
+- **Adding a replica later works.** Under exporter-owned DDL a new replica would
+  have silently had no tables at all, because the `CREATE` statements it needed
+  were queue entries it joined too late to see. In a `Replicated` database it
+  initialises its own tables once the Job has created the database on it.
+- The collector's startup coupling is gone: no DDL in `start()` means a restart
+  during a ClickHouse outage no longer risks the whole telemetry plane.
 
 ### Negative consequences and accepted trade-offs
 
-- **DDL still runs in the collector's `start()`.** A collector restart while
-  ClickHouse is unavailable fails the whole collector — taking VictoriaTraces and
-  VictoriaLogs down with it, because they are sinks in the same process. Flux
-  ordering guards cold start only; kubelet does not read `dependsOn`.
-- **The exporter never `ALTER`s.** The first schema change — a new column, a TTL
-  change, an index — has no owner under this decision.
+- **A new moving part.** A Job, its SQL, and a Flux wave
+  (`clickhouse-schema-local`) between the store and the collector. Jobs are
+  immutable, so changing the DDL needs `kubectl delete job` plus a reconcile —
+  written into the Job's own header rather than left to be rediscovered.
+- **The committed schema must track the exporter's INSERT contract.** Upstream
+  `logs_insert.sql` / `traces_insert.sql` define the columns the exporter writes.
+  A collector image bump can change them, and a mismatch fails at insert time
+  under traffic — not at apply time, so nothing in CI would catch it. The image
+  is pinned; the chart is a range, so the pin is what must be respected.
+- **The schema now exists in two places conceptually** — our SQL and the
+  exporter's templates — and they can drift. Mitigated by deriving the committed
+  DDL from `SHOW CREATE TABLE` on a cluster the exporter itself built, but the
+  drift risk is real and permanent.
 - **Memory and storage triple.** Three replicas at 2Gi limits plus three keepers
   put roughly a 7.5Gi ceiling on the `monitoring` namespace, and every part is
   stored three times. Each replica ingests everything, so capacity is planned per
@@ -216,21 +254,10 @@ either one fires.
   chronically, that is a separate decision with its own migration.
 - **The single `default` user remains** the whole access control story for the
   store, shared by the collector and Grafana.
-- **A half-created schema is now possible, and it is silent.** The exporter's
-  `CREATE ... ON CLUSTER` only reaches the replicas that have already joined the
-  distributed-DDL queue; a host that joins later **skips earlier queue entries**,
-  and `IF NOT EXISTS` makes every subsequent retry a no-op. Measured on the first
-  Kind bring-up: the `otel` database existed on replica 0 alone while all six pods
-  read `Running` and every table read `ReplicatedMergeTree` there. Nothing but
-  `system.replicas` (`total_replicas=1`) and a cross-replica read exposed it. The
-  ordering guarantee this decision depends on is therefore stronger than "the
-  store is up" — it is "every replica has joined the DDL queue before the first
-  DDL runs" — and Flux can only express it through health checks on the
-  operator-created StatefulSets.
-- **Recovery from that state is manual and destructive**: drop the database
-  `ON CLUSTER` and restart the collector so the exporter recreates the schema.
-  Cheap while the data is disposable, which is true today by the fresh-tables
-  decision and will not be true forever.
+- **The `Replicated` database engine is new ground on this platform.** Nothing
+  else here uses it; every other replicated object is a `ReplicatedMergeTree`
+  table. Its constraints (one replica executes each DDL, restrictions on
+  non-deterministic DDL) are now ours to know.
 
 ### Neutral consequences
 
@@ -247,7 +274,7 @@ either one fires.
 |------------|-------|----------|-------------------|
 | `ClickHouseKeeperInstallation` `keeper` (3 replicas) in the `clickhouse-local` wave | platform | RFC-0028 PR | `kubectl get chk -n monitoring` Ready; three keeper pods on three nodes |
 | CHI to `replicasCount: 3` + `zookeeper.keeper.name` + host anti-affinity | platform | RFC-0028 PR | Three CH pods on three distinct nodes |
-| Exporter `cluster_name` + `table_engine` | platform | RFC-0028 PR | Every `otel` table reports engine `ReplicatedMergeTree` |
+| Bootstrap Job owns the DDL; exporter `create_schema: false` | platform | RFC-0028 PR | The Job reaches Complete having asserted `total_replicas` on every replica; the collector creates nothing |
 | Gate all three CH StatefulSets in the Flux wave | platform | RFC-0028 PR | `clickhouse-local` cannot report Ready on one replica of three |
 | Per-pod `:9363` scrape so replicas are individually observable | platform | RFC-0028 PR | `ClickHouseMetrics_*` series exist, labelled per replica |
 | Keeper and read-only-replica alerts | platform | RFC-0028 PR | Rules loaded in vmalert; series confirmed to exist, not merely referenced |
@@ -267,24 +294,27 @@ either one fires.
 | A dead keeper is survivable | Keeper-kill drill: quorum holds at 2/3, writes continue, no replica goes read-only |
 | The collector is not collateral damage | The otel-collector Deployment records zero restarts across both drills |
 | Alerts reference series that exist | The `VERIFY-AT-KIND` markers on the Keeper and read-only rules are closed by querying the series, not by assuming it |
-| Every replica joined the DDL queue | `system.distributed_ddl_queue` carries a status row **per host** for each of the exporter's `CREATE` statements — a single-host entry means the schema is half-created and will never self-heal |
-| The wave really gates | `clickhouse-local` must not carry `wait: true`: it is mutually exclusive with `healthChecks` and wins, and this overlay applies only custom resources whose status kstatus cannot assess. Measured with `wait` set: reconcile finished in 371 ms with zero StatefulSets in existence |
+| The bootstrap avoids the DDL queue entirely | `system.distributed_ddl_queue` has **no** entries for the schema objects: the database is created per replica and the tables inside a `Replicated` database. An entry appearing there means someone reintroduced `ON CLUSTER` |
+| The database engine is right | `SELECT engine FROM system.databases WHERE name='otel'` returns `Replicated` on every replica. `Atomic` means the Job ran against a pre-existing database and table DDL will not propagate |
+| The collector owns no schema | `create_schema: false` in the collector values, and no `cluster_name` / `table_engine` / `ttl` — those only ever fed the DDL path. TTL lives in the committed DDL |
+| The insert contract holds | The committed DDL satisfies upstream `logs_insert.sql` (15 columns + the `EventName` feature column) and `traces_insert.sql` (22 columns). Re-check on any collector image bump |
+| The wave really gates | `clickhouse-local` must not carry `wait: true`: it is mutually exclusive with `healthChecks` and wins, and that overlay applies only custom resources whose status kstatus cannot assess. Measured with `wait` set: reconcile finished in 371 ms with zero StatefulSets in existence. `clickhouse-schema-local` is the opposite case — it applies a Job, which kstatus does assess, so it uses `wait: true` |
 | Documentation | `docs/observability/clickhouse/README.md` and the tracing architecture doc describe the replicated topology; this ADR is linked from RFC-0028 |
 
 ## Revisit triggers
 
 Re-open this decision when one or more of the following become true:
 
-- **The schema needs an `ALTER`** — a new column, a TTL change, a skipping index.
-  Under this decision that DDL has no owner, which is Option B's cue.
-- **A real startup-coupling incident occurs** — a collector restart during a
-  ClickHouse outage takes the telemetry plane down. Also Option B's cue.
-- **A second half-created schema occurs**, or the data in the store stops being
-  disposable. Under Option B the only repair is drop-and-recreate; a migration
-  Job owns its DDL explicitly and can be re-run against a cluster whose replicas
-  arrived in any order. The first Kind bring-up produced exactly this failure —
-  the ordering fix holds it off, but the sharp edge belongs to the decision, not
-  to the wave.
+- **The exporter's INSERT contract changes** under a collector upgrade, making
+  the committed DDL wrong. This is the standing maintenance cost of owning the
+  schema, and the reason the collector image stays pinned.
+- **The `Replicated` database engine proves unsuitable** — a DDL shape it
+  rejects, or an upgrade that changes its semantics. The fallback is per-replica
+  table DDL from the same Job, which is strictly more work but needs no new
+  design.
+- **Sharding arrives.** A `Distributed` table over more than one shard changes
+  what the Job must create, and the `Replicated` database's auto-maintained
+  cluster entry becomes relevant.
 - **Any sharding trigger signal fires chronically** rather than transiently:
   `ClickHouseTooManyParts` sustained, the disk pair firing after TTL, ingest rate
   flat while the collector's queue grows, or heavy scans hitting
@@ -313,6 +343,7 @@ a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-28 | Accepted / Not started | Created at Accepted with the RFC-0028 architecture review |
+| 2026-08-28 | Accepted / Not started | **Decision reversed before it ever shipped.** Two Kind bring-ups showed exporter-owned `ON CLUSTER` DDL reaching only 1 of 3 and then 2 of 3 replicas, and the exporter's README recommends `create_schema: false` for production to prevent exactly that startup race. Schema ownership moves to a bootstrap Job in git and the `otel` database becomes `ENGINE = Replicated`. Option B is demoted to a rejected alternative with the measurements. Amended rather than superseded: this record had not landed on `main` and had never reached `Adoption: Complete`, so a superseding ADR would leave two records describing one never-deployed design |
 
 ---
 _Last updated: 2026-08-28_

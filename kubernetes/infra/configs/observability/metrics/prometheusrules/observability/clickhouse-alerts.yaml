@@ -56,7 +56,10 @@ spec:
             description: "The metrics-exporter has failed to fetch system tables from {{ $labels.hostname }} for 5 minutes. With three replicas its peers keep serving reads and writes, so this is a degraded topology rather than an outage — but a replica that stays unreachable is one disk failure away from mattering, and it stops catching up on replication."
 
         # The page-worthy version: no replica is answering, so the store really
-        # is down and the collector's create_schema will block every restart.
+        # is down. Since RFC-0028 the collector no longer runs DDL at startup
+        # (create_schema: false), so this no longer blocks collector restarts —
+        # what it costs is the ClickHouse sink, and the edge access log has
+        # nowhere else to go.
         # VERIFY-AT-KIND: the `hostname` label cardinality is what makes this
         # count meaningful — confirm the exporter publishes one series per
         # replica (3) rather than one per CHI (1) before trusting the threshold.
@@ -68,7 +71,7 @@ spec:
             category: observability
           annotations:
             summary: "ClickHouse: every replica unreachable"
-            description: "The metrics-exporter cannot reach any ClickHouse replica — the OTel logs/traces store is down, edge access logs (ClickHouse-only per ADR-061) are being dropped, and any OTel Collector restart will fail in create_schema until this returns, taking VictoriaTraces and VictoriaLogs down with it."
+            description: "The metrics-exporter cannot reach any ClickHouse replica — the OTel logs/traces store is down and edge access logs (ClickHouse-only per ADR-061) are being dropped. The collector survives this now that it owns no DDL, but its ClickHouse sink backpressures and then drops; the schema bootstrap Job would also fail until the store returns."
 
         - alert: ClickHouseOperatorDown
           expr: up{job=~".*clickhouse-operator.*"} == 0

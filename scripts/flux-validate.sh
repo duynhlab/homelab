@@ -63,6 +63,7 @@ kustomize_overlays=(
   # ClickHouseKeeperInstallation is now really schema-validated here; the CHI is
   # skipped by kubeconform_flags for the stale-schema reason recorded above.
   "kubernetes/infra/configs/clickhouse"
+  "kubernetes/infra/configs/clickhouse-schema"
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/observability"
   "kubernetes/infra/configs/secrets"

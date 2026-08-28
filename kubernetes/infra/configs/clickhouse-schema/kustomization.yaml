@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Order matters: the ConfigMap carrying the DDL must exist before the Job that
+# mounts it. Listed explicitly rather than relying on kustomize ordering, and a
+# plain ConfigMap rather than configMapGenerator — the repo's own precedent for
+# shipping a script into a Job (openbao-bootstrap), and it keeps the Job's pod
+# template stable when the SQL changes.
+resources:
+  - configmap-schema.yaml
+  - job.yaml

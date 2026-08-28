@@ -353,6 +353,35 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse schema ownership moved out of the collector, reversing ADR-065's
+  central decision before it shipped.** Exporter-owned DDL cannot produce a
+  complete schema at three replicas: `CREATE ... ON CLUSTER` issued at collector
+  startup never reaches a host that joins the distributed-DDL queue later, that
+  host skips the earlier entries permanently, and `IF NOT EXISTS` makes every
+  retry a no-op. Measured on two fresh Kind bring-ups — schema on **1 of 3**
+  replicas, then **2 of 3** after the Flux ordering was fixed, with six pods
+  `Running` and every table present on whichever replica the collector happened
+  to talk to. `system.replicas` reporting fewer copies than the topology claimed
+  was the only signal, and only a cross-replica read exposed it. The exporter's
+  own README recommends `create_schema: false` for production and names the
+  failure: *"This approach prevents race conditions during startup."*
+  As built now: a `clickhouse-schema` Job with its DDL committed in
+  `configs/clickhouse-schema/` creates the `otel` database as
+  **`ENGINE = Replicated`** on each replica individually — no `ON CLUSTER`, so
+  the cluster-wide DDL queue is never involved — then creates the tables once and
+  lets the database's own Keeper log propagate them, which is also what makes a
+  future replica addition initialise its own tables instead of silently having
+  none. The collector runs `create_schema: false`; `cluster_name`,
+  `table_engine`, `ttl` and the `distributed_ddl_task_timeout` DSN parameter are
+  gone because all four only fed the DDL path, and the 90-day TTL now lives in
+  the committed DDL where it can be reviewed. Two things the platform wanted
+  anyway come with it: the collector no longer risks the whole telemetry plane on
+  a restart during a ClickHouse outage, and `ALTER` finally has an owner. The new
+  cost, recorded in the ADR: the committed schema must track the exporter's
+  INSERT contract, so a collector image bump means re-checking upstream
+  `logs_insert.sql` / `traces_insert.sql` — a mismatch fails at insert time under
+  traffic, not at apply time.
+
 - **The ClickHouse observability store is replicated: 1 shard x 3 replicas on a
   3-node ClickHouse Keeper quorum.** One lost PVC used to erase 90 days of edge
   access logs — ClickHouse-only since ADR-061 — and every long-retention trace;

@@ -111,41 +111,41 @@ spec:
           # Tempo (chart), Jaeger, VictoriaTraces and VictoriaLogs. The ordinal
           # said 4th until 2026-08-23: this comment predates the tempo-chart
           # parallel run added by ADR-040 phase 1. Metrics are NEVER routed here.
-          # create_schema bootstraps the otel_logs/otel_traces tables (+ trace_id
-          # materialized view); TTL 90d (2160h) vs 7d ops. sending_queue
-          # + retry_on_failure isolate ClickHouse *runtime* backpressure from the
-          # other sinks — but create_schema runs DDL in start(), so an unreachable
-          # ClickHouse fails the whole collector at startup. tracing-local therefore
-          # dependsOn clickhouse-local (ordering); flip to create_schema:false + a
-          # bootstrap Job to also survive a restart while ClickHouse is down.
+          # This exporter INSERTs only. It does NOT own the schema (RFC-0028 /
+          # ADR-065): create_schema is false and a bootstrap Job in
+          # configs/clickhouse-schema owns the DDL.
           #
-          # RFC-0028 / ADR-065: cluster_name + table_engine make that DDL create
-          # ReplicatedMergeTree tables ON CLUSTER instead of plain MergeTree, so
-          # this exporter is the schema owner for the replicated topology too
-          # (Option B — no migration Job). table_engine carries NO arguments on
-          # purpose: the server's default_replica_path (/clickhouse/tables/{uuid}/
-          # {shard}) mints a fresh Keeper znode per CREATE, so a drop-and-recreate
-          # can never collide with a stale replica path the way an explicit path
-          # can. The exporter cannot pass engine arguments at all, which is part
-          # of why the default path was chosen.
-          # distributed_ddl_task_timeout is a server SETTING passed through the
-          # DSN, and it is load-bearing at 1x3. CREATE ... ON CLUSTER waits for
-          # ALL hosts even with IF NOT EXISTS, and the default is 180s with
-          # distributed_ddl_output_mode: throw — so a collector restart while one
-          # replica is down would block ~180s per statement before failing,
-          # taking VictoriaTraces and VictoriaLogs down with it. The 1x1 topology
-          # could not express that failure; replication makes the startup
-          # coupling worse, not better. 30s fails fast into the HelmRelease retry
-          # loop instead of hanging the telemetry plane.
-          endpoint: tcp://clickhouse-clickhouse.monitoring.svc.cluster.local:9000?dial_timeout=10s&distributed_ddl_task_timeout=30
+          # Why the reversal, measured rather than argued. With create_schema:
+          # true the exporter issued CREATE ... ON CLUSTER at startup; a host
+          # that joins the distributed-DDL queue later SKIPS earlier entries and
+          # IF NOT EXISTS makes every retry a no-op, so two fresh Kind bring-ups
+          # produced a schema on 1 of 3 and then 2 of 3 replicas — permanently
+          # and silently, with every pod Running. The exporter's own README
+          # recommends create_schema: false for production for exactly this
+          # reason: "This approach prevents race conditions during startup."
+          #
+          # What that buys back, beyond correctness: no DDL in start() means a
+          # collector restart while ClickHouse is unavailable costs only the
+          # ClickHouse sink, instead of failing the whole collector and taking
+          # VictoriaTraces and VictoriaLogs with it. The DSN no longer needs
+          # distributed_ddl_task_timeout, and cluster_name / table_engine / ttl
+          # are gone because they only ever fed the DDL path — TTL 90d now lives
+          # in the committed DDL (TTL ... + toIntervalDay(90) plus
+          # ttl_only_drop_parts), which is where it can be reviewed.
+          #
+          # The cost this introduces: the committed DDL must stay column-for-column
+          # compatible with this exporter's INSERT statements. Bumping the
+          # collector image means re-checking upstream logs_insert.sql /
+          # traces_insert.sql, because a mismatch fails at insert time under
+          # traffic, not at apply time.
+          #
+          # sending_queue + retry_on_failure still isolate ClickHouse *runtime*
+          # backpressure from the other sinks.
+          endpoint: tcp://clickhouse-clickhouse.monitoring.svc.cluster.local:9000?dial_timeout=10s
           database: otel
           username: default
           password: ${env:CLICKHOUSE_PASSWORD}
-          create_schema: true
-          cluster_name: otel
-          table_engine:
-            name: ReplicatedMergeTree
-          ttl: 2160h
+          create_schema: false
           logs_table_name: otel_logs
           traces_table_name: otel_traces
           async_insert: true

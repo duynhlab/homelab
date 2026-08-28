@@ -371,8 +371,9 @@ The tracing stack answers this question **twice**, differently, and on purpose.
 
 Both are reconciled by Flux through the `tracing-local` Kustomization
 (path `./controllers/tracing`, `dependsOn: [secrets-local, clickhouse-local]`
-— ClickHouse must be up before the collector's `create_schema` runs; `storage-local`
-was dropped in August with Tempo's RustFS buckets).
+— the collector runs `create_schema: false` since RFC-0028, so it waits on the
+`clickhouse-schema` Job rather than on the store; `storage-local` was dropped in
+August with Tempo's RustFS buckets).
 
 ### Why not the OpenTelemetry Operator
 

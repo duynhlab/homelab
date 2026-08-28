@@ -70,11 +70,13 @@ whose exporter templates carry `ON CLUSTER` + `ENGINE` slots on every table.
    either way 0.27.3 is deployed) and pod anti-affinity on
    `kubernetes.io/hostname` (Kind has no zones). The operator keeps
    auto-creating the PDB; macros and `remote_servers` regenerate themselves.
-3. **Schema (Option B)**: the collector's clickhouse exporter gains
-   `cluster_name: otel` and `table_engine: {name: ReplicatedMergeTree}`
-   (argument-free → the server-default `{uuid}` replica path). Old plain
-   -MergeTree tables are **dropped deliberately** (fresh start); on next
-   collector boot the exporter creates the replicated schema `ON CLUSTER`.
+3. **Schema — REVISED AT IMPLEMENTATION (see History).** The RFC proposed
+   Option B: the exporter gains `cluster_name` + `table_engine` and keeps
+   creating the schema. That was measured and does not work at three replicas.
+   As built: a **bootstrap Job owns the DDL** (`configs/clickhouse-schema`), the
+   `otel` database uses **`ENGINE = Replicated`**, tables are created without
+   `ON CLUSTER`, and the collector runs **`create_schema: false`**. Old plain
+   -MergeTree tables are still **dropped deliberately** (fresh start).
 4. **Alerts**: re-enable the commented `ClickHouseZooKeeperExceptions` alert
    (it exists for exactly this topology) and extend the unreachable-server
    alert to per-replica.
@@ -92,14 +94,18 @@ and [§ Alternatives](./research.md#alternatives); the schema-ownership analysis
 
 | Option | Shape | Why not chosen |
 |--------|-------|----------------|
-| Migration Job owns DDL (Option A) | Job + SQL in git, `create_schema: false` | Owner call at the gate: B is the coherent set with recreate-from-scratch + default replica path, at zero new parts. A's two advantages are recorded as **revisit triggers** (first ALTER; a real startup-coupling incident) — the Job design is ready if either fires |
+| Migration Job owns DDL (Option A) | Job + SQL in git, `create_schema: false` | **Chosen at implementation, reversing the gate.** The gate preferred B for zero new parts; implementation measured B producing a schema on 1 of 3 then 2 of 3 replicas, and found the exporter's README recommends `create_schema: false` for production precisely to "prevent race conditions during startup". See History |
 | Frugal 2+1 first | 2 replicas + 1 keeper (+2 pods) | Owner chose straight 3+3; the RAM ceiling (~7.5Gi limits) is accepted and will be observed after landing |
 | Convert existing tables | `ATTACH ... AS REPLICATED` | Nothing is a real deployment yet — fresh tables skip the ceremony; the technique stays documented in research for the day a real deployment needs it |
 | Stay 1×1 + backups | clickhouse-backup to RustFS | Restores lose the tail and take hours; doesn't teach replication; backups remain a complementary follow-up |
 
 ## Decision outcome
 
-**Chosen option:** Option B — exporter-owned replicated schema, on a 1×3 + CHK topology.
+**Chosen option at the research gate:** Option B — exporter-owned replicated
+schema, on a 1×3 + CHK topology. **Superseded at implementation by Option A**
+(bootstrap Job owns the DDL, `otel` database `ENGINE = Replicated`) — the
+reasoning below is preserved as the gate recorded it, and what overturned it is
+in [Implementation History](#implementation-history).
 
 **Rationale:** satisfies the Goals with the smallest possible delta — no new
 schema owner, no new wave, no data migration — because the other gate
@@ -207,8 +213,9 @@ also recreates plain tables, which is the same fresh-start move in reverse).
 
 ## Testing / verification
 
-1. Fresh `make up`: 25/25 Kustomizations, `chk` + 6 ClickHouse-family pods
-   Ready, `system.replicas` lists 3 replicas per `otel` table.
+1. Fresh `make up`: 26/26 Kustomizations (the schema wave is the 26th), `chk` +
+   6 ClickHouse-family pods Ready, the `clickhouse-schema` Job Complete, and
+   `system.replicas` listing 3 replicas per `otel` table **on all three pods**.
 2. Drive gate traffic (`make e2e GATE=kind` — existing SG/K rows); confirm
    inserts land and `system.replication_queue` drains to 0 on all replicas.
 3. **Kill drill**: delete one replica pod mid-traffic — Grafana keeps
@@ -274,6 +281,48 @@ also recreates plain tables, which is the same fresh-start move in reverse).
   exporter-owned schema (Option B), not to the wave: a migration Job owns its DDL
   explicitly and can be re-run against replicas that arrived in any order.
 
+- 2026-08-28 — **The second bring-up settled it: schema ownership moves to a Job,
+  reversing this RFC's central decision before it shipped.** With the ordering
+  fixed the wave reconciled in 3m25s and the collector was created after all
+  three StatefulSets — correct by every measure this RFC named — and the schema
+  still landed on only **2 of 3** replicas. `system.distributed_ddl_queue` again
+  showed the exporter's six `CREATE` statements with status rows for hosts `0`
+  and `1` only. "Pod Ready" is not "joined the DDL queue", so ordering cannot
+  close this gap; `IF NOT EXISTS` guarantees no retry closes it either.
+
+  Then the exporter's own README, which the research never quoted:
+
+  > **Schema management** — "While the exporter can automatically create
+  > databases and tables, it is recommended for production environments to
+  > manage schemas manually by setting `create_schema` to false. This approach
+  > prevents race conditions during startup and simplifies future upgrades.
+  > When manual schema management is enabled, the exporter only executes INSERT
+  > statements, allowing users to customize indexes, TTL, and partitioning as
+  > needed."
+
+  Upstream names our exact failure and recommends against Option B for
+  production. The gate chose B on parts-count and schema-evolution; it was never
+  shown that sentence.
+
+  **As built instead:** a bootstrap Job (`configs/clickhouse-schema`, its own
+  `clickhouse-schema-local` wave with `wait: true`) creates the `otel` database
+  with **`ENGINE = Replicated`** on **each replica individually** — no
+  `ON CLUSTER`, so the cluster-wide DDL queue is never touched — then creates the
+  tables **once** and lets the database's own Keeper log propagate them. The
+  collector runs `create_schema: false` and only INSERTs; `cluster_name`,
+  `table_engine`, `ttl` and the `distributed_ddl_task_timeout` DSN parameter are
+  gone, because all four only ever fed the DDL path.
+
+  Measured before committing, on the live cluster: `0` DDL-queue entries for the
+  bootstrap; database `Replicated` on all three replicas; tables applied once
+  reaching **`total_replicas=3 active_replicas=3 is_readonly=0`** everywhere; the
+  exporter's exact INSERT column lists accepted; the materialized view firing and
+  its target replicating; and the `__otel_materialized_*` columns computing.
+
+  This also closes both revisit triggers this RFC recorded — `ALTER` ownership
+  and startup decoupling — so the "Option A is ready if either fires" line came
+  due in the same week it was written.
+
 ## Related
 
 - [./research.md](./research.md) — plain-language research and Context7 audit trail (gate passed 2026-08-28)
@@ -282,4 +331,4 @@ also recreates plain tables, which is the same fresh-start move in reverse).
 - Quick-win train (system-table TTLs, image pin, PVC Retain) — independent of this RFC's gate; the `:9363` scrape was pulled out of it and shipped here instead
 
 ---
-_Last updated: 2026-08-28 — Status → `Accepted`; ADR-065 created at `Accepted` and implementation opened in the same PR (the `:9363` scrape folded in, since the quick-win PR it was deferred to had never been created). Earlier same day: owner review — the bare “docs/api: N/A” hid the real docs impact, so the platform-docs checklist names every page that must move at implementation._
+_Last updated: 2026-08-28 — schema ownership **reversed to Option A** at implementation: a bootstrap Job owns the DDL and the `otel` database is `ENGINE = Replicated`, after exporter-owned `ON CLUSTER` DDL was measured reaching 1 of 3 then 2 of 3 replicas and the exporter's README was found to recommend `create_schema: false` for production. Earlier: Status → `Accepted`; ADR-065 created at `Accepted`, implementation opened in the same PR, `:9363` scrape folded in. Earlier still: owner review — the bare “docs/api: N/A” hid the real docs impact._

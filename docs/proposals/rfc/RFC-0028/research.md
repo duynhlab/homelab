@@ -9,8 +9,9 @@
 | **Last updated** | 2026-08-28 |
 
 > **Plain-language research.** This is the learn-before-deciding half of RFC-0028.
-> The companion [`research.vi.md`](research.vi.md) is a condensed Vietnamese
-> reading copy; this file is the source of truth.
+> A condensed Vietnamese reading companion (`research.vi.md`) exists locally
+> for the owner — `*.vi.md` is gitignored by design; this file is the source
+> of truth.
 >
 > **Scope fence, stated up front:** this research covers three rungs — the
 > current single-node deployment, the replicated deployment we intend to

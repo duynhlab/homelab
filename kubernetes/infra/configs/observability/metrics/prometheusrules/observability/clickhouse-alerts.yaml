@@ -45,8 +45,13 @@ spec:
         # a round-robin Service, one unreachable host is a degraded quorum
         # member: reads and writes continue on its peers. What deserves a page
         # is losing them all, which the companion rule below expresses.
+        # MEASURED 2026-08-28: this series is per (hostname, fetch_type) —
+        # 3 hosts x 7 fetch types = 21 series. The bare expression that stood
+        # here would therefore raise up to SEVEN alerts for one sick replica, and
+        # each would read as a separate incident. Aggregated by hostname so one
+        # unreachable replica is one alert.
         - alert: ClickHouseReplicaUnreachable
-          expr: chi_clickhouse_metric_fetch_errors > 0
+          expr: max by (hostname) (chi_clickhouse_metric_fetch_errors) > 0
           for: 5m
           labels:
             severity: warning
@@ -60,11 +65,20 @@ spec:
         # (create_schema: false), so this no longer blocks collector restarts —
         # what it costs is the ClickHouse sink, and the edge access log has
         # nowhere else to go.
-        # VERIFY-AT-KIND: the `hostname` label cardinality is what makes this
-        # count meaningful — confirm the exporter publishes one series per
-        # replica (3) rather than one per CHI (1) before trusting the threshold.
+        #
+        # The VERIFY-AT-KIND marker that stood here asked whether the `hostname`
+        # cardinality made a `count(...) >= 3` threshold meaningful. Measured
+        # 2026-08-28: it did NOT. The series is per (hostname, fetch_type), so
+        # one replica with three failing fetch types would have paged as "every
+        # replica unreachable". Expressed as a RATIO instead — the fraction of
+        # distinct hosts reporting fetch errors — which is both correct and
+        # independent of the replica count, so a scale-out needs no edit here.
         - alert: ClickHouseAllReplicasUnreachable
-          expr: count(chi_clickhouse_metric_fetch_errors > 0) >= 3
+          expr: |
+            count(max by (hostname) (chi_clickhouse_metric_fetch_errors) > 0)
+            /
+            count(count by (hostname) (chi_clickhouse_metric_fetch_errors))
+            == 1
           for: 5m
           labels:
             severity: critical
@@ -220,8 +234,10 @@ spec:
         #
         # The server's own :9363 endpoint writes every ProfileEvent
         # unconditionally, zeros included, so this name IS checkable at the gate
-        # and carries a per-replica label as a bonus. Verified positively by the
-        # keeper drill: killing the quorum must make this counter increment.
+        # and carries a per-replica label as a bonus.
+        # VERIFIED AT KIND 2026-08-28, positively rather than by name lookup: the
+        # keeper drills drove it to 35 / 27 / 30 across the three replicas, and
+        # VictoriaMetrics carries those values. The series is real and it moves.
         - alert: ClickHouseZooKeeperExceptions
           expr: rate(ClickHouseProfileEvents_ZooKeeperHardwareExceptions[5m]) > 0
           for: 5m
@@ -235,12 +251,16 @@ spec:
         # The engine's own answer to "did this replica lose the quorum", from the
         # per-pod :9363 scrape RFC-0028 enabled. A read-only replica still serves
         # SELECTs, so nothing else in this file would notice.
-        # The name needs no marker: ReadonlyReplica is a ClickHouse CurrentMetric,
-        # and :9363 emits every CurrentMetric unconditionally, so it appears at
-        # value 0 as soon as the PodMonitor scrape lands. VERIFY-AT-KIND is
-        # therefore the better question: confirm the PodMonitor has THREE targets
-        # (one per replica). Before this change zero ClickHouse* series existed
-        # at all, because nothing scraped :9363.
+        # VERIFIED AT KIND 2026-08-28: three series, one per replica, all 0 on a
+        # healthy store, and the PodMonitor shows three `clickhouse-server`
+        # targets up. Before this change zero ClickHouse* series existed at all,
+        # because nothing scraped :9363.
+        # What is NOT verified: the firing condition. Deleting all three keepers
+        # did not produce a read-only replica — the pods were recreated fast
+        # enough that no ClickHouse session expired (measured: is_readonly stayed
+        # 0 throughout, SELECTs kept serving). So the name and the plumbing are
+        # proven; the alert's trigger has not been exercised, and saying so is
+        # more useful than implying it was.
         - alert: ClickHouseReadonlyReplica
           expr: ClickHouseMetrics_ReadonlyReplica > 0
           for: 5m

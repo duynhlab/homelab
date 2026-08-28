@@ -68,8 +68,10 @@ spec:
         # The chart's default selector also matches the per-host Service tiers,
         # so each keeper pod would be scraped more than once. Narrowed to the
         # CR-scope Service.
-        # VERIFY-AT-KIND: confirm exactly THREE keeper targets in vmagent, one
-        # per pod — over-counting and zero-counting look identical in a dashboard.
+        # VERIFIED AT KIND 2026-08-28: exactly three `keeper-keeper` targets in
+        # vmagent, one per pod, all up. Without the narrowed selector the same
+        # pods would have been scraped through several Service tiers, and
+        # over-counting looks identical to correct in a dashboard.
         selector:
           clickhouse-keeper.altinity.com/app: chop
           clickhouse-keeper.altinity.com/Service: chk

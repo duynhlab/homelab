@@ -479,14 +479,22 @@ added: `ClickHouseZooKeeperExceptions` (re-enabled — it was written for exactl
 this topology and sat commented out until it existed) and
 `ClickHouseReadonlyReplica`, which catches the failure nothing else notices,
 because a replica that has lost its Keeper session keeps answering reads while
-silently refusing writes and falling behind. Both carry `VERIFY-AT-KIND`
-markers: neither series has ever been observed here, since there has never been
-a Keeper to produce them and nothing scraped `:9363`.
+silently refusing writes and falling behind. Both were **verified at Kind on 2026-08-28**, and one
+answer was negative. `ClickHouseProfileEvents_ZooKeeperHardwareExceptions` is
+real and moves — the keeper drills drove it to 35 / 27 / 30 across the three
+replicas. `ClickHouseMetrics_ReadonlyReplica` exists, one series per replica at
+0, but its firing condition was **not** reached: deleting all three keepers did
+not expire any ClickHouse session, so the trigger remains unexercised and is
+recorded as such rather than implied. The third marker — whether a
+`count(...) >= 3` threshold was meaningful for the reachability page — came back
+**wrong**: the exporter's series is per `(hostname, fetch_type)`, 21 series for 3
+hosts, so one sick replica could have paged as a total outage. That expression is
+now a ratio over distinct hosts.
 
 | Alert | Sev | Metric & trigger | Impact | for |
 |-------|-----|------------------|--------|-----|
-| ClickHouseReplicaUnreachable | warning | exporter fetch errors >0 | One replica of three cannot be fetched; peers still serve reads and writes, but it stops catching up | 5m |
-| ClickHouseAllReplicasUnreachable | critical | `count(fetch errors >0) >= 3` | OTel logs/traces store down; edge access logs (ClickHouse-only) dropped; collector `create_schema` blocks every collector restart | 5m |
+| ClickHouseReplicaUnreachable | warning | `max by (hostname)` of exporter fetch errors >0 | One replica cannot be fetched; peers still serve reads and writes, but it stops catching up. Aggregated by hostname because the series is per `(hostname, fetch_type)` — 21 series for 3 hosts, measured | 5m |
+| ClickHouseAllReplicasUnreachable | critical | fraction of distinct hosts with fetch errors `== 1` | OTel logs/traces store down; edge access logs (ClickHouse-only) dropped. Expressed as a ratio, not a count: a `>= 3` threshold would have paged when ONE replica had three failing fetch types (measured), and a ratio needs no edit on scale-out | 5m |
 | ClickHouseZooKeeperExceptions | warning | Keeper exception rate >0 | A replica cannot reach the quorum: no writes, no part fetches, silent drift | 5m |
 | ClickHouseReadonlyReplica | warning | `ClickHouseMetrics_ReadonlyReplica >0` | Replica lost its Keeper session — still answers reads, so nothing else notices | 5m |
 | ClickHouseOperatorDown | warning | `up{clickhouse-operator}==0` | CHI reconciles frozen (server keeps serving) | 10m |

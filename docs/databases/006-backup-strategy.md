@@ -23,7 +23,7 @@ evidence, see [010-drp.md](./010-drp.md).
 
 1. [Scope (production)](#scope-production)
 2. [Architecture Overview (physical backup to RustFS)](#architecture-overview-physical-backup-to-rustfs)
-   - [Runtime CNPG physical backup (all clusters)](#runtime-cnpg-physical-backup-all-clusters)
+   - [Runtime CNPG physical backup (writable clusters)](#runtime-cnpg-physical-backup-writable-clusters)
    - [Runtime alerts (PrometheusRule)](#runtime-alerts-prometheusrule)
 3. [Cluster Inventory](#cluster-inventory)
 4. [Bucket Layout](#bucket-layout)
@@ -35,7 +35,7 @@ evidence, see [010-drp.md](./010-drp.md).
    - [Operator → tool coupling](#operator--tool-coupling)
    - [What we use today and why](#what-we-use-today-and-why)
 8. [Comparison (physical options)](#comparison-physical-options)
-9. [Trade-offs matrix (frequency vs RPO/RTO/cost)](#trade-offs-matrix-frequency-vs-rporto-cost)
+9. [Trade-offs matrix (frequency vs RPO/RTO/cost)](#trade-offs-matrix-frequency-vs-rportocost)
 10. [PITR window and retention impact](#pitr-window-and-retention-impact)
 11. [Real-world failure scenarios](#real-world-failure-scenarios)
 

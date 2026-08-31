@@ -19,10 +19,10 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**221 statically-defined alerts** across 10 domains (re-derive with
+**223 statically-defined alerts** across 10 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
 — by domain: postgres 54, microservices 52, victoriametrics 31, kubernetes 29,
-observability 17, envoy-gateway 12, gitops 9, valkey 7, keycloak 5, kyverno 4,
+observability 19, envoy-gateway 12, gitops 9, valkey 7, keycloak 5, kyverno 4,
 + the watchdog), plus **68 Sloth-generated** SLO
 burn-rate alerts (2 × 34 SLOs). The 34 SLOs cover all 11 Go services plus Keycloak:
 30 rendered by the `mop` chart through the five domain ResourceSets, plus inventory's 2
@@ -35,7 +35,15 @@ The count is re-derived from the manifests (`- alert:` occurrences under
 showed why that rule exists. One caveat the command itself carries: it has no
 `--include`, so it also counts the **2 alerts in the retired
 `observability/tempo-alerts.yaml.bak`**, which nothing deploys. The deployed
-number is therefore **219**. Re-deriving on 2026-08-28 also found two offsetting
+number is therefore **221**.
+
+Of those 221, **6 cannot fire on Kind** and are documented as such rather than
+counted as coverage — the PVC and CNPG disk rules plus `KubeletTooManyPods`; see
+§8b's "Alerts that are inert on Kind". Effective coverage is **215**. Naming that
+subtraction is the point: three ClickHouse rules spent months inside a count that
+read as coverage before anyone pasted their expressions into a query window.
+
+Re-deriving on 2026-08-28 also found two offsetting
 per-domain errors that had left the total right for the wrong reasons: postgres
 was 54, not 53, and observability was 14, not 15. The page had said **202** with `observability 3`,
 while that directory holds **15**: the ClickHouse and tracing rules of §8/§8b
@@ -496,19 +504,92 @@ now a ratio over distinct hosts.
 | ClickHouseReplicaUnreachable | warning | `max by (hostname)` of exporter fetch errors >0 | One replica cannot be fetched; peers still serve reads and writes, but it stops catching up. Aggregated by hostname because the series is per `(hostname, fetch_type)` — 21 series for 3 hosts, measured | 5m |
 | ClickHouseAllReplicasUnreachable | critical | fraction of distinct hosts with fetch errors `== 1` | OTel logs/traces store down; edge access logs (ClickHouse-only) dropped. Expressed as a ratio, not a count: a `>= 3` threshold would have paged when ONE replica had three failing fetch types (measured), and a ratio needs no edit on scale-out | 5m |
 | ClickHouseZooKeeperExceptions | warning | Keeper exception rate >0 | A replica cannot reach the quorum: no writes, no part fetches, silent drift | 5m |
+| ClickHouseKeeperNoLeader | critical | `count(KeeperIsLeader == 1) == 0`, guarded with `OR on() vector(0)` | Quorum gone: every replicated table read-only, INSERTs fail, part fetches stop. SELECTs keep working, so nothing else looks wrong. The guard is what makes it fire when every keeper series disappears rather than only when a keeper reports a loss | 5m |
+| ClickHouseKeeperQuorumDegraded | warning | `max(KeeperSyncedFollowers) < 2`, same guard | Leader has lost a follower — writes still work, one more failure takes the quorum down. `max` because only the leader reports a real synced-follower count; followers publish 0, so `min`/`avg` would read a healthy quorum as broken. The `< 2` literal assumes the CHK's 3 replicas and carries a VERIFY-AT-KIND marker for scale-out | 5m |
 | ClickHouseReadonlyReplica | warning | `ClickHouseMetrics_ReadonlyReplica >0` | Replica lost its Keeper session — still answers reads, so nothing else notices | 5m |
 | ClickHouseOperatorDown | warning | `up{clickhouse-operator}==0` | CHI reconciles frozen (server keeps serving) | 10m |
-| ClickHouseDiskAlmostFull | warning | free/total <15% | MergeTree refuses writes near full; TTL cleanup can't outrun sustained ingest | 15m |
-| ClickHouseDiskCritical | critical | free/total <5% | Write failures imminent | 5m |
+| ClickHouseDiskAlmostFull | warning | `DiskFreeBytes / DiskTotalBytes < 0.15` | MergeTree refuses writes near full; the 90-day TTL can't outrun sustained ingest. On local-path this ratio is the NODE filesystem, not the PVC — see the note below | 15m |
+| ClickHouseDiskCritical | critical | same ratio `< 0.05` | Write failures imminent. Growing the PVC is not an option on local-path; drop partitions or free the node | 5m |
 | ClickHouseTooManyParts | warning | active parts >300 | Merge backlog → delayed → rejected inserts | 10m |
 | ClickHouseInsertsDelayed | info | `chi_clickhouse_metric_DelayedInserts > 0` (gauge, not a rate) | The step before rejection | 10m |
-| ClickHouseServerErrorsElevated | info | `system.errors` sum-rate >5/s | Broad server error census | 10m |
+| ClickHouseServerErrorsElevated | info | `max by (replica) (rate(ClickHouseErrorMetric_ALL[5m])) > 5` | Worst-replica error census. Deliberately broad — includes routine codes, which is why it is info. Moved from a fleet-wide `sum` to a per-replica `max` when the metric changed, so three replicas at 3/s each no longer trips it; the trade buys attribution | 10m |
 | ClickHouseOperatorReconcileErrors | warning | host-reconcile errors >0 | CHI stuck between spec and reality | 15m |
 | ClickHouseExporterUnhealthy | warning | collector `send_failed_*{exporter="clickhouse"}` >0 | OTel→CH backpressure/loss (VictoriaLogs/Traces keep their copies) | 10m |
 
 The consumer-side `ClickHouseExporterUnhealthy` complements `OtelCollectorDown`:
 the collector can be perfectly up while its ClickHouse exporter backpressures. A
 ZooKeeper-exceptions rule is enabled and verified — see the §8b notes above.
+
+**Three of these could never fire until 2026-08-31.** Every expression in the
+group was pasted verbatim into the VictoriaMetrics query API, in two forms:
+unthresholded, which must return series and proves the names resolve, and
+complete, which must return nothing on a healthy store. Three failed the first
+form:
+
+- `ClickHouseServerErrorsElevated` named `chi_clickhouse_system_errors_value`,
+  which does not exist. Re-pointed at `ClickHouseErrorMetric_ALL` from the
+  `:9363` scrape — a real counter, measured at 137/226/220 across the replicas.
+- `ClickHouseDiskAlmostFull` and `ClickHouseDiskCritical` divided
+  `DiskFreeBytes` (label `disk="default"`) by a sum containing `DiskDataBytes`
+  (no `disk` label). PromQL matches two vectors only when their label sets agree,
+  so the expression returned an empty vector on every evaluation since the day it
+  was written. The denominator is now `DiskTotalBytes`, which carries the same
+  labels; the ratio returns 3 series at ~0.61.
+
+The old disk formula was also wrong on its own terms: `Data` is what ClickHouse
+stores (~70 MiB) while `Free` is whole-filesystem free space, so
+`Free / (Data + Free)` would have sat near 0.9998 forever even with matching
+labels.
+
+**What the disk ratio actually measures, which is not the PVC.** `standard` is
+`rancher.io/local-path`; its PVs are hostPath directories with no quota, so
+ClickHouse sees the node's filesystem. `DiskTotalBytes` reads 507 GiB identically
+on all three replicas, not the 10Gi each PVC requests, and
+`allowVolumeExpansion` is unset so the volume cannot be grown either. Read a
+firing here as "the node hosting this replica is filling", shared with every
+other pod on it. Both summaries say "node filesystem" for that reason —
+`KubeNodeDiskPressure` covers the same ground from the kubelet's side and fires
+later.
+
+**vmalert cannot detect this class of bug for you.** A rule whose expression
+matches nothing reports `state=inactive` with an empty `lastError`, character for
+character identical to a healthy rule. `make validate` does not lint rules and
+there is no promtool in the repo, so running both forms by hand is the only check
+that exists. Do it when editing any expression here.
+
+### Alerts that are inert on Kind, and why they are kept
+
+Measured 2026-08-31, outside the ClickHouse group and recorded here because the
+YAML notes live in chart-generated files that a re-render will erase:
+
+| Alert | Missing series | Status |
+|---|---|---|
+| `KubePersistentVolumeFillingUp` + `…Critical` | `kubelet_volume_stats_*` | inert on Kind |
+| `CNPGClusterLowDiskSpaceWarning` + `…Critical`, ×2 clusters | `kubelet_volume_stats_*` | inert on Kind |
+| `KubeletTooManyPods` | `kubelet_node_config_assigned_pod_cidr_max_pods` | inert on Kind |
+
+The scrape is not at fault. VMNodeScrape `kubelet-volume-stats` targets
+`/metrics` with a keep-filter that matches these names, and `kubelet_running_pods`
+— kept by that same filter — arrives on all four nodes. Kubelet simply publishes
+no volume stats for hostPath volumes:
+
+```bash
+kubectl get --raw /api/v1/nodes/homelab-worker/proxy/metrics \
+  | grep -c '^kubelet_volume_stats'   # -> 0
+```
+
+These are **kept rather than deleted**, unlike the three ClickHouse rules removed
+on 2026-08-22. Those named series that exist nowhere; these are standard
+Kubernetes names that populate on any cluster whose CSI driver implements
+`NodeGetVolumeStats`. Deleting them would trade a local blind spot for a real one
+everywhere else.
+
+The consequence is worth stating plainly: **this platform currently has no
+working PVC-level disk signal**, and the CNPG half of that is the more serious
+one — the databases have no disk alerting at all. `KubeNodeDiskPressure` (reading
+`kube_node_status_condition`) is the only disk alert that can fire here today.
+Closing the gap means either a storage class with a real CSI driver, or building
+the signal from CNPG's and ClickHouse's own metrics instead of the kubelet's.
 
 ---
 
@@ -721,8 +802,8 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 - **Outage double-fire:** `MicroserviceNoTraffic` + `EdgeNoTraffic` can both fire for one outage — group them. Both are `warning`, and on this platform both fire benignly for ~40 min after any bounded traffic burst (no continuous synthetic load); the arithmetic and why `for:` was *not* lengthened are in the [`MicroserviceNoTraffic` runbook](../runbooks/microservices/MicroserviceNoTraffic.md#expected-on-a-rebuilt-cluster--read-this-first).
   **`MicroserviceNoSuccessfulRequests` left this group on 2026-08-24.** Its guard was `rate(total[1h])>0` — *had* traffic — which made its condition a strict superset of `MicroserviceNoTraffic`'s, so it paged alongside every one of those benign warnings (measured: 8 `(app, namespace)` pairs on an idle cluster). The guard is now `rate(total[10m])>0`, so it fires only when requests are arriving and none succeed. Fixing the expression was chosen over Alertmanager inhibition for two reasons: the existing `inhibit_rules` match on `equal: ['alertname','namespace']` and so cannot relate two different alertnames, and an inhibited rule still reads `firing` in `/api/v1/rules`, which is what gate row K5.8 asserts against.
 - **Tuning signals, not incidents:** `PostgresCheckpointsTooFrequent`, `PostgresDeadTuplesHigh`, `PostgresDatabaseSizeLarge` are capacity/tuning signals — they should stay `warning`/`info`, never page (the user-facing symptom is already covered by latency/apdex/SLO).
-- **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit.
+- **`KubeletTooManyPods`** is a static-ceiling cause alert — low value unless actually near the pod/node limit. It is also **inert on Kind** (measured 2026-08-31): its numerator `kubelet_running_pods` arrives, but the denominator `kubelet_node_config_assigned_pod_cidr_max_pods` returns zero series, so the division matches nothing. See §8b's inert-alerts table.
 
 ---
 
-_Last updated: 2026-08-28 — §8b re-graded for a replicated ClickHouse ([RFC-0028](../../proposals/rfc/RFC-0028/) / [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)): `ClickHouseServerUnreachable` split into a warning `ClickHouseReplicaUnreachable` plus a critical `ClickHouseAllReplicasUnreachable`, and two replication rules added (`ClickHouseZooKeeperExceptions` re-enabled, `ClickHouseReadonlyReplica` new on the per-pod `:9363` scrape) — both carrying `VERIFY-AT-KIND` markers because neither series has ever been observed here. The §8b table also still listed the three alerts deleted in August; they are gone. Summary re-derived to **221** (219 deployed — the canonical command counts 2 alerts in a retired `.bak`), which surfaced two offsetting per-domain errors. Previously 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._
+_Last updated: 2026-08-31 — §8b: three ClickHouse alerts that could never fire were repaired, and the Keeper quorum finally got a consumer. `ClickHouseServerErrorsElevated` named `chi_clickhouse_system_errors_value`, which returns zero series; it now reads `ClickHouseErrorMetric_ALL` from the `:9363` scrape, per-replica via `max by (replica)` (a deliberate move from fleet census to worst-replica outlier, documented in the rule). `ClickHouseDiskAlmostFull` and `ClickHouseDiskCritical` divided `DiskFreeBytes` (label `disk="default"`) by a sum containing `DiskDataBytes` (no `disk` label), so PromQL matched nothing on every evaluation since the day they were written; the denominator is now `DiskTotalBytes`, and both summaries were retitled to say "node filesystem" because on local-path that is what the ratio measures — not the 10Gi PVC. Two new rules, `ClickHouseKeeperNoLeader` (critical) and `ClickHouseKeeperQuorumDegraded` (warning), read the `:7000` Keeper scrape that had been collected since RFC-0028 with nothing consuming it; both use `OR on() vector(0)` so they still fire when every keeper series disappears, and `max()` because only the leader reports a real synced-follower count. Every expression in the group was run in two forms — unthresholded (must return series) and complete (must return nothing on a healthy store) — which is what caught the three. Also recorded: 6 alerts outside ClickHouse are inert on Kind because kubelet publishes no volume stats for hostPath volumes, leaving the platform with no working PVC-level disk signal; they are kept, not deleted, since the names are correct on any CSI cluster. Summary re-derived to **223** (221 deployed, 215 able to fire). Previously 2026-08-28 — §8b re-graded for a replicated ClickHouse ([RFC-0028](../../proposals/rfc/RFC-0028/) / [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)): `ClickHouseServerUnreachable` split into a warning `ClickHouseReplicaUnreachable` plus a critical `ClickHouseAllReplicasUnreachable`, and two replication rules added (`ClickHouseZooKeeperExceptions` re-enabled, `ClickHouseReadonlyReplica` new on the per-pod `:9363` scrape) — both carrying `VERIFY-AT-KIND` markers because neither series has ever been observed here. The §8b table also still listed the three alerts deleted in August; they are gone. Summary re-derived to **221** (219 deployed — the canonical command counts 2 alerts in a retired `.bak`), which surfaced two offsetting per-domain errors. Previously 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._

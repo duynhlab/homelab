@@ -1,5 +1,10 @@
 # Generated from cnpg/cluster chart v0.6.0 (helm template) with fullnameOverride=product-db, namespace=product.
 # Do not edit expr by hand; re-render from chart and split, or bump chart version in README.
+# INERT ON KIND (measured 2026-08-31): kubelet_volume_stats_* returns zero series
+# because local-path PVs are hostPath and kubelet collects no volume stats for
+# them, so this rule cannot fire here. Correct on any CSI cluster — kept, not
+# deleted. This file is chart-generated, so this note will be lost on the next
+# re-render; the durable record is in docs/observability/alerting/alert-catalog.md.
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule

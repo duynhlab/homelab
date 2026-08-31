@@ -62,5 +62,21 @@ spec:
     - source_labels: [__name__]
       # kubelet_running_pods + max-pods gauges ride along: KubeletTooManyPods
       # needs them and this keep-filter silently dropped them (audit finding).
+      #
+      # MEASURED 2026-08-31, correcting the note above and recording what this
+      # filter actually delivers. `kubelet_running_pods` arrives normally — 4
+      # series, one per node — so the keep-filter is doing its job for that one.
+      # The other two do not arrive, and neither is the filter's fault:
+      #   * kubelet_volume_stats_* — kubelet publishes NONE of these, because
+      #     local-path PVs are hostPath and kubelet collects no volume stats for
+      #     hostPath volumes. Confirmed straight from the source:
+      #       kubectl get --raw /api/v1/nodes/homelab-worker/proxy/metrics \
+      #         | grep -c '^kubelet_volume_stats'   ->  0
+      #     This is why the PVC and CNPG low-disk alerts cannot fire; see the
+      #     kubernetes-storage group in prometheusrules/kubernetes/workload-alerts.yaml.
+      #   * kubelet_node_config_assigned_pod_cidr_max_pods — also absent, which
+      #     leaves KubeletTooManyPods inert (prometheusrules/kubernetes/controlplane-alerts.yaml).
+      # Both names are kept in the filter: they cost nothing when absent and this
+      # scrape is meant to work unchanged on a cluster with a real CSI driver.
       regex: kubelet_volume_stats_.+|kubelet_running_pods|kubelet_node_config_assigned_pod_cidr_max_pods
       action: keep

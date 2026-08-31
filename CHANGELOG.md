@@ -383,6 +383,33 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse Keeper quorum finally has an alert consumer.** The CHK's `:7000`
+  Prometheus endpoint has been scraped since RFC-0028 (`job="keeper-keeper"`,
+  three targets, 30s) and nothing read it, so losing the quorum — the root cause
+  of a read-only replica, and therefore of writes stopping while SELECTs keep
+  serving — would have paged nobody. Two rules now read it directly instead of
+  inferring from the server side: `ClickHouseKeeperNoLeader` (critical) on
+  `count(ClickHouseAsyncMetrics_KeeperIsLeader == 1) == 0`, and
+  `ClickHouseKeeperQuorumDegraded` (warning) on
+  `max(ClickHouseAsyncMetrics_KeeperSyncedFollowers) < 2`.
+
+  Two measured details shaped them. `max()` and not `min()`/`avg()`, because only
+  the leader publishes a real synced-follower count and both followers publish 0 —
+  an averaging aggregator would read a healthy quorum as broken. And both carry
+  `OR on() vector(0)`, matching the idiom in `cnpg/cluster-offline.yaml`, because
+  `count()` over an empty result set yields no series at all: without the guard
+  the rules would go silent during the exact total-loss outage they exist for,
+  which is the same defect the Bugfix entry below repairs. Verified against a
+  deliberately nonexistent metric name — the guarded form returns 0 and fires.
+
+  Both `for: 5m`, deliberately equal so a total quorum loss lands as one incident
+  rather than a critical followed eight minutes later by a warning. The firing
+  conditions are **not** exercised, and the rules say so: they are proven to
+  return series and proven to stay silent on a healthy quorum, not proven to have
+  paged anyone. Znode count, Keeper latency and outstanding-requests are scraped
+  too and deliberately left alone — no threshold for any of them is guessable on
+  an idle lab, and two alerts that hold up beat four that were invented.
+
 - **ClickHouse schema ownership moved out of the collector, reversing ADR-065's
   central decision before it shipped.** Exporter-owned DDL cannot produce a
   complete schema at three replicas: `CREATE ... ON CLUSTER` issued at collector
@@ -2208,6 +2235,69 @@ Skeleton (copy what you need):
   dashboard CRs while the cluster serves 41.
 
 #### Observability
+
+- **Three ClickHouse alerts could never fire, and vmalert reported all three as
+  healthy.** Pasting every expression in the group verbatim into the
+  VictoriaMetrics query API found three returning an empty vector on every
+  evaluation since the day they were written:
+  `ClickHouseServerErrorsElevated` named `chi_clickhouse_system_errors_value`,
+  which does not exist; `ClickHouseDiskAlmostFull` and `ClickHouseDiskCritical`
+  divided `chi_clickhouse_metric_DiskFreeBytes`, which carries the label
+  `disk="default"`, by a sum containing `chi_clickhouse_metric_DiskDataBytes`,
+  which carries no `disk` label at all — and PromQL matches two vectors only when
+  their label sets agree. Effective coverage was 9 of 12, not 12.
+
+  The errors rule is re-pointed at `ClickHouseErrorMetric_ALL` from the `:9363`
+  scrape (a real counter, measured at 137/226/220 across the replicas) and moved
+  from a fleet-wide `sum` to `max by (replica)`. That changes what the alert
+  means, so it is stated in the rule rather than smuggled in: three replicas at
+  3/s each no longer trips it, and the trade buys the only answer worth having at
+  three replicas — which one is spraying errors. The disk pair now divides by
+  `DiskTotalBytes`, whose labels do match, and both summaries were retitled to say
+  **node filesystem**: on `rancher.io/local-path` the PVs are hostPath with no
+  quota, so `DiskTotalBytes` reads 507 GiB identically on all three replicas
+  rather than the 10Gi each PVC requests. The old formula was wrong on its own
+  terms too — `Free / (Data + Free)` would have sat near 0.9998 forever even with
+  matching labels. The stale "30-day TTL" and "expand the PVC" advice went with
+  it; the table TTL is 90 days and `allowVolumeExpansion` is unset.
+
+  This is the failure class the `VERIFY-AT-KIND` convention exists for, and three
+  sibling rules were deleted for it on 2026-08-22. These are repaired rather than
+  deleted because working names existed this time. vmalert offers no help
+  whatsoever here: a rule matching nothing reports `state=inactive` with an empty
+  `lastError`, character for character identical to a healthy rule, and
+  `make validate` does not lint rules. The group header now records the two-form
+  check — unthresholded must return series, complete must return nothing on a
+  healthy store — as the only test that exists.
+
+- **The local-stack twin of `ClickHouseServerErrorsElevated` was reporting exactly
+  twice the real error rate.** Its expression summed
+  `{__name__=~"ClickHouseErrorMetric_.+"}`, a regex that matches the aggregate
+  `ClickHouseErrorMetric_ALL` as well as every individual error code — so it added
+  the total on top of its own parts. Measured on the cluster twin: 440/452/274 for
+  the regex sum against 220/226/137 for `_ALL` alone. Now reads the total
+  directly, which is also cheaper: the family carries roughly 737 names.
+
+- **Six alerts outside ClickHouse cannot fire on Kind either; documented rather
+  than deleted.** `KubePersistentVolumeFillingUp` and its critical twin, plus
+  `CNPGClusterLowDiskSpace{Warning,Critical}` for both database clusters, all read
+  `kubelet_volume_stats_*`, which returns zero series platform-wide.
+  `KubeletTooManyPods` is inert for the same reason via a different missing
+  series. The scrape is not at fault: VMNodeScrape `kubelet-volume-stats` targets
+  `/metrics` with a keep-filter that matches these names, and
+  `kubelet_running_pods` — kept by that same filter — arrives on all four nodes.
+  Kubelet simply publishes no volume stats for hostPath volumes, which is what
+  `local-path` PVs are; asking it directly returns zero matching lines.
+
+  Kept, unlike the rules deleted in August: those named series that exist nowhere,
+  while these are standard Kubernetes names that populate on any cluster whose CSI
+  driver implements `NodeGetVolumeStats`. Deleting them would trade a local blind
+  spot for a real one everywhere else. The consequence is recorded plainly in the
+  catalog because it is worse than the ClickHouse half: **the platform has no
+  working PVC-level disk signal**, and the databases therefore have no disk
+  alerting at all. `KubeNodeDiskPressure` still works and is the only disk alert
+  that can fire here today. The YAML notes sit in chart-generated files that a
+  re-render will erase, so the durable record is in the alert catalog.
 
 - **The Temporal dashboard's SDK half was blank on the cluster — vmagent was
   overwriting the SDK's own `namespace` label.** The RFC-0014 D-3 relabel rule

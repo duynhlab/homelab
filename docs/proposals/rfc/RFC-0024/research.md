@@ -398,7 +398,7 @@ gate can still overturn any of them.
 | 6 | Kong decommission scope | **Delete all Kong configs and monitoring** (helmrelease, plugins, consumer, ESO secret, 32 rule expressions, dashboard CR, OTTL filter, Kyverno exception, HelmRepository, local `kong.yml`); NetworkPolicies re-pointed. **Docs are kept, marked Archived/read-only** — `docs/platform/kong-gateway.md` gets an archive banner, not a rewrite |
 | 7 | ADR numbering | ~~ADR-045/046/047 counting past RFC-0023's 042–044~~ **Renumbered at acceptance (2026-08-11)**: ADR-039/040 were consumed by unrelated decisions, so the edge ADRs landed as ADR-044 (EG as platform edge — supersedes ADR-006's Kong binding, keeps the defense-in-depth split), ADR-045 (local-first edge rate limiting), ADR-046 (E2E gate placement when compose can't carry the edge); identity ADRs (RFC-0022) took 041–043; RFC-0023's future ADRs shift to 047–049 |
 | 8 | Keycloak integration point | **RFC-0022 absorbed for execution (owner, 2026-08-10)**: the edge is born trusting the Keycloak realm via remoteJWKS — no static-key ESO, no Kong rotation runbook, and no auth-service↔EG wiring ever exists; auth-service + `auth` DB retire in this program's decommission phase |
-| 9 | Sampling | Copy the model: EG `samplingRate` 0.1 cluster / 1.0 local, ParentBased default confirmed; adopt `sampler` enum config when the carrying release ships |
+| 9 | Sampling | Copy the model: EG `samplingRate` 10 cluster / 100 local, ParentBased default confirmed; adopt `sampler` enum config when the carrying release ships |
 | 10 | Edge spans/semconv | Accept the newer semconv (F-8 fix); trace-dashboard queries referencing `service.name="kong"` update to the EG service identity in the same PR as the tracing cutover |
 
 ---

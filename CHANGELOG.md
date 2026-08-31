@@ -231,6 +231,36 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **Edge trace sampling raised 10% → 50%, and the first written reason for an
+  edge rate on this platform.** The `10` was never reasoned about: RFC-0024 copied
+  it from Kong's `tracing_sampling_rate: 0.1` and said so — *"a number copy, not a
+  redesign"* — and no ADR or RFC ever stated a cost, cardinality or storage basis
+  for it. The reasoning now lives in
+  [ADR-044](docs/proposals/adr/ADR-044-envoy-gateway-platform-edge/): this platform
+  exists to be studied, an unsampled trace is a question nobody can answer later,
+  and that costs more here than the bytes do. 50% keeps half of edge-rooted traffic
+  answerable while still halving volume against full sampling.
+  **Nothing running changed**, which is worth stating rather than implying: Kind
+  patches `samplingRate` to `100` so gate evidence stays deterministic, and
+  `clusters/production/` is a stub with no `FluxInstance` — so this value has never
+  been the live one anywhere. It is the number a future prod cluster inherits.
+  The documentation half was the real work. Roughly fifteen sentences stated "10%
+  at the edge **and** `0.1` at services" as one fused fact; those two numbers now
+  diverge, so each was **split** to name both knobs and their scopes rather than
+  find-and-replaced. The edge's `samplingRate` (a percent) decides for every
+  request it proxies; a service's `OTEL_SAMPLE_RATE` (a ratio, unchanged at `0.1`)
+  is wrapped in `ParentBased` and applies only where that service is itself the
+  root — which, measured on the live cluster, is no traffic at all today. Derived
+  figures were recomputed rather than substituted: "90% volume reduction" → 50%,
+  the trace undercount factor 10× → 2×, and the "< 1% CPU" overhead is now
+  labelled as measured at 10% and not re-measured since. RFC-0024's own
+  `samplingRate: 0.1` was corrected to `10` as a unit fix — a percent field
+  recorded as a ratio, which would have been a 100× under-sample for anyone
+  copying it, though the shipped manifest was always right. One trap recorded for
+  whoever meets it first: `spanmetrics_calls_total` is derived from spans, so the
+  day a prod cluster moves to 50 the RED dashboard jumps 5× while the SLO board
+  beside it does not move — arithmetic, not an incident.
+
 - **In-cluster consumers can now reach the public issuer (ADR-062 hairpin).**
   Two small pieces: a stable `edge` Service in `envoy-gateway` selecting the
   proxy fleet (the EG-generated Service has a hashed name nothing in git can

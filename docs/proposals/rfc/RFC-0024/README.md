@@ -128,7 +128,7 @@ fan-out and the manual edge rotation step) are never built at all.
 | Security headers / request ID | `response-transformer` + `correlation-id` plugins | HTTPRoute `ResponseHeaderModifier` + Envoy native `x-request-id` |
 | Resilience | 5× KongUpstreamPolicy + 25 Service annotations | BTP retries/timeouts/active+passive health checks |
 | TLS | wildcard cert mounted via `secretVolumes`/`ssl_cert` | Gateway `certificateRefs` (same cert-manager Certificate) |
-| Edge tracing | OTel plugin, 0.1 sampling, W3C inject | EnvoyProxy OTel tracing, `samplingRate: 0.1`, **ParentBased default** (model identical), `customTags` |
+| Edge tracing | OTel plugin, 0.1 sampling, W3C inject | EnvoyProxy OTel tracing, `samplingRate: 10`, **ParentBased default** (model identical), `customTags` |
 | Access logs | bespoke `kong_json` (11 fields), unfilterable | Envoy default JSON (richer) + **CEL filter drops probe logs at source** |
 | Metrics | `kong_*` + `job="kong"` relabel, out-of-tree dashboard | `envoy_*` + control-plane metrics + 4 first-party dashboards |
 | Local gateway | `kong:3.9` + 283-line `kong.yml` dialect | EG **standalone** container reading the same Gateway API YAML (spike; fallback: E2E gate → Kind) |
@@ -146,7 +146,7 @@ fan-out and the manual edge rotation step) are never built at all.
 | `correlation-id` | Envoy native `x-request-id` (present in default access log) |
 | `security-headers` (response-transformer) | HTTPRoute `ResponseHeaderModifier` filter |
 | `prometheus-metrics` | EnvoyProxy metrics (Prometheus endpoint) + ServiceMonitor |
-| `opentelemetry-tracing` | EnvoyProxy `telemetry.tracing` (OTLP gRPC 4317, samplingRate 0.1, customTags) + access-log OTel sink where useful |
+| `opentelemetry-tracing` | EnvoyProxy `telemetry.tracing` (OTLP gRPC 4317, samplingRate 10, customTags) + access-log OTel sink where useful |
 | 5× `KongUpstreamPolicy` + `konghq.com/{connect,read,write}-timeout/retries` Service annotations | BTP `retry`/timeouts/`healthCheck` per domain ResourceSet template |
 | 31 Ingresses (incl. `configs/temporal/ingress.yaml`) | Gateway + HTTPRoutes, grouped: `gateway.duynh.me` (API), `local.duynh.me` (SPA), admin hosts |
 | `helmrelease.yaml` (chart kong 3.2.0) + HelmRepository | `gateway-crds-helm` (Gateway API standard channel) + `gateway-helm` (OCI) HelmReleases; Flux edges `cert-manager → gateway-api-crds → envoy-gateway → envoy-gateway-config` |
@@ -237,7 +237,7 @@ dashboards as the reference for expression shapes; the alert catalog §2 is rewr
 Vector's `kong_json` parsing maps once onto the Envoy default JSON schema (richer:
 `response_flags`, `upstream_cluster`, `route_name`); a CEL `matches` filter drops
 successful probe access logs at source (closing audit F-2's biggest volume). Tracing:
-`samplingRate: 0.1` cluster / 1.0 local with the confirmed ParentBased default — the
+`samplingRate: 10` cluster / `100` local with the confirmed ParentBased default — the
 fleet's sampling model is unchanged (F-7); span semconv modernizes (F-8);
 trace queries pinned to `service.name="kong"` update with the cutover. The
 `filter/kong_redis_deprecation` OTTL processor is deleted.
@@ -380,6 +380,18 @@ decisions in the meantime, so at acceptance the identity ADRs took
 edge ADRs took 044–046; RFC-0023's future ADRs shift to 047–049.
 
 ## Implementation History
+
+- 2026-08-31 — **Unit correction, not a decision change.** This RFC recorded the
+  edge sampling rate as `samplingRate: 0.1` in four places, carried over from
+  Kong's `tracing_sampling_rate` which really is a 0.0–1.0 ratio. EnvoyProxy's
+  `samplingRate` is a **percent, 0–100**, so `0.1` would have been one trace in a
+  thousand — a 100x under-sample. The shipped manifest was always correct (`10`),
+  so nothing was ever mis-deployed; only this record was wrong, and anyone copying
+  the number out of it would have been. Corrected to `10` cluster / `100` local,
+  which is what the decision meant. Separately, the cluster baseline moved `10` →
+  `50` on the same day — that is a parameter change recorded in
+  [ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/), not a revision of
+  this RFC.
 
 - 2026-08-10 — Research + provisional RFC created. Direction pre-decided by owner
   (activating the RFC-0022 gateway-risk exit trigger proactively): Envoy Gateway,

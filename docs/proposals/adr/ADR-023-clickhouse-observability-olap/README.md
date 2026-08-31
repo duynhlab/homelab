@@ -33,7 +33,7 @@ bootstraps the MergeTree tables). **Metrics stay on VictoriaMetrics — never Cl
 - **Storage:** local PVC (`standard`); **retention:** `ttl 90d` (vs 7d ops).
 - **Query:** the Grafana `grafana-clickhouse-datasource` plugin (SQL panels/Explore).
 - **Analytics model:** *logs-first* — `otel_logs` (100%, unsampled) is the counting
-  workhorse; `otel_traces` (head-10% sampled) are exemplars joined on `trace_id`.
+  workhorse; `otel_traces` (head-sampled at the edge; 50% cluster baseline since 2026-08-31, previously 10%) are exemplars joined on `trace_id`.
 - **No app/service code change** (`pkg/obsx` / `pkg/grpcx` untouched).
 - Gated the same way as everything: the **local-stack e2e audit must pass** before Kind.
 
@@ -67,7 +67,7 @@ no app change; an upstream-standard exporter; ops primaries untouched.
 - **Access control:** no public Ingress; the `default` password is the control. **Not**
   NetworkPolicy-fenced — `monitoring` gets no Kyverno default-deny and netpol is inert on
   kindnet; a `:9000`/`:8123` NetworkPolicy is a follow-up for an enforcing CNI.
-- Trace analytics see only the **10% head sample**; `otel_traces` counts undercount — mitigated
+- Trace analytics see only the head sample — **50%** of edge-rooted traffic in the cluster baseline, 10% before 2026-08-31; `otel_traces` counts undercount — mitigated
   by the logs-first model (and a future consistent-probability upgrade if needed).
 - A ClickHouse **password** to manage (ESO/OpenBAO in-cluster; dev inline in local-stack).
 

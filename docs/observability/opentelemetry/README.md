@@ -16,7 +16,7 @@ how this platform uses it today (Collector topology, sampling, operations).
 | Signals | Traces ✅ (10 services, 2 workers, and the edge) · Metrics ✅ (OTLP push, fleet-wide since RFC-0014 P3; `/metrics` scrape retired) · Logs ✅ (otelzap → OTLP, fleet-wide since RFC-0014 P4) |
 | Protocol | Services and workers use OTLP/HTTP protobuf on `:4318`; the cluster Collector also accepts OTLP/gRPC on `:4317`, which the edge's tracing provider uses |
 | Propagation | W3C Trace Context (`traceparent`); the edge propagates it natively (Envoy Gateway `telemetry.tracing`, no plugin config) |
-| Sampling | 10% head sampling, `ParentBased(TraceIDRatioBased)` (see [Sampling](#sampling)) |
+| Sampling | `ParentBased(TraceIDRatioBased)` head sampling. **The edge is the root and decides**: 50% in the cluster baseline, 100% on Kind. Services carry `OTEL_SAMPLE_RATE=0.1`, which only applies where a service is itself the root (see [Sampling](#sampling)) |
 | Trace backends | **Two sinks** — VictoriaTraces (7d, fast path) + ClickHouse `otel_traces` (90d SQL). Tempo and Jaeger retired under [RFC-0027](../../proposals/rfc/RFC-0027/README.md) |
 | Service identity | `OTEL_SERVICE_NAME` + Downward API envs, injected by the app ResourceSets |
 
@@ -214,7 +214,7 @@ matters when a local query returns a series that does not exist in the cluster.
 
 | Concern | Kubernetes | Local-stack |
 |---------|------------|-------------|
-| Producer sampling | 10% at the edge (`samplingRate: 10`, **planned**) and `0.1` at services | 100% at the edge (`samplingRate: 100`) and `1.0` at services |
+| Producer sampling | **50% at the edge** (`samplingRate: 50`, **planned** — every environment that runs this CR overrides it) and `0.1` at services, which the edge's decision overrides for anything it roots | 100% at the edge (`samplingRate: 100`) and `1.0` at services |
 | Collector receivers | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (gRPC receiver enabled for the edge's tracing provider) | OTLP/HTTP `:4318` and OTLP/gRPC `:4317` (same reason) |
 | Trace fan-out | VictoriaTraces **and ClickHouse** | VictoriaTraces **and ClickHouse** — the two now match |
 | RED metrics | Application SDK metrics **plus** the `span_metrics` connector ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)) | Application SDK metrics plus a spanmetrics compatibility connector |
@@ -226,10 +226,31 @@ emitted directly by `otelgin` and `otelgrpc`.
 
 ## Sampling
 
-Keeping every production trace is expensive and unnecessary. Kubernetes keeps
-about 10% (**head sampling** — the decision is made when the trace starts, per
-`trace_id`, via `TraceIDRatioBased`; env `OTEL_SAMPLE_RATE=0.1`). Local-stack
-sets the rate to `1.0` so a learner can inspect every demo request.
+Keeping every production trace is expensive, so the platform samples — but this
+is a platform built to be studied, and a trace that was never sampled is a
+question nobody can answer later. The cluster baseline therefore keeps **half**
+of edge-rooted traffic (`samplingRate: 50`), raised from an inherited 10 that
+RFC-0024 had copied from Kong without reasoning about it. Local-stack and Kind
+set the rate to full so a learner can inspect every demo request.
+
+**Head sampling** means the decision is made once, when the trace starts, per
+`trace_id`, via `TraceIDRatioBased` — not per span, and never revisited.
+
+One consequence that looks like an incident and is not: **`spanmetrics_calls_total`
+is derived from spans**, so it scales with the edge rate. The day a cluster moves
+its baseline 10 → 50, the RED dashboard's rates jump 5× with no change in traffic,
+while the SLO board beside it does not move at all — Sloth and the Apdex recording
+rules read the SDK's own `http_server_request_duration_seconds` /
+`rpc_server_call_duration_seconds`, and no alert reads spanmetrics. The two boards
+disagreeing by a factor that just changed is arithmetic, not a regression.
+
+Two knobs, and they are not the same knob. The edge's `samplingRate` (a percent,
+0–100) decides for every request it proxies. A service's `OTEL_SAMPLE_RATE` (a
+ratio, 0.0–1.0, currently `0.1`) is wrapped in `ParentBased`, so it applies
+**only** where that service is itself the root — background work, scheduled
+workflows, anything not entering through the gateway. Measured on the live
+cluster: every worker span sat inside an edge-rooted trace, so today that `0.1`
+governs nothing.
 
 The subtlety is *who decides*. The design: the edge (root) decides once,
 everyone downstream honours it — that is what the `ParentBased` wrapper does

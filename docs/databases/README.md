@@ -107,8 +107,6 @@ flowchart LR
 | Commands used during operations | [`runbooks/`](./runbooks/README.md) |
 | Stable PostgreSQL concepts | `fundamentals/` |
 
-The migration sequence and temporary legacy paths are tracked in the
-[refactor plan](./refactor-plan.md) and its [execution tasks](./refactor-tasks.md).
 Architecture decisions remain in [RFC and ADR records](../proposals/README.md);
 this area documents the resulting platform and its operation.
 

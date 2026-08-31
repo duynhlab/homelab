@@ -181,7 +181,7 @@ flowchart LR
   class VM,VL,VT,CH data;
 ```
 
-**Logs-first analytics.** Traces are head-sampled (10% prod / 100% local), so
+**Logs-first analytics.** Traces are head-sampled at the edge (50% cluster baseline / 100% local), so
 `otel_traces` counts undercount real traffic; `otel_logs` is **100% unsampled**
 and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 
@@ -798,7 +798,7 @@ No. `pkg/obsx` / `pkg/grpcx` are untouched; it is a Collector-exporter change.
 Never. Metrics stay on VictoriaMetrics; only the traces + logs pipelines fan out here.
 
 **Why do trace counts look low?**
-Traces are head-sampled (10% prod). Use `otel_logs` (100%) for counting; treat
+Traces are head-sampled at the edge (50% cluster baseline, 100% on Kind), so a trace count is a floor on real traffic rather than a total — and the gap is about 2x in the cluster baseline, not the 10x it used to be. Use `otel_logs` (100%) for counting; treat
 `otel_traces` as exemplars joined on `trace_id`.
 
 **Can ClickHouse replace PostgreSQL?**

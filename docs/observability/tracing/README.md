@@ -10,7 +10,7 @@ Track requests as they flow through multiple microservices to understand perform
 - ✅ Identify slow services and bottlenecks
 - ✅ Debug cross-service errors with full context
 - ✅ Correlate traces with logs (via trace_id)
-- ✅ 10% sampling (configurable) for cost-effectiveness
+- ✅ Head sampling decided at the edge (50% cluster baseline, 100% local), configurable
 
 **Technologies:**
 - **OpenTelemetry**: Industry-standard tracing instrumentation
@@ -114,7 +114,7 @@ flowchart LR
 1. **Request arrives** at the **edge** (Envoy Gateway), which creates the **root span** with `trace_id` and propagates the W3C `traceparent` — native tracing (`EnvoyProxy.spec.telemetry.tracing`), no plugin required
 2. **W3C Trace Context** header (`traceparent`) propagated to the services and downstream
 3. Each service creates **child spans** for its operations (the edge propagates a W3C `traceparent` natively on every proxied request — see [edge→service linkage](architecture.md#edge--service-linkage))
-4. **10% sampling** — the edge (root) decides by ratio (`samplingRate: 10` in the cluster CR, **planned**; `100` in local-stack); each service wraps its ratio in `ParentBased` (`ParentBased(TraceIDRatioBased(rate))`), so downstream hops honour the root's `sampled` flag and traces stay whole — a service's own ratio only applies when it is itself the root (see the [sampling note](architecture.md#edge--service-linkage))
+4. **Head sampling at the edge** — the root decides by ratio (`samplingRate: 50` in the cluster CR, **planned** — overridden everywhere it runs; `100` in local-stack and on Kind); each service wraps its ratio in `ParentBased` (`ParentBased(TraceIDRatioBased(rate))`), so downstream hops honour the root's `sampled` flag and traces stay whole — a service's own ratio only applies when it is itself the root (see the [sampling note](architecture.md#edge--service-linkage))
 5. Spans exported via OTLP HTTP (batch export every 5s) to the **OTel Collector**, which fans out to **two** sinks: **VictoriaTraces** (7d) and **ClickHouse** `otel_traces` (90d)
 6. **Grafana** queries VictoriaTraces through the **Jaeger datasource type**, and ClickHouse with SQL
 
@@ -137,7 +137,7 @@ flowchart LR
 
 | Feature | What It Does | Benefit |
 |---------|--------------|---------|
-| **10% Sampling** | Only trace 10% of requests | Cost-effective, production-ready |
+| **Head sampling at the edge** | Cluster baseline traces 50% of requests; Kind traces 100% | One number governs the whole trace, because the edge is the root |
 | **Request Filtering** | Skip `/health`, `/metrics` | Reduces noise by 30-40% |
 | **Service Identity** | `OTEL_SERVICE_NAME` env injected by the app ResourceSets | Stable `service.name`, no per-service config |
 | **Graceful Shutdown** | Flush pending spans on SIGTERM | Zero data loss during rollouts |
@@ -264,7 +264,7 @@ kubectl describe deployment auth -n auth | grep -A 5 "Environment"
 | **Trace ID** | Unique identifier for entire trace (128-bit) |
 | **Span ID** | Unique identifier for single span (64-bit) |
 | **W3C Trace Context** | Standard header format: `traceparent: 00-<trace-id>-<span-id>-<flags>` |
-| **Sampling** | Percentage of requests to trace (10% = 1 in 10 requests) |
+| **Sampling** | Percentage of requests to trace, decided at the edge (50% = 1 in 2 requests in the cluster baseline; 100% on Kind) |
 
 ### Semantic Conventions (OpenTelemetry)
 
@@ -286,10 +286,10 @@ attribute.String("db.table", "users")
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Sampling overhead | < 1% CPU | At 10% sampling |
+| Sampling overhead | < 1% CPU | **Measured at 10% sampling**; not re-measured since the baseline moved to 50% |
 | Memory overhead | < 50MB | Per service |
 | Export latency | < 100ms P99 | To VictoriaTraces |
-| Trace volume reduction | 90% | vs 100% sampling |
+| Trace volume reduction | 50% | vs 100% sampling, at the 50% edge baseline |
 | Request filtering reduction | 30-40% | Health/metrics skipped |
 
 ### External Resources

@@ -40,7 +40,7 @@ spec:
         - op: replace
           path: /spec/issuerRef/name
           value: homelab-ca
-    # LOCAL-ONLY: sample 100% of edge traces on Kind (base = 10% for the
+    # LOCAL-ONLY: sample 100% of edge traces on Kind (base = 50% for the
     # cluster). EG's samplingRate is a PERCENT, 0-100. Local full sampling
     # makes the E2E trace-continuity audit deterministic.
     - target:

@@ -119,7 +119,7 @@ Verified against `kubernetes/infra/configs/envoy-gateway/`. Every count here is 
 | Object | File | What it fixes |
 |--------|------|---------------|
 | `GatewayClass platform` | `gatewayclass.yaml` | One class, one Gateway; `parametersRef` points at the `EnvoyProxy` — **the `namespace` field there is load-bearing** |
-| `EnvoyProxy platform` | `envoyproxy.yaml` | Data-plane shape: 2 replicas + PDB `minAvailable: 1`, NodePort 30080/30443, JSON access log, OTLP tracing at 10 %, Prometheus stats |
+| `EnvoyProxy platform` | `envoyproxy.yaml` | Data-plane shape: 2 replicas + PDB `minAvailable: 1`, NodePort 30080/30443, JSON access log, OTLP tracing at 50 % (cluster baseline; 100 % on Kind), Prometheus stats |
 | `Certificate platform-edge-tls` | `certificate.yaml` | The wildcard edge certificate — see [TLS](#tls-at-the-edge) |
 | `Gateway platform` | `gateway.yaml` | Two listeners on `*.duynh.me`: `http:80` and `https:443` (Terminate) |
 | `HTTPRoute https-redirect` | `gateway.yaml` | Attaches to the `http` listener only, and 301s everything to HTTPS |
@@ -380,7 +380,7 @@ spanmetrics connector, so the two are complementary rather than redundant.
 
 | Signal | Producer | Pipeline | Consumer |
 |--------|----------|----------|----------|
-| Traces | Envoy, `ParentBased(TraceIDRatio)` — 10 % cluster, 100 % local | OTLP **gRPC** → otel-collector | VictoriaTraces + ClickHouse; spanmetrics connector derives edge RED |
+| Traces | Envoy, `ParentBased(TraceIDRatio)` — 50 % cluster baseline, 100 % local | OTLP **gRPC** → otel-collector | VictoriaTraces + ClickHouse; spanmetrics connector derives edge RED |
 | Access logs | Envoy, custom JSON | Two sinks: stdout (`File`) → Vector, and OTLP → collector ([ADR-060](../proposals/adr/ADR-060-envoy-access-log-transport/)) | VictoriaLogs |
 | Metrics | Envoy Prometheus stats endpoint | VMAgent scrape | VictoriaMetrics |
 

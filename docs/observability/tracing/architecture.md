@@ -84,7 +84,7 @@ behavior that makes this reliable.
 
 **0. Envoy Gateway (edge)**
 - **Technology**: `EnvoyProxy.spec.telemetry.tracing` — native Envoy tracing, no plugin
-- **Enabled by**: the `platform` GatewayClass's `parametersRef` — cluster CR `kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml` (`samplingRate: 10`, **planned** — not yet run on Kind); local overlay `local-stack/gateway/eg/envoyproxy.yaml` patches `samplingRate: 100` (verified in local-stack)
+- **Enabled by**: the `platform` GatewayClass's `parametersRef` — cluster CR `kubernetes/infra/configs/envoy-gateway/envoyproxy.yaml` (`samplingRate: 50`, **planned** — every environment that runs this CR overrides it, so the baseline has never been the live value); local overlay `local-stack/gateway/eg/envoyproxy.yaml` patches `samplingRate: 100` (verified in local-stack)
 - **Export**: OTLP **gRPC** to the collector on `:4317` — the tracing provider speaks gRPC only, unlike the app SDKs which export over OTLP HTTP `:4318`; `service.name` is derived as `<gateway>.<namespace>` (locally `platform.envoy-gateway-system`)
 - **Role**: opens the **root request span** for every proxied call and propagates the W3C `traceparent` downstream, so the trace starts at the edge instead of the first service. Envoy's sampler is `ParentBased`, so an inbound sampled `traceparent` is always honored regardless of `samplingRate`
 - **Logs**: since [ADR-060](../../proposals/adr/ADR-060-envoy-access-log-transport/) the edge has **two** access-log sinks — `File` to stdout (so `kubectl logs` works) and `OpenTelemetry` to the collector on `:4317`, which is how edge logs reach VictoriaLogs *and* ClickHouse. Vector no longer tails the Envoy pods; the `platform.duynhlab.dev/otlp-logs=true` label on them is what stops it (see [../logging/README.md](../logging/README.md))
@@ -241,9 +241,12 @@ flowchart LR
 saga over gRPC) already link, confirming the service-side W3C propagator works
 — no service change was needed.
 
-> **Cluster sampling note:** the edge samples head-based at `samplingRate: 10`
-> (10%, **planned** — the cluster CR has not yet run on Kind) as the trace
-> root; the local overlay patches this to `100`. Each service wraps its ratio in
+> **Cluster sampling note:** the edge samples head-based at `samplingRate: 50`
+> as the trace root — **planned**, in the sense that every environment which runs
+> this CR overrides it, so the baseline has never been the live value: Kind
+> patches it to `100` for deterministic gate evidence, and `clusters/production/`
+> is still a stub. It was 10 until 2026-08-31, a figure RFC-0024 had copied from
+> Kong rather than chosen. Each service wraps its ratio in
 > **`ParentBased`** (`ParentBased(TraceIDRatioBased(rate))`, set inside
 > `obsx.SetupObservability`), and so does the edge's own sampler — both honour
 > whichever `traceparent.sampled` flag reaches them: a sampled remote parent →

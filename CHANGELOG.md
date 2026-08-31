@@ -804,6 +804,12 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The CI/CD v2 candidate is documented as three explicit trust gates.** The
+  platform guide and caller templates now use only `dev` and `main`, separate
+  PR verification from `sha-*` publication and clean `vX.Y.Z` releases, make
+  Sonar's new-code gate blocking, and add hotfix synchronization guidance;
+  consumer and admission adoption remain explicitly planned.
+
 - **The SSO-client procedures that lived only in one session are now docs**
   (owner review of the flux-web rollout: end state clean, process messy — the
   live-fix tooling existed nowhere). `keycloak.md` gains "Add a confidential

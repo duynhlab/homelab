@@ -339,9 +339,9 @@ worth knowing before someone reaches for a second fix during an incident.
 
 **Claim.**
 
-> [`005-ha-dr-deep-dive.md:307`](../../../databases/reference/archive/ha-dr-deep-dive.md) — `| Primary pod crash | CNPG promotes sync replica, `-rw` service updates | 0 (sync) | < 30s | Yes |`
-
-> `005-ha-dr-deep-dive.md:332-341` — "**Service update**: `-rw` endpoints updated to new primary IP (**< 5s**) … **PgDog**: sees `-rw` DNS change, routes writes to new primary"
+The pre-drill estimates under test were RPO 0, database failover under 30
+seconds, and the `-rw` endpoint update under 5 seconds. Those estimates were
+retired after this GameDay produced measured application-visible evidence.
 
 **Instrumentation.** Two probes at 0.3 s / 0.5 s resolution ran across the
 switchover, plus a 10-shopper confirm funnel at 1.2 s spacing:

@@ -23,8 +23,8 @@ runbooks for the platform database layer.
    [custom-metrics.md](custom-metrics.md)
 3. **Runbooks** — per-alert Meaning / Impact / Diagnosis / Mitigation:
    [../runbooks/postgresql/README.md](../../runbooks/postgresql/README.md)
-4. **Deep internals** — PostgreSQL concepts with homelab examples:
-   [../../databases/fundamentals/postgresql-internals.md](../../../databases/fundamentals/postgresql-internals.md)
+4. **Deep internals** — vendor-neutral PostgreSQL concepts:
+   [../../databases/fundamentals/README.md](../../../databases/fundamentals/README.md)
 5. **Emergency** — cluster down triage (before runbook detail):
    [../../databases/runbooks/emergency-recovery.md](../../../databases/runbooks/emergency-recovery.md)
 

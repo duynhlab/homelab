@@ -123,20 +123,19 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 
 ### Deep Dive Documentation
 
-For full explanations with detailed diagrams, tables, and EC2/VM mapping, see:
-
-**[PostgreSQL Internals Deep Dive (product-db)](../../../../../docs/databases/fundamentals/postgresql-internals.md)**
+For vendor-neutral explanations of the PostgreSQL engine, see the
+**[PostgreSQL internals learning path](../../../../../docs/databases/fundamentals/README.md)**.
 
 Topics covered:
-- INSERT/UPDATE workflow with sequence diagrams
-- Shared Buffers and Buffer Manager
-- WAL (Write-Ahead Log) and crash recovery
-- MVCC, tuple versioning, and visibility
-- Streaming Replication internals
-- Storage: files, pages, and on-disk layout
-- Autovacuum and bloat control
-- CNPG vs EC2/VM operational differences
-- Backup/restore, scaling, and sharding concepts
+- Backend processes, shared memory, and connection lifecycle
+- Storage pages, WAL, checkpoints, and crash recovery
+- MVCC, tuple visibility, locking, vacuum, and bloat
+- Query planning and execution
+- Physical and logical replication
+
+CloudNativePG behavior and this repository's deployed topology remain in the
+[database platform docs](../../../../../docs/databases/README.md), not in the
+fundamentals path.
 
 ---
 
@@ -145,4 +144,4 @@ Topics covered:
 - **Database Architecture Overview**: [`docs/databases/architecture.md`](../../../../../docs/databases/architecture.md)
 - **Pooler inventory**: [`docs/databases/poolers.md`](../../../../../docs/databases/poolers.md)
 - **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../../docs/observability/metrics/README.md)
-- **Replication Deep Dive**: [`docs/databases/fundamentals/replication-and-ha.md`](../../../../../docs/databases/fundamentals/replication-and-ha.md)
+- **Replication Fundamentals**: [`docs/databases/fundamentals/replication.md`](../../../../../docs/databases/fundamentals/replication.md)

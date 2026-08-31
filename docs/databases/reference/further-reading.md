@@ -1,34 +1,34 @@
-# PostgreSQL: further reading and references
+# PostgreSQL Official References
 
-Curated links for deeper study of PostgreSQL internals, replication, and
-production operations. This page complements the learning and platform paths
-in the [database hub](../README.md).
+Use primary documentation to deepen a topic after following the local
+[PostgreSQL internals path](../fundamentals/README.md). Product-specific sources
+below support the current or historical platform reference pages; they are not
+runbooks.
 
-## Official and core concepts
+## PostgreSQL 18
 
-- [PostgreSQL documentation: WAL](https://www.postgresql.org/docs/current/wal-intro.html)
+- [Server architecture](https://www.postgresql.org/docs/18/tutorial-arch.html)
+- [Database physical storage](https://www.postgresql.org/docs/18/storage.html)
+- [Write-ahead logging](https://www.postgresql.org/docs/18/wal.html)
+- [Concurrency control](https://www.postgresql.org/docs/18/mvcc.html)
+- [Using `EXPLAIN`](https://www.postgresql.org/docs/18/using-explain.html)
+- [High availability and replication](https://www.postgresql.org/docs/18/high-availability.html)
+- [Continuous archiving and point-in-time recovery](https://www.postgresql.org/docs/18/continuous-archiving.html)
+- [Monitoring database activity](https://www.postgresql.org/docs/18/monitoring.html)
+- [Routine vacuuming](https://www.postgresql.org/docs/18/routine-vacuuming.html)
 
-## Replication and HA
+## Platform products
 
-- [Myths and Truths about Synchronous Replication in PostgreSQL (slides, PGConf.DE 2025)](https://www.postgresql.eu/events/pgconfde2025/sessions/session/6559/slides/663/Myths%20and%20Truths%20about%20Synchronous%20Replication%20in%20PostgreSQL.pdf)
-- [Patroni / HA context - Alexander Kukushkin (speaker page)](https://posetteconf.com/speakers/alexander-kukushkin/)
-
-## Operator documentation
-
-- [CloudNativePG documentation](https://cloudnative-pg.io/docs/1.30/)
+- [CloudNativePG 1.30](https://cloudnative-pg.io/docs/1.30/)
 - [CloudNativePG Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
-- [Zalando Postgres Operator documentation](https://postgres-operator.readthedocs.io/en/latest/)
-- [Patroni documentation](https://patroni.readthedocs.io/en/latest/)
-- [Spilo image repository](https://github.com/zalando/spilo)
+- [PgDog](https://docs.pgdog.dev/)
+- [Barman](https://docs.pgbarman.org/)
 
-## Internals and tutorials
+## Historical comparison sources
 
-- [The Internals of PostgreSQL (Hironobu Suzuki)](https://www.interdb.jp/pg/)
-- [Database notes (maxnilz)](https://maxnilz.com/docs/003-database/)
-
-## Operations and DevOps
-
-- [PostgreSQL for DevOps: production setup and operations](https://medium.com/@mecreate/postgresql-for-devops-production-setup-and-operations-2630f41ce779)
+- [Zalando Postgres Operator](https://postgres-operator.readthedocs.io/en/latest/)
+- [Patroni](https://patroni.readthedocs.io/en/latest/)
+- [Spilo](https://github.com/zalando/spilo)
 
 ---
-_Last updated: 2026-07-10_
+_Last updated: 2026-08-31._

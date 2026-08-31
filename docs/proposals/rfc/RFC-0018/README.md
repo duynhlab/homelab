@@ -351,9 +351,9 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 | File | Primary change |
 |------|----------------|
 | [`docs/databases/architecture.md`](../../../databases/architecture.md) | 3-cluster / 2-pooler hub; platform-db table; Mermaid |
-| [`docs/databases/fundamentals/replication-and-ha.md`](../../../databases/fundamentals/replication-and-ha.md) | Cluster inventory |
-| [`docs/databases/fundamentals/backup-and-recovery.md`](../../../databases/fundamentals/backup-and-recovery.md) | Barman prefixes; temporal on platform-db |
-| [`docs/databases/fundamentals/connection-pooling.md`](../../../databases/fundamentals/connection-pooling.md) | 2 poolers |
+| [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md) | Cluster inventory and recovery topology |
+| [`docs/databases/backup-policy.md`](../../../databases/backup-policy.md) | Barman prefixes; temporal on platform-db |
+| [`docs/databases/poolers.md`](../../../databases/poolers.md) | 2 poolers |
 | [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md) | Cluster table; drills |
 | [`docs/databases/reliability-targets.md`](../../../databases/reliability-targets.md) | Tier mapping |
 | [`docs/databases/runbooks/restore-and-failover-drills.md`](../../../databases/runbooks/restore-and-failover-drills.md) | Drill D → platform-db |
@@ -381,10 +381,10 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 |------|-----|
 | [`docs/databases/runbooks/backup-restore.md`](../../../databases/runbooks/backup-restore.md) | Zalando → CNPG Barman |
 | [`docs/databases/runbooks/rotate-cnpg-service-password.md`](../../../databases/runbooks/rotate-cnpg-service-password.md) | `pgdog-cnpg` → `pgdog-product` / `pgdog-platform` |
-| [`docs/databases/reference/archive/ha-dr-deep-dive.md`](../../../databases/reference/archive/ha-dr-deep-dive.md) | Stale pooler names |
+| [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md) | Stale pooler names |
 | [`docs/databases/cloudnativepg.md`](../../../databases/cloudnativepg.md) | CNPG on all clusters |
 | [`docs/databases/reference/operator-comparison.md`](../../../databases/reference/operator-comparison.md) | 3-cluster table |
-| [`docs/databases/fundamentals/extensions.md`](../../../databases/fundamentals/extensions.md) | platform-db row |
+| [`docs/databases/extensions.md`](../../../databases/extensions.md) | platform-db row |
 | [`docs/observability/metrics/postgresql/custom-metrics.md`](../../../observability/metrics/postgresql/custom-metrics.md) | PodMonitor paths |
 | [`docs/observability/logging/victorialogs.md`](../../../observability/logging/victorialogs.md#stream-catalog) | pgaudit clusters |
 | [`docs/observability/metrics/victoriametrics.md`](../../../observability/metrics/victoriametrics.md) | VMRule dirs |
@@ -403,7 +403,8 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 ### Docs unchanged (product tier)
 
-`fundamentals/postgresql-internals.md`, product sections of `005-ha-dr-deep-dive.md`, `add-service-database.md`, `cnpg-dr-replica-bootstrap.md`, `checkout.md`, product-tier app RSIPs.
+PostgreSQL fundamentals, product-tier recovery mechanics, `add-service-database.md`,
+`cnpg-dr-replica-bootstrap.md`, `checkout.md`, and product-tier app RSIPs.
 
 ## Implementation History
 

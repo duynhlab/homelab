@@ -111,8 +111,8 @@ write. RPO in region B is therefore bounded by object-replication lag on top of
 ## References
 
 - [disaster-recovery.md](./disaster-recovery.md) — parent DRP, "separate failure domain" baseline.
-- [Archived HA/DR notes](./reference/archive/ha-dr-deep-dive.md) — historical replica-cluster notes.
-- [fundamentals/replication-and-ha.md](./fundamentals/replication-and-ha.md) — sync vs async, cascading replication.
+- [Disaster recovery plan](./disaster-recovery.md) — current recovery topology and decision paths.
+- [Replication fundamentals](./fundamentals/replication.md) — sync vs async replication and cascading behavior.
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — the promotion drill that validates this.
 
 ---

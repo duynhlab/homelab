@@ -18,7 +18,8 @@ covers what differs.
 | Pool mode | `transaction`; R/W splitting: SELECTs → `-r` replicas, writes → `-rw` primary; LSN lag monitoring bans lagging replicas |
 | Credentials | Injected per-user via HelmRelease `spec.valuesFrom` targetPath from the per-service ESO Secrets (ADR-014) — never in values |
 
-Concept and trade-off background lives in [fundamentals/connection-pooling.md](../fundamentals/connection-pooling.md); this page is purely operational.
+Concepts, trade-offs, and deployed topology live in [poolers.md](../poolers.md);
+this page is purely operational.
 
 ## Health & status
 
@@ -69,7 +70,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 
 ## References
 
-- [fundamentals/connection-pooling.md](../fundamentals/connection-pooling.md) — architecture, PgBouncer/PgDog comparison
+- [poolers.md](../poolers.md) — architecture, pooling semantics, and PgBouncer/PgDog comparison
 - [add-service-database.md](add-service-database.md), [rotate-cnpg-service-password.md](rotate-cnpg-service-password.md)
 - PgDog docs: https://docs.pgdog.dev/
 

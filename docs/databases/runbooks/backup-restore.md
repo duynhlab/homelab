@@ -6,7 +6,8 @@ clusters using RustFS (S3-compatible) object storage.
 Reference docs:
 
 - [Database DRP](../disaster-recovery.md)
-- [Backup Strategy](../fundamentals/backup-and-recovery.md)
+- [Backup policy](../backup-policy.md)
+- [Storage and WAL](../fundamentals/storage-and-wal.md)
 - [Database Integration](../architecture.md)
 
 ## Overview
@@ -43,10 +44,13 @@ Expected:
 
 ### Trigger manual backup
 
-If the CNPG kubectl plugin is installed:
+If the CNPG kubectl plugin is installed, select the plugin backup method
+explicitly. The bare command defaults to the retired in-tree method and fails
+because this cluster has no `spec.backup` section:
 
 ```bash
-kubectl cnpg backup platform-db -n platform
+kubectl cnpg backup platform-db -n platform \
+  --method plugin --plugin-name barman-cloud.cloudnative-pg.io
 ```
 
 Plain Kubernetes fallback:

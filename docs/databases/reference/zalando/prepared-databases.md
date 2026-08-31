@@ -451,7 +451,7 @@ If `pg_partman` is listed in `extwlist.extensions`, the database owner can creat
 - [Zalando Postgres Operator: Cross-namespace secrets](https://opensource.zalando.com/postgres-operator/docs/user.html#manifest-roles)
 - [PostgreSQL 15 Release Notes: Privilege changes](https://www.postgresql.org/docs/15/release-15.html)
 - Retired manifest: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`
-- [Extensions management guide](../../fundamentals/extensions.md)
+- [Extensions management guide](../../extensions.md)
 
 ---
 _Last updated: 2026-07-11_

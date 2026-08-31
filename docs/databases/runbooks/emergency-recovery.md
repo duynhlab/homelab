@@ -150,7 +150,8 @@ Restore RustFS first, confirm `ContinuousArchiving=True` recovers and the backlo
 drains, then take a fresh on-demand backup:
 
 ```bash
-kubectl cnpg backup product-db -n product
+kubectl cnpg backup product-db -n product \
+  --method plugin --plugin-name barman-cloud.cloudnative-pg.io
 ```
 
 This scenario is why co-located RustFS is the single biggest DR gap — see
@@ -174,8 +175,7 @@ RTO/RPO, and follow-ups. Feed gaps back into the [drill schedule](./restore-and-
 
 - [disaster-recovery.md](../disaster-recovery.md) — parent DRP, decision flow, ownership, evidence checklist.
 - [Restore and failover drills](./restore-and-failover-drills.md) — rehearsed versions of these procedures.
-- [Archived HA/DR notes](../reference/archive/ha-dr-deep-dive.md#8-practical-commands-reference) — historical command reference.
 - [Backup and restore](./backup-restore.md) — full backup/restore runbook.
 
 ---
-_Last updated: 2026-07-17_
+_Last updated: 2026-08-31._

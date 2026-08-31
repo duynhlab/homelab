@@ -420,7 +420,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Cross-Region / Cross-Zone DR](./databases/cross-region-dr.md) - Planned roadmap to independent failure domains
 - [Declarative Role & Database Management](./databases/declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
 - [PostgreSQL Further Reading](./databases/reference/further-reading.md) - Curated external references
-- [PostgreSQL Internals](./databases/fundamentals/postgresql-internals.md) - Deep dive using product-db examples
+- [PostgreSQL Internals](./databases/fundamentals/README.md) - Vendor-neutral learning path for processes, storage, WAL, MVCC, queries, and replication
 
 ### Caching
 

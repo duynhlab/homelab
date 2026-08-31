@@ -3,9 +3,8 @@
 Child playbook of the [PostgreSQL Disaster Recovery Plan](./disaster-recovery.md). The DRP
 is the system of record; this page is the **planning view**: it maps each data
 tier to a concrete cluster, states the **target** RPO/RTO, and contrasts it with
-what the platform actually delivers **today**. It deliberately does not re-derive
-the math — see [fundamentals/backup-and-recovery.md](./fundamentals/backup-and-recovery.md) for the RPO/RTO
-formulas and [disaster-recovery.md](./disaster-recovery.md#rporto-matrix) for the scenario matrix.
+what the platform actually delivers **today**. The scenario-specific recovery
+paths remain in the [disaster recovery plan](./disaster-recovery.md#rporto-matrix).
 
 - **RPO** (Recovery Point Objective) — how much data you can afford to lose,
   measured backwards from the incident. Bounded by replication and WAL-archive lag.
@@ -55,10 +54,21 @@ RPO and RTO are not free-floating numbers — they are consequences of concrete 
 - **Base-backup frequency sets the PITR floor + the restore baseline.** Daily +
   every-6h base backups keep the WAL-replay distance (and therefore restore time)
   short. Longer gaps between base backups mean more WAL to replay at restore → higher RTO.
-- **RTO is the sum of detect + decide + restore + replay + validate + cut-over.**
-  See the RTO breakdown in [fundamentals/backup-and-recovery.md](./fundamentals/backup-and-recovery.md). The
-  only component you cannot estimate from config is *validate + cut-over* — that's
-  what the [restore drills](./runbooks/restore-and-failover-drills.md) measure.
+- **RTO is the sum of detect + decide + download/restore + WAL replay + validate
+  + cut-over.** Backup size, object-store throughput, and the amount of WAL after
+  the selected base backup influence restore and replay time. The validation and
+  cut-over portions cannot be inferred from configuration; the
+  [restore drills](./runbooks/restore-and-failover-drills.md) measure the complete path.
+
+For a recovery method `m`, use these planning bounds:
+
+```text
+RPO(m) >= replication lag or archive lag visible at incident time
+RTO(m) = detect + decide + restore/download + replay + validate + cut-over
+```
+
+These are bounds, not guarantees. Only a drill using representative data volume,
+network throughput, and application validation can turn them into evidence.
 
 ## Known gaps
 
@@ -73,9 +83,9 @@ These widen the gap between target and as-built; tracked in
 ## References
 
 - [disaster-recovery.md](./disaster-recovery.md) — parent DRP, scenario matrix, ownership.
-- [fundamentals/backup-and-recovery.md](./fundamentals/backup-and-recovery.md) — RPO/RTO formulas, retention, PITR window.
-- [Archived HA/DR notes](./reference/archive/ha-dr-deep-dive.md#7-rporto-reference-card) — historical reference card.
+- [Backup policy](./backup-policy.md) — schedules, retention, and object-store paths.
+- [Storage and WAL](./fundamentals/storage-and-wal.md) — WAL durability and checkpoint mechanics.
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — how the targets get verified.
 
 ---
-_Last updated: 2026-07-17_
+_Last updated: 2026-08-31._

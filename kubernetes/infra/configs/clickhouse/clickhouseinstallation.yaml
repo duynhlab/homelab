@@ -9,13 +9,15 @@
 # ADR-061) and every long-retention trace.
 #
 # The `default` user's password comes from the ESO-managed clickhouse-credentials
-# Secret (OpenBAO secret/local/infra/clickhouse/admin). The Collector's contrib
-# clickhouse exporter connects as `default` and, with create_schema: true plus
-# cluster_name + table_engine, creates the `otel` database and the
-# otel_logs / otel_traces ReplicatedMergeTree tables ON CLUSTER itself (TTL 90d).
-# The exporter owns that DDL by decision (ADR-065 Option B) — there is no
-# migration Job, and the exporter never ALTERs, so the first schema change
-# re-opens that question.
+# Secret (OpenBAO secret/local/infra/clickhouse/admin). Both the schema Job and
+# the Collector connect as `default`.
+#
+# Schema ownership lives elsewhere: the `clickhouse-schema` Job in
+# configs/clickhouse-schema/ creates the `otel` database (ENGINE = Replicated,
+# per replica, no ON CLUSTER) and its tables, with the DDL committed to git. The
+# Collector runs create_schema: false and only INSERTs (ADR-065). Exporter-owned
+# DDL was tried and rejected — it cannot reach a replica that joins the
+# distributed-DDL queue late — and that history is in ADR-065's Alternatives.
 # Access control: ClickHouse is never on a public Ingress and the `default` user's
 # password is the access control. It is NOT NetworkPolicy-fenced — the `monitoring`
 # namespace gets no Kyverno default-deny (that targets app-tier only) and netpol is
@@ -36,7 +38,8 @@ spec:
       podTemplate: clickhouse
       dataVolumeClaimTemplate: data-volume
   configuration:
-    # By-name reference to the ClickHouseKeeperInstallation (operator >= 0.27.1):
+    # By-name reference to the ClickHouseKeeperInstallation (operator >= 0.27.0,
+    # per the Altinity release notes: "Reference CHK from CHI by a name"):
     # the operator resolves the keeper endpoints itself and re-reconciles this CHI
     # when that endpoint set changes. serviceType defaults to `replicas`, i.e. the
     # per-pod addresses rather than one Service VIP — which is what a raft client

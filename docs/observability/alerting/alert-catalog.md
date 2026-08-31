@@ -501,14 +501,14 @@ now a ratio over distinct hosts.
 | ClickHouseDiskAlmostFull | warning | free/total <15% | MergeTree refuses writes near full; TTL cleanup can't outrun sustained ingest | 15m |
 | ClickHouseDiskCritical | critical | free/total <5% | Write failures imminent | 5m |
 | ClickHouseTooManyParts | warning | active parts >300 | Merge backlog → delayed → rejected inserts | 10m |
-| ClickHouseInsertsDelayed | info | delayed-inserts rate >0 | The step before rejection | 10m |
+| ClickHouseInsertsDelayed | info | `chi_clickhouse_metric_DelayedInserts > 0` (gauge, not a rate) | The step before rejection | 10m |
 | ClickHouseServerErrorsElevated | info | `system.errors` sum-rate >5/s | Broad server error census | 10m |
 | ClickHouseOperatorReconcileErrors | warning | host-reconcile errors >0 | CHI stuck between spec and reality | 15m |
 | ClickHouseExporterUnhealthy | warning | collector `send_failed_*{exporter="clickhouse"}` >0 | OTel→CH backpressure/loss (VictoriaLogs/Traces keep their copies) | 10m |
 
 The consumer-side `ClickHouseExporterUnhealthy` complements `OtelCollectorDown`:
 the collector can be perfectly up while its ClickHouse exporter backpressures. A
-ZooKeeper-exceptions rule sits commented in the file until replication exists.
+ZooKeeper-exceptions rule is enabled and verified — see the §8b notes above.
 
 ---
 

@@ -6,7 +6,7 @@
 # ClickHouse pods" into "one table with three copies".
 #
 # The CHI references this by name (spec.configuration.zookeeper.keeper.name),
-# available since operator 0.27.1 — the operator resolves the endpoint list
+# available since operator 0.27.0 — the operator resolves the endpoint list
 # itself. Note it does NOT re-reconcile the CHI when that endpoint set changes:
 # `onKeeperResourceUpdate` defaults to `none` in the operator config. Harmless at
 # a fixed replica count; it will matter the day someone scales this quorum.

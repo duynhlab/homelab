@@ -387,10 +387,9 @@ Skeleton (copy what you need):
   access logs — ClickHouse-only since ADR-061 — and every long-retention trace;
   the tracing architecture doc recorded that as an accepted gap in the words
   *"a lost volume is lost traces."* It is now a failover. The `otel` tables are
-  `ReplicatedMergeTree` created `ON CLUSTER` by the collector's own exporter
-  (`cluster_name` + `table_engine`, argument-free so the server's `{uuid}`
-  replica path applies), which keeps the delta at one new resource: no
-  migration Job, no new wave, no second schema owner
+  `ReplicatedMergeTree` in a `Replicated` database, created by the
+  `clickhouse-schema` Job from DDL committed to git — see the schema-ownership
+  entry above, which is the same change viewed from the other side
   ([RFC-0028](docs/proposals/rfc/RFC-0028/) /
   [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/)).
   Three fixes landed with it because without them the gate would have passed on
@@ -411,8 +410,10 @@ Skeleton (copy what you need):
   which catches the failure nothing else notices: a replica that lost its Keeper
   session keeps answering reads while silently refusing writes. Both carry
   `VERIFY-AT-KIND` markers, because neither series has ever been observed here.
-  Accepted costs, unchanged from the decision: DDL still runs in the collector's
-  `start()`, the exporter never `ALTER`s, and memory and storage triple.
+  Accepted costs: memory and storage triple, and the committed schema must track
+  the exporter's INSERT contract across collector upgrades. The two costs this
+  entry originally listed — DDL in the collector's `start()` and an exporter that
+  never `ALTER`s — were removed by the schema-ownership change above.
   local-stack stays single-node with no keeper.
 
 - **ADR-061: the edge's logs are routed by class.** The access log — an
@@ -930,10 +931,11 @@ Skeleton (copy what you need):
 - **RFC-0028 is `Accepted` and ADR-065 is created at `Accepted` with it.**
   [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/) carries
   the one decision the RFC frames — 1x3 replicated ClickHouse on a Keeper
-  quorum, with the exporter owning the replicated schema — and records the
-  runner-up honestly: the migration Job that would own DDL is not wrong, it is
-  early, so both of its advantages (the `ALTER` lifecycle, startup decoupling)
-  stand as revisit triggers rather than as prose about complexity.
+  quorum. It was created stating exporter-owned schema and **amended the same
+  day**, once implementation measured that option leaving replicas without a
+  schema; the migration Job it had recorded as "not wrong, just early" came due
+  immediately, and both of its advantages — the `ALTER` lifecycle and startup
+  decoupling — are now delivered rather than deferred.
   Implementation ships in the same pull request, so the gate that proves the
   topology is also the gate that closes the ADR's adoption. Two RFC defects
   fixed on the way through: its index row had the status sitting in the

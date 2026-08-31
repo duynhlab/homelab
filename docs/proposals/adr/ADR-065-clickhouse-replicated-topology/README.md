@@ -22,7 +22,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | One homelab PR: CHK + CHI topology + a schema bootstrap Job + per-pod scrape + alerts + platform docs, gated by a full Kind run with the replica-kill and keeper-kill drills |
-| **Adoption** | Not started |
+| **Adoption** | **Complete** — Kind gate 2026-08-28: 26/26 Kustomizations, the `clickhouse-schema` Job Complete, `engine = Replicated` and `total_replicas=3 active_replicas=3 is_readonly=0` on all three replicas, **0** entries in `system.distributed_ddl_queue`, cross-replica reads both directions, k6 144/144, replica-kill and keeper-kill drills passed with the collector at 0 restarts. Runtime evidence is the author's own; the external PR audit did not re-run it |
 
 ## Context
 
@@ -114,8 +114,8 @@ without any client change.
 The argument-free engine is a deliberate pairing with recreate-from-scratch: the
 default `{uuid}` path mints a fresh Keeper znode on every `CREATE`, so a
 drop-and-recreate cycle can never collide with a stale replica path — the classic
-failure of explicit paths. It is also the only style the exporter can express,
-which is what makes exporter-owned schema viable at all.
+failure of explicit paths. It is also the style the Job commits verbatim,
+so a drop-and-recreate never has to reason about znode paths.
 
 ### Decision rules
 
@@ -262,7 +262,8 @@ the two options on parts-count and schema-evolution and never surfaced it.
 ### Neutral consequences
 
 - local-stack stays a single node with no keeper. The twin divergence is
-  deliberate and recorded; the exporter's cluster options are cluster-only values.
+  deliberate and recorded: local-stack keeps `create_schema: true` because one
+  node has no `ON CLUSTER` and therefore no race to avoid.
 - Grafana's datasource is unchanged — it already points at the round-robin
   Service, which is why it survives a replica loss without edits.
 - The Altinity operator keeps creating the PodDisruptionBudget; no PDB is authored
@@ -295,7 +296,8 @@ the two options on parts-count and schema-evolution and never surfaced it.
 | The collector is not collateral damage | The otel-collector Deployment records zero restarts across both drills |
 | Alerts reference series that exist | The `VERIFY-AT-KIND` markers on the Keeper and read-only rules are closed by querying the series, not by assuming it |
 | The bootstrap avoids the DDL queue entirely | `system.distributed_ddl_queue` has **no** entries for the schema objects: the database is created per replica and the tables inside a `Replicated` database. An entry appearing there means someone reintroduced `ON CLUSTER` |
-| The database engine is right | `SELECT engine FROM system.databases WHERE name='otel'` returns `Replicated` on every replica. `Atomic` means the Job ran against a pre-existing database and table DDL will not propagate |
+| The database engine is right | `SELECT engine FROM system.databases WHERE name='otel'` returns `Replicated` on every replica. `Atomic` means a pre-existing database, which the Job now refuses in a preflight before running any DDL |
+| The refusal is actionable, not a deadlock | Verified 2026-08-28 by recreating the condition: with an `Atomic` `otel` on all three replicas the Job failed in preflight naming every affected host and printing the per-replica drop procedure; running that procedure verbatim brought the Job to Complete in 5s at `3/3`. Without the preflight the same state fails only *after* partial DDL, and the wave deadlocks with `tracing-local` never released |
 | The collector owns no schema | `create_schema: false` in the collector values, and no `cluster_name` / `table_engine` / `ttl` — those only ever fed the DDL path. TTL lives in the committed DDL |
 | The insert contract holds | The committed DDL satisfies upstream `logs_insert.sql` (15 columns + the `EventName` feature column) and `traces_insert.sql` (22 columns). Re-check on any collector image bump |
 | The wave really gates | `clickhouse-local` must not carry `wait: true`: it is mutually exclusive with `healthChecks` and wins, and that overlay applies only custom resources whose status kstatus cannot assess. Measured with `wait` set: reconcile finished in 371 ms with zero StatefulSets in existence. `clickhouse-schema-local` is the opposite case — it applies a Job, which kstatus does assess, so it uses `wait: true` |
@@ -343,6 +345,7 @@ a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-28 | Accepted / Not started | Created at Accepted with the RFC-0028 architecture review |
+| 2026-08-28 | Accepted / Complete | Adoption closed on the Kind gate above, after an external audit of PR #952 forced a documentation pass: the rollout procedure still described the reversed design and could not have worked against an existing `Atomic` database, several sources still presented Option B as as-built, and a CHK-by-name version claim had been changed to 0.27.1 against the Altinity release notes, which say 0.27.0 |
 | 2026-08-28 | Accepted / Not started | **Decision reversed before it ever shipped.** Two Kind bring-ups showed exporter-owned `ON CLUSTER` DDL reaching only 1 of 3 and then 2 of 3 replicas, and the exporter's README recommends `create_schema: false` for production to prevent exactly that startup race. Schema ownership moves to a bootstrap Job in git and the `otel` database becomes `ENGINE = Replicated`. Option B is demoted to a rejected alternative with the measurements. Amended rather than superseded: this record had not landed on `main` and had never reached `Adoption: Complete`, so a superseding ADR would leave two records describing one never-deployed design |
 
 ---

@@ -440,7 +440,7 @@ and extend Adoption instead.
 | [ADR-062](ADR-062-staff-groups-sso/) | Authorize infra tools through staff-realm groups | Accepted | **Complete** — Grafana + OpenBAO SSO live (2026-08-26); third client `flux-web` joined 2026-08-27 (#940) | — |
 | [ADR-063](ADR-063-temporal-otel-v2/) | Adopt the OpenTelemetry v2 integration for Temporal telemetry | Accepted | **Complete** — fleet on one SDK, consumers on measured names, Kind gate green | — |
 | [ADR-064](ADR-064-all-workers-under-controller/) | Run every Temporal worker under the Worker Controller | Accepted | **Complete** — checkout-abandon WorkerDeployment live, runs pinned to derived builds | — |
-| [ADR-065](ADR-065-clickhouse-replicated-topology/) | Replicate ClickHouse across three replicas on a Keeper quorum | Accepted | Not started | [RFC-0028](../rfc/RFC-0028/) |
+| [ADR-065](ADR-065-clickhouse-replicated-topology/) | Replicate ClickHouse across three replicas on a Keeper quorum, with the schema owned by a bootstrap Job | Accepted | **Complete** — 3/3 replicas on Kind, 0 distributed-DDL entries, replica- and keeper-kill drills passed with the collector never restarting | [RFC-0028](../rfc/RFC-0028/) |
 
 Principles:
 
@@ -451,4 +451,4 @@ API docs describe as-built.  Runbooks operate it.
 ```
 
 ---
-_Last updated: 2026-08-28 — ADR-065 created at `Accepted` with [RFC-0028](../rfc/RFC-0028/) (ClickHouse 1×3 on a Keeper quorum, exporter-owned replicated schema); adoption follows in the same PR's Kind gate. Previously: ADR-062's index row caught up with the record itself (Accepted/Complete since 2026-08-26; the flux-web third client landed 2026-08-27). Previously: ADR-056 accepted (k6 assertion layer; ADR-045 sizing amended alongside it, and ADR-055 finally has an observed backlog to scale on)_
+_Last updated: 2026-08-28 — ADR-065 created at `Accepted` with [RFC-0028](../rfc/RFC-0028/) (ClickHouse 1×3 on a Keeper quorum) and **amended the same day**: schema ownership moved from the collector's exporter to a bootstrap Job in a `Replicated` database, after the exporter-owned path was measured leaving replicas without a schema. Adoption `Complete` on the same PR's Kind gate. Previously: ADR-062's index row caught up with the record itself (Accepted/Complete since 2026-08-26; the flux-web third client landed 2026-08-27). Previously: ADR-056 accepted (k6 assertion layer; ADR-045 sizing amended alongside it, and ADR-055 finally has an observed backlog to scale on)_

@@ -12,7 +12,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 | **Engine** | `clickhouse/clickhouse-server:26.7`, ReplicatedMergeTree, **1 shard × 3 replicas** on a 3-node ClickHouse Keeper quorum |
 | **Operator** | Altinity `clickhouse-operator` `0.27.3` + a `ClickHouseInstallation` CR and a `ClickHouseKeeperInstallation` CR |
 | **Ingest** | OTel Collector contrib `clickhouse` exporter — fan-out on the **traces + logs** pipelines (metrics stay on VictoriaMetrics — **never** here) |
-| **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), auto-created `ON CLUSTER` by the exporter (`create_schema` + `cluster_name` + `table_engine`) |
+| **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), created by the **`clickhouse-schema` Job** from DDL committed in git; the exporter only INSERTs |
 | **Retention** | **TTL 90 days** (`ttl_only_drop_parts`) vs 7d on the ops primaries — the long-retention payoff |
 | **Storage** | local PVC `standard` `10Gi` **per replica** (cluster) + small keeper PVCs; a named `clickhouse-data` volume (local-stack, which stays single-node) |
 | **Query** | Grafana `grafana-clickhouse-datasource` **4.20.0** (`uid: clickhouse`, native `:9000`) + 5 provisioned dashboards in the **ClickHouse** folder (suite Overview→Logs→Traces, service deep dive, platform SQL) |
@@ -195,7 +195,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 | **Operator** | Altinity `altinity-clickhouse-operator` `0.27.3` (HelmRelease in the `controllers` wave, ns `monitoring`); CRDs health-checked before the CHI applies (`kubernetes/infra/controllers/clickhouse-operator/`) |
 | **Instance** | `ClickHouseInstallation` `clickhouse` (cluster `otel`) → StatefulSets `chi-clickhouse-otel-0-{0,1,2}`, one per node (host anti-affinity); own Flux Kustomization `clickhouse-local` `dependsOn [controllers-local, secrets-local]`, health-checking **all three** (`kubernetes/infra/configs/clickhouse/`) |
 | **Coordination** | `ClickHouseKeeperInstallation` `keeper`, 3 replicas, referenced by name (`zookeeper.keeper.name`); holds the replication metadata. A replica that loses its Keeper session serves reads and refuses writes |
-| **Storage** | PVC `standard` `10Gi` per replica (`volumeClaimTemplates`) + keeper data `2Gi` / log `1Gi`; local-stack uses a named `clickhouse-data` volume |
+| **Storage** | PVC `standard` `10Gi` per replica (`volumeClaimTemplates`) + keeper data `2Gi` (no log PVC — the operator's keeper logs to console); local-stack uses a named `clickhouse-data` volume |
 | **Credentials** | `default` user password from OpenBAO `secret/local/infra/clickhouse/admin` via the `clickhouse-credentials` `ClusterExternalSecret` → Secret in `monitoring` (selector label `platform.duynhlab/clickhouse`); local-stack uses an inline dev password |
 | **Ingest** | Collector contrib `clickhouse` exporter appended to the `traces` + `logs` pipelines, **INSERT-only** (`create_schema: false`); `async_insert`, `sending_queue`, `retry_on_failure`; password via `${env:CLICKHOUSE_PASSWORD}` (`extraEnvs` secretKeyRef) |
 | **Schema owner** | The `clickhouse-schema` **Job**, SQL committed in `kubernetes/infra/configs/clickhouse-schema/` ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). It creates the `otel` database with `ENGINE = Replicated` on each replica, then the tables once; the database's Keeper log propagates them. TTL 90d lives in that DDL |
@@ -355,7 +355,7 @@ and trace↔log navigation — without it the datasource is a plain SQL connecti
 
 ### OTel schema versions
 
-The collector's exporter owns the DDL, and its shape changed at contrib
+The DDL is owned by the `clickhouse-schema` Job, but its *shape* still tracks
 **0.151.0** (the `TimestampTime` helper column left `otel_logs`):
 
 | Schema | Exporter | `otel_logs` shape |
@@ -366,7 +366,7 @@ The collector's exporter owns the DDL, and its shape changed at contrib
 Plugin ≥ 4.20.0 **auto-detects the logs schema from the table's columns** when
 the version selector is on auto (latest); our provisioning deliberately does not
 pin a version. After any collector bump, `DESCRIBE otel.otel_logs` tells you
-which shape a table has — `create_schema` is create-if-absent, so an old table
+which shape a table has — the Job's `CREATE TABLE IF NOT EXISTS` is create-if-absent, so an old table
 keeps its old shape until dropped.
 
 ### Explore & trace↔log linking
@@ -517,9 +517,11 @@ not appearing → [Runbook](#runbook--data-not-appearing).
 The five dashboards above watch the **data** (OTel rows over the SQL
 datasource). This chapter is the **engine**: is the server up, is the disk
 filling, are merges keeping pace with inserts. Before this landed the engine
-view was blind — no scrape, no alert — and a dead ClickHouse surfaces in the
-worst possible way: the OTel Collector's `create_schema` startup step blocks
-every collector restart until the store returns.
+view was blind — no scrape, no alert. A dead ClickHouse used to surface in the
+worst possible way too: the collector's `create_schema` startup step blocked
+every restart until the store returned. Since RFC-0028 it does not — the
+collector owns no DDL, so a dead store costs the ClickHouse sink and nothing
+else.
 
 ### Metric sources
 
@@ -555,7 +557,7 @@ naming series the exporter does not publish — count the file, not the prose.
 The spine: the **reachability pair** — `ClickHouseReplicaUnreachable` (warning:
 one of three cannot be fetched, its peers still serve) escalating to
 `ClickHouseAllReplicasUnreachable` (critical: the store is down and the
-collector's `create_schema` will block every restart); the **replication pair**
+edge access log, which lives nowhere else, is being dropped); the **replication pair**
 — `ClickHouseZooKeeperExceptions` and `ClickHouseReadonlyReplica`, which catch
 the failure nothing else notices, because a replica that lost its quorum keeps
 answering reads while falling behind; the **disk pair** (<15% warn, <5%
@@ -615,7 +617,7 @@ the operator's reconcile counters.
   not rebuild it.
 - **ClickHouseDiskCritical** — `SELECT sum(bytes_on_disk) FROM system.parts
   GROUP BY table` to find the eater; drop the oldest partitions
-  (`ALTER TABLE … DROP PARTITION …`) or grow the PVC. The 30-day TTL cannot
+  (`ALTER TABLE … DROP PARTITION …`) or grow the PVC. The 90-day TTL cannot
   rescue a same-day spike.
 - **ClickHouseTooManyParts** — inserts too small or merges starved. Check the
   collector's batch processor settings first (bigger, fewer inserts), then

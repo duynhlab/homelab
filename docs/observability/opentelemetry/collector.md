@@ -163,7 +163,7 @@ into exporters (the old dedicated retry processor is long deprecated):
 
 - The ClickHouse exporter shows the full shape: `retry_on_failure`
   (5s → 30s backoff, 300s max elapsed) + `sending_queue` (4 consumers,
-  queue 1000), `async_insert`, lz4, 90-day TTL (`2160h`).
+  queue 1000), `async_insert`, lz4. The 90-day TTL lives in the committed DDL now, not in the exporter's `ttl:` option.
 - OTLP-HTTP exporters to the Victoria family use gzip; the metrics exporter
   targets **vmagent `:8429`** (not VMSingle) so relabeling and any
   streaming-aggregation stay at one choke point.

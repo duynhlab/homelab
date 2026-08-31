@@ -13,7 +13,7 @@
 - [x] Context7 audit complete (see research § Context7 audit log)
 - [x] Owner approved **ready for RFC** (2026-08-28, in-session)
 - Mechanism deep-dive lives in [./research.md](./research.md) — this file only decides
-- Status → **`Accepted`** 2026-08-28. ADR: [`ADR-065`](../../adr/ADR-065-clickhouse-replicated-topology/) — created at `Accepted` with this review (one decision: 1×3 + CHK with exporter-owned replicated schema). `docs/api/`: N/A — no service contract touches ClickHouse. **Platform docs that MUST move at implementation** (infra-only ≠ docs-free):
+- Status → **`Accepted`** 2026-08-28. ADR: [`ADR-065`](../../adr/ADR-065-clickhouse-replicated-topology/) — created at `Accepted` with this review. Its one decision is the 1×3 + CHK topology with a **Job-owned** replicated schema; the exporter-owned variant this RFC originally proposed was reversed at implementation (see History). `docs/api/`: N/A — no service contract touches ClickHouse. **Platform docs that MUST move at implementation** (infra-only ≠ docs-free):
   - `docs/observability/clickhouse/README.md` — quick-facts row ("MergeTree, single shard × single replica"), deployment inventory, and the DDL section (engine becomes `ReplicatedMergeTree`)
   - `docs/observability/tracing/architecture.md` — the accepted-gap line "ClickHouse is a single shard … lost volume is lost traces" is retired for the ClickHouse half (VictoriaTraces stays single-node by design)
   - `docs/platform/setup.md` — the `clickhouse-local` wave description gains the CHK
@@ -25,13 +25,18 @@
 The ClickHouse observability store moves from 1×1 (one replica, one PVC, the
 recorded *lost volume = lost traces* gap) to **1 shard × 3 replicas
 coordinated by a 3-node ClickHouse Keeper quorum**, with the schema recreated
-from scratch as `ReplicatedMergeTree` **by the otel-collector exporter
-itself** (`create_schema: true` + `cluster_name` + `table_engine`) — zero new
-components beyond the Keeper. Sharding/Distributed stays a documented
-reference (research § trigger signals), and the least-privilege user model
-stays an optional side-rung. Owner decisions binding this RFC: recreate from
-scratch · straight to 3+3 · default `{uuid}` replica path · keep default
-access · exporter-owned schema (Option B).
+from scratch as `ReplicatedMergeTree` in a **`Replicated` database owned by a
+bootstrap Job**, its DDL committed to git; the otel-collector runs
+`create_schema: false` and only INSERTs. Sharding/Distributed stays a
+documented reference (research § trigger signals), and the least-privilege
+user model stays an optional side-rung.
+
+Owner decisions binding this RFC: recreate from scratch · straight to 3+3 ·
+default `{uuid}` replica path · keep default access. The fifth — exporter-owned
+schema (Option B) — was **reversed at implementation** after it was measured
+producing a schema on 1 of 3 and then 2 of 3 replicas; see
+[Implementation History](#implementation-history). The gate's reasoning for it
+is preserved below rather than rewritten.
 
 ## Motivation
 
@@ -39,15 +44,17 @@ One bad disk currently erases 90 days of edge access logs (ClickHouse-only
 per ADR-061) and all long-retention traces. Replication converts that from
 unrecoverable data loss into a failover. Everything this needs is already
 deployed except the topology itself: operator 0.27.3 (CHK CR, macros,
-generated `remote_servers` with `internal_replication: true`) and a collector
-whose exporter templates carry `ON CLUSTER` + `ENGINE` slots on every table.
+generated `remote_servers` with `internal_replication: true`), and the schema
+the exporter had already built is the schema the bootstrap Job now commits.
 
 ### Goals
 
 - Survive the loss of any single ClickHouse pod/PVC with no data loss and no
   read/write outage (Grafana keeps answering; the collector keeps inserting).
-- Keep the delta small: no new schema owner, no new waves, no new repos —
-  one CHK resource, three numbers, one exporter config block.
+- Keep the delta small: no new repos, and reuse the operator's own mechanisms —
+  one CHK resource, three numbers, and the schema in git. (As proposed this goal
+  read "no new schema owner, no new waves"; implementation had to spend both, and
+  why is in the History.)
 - Leave a written trail for the two futures deliberately not built: sharding
   (trigger table in research) and the user model (optional rung).
 
@@ -66,8 +73,8 @@ whose exporter templates carry `ON CLUSTER` + `ENGINE` slots on every table.
    PVCs) lands in `kubernetes/infra/configs/clickhouse/` — same directory,
    same `clickhouse-local` wave; the operator already handles both CRs.
 2. **CHI**: `replicasCount: 1 → 3`, plus `zookeeper.keeper.name: keeper`
-   (the by-name reference; the operator docs date it to 0.27.1, not 0.27.0 —
-   either way 0.27.3 is deployed) and pod anti-affinity on
+   (the by-name reference, added in operator 0.27.0; 0.27.3 is deployed) and
+   pod anti-affinity on
    `kubernetes.io/hostname` (Kind has no zones). The operator keeps
    auto-creating the PDB; macros and `remote_servers` regenerate themselves.
 3. **Schema — REVISED AT IMPLEMENTATION (see History).** The RFC proposed
@@ -82,7 +89,8 @@ whose exporter templates carry `ON CLUSTER` + `ENGINE` slots on every table.
    alert to per-replica.
 5. **local-stack**: compose stays 1×1 single-node (no keeper in compose —
    the twin divergence is recorded, same as it already is for scrape ports
-   pre-quick-win); the exporter options are cluster-only values.
+   pre-quick-win). local-stack keeps `create_schema: true`: one node has no
+   `ON CLUSTER` and therefore no race to avoid.
 
 ### Alternatives
 
@@ -118,18 +126,18 @@ startup decoupling) are not yet needed and are now standing revisit triggers.
 
 ## Architecture & Diagrams
 
-Target state (mechanism diagrams live in research — this is the as-proposed
-topology):
+As-built topology (mechanism diagrams live in research):
 
 ```mermaid
 flowchart TD
   subgraph WRITE["Write"]
-    OC["otel-collector<br/>create_schema: true<br/>cluster_name + table_engine:<br/>ReplicatedMergeTree"]
+    JOB["clickhouse-schema Job<br/>DDL committed in git<br/>owns the schema"]
+    OC["otel-collector<br/>create_schema: false<br/>INSERT only"]
   end
   subgraph READ["Read"]
     GF["Grafana datasource<br/>user: default (unchanged)"]
   end
-  subgraph CH["CHI clickhouse — 1 shard × 3 replicas"]
+  subgraph CH["CHI clickhouse — 1 shard × 3 replicas<br/>database otel: ENGINE = Replicated"]
     R0[("replica 0")]
     R1[("replica 1")]
     R2[("replica 2")]
@@ -137,6 +145,7 @@ flowchart TD
   subgraph KEEP["CHK keeper ×3 (quorum)"]
     K0["keeper-0"] --- K1["keeper-1"] --- K2["keeper-2"]
   end
+  JOB -->|"CREATE DATABASE per replica, no ON CLUSTER"| CH
   OC -->|"INSERT (Service round-robin)"| CH
   GF -->|"SELECT"| CH
   R0 <-->|replicate| R1
@@ -147,33 +156,47 @@ flowchart TD
   classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
   classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
   classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  class OC collector; class GF service;
+  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+  class OC collector; class JOB worker; class GF service;
   class R0,R1,R2 data; class K0,K1,K2 platform;
 ```
 
 ## Design Details
 
-- **Enable/disable**: entirely declarative — the CHK resource, three CHI
-  fields (`replicasCount`, `zookeeper.keeper.name`, anti-affinity), one
-  exporter config block. Disabling = reverting those (see Rollout & rollback).
-- **Ordering**: the CHK must be Ready before the CHI reconciles replicas
-  (the CHI references it by name). Both live in one wave; the operator
-  retries the CHI until Keeper answers, and the wave's `wait: true` plus the
-  existing StatefulSet healthCheck gate downstream (`tracing-local` already
-  dependsOn `clickhouse-local`).
+- **Enable/disable**: declarative — the CHK resource, three CHI fields
+  (`replicasCount`, `zookeeper.keeper.name`, anti-affinity), the schema Job and
+  its DDL, and `create_schema: false` on the collector. Disabling means reverting
+  those *and* dropping the database (see Rollout & rollback — the asymmetry is
+  the part that gets skipped).
+- **Ordering**: the CHK must be Ready before the CHI reconciles replicas (the CHI
+  references it by name); both live in the `clickhouse-local` wave. That wave
+  deliberately carries **no `wait: true`** — `wait` and `healthChecks` are
+  mutually exclusive in Flux and `wait` wins, and since the overlay applies only
+  custom resources kstatus cannot assess, `wait` made it report Ready in 371 ms
+  with zero pods. Six explicit StatefulSet health checks gate it instead. The
+  schema Job then gets its own wave, `clickhouse-schema-local` with `wait: true`
+  (a Job *is* something kstatus assesses), and `tracing-local` depends on that
+  rather than on the store.
 - **Default replica path**: one implementation check —
   `SELECT * FROM system.server_settings WHERE name LIKE 'default_replica%'`
   — to confirm `/clickhouse/tables/{uuid}/{shard}` + `{replica}` on our build.
-- **TTL**: unchanged (`ttl: 2160h` in the exporter). System-table TTLs arrive
-  via the independent quick-win PR.
+- **TTL**: 90 days, and it now lives in the committed DDL
+  (`TTL … + toIntervalDay(90)` plus `ttl_only_drop_parts`) rather than in the
+  exporter's `ttl:` option, which no longer applies once the exporter creates
+  nothing. System-table TTLs arrive via the independent quick-win PR.
 - **Operator determines in-use**: `kubectl get chk,chi -n monitoring`;
   `SELECT * FROM system.replicas` shows three entries per table;
-  `system.zookeeper_connection` names the keeper.
-- **Drawbacks (recorded, accepted)**: (1) DDL still runs in collector
-  `start()` — a collector restart during a ClickHouse outage stalls all its
-  sinks until ClickHouse returns (revisit trigger → Option A); (2) the
-  exporter never ALTERs — the first real schema change re-opens the Job
-  question; (3) memory limits triple (~7.5Gi ceiling in `monitoring`).
+  `system.zookeeper_connection` names the keeper; `system.databases` must show
+  `engine = Replicated` for `otel`.
+- **Drawbacks (recorded, accepted)**: (1) a new moving part — a Job, its SQL and
+  a wave, and Jobs are immutable so changing the DDL needs a delete plus a
+  reconcile; (2) the committed schema must track the exporter's INSERT contract,
+  so a collector image bump means re-checking upstream `logs_insert.sql` /
+  `traces_insert.sql`, and a mismatch fails at insert time under traffic rather
+  than at apply time; (3) memory limits triple (~7.5Gi ceiling in `monitoring`).
+  The two drawbacks this RFC originally accepted — DDL in the collector's
+  `start()`, and an exporter that never `ALTER`s — are **gone**, which is most of
+  why the reversal was worth its cost.
 
 ## Security considerations
 
@@ -196,20 +219,56 @@ only if the optional rung is ever taken.
 
 ## Rollout & rollback
 
-**Rollout** (one homelab PR): CHK + CHI changes + collector exporter block +
-alert re-enable, then either a fresh `make up` or, on the live cluster:
-reconcile, **deliberately drop the old plain-MergeTree tables** (owner
-decision — this discards current demo data), restart the collector so the
-exporter recreates the schema replicated.
+**Rollout is fresh-only, and that is a policy, not an omission.** The owner
+chose fresh tables at the gate — nothing here is a real deployment and the demo
+data is disposable — so there is no in-place migration and none is offered.
+
+The reason it cannot be in-place: `CREATE DATABASE IF NOT EXISTS otel ENGINE =
+Replicated` does **not** convert an existing `Atomic` database. On a cluster that
+already carries the old `otel`, the statement is a no-op, the schema Job's own
+verify then fails on `engine != Replicated`, `clickhouse-schema-local` never goes
+Ready, and `tracing-local` is never released. The Job now detects that state in a
+preflight and fails immediately with the procedure below, rather than after
+running half its DDL.
+
+**Preferred path — a fresh cluster.** `make down && make up`. Nothing to do.
+
+**On a cluster that already has `otel`** (destructive, discards the data):
+
+```bash
+# 1. the store must be up first; the schema wave gates on it
+flux -n flux-system reconcile kustomization clickhouse-local --with-source
+
+# 2. drop the old database on EVERY replica. Per replica, not ON CLUSTER:
+#    the new design never uses the distributed-DDL queue, and a partial drop
+#    leaves exactly the split-brain schema this RFC exists to prevent.
+PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
+for p in $(kubectl -n monitoring get po -l clickhouse.altinity.com/chi=clickhouse -o name); do
+  kubectl -n monitoring exec "${p#pod/}" -c clickhouse -- \
+    clickhouse-client --password "$PW" -q "DROP DATABASE IF EXISTS otel SYNC"
+done
+
+# 3. let the Job build the replicated schema, then release the collector
+kubectl -n monitoring delete job clickhouse-schema --ignore-not-found
+flux -n flux-system reconcile kustomization clickhouse-schema-local --with-source
+flux -n flux-system reconcile kustomization tracing-local --with-source
+```
+
+Order matters and is the same order the waves enforce: `clickhouse-local` →
+drop → `clickhouse-schema-local` → `tracing-local`.
 
 **Blast radius**: `monitoring` namespace; Grafana ClickHouse panels are blank
 between the drop and the first new inserts; VictoriaMetrics-side dashboards
-unaffected.
+unaffected. The collector keeps running — it owns no DDL, so it does not
+crash-loop while the schema is absent; its ClickHouse sink backpressures and
+drops until the tables exist.
 
-**Rollback**: `replicasCount: 3 → 1`, remove the exporter's two options,
-optionally remove the CHK. Replicated tables remain readable single-replica
-(a lone replica without Keeper goes read-only for writes — so a full rollback
-also recreates plain tables, which is the same fresh-start move in reverse).
+**Rollback**: `replicasCount: 3 → 1` and optionally remove the CHK. Note the
+asymmetry: a lone replica without a quorum holds `ReplicatedMergeTree` tables
+that are readable but **read-only for writes**, so a real rollback also means
+dropping the database and letting the Job recreate it — the same destructive
+step as above, in reverse. Write that down before starting, because it is the
+part most likely to be skipped under pressure.
 
 ## Testing / verification
 
@@ -228,7 +287,7 @@ also recreates plain tables, which is the same fresh-start move in reverse).
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| 1×3 replicated ClickHouse with CHK quorum, exporter-owned replicated schema (fresh start, default replica path) | [ADR-065](../../adr/ADR-065-clickhouse-replicated-topology/) | Accepted 2026-08-28 |
+| 1×3 replicated ClickHouse with CHK quorum, **Job-owned** replicated schema in a `Replicated` database (fresh start, default replica path) | [ADR-065](../../adr/ADR-065-clickhouse-replicated-topology/) | Accepted 2026-08-28 · amended same day, exporter-owned → Job-owned |
 
 ## Implementation History
 

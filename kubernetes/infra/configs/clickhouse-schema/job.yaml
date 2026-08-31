@@ -127,6 +127,48 @@ spec:
                 echo "    $h ok"
               done
 
+              # PREFLIGHT. `CREATE DATABASE IF NOT EXISTS ... ENGINE = Replicated`
+              # does NOT convert an existing Atomic database — it is a no-op, and
+              # the verify at the end would then fail on the engine after this Job
+              # had already created tables inside the wrong database. Catch it
+              # here, before touching anything, and say what to do about it.
+              echo "==> preflight: no pre-existing non-Replicated otel database"
+              stale=0
+              for h in $HOSTS; do
+                eng=$(cli "$h.monitoring.svc.cluster.local" -q \
+                  "SELECT engine FROM system.databases WHERE name='otel' FORMAT TSV" 2>/dev/null || true)
+                if [ -n "$eng" ] && [ "$eng" != "Replicated" ]; then
+                  echo "    $h: otel exists with engine '$eng'"
+                  stale=1
+                fi
+              done
+              if [ "$stale" = "1" ]; then
+                cat <<'MSG'
+              FAIL: an `otel` database already exists with a non-Replicated engine.
+
+              This is not repairable in place: CREATE DATABASE IF NOT EXISTS will
+              not change the engine of an existing database, so this Job cannot
+              build the replicated schema on top of it.
+
+              The rollout is fresh-only by decision (RFC-0028: demo data is
+              disposable). Drop the database on EVERY replica, then re-run:
+
+                PW=$(kubectl -n monitoring get secret clickhouse-credentials \
+                      -o jsonpath='{.data.password}' | base64 -d)
+                for p in $(kubectl -n monitoring get po \
+                      -l clickhouse.altinity.com/chi=clickhouse -o name); do
+                  kubectl -n monitoring exec "${p#pod/}" -c clickhouse -- \
+                    clickhouse-client --password "$PW" -q "DROP DATABASE IF EXISTS otel SYNC"
+                done
+                kubectl -n monitoring delete job clickhouse-schema
+                flux -n flux-system reconcile kustomization clickhouse-schema-local
+
+              Per replica, not ON CLUSTER: a partial drop leaves exactly the
+              split-brain schema this design exists to prevent.
+              MSG
+                exit 1
+              fi
+
               echo "==> CREATE DATABASE on each replica (no ON CLUSTER, no DDL queue)"
               for h in $HOSTS; do
                 cli "$h.monitoring.svc.cluster.local" --queries-file /sql/00-database.sql

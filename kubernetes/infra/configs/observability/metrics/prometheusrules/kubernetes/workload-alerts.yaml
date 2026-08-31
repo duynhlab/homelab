@@ -69,6 +69,35 @@ spec:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeHPAMaxedOut.md"
 
     # --- Storage (USE: Utilization) ---
+    #
+    # MEASURED 2026-08-31: both rules in this group are INERT on Kind, and the
+    # cause is the storage class rather than anything here. `kubelet_volume_stats_*`
+    # returns zero series platform-wide, so both expressions evaluate against an
+    # empty vector and can never fire.
+    #
+    # The scrape is not at fault and neither is the expression. VMNodeScrape
+    # `kubelet-volume-stats` (victoriametrics/vmnodescrape-kubelet.yaml) targets
+    # /metrics with a keep-filter that matches these names, and
+    # `kubelet_running_pods` — kept by that same filter — arrives normally on all
+    # four nodes. Asking kubelet directly settles it:
+    #   kubectl get --raw /api/v1/nodes/homelab-worker/proxy/metrics \
+    #     | grep -c '^kubelet_volume_stats'   ->  0
+    # `standard` is rancher.io/local-path, whose PVs are hostPath directories, and
+    # kubelet does not collect volume stats for hostPath volumes. No CSI driver,
+    # no volume stats.
+    #
+    # KEPT, not deleted, and the distinction matters: unlike the ClickHouse rules
+    # deleted on 2026-08-22 for naming series that exist nowhere, these names are
+    # standard Kubernetes and will populate on any cluster with a CSI driver that
+    # implements NodeGetVolumeStats. Deleting them would trade a local blind spot
+    # for a real one everywhere else.
+    #
+    # Consequence worth stating plainly: this platform currently has NO working
+    # PVC-level disk signal. The same gap silently disables
+    # CNPGClusterLowDiskSpace{Warning,Critical} for both database clusters, which
+    # is the more serious half. KubeNodeDiskPressure (node-alerts.yaml) still works
+    # — it reads kube_node_status_condition — and is the only disk alert that can
+    # fire here today.
     - name: kubernetes-storage
       interval: 1m
       rules:

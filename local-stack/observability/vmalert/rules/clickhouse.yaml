@@ -111,10 +111,17 @@ groups:
           description: "The parts_to_delay_insert guard is slowing inserts — the step before rejection."
 
       # system.errors arrives as one series per error name
-      # (ClickHouseErrorMetric_<NAME>) — the local shape of the cluster's
-      # system_errors family. The __name__ regex sums the whole census.
+      # (ClickHouseErrorMetric_<NAME>), plus a ready-made total under the name
+      # ClickHouseErrorMetric_ALL.
+      #
+      # MEASURED 2026-08-31: the `__name__=~"ClickHouseErrorMetric_.+"` regex that
+      # stood here matched _ALL as well as every individual code, so it summed the
+      # total on top of its own parts and reported EXACTLY TWICE the real rate.
+      # On the cluster twin: 440/452/274 for the regex sum against 220/226/137 for
+      # _ALL alone. Reading the total directly is both correct and cheaper — the
+      # family carries ~737 names.
       - alert: ClickHouseServerErrorsElevated
-        expr: sum(rate({__name__=~"ClickHouseErrorMetric_.+"}[5m])) > 5
+        expr: sum(rate(ClickHouseErrorMetric_ALL[5m])) > 5
         for: 10m
         labels:
           severity: info

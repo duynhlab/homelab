@@ -85,6 +85,19 @@ spec:
             summary: "Kubelet is down"
             description: "No kubelet instances are reporting metrics. Node health cannot be determined."
 
+        # MEASURED 2026-08-31: INERT. The numerator arrives fine
+        # (`kubelet_running_pods` — 4 series, 12 pods on one worker), but
+        # `kubelet_node_config_assigned_pod_cidr_max_pods` returns zero series, so
+        # the division matches nothing and this rule has never been able to fire.
+        # It is kept rather than deleted because the shape is right and the
+        # numerator is proven; what is missing is a max-pods series, which this
+        # kubelet does not publish under that name. Finding the name it does use
+        # (or sourcing the capacity from kube-state-metrics' node allocatable
+        # instead) is a follow-up, not a fix to smuggle in here.
+        #
+        # Same failure class as the PVC and CNPG disk rules — see
+        # workload-alerts.yaml's kubernetes-storage group for the long version, and
+        # docs/observability/alerting/alert-catalog.md for the durable record.
         - alert: KubeletTooManyPods
           expr: |
             max(kubelet_running_pods) by (instance)

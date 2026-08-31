@@ -9,8 +9,8 @@ alerts, and operator health. One file per alert name — each file covers both
 | Alert rules | [`prometheusrules/postgres/`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/) |
 | Alert catalog | [§4 / §4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Metrics reference | [postgresql/custom-metrics.md](../../metrics/postgresql/custom-metrics.md) |
-| Emergency triage | [010.4-emergency-recovery.md](../../../databases/010.4-emergency-recovery.md) |
-| Pooler ops | [pgdog-operations.md](../../../databases/runbooks/pgdog-operations.md) |
+| Emergency triage | [runbooks/emergency-recovery.md](../../../databases/runbooks/emergency-recovery.md) |
+| Pooler ops | [pooler-operations.md](../../../databases/runbooks/pooler-operations.md) |
 
 ## Index
 
@@ -32,8 +32,8 @@ alerts, and operator health. One file per alert name — each file covers both
 | PostgresWALSizeHigh | warning | homelab-extra | active | [PostgresWALSizeHigh.md](PostgresWALSizeHigh.md) |
 | CNPGClusterZoneSpreadWarning | warning | chart | gated | [CNPGClusterZoneSpreadWarning.md](CNPGClusterZoneSpreadWarning.md) |
 | CNPGClusterInstancesOnSameNode | warning | chart | gated | [CNPGClusterInstancesOnSameNode.md](CNPGClusterInstancesOnSameNode.md) |
-| PostgresBackupTooOld | warning | backup-alerts | active | [postgres-backup-restore.md](../../../databases/runbooks/postgres-backup-restore.md) |
-| PostgresBackupFailed | critical | backup-alerts | active | [postgres-backup-restore.md](../../../databases/runbooks/postgres-backup-restore.md) |
+| PostgresBackupTooOld | warning | backup-alerts | active | [backup-restore.md](../../../databases/runbooks/backup-restore.md) |
+| PostgresBackupFailed | critical | backup-alerts | active | [backup-restore.md](../../../databases/runbooks/backup-restore.md) |
 | CNPGClusterLogicalReplicationErrors | warning | chart | inactive | [CNPGClusterLogicalReplicationErrors.md](CNPGClusterLogicalReplicationErrors.md) |
 | CNPGClusterLogicalReplicationErrorsCritical | critical | chart | inactive | [CNPGClusterLogicalReplicationErrorsCritical.md](CNPGClusterLogicalReplicationErrorsCritical.md) |
 | CNPGClusterLogicalReplicationLagging | warning | chart | inactive | [CNPGClusterLogicalReplicationLagging.md](CNPGClusterLogicalReplicationLagging.md) |

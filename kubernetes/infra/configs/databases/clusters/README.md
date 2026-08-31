@@ -14,15 +14,20 @@
 
 For detailed architecture, configuration, and components of each cluster, please refer to their respective directories:
 
-- **[platform-db](platform-db/)**: Consolidated CNPG cluster (RFC-0018) hosting Auth, User, Notification, Shipping, Review, and Temporal databases. 3-instance HA with PgDog pooler, Barman backup, and monitoring. Temporal connects direct to `platform-db-rw` (no pooler).
-- **[product-db](product-db/)**: Consolidated CNPG cluster hosting Product, Cart, Order, Checkout, and Payment databases (payment app connects direct-TLS). Includes PgDog pooler, backup, and monitoring.
+- **[platform-db](platform-db/)**: Consolidated CNPG cluster hosting User,
+  Notification, Shipping, Review, Keycloak, and Temporal databases. It has
+  three-instance HA with a CNPG PgBouncer pooler, Barman backup, and monitoring;
+  Temporal and Keycloak connect directly to `platform-db-rw`.
+- **[product-db](product-db/)**: Consolidated CNPG cluster hosting Product,
+  Cart, Order, Checkout, Inventory, and Payment databases. It has a PgDog
+  pooler, backup, and monitoring; the payment app connects directly over TLS.
 - **[product-db-replica](product-db-replica/)**: DR replica cluster; continuously recovers from product-db WAL archive. Promotable to standalone primary. Deployed via Flux **`configs/databases-cnpg-dr`** (`databases-cnpg-dr-local` depends on `databases-local`).
 
 ### DR replica troubleshooting
 
-See **[PostgreSQL DRP](../../../../../docs/databases/010-drp.md)** for the
+See **[PostgreSQL DRP](../../../../../docs/databases/disaster-recovery.md)** for the
 recovery decision flow and DR promotion controls, and
-**[HA and DR Architecture Deep-Dive](../../../../../docs/databases/005-ha-dr-deep-dive.md)**
+**[HA and DR Architecture Deep-Dive](../../../../../docs/databases/disaster-recovery.md)**
 for CNPG recovery internals.
 
 ---
@@ -120,7 +125,7 @@ When a Product Service calls `INSERT INTO products (name, price) VALUES ('Widget
 
 For full explanations with detailed diagrams, tables, and EC2/VM mapping, see:
 
-**[PostgreSQL Internals Deep Dive (product-db)](../../../../../docs/databases/001-postgresql-internals.md)**
+**[PostgreSQL Internals Deep Dive (product-db)](../../../../../docs/databases/fundamentals/postgresql-internals.md)**
 
 Topics covered:
 - INSERT/UPDATE workflow with sequence diagrams
@@ -137,7 +142,7 @@ Topics covered:
 
 ## Related Documentation
 
-- **Database Architecture Overview**: [`docs/databases/002-database-integration.md`](../../../../../docs/databases/002-database-integration.md)
-- **Pooler deep dive**: [`docs/databases/008-pooler.md`](../../../../../docs/databases/008-pooler.md)
+- **Database Architecture Overview**: [`docs/databases/architecture.md`](../../../../../docs/databases/architecture.md)
+- **Pooler inventory**: [`docs/databases/poolers.md`](../../../../../docs/databases/poolers.md)
 - **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../../docs/observability/metrics/README.md)
-- **Replication Deep Dive**: [`docs/databases/004-replication-strategy.md`](../../../../../docs/databases/004-replication-strategy.md)
+- **Replication Deep Dive**: [`docs/databases/fundamentals/replication-and-ha.md`](../../../../../docs/databases/fundamentals/replication-and-ha.md)

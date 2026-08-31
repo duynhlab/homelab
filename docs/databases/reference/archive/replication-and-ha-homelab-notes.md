@@ -1,8 +1,12 @@
-# PostgreSQL Replication & HA: A Deep Dive
+# Archived Homelab Notes: PostgreSQL Replication and HA
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use [replication fundamentals](../../fundamentals/replication-and-ha.md) and
+> [disaster recovery](../../disaster-recovery.md).
 
 This is the canonical sync/async replication deep dive. For DRP policy,
 incident decision flow, RTO/RPO ownership, and restore evidence, see
-[010-drp.md](./010-drp.md).
+[disaster-recovery.md](../../disaster-recovery.md).
 
 ## 1. Executive Summary
 
@@ -71,12 +75,12 @@ flowchart TB
 
 **Key findings:**
 - **product-db**: 3-node HA with synchronous quorum (**ANY 1** standby). Commits that complete under this policy have **RPO = 0** relative to acknowledged standbys. Hosts **product**, **cart**, **order**, and **payment** databases; **PgDog** is the pooler (payment app: direct-TLS).
-- **product-db-replica**: Single-instance cluster used for **disaster recovery**, continuously fed from **object-store backups** (not in-band streaming HA for the same namespace workloads). See [DR replica cluster](#dr-replica-cluster-product-db-replica) below and [005-ha-dr-deep-dive.md](005-ha-dr-deep-dive.md).
+- **product-db-replica**: Single-instance cluster used for **disaster recovery**, continuously fed from **object-store backups** (not in-band streaming HA for the same namespace workloads). See [DR replica cluster](#dr-replica-cluster-product-db-replica) below and [005-ha-dr-deep-dive.md](./ha-dr-deep-dive.md).
 - **platform-db**: 3-node HA with synchronous quorum (**ANY 1** standby), same posture as product-db — **RPO = 0** for commits acknowledged per the sync policy. Hosts auth, supporting services, and Temporal persistence (`temporal` + `temporal_visibility`; Temporal connects direct, not via PgDog).
 
 ### DR replica cluster (product-db-replica)
 
-**product-db-replica** is a separate CloudNativePG cluster (one instance) in the **product** namespace that tracks **product-db** via **backup / WAL archive in object storage**. It is not a substitute for in-cluster synchronous HA; it exists so you can recover or fail over when the primary region or cluster is lost. Scheduling, promotion, and operational trade-offs are covered in [005-ha-dr-deep-dive.md](005-ha-dr-deep-dive.md).
+**product-db-replica** is a separate CloudNativePG cluster (one instance) in the **product** namespace that tracks **product-db** via **backup / WAL archive in object storage**. It is not a substitute for in-cluster synchronous HA; it exists so you can recover or fail over when the primary region or cluster is lost. Scheduling, promotion, and operational trade-offs are covered in [005-ha-dr-deep-dive.md](./ha-dr-deep-dive.md).
 
 ---
 
@@ -165,7 +169,7 @@ sequenceDiagram
     participant Client
     participant Primary
     participant Replica
-    
+
     Note over Client, Primary: 1. ASYNCHRONOUS (local)
     Client->>Primary: COMMIT
     Primary->>Primary: Write to Local WAL
@@ -190,7 +194,7 @@ sequenceDiagram
     *   **Risk**: If Primary dies immediately after, data is lost before reaching replica.
     *   **Your Clusters**: none (single-node teaching examples commit locally by nature; the HA clusters use `on`).
 3.  **`remote_write`**: "Success if Replica OS received it."
-    *   Replica has it in RAM, but hasn't flushed to disk. 
+    *   Replica has it in RAM, but hasn't flushed to disk.
     *   Survives Postgres crash, but not Replica OS crash.
 4.  **`on`** (Standard Sync): "Success if Replica flushed to Disk."
     *   **Zero Data Loss** guarantee.
@@ -282,7 +286,7 @@ SELECT now() - pg_last_xact_replay_timestamp();
 
 **Replication lag monitoring** (run on Primary):
 ```sql
-SELECT 
+SELECT
     application_name,
     client_addr,
     state,

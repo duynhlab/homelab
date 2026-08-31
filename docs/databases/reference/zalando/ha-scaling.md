@@ -1,14 +1,14 @@
 # Runbook: Zalando Postgres Operator -- Scaling from 1 to 3 Nodes
 
 > **Historical / reference.** The platform migrated all Postgres from the
-> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> Zalando operator to [CloudNativePG](../../cloudnativepg.md). Zalando is no longer deployed
 > here — this doc is kept for learning.
 
 This is the operator-specific runbook for scaling a Zalando/Patroni cluster
 from a single instance to local HA. For platform-wide DRP policy, RTO/RPO
 ownership, standby taxonomy, and restore evidence, see
-[../010-drp.md](../010-drp.md). For Zalando operator internals, see
-[../003.2-operator-zalando.md](../003.2-operator-zalando.md).
+[../disaster-recovery.md](../../disaster-recovery.md). For Zalando operator internals, see
+[../reference/zalando/operator.md](./operator.md).
 
 ## Table of Contents
 
@@ -360,7 +360,7 @@ This is much safer than an unplanned failover because Patroni ensures the replic
 
 ## 5. Replication Modes: Async vs Sync
 
-### Current Configuration
+### Historical configuration at the time
 
 The `supporting-shared-db` cluster uses **asynchronous replication**:
 
@@ -644,7 +644,9 @@ Retaining PVCs is a safety feature -- if you scale back up to 3, the replicas ca
 
 ### All 3 Clusters (+ DR Replica)
 
-> **Note**: `product-db` and `transaction-shared-db` were consolidated into **`cnpg-db`** (see CHANGELOG). The table below reflects the current topology.
+> **Historical note**: `product-db` and `transaction-shared-db` were later
+> consolidated. The table below reflects the topology when this runbook was
+> written, not the deployed platform.
 
 | | cnpg-db | auth-db | supporting-shared-db |
 |---|---|---|---|
@@ -677,8 +679,8 @@ All 3 clusters will have HA with automatic failover. The platform achieves **100
 
 - **Manifest**: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`
 - **Reference cluster (3-node)**: `kubernetes/infra/configs/databases/clusters/auth-db/instance.yaml`
-- **Replication strategy docs**: `docs/databases/004-replication-strategy.md`
-- **Operator comparison**: `docs/databases/003-operator-comparison.md`
+- **Replication strategy docs**: `docs/databases/fundamentals/replication-and-ha.md`
+- **Operator comparison**: `docs/databases/reference/operator-comparison.md`
 - **Zalando Operator User Guide**: [Standby clusters](https://opensource.zalando.com/postgres-operator/docs/user.html#setting-up-a-standby-cluster)
 - **Zalando Operator Admin Guide**: [Rolling updates](https://postgres-operator.readthedocs.io/en/latest/administrator/#understanding-rolling-update-of-spilo-pods)
 - **Patroni documentation**: [patroni.readthedocs.io](https://patroni.readthedocs.io/en/latest/)

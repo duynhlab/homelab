@@ -50,7 +50,7 @@ must state rollout order and respect the Flux dependency chain.
 | GitOps / delivery | `kubernetes/clusters/`, `kubernetes/apps/` | [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md), [`docs/platform/setup.md`](docs/platform/setup.md) |
 | Controllers / infra | `kubernetes/infra/` | [`kubernetes/infra/README.md`](kubernetes/infra/README.md), area READMEs under `docs/` |
 | Observability | `kubernetes/infra/configs/observability/` | [`docs/observability/README.md`](docs/observability/README.md) |
-| Databases | `kubernetes/infra/configs/databases/` | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
+| Databases | `kubernetes/infra/configs/databases/` | [`docs/databases/architecture.md`](docs/databases/architecture.md) |
 | Secrets / TLS | `kubernetes/infra/controllers/secrets/` | [`docs/secrets/README.md`](docs/secrets/README.md) |
 | Security / policy | Kyverno, NetworkPolicy | [`docs/security/README.md`](docs/security/README.md) |
 | Bootstrap | `terraform/` | [`terraform/README.md`](terraform/README.md) |
@@ -462,7 +462,7 @@ reference style.
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |
 | Observability | [`docs/observability/README.md`](docs/observability/README.md) |
-| Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
+| Databases | [`docs/databases/architecture.md`](docs/databases/architecture.md) |
 | Secrets | [`docs/secrets/README.md`](docs/secrets/README.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) |
 | Platform edge (gateway) | [`docs/platform/envoy-gateway.md`](docs/platform/envoy-gateway.md) |
 | Caching | [`docs/api/caching.md`](docs/api/caching.md) · [`docs/caching/README.md`](docs/caching/README.md) |

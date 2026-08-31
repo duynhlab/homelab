@@ -205,8 +205,8 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 | PostgresWALSizeHigh | warning | `cnpg_collector_pg_wal{size}` >2GB | WAL pileup → disk + recovery-time impact | 15m | [PostgresWALSizeHigh](../runbooks/postgresql/PostgresWALSizeHigh.md) |
 | CNPGClusterZoneSpreadWarning ⏸ *gated — commented out in kustomization until production (needs KSM zone labels)* | warning | unique zones <3 | Zone failure = data loss | 5m | [CNPGClusterZoneSpreadWarning](../runbooks/postgresql/CNPGClusterZoneSpreadWarning.md) |
 | CNPGClusterInstancesOnSameNode ⏸ *gated — commented out in kustomization until production* | warning | >1 instance per node (`kube_pod_info`) | Node loss = total cluster loss | 5m | [CNPGClusterInstancesOnSameNode](../runbooks/postgresql/CNPGClusterInstancesOnSameNode.md) |
-| PostgresBackupTooOld | warning | `cnpg_collector_last_available_backup_timestamp` >26h | Stale backups → data-loss exposure | 1h | [postgres-backup-restore.md](../../databases/runbooks/postgres-backup-restore.md) |
-| PostgresBackupFailed | critical | `cnpg_collector_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m | [postgres-backup-restore.md](../../databases/runbooks/postgres-backup-restore.md) |
+| PostgresBackupTooOld | warning | `cnpg_collector_last_available_backup_timestamp` >26h | Stale backups → data-loss exposure | 1h | [backup-restore.md](../../databases/runbooks/backup-restore.md) |
+| PostgresBackupFailed | critical | `cnpg_collector_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m | [backup-restore.md](../../databases/runbooks/backup-restore.md) |
 | CNPGClusterLogicalReplicationErrors 💤 | warning | apply+sync error counters increasing | Logical-replication divergence | 1m | [CNPGClusterLogicalReplicationErrors](../runbooks/postgresql/CNPGClusterLogicalReplicationErrors.md) |
 | CNPGClusterLogicalReplicationErrorsCritical 💤 | critical | ≥5 errors in 5m | Persistent logical-replication failure | 0m | [CNPGClusterLogicalReplicationErrorsCritical](../runbooks/postgresql/CNPGClusterLogicalReplicationErrorsCritical.md) |
 | CNPGClusterLogicalReplicationLagging 💤 | warning | receipt/apply lag >60s or buffered >1GB | Subscriber falling behind | 5m | [CNPGClusterLogicalReplicationLagging](../runbooks/postgresql/CNPGClusterLogicalReplicationLagging.md) |
@@ -784,7 +784,7 @@ implemented yet — they are recommendations.
 
 ### Already-tracked DB gaps (from the DR review)
 
-Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-and-next-improvements):
+Recorded in [disaster-recovery.md → Known Gaps](../../databases/disaster-recovery.md#known-gaps-and-next-improvements):
 
 - **`platform-db-replica` DR cluster for platform tier** — not deployed in RFC-0018; product line retains `product-db-replica`.
 - **`payment` reconciliation gaps are closed.** RFC-0021 phase 6 added the

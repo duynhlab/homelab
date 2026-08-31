@@ -1,12 +1,16 @@
-# HA and DR Architecture Deep-Dive
+# Archived Homelab Notes: HA and DR
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use [replication fundamentals](../../fundamentals/replication-and-ha.md) and
+> the current [disaster-recovery guide](../../disaster-recovery.md).
 
 How multiple PostgreSQL instances work together for High Availability and Disaster Recovery using CloudNativePG.
 
 This page is the CNPG technical deep dive. For the production-ready DRP,
 recovery decision flow, RTO/RPO ownership, and drill evidence checklist, see
-[010-drp.md](./010-drp.md).
+[disaster-recovery.md](../../disaster-recovery.md).
 
-> **Prerequisites**: Read [001-postgresql-internals.md](./001-postgresql-internals.md) first for single-instance PostgreSQL mechanics (processes, memory, WAL, MVCC). This document builds on those fundamentals.
+> **Prerequisites**: Read [fundamentals/postgresql-internals.md](../../fundamentals/postgresql-internals.md) first for single-instance PostgreSQL mechanics (processes, memory, WAL, MVCC). This document builds on those fundamentals.
 
 ---
 
@@ -340,7 +344,7 @@ When CNPG promotes a replica:
 5. **PgDog**: sees `-rw` DNS change, routes writes to new primary
 6. **Old primary**: if it recovers, rejoins as replica (pg_rewind if needed)
 
-**Measured on Kind, 2026-08-06** ([drill DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#g3--cnpg-switchover-under-load)):
+**Measured on Kind, 2026-08-06** ([drill DR-2026-08-B](../../../proposals/rfc/RFC-0021/gameday.md#g3--cnpg-switchover-under-load)):
 step 4 took **12.6 s**, not `< 5 s`, and the `-rw` endpoint list was **empty for
 10.9 s** between fencing the old primary and publishing the new one. That empty
 window is the outage — step 5 followed promptly once there was an address to
@@ -369,7 +373,7 @@ kubectl cnpg status product-db
 
 - **Object store backup** — DR `bootstrap.recovery` needs a **completed** physical backup of `product-db` in RustFS (`s3://pg-backups-cnpg/product-db/`). On first cluster bring-up, apply `product-db` and wait for scheduled/on-demand backups before the DR replica can finish `full-recovery` (or expect transient job `Error` until a backup exists).
 - **GitOps** — Flux applies `controllers/databases/cnpg-barman-plugin` before `configs/databases`, then `configs/databases-cnpg-dr` (`databases-cnpg-dr-local` `dependsOn: databases-local`) so the Barman Cloud Plugin, `ObjectStore` CRD, primary cluster, and `ScheduledBackup` / `Backup` resources exist before `product-db-replica`.
-- **WAL GUC parity** — Data directory inherits primary `wal_segment_size` (e.g. 64MB). The DR cluster `spec.postgresql.parameters` must include `min_wal_size` (and related WAL settings) consistent with PostgreSQL rules: `min_wal_size >= 2 * wal_segment_size` (see [`product-db-replica/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/product-db-replica/instance.yaml)).
+- **WAL GUC parity** — Data directory inherits primary `wal_segment_size` (e.g. 64MB). The DR cluster `spec.postgresql.parameters` must include `min_wal_size` (and related WAL settings) consistent with PostgreSQL rules: `min_wal_size >= 2 * wal_segment_size` (see [`product-db-replica/instance.yaml`](../../../../kubernetes/infra/configs/databases/clusters/product-db-replica/instance.yaml)).
 
 ### Architecture
 
@@ -515,12 +519,12 @@ RELOAD;            -- Hot-reload config (no restart)
 
 ## Related Documentation
 
-- [001-postgresql-internals.md](./001-postgresql-internals.md) -- Single-instance PostgreSQL mechanics
-- [002-database-integration.md](./002-database-integration.md) -- All clusters overview
-- [004-replication-strategy.md](./004-replication-strategy.md) -- Replication modes and synchronous_commit deep-dive
-- [006-backup-strategy.md](./006-backup-strategy.md) -- Backup architecture, retention, restore
-- [010-drp.md](./010-drp.md) -- Production-ready DRP, recovery decision flow, and evidence checklist
-- [008-pooler.md](./008-pooler.md) -- PgDog R/W splitting configuration
+- [fundamentals/postgresql-internals.md](../../fundamentals/postgresql-internals.md) -- Single-instance PostgreSQL mechanics
+- [architecture.md](../../architecture.md) -- All clusters overview
+- [fundamentals/replication-and-ha.md](../../fundamentals/replication-and-ha.md) -- Replication modes and synchronous_commit deep-dive
+- [fundamentals/backup-and-recovery.md](../../fundamentals/backup-and-recovery.md) -- Backup architecture, retention, restore
+- [disaster-recovery.md](../../disaster-recovery.md) -- Production-ready DRP, recovery decision flow, and evidence checklist
+- [fundamentals/connection-pooling.md](../../fundamentals/connection-pooling.md) -- PgDog R/W splitting configuration
 - Cluster manifests: `kubernetes/infra/configs/databases/clusters/product-db/`
 - DR replica: `kubernetes/infra/configs/databases/clusters/product-db-replica/`
 

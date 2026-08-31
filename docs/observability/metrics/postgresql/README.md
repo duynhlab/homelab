@@ -24,9 +24,9 @@ runbooks for the platform database layer.
 3. **Runbooks** — per-alert Meaning / Impact / Diagnosis / Mitigation:
    [../runbooks/postgresql/README.md](../../runbooks/postgresql/README.md)
 4. **Deep internals** — PostgreSQL concepts with homelab examples:
-   [../../databases/001-postgresql-internals.md](../../../databases/001-postgresql-internals.md)
+   [../../databases/fundamentals/postgresql-internals.md](../../../databases/fundamentals/postgresql-internals.md)
 5. **Emergency** — cluster down triage (before runbook detail):
-   [../../databases/010.4-emergency-recovery.md](../../../databases/010.4-emergency-recovery.md)
+   [../../databases/runbooks/emergency-recovery.md](../../../databases/runbooks/emergency-recovery.md)
 
 ## Document map
 
@@ -74,8 +74,8 @@ pod logs, tailed by the Vector DaemonSet into VictoriaLogs (no separate exporter
 
 ## References
 
-- [Database integration guide](../../../databases/002-database-integration.md)
-- [PgDog operations](../../../databases/runbooks/pgdog-operations.md)
+- [Database integration guide](../../../databases/architecture.md)
+- [PgDog operations](../../../databases/runbooks/pooler-operations.md)
 - [PromQL guide](../promql-guide.md)
 - [Metrics hub](../README.md)
 

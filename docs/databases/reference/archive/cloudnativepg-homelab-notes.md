@@ -1,18 +1,21 @@
-# CloudNativePG Operator Deep Dive
+# Archived Homelab Notes: CloudNativePG
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use the canonical [CloudNativePG guide](../../cloudnativepg.md).
 
 CloudNativePG (CNPG) is the PostgreSQL operator used for `product-db` and
 `product-db-replica`. This document focuses on what CNPG is good at, how it works,
 where it is stronger than the Zalando operator, and what to watch during
 production hardening.
 
-## Current Homelab Usage
+## Snapshot at archival time
 
 | Cluster | Namespace | Purpose |
 |---------|-----------|---------|
 | `product-db` | `product` | Primary PostgreSQL 18 cluster for `product`, `cart`, `order`, and `payment` |
 | `product-db-replica` | `product` | DR replica cluster following `product-db` from RustFS object-store backup/WAL |
 
-The current operator image in this repository is `ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0`.
+The recorded operator image was `ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0`.
 
 ## What CNPG Is Optimized For
 

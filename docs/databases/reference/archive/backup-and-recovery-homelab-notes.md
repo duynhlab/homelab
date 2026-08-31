@@ -1,4 +1,8 @@
-# PostgreSQL Backup Strategy
+# Archived Homelab Notes: Backup and Recovery
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use [backup fundamentals](../../fundamentals/backup-and-recovery.md) and the
+> current [backup policy](../../backup-policy.md).
 
 This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for the **operational PostgreSQL clusters + DR replica** (`platform-db`, `product-db`, `product-db-replica`) using **RustFS (S3-compatible)** as the backup target. Every cluster runs on CloudNativePG and uses the **Barman Cloud Plugin** (`ObjectStore` CR) into a **single bucket with per-cluster prefixes**:
 
@@ -11,7 +15,7 @@ Each cluster runs a daily `ScheduledBackup` (02:00) plus an every-6h backup. The
 former Zalando/WAL-G bucket `pg-backups-zalando` has been retired.
 
 For DRP policy, recovery decision flow, RTO/RPO ownership, and restore-drill
-evidence, see [010-drp.md](./010-drp.md).
+evidence, see [disaster-recovery.md](../../disaster-recovery.md).
 
 ## Table of Contents
 
@@ -29,7 +33,7 @@ evidence, see [010-drp.md](./010-drp.md).
    - [Operator → tool coupling](#operator--tool-coupling)
    - [What we use today and why](#what-we-use-today-and-why)
 8. [Comparison (physical options)](#comparison-physical-options)
-9. [Trade-offs matrix (frequency vs RPO/RTO/cost)](#trade-offs-matrix-frequency-vs-rporto-cost)
+9. [Trade-offs matrix (frequency vs RPO/RTO/cost)](#trade-offs-matrix-frequency-vs-rportocost)
 10. [PITR window and retention impact](#pitr-window-and-retention-impact)
 11. [Real-world failure scenarios](#real-world-failure-scenarios)
 
@@ -527,10 +531,10 @@ Best practices:
 
 ## Related Documentation
 
-- [002-database-integration.md](./002-database-integration.md) - Database architecture and cluster details
-- [010-drp.md](./010-drp.md) - Production-ready DRP, recovery decision flow, and restore-drill evidence
-- [postgres-backup-restore.md](./runbooks/postgres-backup-restore.md) - Runbook for backup/restore procedures
-- [RustFS README](../../kubernetes/infra/controllers/storage/rustfs/README.md) - RustFS deployment and access
+- [architecture.md](../../architecture.md) - Database architecture and cluster details
+- [disaster-recovery.md](../../disaster-recovery.md) - Production-ready DRP, recovery decision flow, and restore-drill evidence
+- [backup-restore.md](../../runbooks/backup-restore.md) - Runbook for backup/restore procedures
+- [RustFS README](../../../../kubernetes/infra/controllers/storage/rustfs/README.md) - RustFS deployment and access
 
 ---
 

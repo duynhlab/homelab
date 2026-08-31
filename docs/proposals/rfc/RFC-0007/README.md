@@ -8,38 +8,38 @@
 
 The platform has backups, replicas, and recovery runbooks — but it has **never
 rehearsed using them on a schedule with recorded, measured evidence**. Every
-RTO/RPO target in [`010.1`](../../../databases/010.1-rpo-rto-planning.md) is an
+RTO/RPO target in [`010.1`](../../../databases/reliability-targets.md) is an
 estimate, and the Barman Cloud Plugin migration cannot be declared
 production-accepted until a plugin-backed backup + restore/PITR drill is
-*completed and recorded* ([`010-drp.md`](../../../databases/010-drp.md#barman-cloud-plugin-current-state)).
+*completed and recorded* ([`disaster-recovery.md`](../../../databases/disaster-recovery.md#barman-cloud-plugin-current-state)).
 This RFC establishes a **recurring DR-drills program**: a cadence, named roles, a
 scenario catalog (PITR restore, replica promotion/failover, bootstrap-from-object-store),
 and an evidence log — reusing the template already in
-[`010.2`](../../../databases/010.2-restore-and-failover-drills.md) — so the
+[`010.2`](../../../databases/runbooks/restore-and-failover-drills.md) — so the
 estimated RTOs become measured ones and the gaps close with proof.
 
 ## Motivation
 
 > A backup you have never restored is a hypothesis, not a backup.
-> — [`010.2`](../../../databases/010.2-restore-and-failover-drills.md)
+> — [`010.2`](../../../databases/runbooks/restore-and-failover-drills.md)
 
 The DR documentation is mature (a DRP, RPO/RTO planning, a drill playbook, an
 emergency-recovery runbook), but the operational loop that *exercises* it is the
 missing piece. Concretely:
 
 - **RTO/RPO are unproven.** The as-built table in
-  [`010.1`](../../../databases/010.1-rpo-rto-planning.md#as-built-rporto-today)
+  [`010.1`](../../../databases/reliability-targets.md#as-built-rporto-today)
   marks DR promotion and PITR as **"⏳ drills pending"**;
-  the [`010-drp.md` matrix](../../../databases/010-drp.md#rporto-matrix) repeats
+  the [`disaster-recovery.md` matrix](../../../databases/disaster-recovery.md#rporto-matrix) repeats
   "Requires drill" for every non-trivial scenario.
-- **Drills are not drill-recorded.** [`010-drp.md → Known Gaps`](../../../databases/010-drp.md#known-gaps-and-next-improvements)
+- **Drills are not drill-recorded.** [`disaster-recovery.md → Known Gaps`](../../../databases/disaster-recovery.md#known-gaps-and-next-improvements)
   lists "Restore drills and DR promotions are not yet recorded as recurring
   evidence" as an open item.
 - **The Barman plugin is blocked on a recorded drill.** Until a plugin-backed
   on-demand backup *and* restore/PITR drill exist and are recorded, the migration
   is "not fully production-accepted" and existing RustFS prefixes must not be
   deleted.
-- **Open reliability commitments.** [`010-drp.md`](../../../databases/010-drp.md#known-gaps-and-next-improvements)
+- **Open reliability commitments.** [`disaster-recovery.md`](../../../databases/disaster-recovery.md#known-gaps-and-next-improvements)
   and the [RFC backlog — Chaos / GameDay](../README.md#backlog--candidate-rfcs) still call
   for PITR drill (end-to-end), DR runbooks codified and periodically tested, and game days
   (kill primary, network partition).
@@ -50,9 +50,9 @@ missing piece. Concretely:
   scenario catalog covering PITR restore, replica promotion / HA failover, and
   bootstrap-from-object-store.
 - An **evidence log** per run — reusing the
-  [`010.2` template](../../../databases/010.2-restore-and-failover-drills.md#evidence-log-template) —
+  [`010.2` template](../../../databases/runbooks/restore-and-failover-drills.md#evidence-log-template) —
   with **measured RTO/RPO per tier**, pass/fail validation, and IC sign-off.
-- **Convert the estimates** in [`010.1`](../../../databases/010.1-rpo-rto-planning.md)
+- **Convert the estimates** in [`010.1`](../../../databases/reliability-targets.md)
   to measured values, updating the as-built rows as drills complete.
 - **Accept the Barman Cloud Plugin** via a recorded plugin-backed backup +
   restore/PITR drill (Drill A on `product-db`).
@@ -61,37 +61,37 @@ missing piece. Concretely:
 
 - **Building new DR infrastructure.** Closing the SPOF / HA gaps is
   [RFC-0005](../RFC-0005/); independent failure domains are the cross-region
-  roadmap ([`010.3`](../../../databases/010.3-cross-region-dr.md)). This RFC
+  roadmap ([`010.3`](../../../databases/cross-region-dr.md)). This RFC
   *exercises* what exists; it does not add capacity.
 - **Full chaos-engineering tooling.** Automated fault injection (Litmus / Chaos
   Mesh) is a *related future step* (see [Alternatives](#alternatives)), not part
   of this program's first iteration.
 - **Re-deriving RPO/RTO math** — that stays in
-  [`006-backup-strategy.md`](../../../databases/006-backup-strategy.md).
+  [`fundamentals/backup-and-recovery.md`](../../../databases/fundamentals/backup-and-recovery.md).
 
 ## Proposal
 
 Stand up a **scheduled-and-recorded** drills program on top of the existing
-[`010.2`](../../../databases/010.2-restore-and-failover-drills.md) playbook. The
+[`010.2`](../../../databases/runbooks/restore-and-failover-drills.md) playbook. The
 playbook already defines drills A–D, their cadence, roles, and an evidence-log
 template; this RFC's contribution is to make running them a **standing program**:
 a fixed schedule, an owner, a place evidence lives, explicit pass/fail criteria
-tied to [`010.1`](../../../databases/010.1-rpo-rto-planning.md), and the
+tied to [`010.1`](../../../databases/reliability-targets.md), and the
 acceptance gate for the Barman plugin.
 
 **Cadence and scenario catalog** (mirrors the
-[`010.2` drill calendar](../../../databases/010.2-restore-and-failover-drills.md#drill-calendar),
+[`010.2` drill calendar](../../../databases/runbooks/restore-and-failover-drills.md#drill-calendar),
 extended with Temporal):
 
-| Drill | Cadence | Cluster / target | Scenario | Pass criterion (vs [`010.1`](../../../databases/010.1-rpo-rto-planning.md)) |
+| Drill | Cadence | Cluster / target | Scenario | Pass criterion (vs [`010.1`](../../../databases/reliability-targets.md)) |
 |-------|---------|------------------|----------|------------------------------|
-| **A — PITR restore-test** | Monthly | `product-db` (T0) | Restore base backup + WAL replay to a **throwaway** cluster, validate | ≤ 30 min to validated throwaway; **plugin-backed** (Barman acceptance gate). **First run 2026-08-07** — [`DR-2026-08-A`](../../../databases/010.2-restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate): restore **2 m 12 s**, PITR stopped exactly at the target, and it found two never-exercised defects (restore manifest, backup command). **Gate CLOSED** |
-| **B — Planned switchover** | Monthly | `product-db` (T0) | HA failover + app reconnect via PgDog | ≤ 1 min cut-over. **First run 2026-08-06** — recorded as `DR-2026-08-B` in [010.2](../../../databases/010.2-restore-and-failover-drills.md); measured **11.4 s** of app-visible write unavailability, RPO 0. Note `kubectl cnpg switchover` does **not** exist — the plugin has `promote` |
+| **A — PITR restore-test** | Monthly | `product-db` (T0) | Restore base backup + WAL replay to a **throwaway** cluster, validate | ≤ 30 min to validated throwaway; **plugin-backed** (Barman acceptance gate). **First run 2026-08-07** — [`DR-2026-08-A`](../../../databases/runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate): restore **2 m 12 s**, PITR stopped exactly at the target, and it found two never-exercised defects (restore manifest, backup command). **Gate CLOSED** |
+| **B — Planned switchover** | Monthly | `product-db` (T0) | HA failover + app reconnect via PgDog | ≤ 1 min cut-over. **First run 2026-08-06** — recorded as `DR-2026-08-B` in [010.2](../../../databases/runbooks/restore-and-failover-drills.md); measured **11.4 s** of app-visible write unavailability, RPO 0. Note `kubectl cnpg switchover` does **not** exist — the plugin has `promote` |
 | **C — DR promotion rehearsal** | Quarterly | `product-db-replica` (T0) | Whole-cluster-loss recovery (against a restored copy) | ≤ 30 min; RPO ≤ `archive_timeout` (5 min) |
-| **D — platform-db restore-test** | Quarterly | `platform-db` (T1) | Restore from `s3://pg-backups-cnpg/platform-db/` into a throwaway — same CNPG PITR flow as Drill A, different source `ObjectStore` + namespace ([010.2 § Drill D](../../../databases/010.2-restore-and-failover-drills.md)) | ≤ 30 min to validated throwaway. *(The letter previously named a Zalando WAL-G restore of `auth-db`/`supporting-shared-db`; that scenario died with the RFC-0018 consolidation and the letter was re-used for the cluster that replaced them.)* |
+| **D — platform-db restore-test** | Quarterly | `platform-db` (T1) | Restore from `s3://pg-backups-cnpg/platform-db/` into a throwaway — same CNPG PITR flow as Drill A, different source `ObjectStore` + namespace ([010.2 § Drill D](../../../databases/runbooks/restore-and-failover-drills.md)) | ≤ 30 min to validated throwaway. *(The letter previously named a Zalando WAL-G restore of `auth-db`/`supporting-shared-db`; that scenario died with the RFC-0018 consolidation and the letter was re-used for the cluster that replaced them.)* |
 | **E — Kill-the-worker (GameDay)** | Quarterly | Temporal `order-fulfillment` worker | Durability + mid-saga compensation survive a worker/pod kill | Workflow resumes; order reaches a terminal state. **First run executed 2026-08-06** — [RFC-0021 gameday.md](../RFC-0021/gameday.md) G2, claim held with every side effect exactly once. Application-level scenarios are owned there; this row keeps the quarterly cadence |
 
-**Roles** (per [`010-drp.md` ownership](../../../databases/010-drp.md#ownership)):
+**Roles** (per [`disaster-recovery.md` ownership](../../../databases/disaster-recovery.md#ownership)):
 incident commander (schedules, owns the timeline, go/no-go), database recovery
 owner (executes, captures timings), service owner (app smoke test), security
 owner (confirms the restore identity / object-store access).
@@ -105,7 +105,7 @@ standing evidence home:
 |---------|-------|
 | **Cadence** | Monthly: Drills A + B. Quarterly: Drills C + D + E. A quarter's C/D/E runs may share one cluster session with that month's A/B |
 | **Owner** | One operator may wear all four hats on this platform — but each evidence record names who held each role for that run (IC, DB recovery, service, security) |
-| **Evidence home** | One [`010.2`](../../../databases/010.2-restore-and-failover-drills.md#drill-evidence-record-template) record per run, ID `DR-YYYY-MM-<type>`, appended before any teardown — *a run with no recorded evidence did not happen* |
+| **Evidence home** | One [`010.2`](../../../databases/runbooks/restore-and-failover-drills.md#drill-evidence-record-template) record per run, ID `DR-YYYY-MM-<type>`, appended before any teardown — *a run with no recorded evidence did not happen* |
 | **Liveness rule** | The program is **in use** iff the newest record of each drill type is inside its cadence window. A stale row means the program lapsed — that is the signal, not a failure to hide |
 | **Annotations** | Each drill's start/end marked as a Grafana annotation so the RTO window is visible against RED/latency panels |
 
@@ -162,7 +162,7 @@ flowchart TB
 ## Design Details
 
 - **Scenario catalog & who runs it.** Drills A–D are the existing
-  [`010.2`](../../../databases/010.2-restore-and-failover-drills.md) procedures
+  [`010.2`](../../../databases/runbooks/restore-and-failover-drills.md) procedures
   (commands, manifests, and go/no-go checks live there — not duplicated here).
   Drill E (kill-the-worker) is the
   [RFC-0001 GameDay](../RFC-0001/#future-work) future-work item: kill the
@@ -170,23 +170,23 @@ flowchart TB
   execution resumes and compensations run. The database recovery owner executes;
   the service owner validates; the IC signs off.
 - **Where evidence lives.** Each run produces one
-  [`010.2` evidence record](../../../databases/010.2-restore-and-failover-drills.md#evidence-log-template)
+  [`010.2` evidence record](../../../databases/runbooks/restore-and-failover-drills.md#evidence-log-template)
   (drill ID `DR-YYYY-MM-<type>`, timestamps, backup ID, recovery target,
   measured RTO/RPO, validations, sign-off). Until a dedicated drill log exists,
   records are appended to the DRP evidence trail and linked from the scheduling
   PR — closing the "recorded as recurring evidence" gap in
-  [`010-drp.md`](../../../databases/010-drp.md#known-gaps-and-next-improvements).
+  [`disaster-recovery.md`](../../../databases/disaster-recovery.md#known-gaps-and-next-improvements).
 - **Pass/fail criteria.** A drill **passes** when its measured RTO is within the
   SLO column above *and* schema, row-count, and app smoke tests pass. A pass
   updates the matching as-built row in
-  [`010.1`](../../../databases/010.1-rpo-rto-planning.md#as-built-rporto-today)
+  [`010.1`](../../../databases/reliability-targets.md#as-built-rporto-today)
   from "⏳ pending" to the measured value; a fail files a follow-up and keeps the
   estimate.
 - **Barman plugin acceptance criteria.** The plugin is **production-accepted**
   once Drill A has been run *plugin-backed* (on-demand backup via the Barman
   `ObjectStore` path **and** a restore/PITR from it) and the evidence recorded.
   Only then may legacy in-tree RustFS prefixes be retired
-  ([`010-drp.md`](../../../databases/010-drp.md#barman-cloud-plugin-current-state)).
+  ([`disaster-recovery.md`](../../../databases/disaster-recovery.md#barman-cloud-plugin-current-state)).
 - **Ties to other RFCs.** Drill D proves the [RFC-0018](../RFC-0018/)
   consolidation target (`platform-db`) is restorable — the surviving shape of
   what [RFC-0005](../RFC-0005/) wanted for `supporting-shared-db` before that
@@ -209,9 +209,9 @@ flowchart TB
 
 Minimal, and mostly confirmatory. Each drill **verifies** the restore used the
 read-only / restore identity (security-owner step in the
-[`010.2` roles](../../../databases/010.2-restore-and-failover-drills.md#roles-per-010-drpmd-ownership)),
+[`010.2` roles](../../../databases/runbooks/restore-and-failover-drills.md#roles-per-010-drpmd-ownership)),
 which surfaces the current shared-RustFS-credential gap
-([`010-drp.md` control baseline](../../../databases/010-drp.md#control-baseline)).
+([`disaster-recovery.md` control baseline](../../../databases/disaster-recovery.md#control-baseline)).
 No new secret, trust boundary, or NetworkPolicy. Throwaway restore clusters live
 in the same namespace as their source and are torn down post-drill.
 
@@ -219,15 +219,15 @@ in the same namespace as their source and are torn down post-drill.
 
 - **Grafana drill annotations.** Mark each drill's start/end as a Grafana
   annotation so the RTO window is visible against the cluster's normal RED/latency
-  panels and the [`010.1`](../../../databases/010.1-rpo-rto-planning.md) SLO
+  panels and the [`010.1`](../../../databases/reliability-targets.md) SLO
   context.
 - **Proof over signal.** `platform-db` has its own per-cluster PrometheusRules
   (`cnpg-platform-db/`), so Drill D is not the only health signal — it is the
   routine **proof of restorability**, which no alert can provide
-  ([`010.2` § Drill D](../../../databases/010.2-restore-and-failover-drills.md#drill-d--restore-test-for-platform-db-quarterly)).
+  ([`010.2` § Drill D](../../../databases/runbooks/restore-and-failover-drills.md#drill-d--restore-test-for-platform-db-quarterly)).
 - **No new SLOs** are created here; the program *measures attainment* of the
   existing per-tier RTO/RPO targets and feeds the numbers back into
-  [`010.1`](../../../databases/010.1-rpo-rto-planning.md).
+  [`010.1`](../../../databases/reliability-targets.md).
 
 ## Rollout & rollback
 
@@ -235,7 +235,7 @@ in the same namespace as their source and are torn down post-drill.
   T0 RTO and is the **Barman plugin acceptance gate**, so it has the highest
   payoff per run.
 - **Phase 1:** schedule + run Drill A (plugin-backed), record evidence, accept
-  the plugin, update [`010.1`](../../../databases/010.1-rpo-rto-planning.md).
+  the plugin, update [`010.1`](../../../databases/reliability-targets.md).
   **Phase 2:** add Drills B and D. **Phase 3:** add quarterly C and E.
 - **Blast radius:** drills restore to throwaway clusters or rehearse against
   restored copies (never the live DR target) — no production write-path impact
@@ -254,7 +254,7 @@ the SLO. A run with no recorded evidence did not happen.
 
 - 2026-08-06 — **Partially exercised, program still unbuilt.** Drills **B** and **E**
   ran for the first time: B as `DR-2026-08-B` in
-  [010.2](../../../databases/010.2-restore-and-failover-drills.md) — that file's first
+  [010.2](../../../databases/runbooks/restore-and-failover-drills.md) — that file's first
   completed record, measured **11.4 s** of app-visible write unavailability against a
   documented `< 30 s`, RPO 0 — and E as G2 in
   [RFC-0021 gameday.md](../RFC-0021/gameday.md), claim held with every side effect
@@ -268,7 +268,7 @@ the SLO. A run with no recorded evidence did not happen.
   exist: the program is written down (cadence, per-run role naming, evidence home,
   liveness rule — see [The program](#the-program)), and Drill **A**, the blocking
   Barman acceptance gate, has run with recorded evidence
-  ([`DR-2026-08-A`](../../../databases/010.2-restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)).
+  ([`DR-2026-08-A`](../../../databases/runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)).
   It paid for itself immediately: the restore manifest and the documented backup
   command had both never worked.
 
@@ -289,7 +289,7 @@ the SLO. A run with no recorded evidence did not happen.
 - 2026-08-07 — **Program written, Drill A run, RFC implemented.** The
   [program section](#the-program) records the cadence, the per-run role naming,
   the evidence home and the liveness rule; Drill **A** ran as
-  [`DR-2026-08-A`](../../../databases/010.2-restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)
+  [`DR-2026-08-A`](../../../databases/runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)
   and **closed the Barman acceptance gate** — restore in 2 m 12 s, WAL replay
   stopping exactly at the requested instant. The drill's real value was the two
   defects it exposed on artifacts that had been committed but never exercised: a
@@ -307,10 +307,10 @@ the SLO. A run with no recorded evidence did not happen.
 
 ## Related
 
-- DRP & playbooks: [`010-drp.md`](../../../databases/010-drp.md),
-  [`010.1-rpo-rto-planning.md`](../../../databases/010.1-rpo-rto-planning.md),
-  [`010.2-restore-and-failover-drills.md`](../../../databases/010.2-restore-and-failover-drills.md),
-  [`010.4-emergency-recovery.md`](../../../databases/010.4-emergency-recovery.md).
+- DRP & playbooks: [`disaster-recovery.md`](../../../databases/disaster-recovery.md),
+  [`reliability-targets.md`](../../../databases/reliability-targets.md),
+  [`runbooks/restore-and-failover-drills.md`](../../../databases/runbooks/restore-and-failover-drills.md),
+  [`runbooks/emergency-recovery.md`](../../../databases/runbooks/emergency-recovery.md).
 - [RFC-0001](../RFC-0001/) — Temporal saga; this program retires its
   kill-the-worker / mid-saga-compensation GameDay future work (Drill E).
 - [RFC-0005](../RFC-0005/) — `supporting-shared-db` HA; its failover drill is

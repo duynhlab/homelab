@@ -1,4 +1,7 @@
-# Database Integration Guide
+# Archived Homelab Notes: Database Integration
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use the canonical [database architecture](../../architecture.md).
 ## Table of Contents
 
 1. [Quick Summary](#quick-summary) - Clusters, poolers overview
@@ -13,9 +16,9 @@
 > user, notification, shipping, review, and Temporal persistence now live on the
 > consolidated **`platform-db`** cluster (RFC-0018). Zalando internals are kept
 > for reference only in
-> [003.2 — Zalando Operator Deep Dive](./003.2-operator-zalando.md).
+> [003.2 — Zalando Operator Deep Dive](../../reference/zalando/operator.md).
 
-> **Per-cluster details** (topology diagrams, endpoints, components): See each cluster's README in [`kubernetes/infra/configs/databases/clusters/`](../../kubernetes/infra/configs/databases/clusters/README.md)
+> **Per-cluster details** (topology diagrams, endpoints, components): See each cluster's README in [`kubernetes/infra/configs/databases/clusters/`](../../../../kubernetes/infra/configs/databases/clusters/README.md)
 
 ---
 ## Quick Summary
@@ -195,10 +198,10 @@ former `auth-db`, `shared-db`, and `temporal-db` tiers).
 - **Databases**: `auth`, `user`, `notification`, `shipping`, `review`, `temporal`, `temporal_visibility`
 - **Pooler**: **PgBouncer** via the CNPG-native `Pooler` **`platform-db-pooler-rw`** (ADR-026), endpoint **`platform-db-pooler-rw.platform.svc.cluster.local:5432`** — auth, user, notification, shipping, and review use this single entry point at runtime; their migration initContainers go direct to `platform-db-rw`. CNPG manages PgBouncer auth itself (`auth_query` against `pg_shadow` + a TLS client certificate), so no password list is templated and a credential rotation needs no pooler action
 - **Temporal (direct, not pooled)**: the Temporal server connects **directly to `platform-db-rw.platform:5432`** (no pooler); credentials from `platform-db-temporal-secret` (OpenBAO path `platform-db/temporal`)
-- **Roles & databases**: declarative RFC-0012 triplets under `services/`; OpenBAO compat paths `auth-db/*` and `shared-db/*` for app creds (see [openbao.md](../secrets/openbao.md))
+- **Roles & databases**: declarative RFC-0012 triplets under `services/`; OpenBAO compat paths `auth-db/*` and `shared-db/*` for app creds (see [openbao.md](../../../secrets/openbao.md))
 - **Backup**: Barman Cloud Plugin → `s3://pg-backups-cnpg/platform-db/`, retention 30d
 
-> **Manifests**: [`kubernetes/infra/configs/databases/clusters/platform-db/`](../../kubernetes/infra/configs/databases/clusters/platform-db/)
+> **Manifests**: [`kubernetes/infra/configs/databases/clusters/platform-db/`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/)
 
 #### product-db
 
@@ -209,22 +212,22 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 - **Pooler**: **PgDog** (HelmRelease `pgdog-product`), unified endpoint **`pgdog-product.product:6432`** — product, cart, and order services use this single entry point; PgDog routes writes to `product-db-rw` and read traffic to `product-db-r` per pool/database config
 - **payment (direct TLS, not pooled)**: the `payment` database also lives on `product-db`, but payment-service connects **directly to `product-db-rw.product:5432` over TLS** (`sslmode=require`; CNPG serves its own certs). Its config refuses cleartext DB and PgDog terminates no TLS yet, so payment bypasses the pooler. PgDog already carries payment backend entries — move payment behind the pooler once PgDog TLS lands. Its credentials come from `product-db-payment-secret` (present in both the `product` and `payment` namespaces).
 - **Extensions**: preloaded via `shared_preload_libraries` — pgaudit, pg_stat_statements, auto_explain; created via the `Database` CR in each service triplet — pgaudit, pg_stat_statements, pgcrypto, uuid-ossp (product), pgaudit, pg_stat_statements (cart, order, payment). auto_explain is preload-only (no SQL control file), so it is never in a Database resource.
-- **Roles & databases**: declarative per-service triplets under `services/` — see [012 — Declarative Role & Database Management](./012-declarative-role-management.md)
+- **Roles & databases**: declarative per-service triplets under `services/` — see [012 — Declarative Role & Database Management](../../declarative-role-management.md)
 - **Features**: Logical replication slot sync for CDC (Debezium, Kafka Connect) where enabled
 
-> **Manifests, backup, pooler**: [`kubernetes/infra/configs/databases/clusters/product-db/`](../../kubernetes/infra/configs/databases/clusters/product-db/)
+> **Manifests, backup, pooler**: [`kubernetes/infra/configs/databases/clusters/product-db/`](../../../../kubernetes/infra/configs/databases/clusters/product-db/)
 
 #### product-db-replica
 
 - **1 instance**, DR replica cluster continuously recovering from **`product-db`** WAL in object storage (not an application pooler target in steady state)
 - **Namespace**: `product`
 
-> **DR replica manifests**: [`kubernetes/infra/configs/databases/clusters/product-db-replica/`](../../kubernetes/infra/configs/databases/clusters/product-db-replica/)
+> **DR replica manifests**: [`kubernetes/infra/configs/databases/clusters/product-db-replica/`](../../../../kubernetes/infra/configs/databases/clusters/product-db-replica/)
 
 **Note on HA Architecture:**
 - CloudNativePG does **not** use Patroni. It has its own native [Instance Manager](https://cloudnative-pg.io/docs/1.28/instance_manager/) that handles failover and lifecycle.
 - The operator uses Kubernetes API as the sole coordination layer -- no DCS, no etcd required.
-- For a conceptual comparison with Zalando's Patroni-based HA, see [Operator Comparison](./003-operator-comparison.md).
+- For a conceptual comparison with Zalando's Patroni-based HA, see [Operator Comparison](../../reference/operator-comparison.md).
 
 ### Features & Capabilities
 
@@ -251,7 +254,7 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 
 ### Connection Patterns
 
-> **Deep Dive**: For detailed architecture, trade-offs, and configuration of **PgBouncer** and **PgDog**, see [`docs/databases/008-pooler.md`](./008-pooler.md).
+> **Deep Dive**: For detailed architecture, trade-offs, and configuration of **PgBouncer** and **PgDog**, see [`docs/databases/fundamentals/connection-pooling.md`](../../fundamentals/connection-pooling.md).
 
 #### PgBouncer (platform-db)
 
@@ -282,16 +285,16 @@ Consolidated **CloudNativePG** cluster for **product**, **cart**, and **order** 
 **Role, Database & Secret Management (RFC-0012):**
 - Every service database is a **per-service triplet** — `ExternalSecret` +
   `DatabaseRole` + `Database` in one file under
-  `clusters/product-db/services/<name>.yaml` ([ADR-013](../proposals/adr/ADR-013-per-service-db-triplet/))
+  `clusters/product-db/services/<name>.yaml` ([ADR-013](../../../proposals/adr/ADR-013-per-service-db-triplet/))
 - Credentials flow OpenBAO → ESO → `kubernetes.io/basic-auth` Secret
   (`cnpg.io/reload: "true"`); no credential exists in any manifest, and the
   PgDog pooler receives passwords via Flux `valuesFrom`
-  ([ADR-014](../proposals/adr/ADR-014-pooler-credentials-valuesfrom/))
+  ([ADR-014](../../../proposals/adr/ADR-014-pooler-credentials-valuesfrom/))
 - `bootstrap.initdb` in `instance.yaml` is a structural placeholder (product);
   the product triplet adopts it — from-scratch builds and restores converge
-- Concepts and semantics: [012 — Declarative Role & Database Management](./012-declarative-role-management.md);
-  recipes: [add a service database](./runbooks/add-service-database.md),
-  [rotate a password](./runbooks/rotate-cnpg-service-password.md)
+- Concepts and semantics: [012 — Declarative Role & Database Management](../../declarative-role-management.md);
+  recipes: [add a service database](../../runbooks/add-service-database.md),
+  [rotate a password](../../runbooks/rotate-cnpg-service-password.md)
 
 ### Monitoring
 
@@ -321,12 +324,12 @@ no longer deployed. Consequently the platform no longer uses:
 
 - **Zalando PgBouncer sidecars** — replaced by standalone poolers: `pgdog-product` (PgDog) and, since ADR-026, the CNPG-native `Pooler` `platform-db-pooler-rw` (PgBouncer again, but operator-managed rather than a sidecar).
 - **Zalando-generated secrets** (`*.credentials.postgresql.acid.zalan.do`) and cross-namespace secret injection — replaced by RFC-0012 declarative triplets (OpenBAO → ESO).
-- **WAL-G backups** to `pg-backups-zalando` — replaced by the **Barman Cloud Plugin** into `pg-backups-cnpg` (see [006 — Backup Strategy](./006-backup-strategy.md)).
+- **WAL-G backups** to `pg-backups-zalando` — replaced by the **Barman Cloud Plugin** into `pg-backups-cnpg` (see [006 — Backup Strategy](../../fundamentals/backup-and-recovery.md)).
 - **Patroni/Spilo runtime** (`patronictl`, `runit`/`sv`, the operator UI).
 
 Zalando operator internals, HA model, and operational commands are kept for
-learning in [003.2 — Zalando Operator Deep Dive](./003.2-operator-zalando.md)
-and the operator comparison in [003 — Operator Comparison](./003-operator-comparison.md).
+learning in [003.2 — Zalando Operator Deep Dive](../../reference/zalando/operator.md)
+and the operator comparison in [003 — Operator Comparison](../../reference/operator-comparison.md).
 
 ---
 
@@ -454,19 +457,19 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 ```
 
 > [!NOTE]
-> For pooler-specific DSN and rotation checks, see [pgdog-operations.md](./runbooks/pgdog-operations.md).
+> For pooler-specific DSN and rotation checks, see [pooler-operations.md](../../runbooks/pooler-operations.md).
 
 
 ---
 
 ## Related Documentation
 
-- **[Backup Strategy](./006-backup-strategy.md)** - Backup architecture, retention, bucket layout
-- **[Backup/Restore Runbook](./runbooks/postgres-backup-restore.md)** - Restore procedures (CNPG vs Zalando)
-- **[Setup Guide](../platform/setup.md)** - Complete deployment and configuration guide
-- **[Error Envelope](../api/api.md#error-envelope)** - Shared API error contract for database failures
-- **[API Reference](../api/api.md)** - API endpoints using database
-- **[PgDog operations](./runbooks/pgdog-operations.md)** - Day-2 pooler ops for `pgdog-product`
+- **[Backup Strategy](../../fundamentals/backup-and-recovery.md)** - Backup architecture, retention, bucket layout
+- **[Backup/Restore Runbook](../../runbooks/backup-restore.md)** - Restore procedures (CNPG vs Zalando)
+- **[Setup Guide](../../../platform/setup.md)** - Complete deployment and configuration guide
+- **[Error Envelope](../../../api/api.md#error-envelope)** - Shared API error contract for database failures
+- **[API Reference](../../../api/api.md)** - API endpoints using database
+- **[PgDog operations](../../runbooks/pooler-operations.md)** - Day-2 pooler ops for `pgdog-product`
 
 ## Troubleshooting
 
@@ -490,7 +493,7 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 - `prefer_simple_protocol=true` forces simple query protocol (no prepared statement cache)
 - pgx is the supported driver — see [Go PostgreSQL driver (pgx)](#go-postgresql-driver-pgx) above
 
-**Pooler ops:** Validate DSN endpoints and chart values via [pgdog-operations.md](./runbooks/pgdog-operations.md) for `product-db`; PgBouncer settings live in the `Pooler` CR for `platform-db`.
+**Pooler ops:** Validate DSN endpoints and chart values via [pooler-operations.md](../../runbooks/pooler-operations.md) for `product-db`; PgBouncer settings live in the `Pooler` CR for `platform-db`.
 
 ### Zalando `CreateFailed` leaves per-service databases uncreated (historical)
 
@@ -501,10 +504,9 @@ return fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s&prefer_simple_protoco
 
 **Root Cause:** The Zalando operator creates the databases from `spec.databases` only during a *successful first-time* init. On a slow spilo cold boot the operator's DB-connection retry window can expire first → the cluster goes `CreateFailed`; later syncs bring up Patroni and roles but never (re)create the databases.
 
-**Mitigation:** See [003.2 Zalando operator deep dive](./003.2-operator-zalando.md#first-init-fragility-and-the-ensure-databases-job) and [runbooks/prepared-databases.md](./runbooks/prepared-databases.md).
+**Mitigation:** See [003.2 Zalando operator deep dive](../../reference/zalando/operator.md#first-init-fragility-and-the-ensure-databases-job) and [reference/zalando/prepared-databases.md](../../reference/zalando/prepared-databases.md).
 
 ---
 
 _Last updated: 2026-08-07 — ADR-026: platform-db pools through the CNPG PgBouncer `Pooler` `platform-db-pooler-rw` (:5432); PgDog now serves product-db only. Earlier: RFC-0018 platform-db consolidation: 3 CNPG clusters (platform-db, product-db, product-db-replica); Temporal on platform-db with Barman backups._
-
 

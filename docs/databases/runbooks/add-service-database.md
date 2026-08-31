@@ -9,7 +9,7 @@ change to `instance.yaml`**.
 | **Pattern** | Per-service triplet: ExternalSecret + DatabaseRole + Database ([ADR-013](../../proposals/adr/ADR-013-per-service-db-triplet/)) |
 | **Time** | ~15 minutes + one PR |
 | **Reference triplet** | `kubernetes/infra/configs/databases/clusters/product-db/services/payment.yaml` |
-| **Concepts** | [012 — Declarative Role & Database Management](../012-declarative-role-management.md) |
+| **Concepts** | [012 — Declarative Role & Database Management](../declarative-role-management.md) |
 
 ## Steps
 

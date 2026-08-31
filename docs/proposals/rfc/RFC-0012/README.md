@@ -425,7 +425,7 @@ flowchart TB
   (`services/payment.yaml`), inline `managed.roles` removed from
   `instance.yaml`; pattern recorded as
   [ADR-013](../../adr/ADR-013-per-service-db-triplet/); deep-dive doc
-  `docs/databases/012-declarative-role-management.md` added. Live-cluster
+  `docs/databases/declarative-role-management.md` added. Live-cluster
   adoption verification (pg_authid snapshot diff, `applied: true`, payment
   e2e) pending the next kind bring-up.
 - 2026-07-08 — **P2 landed:** cart + order migrated to triplets
@@ -470,7 +470,7 @@ flowchart TB
   ESO pattern this RFC generalizes, and of the ADR-when-phase-lands policy
 - [RFC-0011](../RFC-0011/) — bare-metal migration; Tailscale + `DatabaseRole`
   human-access roles are a natural future combination
-- [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md)
+- [`docs/databases/architecture.md`](../../../databases/architecture.md)
   — current database integration guide (P3 updates it)
 - [`docs/secrets/README.md`](../../../secrets/README.md) — OpenBAO + ESO flow
 - CloudNativePG v1.30.0 release notes and the 1.30 declarative role/database

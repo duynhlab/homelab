@@ -1,22 +1,23 @@
 # Zalando Postgres Operator Deep Dive
 
 > **Historical / reference.** The platform migrated all Postgres from the
-> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> Zalando operator to [CloudNativePG](../../cloudnativepg.md). Zalando is no longer deployed
 > here — this doc is kept for learning.
 
-The Zalando Postgres Operator is the Patroni/Spilo-based operator used for
+The Zalando Postgres Operator is the Patroni/Spilo-based operator that was used for
 `auth-db` and `supporting-shared-db`. This document focuses on what Zalando is
-good at, how it works, why it remains useful in this homelab, and where it is
+good at, how it worked here, why it remains useful for study, and where it is
 less production-forward than CloudNativePG for newer workloads.
 
-## Current Homelab Usage
+## Historical Homelab Usage
 
 | Cluster | Namespace | Purpose |
 |---------|-----------|---------|
 | `auth-db` | `auth` | 3-node auth database cluster with Patroni HA and PgBouncer |
-| `supporting-shared-db` | `user` | Shared cluster for user, notification, shipping, review; currently single-node |
+| `supporting-shared-db` | `user` | Former shared cluster for user, notification, shipping, and review |
 
-The current operator chart version in this repository is `v1.15.1`.
+The last recorded operator chart version was `v1.15.1`; no Zalando controller
+or operand is deployed now.
 
 ## What Zalando Is Optimized For
 
@@ -30,7 +31,7 @@ model:
 - Cross-namespace secret support.
 - `preparedDatabases` for role/schema/extension bootstrap (removed in this
   homelab — it conflicts with cross-namespace `namespace.username` owners; see
-  [runbooks/prepared-databases.md](./runbooks/prepared-databases.md)).
+  [reference/zalando/prepared-databases.md](./prepared-databases.md)).
 - Optional Postgres Operator UI.
 - In-place major version upgrade workflows through Spilo scripts.
 
@@ -145,7 +146,7 @@ Zalando has two different standby concepts that should not be mixed:
 
 For `supporting-shared-db`, scaling `numberOfInstances` from 1 to 3 would add
 local HA standbys. That is not the same as creating a separate standby cluster.
-See [runbooks/zalando-ha-scaling.md](./runbooks/zalando-ha-scaling.md).
+See [reference/zalando/ha-scaling.md](./ha-scaling.md).
 
 ## Connection Pooling
 
@@ -170,10 +171,11 @@ In this homelab:
 Zalando is convenient for application teams because it can auto-create user
 secrets and distribute them across namespaces when configured.
 
-This homelab uses that feature for cross-namespace service ownership patterns.
+This homelab used that feature for its former cross-namespace service ownership
+patterns.
 The trade-off is that features such as `preparedDatabases` can become subtle
 when owner names use `namespace.username` format. See
-[runbooks/prepared-databases.md](./runbooks/prepared-databases.md).
+[reference/zalando/prepared-databases.md](./prepared-databases.md).
 
 ### First-init fragility and the `ensure-databases` Job
 

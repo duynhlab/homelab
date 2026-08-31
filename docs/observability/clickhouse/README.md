@@ -68,7 +68,7 @@ or for the primary observability stack.
 3. **Use it** — [Operations](#operations) → [Playground](#playground--mergetree-by-hand)
 4. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
 
-Pair with [`docs/databases/fundamentals/postgresql-internals.md`](../../databases/fundamentals/postgresql-internals.md)
+Pair with the PostgreSQL [storage and WAL fundamentals](../../databases/fundamentals/storage-and-wal.md)
 if you already know Postgres heap / WAL / B-tree.
 
 ---

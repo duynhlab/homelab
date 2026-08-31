@@ -924,12 +924,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
-- **Database documentation now separates learning, deployed truth, operations,
-  and history.** Added `docs/databases/README.md`, vendor-neutral fundamentals,
-  canonical platform pages, semantic runbook names, and a quarantined Zalando /
-  archived-notes reference tree; migrated repository links and removed the old
-  numbered filenames. Current facts were re-verified against the CNPG, Barman,
-  pooler, role, and extension manifests.
+- **Database documentation now separates PostgreSQL internals, deployed truth,
+  operations, and reference material.** Added `docs/databases/README.md`, a
+  vendor-neutral fundamentals path for process, memory, storage, WAL, MVCC,
+  query execution, and replication, plus canonical platform pages and semantic
+  runbook names. Promoted the useful backup-tool comparison, retired the mixed
+  homelab archive and duplicate fundamentals, migrated repository links, and
+  removed the old numbered filenames. Current facts were re-verified against
+  the CNPG, Barman, pooler, role, and extension manifests.
 
 - **The SSO-client procedures that lived only in one session are now docs**
   (owner review of the flux-web rollout: end state clean, process messy — the

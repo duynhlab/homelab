@@ -17,14 +17,15 @@ or find the right recovery procedure without mixing those three concerns.
 
 ### Learn PostgreSQL
 
-Use these pages for durable concepts. Their main explanations are independent
-of this repository; each ends by linking back to the deployed implementation.
+Use this vendor-neutral path for PostgreSQL internals. Platform products,
+manifests, and cluster names are intentionally excluded.
 
-1. [PostgreSQL internals](./fundamentals/postgresql-internals.md)
-2. [Replication and high availability](./fundamentals/replication-and-ha.md)
-3. [Connection pooling](./fundamentals/connection-pooling.md)
-4. [Backup and recovery](./fundamentals/backup-and-recovery.md)
-5. [Extensions](./fundamentals/extensions.md)
+1. [Fundamentals overview](./fundamentals/README.md)
+2. [Process and memory](./fundamentals/process-and-memory.md)
+3. [Storage and WAL](./fundamentals/storage-and-wal.md)
+4. [MVCC, locking, and vacuum](./fundamentals/mvcc-locking-and-vacuum.md)
+5. [Query planning and execution](./fundamentals/query-planning-and-execution.md)
+6. [Replication](./fundamentals/replication.md)
 
 ### Understand this homelab
 
@@ -55,11 +56,10 @@ These pages support design study and historical review. They are not current
 operating procedures.
 
 - [Operator comparison](./reference/operator-comparison.md)
+- [Backup tooling comparison](./reference/backup-tooling-comparison.md)
 - [Zalando Postgres Operator](./reference/zalando/operator.md) — **historical,
   not deployed**
 - [Further reading](./reference/further-reading.md)
-- [Archived homelab study notes](./reference/archive/) — learning snapshots,
-  never current platform truth
 - Historical Zalando procedures are listed separately in the
   [runbook index](./runbooks/README.md).
 
@@ -105,7 +105,7 @@ flowchart LR
 | Installed and allowed extension model | `extensions.md` |
 | Database, role, and credential reconciliation | `declarative-role-management.md` |
 | Commands used during operations | [`runbooks/`](./runbooks/README.md) |
-| Stable PostgreSQL concepts | `fundamentals/` |
+| PostgreSQL internal mechanics | `fundamentals/` |
 
 Architecture decisions remain in [RFC and ADR records](../proposals/README.md);
 this area documents the resulting platform and its operation.

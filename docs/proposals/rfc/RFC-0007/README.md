@@ -67,7 +67,7 @@ missing piece. Concretely:
   Mesh) is a *related future step* (see [Alternatives](#alternatives)), not part
   of this program's first iteration.
 - **Re-deriving RPO/RTO math** — that stays in
-  [`fundamentals/backup-and-recovery.md`](../../../databases/fundamentals/backup-and-recovery.md).
+  [`reliability-targets.md`](../../../databases/reliability-targets.md).
 
 ## Proposal
 

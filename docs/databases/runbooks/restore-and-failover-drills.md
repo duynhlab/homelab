@@ -8,9 +8,8 @@ behind. A backup you have never restored is a hypothesis, not a backup — these
 drills are the only thing that turns the estimated RTOs in
 [reliability targets](../reliability-targets.md) into measured ones.
 
-It extends the brief monthly procedure in
-[Archived HA/DR notes](../reference/archive/ha-dr-deep-dive.md#dr-drill-runbook-monthly)
-with cadence, roles, and a sign-off record.
+It is the canonical owner of drill cadence, roles, procedures, and sign-off
+records.
 
 ## Drill calendar
 
@@ -212,8 +211,7 @@ artifact.
 - [disaster-recovery.md](../disaster-recovery.md) — DRP, decision flow, evidence checklist.
 - [reliability-targets.md](../reliability-targets.md) — the targets these drills verify.
 - [Emergency recovery](./emergency-recovery.md) — the real-incident version of these procedures.
-- [Archived HA/DR notes](../reference/archive/ha-dr-deep-dive.md#8-practical-commands-reference) — command reference.
 - [Backup and restore](./backup-restore.md) — full backup/restore runbook.
 
 ---
-_Last updated: 2026-07-17_
+_Last updated: 2026-08-31._

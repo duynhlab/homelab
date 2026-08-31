@@ -1,0 +1,236 @@
+# Schema bootstrap for the ClickHouse OTel store (RFC-0028 / ADR-065).
+#
+# Runs the DDL in configmap-schema.yaml so the otel-collector can run with
+# create_schema: false. Why that matters is in the ConfigMap's header; what
+# matters here is the shape of the work:
+#
+#   1. Assert against the INTENDED replica count, not a discovered one. The first
+#      version trusted `system.clusters`, and a clean bring-up proved that wrong
+#      twice over: the operator publishes the cluster definition asynchronously,
+#      so at the moment this Job starts — after clickhouse-local is Ready, after
+#      all three StatefulSets report ready — the definition can still list two
+#      hosts. The Job then "verified" 2 of 2 and went green on a 2-replica store.
+#      It also returns DUPLICATE rows per host (5 rows for 3 hosts, measured), so
+#      any count must be DISTINCT. EXPECTED_REPLICAS below is the intent, and
+#      `make validate` fails if it drifts from the CHI's replicasCount.
+#   2. Create the DATABASE on every replica individually — no ON CLUSTER, so the
+#      distributed-DDL queue that lost replica 2 twice is never involved.
+#   3. Create the TABLES once. The Replicated database engine propagates them.
+#   4. PROVE it. A Job that exits 0 without checking is a green light for a
+#      broken store: both earlier failures had every table present on the
+#      replica the collector happened to talk to. The verify step below asserts
+#      total_replicas on EVERY replica and fails the Job otherwise.
+#
+# Idempotent: every statement is IF NOT EXISTS, and the verify step is a read.
+# Jobs are immutable, so to re-run after editing the SQL:
+#   kubectl delete job clickhouse-schema -n monitoring
+#   flux reconcile kustomization clickhouse-schema-local -n flux-system
+# (No kustomize.toolkit.fluxcd.io/force: the SQL lives in a ConfigMap, so the
+# pod template does not change when the DDL does — there is no immutable-field
+# apply failure to work around, and force on a bootstrap Job is discouraged
+# elsewhere in this repo.)
+#
+# No ttlSecondsAfterFinished on purpose: clickhouse-schema-local gates on this
+# Job with wait: true, and a TTL-deleted Job cannot be health-checked.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickhouse-schema
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: clickhouse-schema
+    app.kubernetes.io/component: bootstrap
+    app.kubernetes.io/part-of: observability
+spec:
+  # High because this Job legitimately races its dependency: the CHI's replicas
+  # come up one at a time, and the wave's health checks gate on StatefulSets,
+  # which go Ready slightly before every server answers queries.
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clickhouse-schema
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: OnFailure
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: schema
+          # Same tag as the CHI: the server image ships clickhouse-client, so
+          # the client is never older than the server it talks to, and the
+          # text(tokenizer = ...) index syntax in the logs DDL is 26.x-only.
+          image: clickhouse/clickhouse-server:26.7
+          env:
+            # Must equal spec.configuration.clusters[0].layout.replicasCount in
+            # configs/clickhouse/clickhouseinstallation.yaml. Duplicated on
+            # purpose: the alternative is discovering it at runtime, which is
+            # exactly what shipped a green Job over a 2-replica store. The
+            # duplication is policed statically — scripts/flux-validate.sh fails
+            # when the two numbers disagree.
+            - name: EXPECTED_REPLICAS
+              value: "3"
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: password
+            # clickhouse-client writes history and temp files under $HOME.
+            - name: HOME
+              value: /tmp
+          command: [sh, -c]
+          args:
+            - |
+              set -eu
+              LB=clickhouse-clickhouse.monitoring.svc.cluster.local
+              cli() { host=$1; shift; clickhouse-client --host "$host" --password "$CLICKHOUSE_PASSWORD" "$@" ; }
+
+              echo "==> waiting for the cluster definition to be servable"
+              n=0
+              until cli "$LB" -q "SELECT 1" >/dev/null 2>&1; do
+                n=$((n+1)); [ "$n" -ge 60 ] && { echo "FAIL: $LB never answered"; exit 1; }
+                sleep 5
+              done
+
+              EXPECTED=$EXPECTED_REPLICAS
+              echo "==> intended replicas: $EXPECTED"
+
+              # The operator publishes remote_servers asynchronously, so wait for
+              # the cluster definition to CATCH UP with the intent rather than
+              # trusting whatever it says right now. DISTINCT because the
+              # generated config lists each host more than once.
+              echo "==> waiting for the cluster definition to list $EXPECTED distinct hosts"
+              n=0
+              while :; do
+                HOSTS=$(cli "$LB" -q "SELECT DISTINCT host_name FROM system.clusters WHERE cluster='otel' ORDER BY host_name FORMAT TSV" 2>/dev/null || true)
+                got=$(printf '%s\n' "$HOSTS" | grep -c . || true)
+                [ "$got" = "$EXPECTED" ] && break
+                n=$((n+1))
+                [ "$n" -ge 60 ] && { echo "FAIL: cluster 'otel' lists $got distinct hosts, want $EXPECTED"; echo "$HOSTS" | sed 's/^/    /'; exit 1; }
+                sleep 5
+              done
+              echo "==> cluster otel lists $EXPECTED hosts:"; echo "$HOSTS" | sed 's/^/    /'
+
+              echo "==> waiting for every replica to answer, not just the Service"
+              for h in $HOSTS; do
+                n=0
+                until cli "$h.monitoring.svc.cluster.local" -q "SELECT 1" >/dev/null 2>&1; do
+                  n=$((n+1)); [ "$n" -ge 60 ] && { echo "FAIL: replica $h never answered"; exit 1; }
+                  sleep 5
+                done
+                echo "    $h ok"
+              done
+
+              # PREFLIGHT. `CREATE DATABASE IF NOT EXISTS ... ENGINE = Replicated`
+              # does NOT convert an existing Atomic database — it is a no-op, and
+              # the verify at the end would then fail on the engine after this Job
+              # had already created tables inside the wrong database. Catch it
+              # here, before touching anything, and say what to do about it.
+              echo "==> preflight: no pre-existing non-Replicated otel database"
+              stale=0
+              for h in $HOSTS; do
+                eng=$(cli "$h.monitoring.svc.cluster.local" -q \
+                  "SELECT engine FROM system.databases WHERE name='otel' FORMAT TSV" 2>/dev/null || true)
+                if [ -n "$eng" ] && [ "$eng" != "Replicated" ]; then
+                  echo "    $h: otel exists with engine '$eng'"
+                  stale=1
+                fi
+              done
+              if [ "$stale" = "1" ]; then
+                cat <<'MSG'
+              FAIL: an `otel` database already exists with a non-Replicated engine.
+
+              This is not repairable in place: CREATE DATABASE IF NOT EXISTS will
+              not change the engine of an existing database, so this Job cannot
+              build the replicated schema on top of it.
+
+              The rollout is fresh-only by decision (RFC-0028: demo data is
+              disposable). Drop the database on EVERY replica, then re-run:
+
+                PW=$(kubectl -n monitoring get secret clickhouse-credentials \
+                      -o jsonpath='{.data.password}' | base64 -d)
+                for p in $(kubectl -n monitoring get po \
+                      -l clickhouse.altinity.com/chi=clickhouse -o name); do
+                  kubectl -n monitoring exec "${p#pod/}" -c clickhouse -- \
+                    clickhouse-client --password "$PW" -q "DROP DATABASE IF EXISTS otel SYNC"
+                done
+                kubectl -n monitoring delete job clickhouse-schema
+                flux -n flux-system reconcile kustomization clickhouse-schema-local
+
+              Per replica, not ON CLUSTER: a partial drop leaves exactly the
+              split-brain schema this design exists to prevent.
+              MSG
+                exit 1
+              fi
+
+              echo "==> CREATE DATABASE on each replica (no ON CLUSTER, no DDL queue)"
+              for h in $HOSTS; do
+                cli "$h.monitoring.svc.cluster.local" --queries-file /sql/00-database.sql
+                echo "    $h database ready"
+              done
+
+              echo "==> CREATE TABLES once; the Replicated database propagates them"
+              FIRST=$(echo "$HOSTS" | head -1)
+              for f in /sql/10-otel_logs.sql /sql/20-otel_traces.sql \
+                       /sql/30-otel_traces_trace_id_ts.sql \
+                       /sql/40-otel_traces_trace_id_ts_mv.sql; do
+                echo "    applying $(basename "$f") on $FIRST"
+                cli "$FIRST.monitoring.svc.cluster.local" --queries-file "$f"
+              done
+
+              echo "==> waiting for the schema to land on every replica"
+              for h in $HOSTS; do
+                n=0
+                until [ "$(cli "$h.monitoring.svc.cluster.local" -q \
+                    "SELECT count() FROM system.tables WHERE database='otel' FORMAT TSV" 2>/dev/null || echo 0)" = "4" ]; do
+                  n=$((n+1)); [ "$n" -ge 36 ] && { echo "FAIL: $h never reached 4 objects in otel"; exit 1; }
+                  sleep 5
+                done
+              done
+
+              echo "==> VERIFY — the step that makes a green Job mean something"
+              rc=0
+              for h in $HOSTS; do
+                host="$h.monitoring.svc.cluster.local"
+                eng=$(cli "$host" -q "SELECT engine FROM system.databases WHERE name='otel' FORMAT TSV")
+                [ "$eng" = "Replicated" ] || { echo "FAIL: $h database engine is '$eng', want Replicated"; rc=1; }
+                bad=$(cli "$host" -q "SELECT count() FROM system.replicas WHERE database='otel' AND (total_replicas != $EXPECTED OR active_replicas != $EXPECTED OR is_readonly != 0) FORMAT TSV")
+                [ "$bad" = "0" ] || { echo "FAIL: $h has $bad replicated tables not at ${EXPECTED}/${EXPECTED} or read-only"; rc=1; }
+                plain=$(cli "$host" -q "SELECT count() FROM system.tables WHERE database='otel' AND engine='MergeTree' FORMAT TSV")
+                [ "$plain" = "0" ] || { echo "FAIL: $h has $plain unreplicated MergeTree tables in otel"; rc=1; }
+                echo "    $h: engine=$eng replicated_tables_ok=$([ "$bad" = 0 ] && echo yes || echo NO)"
+              done
+              [ "$rc" -eq 0 ] || { echo "SCHEMA BOOTSTRAP FAILED"; exit 1; }
+
+              cli "$LB" -q "SELECT table, is_readonly, total_replicas, active_replicas FROM system.replicas WHERE database='otel' ORDER BY table FORMAT PrettyCompact"
+              echo "==> schema bootstrap complete on $EXPECTED replicas"
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: sql
+          configMap:
+            name: clickhouse-schema
+        - name: tmp
+          emptyDir: {}

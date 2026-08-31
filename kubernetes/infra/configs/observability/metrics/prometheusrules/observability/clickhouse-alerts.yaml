@@ -8,8 +8,8 @@ metadata:
     role: alert-rules
 spec:
   groups:
-    # Engine health of the OTel OLAP store. Two producers feed these series,
-    # both on the clickhouse-operator-metrics Service (:8888), scraped via the
+    # Engine health of the OTel OLAP store. Two of the three producers sit on
+    # the clickhouse-operator-metrics Service (:8888), scraped via the
     # chart's ServiceMonitor (serviceMonitor.enabled in the operator
     # HelmRelease):
     #   /metrics -> clickhouse_operator_*  (operator control plane)
@@ -23,12 +23,13 @@ spec:
     # (FailedInsertQuery), and the job label the VM operator derives. Every
     # expr carrying that risk says so in a comment.
     #
-    # There is deliberately NO ServiceMonitor on the clickhouse-server pod
-    # itself (settings.prometheus/* stays unset): with one shard × one
-    # replica the exporter's /chi already carries the engine signals, and
-    # per-pod scrape is the thing to add the moment replicas appear —
-    # recorded in docs/observability/clickhouse/README.md § Metrics &
-    # alerting.
+    # Since RFC-0028 there is a THIRD producer: the server's own Prometheus
+    # endpoint (:9363), scraped per pod by podmonitors/clickhouse-server.yaml
+    # (job="clickhouse-server", label `replica`). It publishes the
+    # ClickHouseMetrics_* / ClickHouseProfileEvents_* / ClickHouseErrorMetric_*
+    # families. The exporter aggregates by CHI and therefore cannot say WHICH
+    # replica is sick — which is the only question that matters once there are
+    # three of them.
     - name: observability-clickhouse
       interval: 30s
       rules:
@@ -39,15 +40,52 @@ spec:
         # Series name verified on the Kind cluster 2026-08-22: the exporter does
         # publish chi_clickhouse_metric_fetch_errors. An earlier note in this repo
         # claimed it did not exist -- that was wrong.
-        - alert: ClickHouseServerUnreachable
-          expr: chi_clickhouse_metric_fetch_errors > 0
+        # RFC-0028 re-graded this from critical to warning. At 1x1 one
+        # unreachable host WAS the store being down. With three replicas behind
+        # a round-robin Service, one unreachable host is a degraded quorum
+        # member: reads and writes continue on its peers. What deserves a page
+        # is losing them all, which the companion rule below expresses.
+        # MEASURED 2026-08-28: this series is per (hostname, fetch_type) —
+        # 3 hosts x 7 fetch types = 21 series. The bare expression that stood
+        # here would therefore raise up to SEVEN alerts for one sick replica, and
+        # each would read as a separate incident. Aggregated by hostname so one
+        # unreachable replica is one alert.
+        - alert: ClickHouseReplicaUnreachable
+          expr: max by (hostname) (chi_clickhouse_metric_fetch_errors) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse replica unreachable ({{ $labels.hostname }})"
+            description: "The metrics-exporter has failed to fetch system tables from {{ $labels.hostname }} for 5 minutes. With three replicas its peers keep serving reads and writes, so this is a degraded topology rather than an outage — but a replica that stays unreachable is one disk failure away from mattering, and it stops catching up on replication."
+
+        # The page-worthy version: no replica is answering, so the store really
+        # is down. Since RFC-0028 the collector no longer runs DDL at startup
+        # (create_schema: false), so this no longer blocks collector restarts —
+        # what it costs is the ClickHouse sink, and the edge access log has
+        # nowhere else to go.
+        #
+        # The VERIFY-AT-KIND marker that stood here asked whether the `hostname`
+        # cardinality made a `count(...) >= 3` threshold meaningful. Measured
+        # 2026-08-28: it did NOT. The series is per (hostname, fetch_type), so
+        # one replica with three failing fetch types would have paged as "every
+        # replica unreachable". Expressed as a RATIO instead — the fraction of
+        # distinct hosts reporting fetch errors — which is both correct and
+        # independent of the replica count, so a scale-out needs no edit here.
+        - alert: ClickHouseAllReplicasUnreachable
+          expr: |
+            count(max by (hostname) (chi_clickhouse_metric_fetch_errors) > 0)
+            /
+            count(count by (hostname) (chi_clickhouse_metric_fetch_errors))
+            == 1
           for: 5m
           labels:
             severity: critical
             category: observability
           annotations:
-            summary: "ClickHouse server unreachable ({{ $labels.hostname }})"
-            description: "The metrics-exporter has failed to fetch system tables from {{ $labels.hostname }} for 5 minutes — the OTel logs/traces store is effectively down, and the OTel Collector's create_schema step will block every collector restart until it returns."
+            summary: "ClickHouse: every replica unreachable"
+            description: "The metrics-exporter cannot reach any ClickHouse replica — the OTel logs/traces store is down and edge access logs (ClickHouse-only per ADR-061) are being dropped. The collector survives this now that it owns no DDL, but its ClickHouse sink backpressures and then drops; the schema bootstrap Job would also fail until the store returns."
 
         - alert: ClickHouseOperatorDown
           expr: up{job=~".*clickhouse-operator.*"} == 0
@@ -105,8 +143,20 @@ spec:
         # named do not exist. The exporter publishes 166 chi_clickhouse_event_*
         # series and 920 chi_*/clickhouse series in total; a name search for
         # RejectedInserts, FailedInsertQuery, FailedMerges -- and for `Failed`
-        # anywhere in a chi_ series -- returns nothing. No replacement exists
-        # under another name, so there was nothing to re-point them at.
+        # anywhere in a chi_ series -- returns nothing.
+        #
+        # CORRECTION (2026-08-28, RFC-0028): the deletions were right in outcome
+        # but wrong in reasoning, and the reasoning is what gets reused. The
+        # exporter builds chi_clickhouse_event_* from system.events, which OMITS
+        # every counter still at zero -- so absence on a quiet lab proves the
+        # event never fired, not that the name is wrong. Two of those three names
+        # are in fact real ClickHouse ProfileEvents (RejectedInserts,
+        # FailedInsertQuery); only FailedMerges is fiction. The server's own
+        # :9363 endpoint publishes every ProfileEvent unconditionally, zeros
+        # included, so those two are re-pointable at
+        # ClickHouseProfileEvents_{RejectedInserts,FailedInsertQuery} and
+        # verifiable at rest. Recorded as a follow-up rather than widened into
+        # this PR.
         #
         # This is exactly the failure the VERIFY-AT-KIND convention was invented
         # for: an expression naming a series that does not exist loads cleanly,
@@ -168,14 +218,55 @@ spec:
             summary: "OTel → ClickHouse export failing"
             description: "The Collector's clickhouse exporter has been failing sends for 10 minutes — OTel logs/traces are not landing in the OLAP store (VictoriaLogs/VictoriaTraces keep their own copies)."
 
-        # Latent: only meaningful if ClickHouseKeeper/ZooKeeper is ever
-        # adopted (replication). Uncomment with the first replicated table.
-        # - alert: ClickHouseZooKeeperExceptions
-        #   expr: rate(chi_clickhouse_event_ZooKeeperHardwareExceptions[5m]) > 0
-        #   for: 5m
-        #   labels:
-        #     severity: warning
-        #     category: observability
-        #   annotations:
-        #     summary: "ClickHouse ZooKeeper exceptions"
-        #     description: "Keeper/ZooKeeper hardware exceptions on the replication path."
+        # Enabled by RFC-0028 — the replication this rule was written for now
+        # exists — but deliberately moved OFF the chi_clickhouse_event_* family
+        # it was originally written against.
+        #
+        # The reason matters beyond this rule. The Altinity exporter builds
+        # chi_clickhouse_event_* from system.events, and system.events OMITS any
+        # counter still at zero. So a chi_clickhouse_event_* name can never be
+        # confirmed on a healthy cluster: absence proves the event has not fired
+        # and says nothing about whether the name is right. That is the same test
+        # that condemned three sibling alerts on 2026-08-22 — and at least two of
+        # those names (RejectedInserts, FailedInsertQuery) are real ClickHouse
+        # events which were simply idle on a quiet lab. Restoring them on
+        # verifiable names is recorded as a follow-up, not smuggled in here.
+        #
+        # The server's own :9363 endpoint writes every ProfileEvent
+        # unconditionally, zeros included, so this name IS checkable at the gate
+        # and carries a per-replica label as a bonus.
+        # VERIFIED AT KIND 2026-08-28, positively rather than by name lookup: the
+        # keeper drills drove it to 35 / 27 / 30 across the three replicas, and
+        # VictoriaMetrics carries those values. The series is real and it moves.
+        - alert: ClickHouseZooKeeperExceptions
+          expr: rate(ClickHouseProfileEvents_ZooKeeperHardwareExceptions[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse Keeper exceptions ({{ $labels.replica }})"
+            description: "Network-level Keeper exceptions on the replication path from this replica. A replica that cannot reach the quorum stops accepting writes and stops fetching parts from its peers — it drifts silently while still answering reads. Check the quorum: kubectl -n monitoring get pods -l clickhouse-keeper.altinity.com/chk=keeper."
+
+        # The engine's own answer to "did this replica lose the quorum", from the
+        # per-pod :9363 scrape RFC-0028 enabled. A read-only replica still serves
+        # SELECTs, so nothing else in this file would notice.
+        # VERIFIED AT KIND 2026-08-28: three series, one per replica, all 0 on a
+        # healthy store, and the PodMonitor shows three `clickhouse-server`
+        # targets up. Before this change zero ClickHouse* series existed at all,
+        # because nothing scraped :9363.
+        # What is NOT verified: the firing condition. Deleting all three keepers
+        # did not produce a read-only replica — the pods were recreated fast
+        # enough that no ClickHouse session expired (measured: is_readonly stayed
+        # 0 throughout, SELECTs kept serving). So the name and the plumbing are
+        # proven; the alert's trigger has not been exercised, and saying so is
+        # more useful than implying it was.
+        - alert: ClickHouseReadonlyReplica
+          expr: ClickHouseMetrics_ReadonlyReplica > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            summary: "ClickHouse replica is read-only ({{ $labels.replica }})"
+            description: "This replica has lost its ClickHouse Keeper session and can no longer accept writes or fetch parts. Reads still succeed, so the topology looks healthy from the outside while one of three copies falls behind. Check the keeper quorum first: kubectl -n monitoring get pods -l clickhouse-keeper.altinity.com/chk=keeper."

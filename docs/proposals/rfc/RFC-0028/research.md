@@ -42,6 +42,17 @@
 
 ---
 
+> **Read this as a dated record, not as current design.** The gate this research
+> fed chose Option B (exporter-owned schema). Implementation measured that option
+> producing a schema on 1 of 3 and then 2 of 3 replicas and **reversed it** to a
+> Job-owned `Replicated` database — see
+> [RFC-0028 § Implementation History](./README.md#implementation-history) and
+> [ADR-065](../../adr/ADR-065-clickhouse-replicated-topology/). The analysis below
+> is left intact on purpose: it is the evidence of *why* the gate chose as it did.
+> One gap worth naming — this research never quoted the exporter README's
+> recommendation to set `create_schema: false` in production, which is the single
+> fact that would have changed the gate.
+
 ## Problem statement
 
 ### Real-world trigger

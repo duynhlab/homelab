@@ -1,0 +1,40 @@
+# ClickHouse schema bootstrap (RFC-0028 / ADR-065). Its own Kustomization, and
+# the split is load-bearing in two directions.
+#
+# It cannot live in clickhouse-local: that wave deliberately carries NO
+# `wait: true` so its six StatefulSet healthChecks are actually evaluated, and a
+# Job needs `wait: true` to gate anything. Putting them together would mean
+# choosing which of the two guarantees to lose.
+#
+# It sits BETWEEN clickhouse-local and tracing-local: the schema must exist
+# before the collector starts, because the collector no longer creates it
+# (create_schema: false). Same shape as temporal-local → temporal-config-local →
+# apps-local, which is this repo's established pattern for "a Job must complete
+# before consumers roll".
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: clickhouse-schema-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: observability
+spec:
+  interval: 10m
+  # The Job itself waits up to ~5 minutes for every replica to answer, then
+  # waits again for the schema to propagate. 15m leaves room for a backoff retry
+  # on a cold node without wedging the wave.
+  timeout: 15m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./configs/clickhouse-schema
+  prune: true
+  # wait: true is what makes downstream gate on the Job reaching Complete.
+  # kstatus does assess Jobs, so this is the whole mechanism — and unlike the
+  # CHI/CHK custom resources, a Job publishes a status kstatus understands.
+  wait: true
+  dependsOn:
+    - name: clickhouse-local
+    - name: secrets-local

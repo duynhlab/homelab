@@ -15,9 +15,14 @@ groups:
     interval: 30s
     rules:
       # Locally `up` is the genuine server-liveness signal: vmagent scrapes
-      # the server itself, not a sidecar. Same blast radius as the cluster
-      # rule: the collector's create_schema blocks every collector restart
-      # while this fires.
+      # the server itself, not a sidecar.
+      #
+      # The blast radius is WIDER here than on the cluster, and that is
+      # deliberate: local-stack keeps create_schema: true (one node, no
+      # ON CLUSTER, so no race to avoid), which means the collector still runs
+      # DDL at startup and a dead ClickHouse blocks every collector restart.
+      # The cluster moved that DDL into a bootstrap Job (RFC-0028), so there
+      # the same outage costs only the ClickHouse sink.
       - alert: ClickHouseServerUnreachable
         expr: up{job="clickhouse"} == 0
         for: 5m

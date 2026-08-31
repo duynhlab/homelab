@@ -40,15 +40,20 @@ spec:
   # in THIS file hints why.
   dependsOn:
     - name: secrets-local
-    # RFC-0019: the OTel Collector's clickhouse exporter runs CREATE DATABASE/TABLE
-    # in its start() (create_schema: true). If ClickHouse is unreachable when the
-    # collector starts, the WHOLE collector fails to start — taking VictoriaTraces
-    # and VictoriaLogs down with it (Tempo and Jaeger retired, RFC-0027). Order ClickHouse first (this mirrors
-    # local-stack's `depends_on: clickhouse: service_healthy`). Note: this guards
-    # cold-start ordering only; a collector restart while ClickHouse is down still
-    # crash-loops until it recovers — switch the exporter to create_schema:false +
-    # a schema-bootstrap Job to fully decouple when this goes beyond a pilot.
-    - name: clickhouse-local
+    # RFC-0019 used to order this behind clickhouse-local because the collector's
+    # exporter ran CREATE DATABASE/TABLE in its start() (create_schema: true), so
+    # an unreachable ClickHouse failed the WHOLE collector and took VictoriaTraces
+    # and VictoriaLogs with it (Tempo and Jaeger retired, RFC-0027).
+    #
+    # RFC-0028 did what that note prescribed: create_schema is false and a
+    # bootstrap Job owns the DDL, so the collector no longer runs any DDL and a
+    # restart during a ClickHouse outage costs only the ClickHouse sink.
+    #
+    # The dependency moves to the SCHEMA wave, and it has to: the collector can
+    # no longer create what it is missing, so starting before the schema exists
+    # produces failing INSERTs instead of self-healing. clickhouse-schema-local
+    # itself dependsOn clickhouse-local, so the store is still ordered first.
+    - name: clickhouse-schema-local
   # RFC-0027 / ADR-059: gated on Tempo until Tempo was retired. The collector is
   # the right gate anyway — it is what every trace, log and metric passes through.
   healthChecks:

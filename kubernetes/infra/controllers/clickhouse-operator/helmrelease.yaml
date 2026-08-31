@@ -54,7 +54,27 @@ spec:
     serviceMonitor:
       enabled: true
       keeperMetrics:
-        enabled: false # no ClickHouseKeeper deployed
+        # RFC-0028: a CHK quorum now exists, so the keeper surface is worth
+        # scraping — an invisible quorum is one nobody can alert on.
+        #
+        # This flip is INERT on its own, and that is the trap: operator-generated
+        # Keeper Services publish only the zk/raft ports, so the CHK must both
+        # enable `prometheus/*` settings AND name a prometheus port in a
+        # serviceTemplate. Both live in configs/clickhouse/clickhousekeeperinstallation.yaml.
+        # Without them this ships a ServiceMonitor with zero targets, which reads
+        # as coverage — the same class of defect as an alert on a series that
+        # does not exist.
+        enabled: true
+        # The chart's default selector also matches the per-host Service tiers,
+        # so each keeper pod would be scraped more than once. Narrowed to the
+        # CR-scope Service.
+        # VERIFIED AT KIND 2026-08-28: exactly three `keeper-keeper` targets in
+        # vmagent, one per pod, all up. Without the narrowed selector the same
+        # pods would have been scraped through several Service tiers, and
+        # over-counting looks identical to correct in a dashboard.
+        selector:
+          clickhouse-keeper.altinity.com/app: chop
+          clickhouse-keeper.altinity.com/Service: chk
     operator:
       resources:
         requests:

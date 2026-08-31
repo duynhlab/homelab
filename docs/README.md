@@ -45,7 +45,7 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-064     # 64 records; status per record in the ADR index
+│   │   └── ADR-001 … ADR-065     # 65 records; status per record in the ADR index
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
@@ -425,7 +425,7 @@ The **owning indexes are complete and are the only place a record's status is
 maintained.** This page deliberately does not duplicate them — a partial copy
 here is how an index starts disagreeing with the records it points at.
 
-- [**ADR index**](./proposals/adr/README.md) — all **60** decisions, each with
+- [**ADR index**](./proposals/adr/README.md) — all **65** decisions, each with
   its `Status` and `Adoption`. The *why* behind significant choices.
 - [**RFC index**](./proposals/rfc/README.md) — all **26** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.

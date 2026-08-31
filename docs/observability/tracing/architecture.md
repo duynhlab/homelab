@@ -335,7 +335,7 @@ by ratio, downstream honours the parent.
 
 ### Current Limitations
 
-1. **Single-node stores**: VictoriaTraces is one `VTSingle` on a PVC and ClickHouse is a single shard — neither is replicated, so a lost volume is lost traces. Acceptable here because traces are diagnostic data with a 7/90-day horizon, not a system of record.
+1. **Single-node store (VictoriaTraces only)**: VictoriaTraces is one `VTSingle` on a PVC and is not replicated, so a lost volume is lost traces there. Acceptable by design because it holds 7-day diagnostic data, not a system of record. **ClickHouse is no longer in this bucket** — it runs 1 shard × 3 replicas on a ClickHouse Keeper quorum, so losing a volume is a failover ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)); that mattered most because the edge access log lives only there ([ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)).
 2. **Collector HA**: Single replica (no redundancy); in-memory exporter queues drop on restart
 3. **Security**: No TLS between components
 4. **Service graph is not retroactive**: it is built by a background task from spans arriving *after* it was enabled ([ADR-059](../../proposals/adr/ADR-059-retire-tempo/))
@@ -370,8 +370,10 @@ The tracing stack answers this question **twice**, differently, and on purpose.
 | VictoriaTraces | **CR** (`VTSingle`, VictoriaMetrics Operator) | The operator is already on the cluster for `VMSingle` + `VLSingle`; adding traces means one more CR, not one more controller |
 
 Both are reconciled by Flux through the `tracing-local` Kustomization
-(path `./controllers/tracing`, `dependsOn: [secrets-local, storage-local, clickhouse-local]`
-— ClickHouse must be up before the collector's `create_schema` runs).
+(path `./controllers/tracing`, `dependsOn: [secrets-local, clickhouse-local]`
+— the collector runs `create_schema: false` since RFC-0028, so it waits on the
+`clickhouse-schema` Job rather than on the store; `storage-local` was dropped in
+August with Tempo's RustFS buckets).
 
 ### Why not the OpenTelemetry Operator
 

@@ -353,6 +353,69 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse schema ownership moved out of the collector, reversing ADR-065's
+  central decision before it shipped.** Exporter-owned DDL cannot produce a
+  complete schema at three replicas: `CREATE ... ON CLUSTER` issued at collector
+  startup never reaches a host that joins the distributed-DDL queue later, that
+  host skips the earlier entries permanently, and `IF NOT EXISTS` makes every
+  retry a no-op. Measured on two fresh Kind bring-ups — schema on **1 of 3**
+  replicas, then **2 of 3** after the Flux ordering was fixed, with six pods
+  `Running` and every table present on whichever replica the collector happened
+  to talk to. `system.replicas` reporting fewer copies than the topology claimed
+  was the only signal, and only a cross-replica read exposed it. The exporter's
+  own README recommends `create_schema: false` for production and names the
+  failure: *"This approach prevents race conditions during startup."*
+  As built now: a `clickhouse-schema` Job with its DDL committed in
+  `configs/clickhouse-schema/` creates the `otel` database as
+  **`ENGINE = Replicated`** on each replica individually — no `ON CLUSTER`, so
+  the cluster-wide DDL queue is never involved — then creates the tables once and
+  lets the database's own Keeper log propagate them, which is also what makes a
+  future replica addition initialise its own tables instead of silently having
+  none. The collector runs `create_schema: false`; `cluster_name`,
+  `table_engine`, `ttl` and the `distributed_ddl_task_timeout` DSN parameter are
+  gone because all four only fed the DDL path, and the 90-day TTL now lives in
+  the committed DDL where it can be reviewed. Two things the platform wanted
+  anyway come with it: the collector no longer risks the whole telemetry plane on
+  a restart during a ClickHouse outage, and `ALTER` finally has an owner. The new
+  cost, recorded in the ADR: the committed schema must track the exporter's
+  INSERT contract, so a collector image bump means re-checking upstream
+  `logs_insert.sql` / `traces_insert.sql` — a mismatch fails at insert time under
+  traffic, not at apply time.
+
+- **The ClickHouse observability store is replicated: 1 shard x 3 replicas on a
+  3-node ClickHouse Keeper quorum.** One lost PVC used to erase 90 days of edge
+  access logs — ClickHouse-only since ADR-061 — and every long-retention trace;
+  the tracing architecture doc recorded that as an accepted gap in the words
+  *"a lost volume is lost traces."* It is now a failover. The `otel` tables are
+  `ReplicatedMergeTree` in a `Replicated` database, created by the
+  `clickhouse-schema` Job from DDL committed to git — see the schema-ownership
+  entry above, which is the same change viewed from the other side
+  ([RFC-0028](docs/proposals/rfc/RFC-0028/) /
+  [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/)).
+  Three fixes landed with it because without them the gate would have passed on
+  false evidence: the wave health-checked **one** StatefulSet, so `wait: true`
+  reported Ready on one replica of three and released `tracing-local` early; the
+  Keeper **CRD was not health-checked**, so the wave could race the CRD it
+  needs; and `make validate` **never built** the ClickHouse overlay, so a
+  malformed CR would have passed validation and failed on the cluster.
+  The engine-native `:9363` endpoint is finally scraped, per pod — deferred to a
+  "quick-win PR" that turned out never to have been created, which had left
+  `ClickHouseMetrics_ReadonlyReplica`, named in the RFC's own rollout watch
+  list, with no series at all. Alerts follow the new failure shape:
+  `ClickHouseServerUnreachable` is now the warning-level
+  `ClickHouseReplicaUnreachable` (one of three, peers still serving) with a new
+  critical `ClickHouseAllReplicasUnreachable` carrying the page, plus
+  `ClickHouseZooKeeperExceptions` (re-enabled — written for exactly this
+  topology and commented out until it existed) and `ClickHouseReadonlyReplica`,
+  which catches the failure nothing else notices: a replica that lost its Keeper
+  session keeps answering reads while silently refusing writes. Both carry
+  `VERIFY-AT-KIND` markers, because neither series has ever been observed here.
+  Accepted costs: memory and storage triple, and the committed schema must track
+  the exporter's INSERT contract across collector upgrades. The two costs this
+  entry originally listed — DDL in the collector's `start()` and an exporter that
+  never `ALTER`s — were removed by the schema-ownership change above.
+  local-stack stays single-node with no keeper.
+
 - **ADR-061: the edge's logs are routed by class.** The access log — an
   attributes-only record LogsQL free-text could never see, and the noisiest
   OTLP stream (5,941 records/6h under a gate run) — is now **ClickHouse-only**:
@@ -864,6 +927,21 @@ Skeleton (copy what you need):
   Fifteen inbound `#platform-pipeline`/`#troubleshooting` links retargeted.
 
 #### Proposals
+
+- **RFC-0028 is `Accepted` and ADR-065 is created at `Accepted` with it.**
+  [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/) carries
+  the one decision the RFC frames — 1x3 replicated ClickHouse on a Keeper
+  quorum. It was created stating exporter-owned schema and **amended the same
+  day**, once implementation measured that option leaving replicas without a
+  schema; the migration Job it had recorded as "not wrong, just early" came due
+  immediately, and both of its advantages — the `ALTER` lifecycle and startup
+  decoupling — are now delivered rather than deferred.
+  Implementation ships in the same pull request, so the gate that proves the
+  topology is also the gate that closes the ADR's adoption. Two RFC defects
+  fixed on the way through: its index row had the status sitting in the
+  Priority column and the row itself sat out of numeric order in an index that
+  declares itself number-ordered, and its topology diagram carried
+  non-English node labels.
 
 - **RFC-0028 research gate passed and the README authored at `provisional`,
   the same day it opened.** The owner resolved every open question in-session
@@ -1996,6 +2074,23 @@ Skeleton (copy what you need):
 ### Bugfix
 
 #### GitOps
+
+- **The `clickhouse-local` wave gated on nothing, and had never gated on
+  anything.** `wait` and `healthChecks` are mutually exclusive in Flux and
+  `wait` wins, so `wait: true` waited on the health of what the overlay applies
+  — two custom resources whose status kstatus cannot assess, and therefore calls
+  Current immediately. Measured on a fresh Kind bring-up: **the wave reconciled
+  in 371ms and reported success while zero StatefulSets existed**; the operator
+  created the first one a minute later, and `tracing-local` applied on that green
+  light. The single health check the wave carried before this was inert for the
+  same reason. What that cost, once the store had three replicas: the collector
+  ran `CREATE ... ON CLUSTER` before replicas 1 and 2 joined the
+  distributed-DDL queue, a host that joins later skips earlier entries, and
+  `IF NOT EXISTS` makes every retry a no-op — so the `otel` schema existed on
+  replica 0 alone, permanently and silently, while six pods read `Running` and
+  every table read `ReplicatedMergeTree`. Dropping `wait` is what makes health
+  checks on operator-created StatefulSets evaluate at all. The trap is now a
+  gotcha in `AGENTS.md`, because any wave that applies only CRs can hit it.
 
 - **RustFS memory limit 1Gi → 2Gi — the 422s came back, as OOM this time.**
   Live on 2026-08-25: RustFS OOMKilled in a loop (Last State) while its

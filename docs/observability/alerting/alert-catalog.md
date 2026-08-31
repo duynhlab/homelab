@@ -19,10 +19,10 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**218 statically-defined alerts** across 10 domains (re-derive with
+**219 statically-defined alerts** across 10 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
-— by domain: postgres 53, microservices 52, victoriametrics 31, kubernetes 29,
-envoy-gateway 12, gitops 9, valkey 7, observability 15, keycloak 5, kyverno 4,
+— by domain: postgres 55, microservices 52, victoriametrics 31, kubernetes 29,
+envoy-gateway 12, gitops 9, valkey 7, observability 14, keycloak 5, kyverno 4,
 + the watchdog), plus **68 Sloth-generated** SLO
 burn-rate alerts (2 × 34 SLOs). The 34 SLOs cover all 11 Go services plus Keycloak:
 30 rendered by the `mop` chart through the five domain ResourceSets, plus inventory's 2
@@ -44,7 +44,7 @@ error forward a fourth time.
 | [Envoy Gateway edge](#2-envoy-gateway-edge) | 12 | The single API ingress for the whole platform — proxy fleet + control plane |
 | [Keycloak identity](#2b-keycloak-identity) | 5 | The identity provider — new logins and token refreshes, and the DB pool + token endpoint behind them |
 | [Valkey cache](#3-valkey-cache) | 7 | Cache-aside layer in front of PostgreSQL |
-| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 51 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
+| [PostgreSQL — CloudNativePG](#4-postgresql--cloudnativepg) | 53 (+2 gated) | Two operational CNPG clusters (`platform-db`, `product-db`) + DR (`product-db-replica`) + backups + deep-signal alerts |
 | [Kubernetes](#5-kubernetes) | 29 | Nodes, workloads, pods, API server, control plane, network |
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
@@ -164,13 +164,14 @@ upstream `cluster-*.yaml`), deployed as:
 
 - `prometheusrules/postgres/cnpg/` — `product-db` (ns `product`): full HA set + `PostgresWALSizeHigh` + the **global** operator-health singleton (`CNPGOperatorDown`, `CNPGControllerReconcileErrorsSpiking`).
 - `prometheusrules/postgres/cnpg-platform-db/` — `platform-db` (ns `platform`): full HA set; covers auth, user, notification, shipping, review, and Temporal persistence.
-- `prometheusrules/postgres/backup-alerts.yaml` — backup age/failure (label-driven; fires for any CNPG cluster emitting the metrics).
+- `prometheusrules/postgres/backup-alerts.yaml` — backup age/failure/metrics-missing (label-driven; queries the Barman Cloud plugin metrics `barman_cloud_cloudnative_pg_io_*`, which superseded the in-tree `cnpg_collector_*` backup metrics after the plugin migration).
 
 - `prometheusrules/postgres/deep-signals-alerts.yaml` — hand-authored deep-signal alerts (§4b), label-driven, one file for both clusters.
 
-Base metrics: `cnpg_*`. The alert **types** are catalogued once below; the same rule
-set is replicated per HA cluster. **53 rules total** = `product-db` 22 (incl. the operator-health
-singleton) + `platform-db` 18 + 2 backup alerts + 11 deep-signal alerts.
+Base metrics: `cnpg_*` (backup alerts: `barman_cloud_cloudnative_pg_io_*`). The alert
+**types** are catalogued once below; the same rule
+set is replicated per HA cluster. **55 rules total** = `product-db` 22 (incl. the operator-health
+singleton) + `platform-db` 18 + 3 backup alerts + 12 deep-signal alerts.
 
 Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/README.md).
 
@@ -192,8 +193,9 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 | PostgresWALSizeHigh | warning | `cnpg_collector_pg_wal{size}` >2GB | WAL pileup → disk + recovery-time impact | 15m | [PostgresWALSizeHigh](../runbooks/postgresql/PostgresWALSizeHigh.md) |
 | CNPGClusterZoneSpreadWarning ⏸ *gated — commented out in kustomization until production (needs KSM zone labels)* | warning | unique zones <3 | Zone failure = data loss | 5m | [CNPGClusterZoneSpreadWarning](../runbooks/postgresql/CNPGClusterZoneSpreadWarning.md) |
 | CNPGClusterInstancesOnSameNode ⏸ *gated — commented out in kustomization until production* | warning | >1 instance per node (`kube_pod_info`) | Node loss = total cluster loss | 5m | [CNPGClusterInstancesOnSameNode](../runbooks/postgresql/CNPGClusterInstancesOnSameNode.md) |
-| PostgresBackupTooOld | warning | `cnpg_collector_last_available_backup_timestamp` >26h | Stale backups → data-loss exposure | 1h | [postgres-backup-restore.md](../../databases/runbooks/postgres-backup-restore.md) |
-| PostgresBackupFailed | critical | `cnpg_collector_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m | [postgres-backup-restore.md](../../databases/runbooks/postgres-backup-restore.md) |
+| PostgresBackupTooOld | warning | `barman_cloud_cloudnative_pg_io_last_available_backup_timestamp` >8h (6h schedule + 2h grace) | Stale backups → data-loss exposure | 30m | [postgres-backup-restore.md](../../databases/runbooks/postgres-backup-restore.md) |
+| PostgresBackupFailed | critical | `barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m | [postgres-backup-restore.md](../../databases/runbooks/postgres-backup-restore.md) |
+| PostgresBackupMetricsMissing | warning | `absent(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp)` per writable cluster ns | Backup alerting blind — plugin/sidecar/scrape broken | 30m | [postgres-backup-restore.md](../../databases/runbooks/postgres-backup-restore.md) |
 | CNPGClusterLogicalReplicationErrors 💤 | warning | apply+sync error counters increasing | Logical-replication divergence | 1m | [CNPGClusterLogicalReplicationErrors](../runbooks/postgresql/CNPGClusterLogicalReplicationErrors.md) |
 | CNPGClusterLogicalReplicationErrorsCritical 💤 | critical | ≥5 errors in 5m | Persistent logical-replication failure | 0m | [CNPGClusterLogicalReplicationErrorsCritical](../runbooks/postgresql/CNPGClusterLogicalReplicationErrorsCritical.md) |
 | CNPGClusterLogicalReplicationLagging 💤 | warning | receipt/apply lag >60s or buffered >1GB | Subscriber falling behind | 5m | [CNPGClusterLogicalReplicationLagging](../runbooks/postgresql/CNPGClusterLogicalReplicationLagging.md) |
@@ -692,4 +694,4 @@ Recorded in [010-drp.md → Known Gaps](../../databases/010-drp.md#known-gaps-an
 
 ---
 
-_Last updated: 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._
+_Last updated: 2026-08-31 — backup alerts migrated to the Barman Cloud plugin metrics (`barman_cloud_cloudnative_pg_io_*` — the in-tree `cnpg_collector_*` backup metrics are no longer emitted after the plugin migration), freshness threshold aligned to the actual schedule (26h → 8h = 6h schedule + 2h grace), and a new `PostgresBackupMetricsMissing` absent-series alert added; Summary re-derived to **219** (the by-domain figures had drifted: postgres held 54 not 53, observability 14 not 15). Previously 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._

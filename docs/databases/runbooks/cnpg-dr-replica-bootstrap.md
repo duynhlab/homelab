@@ -22,11 +22,16 @@ It recovers from `product-db` backups and WAL in:
 s3://pg-backups-cnpg/product-db/
 ```
 
-It also has its own backup prefix after bootstrap:
+It also archives its **own WAL** (as `isWALArchiver: true`) under a separate
+prefix:
 
 ```text
 s3://pg-backups-cnpg/product-db-replica/
 ```
+
+That prefix receives **WAL only**: the replica has no `Backup`/`ScheduledBackup`
+manifest, so no base backup anchors the chain and the prefix is **not
+independently restorable**. Restores always come from the `product-db` prefix.
 
 ## Quick Checks
 
@@ -58,5 +63,12 @@ For incident decisions, use the recovery decision flow in
 [../010-drp.md](../010-drp.md). Do not promote the DR replica until split-brain
 risk is controlled and the incident owner approves cutover.
 
+Promotion semantics: the replica **cluster** transitions via
+`spec.replica.enabled: false` (a GitOps-committed change — see
+[../010.4-emergency-recovery.md](../010.4-emergency-recovery.md)), not via
+`kubectl cnpg promote`. Disabling replication is **one-way**: turning it back
+into a replica requires destroying the cluster and re-bootstrapping (re-cloning)
+from the then-current primary.
+
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-08-31 — replica prefix clarified as WAL-only (no base-backup chain), promotion/re-clone semantics documented._

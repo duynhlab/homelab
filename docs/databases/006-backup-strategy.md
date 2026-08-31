@@ -3,12 +3,18 @@
 This document defines a **production-ready physical backup strategy** (base backup + WAL archiving) for the **operational PostgreSQL clusters + DR replica** (`platform-db`, `product-db`, `product-db-replica`) using **RustFS (S3-compatible)** as the backup target. Every cluster runs on CloudNativePG and uses the **Barman Cloud Plugin** (`ObjectStore` CR) into a **single bucket with per-cluster prefixes**:
 
 - **Bucket `pg-backups-cnpg`** (CloudNativePG / Barman Cloud Plugin):
-  - `platform-db` → `s3://pg-backups-cnpg/platform-db/` (retention 30d; includes `temporal` + `temporal_visibility`)
-  - `product-db` → `s3://pg-backups-cnpg/product-db/` (retention 30d)
-  - `product-db-replica` → `s3://pg-backups-cnpg/product-db-replica/` (retention 7d, DR)
+  - `platform-db` → `s3://pg-backups-cnpg/platform-db/` (recovery window 30d; includes `temporal` + `temporal_visibility`)
+  - `product-db` → `s3://pg-backups-cnpg/product-db/` (recovery window 30d)
+  - `product-db-replica` → `s3://pg-backups-cnpg/product-db-replica/` (recovery window 7d — **WAL archive only**, see below)
 
-Each cluster runs a daily `ScheduledBackup` (02:00) plus an every-6h backup. The
-former Zalando/WAL-G bucket `pg-backups-zalando` has been retired.
+The two **writable** clusters (`platform-db`, `product-db`) each run a daily
+`ScheduledBackup` (02:00) plus an every-6h backup. `product-db-replica` has **no**
+`Backup`/`ScheduledBackup` manifest: it archives WAL under its own prefix
+(`isWALArchiver: true`) but takes no base backups, so that prefix is **not an
+independently restorable backup chain**. The `30d`/`7d` values are Barman
+**recovery windows** (Barman keeps the first base backup before the window start
+plus the WAL to replay from it), not simple retention periods. The former
+Zalando/WAL-G bucket `pg-backups-zalando` has been retired.
 
 For DRP policy, recovery decision flow, RTO/RPO ownership, and restore-drill
 evidence, see [010-drp.md](./010-drp.md).
@@ -55,11 +61,12 @@ evidence, see [010-drp.md](./010-drp.md).
 
 Assumption: the database clusters already exist and the RustFS bucket is already created and reachable.
 
-### Runtime CNPG physical backup (all clusters)
+### Runtime CNPG physical backup (writable clusters)
 
-All three backed-up clusters (`platform-db`, `product-db`, `product-db-replica`)
-follow the same CloudNativePG Barman Cloud Plugin flow — only the
-`destinationPath` prefix differs:
+Both writable clusters (`platform-db`, `product-db`) follow the same
+CloudNativePG Barman Cloud Plugin flow — only the `destinationPath` prefix
+differs. `product-db-replica` participates only in the WAL-archiving leg (its own
+prefix), not in the `ScheduledBackup` flow below:
 
 ```mermaid
 sequenceDiagram
@@ -82,7 +89,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  CNPGMetrics["CNPG backup metrics (cnpg_collector_*)"] --> Prometheus["Prometheus"]
+  CNPGMetrics["Barman plugin backup metrics (barman_cloud_cloudnative_pg_io_*)"] --> Prometheus["Prometheus"]
   Prometheus --> Rule["PrometheusRule: postgres-backup-alerts"]
   Rule --> Runbook["postgres-backup-restore.md"]
 ```
@@ -118,7 +125,7 @@ flowchart LR
 - **Pooler:** PgDog (routes to this cluster; 3 replicas)
 - **Secret:** `product-db-secret` (ESO / RFC-0012 triplet)
 - **Backup scope:** Physical backup + WAL archiving (PITR) to RustFS at `s3://pg-backups-cnpg/product-db/`; daily + every-6h `ScheduledBackup`; restore-to-new-cluster drills.
-- **DR replica cluster (`product-db-replica`):** separate CloudNativePG `Cluster` for disaster recovery; Barman backups at `s3://pg-backups-cnpg/product-db-replica/` (same bucket `pg-backups-cnpg`, distinct prefix from primary).
+- **DR replica cluster (`product-db-replica`):** separate CloudNativePG `Cluster` for disaster recovery; archives **WAL only** at `s3://pg-backups-cnpg/product-db-replica/` (same bucket, distinct prefix — no base backups, so not an independent recovery chain).
 
 ---
 
@@ -210,17 +217,19 @@ Assumptions: WAL segments may not switch frequently without `archive_timeout`.
 
 ### Scenario B: High-write workload (approx 1000 writes/sec)
 
-Assumptions: WAL fills quickly; WAL segment size = 16MB.
+Assumptions: WAL fills quickly; WAL segment size = **64MB** (this repo sets
+`walSegmentSize: 64` on both writable clusters — not the PostgreSQL default 16MB).
 
 | Config | WAL generation | WAL ship frequency | RPO | RTO | Notes |
 |--------|----------------|--------------------|-----|-----|------|
 | No PITR | Fast | N/A | 24h | 1-2h | Daily base backup only |
-| PITR basic | Fast (16MB/min) | Per 16MB WAL | < 1m | 3-4h | WAL fills fast, auto ship |
-| PITR + compression | Fast | Per 16MB (compressed) | < 1m | 2-3h | WAL compressed ~70% |
-| PITR + parallel upload | Fast | 4 WAL in parallel | < 30s | 1-2h | Higher upload parallelism |
+| PITR basic | Fast (16MB/min) | Per 64MB WAL (~4m fill) | ~4-5m | 3-4h | Segment fill dominates; `archive_timeout=5m` caps it |
+| PITR + compression | Fast | Per 64MB (compressed) | ~4-5m | 2-3h | WAL compressed ~70%; upload faster, fill time unchanged |
+| PITR + parallel upload | Fast | 4 WAL in parallel | ~4-5m | 1-2h | Parallelism helps catch-up, not steady-state RPO |
 
-**High-write RPO formula**:
-- Example: `RPO = (16MB / 10MB/s) + 1s = 2.6s`
+**High-write RPO formula** (ship time once a segment closes):
+- Example: `ship = 64MB / 10MB/s + 1s ≈ 7.4s`; steady-state RPO is bounded by
+  segment fill time (or `archive_timeout`), so `RPO ≈ min(fill time, 5m) + ship`.
 
 ### RTO breakdown (components)
 
@@ -435,13 +444,14 @@ Barman Cloud Plugin — so there is no per-operator tool split anymore.
 
 | Cluster | Operator | Backup tool | Rationale |
 |---|---|---|---|
-| `platform-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/platform-db/` (30d) | Consolidated platform tier; includes Temporal persistence (`temporal`, `temporal_visibility`). |
-| `product-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/product-db/` (30d) | Declarative `ObjectStore` + `ScheduledBackup` CRs; CNPG 1.26+ deprecated in-tree `barmanObjectStore`, so the plugin is the long-term path. |
-| `product-db-replica` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/product-db-replica/` (7d) | Same bucket as primary, separate prefix; DR cluster keeps its own backups for independent recovery. |
+| `platform-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/platform-db/` (recovery window 30d) | Consolidated platform tier; includes Temporal persistence (`temporal`, `temporal_visibility`). |
+| `product-db` | CloudNativePG | **Barman Cloud Plugin** (CNPG-I) + `ObjectStore` CR, `s3://pg-backups-cnpg/product-db/` (recovery window 30d) | Declarative `ObjectStore` + `ScheduledBackup` CRs; CNPG 1.26+ deprecated in-tree `barmanObjectStore`, so the plugin is the long-term path. |
+| `product-db-replica` | CloudNativePG | **Barman Cloud Plugin**, `s3://pg-backups-cnpg/product-db-replica/` (recovery window 7d, **WAL only**) | Same bucket as primary, separate prefix, prepared to archive under its own identity — but with no `ScheduledBackup` there is no base backup, so this prefix is **not** an independent recovery chain. |
 
 All clusters write to the **same RustFS bucket** `pg-backups-cnpg` with
-**per-cluster prefixes**, which keeps recovery independent per cluster while
-sharing one credential and one bucket-creation job.
+**per-cluster prefixes**. A prefix gives naming isolation only — the bucket,
+credential, and failure domain are still shared, so per-cluster recovery is
+independent only as far as the writable clusters' own backup chains go.
 
 **Why one tool now**: the Zalando operator (and its bundled WAL-G) is retired, so
 CloudNativePG's first-class Barman Cloud Plugin covers the whole fleet with
@@ -534,4 +544,4 @@ Best practices:
 
 ---
 
-_Last updated: 2026-07-17 — RFC-0018: platform-db consolidates auth/shared/temporal; Barman prefix `s3://pg-backups-cnpg/platform-db/` (30d); product tier unchanged._
+_Last updated: 2026-08-31 — corrected against the manifests: only the writable clusters have `ScheduledBackup`s (the DR replica archives WAL only, its prefix is not an independent recovery chain), `30d`/`7d` are recovery windows, WAL examples use the configured 64MB segment size, backup alerts use the Barman plugin metrics. Previously 2026-07-17 — RFC-0018: platform-db consolidates auth/shared/temporal; Barman prefix `s3://pg-backups-cnpg/platform-db/` (30d); product tier unchanged._

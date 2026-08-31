@@ -2084,6 +2084,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Backup alerting was watching metrics the platform stopped emitting when it
+  moved to the Barman Cloud plugin.** `postgres-backup-alerts` still queried the
+  in-tree `cnpg_collector_last_available_backup_timestamp` /
+  `_last_failed_backup_timestamp`, which the plugin supersedes with
+  `barman_cloud_cloudnative_pg_io_*` (upstream migration guide, "Verify your
+  metrics") — so a failed or stale backup could pass silently. Both alerts now
+  query the plugin metrics, the freshness threshold follows the actual schedule
+  (26h → 8h = every-6h `ScheduledBackup` + 2h grace, `for` 1h → 30m), and a new
+  `PostgresBackupMetricsMissing` absent-series alert fires when a writable
+  cluster stops exposing the plugin series (broken plugin/sidecar/scrape —
+  the failure mode the freshness alert cannot see). Alert catalog re-derived to
+  219 (§4 to 55 — the by-domain figures had drifted ±1); `builtin-metrics.md`
+  documents the plugin metric set and marks the collector backup metrics
+  superseded.
+
 - **The Temporal dashboard's SDK half was blank on the cluster — vmagent was
   overwriting the SDK's own `namespace` label.** The RFC-0014 D-3 relabel rule
   copied `k8s_namespace_name` onto `namespace` unconditionally, clobbering the
@@ -2401,6 +2416,27 @@ Skeleton (copy what you need):
   neither cap, so neither exhausted branch was reachable from a request.
 
 #### Databases
+
+- **The backup/DR docs promised a recovery chain the manifests never built —
+  eight files corrected against as-built reality** (Kubernetes 1.36 research,
+  CNPG backup/restore/DR audit). The recurring false claim: `product-db-replica`
+  "keeps its own backups for independent recovery" — the replica archives WAL
+  under its own prefix but has **no** `Backup`/`ScheduledBackup`, so nothing
+  anchors that chain and restores must come from the `product-db` prefix
+  (`006-backup-strategy.md`, `010.1-rpo-rto-planning.md`,
+  `postgres-backup-restore.md`, `cnpg-dr-replica-bootstrap.md`,
+  `kubernetes/infra/configs/databases/README.md`). Unsafe commands fixed:
+  `platform-db` and post-RustFS-recovery manual backups gained the mandatory
+  `--method plugin --plugin-name barman-cloud.cloudnative-pg.io` flags (the bare
+  command fails on plugin-backed clusters — proven in Drill A), and
+  `005-ha-dr-deep-dive.md`'s `kubectl cnpg promote product-db-replica` was
+  replaced with the real mechanism (`spec.replica.enabled: false`, one-way,
+  GitOps-committed; `010.4` promotion/cut-over steps are now Flux-safe). Also:
+  `30d`/`7d` described as Barman recovery windows (not retention), WAL examples
+  recomputed for the configured 64MB `walSegmentSize` (docs assumed 16MB),
+  `003.1`/`010.1` record the 2026-08-07 product-db PITR drill (2m12s) while
+  keeping the platform-db/DR-promotion evidence gaps explicit, and the DR
+  topology is labeled a mechanism test, not production DR.
 
 - **auto_explain plans never reached their VictoriaLogs stream — every plan was
   silently landing in the `pg_parse_failures` debug sink.** `platform-db` and

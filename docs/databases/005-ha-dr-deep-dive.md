@@ -27,6 +27,12 @@ recovery decision flow, RTO/RPO ownership, and drill evidence checklist, see
 
 ### Target Topology
 
+> **Scope note:** everything below — including the DR cluster — runs inside the
+> same Kind cluster on one host. This topology exercises the *mechanism*
+> (replica cluster + object-store recovery); it is **not** production DR, which
+> requires a separate cluster/region and an independent object store
+> ([010.3 cross-region DR](./010.3-cross-region-dr.md)).
+
 ```mermaid
 flowchart TB
   subgraph productNS ["Namespace: product"]
@@ -485,17 +491,19 @@ FROM pg_stat_archiver;
 # Cluster status overview
 kubectl cnpg status product-db -n product
 
-# Promote DR replica to standalone
-kubectl cnpg promote product-db-replica -n product
+# Promote the DR replica CLUSTER to standalone: `kubectl cnpg promote` operates on
+# an INSTANCE inside one cluster and cannot do this. A replica cluster transitions
+# by setting `spec.replica.enabled: false` in its manifest (section 4 above).
 
 # Planned switchover (primary -> replica); no `switchover` verb exists
 kubectl cnpg promote product-db product-db-2 -n product
 
-# Trigger on-demand backup
-kubectl cnpg backup product-db -n product
+# Trigger on-demand backup (method flags are mandatory on plugin-backed clusters)
+kubectl cnpg backup product-db -n product \
+  --method plugin --plugin-name barman-cloud.cloudnative-pg.io
 
 # Check backup status
-kubectl cnpg backup list product-db -n product
+kubectl get backups -n product
 ```
 
 ### PgDog Admin
@@ -525,4 +533,4 @@ RELOAD;            -- Hot-reload config (no restart)
 - DR replica: `kubernetes/infra/configs/databases/clusters/product-db-replica/`
 
 ---
-_Last updated: 2026-07-17 (RFC-0018: pgdog-product pooler name)_
+_Last updated: 2026-08-31 — commands reference corrected (replica-cluster promotion is `replica.enabled: false`, not `kubectl cnpg promote`; backup command needs the plugin flags), co-located topology labeled a mechanism test rather than production DR. Previously 2026-07-17 (RFC-0018: pgdog-product pooler name)._

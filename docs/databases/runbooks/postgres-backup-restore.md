@@ -15,7 +15,7 @@ Reference docs:
 |---------|----------|---------------|----------------|
 | `platform-db` | CloudNativePG | Barman object store + `Backup` / `ScheduledBackup` | Bootstrap recovery from `s3://pg-backups-cnpg/platform-db/` |
 | `product-db` | CloudNativePG | Barman object store + `Backup` / `ScheduledBackup` | Bootstrap recovery from `s3://pg-backups-cnpg/product-db/` |
-| `product-db-replica` | CloudNativePG | Barman object store for its own DR prefix | Replica cluster or restore from object store |
+| `product-db-replica` | CloudNativePG | **WAL archiving only** into its own DR prefix — no `Backup`/`ScheduledBackup` exists, so the prefix holds no base backup and is **not restorable on its own** | Promote the replica cluster, or restore from the **`product-db`** prefix |
 
 ## CloudNativePG: `platform-db`
 
@@ -43,10 +43,13 @@ Expected:
 
 ### Trigger manual backup
 
-If the CNPG kubectl plugin is installed:
+If the CNPG kubectl plugin is installed — **the method flags are mandatory**
+(same reason as `product-db` below: the bare command targets the in-tree
+`barmanObjectStore` method these clusters no longer use):
 
 ```bash
-kubectl cnpg backup platform-db -n platform
+kubectl cnpg backup platform-db -n platform \
+  --method plugin --plugin-name barman-cloud.cloudnative-pg.io
 ```
 
 Plain Kubernetes fallback:
@@ -217,7 +220,10 @@ kubectl exec -it product-db-restore-1 -n product -- psql -U product -d product -
 ## CloudNativePG: `product-db-replica`
 
 `product-db-replica` is a DR replica cluster that follows the `product-db` backup/WAL
-archive path. It is not part of the normal app write path.
+archive path. It is not part of the normal app write path. It archives its own WAL
+to `s3://pg-backups-cnpg/product-db-replica/`, but has **no `ScheduledBackup`** —
+that prefix contains no base backup, so never plan a restore from it; restore from
+the `product-db` prefix instead.
 
 Check status:
 
@@ -237,8 +243,15 @@ Promotion and cutover details live in [010-drp.md](../010-drp.md).
 
 ## Validation Checklist
 
+- [ ] Barman Cloud plugin controller is healthy and the Cluster reports no
+      plugin-discovery errors (`kubectl get pods -n cloudnative-pg`,
+      `kubectl describe cluster <name>`).
 - [ ] Backup or restore resource reached successful state.
 - [ ] WAL archive health was checked.
+- [ ] Kubernetes secrets/config the cluster depends on (app user secrets,
+      superuser secret, pooler config, certificates) are restored through their
+      own GitOps/ESO path — physical backups contain **only** the database files,
+      never these objects.
 - [ ] Restored cluster reached healthy state.
 - [ ] Schema list matches expected databases.
 - [ ] Row counts for critical tables match the expected restore target.
@@ -269,4 +282,4 @@ For every restore drill or incident recovery, capture:
 - Final measured RTO and estimated RPO.
 
 ---
-_Last updated: 2026-07-21 — Moved from `docs/runbooks/troubleshooting/` to domain runbooks._
+_Last updated: 2026-08-31 — platform-db manual-backup command gained the mandatory plugin flags, replica rows corrected to WAL-only (no base-backup chain), plugin-health and secret/config recovery checks added. Previously 2026-07-21 — moved from `docs/runbooks/troubleshooting/` to domain runbooks._

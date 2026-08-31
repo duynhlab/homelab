@@ -1,8 +1,12 @@
-# Connection Poolers Deep Dive
+# Archived Homelab Notes: Connection Poolers
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use [pooling fundamentals](../../fundamentals/connection-pooling.md) and the
+> current [pooler inventory](../../poolers.md).
 
 This document provides a detailed analysis of the connection pooling strategies used in the platform, including architecture, trade-offs, and configuration details for **PgBouncer** and **PgDog**. **Two poolers are deployed, one per cluster (ADR-026 pilot):**
 
-- **`platform-db` → CNPG-native PgBouncer** (`Pooler` `platform-db-pooler-rw`, `type: rw`, pooling **auth**, **user**, **notification**, **shipping**, **review** — Temporal connects direct past it). Operator-managed `auth_query` auth; single `rw` endpoint (no read-split in the pilot). Port **5432** (not PgDog's 6432). See [ADR-026](../proposals/adr/ADR-026-platform-db-pgbouncer-pilot/).
+- **`platform-db` → CNPG-native PgBouncer** (`Pooler` `platform-db-pooler-rw`, `type: rw`, pooling **auth**, **user**, **notification**, **shipping**, **review** — Temporal connects direct past it). Operator-managed `auth_query` auth; single `rw` endpoint (no read-split in the pilot). Port **5432** (not PgDog's 6432). See [ADR-026](../../../proposals/adr/ADR-026-platform-db-pgbouncer-pilot/).
 - **`product-db` → PgDog** (Helm release `pgdog-product`, pooling **product**, **cart**, **order** — the payment *app* connects direct over TLS, bypassing the pooler). Read/write split + replica load-balancing on port **6432**.
 
 ## 1. Why Connection Pooling?
@@ -91,7 +95,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
     - **Young Project**: Less community documentation than PgBouncer.
     - **More Configuration**: Chart values for per-database pools and replica hosts.
 
-**Day-2 ops:** [pgdog-operations.md](./runbooks/pgdog-operations.md)
+**Day-2 ops:** [pooler-operations.md](../../runbooks/pooler-operations.md)
 
 ---
 
@@ -101,7 +105,7 @@ PostgreSQL uses a **process-based model** where each connection spawns a new OS 
 - **Behavior**: Server connection is assigned to client **only for the duration of a transaction**.
 - **When released**: On `COMMIT` or `ROLLBACK`.
 - **Benefit**: Massive multiplexing. 1000 clients can share 50 DB connections if they are mostly idle or doing short ops.
-- **Caveat**: **Prepared Statements** require driver/pooler-aware configuration (see [002-database-integration.md](./002-database-integration.md#go-postgresql-driver-pgx)). Session-based features (e.g. `SET session_var = 'x'`) are reset or unsafe.
+- **Caveat**: **Prepared Statements** require driver/pooler-aware configuration (see [architecture.md](../../architecture.md#go-postgresql-driver-pgx)). Session-based features (e.g. `SET session_var = 'x'`) are reset or unsafe.
 
 ### 4.2. Session Mode (Not Used)
 - **Behavior**: Server connection assigned for the **entire lifetime** of the client connection.

@@ -95,7 +95,7 @@ migration activity (`logger: postgres` / application DDL via `pgaudit`).
 4. **App-level deadlocks** — if `CNPGDeadlocksIncreasing` also fires, fix lock
    ordering in application code rather than killing backends repeatedly.
 5. **Pooler layer** — confirm PgDog is not masking saturation:
-   [PgDog operations](../../../databases/runbooks/pgdog-operations.md).
+   [PgDog operations](../../../databases/runbooks/pooler-operations.md).
 
 ## Escalation
 

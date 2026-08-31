@@ -5,9 +5,9 @@ clusters using RustFS (S3-compatible) object storage.
 
 Reference docs:
 
-- [Database DRP](../010-drp.md)
-- [Backup Strategy](../006-backup-strategy.md)
-- [Database Integration](../002-database-integration.md)
+- [Database DRP](../disaster-recovery.md)
+- [Backup Strategy](../fundamentals/backup-and-recovery.md)
+- [Database Integration](../architecture.md)
 
 ## Overview
 
@@ -233,7 +233,7 @@ Before promotion:
 - Confirm the replay point is acceptable for the incident RPO.
 - Get incident commander approval.
 
-Promotion and cutover details live in [010-drp.md](../010-drp.md).
+Promotion and cutover details live in [disaster-recovery.md](../disaster-recovery.md).
 
 ## Validation Checklist
 

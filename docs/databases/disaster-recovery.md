@@ -5,36 +5,33 @@ homelab. The homelab is the concrete implementation, but the structure is
 written as a production-ready operating standard that can be applied to a real
 environment after the known gaps are closed.
 
-Use this page as the system of record for PostgreSQL HA, DR, RPO, RTO, PITR,
-standby patterns, restore drills, and recovery evidence. Use the deep dives for
-implementation details:
+Use this page as the system of record for recovery paths and DR topology.
+Targets and measured evidence belong to [reliability targets](./reliability-targets.md);
+commands belong to runbooks. Use these pages for supporting detail:
 
-- [004-replication-strategy.md](./004-replication-strategy.md) - sync/async replication and commit behavior.
-- [005-ha-dr-deep-dive.md](./005-ha-dr-deep-dive.md) - CNPG HA/DR internals.
-- [006-backup-strategy.md](./006-backup-strategy.md) - physical backup, WAL archiving, retention, and PITR mechanics.
-- [003.1-operator-cnpg.md](./003.1-operator-cnpg.md) - CloudNativePG operator deep dive.
-- [003.2-operator-zalando.md](./003.2-operator-zalando.md) - Zalando Postgres Operator deep dive.
+- [fundamentals/replication-and-ha.md](./fundamentals/replication-and-ha.md) - sync/async replication and commit behavior.
+- [Archived HA/DR notes](./reference/archive/ha-dr-deep-dive.md) - historical study material.
+- [fundamentals/backup-and-recovery.md](./fundamentals/backup-and-recovery.md) - physical backup, WAL archiving, retention, and PITR mechanics.
+- [cloudnativepg.md](./cloudnativepg.md) - CloudNativePG operator deep dive.
+- [reference/zalando/operator.md](./reference/zalando/operator.md) - Zalando Postgres Operator deep dive.
 
 ### Child playbooks
 
 Operational sub-pages that turn this plan into routine practice and incident response:
 
-- [010.1-rpo-rto-planning.md](./010.1-rpo-rto-planning.md) - per-tier RPO/RTO targets vs as-built, mapped to clusters.
-- [010.2-restore-and-failover-drills.md](./010.2-restore-and-failover-drills.md) - restore/failover drill cadence, roles, and evidence log.
-- [010.3-cross-region-dr.md](./010.3-cross-region-dr.md) - cross-zone/cross-region roadmap (current co-location → independent failure domains).
-- [010.4-emergency-recovery.md](./010.4-emergency-recovery.md) - "start here when it's down" recovery runbook.
+- [reliability-targets.md](./reliability-targets.md) - per-tier RPO/RTO targets vs as-built, mapped to clusters.
+- [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) - restore/failover drill cadence, roles, and evidence log.
+- [cross-region-dr.md](./cross-region-dr.md) - cross-zone/cross-region roadmap (current co-location → independent failure domains).
+- [runbooks/emergency-recovery.md](./runbooks/emergency-recovery.md) - "start here when it's down" recovery runbook.
 
 ## Purpose and Scope
 
 ### Current homelab state
 
-The platform runs three PostgreSQL clusters:
-
-| Cluster | Operator | Namespace | Role |
-|---------|----------|-----------|------|
-| `platform-db` | CloudNativePG | `platform` | 3-node HA cluster for auth, user, notification, shipping, review, and Temporal persistence |
-| `product-db` | CloudNativePG | `product` | Primary CNPG cluster for `product`, `cart`, `order`, `payment` |
-| `product-db-replica` | CloudNativePG | `product` | DR replica cluster following `product-db` via RustFS object-store recovery |
+The authoritative cluster inventory is in [database architecture](./architecture.md).
+For recovery, the important distinction is that `platform-db` and `product-db`
+have local synchronous HA, while only `product-db` has a separate
+object-store-fed replica cluster.
 
 ### Production baseline
 
@@ -67,6 +64,9 @@ flowchart TB
     productSvc["Product service"]
     cartSvc["Cart service"]
     orderSvc["Order service"]
+    checkoutSvc["Checkout service"]
+    inventorySvc["Inventory service"]
+    paymentSvc["Payment service<br/>direct connection"]
     pgdog["PgDog pgdog-product:6432"]
 
     subgraph cnpgPrimary ["product-db primary cluster"]
@@ -88,12 +88,15 @@ flowchart TB
   end
 
   subgraph otherClusters ["Other CloudNativePG clusters"]
-    platformDb["platform-db 3 nodes HA (sync ANY 1)<br/>auth, user, notification,<br/>shipping, review, temporal"]
+    platformDb["platform-db 3 nodes HA (sync ANY 1)<br/>user, notification, shipping, review,<br/>Keycloak, Temporal"]
   end
 
   productSvc --> pgdog
   cartSvc --> pgdog
   orderSvc --> pgdog
+  checkoutSvc --> pgdog
+  inventorySvc --> pgdog
+  paymentSvc --> cnpgPrimaryPod
   pgdog --> cnpgPrimaryPod
   cnpgPrimaryPod -->|"base backup and WAL archive"| primaryBucket
   primaryBucket -->|"restore and WAL replay"| drPod
@@ -151,7 +154,7 @@ The correct recovery path is PITR or selective restore, not HA failover.
 | Data class | Example | Production baseline |
 |------------|---------|---------------------|
 | Critical transactional | `order`, cart checkout path | RPO 0 for HA failover; DR RPO bounded by WAL archive interval; RTO measured by drills |
-| Important user-facing | auth, user profiles | Small RPO may be acceptable if documented; restore must be tested |
+| Important user-facing | identity and user profiles | Small RPO may be acceptable if documented; restore must be tested |
 | Supporting/non-critical | notification, shipping metadata, review | RPO/RTO can be looser, but owner must accept impact |
 | Analytics/reporting | reporting clone | Freshness SLA instead of failover RPO |
 

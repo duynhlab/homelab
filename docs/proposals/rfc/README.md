@@ -146,7 +146,7 @@ when someone starts research (owner OK → `research.md` → index `researching`
 | **Authorization (RBAC/ABAC)** — claim population + enforcement; claim population moves to Keycloak roles under [RFC-0022](RFC-0022/); the first enforcement (role gate + `protected` routes) ships with [RFC-0023](RFC-0023/); fine-grained roles remain here | platform-wide | [RFC-0009](RFC-0009/) O1 |
 | **Gateway improvements** — edge `proxy-cache` + dedicated per-env issuer domain; the issuer-domain question is reshaped by the Keycloak realm issuer in [RFC-0022](RFC-0022/) | infra | [RFC-0009](RFC-0009/) O4/O6 |
 | ~~**Gateway strategy post-Kong-OSS**~~ — **promoted to [RFC-0024](RFC-0024/)** (owner activated the exit trigger proactively, 2026-08-10) | infra | RFC-0022 § Gateway distribution risk |
-| **Chaos / GameDay program** | infra | [`docs/databases/010-drp.md`](../../databases/010-drp.md), DR docs |
+| **Chaos / GameDay program** | infra | [`docs/databases/disaster-recovery.md`](../../databases/disaster-recovery.md), DR docs |
 | **API v1→v2 versioning policy** | platform-wide | `docs/api/api.md#versioning-and-compatibility` |
 | **Split OpenBAO bootstrap** (auth config vs secret seeding) | infra | secrets ESO review |
 | **Secret rotation** (CronJob / push) — largely superseded by dynamic DB creds in [RFC-0008](RFC-0008/) | infra | secrets ESO review |

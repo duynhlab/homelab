@@ -1,15 +1,15 @@
 # Restore & Failover Drills
 
-Child playbook of the [PostgreSQL Disaster Recovery Plan](./010-drp.md). The DRP
+Child playbook of the [PostgreSQL Disaster Recovery Plan](../disaster-recovery.md). The DRP
 defines *what* recovery looks like and the
-[evidence checklist](./010-drp.md#compliance-and-evidence-checklist); this page
+[evidence checklist](../disaster-recovery.md#compliance-and-evidence-checklist); this page
 defines *how often* we rehearse, *who* runs it, and *what proof* each run leaves
 behind. A backup you have never restored is a hypothesis, not a backup — these
 drills are the only thing that turns the estimated RTOs in
-[010.1](./010.1-rpo-rto-planning.md) into measured ones.
+[reliability targets](../reliability-targets.md) into measured ones.
 
 It extends the brief monthly procedure in
-[005-ha-dr-deep-dive.md → DR Drill Runbook](./005-ha-dr-deep-dive.md#dr-drill-runbook-monthly)
+[Archived HA/DR notes](../reference/archive/ha-dr-deep-dive.md#dr-drill-runbook-monthly)
 with cadence, roles, and a sign-off record.
 
 ## Drill calendar
@@ -24,7 +24,7 @@ with cadence, roles, and a sign-off record.
 Each run produces one [evidence record](#evidence-log-template). A drill with no
 recorded evidence did not happen.
 
-## Roles (per [010-drp.md ownership](./010-drp.md#ownership))
+## Roles (per [disaster-recovery.md ownership](../disaster-recovery.md#ownership))
 
 | Role | Responsibility during a drill |
 |------|-------------------------------|
@@ -63,7 +63,7 @@ proof that `s3://pg-backups-cnpg/product-db/` is restorable.
    kubectl get cluster -n product -w
    ```
    The example carries `postgresql.parameters` (WAL sizing) on purpose — see the
-   [restore runbook](runbooks/postgres-backup-restore.md#restore-to-a-new-cluster):
+   [restore runbook](./backup-restore.md#restore-to-a-new-cluster):
    omitting them makes Postgres refuse to start on a cluster whose data
    directory uses 64MB WAL segments.
 3. **Wait for healthy**, then **validate** (schema + critical row counts):
@@ -79,7 +79,7 @@ proof that `s3://pg-backups-cnpg/product-db/` is restorable.
    kubectl delete cluster product-db-restore -n product
    ```
 
-Full command reference: [postgres-backup-restore.md](./runbooks/postgres-backup-restore.md).
+Full command reference: [Backup and restore](./backup-restore.md).
 
 ## Drill B — Planned switchover (monthly)
 
@@ -95,7 +95,7 @@ There is **no `kubectl cnpg switchover`** — the plugin (v1.30.0) exposes
 `promote <cluster> <instance>` and nothing else for this, so the instance to
 promote is named explicitly. `switchover` returns
 `Error: unknown command "switchover"`, found by
-[drill DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record).
+[drill DR-2026-08-B](../../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record).
 
 Then confirm PgDog still routes and the app reconnects cleanly (service owner).
 Record the observed cut-over time against the **≤ 1 min** SLO. Measure it with a
@@ -107,7 +107,7 @@ reported `healthy` at +30.5 s while writes had already recovered at +12.2 s.
 Rehearses recovery from **whole-cluster loss** using `product-db-replica`. Do **not**
 promote the live DR target during a routine drill — rehearse against a restored
 copy so the real DR replica keeps following the primary. Go/no-go first
-(see [010-drp.md](./010-drp.md#dr-promotion-outline)):
+(see [disaster-recovery.md](../disaster-recovery.md#dr-promotion-outline)):
 
 - Primary cluster confirmed down or intentionally frozen — no split-brain risk.
 - DR replica replay point is within the incident RPO.
@@ -140,7 +140,7 @@ backups are restorable rather than being their only health signal.
 ## Evidence log template
 
 Copy one block per drill into the drill record. This is the artifact the
-[010-drp.md evidence checklist](./010-drp.md#compliance-and-evidence-checklist)
+[disaster-recovery.md evidence checklist](../disaster-recovery.md#compliance-and-evidence-checklist)
 asks for.
 
 | Field | Value |
@@ -186,21 +186,21 @@ it carried does not apply on this platform: the Kind cluster and its RustFS buck
 are rebuilt by every `make up`, and the bucket holds only plugin-era prefixes
 (`pg-backups-cnpg/{product-db,platform-db,product-db-replica}/`) — there is no
 surviving in-tree prefix to retire. The hold stays meaningful for a durable store,
-which arrives with the bare-metal migration ([RFC-0011](../proposals/rfc/RFC-0011/)).
+which arrives with the bare-metal migration ([RFC-0011](../../proposals/rfc/RFC-0011/)).
 
 ## Where evidence lives
 
 Until a dedicated drill log exists, append completed records to the DRP's
 evidence trail and link them from the PR that schedules the drill. Recording
 drills as recurring evidence is an open item in
-[010-drp.md → Known Gaps](./010-drp.md#known-gaps-and-next-improvements).
+[disaster-recovery.md → Known Gaps](../disaster-recovery.md#known-gaps-and-next-improvements).
 
 ### Completed records
 
 | Drill ID | Type | Date | Cluster | Measured RTO | Record |
 |----------|------|------|---------|--------------|--------|
 | `DR-2026-08-A` | A — PITR restore-test | 2026-08-07 | `product-db` | **2 m 12 s** (SLO ≤ 30 min) | [above](#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) |
-| `DR-2026-08-B` | B — planned switchover | 2026-08-06 | `product-db` | **11.4 s** (SLO `< 30 s`) | [RFC-0021 GameDay § 010.2 evidence record](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) |
+| `DR-2026-08-B` | B — planned switchover | 2026-08-06 | `product-db` | **11.4 s** (SLO `< 30 s`) | [RFC-0021 GameDay § 010.2 evidence record](../../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) |
 
 Drill B lives inside the RFC-0021 GameDay record because it ran as one of that
 RFC's five phase-7 scenarios, alongside four application-saga drills that have no
@@ -209,11 +209,11 @@ artifact.
 
 ## References
 
-- [010-drp.md](./010-drp.md) — DRP, decision flow, evidence checklist.
-- [010.1-rpo-rto-planning.md](./010.1-rpo-rto-planning.md) — the targets these drills verify.
-- [010.4-emergency-recovery.md](./010.4-emergency-recovery.md) — the real-incident version of these procedures.
-- [005-ha-dr-deep-dive.md](./005-ha-dr-deep-dive.md#8-practical-commands-reference) — command reference.
-- [postgres-backup-restore.md](./runbooks/postgres-backup-restore.md) — full backup/restore runbook.
+- [disaster-recovery.md](../disaster-recovery.md) — DRP, decision flow, evidence checklist.
+- [reliability-targets.md](../reliability-targets.md) — the targets these drills verify.
+- [Emergency recovery](./emergency-recovery.md) — the real-incident version of these procedures.
+- [Archived HA/DR notes](../reference/archive/ha-dr-deep-dive.md#8-practical-commands-reference) — command reference.
+- [Backup and restore](./backup-restore.md) — full backup/restore runbook.
 
 ---
 _Last updated: 2026-07-17_

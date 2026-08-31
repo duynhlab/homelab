@@ -1,4 +1,8 @@
-# PostgreSQL Extensions Management Guide
+# Archived Homelab Notes: PostgreSQL Extensions
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use [extension fundamentals](../../fundamentals/extensions.md) and the
+> current [extension inventory](../../extensions.md).
 
 ## Table of Contents
 
@@ -26,8 +30,8 @@ The `product-db` cluster runs `ghcr.io/cloudnative-pg/postgresql:18.1-system-tri
 
 This is all that's needed when the required extension **already ships with the operand image**. No Kubernetes ImageVolume support is required.
 
-- Cluster manifest: [`kubernetes/infra/configs/databases/clusters/product-db/instance.yaml`](../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml)
-- Extension declarations: per-service `Database` resources under [`kubernetes/infra/configs/databases/clusters/product-db/services/`](../../kubernetes/infra/configs/databases/clusters/product-db/services/) (RFC-0012 triplets)
+- Cluster manifest: [`kubernetes/infra/configs/databases/clusters/product-db/instance.yaml`](../../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml)
+- Extension declarations: per-service `Database` resources under [`kubernetes/infra/configs/databases/clusters/product-db/services/`](../../../../kubernetes/infra/configs/databases/clusters/product-db/services/) (RFC-0012 triplets)
 
 ### Path B — Image Volume Extensions (pluggable OCI images)
 
@@ -70,7 +74,7 @@ flowchart TD
 
 - [Image Volume Extensions (CNPG docs — devel)](https://cloudnative-pg.io/docs/devel/imagevolume_extensions/) — check the stable docs matching your operator version for production guidance.
 - [postgres-extensions-containers](https://github.com/cloudnative-pg/postgres-extensions-containers) — official OCI extension images (pgvector, PostGIS, pgaudit, pg_crash) and `ClusterImageCatalog` artifacts.
-- Operator version deployed in this repo: see [`kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`](../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml) (Helm chart constraint). Verify the running controller version with `kubectl get deployment -n cloudnative-pg -o wide`.
+- Operator version deployed in this repo: see [`kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml`](../../../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml) (Helm chart constraint). Verify the running controller version with `kubectl get deployment -n cloudnative-pg -o wide`.
 
 ---
 
@@ -82,7 +86,7 @@ flowchart TD
 |----------|---------|-------------------|----------|
 | **CloudNativePG** | v1.30.0 | 18.1 (default) | `platform-db` (auth, user, notification, shipping, review, temporal), `product-db` (product, cart, order, checkout, payment), `product-db-replica` (DR) |
 
-All Postgres runs on CloudNativePG; the Zalando operator has been retired (see [002](./002-database-integration.md), [003.2](./003.2-operator-zalando.md)).
+All Postgres runs on CloudNativePG; the Zalando operator has been retired (see [002](../../architecture.md), [003.2](../../reference/zalando/operator.md)).
 
 ### Current Extensions Usage
 
@@ -96,8 +100,8 @@ All CNPG clusters use the **`system-trixie`** image (`ghcr.io/cloudnative-pg/pos
 | `product-db` | system-trixie | pgaudit, pg_stat_statements, auto_explain | product: pgaudit, pg_stat_statements, pgcrypto, uuid-ossp; cart/order/checkout/payment: pgaudit, pg_stat_statements |
 
 Extension declarations live in each cluster's `services/` triplets, e.g.
-[`clusters/platform-db/services/`](../../kubernetes/infra/configs/databases/clusters/platform-db/services/)
-and [`clusters/product-db/services/`](../../kubernetes/infra/configs/databases/clusters/product-db/services/).
+[`clusters/platform-db/services/`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/services/)
+and [`clusters/product-db/services/`](../../../../kubernetes/infra/configs/databases/clusters/product-db/services/).
 
 ### Compatibility Check
 
@@ -119,8 +123,8 @@ and [`clusters/product-db/services/`](../../kubernetes/infra/configs/databases/c
 In CloudNativePG 1.30, `shared_preload_libraries` is a **fixed parameter** and **cannot** be set via `spec.postgresql.parameters`. Attempting to do so results in:
 
 ```
-Cluster.postgresql.cnpg.io "product-db" is invalid: 
-spec.postgresql.parameters.shared_preload_libraries: Invalid value: "pg_stat_statements": 
+Cluster.postgresql.cnpg.io "product-db" is invalid:
+spec.postgresql.parameters.shared_preload_libraries: Invalid value: "pg_stat_statements":
 Can't set fixed configuration parameter
 ```
 
@@ -306,15 +310,15 @@ flowchart TD
         Source["Extension Source"]
         Compile["Compile Extension"]
     end
-    
+
     subgraph Final["Final Stage (scratch)"]
         Lib["/lib/<br/>*.so files"]
         Share["/share/extension/<br/>*.control, *.sql"]
         Deps["Dependencies<br/>(if needed)"]
     end
-    
+
     Builder -->|Copy artifacts| Final
-    
+
     style Builder fill:#e3f2fd
     style Final fill:#c8e6c9
 ```
@@ -357,7 +361,7 @@ COPY --from=builder /opt/extension/share/extension/* /share/extension/
 **Key Points**:
 - **Builder stage**: Uses PostgreSQL base image with build tools to compile extension
 - **Final stage**: Uses `scratch` (empty image) for minimal size
-- **Output structure**: 
+- **Output structure**:
   - `/lib/` contains shared libraries (`.so` files)
   - `/share/extension/` contains control files (`.control`) and SQL scripts (`.sql`)
 
@@ -486,29 +490,29 @@ flowchart TB
         ExtImage2["postgis-extension:3.6.1-18-trixie<br/>~50MB"]
         ExtImage3["pgaudit:1.7.0-18-trixie<br/>~2MB"]
     end
-    
+
     subgraph PostgresPod["PostgreSQL Pod"]
         subgraph PostgresContainer["Postgres Container<br/>minimal image ~260MB"]
             InstanceMgr["Instance Manager<br/>(PID 1)"]
             PostgresProc["PostgreSQL Process"]
         end
-        
+
         subgraph ExtensionVolumes["Image Volumes (Read-Only)"]
             Vol1["/extensions/pgvector<br/>lib/*.so<br/>share/extension/*"]
             Vol2["/extensions/postgis<br/>lib/*.so<br/>share/extension/*<br/>system/*.so"]
             Vol3["/extensions/pgaudit<br/>lib/*.so<br/>share/extension/*"]
         end
-        
+
         PgData["Persistent Volume<br/>PGDATA"]
     end
-    
+
     Registry -->|Pull & Mount| ExtensionVolumes
     ExtensionVolumes -->|extension_control_path| PostgresProc
     ExtensionVolumes -->|dynamic_library_path| PostgresProc
     ExtensionVolumes -->|ld_library_path| PostgresProc
     PostgresProc --> PgData
     InstanceMgr --> PostgresProc
-    
+
     style Registry fill:#e3f2fd
     style PostgresContainer fill:#fff3e0
     style ExtensionVolumes fill:#c8e6c9
@@ -719,7 +723,7 @@ Build a custom PostgreSQL image with extensions pre-installed. **Not recommended
 > `shared_preload_libraries` directly in `spec.postgresql.parameters` and created
 > extensions via `postInitSQL` or manual `CREATE EXTENSION`; kept here only as a
 > contrast to the CNPG model. Operator internals live in
-> [003.2](./003.2-operator-zalando.md).
+> [003.2](../../reference/zalando/operator.md).
 
 ---
 
@@ -816,12 +820,12 @@ kubectl exec -it <pod-name> -n <namespace> -- ls -la /extensions/<extension-name
 **`pgAudit`** (Audit Logging) - ✅ **Currently Implemented**:
 - **Status**: Configured in `product-db` via `system` image + `shared_preload_libraries` field + Database resources
 - **Use Cases**: Compliance (PCI-DSS, HIPAA, SOC 2), security auditing, data access monitoring, troubleshooting
-- **Configuration**: 
+- **Configuration**:
   - `system-trixie` image has pgaudit binary built-in (no ImageVolume needed)
   - `shared_preload_libraries` loads it at startup
   - Database resources run `CREATE EXTENSION` declaratively
   - Logs output: JSON format to stdout, collected by Vector sidecar → VictoriaLogs
-- **Considerations**: 
+- **Considerations**:
   - Increases log volume significantly
   - May impact performance (especially with `pgaudit.log: "all"`)
   - Requires careful log management and retention policies

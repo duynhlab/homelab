@@ -1,16 +1,16 @@
 # Declarative Role & Database Management (CNPG)
 
-One file per service — an `ExternalSecret`, a `DatabaseRole`, and a `Database` —
-is the single pattern for every service database on `product-db`; no role or
-database is created by SQL in Git, and no credential ever appears in a manifest.
+One file per service groups its `ExternalSecret`, `DatabaseRole`, and
+`Database` resources on both operational clusters; no credential appears in a
+manifest.
 
 | | |
 |---|---|
-| **Status** | Complete (RFC-0012 P1–P4): all four services on triplets, connection isolation via `pg_hba` live |
+| **Status** | Current: 12 service files reconcile 13 databases across the two operational clusters |
 | **Decision record** | [ADR-013 — per-service database triplet](../proposals/adr/ADR-013-per-service-db-triplet/) |
 | **Operator** | CloudNativePG v1.30.0 (`DatabaseRole` CRD since 1.30) |
-| **Cluster** | `product-db` (namespace `product`); DR replica `product-db-replica` receives roles/databases via WAL, no CRs of its own |
-| **Triplet location** | `kubernetes/infra/configs/databases/clusters/product-db/services/<name>.yaml` |
+| **Clusters** | `product-db` and `platform-db`; `product-db-replica` receives roles/databases through recovery, with no service CRs of its own |
+| **Triplet locations** | `kubernetes/infra/configs/databases/clusters/{product-db,platform-db}/services/<name>.yaml` |
 | **Credential flow** | OpenBAO → ESO → `kubernetes.io/basic-auth` Secret (`cnpg.io/reload: "true"`) |
 
 ## Concept
@@ -73,7 +73,7 @@ logging around them, so cleartext never reaches PostgreSQL logs,
 
 ## How it works in this platform
 
-Each service file under `clusters/product-db/services/` declares, in order:
+The `product-db` files demonstrate the common pattern in this order:
 
 1. **`ExternalSecret`** — renders `product-db-<svc>-secret` in namespace `product`
    from OpenBAO path `secret/data/local/databases/product-db/<svc>` (product is
@@ -102,7 +102,14 @@ Replica behavior: roles and databases replicate through WAL to
 `product-db-replica`; a `DatabaseRole` pointed at a replica reports `unknown`
 (unset `applied`), not an error, and reconciles normally after promotion.
 
-### Migration state (RFC-0012 phases)
+### Current inventory
+
+| Cluster | Service files | Managed databases |
+|---|---|---|
+| `product-db` | product, cart, order, payment, checkout, inventory | Same six names |
+| `platform-db` | user, notification, shipping, review, keycloak, temporal | Same names plus `temporal_visibility` |
+
+### Original migration record (RFC-0012 phases)
 
 | Service | Mechanism today | Target phase |
 |---------|-----------------|--------------|
@@ -127,7 +134,8 @@ Replica behavior: roles and databases replicate through WAL to
 - **Rotate a password:** [runbook](./runbooks/rotate-cnpg-service-password.md). Short form: new
   version in OpenBAO → force ESO sync → CNPG applies `ALTER ROLE` via reload
   label → reconcile the PgDog HelmRelease → rollout-restart the app.
-- **Watch:** `kubectl get databaseroles,databases -n product` — anything
+- **Watch:** `kubectl get databaseroles,databases -n product` and repeat for
+  namespace `platform` — anything
   `applied: false` is a conflict (usually a leftover inline entry) or an error;
   `unknown` on a replica is normal. Existing `cnpg_*` alert set covers the
   cluster itself; a rule for stuck-unapplied CRs is a tracked follow-up.
@@ -158,7 +166,7 @@ Replica behavior: roles and databases replicate through WAL to
 
 - [RFC-0012 — Converge CNPG role & database management on declarative CRDs](../proposals/rfc/RFC-0012/)
 - [ADR-013 — Per-service database triplet](../proposals/adr/ADR-013-per-service-db-triplet/)
-- [002 — Database integration](./002-database-integration.md) · [003.1 — CNPG operator deep dive](./003.1-operator-cnpg.md)
+- [002 — Database integration](./architecture.md) · [003.1 — CNPG operator deep dive](./cloudnativepg.md)
 - CloudNativePG official docs: *PostgreSQL Role Management* and *Database
   Management* (v1.30)
 

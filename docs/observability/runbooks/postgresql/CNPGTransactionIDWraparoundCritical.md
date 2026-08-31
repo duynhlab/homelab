@@ -34,7 +34,7 @@ max by (cnpg_io_cluster, datname) (cnpg_pg_database_xid_age)
 2. Run `VACUUM FREEZE VERBOSE` on affected database from primary.
 3. Watch `pg_stat_progress_vacuum` and xid age until below warning threshold.
 4. Open incident — follow
-   [Emergency recovery](../../../databases/010.4-emergency-recovery.md).
+   [Emergency recovery](../../../databases/runbooks/emergency-recovery.md).
 
 ## Escalation
 

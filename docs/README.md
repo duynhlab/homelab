@@ -51,35 +51,17 @@ docs/
 │   │   ├── RFC-0000/             # template (research.md + README.md)
 │   │   └── RFC-0001 … RFC-0027   # 26 records; reserve number → research.md → README.md
 ├── databases/                    # Database documentation
-│   ├── 002-database-integration.md               # PostgreSQL architecture
-│   ├── 003-operator-comparison.md               # CloudNativePG vs Zalando decision guide
-│   ├── 003.1-operator-cnpg.md                   # CloudNativePG operator deep dive
-│   ├── 003.2-operator-zalando.md                # Zalando Postgres Operator deep dive (historical/reference — operator removed)
-│   ├── 007-architecture.md           # Database architecture overview
-│   ├── 006-backup-strategy.md                 # Backup strategy and retention
-│   ├── 009-extensions.md             # PostgreSQL extensions
-│   ├── 008-pooler.md                 # Connection pooler documentation
-│   ├── 004-replication-strategy.md   # Replication strategy
-│   ├── 005-ha-dr-deep-dive.md        # HA vs DR (product-db-replica)
-│   ├── 001-postgresql-internals.md  # PostgreSQL internals deep dive
-│   ├── 010-drp.md                    # PostgreSQL DRP, RTO/RPO, PITR, restore evidence
-│   ├── 010.1-rpo-rto-planning.md     # Per-tier RPO/RTO targets vs as-built
-│   ├── 010.2-restore-and-failover-drills.md  # Drill cadence, roles, evidence log
-│   ├── 010.3-cross-region-dr.md      # Cross-zone/cross-region DR roadmap
-│   ├── 010.4-emergency-recovery.md   # "Start here when it's down" runbook
-│   ├── 011-documents.md              # Further reading / document map
-│   ├── 012-declarative-role-management.md  # RFC-0012 per-service triplets (ExternalSecret + DatabaseRole + Database)
-│   └── runbooks/                     # Database ops runbooks
-│       ├── README.md
-│       ├── add-service-database.md   # Add a service DB to product-db (RFC-0012 triplet)
-│       ├── rotate-cnpg-service-password.md  # Rotate a product-db service password end-to-end
-│       ├── pgdog-operations.md       # PgDog day-2 ops: rotations, backends, failure modes
-│       ├── postgres-backup-restore.md  # Backup/restore and PITR
-│       ├── cnpg-dr-replica-bootstrap.md
-│       ├── endpoints-to-configmaps.md
-│       ├── prepared-databases.md
-│       ├── zalando-ha-scaling.md
-│       └── postgres-backup-restore.md  # Backup/restore and PITR
+│   ├── README.md                 # Learn / understand / operate / reference hub
+│   ├── architecture.md           # Current cluster and connection topology
+│   ├── cloudnativepg.md          # Current operator boundary
+│   ├── backup-policy.md          # Current schedules, retention, object paths
+│   ├── disaster-recovery.md      # Recovery policy and DR topology
+│   ├── reliability-targets.md    # RPO/RTO targets and evidence
+│   ├── poolers.md                # Current PgBouncer and PgDog inventory
+│   ├── extensions.md             # Current extension policy and inventory
+│   ├── fundamentals/             # Vendor-neutral PostgreSQL learning path
+│   ├── runbooks/                 # Current task-focused procedures
+│   └── reference/                # Comparisons and historical learning notes
 ├── observability/                # Observability documentation
 │   ├── README.md                 # Master index + 4-pillar architecture
 │   ├── opentelemetry/             # OTel instrumentation, transport, and migration learning
@@ -317,46 +299,26 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Databases
 
-1. **[Database Guide](./databases/002-database-integration.md)** - PostgreSQL database integration guide
-    - 4 PostgreSQL clusters architecture with comprehensive diagrams
-    - Overview diagram showing operators, services, poolers, and clusters
-    - Individual cluster diagrams with secrets, connections, and patterns
+1. **[Database area hub](./databases/README.md)** - Choose a learning,
+   platform, operations, or historical-reference path.
 
-2. **[Operator Comparison](./databases/003-operator-comparison.md)** - CloudNativePG vs Zalando decision guide (reference/historical — the platform standardised on CloudNativePG; the Zalando operator was removed)
-    - Concise decision matrix
-    - Homelab cluster-to-operator mapping
-    - Links to [CloudNativePG](./databases/003.1-operator-cnpg.md) and [Zalando](./databases/003.2-operator-zalando.md) deep dives
+2. **[PostgreSQL learning path](./databases/README.md#learn-postgresql)** -
+   Internals, replication and HA, pooling, backup/recovery, and extensions.
 
-3. **[PostgreSQL Internals Deep Dive](./databases/001-postgresql-internals.md)** - PostgreSQL internals using product-db examples
-    - INSERT/UPDATE workflow with sequence diagrams
-    - Shared Buffers and Buffer Manager explained
-    - WAL (Write-Ahead Log) and crash recovery
-    - MVCC, tuple versioning, and visibility
-    - Streaming Replication internals (WAL sender/receiver, lag)
-    - Storage: files, pages, and on-disk layout
-    - Autovacuum and bloat control
-    - CNPG vs EC2/VM operational differences
-    - Backup/restore, scaling, and sharding concepts
-    - Cross-namespace secrets visualization for supporting-shared-db
-    - Connection patterns (direct, PgBouncer, PgDog)
-    - Environment variables and Helm configuration
-    - Database verification and troubleshooting
-    - Monitoring and best practices
-
-4. **[PostgreSQL Disaster Recovery](./databases/010-drp.md)** - HA, DR, RPO/RTO, PITR, standby taxonomy, and restore evidence
-    - [RPO/RTO Planning](./databases/010.1-rpo-rto-planning.md) - per-tier targets vs as-built, mapped to clusters
-    - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
-    - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
-    - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
+3. **[PostgreSQL Disaster Recovery](./databases/disaster-recovery.md)** - HA, DR, RPO/RTO, PITR, standby taxonomy, and restore evidence
+    - [RPO/RTO Planning](./databases/reliability-targets.md) - per-tier targets vs as-built, mapped to clusters
+    - [Restore & Failover Drills](./databases/runbooks/restore-and-failover-drills.md) - drill cadence, roles, and evidence log
+    - [Cross-Region / Cross-Zone DR](./databases/cross-region-dr.md) - roadmap to independent failure domains
+    - [Emergency Recovery](./databases/runbooks/emergency-recovery.md) - "start here when it's down" runbook
     - [GameDay drill record](./proposals/rfc/RFC-0021/gameday.md) - recorded drills: measured RTO, data-convergence evidence, falsified claims
 
 ### Runbooks & Troubleshooting
 
-1. **[PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md)** - Backup and restore procedures (CNPG Barman)
+1. **[PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md)** - Backup and restore procedures (CNPG Barman)
 2. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
-6. **[Pooler operations](./databases/runbooks/pgdog-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
+6. **[Pooler operations](./databases/runbooks/pooler-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
 7. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
 
 ---
@@ -451,25 +413,14 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ### Databases
 
-- [Database Guide](./databases/002-database-integration.md) - PostgreSQL database integration guide
-- [Operator Comparison](./databases/003-operator-comparison.md) - CloudNativePG vs Zalando decision guide (reference/historical — standardised on CloudNativePG)
-- [CloudNativePG Operator](./databases/003.1-operator-cnpg.md) - CloudNativePG feature and operations deep dive
-- [Zalando Postgres Operator](./databases/003.2-operator-zalando.md) - Patroni/Spilo operator deep dive (historical/reference — operator removed)
-- [Architecture](./databases/007-architecture.md) - Database architecture overview
-- [Backup Strategy](./databases/006-backup-strategy.md) - Backup architecture and retention
-- [Extensions](./databases/009-extensions.md) - PostgreSQL extensions (operand built-in vs Image Volume models)
-- [Connection Poolers](./databases/008-pooler.md) - PgBouncer, PgDog
-- [Replication Strategy](./databases/004-replication-strategy.md) - Replication strategy
-- [HA & DR Deep Dive](./databases/005-ha-dr-deep-dive.md) - product-db vs product-db-replica (object-store DR)
-- [PostgreSQL DRP](./databases/010-drp.md) - DRP, RTO/RPO, PITR, standby taxonomy, and restore evidence
-    - [RPO/RTO Planning](./databases/010.1-rpo-rto-planning.md) - per-tier targets vs as-built, mapped to clusters
-    - [Restore & Failover Drills](./databases/010.2-restore-and-failover-drills.md) - drill cadence, roles, and evidence log
-    - [Cross-Region / Cross-Zone DR](./databases/010.3-cross-region-dr.md) - roadmap to independent failure domains
-    - [Emergency Recovery](./databases/010.4-emergency-recovery.md) - "start here when it's down" runbook
-    - [GameDay drill record](./proposals/rfc/RFC-0021/gameday.md) - recorded drills: measured RTO, data-convergence evidence, falsified claims
-- [Declarative Role & Database Management](./databases/012-declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
-- [PostgreSQL Further Reading](./databases/011-documents.md) - Curated external references
-- [PostgreSQL Internals](./databases/001-postgresql-internals.md) - Deep dive using product-db examples
+- [Database area hub](./databases/README.md) - Learning, current platform,
+  runbooks, and historical reference.
+- [Emergency recovery](./databases/runbooks/emergency-recovery.md) - First-response router
+- [Restore & Failover Drills](./databases/runbooks/restore-and-failover-drills.md) - Drill cadence, roles, and evidence log
+- [Cross-Region / Cross-Zone DR](./databases/cross-region-dr.md) - Planned roadmap to independent failure domains
+- [Declarative Role & Database Management](./databases/declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
+- [PostgreSQL Further Reading](./databases/reference/further-reading.md) - Curated external references
+- [PostgreSQL Internals](./databases/fundamentals/postgresql-internals.md) - Deep dive using product-db examples
 
 ### Caching
 
@@ -515,7 +466,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 - [Kind E2E audit](./platform/kind-e2e-audit.md) - The cluster release gate (K0–K6), twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [k6 assertion layer](./testing/k6.md) - One suite for both gates: rows as thresholds, saga over HTTP, edge limiter, Temporal backlog
-- [PostgreSQL Backup/Restore](./databases/runbooks/postgres-backup-restore.md) - Backup and restore procedures
+- [PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md) - Backup and restore procedures
 - [Logging troubleshooting](./observability/logging/vector.md#troubleshooting) - Missing/blank Kubernetes logs
 - [Add a service database](./databases/runbooks/add-service-database.md) - RFC-0012 triplet flow
 - [Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md) - End-to-end rotation

@@ -29,7 +29,7 @@ kubectl top pods -n "$NAMESPACE" -l "cnpg.io/cluster=$CLUSTER"
 ```
 
 Check long queries, network, disk IO on replicas. PgDog bans lagging replicas —
-see [PgDog operations](../../../databases/runbooks/pgdog-operations.md).
+see [PgDog operations](../../../databases/runbooks/pooler-operations.md).
 
 ## Mitigation
 

@@ -48,8 +48,8 @@ Domain-specific rows and diagnosis dialects live in each folder README's
 - [SLO System](../slo/README.md) -- SLO definitions and burn-rate alerts
 - [Grafana Datasources](../grafana/datasources.md) -- how to view rules in Grafana UI
 - [PostgreSQL metrics hub](../metrics/postgresql/README.md) — custom queries, workflows, learning path
-- [Database HA Scaling](../../databases/runbooks/zalando-ha-scaling.md) — historical Zalando HA reference
-- [Prepared Databases](../../databases/runbooks/prepared-databases.md) -- preparedDatabases issue runbook
+- [Database HA Scaling](../../databases/reference/zalando/ha-scaling.md) — historical Zalando HA reference
+- [Prepared Databases](../../databases/reference/zalando/prepared-databases.md) -- preparedDatabases issue runbook
 
 ---
 _Last updated: 2026-08-19 — infrastructure-alerts.md split into kubernetes/ + valkey/; one canonical template_

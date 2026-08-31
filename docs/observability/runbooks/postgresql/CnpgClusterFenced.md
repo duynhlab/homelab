@@ -32,7 +32,7 @@ Check recent operator actions, failed failovers, or manual `cnpg fencing` comman
 
 1. **Do not unfence blindly** — understand why fencing was applied (CNPG
    failure modes docs).
-2. Follow [Emergency recovery](../../../databases/010.4-emergency-recovery.md)
+2. Follow [Emergency recovery](../../../databases/runbooks/emergency-recovery.md)
    with IC approval.
 3. After root cause fixed, unfence per CNPG procedure for your scenario.
 

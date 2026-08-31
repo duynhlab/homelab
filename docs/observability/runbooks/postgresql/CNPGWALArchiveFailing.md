@@ -109,7 +109,7 @@ kubectl logs -n "$NAMESPACE" "${CLUSTER}-1" -c postgres --tail=100 | grep -i arc
 kubectl get objectstore -n "$NAMESPACE"
 ```
 
-See [postgres-backup-restore.md](../../../databases/runbooks/postgres-backup-restore.md)
+See [backup-restore.md](../../../databases/runbooks/backup-restore.md)
 for Barman/RustFS connectivity checks.
 
 ## Mitigation

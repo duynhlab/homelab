@@ -19,10 +19,10 @@ the supporting tier (T2)**, and recommends scaling the existing cluster to a
 
 The DRP explicitly lists `supporting-shared-db` as a **known gap** — a
 single-node SPOF with "no automatic database failover"
-([`010-drp.md`](../../../databases/010-drp.md#known-gaps-and-next-improvements)),
+([`disaster-recovery.md`](../../../databases/disaster-recovery.md#known-gaps-and-next-improvements)),
 and the RPO/RTO planning page records its as-built posture as **"1 node (SPOF) …
 No DB failover; manual restore only"**
-([`010.1-rpo-rto-planning.md`](../../../databases/010.1-rpo-rto-planning.md#as-built-rporto-today)).
+([`reliability-targets.md`](../../../databases/reliability-targets.md#as-built-rporto-today)).
 Concretely:
 
 - **Shared blast radius.** Four otherwise-independent services share one
@@ -42,15 +42,15 @@ the only operational cluster with no HA at all.
 
 - **Remove the single-instance SPOF** for `user`, `notification`, `shipping`, `review`.
 - **Define and document a T2 RPO/RTO** the data owners accept, matching the
-  target table in [`010.1`](../../../databases/010.1-rpo-rto-planning.md#target-rporto-by-tier).
+  target table in [`010.1`](../../../databases/reliability-targets.md#target-rporto-by-tier).
 - **Prove failover with a recorded drill** (ties to the DR-drills backlog,
-  [`010.2`](../../../databases/010.2-restore-and-failover-drills.md)).
+  [`010.2`](../../../databases/runbooks/restore-and-failover-drills.md)).
 - **No application changes** — services keep using `supporting-shared-db-pooler.user:5432`.
 
 ### Non-Goals
 
 - **Cross-region / cross-cluster DR** — independent failure domains are a
-  separate roadmap item ([`010.3`](../../../databases/010.3-cross-region-dr.md)).
+  separate roadmap item ([`010.3`](../../../databases/cross-region-dr.md)).
 - **Migrating `cnpg-db`** or changing the T0 topology.
 - Re-litigating the operator choice for clusters other than this one.
 
@@ -58,11 +58,11 @@ the only operational cluster with no HA at all.
 
 **Scale `supporting-shared-db` to a 3-node Patroni HA cluster** by raising
 `numberOfInstances` from `1` to `3` in
-[`kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`](../../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml),
+`kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml` (retired),
 mirroring the proven `auth-db` posture. This is the **least-churn** path: same
 operator, same pooler, same secrets, same endpoints — only the replica count and
 durability semantics change. The existing
-[`zalando-ha-scaling.md`](../../../databases/runbooks/zalando-ha-scaling.md)
+[`zalando-ha-scaling.md`](../../../databases/reference/zalando/ha-scaling.md)
 runbook already documents exactly this transition (manual recovery → Patroni
 auto-failover).
 
@@ -128,7 +128,7 @@ flowchart LR
 - **Failover.** Patroni handles leader election and promotion (target **< 1 min**,
   matching `auth-db`); the Kubernetes API serves as the DCS. No operator
   availability is required for failover (a Zalando/Patroni strength —
-  [`003-operator-comparison.md`](../../../databases/003-operator-comparison.md)).
+  [`reference/operator-comparison.md`](../../../databases/reference/operator-comparison.md)).
 - **Replication / durability.** Today `synchronous_commit: local` (async). For
   T2 metadata, async is the accepted default; if the owner wants RPO-0 on
   acknowledged commits, switch to synchronous replication explicitly and accept
@@ -189,7 +189,7 @@ and PSS posture are unchanged (same pod spec, more replicas). No Kyverno impact
 
 - `make validate` on the changed manifest.
 - After sync: `patronictl list` shows 1 Leader + 2 Replicas; lag ~0.
-- **Failover drill** (ties to the [DR-drills backlog](../../../databases/010.2-restore-and-failover-drills.md)):
+- **Failover drill** (ties to the [DR-drills backlog](../../../databases/runbooks/restore-and-failover-drills.md)):
   delete the leader pod, confirm Patroni promotes a standby in < 1 min, smoke-test
   all four services through the pooler, and **record measured RTO/RPO** in
   `010.2` and update the as-built row in `010.1`.
@@ -200,13 +200,13 @@ and PSS posture are unchanged (same pod spec, more replicas). No Kyverno impact
 
 ## Related
 
-- DRP: [`010-drp.md`](../../../databases/010-drp.md) (Known Gaps, Zalando DRP section).
-- RPO/RTO planning: [`010.1-rpo-rto-planning.md`](../../../databases/010.1-rpo-rto-planning.md).
-- Drills: [`010.2-restore-and-failover-drills.md`](../../../databases/010.2-restore-and-failover-drills.md).
-- Operator comparison: [`003-operator-comparison.md`](../../../databases/003-operator-comparison.md).
-- DB integration: [`002-database-integration.md`](../../../databases/002-database-integration.md).
-- Scaling runbook: [`runbooks/zalando-ha-scaling.md`](../../../databases/runbooks/zalando-ha-scaling.md).
-- Manifest: [`kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`](../../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml).
+- DRP: [`disaster-recovery.md`](../../../databases/disaster-recovery.md) (Known Gaps, Zalando DRP section).
+- RPO/RTO planning: [`reliability-targets.md`](../../../databases/reliability-targets.md).
+- Drills: [`runbooks/restore-and-failover-drills.md`](../../../databases/runbooks/restore-and-failover-drills.md).
+- Operator comparison: [`reference/operator-comparison.md`](../../../databases/reference/operator-comparison.md).
+- DB integration: [`architecture.md`](../../../databases/architecture.md).
+- Scaling runbook: [`reference/zalando/ha-scaling.md`](../../../databases/reference/zalando/ha-scaling.md).
+- Manifest: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml` (retired).
 
 ---
 _Last updated: 2026-06-26_

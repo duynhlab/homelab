@@ -1,4 +1,8 @@
-# PostgreSQL Internals Deep Dive (product-db)
+# Archived Homelab Notes: PostgreSQL Internals
+
+> **Historical learning snapshot — not a source of current platform truth.**
+> Use [PostgreSQL internals](../../fundamentals/postgresql-internals.md) and the
+> current [architecture](../../architecture.md).
 
 A comprehensive guide to PostgreSQL internals using the `product-db` cluster as a learning vehicle. This document covers how PostgreSQL works internally, whether running on Kubernetes (CloudNativePG) or VMs (EC2).
 
@@ -75,7 +79,7 @@ flowchart TB
 
 ## 2. product-db Architecture
 
-### Current Configuration (from manifests)
+### Configuration snapshot from former manifests
 
 | Setting | Value | Source |
 |---------|-------|--------|
@@ -108,16 +112,16 @@ sequenceDiagram
     Backend->>Parser: Parse SQL
     Parser->>Planner: Parse Tree
     Planner->>Executor: Execution Plan
-    
+
     Note over Executor: BEGIN TRANSACTION
     Executor->>BufferMgr: Request heap page
     BufferMgr->>Disk: Load page if not in buffer
     Disk-->>BufferMgr: Page data
     BufferMgr-->>Executor: Page in Shared Buffers
-    
+
     Note over Executor: Insert tuple, mark page dirty
     Executor->>WAL: Write WAL record
-    
+
     Note over Executor: COMMIT
     WAL->>Disk: fsync WAL segment
     Disk-->>WAL: Ack
@@ -380,7 +384,7 @@ flowchart LR
     INSERT -->|"2. Modify page"| SharedBuffer
     COMMIT -->|"3. fsync WAL"| WALFile
     WALFile -->|"4. Success"| COMMIT
-    
+
     SharedBuffer -.->|"Later: BGWriter/Checkpoint"| DataFile
 ```
 
@@ -454,12 +458,12 @@ sequenceDiagram
     App->>Backend: SELECT * FROM products WHERE id = 42
     Backend->>Parser: Parse SQL
     Parser->>Planner: Parse Tree
-    
+
     Note over Planner: Analyze statistics, costs
     Note over Planner: Choose: Index Scan vs Seq Scan
-    
+
     Planner->>Executor: Index Scan Plan
-    
+
     loop For each page needed
         Executor->>BufferMgr: Get page
         alt Buffer Hit
@@ -472,7 +476,7 @@ sequenceDiagram
         Note over Executor: Check tuple visibility (MVCC)
         Note over Executor: Return visible tuples
     end
-    
+
     Executor-->>Backend: Result set
     Backend-->>App: Rows
 ```
@@ -579,17 +583,17 @@ flowchart TB
                 VM["12345_vm - Visibility Map"]
             end
         end
-        
+
         subgraph WAL["pg_wal/ - WAL Segments"]
             WAL1["000000010000000000000001"]
             WAL2["000000010000000000000002"]
         end
-        
+
         subgraph Global["global/ - Shared Catalogs"]
             PgDatabase["pg_database"]
             PgAuthid["pg_authid"]
         end
-        
+
         subgraph Config["Configuration"]
             Conf["postgresql.conf"]
             HBA["pg_hba.conf"]
@@ -606,7 +610,7 @@ Every data file is divided into 8KB pages:
 | Page Header      | 24 bytes - LSN, checksum, flags
 +------------------+
 | Item Pointers    | Array of (offset, length) pairs
-| (line pointers)  | 
+| (line pointers)  |
 +------------------+
 |                  |
 | Free Space       |
@@ -717,13 +721,13 @@ sequenceDiagram
     WALSender->>Network: Stream WAL data
     Network->>WALReceiver: Receive WAL
     WALReceiver->>Replica: Write to pg_wal/
-    
+
     loop Continuous replay
         Startup->>Replica: Read WAL from disk
         Startup->>Replica: Apply changes to Shared Buffers
         Note over Replica: Data now matches Primary
     end
-    
+
     WALReceiver-->>WALSender: Ack (flush position)
 ```
 
@@ -819,17 +823,17 @@ flowchart TB
             Primary["EC2: Primary PostgreSQL"]
             EBS1["EBS: PGDATA + pg_wal"]
         end
-        
+
         subgraph AZ2["Availability Zone 2"]
             Replica1["EC2: Replica 1"]
             EBS2["EBS: PGDATA + pg_wal"]
         end
-        
+
         subgraph AZ3["Availability Zone 3"]
             Replica2["EC2: Replica 2"]
             EBS3["EBS: PGDATA + pg_wal"]
         end
-        
+
         LB["Network Load Balancer or HAProxy"]
         S3["S3: WAL Archive"]
     end
@@ -837,11 +841,11 @@ flowchart TB
     Primary -->|"Streaming Replication"| Replica1
     Primary -->|"Streaming Replication"| Replica2
     Primary -->|"WAL Archive"| S3
-    
+
     LB -->|"Write traffic"| Primary
     LB -->|"Read traffic"| Replica1
     LB -->|"Read traffic"| Replica2
-    
+
     Primary --- EBS1
     Replica1 --- EBS2
     Replica2 --- EBS3
@@ -999,13 +1003,13 @@ PgDog fronts **four application databases** on this cluster — **product**, **c
 
 ## Related Documentation
 
-- **Cluster Topology**: [`kubernetes/infra/configs/databases/clusters/README.md`](../../kubernetes/infra/configs/databases/clusters/README.md)
-- **Database architecture & connection patterns**: [`002-database-integration.md`](./002-database-integration.md)
-- **Operator comparison (Zalando vs CNPG)**: [`003-operator-comparison.md`](./003-operator-comparison.md)
-- **Replication strategy**: [`004-replication-strategy.md`](./004-replication-strategy.md)
-- **Backup strategy**: [`006-backup-strategy.md`](./006-backup-strategy.md)
-- **Poolers (PgBouncer, PgDog)**: [`008-pooler.md`](./008-pooler.md)
-- **Related in-repo docs**: [002-database-integration.md](002-database-integration.md) · [007-architecture.md](007-architecture.md) (the former `specs/active` research notes were retired)
+- **Cluster Topology**: [`kubernetes/infra/configs/databases/clusters/README.md`](../../../../kubernetes/infra/configs/databases/clusters/README.md)
+- **Database architecture & connection patterns**: [`architecture.md`](../../architecture.md)
+- **Operator comparison (Zalando vs CNPG)**: [`reference/operator-comparison.md`](../../reference/operator-comparison.md)
+- **Replication strategy**: [`fundamentals/replication-and-ha.md`](../../fundamentals/replication-and-ha.md)
+- **Backup strategy**: [`fundamentals/backup-and-recovery.md`](../../fundamentals/backup-and-recovery.md)
+- **Poolers (PgBouncer, PgDog)**: [`fundamentals/connection-pooling.md`](../../fundamentals/connection-pooling.md)
+- **Related in-repo docs**: [architecture.md](../../architecture.md) · [007-architecture.md](./database-architecture-notes.md) (the former `specs/active` research notes were retired)
 
 ---
 _Last updated: 2026-07-11_

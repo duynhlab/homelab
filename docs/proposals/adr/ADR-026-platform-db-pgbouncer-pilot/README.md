@@ -100,7 +100,7 @@ comparison on identical workloads.
 - [ADR-014](../ADR-014-pooler-credentials-valuesfrom/) (PgDog `valuesFrom` creds — superseded on platform-db)
 - [ADR-015](../ADR-015-pg-hba-connection-isolation/) (pg_hba reject — the interaction to verify)
 - [ADR-025](../ADR-025-pgdog-passthrough-dynamic-db-creds/) (dynamic creds via PgDog passthrough — auth_query is the PgBouncer counterpart)
-- [`docs/databases/008-pooler.md`](../../../databases/008-pooler.md), [`007-architecture.md`](../../../databases/007-architecture.md)
+- [`docs/databases/fundamentals/connection-pooling.md`](../../../databases/fundamentals/connection-pooling.md), [`architecture.md`](../../../databases/architecture.md)
 
 ## History
 

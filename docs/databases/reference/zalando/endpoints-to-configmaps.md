@@ -1,7 +1,7 @@
 # Runbook: Zalando Postgres Operator -- Migrate Patroni DCS from Endpoints to ConfigMaps
 
 > **Historical / reference.** The platform migrated all Postgres from the
-> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> Zalando operator to [CloudNativePG](../../cloudnativepg.md). Zalando is no longer deployed
 > here — this doc is kept for learning.
 
 ## Table of Contents
@@ -356,9 +356,9 @@ make down && make up
 - [Zalando v1.15.0 Release Notes](https://github.com/zalando/postgres-operator/releases/tag/v1.15.0) -- migration paths documentation
 - [K8s Endpoints Deprecation Blog](https://kubernetes.io/blog/2025/04/24/endpoints-deprecation/) -- official deprecation announcement
 - [EndpointSlice Migration Guide](https://thelinuxnotes.com/migrating-from-endpoints-to-endpointslices-in-kubernetes/) -- general Endpoints to EndpointSlices migration
-- [Zalando HA Scaling Runbook](zalando-ha-scaling.md) -- scaling from 1 to 3 nodes
+- [Zalando HA Scaling Runbook](./ha-scaling.md) -- scaling from 1 to 3 nodes
 - [Prepared Databases Runbook](prepared-databases.md) -- preparedDatabases CreateFailed fix
-- [Operator Comparison](../003-operator-comparison.md) -- Zalando vs CloudNativePG
+- [Operator Comparison](../operator-comparison.md) -- Zalando vs CloudNativePG
 
 ## Manifest Locations
 

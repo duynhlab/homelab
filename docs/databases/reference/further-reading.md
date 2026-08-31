@@ -1,8 +1,8 @@
 # PostgreSQL: further reading and references
 
 Curated links for deeper study of PostgreSQL internals, replication, and
-production operations. This page complements the platform-specific guides in
-this directory (`001`-`010`).
+production operations. This page complements the learning and platform paths
+in the [database hub](../README.md).
 
 ## Official and core concepts
 

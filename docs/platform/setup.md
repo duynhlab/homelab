@@ -516,11 +516,23 @@ homelab/
 7. `storage-local`: Provisions RustFS (S3) object storage (depends on `controllers-local`, `secrets-local`).
 7a. `caching-local`: Valkey (product cache-aside, db 0 — the edge does not use it) (depends on `controllers-local`, `monitoring-local`).
 8. `network-policies-local`: Per-namespace NetworkPolicies (depends on `controllers-local`).
-8a. `clickhouse-local`: ClickHouse OLAP for OTel logs+traces SQL — a `ClickHouseKeeperInstallation` (3-node quorum) plus the `ClickHouseInstallation` at 1 shard × 3 replicas, both in this one wave; the operator retries the CHI until Keeper answers. This wave deliberately carries **no `wait: true`**: `wait` and `healthChecks` are mutually exclusive in Flux and `wait` wins, and because this overlay applies only custom resources — whose status kstatus cannot assess — `wait` made it report Ready in 371 ms with zero StatefulSets in existence. Its six explicit health checks (three ClickHouse plus three keeper StatefulSets, all operator-created and so never in the applied set) are the only thing that can gate the wave, and they matter: releasing `tracing-local` early let the collector run `CREATE ... ON CLUSTER` before every replica had joined the distributed-DDL queue ([RFC-0028](../proposals/rfc/RFC-0028/README.md)). Depends on `controllers-local`, `secrets-local`.
-8b. `clickhouse-schema-local`: the **DDL bootstrap Job** for the `otel` database
+8a. `clickhouse-keeper-local`: the `ClickHouseKeeperInstallation` (3-node quorum),
+    in its own wave ahead of the CHI. The operator resolves the CHI's
+    `zookeeper.keeper.name` reference **once**, on its first reconcile, and it
+    fails open — if the keeper pods are not up it renders an empty
+    `<zookeeper></zookeeper>` and reports the reconcile successful, with no
+    `ErrKeeperNotReady` event and no retry. Nothing repairs that afterwards, so
+    every `ENGINE = Replicated` DDL fails with `No hosts passed to ZooKeeper
+    constructor` until a human restarts the operator (observed on the 2026-09-01
+    cold rebuild: `readyTimeout` is 120 s, the keepers took ~4 min). Gating the
+    CHI behind this wave removes the race instead of betting on that timeout.
+    Same `wait`/`healthChecks` rule as 8b. Depends on `controllers-local`,
+    `secrets-local`.
+8b. `clickhouse-local`: ClickHouse OLAP for OTel logs+traces SQL — the `ClickHouseInstallation` at 1 shard × 3 replicas. This wave deliberately carries **no `wait: true`**: `wait` and `healthChecks` are mutually exclusive in Flux and `wait` wins, and because this overlay applies only custom resources — whose status kstatus cannot assess — `wait` made it report Ready in 371 ms with zero StatefulSets in existence. Its three explicit health checks (the ClickHouse StatefulSets, operator-created and so never in the applied set) are the only thing that can gate the wave, and they matter: releasing `tracing-local` early let the collector run `CREATE ... ON CLUSTER` before every replica had joined the distributed-DDL queue ([RFC-0028](../proposals/rfc/RFC-0028/README.md)). Depends on `controllers-local`, `secrets-local`, **`clickhouse-keeper-local`**.
+8c. `clickhouse-schema-local`: the **DDL bootstrap Job** for the `otel` database
     and its tables (`configs/clickhouse-schema`). Its own wave because it needs
     `wait: true` to gate anything, while `clickhouse-local` must NOT have it —
-    see 8a. The collector runs `create_schema: false`, so this Job is what makes
+    see 8b. The collector runs `create_schema: false`, so this Job is what makes
     the schema exist; it creates the database on each replica individually (no
     `ON CLUSTER`, so the distributed-DDL queue is never involved) and the tables
     once inside a `Replicated` database. Depends on `clickhouse-local`,

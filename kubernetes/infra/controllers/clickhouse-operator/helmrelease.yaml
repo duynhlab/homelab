@@ -60,7 +60,7 @@ spec:
         # This flip is INERT on its own, and that is the trap: operator-generated
         # Keeper Services publish only the zk/raft ports, so the CHK must both
         # enable `prometheus/*` settings AND name a prometheus port in a
-        # serviceTemplate. Both live in configs/clickhouse/clickhousekeeperinstallation.yaml.
+        # serviceTemplate. Both live in configs/clickhouse-keeper/clickhousekeeperinstallation.yaml.
         # Without them this ships a ServiceMonitor with zero targets, which reads
         # as coverage — the same class of defect as an alert on a series that
         # does not exist.

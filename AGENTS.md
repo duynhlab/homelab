@@ -337,8 +337,8 @@ Every manifest applied to the cluster must satisfy admission:
   ```
   flux-system → controllers-local → {secrets, monitoring, network-policies,
   gateway-api-crds, ...}
-  secrets → {cert-manager, clickhouse, storage, profiling}
-  clickhouse → clickhouse-schema (DDL bootstrap Job) → tracing
+  secrets → {cert-manager, clickhouse-keeper, storage, profiling}
+  clickhouse-keeper → clickhouse → clickhouse-schema (DDL bootstrap Job) → tracing
   cert-manager → {envoy-gateway (also after gateway-api-crds),
   cnpg-barman-plugin}
   databases (after secrets + monitoring + cnpg-barman-plugin + storage +
@@ -351,11 +351,13 @@ Every manifest applied to the cluster must satisfy admission:
   kyverno-policies → policy-reporter
   apps-local (depends: databases + monitoring + temporal-config)
   ```
-  (26 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
-  commented out of its kustomization since 2026-08-21, so 25 apply; `flux-system`
+  (27 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
+  commented out of its kustomization since 2026-08-21, so 26 apply; `flux-system`
   is created by the FluxInstance rather than this directory, and a cluster
-  therefore reports **26** — 25 was the figure before `clickhouse-schema-local`
-  landed (RFC-0028 DDL bootstrap, 2026-08-28), and 24 before `flux-web-local`
+  therefore reports **27** — 26 was the figure before `clickhouse-keeper-local`
+  landed (2026-09-01, splitting the Keeper quorum out so the CHI cannot be applied
+  before it), 25 before `clickhouse-schema-local`
+  (RFC-0028 DDL bootstrap, 2026-08-28), and 24 before `flux-web-local`
   (Flux web UI SSO, 2026-08-27). Count them at run
   time rather than trusting this number; full graph in
   [`docs/platform/setup.md`](docs/platform/setup.md).)

@@ -1,0 +1,65 @@
+# ClickHouse Keeper — the coordination quorum, in its own wave ahead of the CHI
+# (RFC-0028 / ADR-065).
+#
+# Why this is a separate Kustomization rather than a second resource in
+# `configs/clickhouse`: the CHI references the quorum by name
+# (`zookeeper.keeper.name`) and the operator resolves that reference exactly
+# once, when it first reconciles the CHI. If the keeper pods are not up yet it
+# resolves to an EMPTY node list and **completes the reconcile successfully** —
+# no `ErrKeeperNotReady` event, no retry. Nothing re-reconciles the CHI
+# afterwards, so `<zookeeper></zookeeper>` stays empty until a human restarts the
+# operator, and every `ENGINE = Replicated` DDL fails with
+# `Coordination::Exception: No hosts passed to ZooKeeper constructor`.
+#
+# Observed on the 2026-09-01 cold rebuild: `reconcile.coordination.keeper.readyTimeout`
+# is 120s and the three keepers took ~4 minutes to come up on a node pulling
+# images, so the CHI lost that race and `clickhouse-schema` crash-looped until the
+# operator was restarted by hand. Flux ordering removes the race instead of
+# betting on the timeout: the CHI is not applied at all until the health checks
+# below pass.
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: clickhouse-keeper-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: observability
+spec:
+  interval: 10m
+  # Three pods with three PVCs on a possibly-cold node.
+  timeout: 15m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./configs/clickhouse-keeper
+  prune: true
+  # NO `wait: true`, for the same reason as clickhouse-local: `wait` and
+  # `healthChecks` are mutually exclusive in Flux and `wait` wins, and this
+  # overlay applies exactly one custom resource whose status kstatus cannot
+  # assess — so `wait` would report Ready the instant the CHK was applied, with
+  # zero StatefulSets in existence, which is the failure this whole split exists
+  # to prevent.
+  dependsOn:
+    - name: controllers-local
+    - name: secrets-local
+  healthChecks:
+    # Keeper StatefulSets: chk-<chk>-<cluster>-<shard>-<replica>, one per host.
+    # All three are listed on purpose — a replica missing from this list is a
+    # replica nobody gates on, and the CHI would be released while the quorum is
+    # still forming. These only take effect because `wait` is absent, and they
+    # can only be checked here because the operator creates them; they are never
+    # part of this overlay's applied set.
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: chk-keeper-keeper-0-0
+      namespace: monitoring
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: chk-keeper-keeper-0-1
+      namespace: monitoring
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: chk-keeper-keeper-0-2
+      namespace: monitoring

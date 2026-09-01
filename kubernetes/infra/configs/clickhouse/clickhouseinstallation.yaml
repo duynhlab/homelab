@@ -40,10 +40,15 @@ spec:
   configuration:
     # By-name reference to the ClickHouseKeeperInstallation (operator >= 0.27.0,
     # per the Altinity release notes: "Reference CHK from CHI by a name"):
-    # the operator resolves the keeper endpoints itself and re-reconciles this CHI
-    # when that endpoint set changes. serviceType defaults to `replicas`, i.e. the
-    # per-pod addresses rather than one Service VIP — which is what a raft client
-    # wants.
+    # the operator resolves the keeper endpoints itself. serviceType defaults to
+    # `replicas`, i.e. the per-pod addresses rather than one Service VIP — which
+    # is what a raft client wants.
+    #
+    # It resolves ONCE, and it fails open: if the keeper pods are not up yet the
+    # rendered config gets an empty `<zookeeper>` and the reconcile still reports
+    # success, with no re-resolution afterwards. `clickhouse-keeper-local` is a
+    # separate Flux wave that this one dependsOn precisely so that cannot happen
+    # — see the header of configs/clickhouse-keeper/clickhousekeeperinstallation.yaml.
     zookeeper:
       keeper:
         name: keeper

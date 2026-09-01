@@ -43,19 +43,31 @@ CloudNativePG schedules use six-field cron expressions, including seconds.
 |---|---|---|---:|---|
 | `platform-db` | `platform` | `s3://pg-backups-cnpg/platform-db/` | 30d | `0 0 */6 * * *`; `0 0 2 * * *` |
 | `product-db` | `product` | `s3://pg-backups-cnpg/product-db/` | 30d | `0 0 */6 * * *`; `0 0 2 * * *` |
-| `product-db-replica` | `product` | `s3://pg-backups-cnpg/product-db-replica/` | 7d | None declared |
+| `product-db-replica` | `product` | `s3://pg-backups-cnpg/product-db-replica/` | 7d | `0 30 3 * * *` (`target: primary`) |
 
 The operational clusters archive WAL continuously and set `immediate: true` on
 both schedules. Each also declares an initial on-demand `Backup`. The DR replica
-has its own archive destination so it can archive after promotion, but current
-manifests do not schedule base backups for it.
+archives WAL to its own destination so it can keep archiving after promotion,
+and takes one daily base backup of its own so that destination is a restorable
+chain rather than loose WAL.
 
 `30d` and `7d` are Barman **recovery windows**, not plain retention periods.
 Barman keeps the first valid base backup taken before the point of
 recoverability plus every WAL segment needed to replay forward from it, so the
-archive is always at least as old as the window. One consequence for the DR
-prefix: because deletion is only ever triggered by a *backup* being retired, a
-prefix holding WAL and no base backup never gets a cleanup pass at all.
+archive is always at least as old as the window.
+
+That distinction is why the DR schedule exists at all. Retention is enforced by
+the plugin's instance sidecar on a timer (`retentionPolicyIntervalSeconds`,
+default 1800), but the pass it runs — `barman-cloud-backup-delete` — deletes WAL
+only as a *side effect* of retiring an obsolete base backup. A prefix holding WAL
+and no base backup therefore has its retention pass run on schedule and delete
+nothing, growing without bound while remaining unrestorable.
+
+**Backup target.** The DR schedule pins `target: primary`. The cluster-level
+default is `prefer-standby`, which on a three-instance replica cluster elects a
+cascading standby; the designated primary is the instance upstream documents for
+replica-cluster backups, and a standby backup does not force a WAL switch on its
+source — unhelpful on a low-write follower.
 
 ## Policy consequences
 
@@ -97,4 +109,4 @@ acceptance gate.
 - [CloudNativePG 1.30 backup](https://cloudnative-pg.io/docs/1.30/backup/)
 - [Barman Cloud plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
 
-_Last updated: 2026-09-01 — `30d`/`7d` described as Barman recovery windows rather than plain retention, with the consequence for a base-backup-less prefix spelled out._
+_Last updated: 2026-09-01 — DR replica gained a daily `ScheduledBackup` (`target: primary`); the sidecar retention timer and its backup-driven WAL deletion are spelled out. Earlier the same day — `30d`/`7d` described as Barman recovery windows rather than plain retention._

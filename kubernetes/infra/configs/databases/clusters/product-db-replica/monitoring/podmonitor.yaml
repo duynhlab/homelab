@@ -1,0 +1,24 @@
+# Scrape the DR cluster. Without this the cluster emits no series at all, so
+# PostgresBackupTooOld / PostgresBackupFailed -- which are cluster-agnostic --
+# can never fire for it, and its scheduled backup would be unmonitored.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: product-db-replica
+  namespace: product
+  labels:
+    app: product-db-replica
+    operator: cloudnativepg
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: product-db-replica
+  podMetricsEndpoints:
+  - port: metrics
+    interval: 15s
+    scrapeTimeout: 10s
+    path: /metrics
+  podTargetLabels:
+    - cnpg.io/cluster
+    - cnpg.io/instanceRole
+    - cnpg.io/instanceName

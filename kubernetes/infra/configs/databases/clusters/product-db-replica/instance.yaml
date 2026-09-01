@@ -1,13 +1,19 @@
 # DR Replica Cluster (CloudNativePG)
-# Single-node designated primary that continuously recovers from product-db WAL archive
-# Promotable to standalone primary for disaster recovery
+# Designated primary (instance 1) continuously recovering from the product-db WAL
+# archive, with two cascading standbys. Promotable to standalone primary for DR.
+#
+# Why 3 instances and not 1: promotion is the moment the cluster stops being a
+# spare and becomes the system of record. At 1 instance the promoted cluster is a
+# single point of failure with no quorum -- HA would have to be built during the
+# incident. The standbys cascade from the designated primary and cost only local
+# replication.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: product-db-replica
   namespace: product
 spec:
-  instances: 1
+  instances: 3
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 
   plugins:

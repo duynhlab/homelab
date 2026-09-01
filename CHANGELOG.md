@@ -722,6 +722,29 @@ Skeleton (copy what you need):
   `MicroserviceHighLatencyP99`, `GrpcServerHighLatencyP95`) are rewritten to
   full template shape grounded in their live exprs.
 
+#### Databases
+
+- **The DR cluster was a spare that could not be restored from and could not
+  survive its own promotion.** `product-db-replica` ran a single instance and
+  archived WAL to `s3://pg-backups-cnpg/product-db-replica/` with no
+  `Backup`/`ScheduledBackup` anywhere — so that prefix held loose WAL that
+  ["cannot restore a PostgreSQL cluster"](https://cloudnative-pg.io/documentation/1.30/backup/),
+  and its `retentionPolicy: "7d"` was inert: the plugin sidecar runs the
+  retention pass on a timer (`retentionPolicyIntervalSeconds`, default 1800) but
+  `barman-cloud-backup-delete` only removes WAL as a side effect of retiring an
+  obsolete base backup, so with zero backups the pass ran on schedule and deleted
+  nothing while the prefix grew. Three changes: **3 instances** (a promoted
+  1-node cluster is a single point of failure with no quorum, and building HA
+  during an incident is the wrong time), a **daily `ScheduledBackup`**, and its
+  own **`PodMonitor`**. The monitor is not optional — the backup alerts are
+  cluster-agnostic, so an unscraped cluster emits nothing and
+  `PostgresBackupTooOld` could never fire for a schedule nobody was watching.
+  The schedule pins **`target: primary`**: the cluster-level default is
+  `prefer-standby`, which at 3 instances elects a cascading standby, whereas the
+  designated primary is the instance upstream documents for replica-cluster
+  backups — and a standby backup does not force a WAL switch on its source,
+  unhelpful on a low-write follower.
+
 #### Temporal
 
 - **Every execution now carries its business key, a one-line summary, and live

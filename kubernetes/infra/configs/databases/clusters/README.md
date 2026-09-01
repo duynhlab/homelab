@@ -6,7 +6,7 @@
 |---------|----------|-----------|-----------|-------------|--------|-----------------|-----------------|
 | **platform-db** | CloudNativePG | platform | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgBouncer (`platform-db-pooler-rw`, ADR-026) | `platform-db-pooler-rw.platform.svc:5432` | `platform-db-rw.platform.svc:5432` |
 | **product-db** | CloudNativePG | product | 3 (1 Primary + 1 Sync + 1 Async Replica) | Sync (ANY 1) | PgDog (`pgdog-product`) | `pgdog-product.product.svc:6432` | `product-db-rw.product.svc:5432` |
-| **product-db-replica** | CloudNativePG | product | 1 (Designated Primary) | WAL recovery from object store | — | — | `product-db-replica-rw.product.svc:5432` |
+| **product-db-replica** | CloudNativePG | product | 3 (Designated Primary + 2 cascading) | WAL recovery from object store | — | — | `product-db-replica-rw.product.svc:5432` |
 
 ---
 

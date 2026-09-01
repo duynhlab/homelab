@@ -2682,6 +2682,23 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The DR replica's metrics exporter was connecting to a database that does not
+  exist.** Every scrape cycle logged `FATAL: database "app" does not exist
+  (SQLSTATE 3D000)` for user `cnpg_metrics_exporter` — 286 occurrences in 300 log
+  lines on a freshly built cluster, against zero on `product-db` and
+  `platform-db`. `product-db-replica` bootstraps by `recovery` and the manifest
+  set neither `database` nor `owner`, so the CRD defaulted both to `app`, while
+  the restored data directory carries `product`, `cart`, `order`, `payment`,
+  `checkout` and `inventory`. CNPG reads that name as the application database
+  and points the exporter at it, so every default monitoring query failed. Both
+  fields now match `product-db`'s initdb. The recovery bootstrap does not create
+  anything from them — the databases arrive with the restore — they only name
+  what already exists. Latent since the DR cluster was introduced, but only
+  consequential once the `PodMonitor` landed (#959): before that nothing scraped
+  the cluster, so this was silent log noise rather than missing metrics. The
+  plugin backup series (`barman_cloud_cloudnative_pg_io_*`) were never affected —
+  the instance manager emits those, not the user-query collector.
+
 - **Three backup/DR claims the docs restructure left behind.** A CNPG
   backup/restore/DR audit (Kubernetes 1.36 research) found ten drifted claims;
   the `docs/databases` restructure independently fixed six of them, and these

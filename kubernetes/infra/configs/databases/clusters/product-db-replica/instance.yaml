@@ -39,6 +39,15 @@ spec:
   bootstrap:
     recovery:
       source: product-db-primary
+      # Must match product-db's initdb. A recovery bootstrap does NOT create
+      # these -- the databases arrive in the restored data directory -- but CNPG
+      # reads them as the name of the application database, and that is what the
+      # metrics exporter connects to. Left unset, the CRD defaults both to `app`,
+      # which does not exist here (the restore carries product, cart, order,
+      # payment, checkout, inventory), so every default monitoring query failed
+      # with `FATAL: database "app" does not exist` on every scrape cycle.
+      database: product
+      owner: product
 
   replica:
     enabled: true

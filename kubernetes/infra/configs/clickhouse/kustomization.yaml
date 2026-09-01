@@ -1,8 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# The CHK lives in ../clickhouse-keeper and is applied by its own Flux
+# Kustomization, which this one `dependsOn`. That ordering is load-bearing, not
+# tidiness: the operator resolves `zookeeper.keeper.name` once, when it first
+# reconciles the CHI, and if the keeper pods are not up yet it resolves to an
+# EMPTY node list and completes the reconcile anyway (RFC-0028 / ADR-065).
 resources:
-  # Keeper first in reading order: the CHI references it by name and the
-  # operator retries the CHI until the quorum answers (RFC-0028 / ADR-065).
-  - clickhousekeeperinstallation.yaml
   - clickhouseinstallation.yaml

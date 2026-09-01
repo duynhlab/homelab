@@ -408,7 +408,7 @@ spec:
 
         # VERIFY-AT-KIND: the `< 2` literal hardcodes a 3-node ensemble. It is
         # correct for the CHK as it stands (replicasCount: 3 in
-        # configs/clickhouse/clickhousekeeperinstallation.yaml) and wrong the day
+        # configs/clickhouse-keeper/clickhousekeeperinstallation.yaml) and wrong the day
         # anyone scales that number: at 5 keepers a healthy leader reports 4
         # synced followers, so losing two — genuinely degraded, quorum barely
         # intact — would not trip `< 2` until three of four were gone.

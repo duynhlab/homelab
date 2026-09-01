@@ -7,17 +7,25 @@
 #
 # The CHI references this by name (spec.configuration.zookeeper.keeper.name),
 # available since operator 0.27.0 — the operator resolves the endpoint list
-# itself. Note it does NOT re-reconcile the CHI when that endpoint set changes:
-# `onKeeperResourceUpdate` defaults to `none` in the operator config. Harmless at
-# a fixed replica count; it will matter the day someone scales this quorum.
+# itself, ONCE, on its first reconcile of the CHI. It does not re-resolve when
+# the endpoint set later changes.
 #
-# Both CRs live in this same directory and therefore the same clickhouse-local
-# wave. The operator waits for the referenced CHK's pods before resolving keeper
-# endpoints (`reconcile.coordination.keeper.readyTimeout`, default 120s) and
-# fails the CHI reconcile with an ErrKeeperNotReady Event if they are not up in
-# time. On a cold Kind node pulling two images that will happen at least once and
-# retry — the wave's 25m timeout is sized for it, and such an Event on a first
-# bring-up is expected rather than a defect.
+# That one-shot resolution is why this CR has its own directory and its own Flux
+# Kustomization (`clickhouse-keeper-local`), which `clickhouse-local` dependsOn.
+# When both CRs shared a wave the CHI could be applied while the keepers were
+# still pulling images, and the failure mode is silent: the operator does NOT
+# emit ErrKeeperNotReady and retry, as this comment previously claimed. It
+# resolves to an EMPTY node list and completes the reconcile successfully,
+# leaving `<zookeeper></zookeeper>` in every rendered host config. Every
+# `ENGINE = Replicated` DDL then fails with
+# `Coordination::Exception: No hosts passed to ZooKeeper constructor`, and
+# nothing ever repairs it — the CHI is Completed, so only a human restarting the
+# operator re-triggers resolution.
+#
+# Measured on the 2026-09-01 cold rebuild: `reconcile.coordination.keeper.readyTimeout`
+# is 120s, the three keepers took ~4 minutes, and `clickhouse-schema` crash-looped
+# until the operator was restarted by hand. Flux ordering removes the race rather
+# than betting on that timeout.
 #
 # Sizing is the owner's decision at the RFC-0028 research gate: straight to
 # 3 keepers rather than a frugal 1, accepting the extra pods. A 3-node quorum

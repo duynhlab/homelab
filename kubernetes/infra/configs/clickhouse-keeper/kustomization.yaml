@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The coordination quorum, in its own overlay so Flux can gate the CHI behind it
+# (RFC-0028 / ADR-065). Keeping the CHK here rather than beside the CHI is the
+# whole point: `clickhouse-local` now `dependsOn` this wave, so the CHI is not
+# applied until all three keeper StatefulSets are healthy and the operator can
+# resolve `zookeeper.keeper.name` to real endpoints on its first attempt.
+resources:
+  - clickhousekeeperinstallation.yaml

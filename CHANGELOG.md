@@ -2268,6 +2268,24 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse came up with no Keeper and said it was fine.** On the 2026-09-01
+  cold rebuild `clickhouse-schema` crash-looped with
+  `Coordination::Exception: No hosts passed to ZooKeeper constructor` because the
+  operator had rendered `<zookeeper></zookeeper>` — empty — into every host
+  config. The CHI references the quorum by name and the operator resolves that
+  reference **once**, on its first reconcile; the keepers were still pulling
+  images past the 120 s `reconcile.coordination.keeper.readyTimeout` (they took
+  ~4 min), so it resolved to an empty list and **completed the reconcile
+  successfully**. No `ErrKeeperNotReady` event, no retry, and nothing
+  re-reconciles a Completed CHI — so the cluster stays permanently unable to
+  create a `Replicated` database until a human restarts the operator. The CHK now
+  has its own Flux wave (`clickhouse-keeper-local`, health-checked on all three
+  keeper StatefulSets) that `clickhouse-local` `dependsOn`, so the CHI is not
+  applied until the quorum is running and the one-shot resolution cannot lose the
+  race. The comments that predicted a retry are corrected in place; they also
+  referenced an `onKeeperResourceUpdate` setting that exists in neither the
+  repo's HelmRelease nor operator 0.27.3's live config.
+
 - **Backup alerting was watching metrics the platform stopped emitting when it
   moved to the Barman Cloud plugin.** `postgres-backup-alerts` still queried the
   in-tree `cnpg_collector_last_available_backup_timestamp` /

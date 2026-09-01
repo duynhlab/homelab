@@ -76,23 +76,38 @@ replaying. **Path:** DR promotion. RPO ≤ `archive_timeout` (5 min).
 - Primary cluster is confirmed down or intentionally frozen — no split-brain risk.
 - DR replica replay point is within the incident RPO.
 
-Promote (the replica cluster stops recovery and becomes read-write):
+Promote (the replica cluster stops recovery and becomes read-write). **Flux owns
+this manifest** — a live `kubectl edit` is reverted on the next reconcile, so
+either commit the change to Git and let Flux apply it, or, if Git is unreachable
+mid-incident, suspend the owning Kustomization first and reconcile the commit
+afterwards:
 
+```bash
+flux suspend kustomization databases-cnpg-dr-local -n flux-system   # only if editing live
+```
 ```yaml
-# product-db-replica manifest
+# product-db-replica manifest — committed to Git, or applied after the suspend above
 spec:
   replica:
     enabled: false      # changed from true → triggers promotion
 ```
+
+Promotion is **one-way**: turning the cluster back into a replica means deleting
+it and re-bootstrapping from the then-current primary.
+
 ```bash
 kubectl cnpg status product-db-replica -n product    # expect: Primary, accepting connections
 ```
 
-Cut PgDog over and smoke test:
+Cut PgDog over and smoke test — same rule, and the pooler re-reads `valuesFrom`
+only on reconcile (see [pooler-operations.md](pooler-operations.md)):
 
 ```yaml
 # pgdog-product HelmRelease (product tier DR promotion)
 host: product-db-replica-rw.product.svc.cluster.local
+```
+```bash
+flux reconcile helmrelease pgdog-product -n product
 ```
 
 Detailed sequence: [disaster-recovery.md → DR promotion outline](../disaster-recovery.md#dr-promotion-outline).
@@ -178,4 +193,4 @@ RTO/RPO, and follow-ups. Feed gaps back into the [drill schedule](./restore-and-
 - [Backup and restore](./backup-restore.md) — full backup/restore runbook.
 
 ---
-_Last updated: 2026-08-31._
+_Last updated: 2026-09-01 — DR promotion and the PgDog cut-over are now GitOps-safe (commit, or `flux suspend` then reconcile), and the one-way nature of promotion is stated._

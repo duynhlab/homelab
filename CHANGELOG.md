@@ -2245,6 +2245,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Backup alerting was watching metrics the platform stopped emitting when it
+  moved to the Barman Cloud plugin.** `postgres-backup-alerts` still queried the
+  in-tree `cnpg_collector_last_available_backup_timestamp` /
+  `_last_failed_backup_timestamp`, which the plugin supersedes with
+  `barman_cloud_cloudnative_pg_io_*` (upstream migration guide, "Verify your
+  metrics") — so a failed or stale backup could pass silently. Both alerts now
+  query the plugin metrics, the freshness threshold follows the actual schedule
+  (26h → 8h = every-6h `ScheduledBackup` + 2h grace, `for` 1h → 30m), and a new
+  `PostgresBackupMetricsMissing` absent-series alert fires when a writable
+  cluster stops exposing the plugin series (broken plugin/sidecar/scrape —
+  the failure mode the freshness alert cannot see). Alert catalog re-derived to
+  224 (222 deployed, 216 able to fire; §4 to 55); `builtin-metrics.md`
+  documents the plugin metric set and marks the collector backup metrics
+  superseded.
+
 - **Three ClickHouse alerts could never fire, and vmalert reported all three as
   healthy.** Pasting every expression in the group verbatim into the
   VictoriaMetrics query API found three returning an empty vector on every
@@ -2625,6 +2640,25 @@ Skeleton (copy what you need):
   neither cap, so neither exhausted branch was reachable from a request.
 
 #### Databases
+
+- **Three backup/DR claims the docs restructure left behind.** A CNPG
+  backup/restore/DR audit (Kubernetes 1.36 research) found ten drifted claims;
+  the `docs/databases` restructure independently fixed six of them, and these
+  three survived it. (1) `disaster-recovery.md` still said the plugin migration
+  was "not fully production-accepted until a plugin-backed on-demand backup and
+  restore/PITR drill are completed and recorded" and cited only the switchover
+  record — while `runbooks/restore-and-failover-drills.md` records exactly that
+  evidence as DR-2026-08-A (product-db PITR, 2026-08-07, measured RTO 2 m 12 s)
+  and declares the gate passed; the two pages contradicted each other, and the
+  remaining gaps are narrower than stated (platform-db restore, DR-promotion
+  rehearsal, cadence). (2) DR promotion in `runbooks/emergency-recovery.md` was
+  written as a bare live manifest edit — Flux owns that manifest and reverts it
+  on the next reconcile, so the runbook now commits to Git or suspends
+  `databases-cnpg-dr-local` first, reconciles `pgdog-product` on cut-over, and
+  states that promotion is one-way. (3) `30d`/`7d` were described as retention;
+  they are Barman **recovery windows**, and the difference matters most for the
+  DR prefix — deletion is only ever triggered by a backup being retired, so a
+  prefix holding WAL and no base backup never gets a cleanup pass.
 
 - **auto_explain plans never reached their VictoriaLogs stream — every plan was
   silently landing in the `pg_parse_failures` debug sink.** `platform-db` and

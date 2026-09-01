@@ -379,10 +379,13 @@ Capture the following for every restore or DR drill:
 - `product-db-replica` shares the same Kubernetes cluster and namespace as the primary.
 - RustFS shares the homelab failure domain.
 - Restore drills and DR promotions are not yet recorded as recurring evidence —
-  **partly closed**: the first record exists
-  ([DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record), a
-  planned `product-db` switchover), but the cadence and a cross-domain drill log
-  are still missing.
+  **partly closed**: two records exist —
+  [DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) (a
+  planned `product-db` switchover) and
+  [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)
+  (a `product-db` PITR restore, 2026-08-07, measured RTO 2 m 12 s). Still
+  missing: a `platform-db` restore, a DR-promotion rehearsal, the cadence, and a
+  cross-domain drill log.
 - The `kubectl cnpg` plugin **is** installed (v1.30.0). Note it has no
   `switchover` verb — planned switchovers go through
   `kubectl cnpg promote <cluster> <instance>`.
@@ -394,7 +397,9 @@ Capture the following for every restore or DR drill:
 - Move backup object storage to an independent durable service with versioning and object lock.
 - Split backup writer and restore reader credentials.
 - Add monthly restore drills with retained evidence.
-- Complete and record plugin-backed restore/PITR drills after the Barman Cloud Plugin rollout.
+- Record a `platform-db` restore drill and a DR-promotion rehearsal — the
+  plugin-backed PITR path itself is already proven for `product-db` by
+  DR-2026-08-A.
 - Decide whether a **`platform-db-replica`** DR cluster is needed (product line already has `product-db-replica`).
 
 ## Barman Cloud Plugin Current State
@@ -443,9 +448,13 @@ spec:
         serverName: product-db-cluster
 ```
 
-The migration is not fully production-accepted until a plugin-backed on-demand
-backup and restore/PITR drill are completed and recorded. Do not delete existing
-RustFS backup prefixes until that evidence exists.
+The migration **is production-accepted**: a plugin-backed on-demand backup and a
+PITR restore from it are both recorded in
+[DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)
+(2026-08-07). The retention hold that acceptance carried does not bind here — the
+Kind cluster and its RustFS bucket are rebuilt by every `make up`, and the bucket
+holds only plugin-era prefixes, so there is no surviving in-tree prefix to
+retire. The hold stays meaningful for a durable store ([RFC-0011](../proposals/rfc/RFC-0011/)).
 
 ## References
 
@@ -456,4 +465,4 @@ RustFS backup prefixes until that evidence exists.
 
 ---
 
-_Last updated: 2026-08-31._
+_Last updated: 2026-09-01 — Known Gaps and the plugin acceptance note now record DR-2026-08-A (product-db PITR, 2026-08-07); the remaining gaps are a platform-db restore, a DR-promotion rehearsal, and drill cadence._

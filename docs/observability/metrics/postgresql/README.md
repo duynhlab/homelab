@@ -6,11 +6,11 @@ runbooks for the platform database layer.
 | Quick facts | |
 |---|---|
 | Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`), DR `product-db-replica` |
-| Exporter | CNPG built-in `:9187` — prefix `cnpg_` on all series |
+| Exporter | CNPG built-in `:9187` — prefix `cnpg_` (backup series: `barman_cloud_cloudnative_pg_io_*` from the Barman Cloud plugin) |
 | Custom queries | **11** SQL definitions per cluster ConfigMap |
 | Per-db scope | platform: user, notification, shipping, review · product: product, cart, order |
 | **Not in per-db queries** | platform: temporal, temporal_visibility · product: payment, checkout |
-| Alerts | 53 rules — [alert catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
+| Alerts | 55 rules — [alert catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Runbooks | [postgresql/](../../runbooks/postgresql/README.md) (one file per alert) |
 | Dashboards | pg-query-performance, pg-maintenance, pg-io-waits, CloudNativePG Cluster Overview |
 
@@ -42,6 +42,7 @@ runbooks for the platform database layer.
 | Layer | Metrics | Alerts |
 |-------|---------|--------|
 | CNPG built-in | `cnpg_collector_*`, `cnpg_pg_replication_lag`, `cnpg_pg_settings_*` | Chart rules (HA, offline, connections, …) |
+| Barman Cloud plugin | `barman_cloud_cloudnative_pg_io_*` (backup timestamps, first recoverability point) | Backup rules (`backup-alerts.yaml`) |
 | Custom queries | `cnpg_pg_stat_statements_*`, `cnpg_pg_blocking_queries_*`, … | Deep-signal rules |
 | PgDog pooler | `pgdog_*` via `:9090` | — (investigate via connection runbooks) |
 
@@ -80,4 +81,4 @@ pod logs, tailed by the Vector DaemonSet into VictoriaLogs (no separate exporter
 - [Metrics hub](../README.md)
 
 ---
-_Last updated: 2026-07-18_
+_Last updated: 2026-08-31 — backup alerts migrated to Barman Cloud plugin metrics; rule count re-derived (55)._

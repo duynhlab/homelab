@@ -9,7 +9,8 @@ for a [custom query](custom-metrics.md).
 |---|---|
 | Source A | `cnpg-default-monitoring` ConfigMap (13 default queries), enabled by `disableDefaultQueries: false` in each `Cluster.spec.monitoring` |
 | Source B | `cnpg_collector_*` — instance-manager collector metrics (always on, not query-driven) |
-| Metric prefix | `cnpg_` — series are `cnpg_<query>_<column>` (default queries) or `cnpg_collector_<name>` |
+| Source C | `barman_cloud_cloudnative_pg_io_*` — Barman Cloud plugin backup metrics (supersede the collector backup metrics) |
+| Metric prefix | `cnpg_` — series are `cnpg_<query>_<column>` (default queries) or `cnpg_collector_<name>`; backup series use the plugin prefix |
 | Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) |
 | Custom counterpart | [custom-metrics.md](custom-metrics.md) |
 | Scrape | repo `PodMonitor` (`monitoring/podmonitor.yaml`) with `podTargetLabels: [cnpg.io/cluster, cnpg.io/instanceRole, cnpg.io/instanceName]` → `cnpg_io_cluster` label |
@@ -24,8 +25,12 @@ Two independent built-in sources feed the `cnpg_*` namespace:
    shadows the built-in and can drop columns — see the removed `pg_stat_checkpointer`
    / `pg_database_size` note in [custom-metrics.md](custom-metrics.md)).
 2. **Collector metrics** — the instance manager exports `cnpg_collector_*` directly
-   (cluster liveness, WAL, backups, fencing). These are not queries and cannot be
-   disabled.
+   (cluster liveness, WAL, fencing). These are not queries and cannot be
+   disabled. The **backup** collector metrics are the exception: since the clusters
+   moved to the Barman Cloud CNPG-I plugin, backup timestamps are emitted as
+   `barman_cloud_cloudnative_pg_io_*` through the same exporter, and the old
+   `cnpg_collector_*backup*` names are no longer populated (plugin migration guide,
+   "Verify your metrics").
 
 Most **chart** and **deep-signal** alerts consume built-in metrics; custom queries
 add per-table / per-statement / lock-level detail the built-ins do not cover.
@@ -56,10 +61,23 @@ add per-table / per-statement / lock-level detail the built-ins do not cover.
 | `cnpg_collector_fencing_on` | instance fenced | `CnpgClusterFenced` |
 | `cnpg_collector_pg_wal` (label `value` ∈ `size,count,keep,min,max`) | WAL directory stats | `PostgresWALSizeHigh` (`value="size"`) |
 | `cnpg_collector_pg_wal_archive_status` | last archive success/fail | (WAL runbooks) |
-| `cnpg_collector_last_available_backup_timestamp`, `_last_failed_backup_timestamp` | backup recency | `PostgresBackupTooOld`, `PostgresBackupFailed` |
+| `cnpg_collector_last_available_backup_timestamp`, `_last_failed_backup_timestamp` | backup recency — **superseded** by the plugin metrics below; not populated for plugin-managed backups | (none — alerts moved to plugin metrics) |
 | `cnpg_collector_wal_records`, `_wal_bytes`, `_wal_fpi`, `_wal_buffers_full` | WAL generation | (dashboards) |
 | `cnpg_collector_sync_replicas`, `_replica_mode`, `_nodes_used`, `_manual_switchover_required` | topology/HA state | (dashboards) |
-| `cnpg_collector_postgres_version`, `_first_recoverability_point`, `_collection_duration_seconds`, `_last_collection_error` | metadata / exporter health | (dashboards) |
+| `cnpg_collector_postgres_version`, `_collection_duration_seconds`, `_last_collection_error` | metadata / exporter health | (dashboards) |
+| `cnpg_collector_first_recoverability_point` | **superseded** by the plugin metric below | (none) |
+
+## Barman Cloud plugin metrics (`barman_cloud_cloudnative_pg_io_*`)
+
+Exposed through the same instance-manager exporter once a cluster archives via the
+Barman Cloud plugin (all three clusters do). These are the metrics backup alerting
+must query.
+
+| Metric | Meaning | Consumed by alert |
+|--------|---------|-------------------|
+| `barman_cloud_cloudnative_pg_io_last_available_backup_timestamp` | UNIX timestamp of the most recent successful backup | `PostgresBackupTooOld`, `PostgresBackupMetricsMissing` |
+| `barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp` | UNIX timestamp of the most recent failed backup | `PostgresBackupFailed` |
+| `barman_cloud_cloudnative_pg_io_first_recoverability_point` | earliest point in time the cluster can be recovered to | (no alert yet — recoverability-vs-policy alerting is an open gap) |
 
 ## Operations
 
@@ -79,4 +97,4 @@ add per-table / per-statement / lock-level detail the built-ins do not cover.
 - Runbooks: [postgresql/](../../runbooks/postgresql/)
 
 ---
-_Last updated: 2026-07-18_
+_Last updated: 2026-08-31 — Barman Cloud plugin metrics documented; collector backup metrics marked superseded._

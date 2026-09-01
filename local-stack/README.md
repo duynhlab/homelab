@@ -351,7 +351,7 @@ ambiguous.
 | Admission | None | Kyverno and PSS policies |
 | TLS | Plain HTTP on localhost | Gateway TLS termination using the local `homelab-ca` issuer |
 | Edge | Envoy Gateway standalone, one container, file-driven | Envoy Gateway controller + `EnvoyProxy` Deployment reconciled by Flux |
-| Telemetry | Local single-node backends; the edge samples every request (100%) and its access log is unfiltered, so a failed audit row is diagnosable | Cluster observability controllers and CRs; the edge samples 10% and a CEL filter drops successful probe access logs at source |
+| Telemetry | Local single-node backends; the edge samples every request (100%) and its access log is unfiltered, so a failed audit row is diagnosable | Cluster observability controllers and CRs; the edge samples 50% in the cluster baseline and a CEL filter drops successful probe access logs at source |
 
 Passing one environment never implies that the other environment passes.
 

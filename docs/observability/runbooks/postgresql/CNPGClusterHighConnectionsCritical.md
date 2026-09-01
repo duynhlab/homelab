@@ -83,7 +83,7 @@ kubectl logs -n "$NAMESPACE" deploy/pgdog-${CLUSTER%-db} --tail=50
 
 - **payment-service** connects direct to `product-db-rw:5432` with TLS — counts
   against Postgres, not PgDog. See
-  [PgDog operations](../../../databases/runbooks/pgdog-operations.md).
+  [PgDog operations](../../../databases/runbooks/pooler-operations.md).
 - **Init/migration jobs** connect direct to `-rw:5432`.
 
 ## Mitigation
@@ -103,5 +103,5 @@ kubectl logs -n "$NAMESPACE" deploy/pgdog-${CLUSTER%-db} --tail=50
 
 - **Immediate** if apps report connection failures — treat as P1 alongside
   [CNPGClusterOffline.md](CNPGClusterOffline.md) triage if errors are widespread.
-- Link [Emergency recovery](../../../databases/010.4-emergency-recovery.md) if
+- Link [Emergency recovery](../../../databases/runbooks/emergency-recovery.md) if
   the cluster is unreachable, not merely saturated.

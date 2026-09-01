@@ -23,7 +23,7 @@ See [CNPGClusterLowDiskSpaceWarning.md](CNPGClusterLowDiskSpaceWarning.md).
 
 1. **Emergency** — free WAL (`archive_command` working?) or expand PVC immediately.
 2. Stop non-essential writers if disk cannot expand.
-3. Follow [Emergency recovery](../../../databases/010.4-emergency-recovery.md) if
+3. Follow [Emergency recovery](../../../databases/runbooks/emergency-recovery.md) if
    instance down.
 
 ## Escalation

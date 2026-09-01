@@ -1,8 +1,9 @@
 # Runbook: CNPG DR Replica Bootstrap
 
 This runbook is a focused pointer for `product-db-replica` bootstrap and recovery
-checks. The canonical DRP now lives in [../010-drp.md](../010-drp.md); the CNPG
-technical flow lives in [../005-ha-dr-deep-dive.md](../005-ha-dr-deep-dive.md).
+checks. The canonical DRP now lives in [../disaster-recovery.md](../disaster-recovery.md); the CNPG
+technical flow lives in the [disaster recovery plan](../disaster-recovery.md)
+and the PostgreSQL [replication fundamentals](../fundamentals/replication.md).
 
 ## When to Use
 
@@ -60,12 +61,12 @@ Expected:
 ## Escalation Path
 
 For incident decisions, use the recovery decision flow in
-[../010-drp.md](../010-drp.md). Do not promote the DR replica until split-brain
+[../disaster-recovery.md](../disaster-recovery.md). Do not promote the DR replica until split-brain
 risk is controlled and the incident owner approves cutover.
 
 Promotion semantics: the replica **cluster** transitions via
 `spec.replica.enabled: false` (a GitOps-committed change — see
-[../010.4-emergency-recovery.md](../010.4-emergency-recovery.md)), not via
+[emergency-recovery.md](./emergency-recovery.md)), not via
 `kubectl cnpg promote`. Disabling replication is **one-way**: turning it back
 into a replica requires destroying the cluster and re-bootstrapping (re-cloning)
 from the then-current primary.

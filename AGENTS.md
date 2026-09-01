@@ -50,7 +50,7 @@ must state rollout order and respect the Flux dependency chain.
 | GitOps / delivery | `kubernetes/clusters/`, `kubernetes/apps/` | [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md), [`docs/platform/setup.md`](docs/platform/setup.md) |
 | Controllers / infra | `kubernetes/infra/` | [`kubernetes/infra/README.md`](kubernetes/infra/README.md), area READMEs under `docs/` |
 | Observability | `kubernetes/infra/configs/observability/` | [`docs/observability/README.md`](docs/observability/README.md) |
-| Databases | `kubernetes/infra/configs/databases/` | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
+| Databases | `kubernetes/infra/configs/databases/` | [`docs/databases/architecture.md`](docs/databases/architecture.md) |
 | Secrets / TLS | `kubernetes/infra/controllers/secrets/` | [`docs/secrets/README.md`](docs/secrets/README.md) |
 | Security / policy | Kyverno, NetworkPolicy | [`docs/security/README.md`](docs/security/README.md) |
 | Bootstrap | `terraform/` | [`terraform/README.md`](terraform/README.md) |
@@ -325,11 +325,20 @@ Every manifest applied to the cluster must satisfy admission:
 
 ## Gotchas & non-obvious rules
 
+- **`wait: true` silently disables `healthChecks`.** They are mutually exclusive
+  in Flux and `wait` wins. `wait` checks only the resources the Kustomization
+  *applies*, so an overlay that applies only custom resources whose status kstatus
+  cannot assess reports Ready instantly — measured 2026-08-28 on
+  `clickhouse-local`: **371ms, zero StatefulSets in existence**, downstream
+  released. If a wave must gate on objects an operator creates later (StatefulSets
+  behind a CR), list them in `healthChecks` and **omit `wait`**. A wave carrying
+  both is a wave that gates on nothing.
 - **Flux enforces deployment order via `dependsOn`** — apps won't start until infra is ready. Chain (in `kubernetes/clusters/local/`):
   ```
   flux-system → controllers-local → {secrets, monitoring, network-policies,
   gateway-api-crds, ...}
-  secrets → {cert-manager, clickhouse, storage, tracing, profiling}
+  secrets → {cert-manager, clickhouse, storage, profiling}
+  clickhouse → clickhouse-schema (DDL bootstrap Job) → tracing
   cert-manager → {envoy-gateway (also after gateway-api-crds),
   cnpg-barman-plugin}
   databases (after secrets + monitoring + cnpg-barman-plugin + storage +
@@ -342,10 +351,11 @@ Every manifest applied to the cluster must satisfy admission:
   kyverno-policies → policy-reporter
   apps-local (depends: databases + monitoring + temporal-config)
   ```
-  (25 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
-  commented out of its kustomization since 2026-08-21, so 24 apply; `flux-system`
+  (26 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
+  commented out of its kustomization since 2026-08-21, so 25 apply; `flux-system`
   is created by the FluxInstance rather than this directory, and a cluster
-  therefore reports **25** — 24 was the figure before `flux-web-local` landed
+  therefore reports **26** — 25 was the figure before `clickhouse-schema-local`
+  landed (RFC-0028 DDL bootstrap, 2026-08-28), and 24 before `flux-web-local`
   (Flux web UI SSO, 2026-08-27). Count them at run
   time rather than trusting this number; full graph in
   [`docs/platform/setup.md`](docs/platform/setup.md).)
@@ -452,7 +462,7 @@ reference style.
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |
 | Observability | [`docs/observability/README.md`](docs/observability/README.md) |
-| Databases | [`docs/databases/002-database-integration.md`](docs/databases/002-database-integration.md) |
+| Databases | [`docs/databases/architecture.md`](docs/databases/architecture.md) |
 | Secrets | [`docs/secrets/README.md`](docs/secrets/README.md), [`docs/secrets/openbao.md`](docs/secrets/openbao.md) |
 | Platform edge (gateway) | [`docs/platform/envoy-gateway.md`](docs/platform/envoy-gateway.md) |
 | Caching | [`docs/api/caching.md`](docs/api/caching.md) · [`docs/caching/README.md`](docs/caching/README.md) |

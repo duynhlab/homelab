@@ -15,7 +15,7 @@ data state, not an HTTP code.
 | **Window** | 2026-08-06 09:59:53Z → 10:42:02Z (UTC throughout) |
 
 Before this run, **no drill had ever been recorded anywhere in the repo** —
-[`010.2`](../../../databases/010.2-restore-and-failover-drills.md#where-evidence-lives)
+[`010.2`](../../../databases/runbooks/restore-and-failover-drills.md#where-evidence-lives)
 carried a template and no results, and
 [RFC-0007](../RFC-0007/) still said "no drill recorded yet". A drill with no
 recorded evidence did not happen, so this file is the evidence.
@@ -339,9 +339,9 @@ worth knowing before someone reaches for a second fix during an incident.
 
 **Claim.**
 
-> [`005-ha-dr-deep-dive.md:307`](../../../databases/005-ha-dr-deep-dive.md) — `| Primary pod crash | CNPG promotes sync replica, `-rw` service updates | 0 (sync) | < 30s | Yes |`
-
-> `005-ha-dr-deep-dive.md:332-341` — "**Service update**: `-rw` endpoints updated to new primary IP (**< 5s**) … **PgDog**: sees `-rw` DNS change, routes writes to new primary"
+The pre-drill estimates under test were RPO 0, database failover under 30
+seconds, and the `-rw` endpoint update under 5 seconds. Those estimates were
+retired after this GameDay produced measured application-visible evidence.
 
 **Instrumentation.** Two probes at 0.3 s / 0.5 s resolution ran across the
 switchover, plus a 10-shopper confirm funnel at 1.2 s spacing:
@@ -410,7 +410,7 @@ this drill is not a product-service drill. An 11-second write outage there is an
 ### 010.2 evidence record
 
 Filed in the shape
-[`010.2`](../../../databases/010.2-restore-and-failover-drills.md#evidence-log-template)
+[`010.2`](../../../databases/runbooks/restore-and-failover-drills.md#evidence-log-template)
 asks for. This is that file's **first** completed record.
 
 | Field | Value |
@@ -431,7 +431,7 @@ asks for. This is that file's **first** completed record.
 | Sign-off (IC) | pending review on the PR that adds this record |
 
 Per [RFC-0007:166-171](../RFC-0007/), a pass updates the as-built row in
-[`010.1`](../../../databases/010.1-rpo-rto-planning.md#as-built-rporto-today),
+[`010.1`](../../../databases/reliability-targets.md#as-built-rporto-today),
 which this change does.
 
 ## Falsified claims
@@ -443,7 +443,7 @@ drill. Fixed in this change unless marked tracked.
 |---|---|---|---|
 | F1 | `mockpay.yaml` tracks the payment image | pinned `1.0.0` since PR #438 while payment reached `1.5.0`; the skew manufactured a permanent critical alert **and** made the phase-6 ambiguity faults uninjectable | **fixed** — pin `1.5.0` + payment's `$imagepolicy` marker |
 | F2 | `kubectl cnpg switchover <cluster> -n <ns>` (`010.2:79`, `010.4:64`, `005:347`, `005:481`) | `Error: unknown command "switchover" for "kubectl cnpg"` — plugin v1.30.0 has `promote`, not `switchover` | **fixed** — corrected to `kubectl cnpg promote <cluster> <instance>` |
-| F3 | `010-drp.md:447` "`kubectl cnpg` plugin is not installed locally at the time of writing" | installed, v1.30.0 (`Build: {Version:1.30.0 Commit:4b5e244a7}`) | **fixed** |
+| F3 | `disaster-recovery.md:447` "`kubectl cnpg` plugin is not installed locally at the time of writing" | installed, v1.30.0 (`Build: {Version:1.30.0 Commit:4b5e244a7}`) | **fixed** |
 | F4 | `PaymentReconciliationDiscrepancy.md:38` Diagnosis SQL `SELECT id, started_at, finished_at, status, scanned, found FROM reconciliation_runs` | `ERROR: column "scanned" does not exist` — the columns are `transactions_scanned` and `discrepancies_found`. The runbook's first query has never run | **fixed**, plus the window-asymmetry false-positive check the drill needed |
 | F5 | `-rw` endpoints updated `< 5s` (`005:337`) | 12.6 s, with the endpoint list **empty** for 10.9 s | **tracked** — the `< 30 s` RTO claim it serves still holds; the sub-step figure needs re-measuring on real hardware before it is rewritten |
 | F6 | "anything counted here is real drift" (`rfc0021-phase6.yaml:144`) | true of the detector's intent, false of what fired: an unbounded provider reply is indistinguishable from drift | **tracked** — the reconciler asks for bounds but never verifies the provider honoured them. Any provider that paginates differently reproduces this without a mock |
@@ -552,8 +552,8 @@ missing.
 - [README.md](./README.md) — RFC-0021, phase 7 exit gate.
 - [cutover-rollback.md](./cutover-rollback.md) — per-phase rollback commands.
 - [RFC-0007](../RFC-0007/) — the drill programme; Drill E is G2, Drill B is G3.
-- [010.2-restore-and-failover-drills.md](../../../databases/010.2-restore-and-failover-drills.md) — drill procedures and the evidence template.
-- [010.1-rpo-rto-planning.md](../../../databases/010.1-rpo-rto-planning.md) — the RPO/RTO targets G3 verifies.
+- [runbooks/restore-and-failover-drills.md](../../../databases/runbooks/restore-and-failover-drills.md) — drill procedures and the evidence template.
+- [reliability-targets.md](../../../databases/reliability-targets.md) — the RPO/RTO targets G3 verifies.
 - [CheckoutAvailabilityErrors.md](../../../observability/runbooks/microservices/CheckoutAvailabilityErrors.md) — G1's claims.
 - [PaymentProviderUnknownRate.md](../../../observability/runbooks/microservices/PaymentProviderUnknownRate.md) — G4's claim.
 - [PaymentReconciliationDiscrepancy.md](../../../observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md) — G5's claim.

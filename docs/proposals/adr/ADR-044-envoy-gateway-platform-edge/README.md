@@ -445,8 +445,8 @@ One is easy to misread and so deserves naming: **tracing client sampling now
 defaults to 0% instead of 100%**. The new `clientSamplingFraction` field governs
 whether a *caller-forced* sampling decision is honored; it is distinct from
 `samplingRate`, which still exists on `EnvoyProxy` and still governs the
-sampling this platform relies on — `10` in the infra baseline, patched to `100`
-for local. The two remain mutually exclusive by CRD validation. Nothing here
+sampling this platform relies on — `50` in the infra baseline since 2026-08-31
+(`10` before that), patched to `100` for local. The two remain mutually exclusive by CRD validation. Nothing here
 ever depended on client-forced tracing, so edge sampling behavior is unchanged.
 
 **Amended decision:** unchanged from 2026-08-17 in substance. The controller
@@ -481,10 +481,43 @@ new ADR that supersedes this one.
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — to be archived read-only
 - [envoyproxy/gateway#6105](https://github.com/envoyproxy/gateway/issues/6105) — the open upstream issue behind the CRD delivery amendments
 
+**Amended parameter (2026-08-31): edge sampling 10 → 50.** The decision is
+unchanged — the edge remains the fleet's root sampling authority, still
+`ParentBased`, still ratio-based head sampling — so this is a parameter move
+recorded here rather than a superseding ADR.
+
+Why it needed saying at all: the `10` was never reasoned about. RFC-0024 copied
+it from Kong's `tracing_sampling_rate: 0.1` and said so in as many words, *"a
+number copy, not a redesign"*, and no ADR or RFC ever stated a cost, cardinality
+or storage basis for it. So 50 is the first edge rate this platform has actually
+chosen.
+
+The reasoning: this platform exists to be studied, and an unsampled trace is a
+question that can no longer be answered — which costs more here than the bytes
+do. 50% keeps half of edge-rooted traffic answerable while still halving volume
+against full sampling. It is deliberately not a cost-optimised number, and a real
+production cluster at this rate should do the storage math first; nothing in this
+repo has written that math down for either the ClickHouse `10Gi`/90d or the
+VictoriaTraces `10Gi`/7d volume.
+
+Two consequences worth knowing before anyone reads a dashboard:
+
+- **Nothing running changed.** Kind patches `samplingRate` to `100` so gate
+  evidence is deterministic, and `clusters/production/` is still a stub with no
+  `FluxInstance`. This value is the number a future prod cluster inherits; it has
+  never been the live value anywhere.
+- **`spanmetrics_calls_total` scales with this number.** It is derived from spans,
+  so the day a prod cluster moves 10 → 50 the RED dashboard jumps 5× with no
+  traffic change, while the SLO board beside it does not move at all — Sloth and
+  the Apdex recording rules read the SDK's own
+  `http_server_request_duration_seconds` / `rpc_server_call_duration_seconds`, and
+  no alert reads spanmetrics. That divergence is arithmetic, not an incident.
+
 ## History
 
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
+| 2026-08-31 | Accepted / Complete | Amended parameter: edge `samplingRate` 10 → 50 in the infra baseline, with the first written rationale for an edge rate on this platform. Decision unchanged; RFC-0024's unit error (`0.1`, a percent field read as a ratio) corrected in the same change |
 | 2026-08-10 | Proposed / Not started | Proposed inside the RFC-0024 review |
 | 2026-08-11 | Accepted / Not started | Accepted with RFC-0024; numbering assigned 044–046 because ADR-039/040 were consumed by unrelated decisions (RFC text had said 045–047) |
 | 2026-08-17 | Accepted / Partial | Amended: CRD delivery moves from a HelmRelease to vendored manifests applied server-side, after the first Kind bring-up proved the Helm path exceeds the 1 MiB `Secret` limit |

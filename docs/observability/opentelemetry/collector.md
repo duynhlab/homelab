@@ -163,7 +163,7 @@ into exporters (the old dedicated retry processor is long deprecated):
 
 - The ClickHouse exporter shows the full shape: `retry_on_failure`
   (5s → 30s backoff, 300s max elapsed) + `sending_queue` (4 consumers,
-  queue 1000), `async_insert`, lz4, 90-day TTL (`2160h`).
+  queue 1000), `async_insert`, lz4. The 90-day TTL lives in the committed DDL now, not in the exporter's `ttl:` option.
 - OTLP-HTTP exporters to the Victoria family use gzip; the metrics exporter
   targets **vmagent `:8429`** (not VMSingle) so relabeling and any
   streaming-aggregation stay at one choke point.
@@ -173,13 +173,18 @@ into exporters (the old dedicated retry processor is long deprecated):
   Durable buffering would require a storage extension — not deployed,
   accepted for a lab.
 
-### Startup coupling worth knowing
+### Startup coupling — removed, and worth knowing why
 
-The ClickHouse exporter runs `create_schema` DDL **in `start()`** — if
-ClickHouse is unreachable, the whole collector fails to start, taking the
-traces *and* logs pipelines with it. That is why the Flux Kustomization
-`tracing-local` declares `dependsOn: clickhouse-local`. Removing ClickHouse
-from a pipeline also removes this coupling.
+The ClickHouse exporter *used to* run `create_schema` DDL **in `start()`**: if
+ClickHouse was unreachable the whole collector failed to start, taking the traces
+*and* logs pipelines with it. Replication made that worse rather than better,
+because `CREATE ... ON CLUSTER` waits for every host.
+
+Since RFC-0028 the exporter runs `create_schema: false` and a bootstrap Job owns
+the DDL, so the collector executes no DDL at all and a restart during a
+ClickHouse outage costs only the ClickHouse sink. `tracing-local` now declares
+`dependsOn: clickhouse-schema-local` — a stricter gate, because the collector can
+no longer create a schema it finds missing.
 
 ## Operations
 
@@ -204,7 +209,7 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 | Export errors: `context deadline exceeded` | Backend unreachable or too slow before the exporter timeout | Verify endpoint/NetworkPolicy; exporters buffer + retry with backoff, so transient blips self-heal — persistent ones need the backend fixed or `timeout` raised |
 | `tls: first record does not look like a TLS handshake` | Exporter speaks TLS to a plaintext endpoint (or vice versa) | Match the exporter `tls.insecure` setting to the backend — in-cluster hops here are plaintext |
 | Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.159.0` |
-| Collector crash-loops at startup, ClickHouse also down | `create_schema` DDL coupling (above) | Restore ClickHouse first (or temporarily remove the exporter from both pipelines) |
+| Collector crash-loops at startup, ClickHouse also down | Historically the `create_schema` DDL coupling (above); **not possible since RFC-0028** — if you see it, check whether `create_schema` was set back to `true` | Restore ClickHouse first; confirm `create_schema: false` in the collector values |
 
 ## References
 

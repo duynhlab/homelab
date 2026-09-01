@@ -389,7 +389,7 @@ Two poolers now differ (PgDog vs PgBouncer). Production passthrough requires TLS
 
 - [RFC-0008](../../rfc/RFC-0008/) (secrets hardening — finding #4) · [RFC-0012](../../rfc/RFC-0012/) (credential triplets)
 - [ADR-013](../ADR-013-per-service-db-triplet/) · [ADR-014](../ADR-014-pooler-credentials-valuesfrom/) · [ADR-015](../ADR-015-pg-hba-connection-isolation/) · [ADR-024](../ADR-024-floci-kms-emulator-auto-unseal/) · [ADR-026](../ADR-026-platform-db-pgbouncer-pilot/)
-- [`docs/databases/008-pooler.md`](../../../databases/008-pooler.md)
+- [`docs/databases/poolers.md`](../../../databases/poolers.md)
 
 ---
 _Last updated: 2026-07-21_

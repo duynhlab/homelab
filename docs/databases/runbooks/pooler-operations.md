@@ -6,7 +6,7 @@ changes, and the failure modes we have actually hit.
 The platform runs **two different poolers**, on purpose (ADR-026): PgDog in front
 of `product-db`, and the CloudNativePG-native `Pooler` (PgBouncer) in front of
 `platform-db`. Most of this page is PgDog; the PgBouncer section at the end
-covers what differs. The filename is kept for link stability.
+covers what differs.
 
 | Fact | Value |
 |------|-------|
@@ -18,7 +18,8 @@ covers what differs. The filename is kept for link stability.
 | Pool mode | `transaction`; R/W splitting: SELECTs → `-r` replicas, writes → `-rw` primary; LSN lag monitoring bans lagging replicas |
 | Credentials | Injected per-user via HelmRelease `spec.valuesFrom` targetPath from the per-service ESO Secrets (ADR-014) — never in values |
 
-Concept and trade-off background lives in [008-pooler.md](../008-pooler.md); this page is purely operational.
+Concepts, trade-offs, and deployed topology live in [poolers.md](../poolers.md);
+this page is purely operational.
 
 ## Health & status
 
@@ -69,7 +70,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 
 ## References
 
-- [008-pooler.md](../008-pooler.md) — architecture, PgBouncer/PgDog comparison
+- [poolers.md](../poolers.md) — architecture, pooling semantics, and PgBouncer/PgDog comparison
 - [add-service-database.md](add-service-database.md), [rotate-cnpg-service-password.md](rotate-cnpg-service-password.md)
 - PgDog docs: https://docs.pgdog.dev/
 

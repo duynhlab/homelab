@@ -1,0 +1,91 @@
+# PostgreSQL RPO/RTO Planning
+
+Child playbook of the [PostgreSQL Disaster Recovery Plan](./disaster-recovery.md). The DRP
+is the system of record; this page is the **planning view**: it maps each data
+tier to a concrete cluster, states the **target** RPO/RTO, and contrasts it with
+what the platform actually delivers **today**. The scenario-specific recovery
+paths remain in the [disaster recovery plan](./disaster-recovery.md#rporto-matrix).
+
+- **RPO** (Recovery Point Objective) — how much data you can afford to lose,
+  measured backwards from the incident. Bounded by replication and WAL-archive lag.
+- **RTO** (Recovery Time Objective) — how long recovery may take, measured forward
+  from the incident to validated service. Proven only by drills
+  ([restore and failover drills](./runbooks/restore-and-failover-drills.md)).
+
+## Data tiers → clusters
+
+| Tier | Meaning | Cluster(s) | Operator |
+|------|---------|-----------|----------|
+| **T0 — critical transactional** | Money/checkout path; loss is unacceptable | `product-db` (`product`, `cart`, `order`, `payment`, `checkout`, `inventory`) | CloudNativePG |
+| **T1 — important user-facing** | Identity/user data; brief loss tolerable if documented | `platform-db` (`keycloak`, `user`) | CloudNativePG |
+| **T2 — supporting** | Notification/shipping/review metadata | `platform-db` | CloudNativePG |
+| **T3 — orchestration state** | Temporal workflow history | `platform-db` (`temporal`, `temporal_visibility`) | CloudNativePG |
+
+## Target RPO/RTO by tier
+
+These are the objectives the design is built to meet once drills are recorded.
+
+| Tier | Target RPO | Target RTO | Primary recovery path |
+|------|-----------|-----------|-----------------------|
+| T0 `product-db` | **0** for HA failover; **≤ 5 min** for DR promotion | **< 1 min** failover; **minutes** DR promotion | HA failover → DR promotion → PITR |
+| T1 `platform-db` (auth/user) | **0** for HA failover; **≤ 5 min** for restore | **< 1 min** CNPG failover; **manual** for restore | CNPG HA failover → Barman restore |
+| T2 `platform-db` (supporting) | **0** for HA failover; **≤ 5 min** for restore | **< 1 min** CNPG failover; **manual** for restore | CNPG HA failover → Barman restore |
+| T3 `platform-db` (temporal) | **≤ 5 min** (WAL archive) | Restore + Temporal replay | Barman PITR on `platform-db` |
+
+## As-built RPO/RTO today
+
+What the current homelab manifests actually guarantee. The gap between this and
+the target table above is the DR backlog.
+
+| Cluster | RPO driver (as-built) | Effective RPO | RTO posture | Evidence |
+|---------|----------------------|---------------|-------------|----------|
+| `product-db` | 3 instances, sync quorum `ANY 1`; `archive_timeout 5m`; daily + every-6h base backups → `s3://pg-backups-cnpg/product-db/` (30-day retention) | **0** on quorum-ack commits (**measured 0**); **≤ 5 min** to DR replica | Planned switchover **measured 11.4 s** RTO; **PITR measured 2 m 12 s** to a validated throwaway; DR promotion still **not drill-recorded** | ✅ [DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) (switchover, 2026-08-06) · ✅ [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) (PITR, 2026-08-07); ⏳ promotion pending durable hardware |
+| `product-db-replica` | Follows `product-db` via object-store recovery; own archive retention is 7 days | Tracks primary minus replay lag | Promote via `replica.enabled: false` | ⏳ promotion drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)) — on an ephemeral Kind cluster the rehearsal cannot honour the runbook's "never promote the live DR target" rule except by disposability |
+| `platform-db` | 3 instances, sync quorum `ANY 1`; Barman → `s3://pg-backups-cnpg/platform-db/` (30-day retention); includes `temporal` + `temporal_visibility` | **0** on quorum-ack commits | CNPG auto-failover; restore is manual | ⏳ restore drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)); the mechanism itself is proven by [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) on the identical CNPG + Barman plugin path |
+
+## How targets map to backup cadence
+
+RPO and RTO are not free-floating numbers — they are consequences of concrete knobs:
+
+- **RPO is set by the archive/replication lag.** For `product-db` and `platform-db`, synchronous
+  quorum makes acknowledged commits RPO-0 for in-cluster failover. For anything
+  recovered from the object store, RPO is bounded by `archive_timeout` (**5 min**)
+  plus upload time — a WAL segment not yet in RustFS is not recoverable.
+- **Base-backup frequency sets the PITR floor + the restore baseline.** Daily +
+  every-6h base backups keep the WAL-replay distance (and therefore restore time)
+  short. Longer gaps between base backups mean more WAL to replay at restore → higher RTO.
+- **RTO is the sum of detect + decide + download/restore + WAL replay + validate
+  + cut-over.** Backup size, object-store throughput, and the amount of WAL after
+  the selected base backup influence restore and replay time. The validation and
+  cut-over portions cannot be inferred from configuration; the
+  [restore drills](./runbooks/restore-and-failover-drills.md) measure the complete path.
+
+For a recovery method `m`, use these planning bounds:
+
+```text
+RPO(m) >= replication lag or archive lag visible at incident time
+RTO(m) = detect + decide + restore/download + replay + validate + cut-over
+```
+
+These are bounds, not guarantees. Only a drill using representative data volume,
+network throughput, and application validation can turn them into evidence.
+
+## Known gaps
+
+These widen the gap between target and as-built; tracked in
+[disaster-recovery.md → Known Gaps](./disaster-recovery.md#known-gaps-and-next-improvements).
+
+- **No `platform-db-replica` DR cluster** — platform tier recovery is in-cluster HA + Barman PITR only (RFC-0018 follow-up).
+- **No recorded DR-promotion or `platform-db` restore drill** — those rows stay
+  pending until the [drill runbook](./runbooks/restore-and-failover-drills.md)
+  produces signed evidence. Product failover and PITR already have records.
+
+## References
+
+- [disaster-recovery.md](./disaster-recovery.md) — parent DRP, scenario matrix, ownership.
+- [Backup policy](./backup-policy.md) — schedules, retention, and object-store paths.
+- [Storage and WAL](./fundamentals/storage-and-wal.md) — WAL durability and checkpoint mechanics.
+- [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — how the targets get verified.
+
+---
+_Last updated: 2026-08-31._

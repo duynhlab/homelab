@@ -4,7 +4,7 @@
 #   resources                         -- CPU/memory requests and limits
 #   NodePort 30080/30443              -- fixed node ports for the Kind cluster
 #   JSON access log to stdout         -- structured request logging
-#   OTLP tracing, 10% sampling        -- distributed tracing export
+#   OTLP tracing, 50% sampling        -- distributed tracing export
 #   Prometheus metrics endpoint       -- proxy fleet metrics scrape target
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
@@ -147,13 +147,32 @@ spec:
                 resourceAttributes:
                   service.name: platform.envoy-gateway
     tracing:
-      # PERCENT (0-100), not a ratio: 10 means 10% of traces are sampled.
+      # PERCENT (0-100), not a ratio: 50 means 50% of traces are sampled.
+      #
       # Envoy's default sampler is ParentBased, so an inbound sampled
       # traceparent is always honored — the fleet's sampling model stays
-      # consistent end-to-end (RFC-0024 research F-7). The LOCAL cluster
-      # overrides this to 100 via a patch in
-      # clusters/local/envoy-gateway-config.yaml.
-      samplingRate: 10
+      # consistent end-to-end (RFC-0024 research F-7). Because the edge creates
+      # the root span for every proxied request, THIS number governs the whole
+      # trace: services wrap their own ratio in ParentBased and honour the root's
+      # decision, so their OTEL_SAMPLE_RATE only applies where a service is
+      # itself the root.
+      #
+      # Why 50 (2026-08-31). The previous 10 was never reasoned about — RFC-0024
+      # copied it from Kong's tracing_sampling_rate: 0.1 and said so, "a number
+      # copy, not a redesign". On a platform built to be studied, a trace that
+      # was never sampled is a question that can no longer be answered, and that
+      # costs more here than the bytes do. 50 keeps half of production traffic
+      # answerable while still halving volume against full sampling. It is not a
+      # cost-optimised number and does not pretend to be: a real production
+      # cluster at this rate wants the storage math done first, and nothing in
+      # this repo has written that down for either the ClickHouse 10Gi/90d or the
+      # VictoriaTraces 10Gi/7d volume.
+      #
+      # This value is currently effective NOWHERE: the LOCAL cluster overrides it
+      # to 100 via clusters/local/envoy-gateway-config.yaml, and
+      # clusters/production/ is still a stub. It is the number a future prod
+      # cluster inherits.
+      samplingRate: 50
       provider:
         type: OpenTelemetry
         # EG's tracing provider speaks OTLP gRPC, so the collector is reached

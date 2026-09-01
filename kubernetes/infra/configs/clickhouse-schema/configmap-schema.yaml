@@ -1,0 +1,173 @@
+# ClickHouse schema, owned in git (RFC-0028 / ADR-065).
+#
+# The otel-collector's clickhouse exporter used to create this schema itself
+# (create_schema: true). Two fresh Kind bring-ups proved that cannot work at
+# three replicas: the exporter issues CREATE ... ON CLUSTER, a host that joins
+# the distributed-DDL queue later SKIPS earlier entries, and IF NOT EXISTS makes
+# every retry a no-op. Result both times: a schema on some replicas and not
+# others, permanently and silently (1 of 3, then 2 of 3 after the ordering fix).
+# The exporter's own README recommends exactly this move:
+#
+#   "While the exporter can automatically create databases and tables, it is
+#    recommended for production environments to manage schemas manually by
+#    setting create_schema to false. This approach prevents race conditions
+#    during startup and simplifies future upgrades. When manual schema
+#    management is enabled, the exporter only executes INSERT statements,
+#    allowing users to customize indexes, TTL, and partitioning as needed."
+#
+# Two properties make this bootstrap immune to the race rather than merely less
+# exposed to it:
+#
+#   1. The DATABASE is created per host with no ON CLUSTER, so the cluster-wide
+#      task queue is never involved. Measured: 0 entries in
+#      system.distributed_ddl_queue mentioning it.
+#   2. The database uses ENGINE = Replicated, so TABLE DDL run once on any one
+#      replica propagates through the database's own Keeper log, and a replica
+#      added later initialises its own tables.
+#
+# The DDL below was captured with SHOW CREATE TABLE from a live cluster that the
+# exporter had built, then made idempotent and switched to the argument-free
+# engine form. It must stay column-for-column compatible with the exporter's
+# INSERT statements (upstream logs_insert.sql / traces_insert.sql at the pinned
+# collector version) — a mismatch is a runtime insert failure under traffic, not
+# an apply-time error, so nothing in CI would catch it.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-schema
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: clickhouse-schema
+    app.kubernetes.io/component: bootstrap
+    app.kubernetes.io/part-of: observability
+data:
+  00-database.sql: |
+    -- Applied to EVERY replica individually (no ON CLUSTER, no DDL queue).
+    -- ENGINE = Replicated is the point: table DDL then replicates through this
+    -- database's own Keeper log, so a replica added later initialises its own
+    -- tables. The znode path is stable and shared by all replicas by design;
+    -- {shard} and {replica} come from the operator-supplied macros.
+    CREATE DATABASE IF NOT EXISTS otel
+        ENGINE = Replicated('/clickhouse/databases/otel', '{shard}', '{replica}');
+
+  10-otel_logs.sql: |
+    -- The text(...) skipping indexes are the exporter's full-text branch and are
+    -- 26.x syntax. GRANULARITY is deliberately omitted: the server fills the
+    -- default the exporter also relied on. The __otel_materialized_* columns are
+    -- MATERIALIZED, so they are absent from the INSERT surface but queried by
+    -- dashboards — dropping them would break those silently.
+    CREATE TABLE IF NOT EXISTS otel.otel_logs
+    (
+        `Timestamp` DateTime64(9) COMMENT 'Event timestamp with nanosecond precision' CODEC(Delta(8), ZSTD(1)),
+        `TraceId` String COMMENT 'W3C trace identifier' CODEC(ZSTD(1)),
+        `SpanId` String COMMENT 'W3C span identifier' CODEC(ZSTD(1)),
+        `TraceFlags` UInt8 COMMENT 'W3C trace flags',
+        `SeverityText` LowCardinality(String) COMMENT 'Log severity as text' CODEC(ZSTD(1)),
+        `SeverityNumber` UInt8 COMMENT 'Log severity as number (1-24)',
+        `ServiceName` LowCardinality(String) COMMENT 'Service that emitted the log' CODEC(ZSTD(1)),
+        `Body` String COMMENT 'Log message body' CODEC(ZSTD(1)),
+        `ResourceSchemaUrl` LowCardinality(String) COMMENT 'Schema URL for the resource' CODEC(ZSTD(1)),
+        `ResourceAttributes` Map(LowCardinality(String), String) COMMENT 'Resource attributes as key-value pairs' CODEC(ZSTD(1)),
+        `ScopeSchemaUrl` LowCardinality(String) COMMENT 'Schema URL for the instrumentation scope' CODEC(ZSTD(1)),
+        `ScopeName` String COMMENT 'Instrumentation scope name' CODEC(ZSTD(1)),
+        `ScopeVersion` LowCardinality(String) COMMENT 'Instrumentation scope version' CODEC(ZSTD(1)),
+        `ScopeAttributes` Map(LowCardinality(String), String) COMMENT 'Instrumentation scope attributes' CODEC(ZSTD(1)),
+        `LogAttributes` Map(LowCardinality(String), String) COMMENT 'Log record attributes' CODEC(ZSTD(1)),
+        `EventName` String COMMENT 'Event name for log records representing events' CODEC(ZSTD(1)),
+        `__otel_materialized_k8s.cluster.name` LowCardinality(String) MATERIALIZED ResourceAttributes['k8s.cluster.name'] CODEC(ZSTD(1)),
+        `__otel_materialized_k8s.container.name` LowCardinality(String) MATERIALIZED ResourceAttributes['k8s.container.name'] CODEC(ZSTD(1)),
+        `__otel_materialized_k8s.deployment.name` LowCardinality(String) MATERIALIZED ResourceAttributes['k8s.deployment.name'] CODEC(ZSTD(1)),
+        `__otel_materialized_k8s.namespace.name` LowCardinality(String) MATERIALIZED ResourceAttributes['k8s.namespace.name'] CODEC(ZSTD(1)),
+        `__otel_materialized_k8s.node.name` LowCardinality(String) MATERIALIZED ResourceAttributes['k8s.node.name'] CODEC(ZSTD(1)),
+        `__otel_materialized_k8s.pod.name` LowCardinality(String) MATERIALIZED ResourceAttributes['k8s.pod.name'] CODEC(ZSTD(1)),
+        `__otel_materialized_k8s.pod.uid` LowCardinality(String) MATERIALIZED ResourceAttributes['k8s.pod.uid'] CODEC(ZSTD(1)),
+        `__otel_materialized_deployment.environment.name` LowCardinality(String) MATERIALIZED ResourceAttributes['deployment.environment.name'] CODEC(ZSTD(1)),
+        INDEX idx_trace_id TraceId TYPE text(tokenizer = 'array') GRANULARITY 100000000,
+        INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE text(tokenizer = 'array') GRANULARITY 100000000,
+        INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE text(tokenizer = 'array') GRANULARITY 100000000,
+        INDEX idx_scope_attr_key mapKeys(ScopeAttributes) TYPE text(tokenizer = 'array') GRANULARITY 100000000,
+        INDEX idx_scope_attr_value mapValues(ScopeAttributes) TYPE text(tokenizer = 'array') GRANULARITY 100000000,
+        INDEX idx_log_attr_key mapKeys(LogAttributes) TYPE text(tokenizer = 'array') GRANULARITY 100000000,
+        INDEX idx_log_attr_value mapValues(LogAttributes) TYPE text(tokenizer = 'array') GRANULARITY 100000000,
+        INDEX idx_lower_body lower(Body) TYPE text(tokenizer = 'splitByNonAlpha') GRANULARITY 100000000
+    )
+    ENGINE = ReplicatedMergeTree
+    PARTITION BY toDate(Timestamp)
+    ORDER BY (toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp)
+    TTL toDateTime(Timestamp) + toIntervalDay(90)
+    SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
+
+  20-otel_traces.sql: |
+    CREATE TABLE IF NOT EXISTS otel.otel_traces
+    (
+        `Timestamp` DateTime64(9) CODEC(Delta(8), ZSTD(1)),
+        `TraceId` String CODEC(ZSTD(1)),
+        `SpanId` String CODEC(ZSTD(1)),
+        `ParentSpanId` String CODEC(ZSTD(1)),
+        `TraceState` String CODEC(ZSTD(1)),
+        `SpanName` LowCardinality(String) CODEC(ZSTD(1)),
+        `SpanKind` LowCardinality(String) CODEC(ZSTD(1)),
+        `ServiceName` LowCardinality(String) CODEC(ZSTD(1)),
+        `ResourceAttributes` Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+        `ScopeName` String CODEC(ZSTD(1)),
+        `ScopeVersion` String CODEC(ZSTD(1)),
+        `SpanAttributes` Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+        `Duration` UInt64 CODEC(ZSTD(1)),
+        `StatusCode` LowCardinality(String) CODEC(ZSTD(1)),
+        `StatusMessage` String CODEC(ZSTD(1)),
+        `Events.Timestamp` Array(DateTime64(9)) CODEC(ZSTD(1)),
+        `Events.Name` Array(LowCardinality(String)) CODEC(ZSTD(1)),
+        `Events.Attributes` Array(Map(LowCardinality(String), String)) CODEC(ZSTD(1)),
+        `Links.TraceId` Array(String) CODEC(ZSTD(1)),
+        `Links.SpanId` Array(String) CODEC(ZSTD(1)),
+        `Links.TraceState` Array(String) CODEC(ZSTD(1)),
+        `Links.Attributes` Array(Map(LowCardinality(String), String)) CODEC(ZSTD(1)),
+        INDEX idx_trace_id TraceId TYPE bloom_filter(0.001) GRANULARITY 1,
+        INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
+        INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
+        INDEX idx_span_attr_key mapKeys(SpanAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
+        INDEX idx_span_attr_value mapValues(SpanAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
+        INDEX idx_duration Duration TYPE minmax GRANULARITY 1
+    )
+    ENGINE = ReplicatedMergeTree
+    PARTITION BY toDate(Timestamp)
+    ORDER BY (ServiceName, SpanName, toDateTime(Timestamp))
+    TTL toDateTime(Timestamp) + toIntervalDay(90)
+    SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
+
+  30-otel_traces_trace_id_ts.sql: |
+    CREATE TABLE IF NOT EXISTS otel.otel_traces_trace_id_ts
+    (
+        `TraceId` String CODEC(ZSTD(1)),
+        `Start` DateTime CODEC(Delta(4), ZSTD(1)),
+        `End` DateTime CODEC(Delta(4), ZSTD(1)),
+        INDEX idx_trace_id TraceId TYPE bloom_filter(0.01) GRANULARITY 1
+    )
+    ENGINE = ReplicatedMergeTree
+    PARTITION BY toDate(Start)
+    ORDER BY (TraceId, Start)
+    TTL toDateTime(Start) + toIntervalDay(90)
+    SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
+
+  40-otel_traces_trace_id_ts_mv.sql: |
+    -- TO-style view: it owns no storage, which is what keeps it legal inside a
+    -- Replicated database. The declared Start/End are DateTime64(9) while the
+    -- target columns are DateTime; ClickHouse casts on insert. That asymmetry is
+    -- reproduced from as-built on purpose — do not 'fix' it.
+    -- Must be created AFTER otel_traces and otel_traces_trace_id_ts: a missing
+    -- MV loses trace-id lookups with no error anywhere.
+    CREATE MATERIALIZED VIEW IF NOT EXISTS otel.otel_traces_trace_id_ts_mv TO otel.otel_traces_trace_id_ts
+    (
+        `TraceId` String,
+        `Start` DateTime64(9),
+        `End` DateTime64(9)
+    )
+    AS SELECT
+        TraceId,
+        min(Timestamp) AS Start,
+        max(Timestamp) AS End
+    FROM otel.otel_traces
+    WHERE TraceId != ''
+    GROUP BY TraceId;
+

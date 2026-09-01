@@ -231,6 +231,36 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **Edge trace sampling raised 10% → 50%, and the first written reason for an
+  edge rate on this platform.** The `10` was never reasoned about: RFC-0024 copied
+  it from Kong's `tracing_sampling_rate: 0.1` and said so — *"a number copy, not a
+  redesign"* — and no ADR or RFC ever stated a cost, cardinality or storage basis
+  for it. The reasoning now lives in
+  [ADR-044](docs/proposals/adr/ADR-044-envoy-gateway-platform-edge/): this platform
+  exists to be studied, an unsampled trace is a question nobody can answer later,
+  and that costs more here than the bytes do. 50% keeps half of edge-rooted traffic
+  answerable while still halving volume against full sampling.
+  **Nothing running changed**, which is worth stating rather than implying: Kind
+  patches `samplingRate` to `100` so gate evidence stays deterministic, and
+  `clusters/production/` is a stub with no `FluxInstance` — so this value has never
+  been the live one anywhere. It is the number a future prod cluster inherits.
+  The documentation half was the real work. Roughly fifteen sentences stated "10%
+  at the edge **and** `0.1` at services" as one fused fact; those two numbers now
+  diverge, so each was **split** to name both knobs and their scopes rather than
+  find-and-replaced. The edge's `samplingRate` (a percent) decides for every
+  request it proxies; a service's `OTEL_SAMPLE_RATE` (a ratio, unchanged at `0.1`)
+  is wrapped in `ParentBased` and applies only where that service is itself the
+  root — which, measured on the live cluster, is no traffic at all today. Derived
+  figures were recomputed rather than substituted: "90% volume reduction" → 50%,
+  the trace undercount factor 10× → 2×, and the "< 1% CPU" overhead is now
+  labelled as measured at 10% and not re-measured since. RFC-0024's own
+  `samplingRate: 0.1` was corrected to `10` as a unit fix — a percent field
+  recorded as a ratio, which would have been a 100× under-sample for anyone
+  copying it, though the shipped manifest was always right. One trap recorded for
+  whoever meets it first: `spanmetrics_calls_total` is derived from spans, so the
+  day a prod cluster moves to 50 the RED dashboard jumps 5× while the SLO board
+  beside it does not move — arithmetic, not an incident.
+
 - **In-cluster consumers can now reach the public issuer (ADR-062 hairpin).**
   Two small pieces: a stable `edge` Service in `envoy-gateway` selecting the
   proxy fleet (the EG-generated Service has a hashed name nothing in git can
@@ -352,6 +382,96 @@ Skeleton (copy what you need):
   context.
 
 #### Observability
+
+- **ClickHouse Keeper quorum finally has an alert consumer.** The CHK's `:7000`
+  Prometheus endpoint has been scraped since RFC-0028 (`job="keeper-keeper"`,
+  three targets, 30s) and nothing read it, so losing the quorum — the root cause
+  of a read-only replica, and therefore of writes stopping while SELECTs keep
+  serving — would have paged nobody. Two rules now read it directly instead of
+  inferring from the server side: `ClickHouseKeeperNoLeader` (critical) on
+  `count(ClickHouseAsyncMetrics_KeeperIsLeader == 1) == 0`, and
+  `ClickHouseKeeperQuorumDegraded` (warning) on
+  `max(ClickHouseAsyncMetrics_KeeperSyncedFollowers) < 2`.
+
+  Two measured details shaped them. `max()` and not `min()`/`avg()`, because only
+  the leader publishes a real synced-follower count and both followers publish 0 —
+  an averaging aggregator would read a healthy quorum as broken. And both carry
+  `OR on() vector(0)`, matching the idiom in `cnpg/cluster-offline.yaml`, because
+  `count()` over an empty result set yields no series at all: without the guard
+  the rules would go silent during the exact total-loss outage they exist for,
+  which is the same defect the Bugfix entry below repairs. Verified against a
+  deliberately nonexistent metric name — the guarded form returns 0 and fires.
+
+  Both `for: 5m`, deliberately equal so a total quorum loss lands as one incident
+  rather than a critical followed eight minutes later by a warning. The firing
+  conditions are **not** exercised, and the rules say so: they are proven to
+  return series and proven to stay silent on a healthy quorum, not proven to have
+  paged anyone. Znode count, Keeper latency and outstanding-requests are scraped
+  too and deliberately left alone — no threshold for any of them is guessable on
+  an idle lab, and two alerts that hold up beat four that were invented.
+
+- **ClickHouse schema ownership moved out of the collector, reversing ADR-065's
+  central decision before it shipped.** Exporter-owned DDL cannot produce a
+  complete schema at three replicas: `CREATE ... ON CLUSTER` issued at collector
+  startup never reaches a host that joins the distributed-DDL queue later, that
+  host skips the earlier entries permanently, and `IF NOT EXISTS` makes every
+  retry a no-op. Measured on two fresh Kind bring-ups — schema on **1 of 3**
+  replicas, then **2 of 3** after the Flux ordering was fixed, with six pods
+  `Running` and every table present on whichever replica the collector happened
+  to talk to. `system.replicas` reporting fewer copies than the topology claimed
+  was the only signal, and only a cross-replica read exposed it. The exporter's
+  own README recommends `create_schema: false` for production and names the
+  failure: *"This approach prevents race conditions during startup."*
+  As built now: a `clickhouse-schema` Job with its DDL committed in
+  `configs/clickhouse-schema/` creates the `otel` database as
+  **`ENGINE = Replicated`** on each replica individually — no `ON CLUSTER`, so
+  the cluster-wide DDL queue is never involved — then creates the tables once and
+  lets the database's own Keeper log propagate them, which is also what makes a
+  future replica addition initialise its own tables instead of silently having
+  none. The collector runs `create_schema: false`; `cluster_name`,
+  `table_engine`, `ttl` and the `distributed_ddl_task_timeout` DSN parameter are
+  gone because all four only fed the DDL path, and the 90-day TTL now lives in
+  the committed DDL where it can be reviewed. Two things the platform wanted
+  anyway come with it: the collector no longer risks the whole telemetry plane on
+  a restart during a ClickHouse outage, and `ALTER` finally has an owner. The new
+  cost, recorded in the ADR: the committed schema must track the exporter's
+  INSERT contract, so a collector image bump means re-checking upstream
+  `logs_insert.sql` / `traces_insert.sql` — a mismatch fails at insert time under
+  traffic, not at apply time.
+
+- **The ClickHouse observability store is replicated: 1 shard x 3 replicas on a
+  3-node ClickHouse Keeper quorum.** One lost PVC used to erase 90 days of edge
+  access logs — ClickHouse-only since ADR-061 — and every long-retention trace;
+  the tracing architecture doc recorded that as an accepted gap in the words
+  *"a lost volume is lost traces."* It is now a failover. The `otel` tables are
+  `ReplicatedMergeTree` in a `Replicated` database, created by the
+  `clickhouse-schema` Job from DDL committed to git — see the schema-ownership
+  entry above, which is the same change viewed from the other side
+  ([RFC-0028](docs/proposals/rfc/RFC-0028/) /
+  [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/)).
+  Three fixes landed with it because without them the gate would have passed on
+  false evidence: the wave health-checked **one** StatefulSet, so `wait: true`
+  reported Ready on one replica of three and released `tracing-local` early; the
+  Keeper **CRD was not health-checked**, so the wave could race the CRD it
+  needs; and `make validate` **never built** the ClickHouse overlay, so a
+  malformed CR would have passed validation and failed on the cluster.
+  The engine-native `:9363` endpoint is finally scraped, per pod — deferred to a
+  "quick-win PR" that turned out never to have been created, which had left
+  `ClickHouseMetrics_ReadonlyReplica`, named in the RFC's own rollout watch
+  list, with no series at all. Alerts follow the new failure shape:
+  `ClickHouseServerUnreachable` is now the warning-level
+  `ClickHouseReplicaUnreachable` (one of three, peers still serving) with a new
+  critical `ClickHouseAllReplicasUnreachable` carrying the page, plus
+  `ClickHouseZooKeeperExceptions` (re-enabled — written for exactly this
+  topology and commented out until it existed) and `ClickHouseReadonlyReplica`,
+  which catches the failure nothing else notices: a replica that lost its Keeper
+  session keeps answering reads while silently refusing writes. Both carry
+  `VERIFY-AT-KIND` markers, because neither series has ever been observed here.
+  Accepted costs: memory and storage triple, and the committed schema must track
+  the exporter's INSERT contract across collector upgrades. The two costs this
+  entry originally listed — DDL in the collector's `start()` and an exporter that
+  never `ALTER`s — were removed by the schema-ownership change above.
+  local-stack stays single-node with no keeper.
 
 - **ADR-061: the edge's logs are routed by class.** The access log — an
   attributes-only record LogsQL free-text could never see, and the noisiest
@@ -804,6 +924,15 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Database documentation now separates PostgreSQL internals, deployed truth,
+  operations, and reference material.** Added `docs/databases/README.md`, a
+  vendor-neutral fundamentals path for process, memory, storage, WAL, MVCC,
+  query execution, and replication, plus canonical platform pages and semantic
+  runbook names. Promoted the useful backup-tool comparison, retired the mixed
+  homelab archive and duplicate fundamentals, migrated repository links, and
+  removed the old numbered filenames. Current facts were re-verified against
+  the CNPG, Barman, pooler, role, and extension manifests.
+
 - **The SSO-client procedures that lived only in one session are now docs**
   (owner review of the flux-web rollout: end state clean, process messy — the
   live-fix tooling existed nowhere). `keycloak.md` gains "Add a confidential
@@ -864,6 +993,21 @@ Skeleton (copy what you need):
   Fifteen inbound `#platform-pipeline`/`#troubleshooting` links retargeted.
 
 #### Proposals
+
+- **RFC-0028 is `Accepted` and ADR-065 is created at `Accepted` with it.**
+  [ADR-065](docs/proposals/adr/ADR-065-clickhouse-replicated-topology/) carries
+  the one decision the RFC frames — 1x3 replicated ClickHouse on a Keeper
+  quorum. It was created stating exporter-owned schema and **amended the same
+  day**, once implementation measured that option leaving replicas without a
+  schema; the migration Job it had recorded as "not wrong, just early" came due
+  immediately, and both of its advantages — the `ALTER` lifecycle and startup
+  decoupling — are now delivered rather than deferred.
+  Implementation ships in the same pull request, so the gate that proves the
+  topology is also the gate that closes the ADR's adoption. Two RFC defects
+  fixed on the way through: its index row had the status sitting in the
+  Priority column and the row itself sat out of numeric order in an index that
+  declares itself number-ordered, and its topology diagram carried
+  non-English node labels.
 
 - **RFC-0028 research gate passed and the README authored at `provisional`,
   the same day it opened.** The owner resolved every open question in-session
@@ -1997,6 +2141,23 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **The `clickhouse-local` wave gated on nothing, and had never gated on
+  anything.** `wait` and `healthChecks` are mutually exclusive in Flux and
+  `wait` wins, so `wait: true` waited on the health of what the overlay applies
+  — two custom resources whose status kstatus cannot assess, and therefore calls
+  Current immediately. Measured on a fresh Kind bring-up: **the wave reconciled
+  in 371ms and reported success while zero StatefulSets existed**; the operator
+  created the first one a minute later, and `tracing-local` applied on that green
+  light. The single health check the wave carried before this was inert for the
+  same reason. What that cost, once the store had three replicas: the collector
+  ran `CREATE ... ON CLUSTER` before replicas 1 and 2 joined the
+  distributed-DDL queue, a host that joins later skips earlier entries, and
+  `IF NOT EXISTS` makes every retry a no-op — so the `otel` schema existed on
+  replica 0 alone, permanently and silently, while six pods read `Running` and
+  every table read `ReplicatedMergeTree`. Dropping `wait` is what makes health
+  checks on operator-created StatefulSets evaluate at all. The trap is now a
+  gotcha in `AGENTS.md`, because any wave that applies only CRs can hit it.
+
 - **RustFS memory limit 1Gi → 2Gi — the 422s came back, as OOM this time.**
   Live on 2026-08-25: RustFS OOMKilled in a loop (Last State) while its
   scanner swept the accumulated `pyroscope-profiles` segment folders during a
@@ -2095,9 +2256,72 @@ Skeleton (copy what you need):
   `PostgresBackupMetricsMissing` absent-series alert fires when a writable
   cluster stops exposing the plugin series (broken plugin/sidecar/scrape —
   the failure mode the freshness alert cannot see). Alert catalog re-derived to
-  219 (§4 to 55 — the by-domain figures had drifted ±1); `builtin-metrics.md`
+  224 (222 deployed, 216 able to fire; §4 to 55); `builtin-metrics.md`
   documents the plugin metric set and marks the collector backup metrics
   superseded.
+
+- **Three ClickHouse alerts could never fire, and vmalert reported all three as
+  healthy.** Pasting every expression in the group verbatim into the
+  VictoriaMetrics query API found three returning an empty vector on every
+  evaluation since the day they were written:
+  `ClickHouseServerErrorsElevated` named `chi_clickhouse_system_errors_value`,
+  which does not exist; `ClickHouseDiskAlmostFull` and `ClickHouseDiskCritical`
+  divided `chi_clickhouse_metric_DiskFreeBytes`, which carries the label
+  `disk="default"`, by a sum containing `chi_clickhouse_metric_DiskDataBytes`,
+  which carries no `disk` label at all — and PromQL matches two vectors only when
+  their label sets agree. Effective coverage was 9 of 12, not 12.
+
+  The errors rule is re-pointed at `ClickHouseErrorMetric_ALL` from the `:9363`
+  scrape (a real counter, measured at 137/226/220 across the replicas) and moved
+  from a fleet-wide `sum` to `max by (replica)`. That changes what the alert
+  means, so it is stated in the rule rather than smuggled in: three replicas at
+  3/s each no longer trips it, and the trade buys the only answer worth having at
+  three replicas — which one is spraying errors. The disk pair now divides by
+  `DiskTotalBytes`, whose labels do match, and both summaries were retitled to say
+  **node filesystem**: on `rancher.io/local-path` the PVs are hostPath with no
+  quota, so `DiskTotalBytes` reads 507 GiB identically on all three replicas
+  rather than the 10Gi each PVC requests. The old formula was wrong on its own
+  terms too — `Free / (Data + Free)` would have sat near 0.9998 forever even with
+  matching labels. The stale "30-day TTL" and "expand the PVC" advice went with
+  it; the table TTL is 90 days and `allowVolumeExpansion` is unset.
+
+  This is the failure class the `VERIFY-AT-KIND` convention exists for, and three
+  sibling rules were deleted for it on 2026-08-22. These are repaired rather than
+  deleted because working names existed this time. vmalert offers no help
+  whatsoever here: a rule matching nothing reports `state=inactive` with an empty
+  `lastError`, character for character identical to a healthy rule, and
+  `make validate` does not lint rules. The group header now records the two-form
+  check — unthresholded must return series, complete must return nothing on a
+  healthy store — as the only test that exists.
+
+- **The local-stack twin of `ClickHouseServerErrorsElevated` was reporting exactly
+  twice the real error rate.** Its expression summed
+  `{__name__=~"ClickHouseErrorMetric_.+"}`, a regex that matches the aggregate
+  `ClickHouseErrorMetric_ALL` as well as every individual error code — so it added
+  the total on top of its own parts. Measured on the cluster twin: 440/452/274 for
+  the regex sum against 220/226/137 for `_ALL` alone. Now reads the total
+  directly, which is also cheaper: the family carries roughly 737 names.
+
+- **Six alerts outside ClickHouse cannot fire on Kind either; documented rather
+  than deleted.** `KubePersistentVolumeFillingUp` and its critical twin, plus
+  `CNPGClusterLowDiskSpace{Warning,Critical}` for both database clusters, all read
+  `kubelet_volume_stats_*`, which returns zero series platform-wide.
+  `KubeletTooManyPods` is inert for the same reason via a different missing
+  series. The scrape is not at fault: VMNodeScrape `kubelet-volume-stats` targets
+  `/metrics` with a keep-filter that matches these names, and
+  `kubelet_running_pods` — kept by that same filter — arrives on all four nodes.
+  Kubelet simply publishes no volume stats for hostPath volumes, which is what
+  `local-path` PVs are; asking it directly returns zero matching lines.
+
+  Kept, unlike the rules deleted in August: those named series that exist nowhere,
+  while these are standard Kubernetes names that populate on any cluster whose CSI
+  driver implements `NodeGetVolumeStats`. Deleting them would trade a local blind
+  spot for a real one everywhere else. The consequence is recorded plainly in the
+  catalog because it is worse than the ClickHouse half: **the platform has no
+  working PVC-level disk signal**, and the databases therefore have no disk
+  alerting at all. `KubeNodeDiskPressure` still works and is the only disk alert
+  that can fire here today. The YAML notes sit in chart-generated files that a
+  re-render will erase, so the durable record is in the alert catalog.
 
 - **The Temporal dashboard's SDK half was blank on the cluster — vmagent was
   overwriting the SDK's own `namespace` label.** The RFC-0014 D-3 relabel rule
@@ -2417,26 +2641,24 @@ Skeleton (copy what you need):
 
 #### Databases
 
-- **The backup/DR docs promised a recovery chain the manifests never built —
-  eight files corrected against as-built reality** (Kubernetes 1.36 research,
-  CNPG backup/restore/DR audit). The recurring false claim: `product-db-replica`
-  "keeps its own backups for independent recovery" — the replica archives WAL
-  under its own prefix but has **no** `Backup`/`ScheduledBackup`, so nothing
-  anchors that chain and restores must come from the `product-db` prefix
-  (`006-backup-strategy.md`, `010.1-rpo-rto-planning.md`,
-  `postgres-backup-restore.md`, `cnpg-dr-replica-bootstrap.md`,
-  `kubernetes/infra/configs/databases/README.md`). Unsafe commands fixed:
-  `platform-db` and post-RustFS-recovery manual backups gained the mandatory
-  `--method plugin --plugin-name barman-cloud.cloudnative-pg.io` flags (the bare
-  command fails on plugin-backed clusters — proven in Drill A), and
-  `005-ha-dr-deep-dive.md`'s `kubectl cnpg promote product-db-replica` was
-  replaced with the real mechanism (`spec.replica.enabled: false`, one-way,
-  GitOps-committed; `010.4` promotion/cut-over steps are now Flux-safe). Also:
-  `30d`/`7d` described as Barman recovery windows (not retention), WAL examples
-  recomputed for the configured 64MB `walSegmentSize` (docs assumed 16MB),
-  `003.1`/`010.1` record the 2026-08-07 product-db PITR drill (2m12s) while
-  keeping the platform-db/DR-promotion evidence gaps explicit, and the DR
-  topology is labeled a mechanism test, not production DR.
+- **Three backup/DR claims the docs restructure left behind.** A CNPG
+  backup/restore/DR audit (Kubernetes 1.36 research) found ten drifted claims;
+  the `docs/databases` restructure independently fixed six of them, and these
+  three survived it. (1) `disaster-recovery.md` still said the plugin migration
+  was "not fully production-accepted until a plugin-backed on-demand backup and
+  restore/PITR drill are completed and recorded" and cited only the switchover
+  record — while `runbooks/restore-and-failover-drills.md` records exactly that
+  evidence as DR-2026-08-A (product-db PITR, 2026-08-07, measured RTO 2 m 12 s)
+  and declares the gate passed; the two pages contradicted each other, and the
+  remaining gaps are narrower than stated (platform-db restore, DR-promotion
+  rehearsal, cadence). (2) DR promotion in `runbooks/emergency-recovery.md` was
+  written as a bare live manifest edit — Flux owns that manifest and reverts it
+  on the next reconcile, so the runbook now commits to Git or suspends
+  `databases-cnpg-dr-local` first, reconciles `pgdog-product` on cut-over, and
+  states that promotion is one-way. (3) `30d`/`7d` were described as retention;
+  they are Barman **recovery windows**, and the difference matters most for the
+  DR prefix — deletion is only ever triggered by a backup being retired, so a
+  prefix holding WAL and no base backup never gets a cleanup pass.
 
 - **auto_explain plans never reached their VictoriaLogs stream — every plan was
   silently landing in the `pg_parse_failures` debug sink.** `platform-db` and

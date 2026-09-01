@@ -1,14 +1,14 @@
 # Emergency Recovery — Start Here
 
-Child playbook of the [PostgreSQL Disaster Recovery Plan](./010-drp.md). When a
+Child playbook of the [PostgreSQL Disaster Recovery Plan](../disaster-recovery.md). When a
 database is down or producing bad data, **start on this page.** It triages the
 symptom, routes you to the right recovery path, and chains the procedures the DRP
 and deep dives describe — it does not replace them. The rehearsed version of every
-step here lives in [010.2 drills](./010.2-restore-and-failover-drills.md); a real
+step here lives in [restore and failover drills](./restore-and-failover-drills.md); a real
 incident is a drill you did not get to schedule.
 
 > First action, always: **declare the incident** and name an incident commander
-> (IC) and database recovery owner (per [010-drp.md ownership](./010-drp.md#ownership)).
+> (IC) and database recovery owner (per [disaster-recovery.md ownership](../disaster-recovery.md#ownership)).
 > Recovery decisions are the IC's go/no-go, not the first responder's.
 
 ## 0. Triage (first 5 minutes)
@@ -27,7 +27,7 @@ HA failover and DR promotion **replicate** a bad write; only PITR undoes it.
 
 ## Decision tree
 
-Mirrors [010-drp.md → Recovery Decision Flow](./010-drp.md#recovery-decision-flow).
+Mirrors [disaster-recovery.md → Recovery Decision Flow](../disaster-recovery.md#recovery-decision-flow).
 
 ```mermaid
 flowchart TB
@@ -76,32 +76,41 @@ replaying. **Path:** DR promotion. RPO ≤ `archive_timeout` (5 min).
 - Primary cluster is confirmed down or intentionally frozen — no split-brain risk.
 - DR replica replay point is within the incident RPO.
 
-Promote (the replica cluster stops recovery and becomes read-write). **GitOps
-first:** Flux owns this manifest, so a live `kubectl edit` gets reverted on the
-next reconcile. Either commit the change to Git and let Flux apply it, or — if
-Git is unreachable during the incident — suspend the owning Kustomization
-(`flux suspend kustomization databases-cnpg-dr-local`) before editing live, and
-reconcile the committed change afterwards:
+Promote (the replica cluster stops recovery and becomes read-write). **Flux owns
+this manifest** — a live `kubectl edit` is reverted on the next reconcile, so
+either commit the change to Git and let Flux apply it, or, if Git is unreachable
+mid-incident, suspend the owning Kustomization first and reconcile the commit
+afterwards:
 
+```bash
+flux suspend kustomization databases-cnpg-dr-local -n flux-system   # only if editing live
+```
 ```yaml
-# product-db-replica manifest (committed to Git, or applied after suspending Flux)
+# product-db-replica manifest — committed to Git, or applied after the suspend above
 spec:
   replica:
-    enabled: false      # changed from true → triggers promotion (irreversible: re-enabling requires re-cloning)
+    enabled: false      # changed from true → triggers promotion
 ```
+
+Promotion is **one-way**: turning the cluster back into a replica means deleting
+it and re-bootstrapping from the then-current primary.
+
 ```bash
 kubectl cnpg status product-db-replica -n product    # expect: Primary, accepting connections
 ```
 
-Cut PgDog over and smoke test (same GitOps rule — commit the HelmRelease change
-or suspend its Kustomization first):
+Cut PgDog over and smoke test — same rule, and the pooler re-reads `valuesFrom`
+only on reconcile (see [pooler-operations.md](pooler-operations.md)):
 
 ```yaml
 # pgdog-product HelmRelease (product tier DR promotion)
 host: product-db-replica-rw.product.svc.cluster.local
 ```
+```bash
+flux reconcile helmrelease pgdog-product -n product
+```
 
-Detailed sequence: [010-drp.md → DR promotion outline](./010-drp.md#dr-promotion-outline).
+Detailed sequence: [disaster-recovery.md → DR promotion outline](../disaster-recovery.md#dr-promotion-outline).
 
 ## Scenario 3 — bad data / corruption (DROP, bad migration)
 
@@ -123,7 +132,7 @@ kubectl get cluster -n product -w
 
 Validate schema + row counts on the restored cluster, then decide cut-over vs
 selective data extraction with the IC. Full steps:
-[postgres-backup-restore.md → Point-in-time recovery](./runbooks/postgres-backup-restore.md#point-in-time-recovery).
+[backup-restore.md → Point-in-time recovery](./backup-restore.md#point-in-time-recovery).
 
 ## Scenario 4 — total loss (primary + DR replica gone)
 
@@ -153,8 +162,7 @@ recovery story is degraded:
 - New base backups and DR replica recovery are blocked until RustFS returns.
 
 Restore RustFS first, confirm `ContinuousArchiving=True` recovers and the backlog
-drains, then take a fresh on-demand backup (the method flags are mandatory —
-the bare command targets the retired in-tree method and fails):
+drains, then take a fresh on-demand backup:
 
 ```bash
 kubectl cnpg backup product-db -n product \
@@ -162,7 +170,7 @@ kubectl cnpg backup product-db -n product \
 ```
 
 This scenario is why co-located RustFS is the single biggest DR gap — see
-[010.3 cross-region DR](./010.3-cross-region-dr.md).
+[planned cross-region DR](../cross-region-dr.md).
 
 ## Escalation & communication
 
@@ -173,17 +181,16 @@ This scenario is why co-located RustFS is the single biggest DR gap — see
 ## After recovery — capture evidence
 
 Recovery is not done until it is recorded. Fill in the
-[010.2 evidence log](./010.2-restore-and-failover-drills.md#evidence-log-template)
-and the [010-drp.md evidence checklist](./010-drp.md#compliance-and-evidence-checklist):
+[drill evidence log](./restore-and-failover-drills.md#evidence-log-template)
+and the [disaster-recovery.md evidence checklist](../disaster-recovery.md#compliance-and-evidence-checklist):
 incident ID, timestamps, backup ID, recovery target, validation output, measured
-RTO/RPO, and follow-ups. Feed gaps back into the [drill schedule](./010.2-restore-and-failover-drills.md#drill-calendar).
+RTO/RPO, and follow-ups. Feed gaps back into the [drill schedule](./restore-and-failover-drills.md#drill-calendar).
 
 ## References
 
-- [010-drp.md](./010-drp.md) — parent DRP, decision flow, ownership, evidence checklist.
-- [010.2-restore-and-failover-drills.md](./010.2-restore-and-failover-drills.md) — rehearsed versions of these procedures.
-- [005-ha-dr-deep-dive.md](./005-ha-dr-deep-dive.md#8-practical-commands-reference) — command + promotion reference.
-- [postgres-backup-restore.md](./runbooks/postgres-backup-restore.md) — full backup/restore runbook.
+- [disaster-recovery.md](../disaster-recovery.md) — parent DRP, decision flow, ownership, evidence checklist.
+- [Restore and failover drills](./restore-and-failover-drills.md) — rehearsed versions of these procedures.
+- [Backup and restore](./backup-restore.md) — full backup/restore runbook.
 
 ---
-_Last updated: 2026-08-31 — DR promotion and PgDog cut-over made GitOps-safe (commit or suspend Flux first), post-RustFS-recovery backup command gained the mandatory plugin flags._
+_Last updated: 2026-09-01 — DR promotion and the PgDog cut-over are now GitOps-safe (commit, or `flux suspend` then reconcile), and the one-way nature of promotion is stated._

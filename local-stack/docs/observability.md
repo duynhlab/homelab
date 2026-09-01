@@ -128,7 +128,7 @@ Keycloak alert set.
 | ClickHouse operator (Altinity 0.27.3) | ✅ | N/A | Compose runs the server only |
 | Operator metrics (`clickhouse_operator_*`) | ✅ `:8888/metrics` | N/A | cannot exist locally |
 | Metrics-exporter (`chi_clickhouse_*`) | ✅ `:8888/chi` | N/A | cannot exist locally |
-| Server built-in `/metrics` (`ClickHouseMetrics_*` …) | ❌ off at 1×1, by decision | ✅ `:9363` | the local engine view — see §5 |
+| Server built-in `/metrics` (`ClickHouseMetrics_*` …) | ✅ `:9363`, PodMonitor per replica (RFC-0028) | ✅ `:9363` | local was first; the cluster followed when three replicas made per-pod series necessary — see §5 |
 | Collector self-scrape (`otelcol_*`) | ✅ ServiceMonitor | ✅ vmagent job | identical series names; local board `otel-collector-health-local` |
 | Edge scrape (`envoy_*` + control plane) | ✅ ServiceMonitor + PodMonitor | ✅ vmagent jobs `envoy-gateway` + `envoy` | data plane via the bootstrap-merged `:19005` listener |
 | Temporal server metrics (`service_*`, `persistence_*`) | ✅ 4 chart ServiceMonitors | ✅ vmagent job `temporal` (`:8000`) | enabled by `PROMETHEUS_ENDPOINT` in compose; validates the 3 server alerts |
@@ -153,10 +153,10 @@ Keycloak alert set.
 | Which service is slow / erroring? | VictoriaMetrics | `spanmetrics` connector | identical both stacks |
 | Where did a request go? | VictoriaTraces | `otlphttp/victoriatraces` | identical |
 | Full-text log search / correlation | VictoriaLogs | `otlphttp/victorialogs` + Vector | identical sink; edge contributes access logs via Vector only |
-| Long-retention SQL over logs+traces | ClickHouse | `clickhouse` exporter (`create_schema`) | identical |
+| Long-retention SQL over logs+traces | ClickHouse | `clickhouse` exporter | **schema owner differs**: local keeps `create_schema: true` (single node, no race to have); the cluster runs `create_schema: false` with a bootstrap Job owning the DDL — RFC-0028. Same tables either way |
 | Continuous profiles | Pyroscope | pushed by services | identical |
 | Is the collector / ClickHouse itself up? | VictoriaMetrics | **vmagent scrape** | cluster: operator CRs · local: static config |
-| Are inserts / merges / disk failing? | VictoriaMetrics | ClickHouse `:9363` (local) / metrics-exporter (cluster) | same alert names, different series — §5 |
+| Are inserts / merges / disk failing? | VictoriaMetrics | ClickHouse `:9363` (both, per-pod on the cluster since RFC-0028) / metrics-exporter (cluster) | same alert names, different series — §5 |
 
 ## 5. The engine-health slice, as built
 
@@ -177,11 +177,16 @@ the current server's supported options — `status_info` no longer exists and
 must not be re-added. `errors` is load-bearing: it is what lets the cluster's
 `ClickHouseServerErrorsElevated` rule map locally.
 
-The cluster deliberately does **not** enable this endpoint at one shard × one
-replica (the Altinity exporter's `/chi` already carries the engine signals
-there); enabling it per pod is recorded as part of any scale-out
+The cluster did not enable this endpoint while it ran one shard × one replica —
+the Altinity exporter's `/chi` carried the engine signals and a second scrape
+would only have duplicated them. RFC-0028 changed that: with three replicas the
+per-pod series are what say *which* replica is sick, and
+`ClickHouseMetrics_ReadonlyReplica` has no equivalent in the exporter's view at
+all, so the cluster now scrapes the same endpoint through
+`podmonitors/clickhouse-server.yaml`
 ([clickhouse hub § Metrics & alerting](../../docs/observability/clickhouse/README.md#metrics--alerting)).
-Locally there is no operator, so this endpoint **is** the engine view.
+Locally there is still no operator, so this endpoint **is** the engine view —
+and local-stack stays single-node with no keeper, a deliberate divergence.
 
 ### 5B. vmagent + vmalert
 

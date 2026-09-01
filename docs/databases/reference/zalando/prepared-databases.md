@@ -1,7 +1,7 @@
 # Runbook: Zalando `preparedDatabases` CreateFailed
 
 > **Historical / reference.** The platform migrated all Postgres from the
-> Zalando operator to CloudNativePG (see 002/003). Zalando is no longer deployed
+> Zalando operator to [CloudNativePG](../../cloudnativepg.md). Zalando is no longer deployed
 > here — this doc is kept for learning.
 
 ## Table of Contents
@@ -239,7 +239,8 @@ Remove the entire `preparedDatabases` section from the manifest. Handle extensio
 - Extensions must be installed through golang-migrate migrations or manually
 - `pg_partman` (non-trusted) requires superuser and cannot be installed via golang-migrate
 
-**Status**: This is the currently applied fix. The `preparedDatabases` section is commented out in [instance.yaml](../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml).
+**Historical status**: This was the applied fix. The retired manifest lived at
+`kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`.
 
 ---
 
@@ -439,7 +440,7 @@ If `pg_partman` is listed in `extwlist.extensions`, the database owner can creat
 3. If you need the full `preparedDatabases` role hierarchy, do NOT use `namespace.username` format in `databases`. Use `ClusterExternalSecret` or similar for cross-namespace credential delivery instead.
 4. Always test `preparedDatabases` changes on a fresh cluster (delete and recreate) because the operator only runs `preparedDatabases` on first creation, not on updates.
 
-> **Note:** The same first-creation-only behavior applies to the databases under `spec.databases` — on a failed first init (e.g. `CreateFailed` from a slow cold boot) they are never (re)created, so app migrations fail with `database "…" does not exist`. After removing `preparedDatabases` (Fix 1), the per-service databases are additionally guaranteed by the idempotent `ensure-databases` Job in each Zalando cluster dir (`databases-local` wave), which connects as superuser and runs guarded `CREATE DATABASE … OWNER …`. See [supporting-shared-db/ensure-databases-job.yaml](../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/ensure-databases-job.yaml) and [003.2 Zalando operator deep dive](../003.2-operator-zalando.md#first-init-fragility-and-the-ensure-databases-job).
+> **Note:** The same first-creation-only behavior applies to the databases under `spec.databases` — on a failed first init (e.g. `CreateFailed` from a slow cold boot) they are never (re)created, so app migrations fail with `database "…" does not exist`. After removing `preparedDatabases` (Fix 1), the per-service databases are additionally guaranteed by the idempotent `ensure-databases` Job in each Zalando cluster dir (`databases-local` wave), which connects as superuser and runs guarded `CREATE DATABASE … OWNER …`. See `kubernetes/infra/configs/databases/clusters/supporting-shared-db/ensure-databases-job.yaml` (retired) and [003.2 Zalando operator deep dive](./operator.md#first-init-fragility-and-the-ensure-databases-job).
 
 ---
 
@@ -449,8 +450,8 @@ If `pg_partman` is listed in `extwlist.extensions`, the database owner can creat
 - [Zalando Postgres Operator: From databases to preparedDatabases](https://opensource.zalando.com/postgres-operator/docs/user.html#from-databases-to-prepareddatabases)
 - [Zalando Postgres Operator: Cross-namespace secrets](https://opensource.zalando.com/postgres-operator/docs/user.html#manifest-roles)
 - [PostgreSQL 15 Release Notes: Privilege changes](https://www.postgresql.org/docs/15/release-15.html)
-- [Instance manifest](../../../kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml)
-- [Extensions management guide](../009-extensions.md)
+- Retired manifest: `kubernetes/infra/configs/databases/clusters/supporting-shared-db/instance.yaml`
+- [Extensions management guide](../../extensions.md)
 
 ---
 _Last updated: 2026-07-11_

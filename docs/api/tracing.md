@@ -44,13 +44,13 @@ Full env table: [Application observability § Environment variables](./observabi
 
 Configured inside `obsx.SetupObservability` as `ParentBased(TraceIDRatioBased(rate))`:
 
-- **Production (cluster):** ~10% head sampling at the edge and in services — statistically valid, ~90% storage savings.
+- **Production (cluster):** **50%** head sampling at the edge — and the edge is the root, so that is what governs any request it proxies. Services keep `OTEL_SAMPLE_RATE=0.1`, which applies only to traces a service starts itself. Roughly **half** the storage of full sampling.
 - **Local-stack:** `OTEL_SAMPLE_RATE=1.0` for complete demo traces.
 - **No ENV auto-mapping** — set `OTEL_SAMPLE_RATE` explicitly per environment.
 
 | Environment | Recommended rate | Use case |
 |-------------|------------------|----------|
-| Production | 10% | Cost-effective, statistically valid |
+| Production (edge, baseline) | 50% | Half the volume of full sampling, and the edge decides for the whole trace |
 | Staging | 50% | More coverage for testing |
 | Development / local-stack | 100% | Full debugging visibility |
 

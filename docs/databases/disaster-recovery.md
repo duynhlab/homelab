@@ -5,36 +5,33 @@ homelab. The homelab is the concrete implementation, but the structure is
 written as a production-ready operating standard that can be applied to a real
 environment after the known gaps are closed.
 
-Use this page as the system of record for PostgreSQL HA, DR, RPO, RTO, PITR,
-standby patterns, restore drills, and recovery evidence. Use the deep dives for
-implementation details:
+Use this page as the system of record for recovery paths and DR topology.
+Targets and measured evidence belong to [reliability targets](./reliability-targets.md);
+commands belong to runbooks. Use these pages for supporting detail:
 
-- [004-replication-strategy.md](./004-replication-strategy.md) - sync/async replication and commit behavior.
-- [005-ha-dr-deep-dive.md](./005-ha-dr-deep-dive.md) - CNPG HA/DR internals.
-- [006-backup-strategy.md](./006-backup-strategy.md) - physical backup, WAL archiving, retention, and PITR mechanics.
-- [003.1-operator-cnpg.md](./003.1-operator-cnpg.md) - CloudNativePG operator deep dive.
-- [003.2-operator-zalando.md](./003.2-operator-zalando.md) - Zalando Postgres Operator deep dive.
+- [Replication](./fundamentals/replication.md) - physical/logical replication and commit behavior.
+- [Storage and WAL](./fundamentals/storage-and-wal.md) - WAL, checkpoints, and crash recovery.
+- [Backup policy](./backup-policy.md) - current schedules, retention, and PITR inputs.
+- [cloudnativepg.md](./cloudnativepg.md) - CloudNativePG operator deep dive.
+- [reference/zalando/operator.md](./reference/zalando/operator.md) - Zalando Postgres Operator deep dive.
 
 ### Child playbooks
 
 Operational sub-pages that turn this plan into routine practice and incident response:
 
-- [010.1-rpo-rto-planning.md](./010.1-rpo-rto-planning.md) - per-tier RPO/RTO targets vs as-built, mapped to clusters.
-- [010.2-restore-and-failover-drills.md](./010.2-restore-and-failover-drills.md) - restore/failover drill cadence, roles, and evidence log.
-- [010.3-cross-region-dr.md](./010.3-cross-region-dr.md) - cross-zone/cross-region roadmap (current co-location → independent failure domains).
-- [010.4-emergency-recovery.md](./010.4-emergency-recovery.md) - "start here when it's down" recovery runbook.
+- [reliability-targets.md](./reliability-targets.md) - per-tier RPO/RTO targets vs as-built, mapped to clusters.
+- [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) - restore/failover drill cadence, roles, and evidence log.
+- [cross-region-dr.md](./cross-region-dr.md) - cross-zone/cross-region roadmap (current co-location → independent failure domains).
+- [runbooks/emergency-recovery.md](./runbooks/emergency-recovery.md) - "start here when it's down" recovery runbook.
 
 ## Purpose and Scope
 
 ### Current homelab state
 
-The platform runs three PostgreSQL clusters:
-
-| Cluster | Operator | Namespace | Role |
-|---------|----------|-----------|------|
-| `platform-db` | CloudNativePG | `platform` | 3-node HA cluster for auth, user, notification, shipping, review, and Temporal persistence |
-| `product-db` | CloudNativePG | `product` | Primary CNPG cluster for `product`, `cart`, `order`, `payment` |
-| `product-db-replica` | CloudNativePG | `product` | DR replica cluster following `product-db` via RustFS object-store recovery |
+The authoritative cluster inventory is in [database architecture](./architecture.md).
+For recovery, the important distinction is that `platform-db` and `product-db`
+have local synchronous HA, while only `product-db` has a separate
+object-store-fed replica cluster.
 
 ### Production baseline
 
@@ -59,66 +56,40 @@ architecture. In production, the DR replica and object store should live in
 independent failure domains, with versioning, immutability, and least-privilege
 backup/restore identities.
 
-## Current Database Topology
+## Current Recovery Topology
+
+This diagram answers which recovery mechanisms protect each operational
+cluster. The canonical client and pooler topology remains in
+[database architecture](./architecture.md).
 
 ```mermaid
-flowchart TB
-  subgraph productNs ["Namespace product"]
-    productSvc["Product service"]
-    cartSvc["Cart service"]
-    orderSvc["Order service"]
-    pgdog["PgDog pgdog-product:6432"]
+flowchart LR
+    Platform["platform-db<br/>3-instance synchronous HA"]
+    Product["product-db<br/>3-instance synchronous HA"]
+    PlatformStore[("platform-db<br/>base backups + WAL")]
+    ProductStore[("product-db<br/>base backups + WAL")]
+    DR["product-db-replica<br/>continuous recovery"]
+    PlatformRestore["Isolated restore / PITR"]
+    ProductRestore["Isolated restore / PITR"]
 
-    subgraph cnpgPrimary ["product-db primary cluster"]
-      cnpgPrimaryPod["Primary"]
-      cnpgReplicaA["Replica candidate A"]
-      cnpgReplicaB["Replica candidate B"]
-      cnpgPrimaryPod -->|"streaming WAL"| cnpgReplicaA
-      cnpgPrimaryPod -->|"streaming WAL"| cnpgReplicaB
-    end
+    Platform -->|"archive"| PlatformStore
+    Product -->|"archive"| ProductStore
+    PlatformStore -->|"restore"| PlatformRestore
+    ProductStore -->|"restore"| ProductRestore
+    ProductStore -->|"replay"| DR
 
-    subgraph cnpgDr ["product-db-replica DR cluster"]
-      drPod["Designated primary in recovery"]
-    end
-  end
-
-  subgraph objectStore ["RustFS object store"]
-    primaryBucket["pg-backups-cnpg/product-db"]
-    drBucket["pg-backups-cnpg/product-db-replica"]
-  end
-
-  subgraph otherClusters ["Other CloudNativePG clusters"]
-    platformDb["platform-db 3 nodes HA (sync ANY 1)<br/>auth, user, notification,<br/>shipping, review, temporal"]
-  end
-
-  productSvc --> pgdog
-  cartSvc --> pgdog
-  orderSvc --> pgdog
-  pgdog --> cnpgPrimaryPod
-  cnpgPrimaryPod -->|"base backup and WAL archive"| primaryBucket
-  primaryBucket -->|"restore and WAL replay"| drPod
-  drPod -->|"own backups after bootstrap"| drBucket
+    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    class Platform,Product platform;
+    class PlatformStore,ProductStore data;
+    class DR,PlatformRestore,ProductRestore worker;
 ```
 
-### Live status snapshot
-
-At the time this DRP was written, live cluster inspection showed the
-following (illustrative — re-run the commands below for current values):
-
-| Resource | Status |
-|----------|--------|
-| `product-db` | `Cluster in healthy state`, 3/3 ready, current primary `product-db-1` |
-| `product-db` archiving | `ContinuousArchiving=True` |
-| `product-db` backup | `LastBackupSucceeded=True`, last successful backup `<timestamp>` |
-| `product-db-replica` | `Cluster in healthy state`, 1/1 ready |
-| `platform-db` | CNPG cluster healthy, 3/3 ready |
-
-Use plain `kubectl` fallbacks if the CNPG plugin is not installed:
-
-```bash
-kubectl get cluster,backup,scheduledbackup -A
-kubectl get cluster product-db product-db-replica -n product -o jsonpath='{range .items[*]}{.metadata.name}{" status="}{.status.phase}{" primary="}{.status.currentPrimary}{" ready="}{.status.readyInstances}{"/"}{.status.instances}{"\n"}{end}'
-```
+Runtime health is deliberately not copied into this design page. Inspect it with
+the [emergency recovery](./runbooks/emergency-recovery.md) and
+[backup/restore](./runbooks/backup-restore.md) runbooks; retain measured outcomes
+in the [drill record](./runbooks/restore-and-failover-drills.md).
 
 ## Core DRP Concepts
 
@@ -151,7 +122,7 @@ The correct recovery path is PITR or selective restore, not HA failover.
 | Data class | Example | Production baseline |
 |------------|---------|---------------------|
 | Critical transactional | `order`, cart checkout path | RPO 0 for HA failover; DR RPO bounded by WAL archive interval; RTO measured by drills |
-| Important user-facing | auth, user profiles | Small RPO may be acceptable if documented; restore must be tested |
+| Important user-facing | identity and user profiles | Small RPO may be acceptable if documented; restore must be tested |
 | Supporting/non-critical | notification, shipping metadata, review | RPO/RTO can be looser, but owner must accept impact |
 | Analytics/reporting | reporting clone | Freshness SLA instead of failover RPO |
 
@@ -344,59 +315,20 @@ flowchart TB
   reportingClone --> validate
 ```
 
-## Operational Runbooks and Commands
+## Runbook Ownership
 
-### Verify backup health
+This page owns policy and recovery-path selection. Commands and mutable
+procedures have one operational owner:
 
-```bash
-kubectl get backup,scheduledbackup -n product
-kubectl get cluster product-db -n product -o jsonpath='{.status.conditions}'
-```
+| Situation | Runbook |
+|---|---|
+| Failure mode is not yet known | [Emergency recovery](./runbooks/emergency-recovery.md) |
+| Check backup health, create a backup, or restore/PITR | [Backup and restore](./runbooks/backup-restore.md) |
+| Rehearse failover, restore, or DR promotion | [Restore and failover drills](./runbooks/restore-and-failover-drills.md) |
+| Bootstrap or rebuild the DR replica | [CNPG DR replica bootstrap](./runbooks/cnpg-dr-replica-bootstrap.md) |
 
-Expected:
-
-- Recent `Backup` resources are `completed`.
-- `LastBackupSucceeded=True`.
-- `ContinuousArchiving=True`.
-
-### Verify DR replica health
-
-```bash
-kubectl get cluster product-db-replica -n product -o wide
-kubectl get pods -n product -l cnpg.io/cluster=product-db-replica
-```
-
-Expected:
-
-- Cluster is healthy.
-- One pod is ready.
-- It remains in recovery while `spec.replica.enabled: true`.
-
-### Trigger on-demand backup
-
-If the CNPG plugin is installed (method flags are mandatory on plugin-backed
-clusters):
-
-```bash
-kubectl cnpg backup product-db -n product \
-  --method plugin --plugin-name barman-cloud.cloudnative-pg.io
-```
-
-Plain Kubernetes fallback:
-
-```bash
-kubectl apply -f kubernetes/infra/configs/databases/clusters/product-db/backup/backup-initial.yaml
-kubectl get backup -n product
-```
-
-### PITR drill outline
-
-1. Pick a test timestamp before a known test write or delete.
-2. Create a temporary restore cluster with `bootstrap.recovery.recoveryTarget.targetTime`.
-3. Wait for the restore cluster to become healthy.
-4. Validate schema, row counts, and app smoke tests.
-5. Record start time, end time, backup ID, target timestamp, and final RTO/RPO.
-6. Delete the temporary restore cluster only after evidence is captured.
+The following sequence captures the approval and routing boundary for a DR
+promotion; executable steps remain in the runbooks.
 
 ### DR promotion outline
 
@@ -447,10 +379,13 @@ Capture the following for every restore or DR drill:
 - `product-db-replica` shares the same Kubernetes cluster and namespace as the primary.
 - RustFS shares the homelab failure domain.
 - Restore drills and DR promotions are not yet recorded as recurring evidence —
-  **partly closed**: the first record exists
-  ([DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record), a
-  planned `product-db` switchover), but the cadence and a cross-domain drill log
-  are still missing.
+  **partly closed**: two records exist —
+  [DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) (a
+  planned `product-db` switchover) and
+  [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)
+  (a `product-db` PITR restore, 2026-08-07, measured RTO 2 m 12 s). Still
+  missing: a `platform-db` restore, a DR-promotion rehearsal, the cadence, and a
+  cross-domain drill log.
 - The `kubectl cnpg` plugin **is** installed (v1.30.0). Note it has no
   `switchover` verb — planned switchovers go through
   `kubectl cnpg promote <cluster> <instance>`.
@@ -462,7 +397,9 @@ Capture the following for every restore or DR drill:
 - Move backup object storage to an independent durable service with versioning and object lock.
 - Split backup writer and restore reader credentials.
 - Add monthly restore drills with retained evidence.
-- Complete and record plugin-backed restore/PITR drills after the Barman Cloud Plugin rollout.
+- Record a `platform-db` restore drill and a DR-promotion rehearsal — the
+  plugin-backed PITR path itself is already proven for `product-db` by
+  DR-2026-08-A.
 - Decide whether a **`platform-db-replica`** DR cluster is needed (product line already has `product-db-replica`).
 
 ## Barman Cloud Plugin Current State
@@ -511,9 +448,13 @@ spec:
         serverName: product-db-cluster
 ```
 
-The migration is not fully production-accepted until a plugin-backed on-demand
-backup and restore/PITR drill are completed and recorded. Do not delete existing
-RustFS backup prefixes until that evidence exists.
+The migration **is production-accepted**: a plugin-backed on-demand backup and a
+PITR restore from it are both recorded in
+[DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate)
+(2026-08-07). The retention hold that acceptance carried does not bind here — the
+Kind cluster and its RustFS bucket are rebuilt by every `make up`, and the bucket
+holds only plugin-era prefixes, so there is no surviving in-tree prefix to
+retire. The hold stays meaningful for a durable store ([RFC-0011](../proposals/rfc/RFC-0011/)).
 
 ## References
 
@@ -524,4 +465,4 @@ RustFS backup prefixes until that evidence exists.
 
 ---
 
-_Last updated: 2026-07-17 — RFC-0018: 3 CNPG clusters (platform-db, product-db, product-db-replica); platform tier consolidated with Barman backups including Temporal._
+_Last updated: 2026-09-01 — Known Gaps and the plugin acceptance note now record DR-2026-08-A (product-db PITR, 2026-08-07); the remaining gaps are a platform-db restore, a DR-promotion rehearsal, and drill cadence._

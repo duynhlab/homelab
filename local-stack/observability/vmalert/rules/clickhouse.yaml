@@ -15,9 +15,14 @@ groups:
     interval: 30s
     rules:
       # Locally `up` is the genuine server-liveness signal: vmagent scrapes
-      # the server itself, not a sidecar. Same blast radius as the cluster
-      # rule: the collector's create_schema blocks every collector restart
-      # while this fires.
+      # the server itself, not a sidecar.
+      #
+      # The blast radius is WIDER here than on the cluster, and that is
+      # deliberate: local-stack keeps create_schema: true (one node, no
+      # ON CLUSTER, so no race to avoid), which means the collector still runs
+      # DDL at startup and a dead ClickHouse blocks every collector restart.
+      # The cluster moved that DDL into a bootstrap Job (RFC-0028), so there
+      # the same outage costs only the ClickHouse sink.
       - alert: ClickHouseServerUnreachable
         expr: up{job="clickhouse"} == 0
         for: 5m
@@ -106,10 +111,17 @@ groups:
           description: "The parts_to_delay_insert guard is slowing inserts — the step before rejection."
 
       # system.errors arrives as one series per error name
-      # (ClickHouseErrorMetric_<NAME>) — the local shape of the cluster's
-      # system_errors family. The __name__ regex sums the whole census.
+      # (ClickHouseErrorMetric_<NAME>), plus a ready-made total under the name
+      # ClickHouseErrorMetric_ALL.
+      #
+      # MEASURED 2026-08-31: the `__name__=~"ClickHouseErrorMetric_.+"` regex that
+      # stood here matched _ALL as well as every individual code, so it summed the
+      # total on top of its own parts and reported EXACTLY TWICE the real rate.
+      # On the cluster twin: 440/452/274 for the regex sum against 220/226/137 for
+      # _ALL alone. Reading the total directly is both correct and cheaper — the
+      # family carries ~737 names.
       - alert: ClickHouseServerErrorsElevated
-        expr: sum(rate({__name__=~"ClickHouseErrorMetric_.+"}[5m])) > 5
+        expr: sum(rate(ClickHouseErrorMetric_ALL[5m])) > 5
         for: 10m
         labels:
           severity: info

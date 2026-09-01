@@ -72,6 +72,14 @@ exporters:
   # VictoriaLogs/VictoriaTraces (supplementary OLAP, not a replacement); metrics stay
   # on VictoriaMetrics. ClickHouse native protocol :9000; the contrib exporter
   # auto-creates the otel_logs / otel_traces MergeTree tables (create_schema).
+  #
+  # DELIBERATE DIVERGENCE from the cluster, which runs create_schema: false with a
+  # bootstrap Job owning the DDL (RFC-0028 / ADR-065). The cluster had to move
+  # because ON CLUSTER DDL cannot reach a replica that joins the distributed-DDL
+  # queue late; local-stack is a single node with no cluster and no ON CLUSTER, so
+  # that failure has no local equivalent and the exporter's own bootstrap is the
+  # simplest thing that works. Tables end up the same shape either way — plain
+  # MergeTree here, ReplicatedMergeTree there.
   clickhouse:
     endpoint: tcp://clickhouse:9000?dial_timeout=10s
     database: otel

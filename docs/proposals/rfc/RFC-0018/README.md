@@ -49,7 +49,7 @@ Target inventory: **3 CNPG clusters** (2 operational + 1 DR), **2 PgDog poolers*
 | `product-db` | `product` | 3 (HA) | `pgdog-product` ×3 | Barman | T0 — keep |
 | `product-db-replica` | `product` | 1 (DR) | — | Barman | T0 DR — keep |
 
-Documentation is **internally consistent among canonical hub pages** (`002-database-integration.md`, `010-drp.md`, etc.) but **contradicts legacy runbooks** still describing Zalando WAL-G, `cnpg-db`, and `pgdog-cnpg`. A cluster merge without a **docs gate** would widen that gap.
+Documentation is **internally consistent among canonical hub pages** (`architecture.md`, `disaster-recovery.md`, etc.) but **contradicts legacy runbooks** still describing Zalando WAL-G, `cnpg-db`, and `pgdog-cnpg`. A cluster merge without a **docs gate** would widen that gap.
 
 ### Goals
 
@@ -337,7 +337,7 @@ rg 'auth-db|shared-db|temporal-db|pgdog-auth|pgdog-shared' docs/ kubernetes/ \
   --glob '!**/003.2*' --glob '!**/zalando*'
 
 # Hubs mention new topology
-rg 'platform-db|pgdog-platform' docs/databases/002-database-integration.md docs/platform/setup.md
+rg 'platform-db|pgdog-platform' docs/databases/architecture.md docs/platform/setup.md
 ```
 
 Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram workflow).
@@ -350,14 +350,14 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 | File | Primary change |
 |------|----------------|
-| [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) | 3-cluster / 2-pooler hub; platform-db table; Mermaid |
-| [`docs/databases/004-replication-strategy.md`](../../../databases/004-replication-strategy.md) | Cluster inventory |
-| [`docs/databases/006-backup-strategy.md`](../../../databases/006-backup-strategy.md) | Barman prefixes; temporal on platform-db |
-| [`docs/databases/008-pooler.md`](../../../databases/008-pooler.md) | 2 poolers |
-| [`docs/databases/010-drp.md`](../../../databases/010-drp.md) | Cluster table; drills |
-| [`docs/databases/010.1-rpo-rto-planning.md`](../../../databases/010.1-rpo-rto-planning.md) | Tier mapping |
-| [`docs/databases/010.2-restore-and-failover-drills.md`](../../../databases/010.2-restore-and-failover-drills.md) | Drill D → platform-db |
-| [`docs/databases/010.4-emergency-recovery.md`](../../../databases/010.4-emergency-recovery.md) | Pooler names; platform cutover |
+| [`docs/databases/architecture.md`](../../../databases/architecture.md) | 3-cluster / 2-pooler hub; platform-db table; Mermaid |
+| [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md) | Cluster inventory and recovery topology |
+| [`docs/databases/backup-policy.md`](../../../databases/backup-policy.md) | Barman prefixes; temporal on platform-db |
+| [`docs/databases/poolers.md`](../../../databases/poolers.md) | 2 poolers |
+| [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md) | Cluster table; drills |
+| [`docs/databases/reliability-targets.md`](../../../databases/reliability-targets.md) | Tier mapping |
+| [`docs/databases/runbooks/restore-and-failover-drills.md`](../../../databases/runbooks/restore-and-failover-drills.md) | Drill D → platform-db |
+| [`docs/databases/runbooks/emergency-recovery.md`](../../../databases/runbooks/emergency-recovery.md) | Pooler names; platform cutover |
 | [`docs/platform/setup.md`](../../../platform/setup.md) | Expected cluster state |
 | [`docs/platform/application-delivery.md`](../../../platform/application-delivery.md) | Domain → DB map |
 | [`docs/api/microservices.md`](../../../api/microservices.md) | Per-service DB endpoints |
@@ -369,7 +369,7 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 | [`docs/observability/metrics/postgresql/README.md`](../../../observability/metrics/postgresql/README.md) | Inventory |
 | [`docs/observability/alerting/alert-catalog.md`](../../../observability/alerting/alert-catalog.md) | Rule ownership |
 | [`docs/observability/alerting/README.md`](../../../observability/alerting/README.md) | Index sync |
-| [`docs/databases/runbooks/pgdog-operations.md`](../../../databases/runbooks/pgdog-operations.md) | Add pgdog-platform |
+| [`docs/databases/runbooks/pooler-operations.md`](../../../databases/runbooks/pooler-operations.md) | Add pgdog-platform |
 | [`docs/README.md`](../../README.md) | Fix PgDog runbook index (line ~292) |
 | [`kubernetes/infra/configs/databases/README.md`](../../../../kubernetes/infra/configs/databases/README.md) | Infra hub |
 | [`kubernetes/infra/configs/databases/clusters/README.md`](../../../../kubernetes/infra/configs/databases/clusters/README.md) | Cluster table |
@@ -379,12 +379,12 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 | File | Fix |
 |------|-----|
-| [`docs/databases/runbooks/postgres-backup-restore.md`](../../../databases/runbooks/postgres-backup-restore.md) | Zalando → CNPG Barman |
+| [`docs/databases/runbooks/backup-restore.md`](../../../databases/runbooks/backup-restore.md) | Zalando → CNPG Barman |
 | [`docs/databases/runbooks/rotate-cnpg-service-password.md`](../../../databases/runbooks/rotate-cnpg-service-password.md) | `pgdog-cnpg` → `pgdog-product` / `pgdog-platform` |
-| [`docs/databases/005-ha-dr-deep-dive.md`](../../../databases/005-ha-dr-deep-dive.md) | Stale pooler names |
-| [`docs/databases/003.1-operator-cnpg.md`](../../../databases/003.1-operator-cnpg.md) | CNPG on all clusters |
-| [`docs/databases/003-operator-comparison.md`](../../../databases/003-operator-comparison.md) | 3-cluster table |
-| [`docs/databases/009-extensions.md`](../../../databases/009-extensions.md) | platform-db row |
+| [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md) | Stale pooler names |
+| [`docs/databases/cloudnativepg.md`](../../../databases/cloudnativepg.md) | CNPG on all clusters |
+| [`docs/databases/reference/operator-comparison.md`](../../../databases/reference/operator-comparison.md) | 3-cluster table |
+| [`docs/databases/extensions.md`](../../../databases/extensions.md) | platform-db row |
 | [`docs/observability/metrics/postgresql/custom-metrics.md`](../../../observability/metrics/postgresql/custom-metrics.md) | PodMonitor paths |
 | [`docs/observability/logging/victorialogs.md`](../../../observability/logging/victorialogs.md#stream-catalog) | pgaudit clusters |
 | [`docs/observability/metrics/victoriametrics.md`](../../../observability/metrics/victoriametrics.md) | VMRule dirs |
@@ -399,11 +399,12 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 
 ### P3 — legacy archaeology (banner only)
 
-`zalando-ha-scaling.md`, `prepared-databases.md`, `003.2-operator-zalando.md` — strengthen legacy banners; no current-state claims.
+`zalando-ha-scaling.md`, `prepared-databases.md`, `reference/zalando/operator.md` — strengthen legacy banners; no current-state claims.
 
 ### Docs unchanged (product tier)
 
-`001-postgresql-internals.md`, product sections of `005-ha-dr-deep-dive.md`, `add-service-database.md`, `cnpg-dr-replica-bootstrap.md`, `checkout.md`, product-tier app RSIPs.
+PostgreSQL fundamentals, product-tier recovery mechanics, `add-service-database.md`,
+`cnpg-dr-replica-bootstrap.md`, `checkout.md`, and product-tier app RSIPs.
 
 ## Implementation History
 
@@ -418,8 +419,8 @@ Render every changed Mermaid block with `mmdc` before merge (AGENTS.md diagram w
 - **Supersedes (partial):** [RFC-0005](../RFC-0005/) supporting-shared-db HA goal
 - **Amends persistence host for:** [RFC-0001](../RFC-0001/), [ADR-001](../../adr/ADR-001-adopt-temporal-for-order-fulfillment/), [ADR-002](../../adr/ADR-002-deploy-temporal-via-operator/)
 - **Builds on:** [RFC-0012](../RFC-0012/) triplet pattern, [ADR-013](../../adr/ADR-013-per-service-db-triplet/), [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/)
-- **Canonical docs after ship:** [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md), [`docs/databases/010-drp.md`](../../../databases/010-drp.md)
-- **DR unchanged:** [`docs/databases/010.3-cross-region-dr.md`](../../../databases/010.3-cross-region-dr.md) (product line)
+- **Canonical docs after ship:** [`docs/databases/architecture.md`](../../../databases/architecture.md), [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md)
+- **DR unchanged:** [`docs/databases/cross-region-dr.md`](../../../databases/cross-region-dr.md) (product line)
 
 ---
 _Last updated: 2026-08-07_

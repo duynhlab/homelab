@@ -1,6 +1,6 @@
 # Cross-Region / Cross-Zone DR
 
-Child playbook of the [PostgreSQL Disaster Recovery Plan](./010-drp.md). It makes
+Child playbook of the [PostgreSQL Disaster Recovery Plan](./disaster-recovery.md). It makes
 the DRP's "separate failure domain" production baseline concrete: where the DR
 replica and object store run **today**, why that is not yet real DR, and the
 staged path to cross-zone and cross-region redundancy. This is a **roadmap** doc
@@ -46,13 +46,13 @@ moving the failure domains apart, not rebuilding the pattern.
 
 Two stages, smallest blast-radius reduction first.
 
-### Stage 1 — cross-zone (within one region)
+### Planned stage 1 — cross-zone (within one region)
 
 Spread the primary's instances and the DR replica across availability zones, with
 pod anti-affinity and topology spread so no single node/zone hosts all of them.
 Cheap, low latency, survives a zone failure.
 
-### Stage 2 — cross-region
+### Planned stage 2 — cross-region
 
 Run the DR replica in a **separate cluster in another region**, following a
 **replicated** object-store bucket. The primary writes backups/WAL to its regional
@@ -62,20 +62,22 @@ from the replicated copy.
 ```mermaid
 flowchart LR
   subgraph regionA ["Region A (primary)"]
-    primary["product-db (multi-AZ)"]
-    bucketA["pg-backups-cnpg @ A"]
-    primary -->|"base backup + WAL"| bucketA
+    primary["planned — product-db multi-AZ"]
+    bucketA["planned — backup bucket @ A"]
+    primary -. "planned — base backup + WAL" .-> bucketA
   end
   subgraph regionB ["Region B (DR)"]
-    bucketB["pg-backups-cnpg @ B (replicated)"]
-    drCluster["product-db-replica\n(separate cluster)"]
-    bucketB -->|"recovery + WAL replay"| drCluster
+    bucketB["planned — replicated bucket @ B"]
+    drCluster["planned — product-db-replica\nseparate cluster"]
+    bucketB -. "planned — recovery + WAL replay" .-> drCluster
   end
-  bucketA ==>|"async object replication"| bucketB
+  bucketA -. "planned — async object replication" .-> bucketB
+  classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+  class primary,bucketA,bucketB,drCluster planned;
 ```
 
 Failover to region B is the same DR promotion as today
-([010.2 Drill C](./010.2-restore-and-failover-drills.md#drill-c--dr-promotion-rehearsal-quarterly)) —
+([Drill C](./runbooks/restore-and-failover-drills.md#drill-c--dr-promotion-rehearsal-quarterly)) —
 `replica.enabled: false` — only the replica now lives elsewhere.
 
 ## Trade-offs
@@ -100,18 +102,18 @@ write. RPO in region B is therefore bounded by object-replication lag on top of
 2. **Harden the object store:** independent durable backend with **versioning +
    object-lock/immutability**, and split **backup-writer vs restore-reader**
    credentials (today both share the RustFS credential — a
-   [010-drp.md known gap](./010-drp.md#known-gaps-and-next-improvements)).
+   [disaster-recovery.md known gap](./disaster-recovery.md#known-gaps-and-next-improvements)).
 3. **Stage 2:** stand up a second-region bucket with replication, then a second
    cluster hosting `product-db-replica` that recovers from it.
-4. **Prove it:** run a [Drill C](./010.2-restore-and-failover-drills.md#drill-c--dr-promotion-rehearsal-quarterly)
+4. **Prove it:** run a [Drill C](./runbooks/restore-and-failover-drills.md#drill-c--dr-promotion-rehearsal-quarterly)
    promotion against the remote replica and record the measured RTO/RPO.
 
 ## References
 
-- [010-drp.md](./010-drp.md) — parent DRP, "separate failure domain" baseline.
-- [005-ha-dr-deep-dive.md](./005-ha-dr-deep-dive.md) — replica-cluster internals (object-store DR).
-- [004-replication-strategy.md](./004-replication-strategy.md) — sync vs async, cascading replication.
-- [010.2-restore-and-failover-drills.md](./010.2-restore-and-failover-drills.md) — the promotion drill that validates this.
+- [disaster-recovery.md](./disaster-recovery.md) — parent DRP, "separate failure domain" baseline.
+- [Disaster recovery plan](./disaster-recovery.md) — current recovery topology and decision paths.
+- [Replication fundamentals](./fundamentals/replication.md) — sync vs async replication and cascading behavior.
+- [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — the promotion drill that validates this.
 
 ---
 _Last updated: 2026-07-11_

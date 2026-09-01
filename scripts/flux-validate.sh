@@ -17,8 +17,16 @@ set -o pipefail
 
 kustomize_flags=("--load-restrictor=LoadRestrictionsNone")
 
-kubeconform_flags=("-skip=Secret")
-kubeconform_flags=("-skip=Secret")
+# ClickHouseInstallation is skipped, and the reason is a stale upstream schema
+# rather than a shortcut: the datree CRDs-catalog copy of
+# clickhouseinstallation_v1.json declares spec.configuration.zookeeper with
+# additionalProperties:false and without the `keeper` property that operator
+# 0.27.1 added, so it rejects a CORRECT manifest
+# ("additional properties 'keeper' not allowed" — reproduced 2026-08-28).
+# -ignore-missing-schemas does not help: the schema is found, it is just old.
+# The ClickHouseKeeperInstallation schema IS current and does validate, which is
+# the CR this train adds and the one a typo would most likely land in.
+kubeconform_flags=("-skip=Secret,ClickHouseInstallation")
 kubeconform_config=(
   "-strict" 
   "-ignore-missing-schemas" 
@@ -49,6 +57,13 @@ kustomize_overlays=(
   # reason (its own Kustomization, keycloak-local) — validate it explicitly.
   "kubernetes/infra/controllers/keycloak"
   "kubernetes/infra/configs/temporal"
+  # clickhouse/ has its own Kustomization (clickhouse-local), so a build of
+  # configs/ never reached it — before RFC-0028 it got nothing but a bare
+  # yq syntax check, so a structurally broken overlay passed validate. The
+  # ClickHouseKeeperInstallation is now really schema-validated here; the CHI is
+  # skipped by kubeconform_flags for the stale-schema reason recorded above.
+  "kubernetes/infra/configs/clickhouse"
+  "kubernetes/infra/configs/clickhouse-schema"
   "kubernetes/infra/configs/databases"
   "kubernetes/infra/configs/observability"
   "kubernetes/infra/configs/secrets"
@@ -232,6 +247,41 @@ validate_worker_versioning() {
 #
 # Pin the CLI to the engine the cluster runs (chart 3.8.2 -> v1.18.2). A CLI
 # ahead of the engine can agree with itself and disagree with admission.
+# The schema bootstrap Job asserts a replica count, and that number is stated in
+# two files: the CHI's layout and the Job's EXPECTED_REPLICAS. Discovering it at
+# runtime instead was tried and failed — the operator publishes the cluster
+# definition asynchronously, so the Job "verified" 2 of 2 on a 3-replica store
+# and went green (RFC-0028). Duplicating the intent is the safer trade, provided
+# nothing lets the two drift. This is that guard.
+validate_clickhouse_replica_count() {
+  echo "INFO - Validating ClickHouse replica count agreement"
+  local chi="kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml"
+  local job="kubernetes/infra/configs/clickhouse-schema/job.yaml"
+  if [[ ! -f "$chi" || ! -f "$job" ]]; then
+    echo "  SKIP - ClickHouse manifests not found"
+    return 0
+  fi
+  local want got
+  want=$(yq e '.spec.configuration.clusters[0].layout.replicasCount' "$chi")
+  got=$(yq e '.spec.template.spec.containers[0].env[] | select(.name == "EXPECTED_REPLICAS") | .value' "$job")
+  if [[ -z "$want" || "$want" == "null" ]]; then
+    echo "ERROR - could not read replicasCount from $chi" >&2
+    exit 1
+  fi
+  if [[ -z "$got" || "$got" == "null" ]]; then
+    echo "ERROR - could not read EXPECTED_REPLICAS from $job" >&2
+    exit 1
+  fi
+  if [[ "$want" != "$got" ]]; then
+    echo "ERROR - replica count drift: CHI layout says $want, schema Job expects $got" >&2
+    echo "        The Job asserts total_replicas against its own number, so a" >&2
+    echo "        mismatch either fails the wave or, worse, passes on the wrong" >&2
+    echo "        topology. Update both." >&2
+    exit 1
+  fi
+  echo "  CHI replicasCount=$want matches schema Job EXPECTED_REPLICAS=$got"
+}
+
 validate_kyverno_policies() {
   local dir="kubernetes/infra/configs/kyverno/tests"
   if [[ ! -d "$dir" ]]; then
@@ -260,5 +310,6 @@ validate_standalone_manifests
 validate_kustomize_overlays
 validate_worker_versioning
 validate_kyverno_policies
+validate_clickhouse_replica_count
 validate_production
 echo "INFO - All validations passed"

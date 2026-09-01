@@ -19,7 +19,7 @@ Data-loss risk if primary failed uncleanly without sync replica acknowledgment.
 
 ## Diagnosis
 
-> **Start here:** [Emergency recovery](../../../databases/010.4-emergency-recovery.md)
+> **Start here:** [Emergency recovery](../../../databases/runbooks/emergency-recovery.md)
 
 ### False positive branch
 
@@ -50,7 +50,7 @@ kubectl logs -n cloudnative-pg -l app.kubernetes.io/name=cloudnative-pg --tail=5
 
 ## Mitigation
 
-1. Follow [Emergency recovery](../../../databases/010.4-emergency-recovery.md)
+1. Follow [Emergency recovery](../../../databases/runbooks/emergency-recovery.md)
    decision tree (availability vs integrity).
 2. CNPG auto-failover usually recovers single-node loss — watch `kubectl cnpg
    status` if plugin installed.

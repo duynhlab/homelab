@@ -208,7 +208,7 @@ an id exists beyond what the public read already reveals (it returns 404 either 
 - [RFC-0003 Inventory ownership](../RFC-0003/) — where stock writes ultimately live; co-determines the cache owner for stock.
 - [Application caching](../../../api/caching.md) — product Cache-Aside, stampede prevention, ownership boundary
 - [Caching (platform)](../../../caching/README.md) — Valkey deployment, eviction, roadmap gaps
-- [`docs/databases/002-database-integration.md`](../../../databases/002-database-integration.md) — the shared `cnpg-db` cluster product/cart/order write to.
+- [`docs/databases/architecture.md`](../../../databases/architecture.md) — the shared `cnpg-db` cluster product/cart/order write to.
 
 ---
 _Last updated: 2026-07-07_

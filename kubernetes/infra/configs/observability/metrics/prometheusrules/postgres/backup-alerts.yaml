@@ -1,5 +1,5 @@
 # PrometheusRule for PostgreSQL backup alerts (CNPG clusters)
-# Reference: docs/databases/runbooks/postgres-backup-restore.md
+# Reference: docs/databases/runbooks/backup-restore.md
 #
 # Metrics come from the Barman Cloud CNPG-I plugin (barman_cloud_cloudnative_pg_io_*),
 # exposed by the instance-manager exporter. The pre-plugin cnpg_collector_* backup
@@ -30,7 +30,7 @@ spec:
           annotations:
             summary: "PostgreSQL backup too old ({{ $labels.namespace }}/{{ $labels.cluster }})"
             description: "Last successful backup was more than 8 hours ago against a six-hour schedule. Check ScheduledBackup runs, the Barman Cloud plugin, and RustFS connectivity."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/runbooks/postgres-backup-restore.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/runbooks/backup-restore.md"
         # CNPG: Backup failed recently
         - alert: PostgresBackupFailed
           expr: |
@@ -42,7 +42,7 @@ spec:
           annotations:
             summary: "PostgreSQL backup failed ({{ $labels.namespace }}/{{ $labels.cluster }})"
             description: "Backup failed in the last hour. Check cluster logs and S3 connectivity."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/runbooks/postgres-backup-restore.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/runbooks/backup-restore.md"
         # Plugin health: backup metrics disappeared for a writable cluster. Catches a
         # broken plugin/sidecar/scrape path that the freshness alert cannot see
         # (no series = no alert). The generic KubeDeploymentReplicasMismatch covers
@@ -57,4 +57,4 @@ spec:
           annotations:
             summary: "PostgreSQL backup metrics missing ({{ $labels.namespace }})"
             description: "No barman_cloud_cloudnative_pg_io_last_available_backup_timestamp series for a writable CNPG cluster. Backup freshness/failure alerts are blind: check the Barman Cloud plugin controller, instance sidecars, and metrics scraping."
-            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/runbooks/postgres-backup-restore.md"
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/databases/runbooks/backup-restore.md"

@@ -1,12 +1,23 @@
 # ClickHouseInstallation — the supplementary OLAP backend for OTel logs+traces
-# SQL (RFC-0019 Phase B / ADR-023). Single shard x single replica pilot on a
-# local PVC; the OTel Collector fans out logs+traces here alongside
+# SQL (RFC-0019 Phase B / ADR-023). Single shard x THREE replicas on local PVCs,
+# coordinated by the `keeper` CHK in this same directory (RFC-0028 / ADR-065);
+# the OTel Collector fans out logs+traces here alongside
 # VictoriaLogs / VictoriaTraces (metrics stay on VictoriaMetrics — never here).
 #
+# Replication is why the CHK exists: losing one pod or one PVC is now a failover
+# rather than the loss of 90 days of edge access logs (ClickHouse-only per
+# ADR-061) and every long-retention trace.
+#
 # The `default` user's password comes from the ESO-managed clickhouse-credentials
-# Secret (OpenBAO secret/local/infra/clickhouse/admin). The Collector's contrib
-# clickhouse exporter connects as `default` and, with create_schema: true, creates
-# the `otel` database + otel_logs / otel_traces MergeTree tables itself (TTL 90d).
+# Secret (OpenBAO secret/local/infra/clickhouse/admin). Both the schema Job and
+# the Collector connect as `default`.
+#
+# Schema ownership lives elsewhere: the `clickhouse-schema` Job in
+# configs/clickhouse-schema/ creates the `otel` database (ENGINE = Replicated,
+# per replica, no ON CLUSTER) and its tables, with the DDL committed to git. The
+# Collector runs create_schema: false and only INSERTs (ADR-065). Exporter-owned
+# DDL was tried and rejected — it cannot reach a replica that joins the
+# distributed-DDL queue late — and that history is in ADR-065's Alternatives.
 # Access control: ClickHouse is never on a public Ingress and the `default` user's
 # password is the access control. It is NOT NetworkPolicy-fenced — the `monitoring`
 # namespace gets no Kyverno default-deny (that targets app-tier only) and netpol is
@@ -27,6 +38,15 @@ spec:
       podTemplate: clickhouse
       dataVolumeClaimTemplate: data-volume
   configuration:
+    # By-name reference to the ClickHouseKeeperInstallation (operator >= 0.27.0,
+    # per the Altinity release notes: "Reference CHK from CHI by a name"):
+    # the operator resolves the keeper endpoints itself and re-reconciles this CHI
+    # when that endpoint set changes. serviceType defaults to `replicas`, i.e. the
+    # per-pod addresses rather than one Service VIP — which is what a raft client
+    # wants.
+    zookeeper:
+      keeper:
+        name: keeper
     users:
       # default user password sourced from the ESO-managed Secret
       default/password:
@@ -42,15 +62,41 @@ spec:
         - "::/0"
       default/profile: default
       default/quota: default
+    # The engine's own Prometheus endpoint, finally enabled. At 1x1 the Altinity
+    # metrics-exporter's chi_* series were the whole engine view and a per-pod
+    # scrape would have duplicated them; with three replicas the per-pod series
+    # are what separate "one replica is sick" from "the shared exporter is sick",
+    # and ClickHouseMetrics_ReadonlyReplica — a replica that lost Keeper — has no
+    # equivalent in the exporter's view at all. Key set mirrors the local-stack
+    # twin (local-stack/observability/clickhouse/metrics.xml); status_info was
+    # removed from the server and must not be re-added.
+    settings:
+      prometheus/endpoint: /metrics
+      prometheus/port: "9363"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+      prometheus/errors: "true"
     clusters:
       - name: otel
         layout:
           shardsCount: 1
-          replicasCount: 1
+          replicasCount: 3
   templates:
     podTemplates:
       - name: clickhouse
         spec:
+          # One replica per node. Three copies sharing a node survive nothing that
+          # matters, which would make the whole change ceremonial. Kind runs three
+          # workers, so `required` fits exactly — and an unschedulable replica is a
+          # signal worth seeing rather than a silent co-location.
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      clickhouse.altinity.com/chi: clickhouse
           securityContext:
             runAsNonRoot: true
             runAsUser: 101
@@ -61,6 +107,13 @@ spec:
           containers:
             - name: clickhouse
               image: clickhouse/clickhouse-server:26.7
+              # Named so the PodMonitor can reference it: the operator-generated
+              # Services carry only the native/HTTP/interserver ports, so :9363
+              # is reachable for scraping through the pod, not through a Service
+              # (same reason the Envoy proxy fleet uses a PodMonitor).
+              ports:
+                - name: metrics
+                  containerPort: 9363
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true

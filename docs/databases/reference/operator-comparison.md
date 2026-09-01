@@ -3,19 +3,19 @@
 This is a **conceptual** comparison of two PostgreSQL operators and keeps the
 decision-making surface small. **The platform now runs CloudNativePG only** —
 all Postgres was migrated off the Zalando operator, which is no longer deployed
-(see [002](./002-database-integration.md)). Zalando is retained here purely for
+(see [database architecture](../architecture.md)). Zalando is retained here purely for
 comparison and learning. Use the focused deep dives for operator internals and
 feature details:
 
-- [003.1-operator-cnpg.md](./003.1-operator-cnpg.md) - CloudNativePG deep dive.
-- [003.2-operator-zalando.md](./003.2-operator-zalando.md) - Zalando Postgres Operator deep dive.
-- [010-drp.md](./010-drp.md) - HA, DR, PITR, RTO, and RPO operating model.
+- [cloudnativepg.md](../cloudnativepg.md) - CloudNativePG deep dive.
+- [reference/zalando/operator.md](./zalando/operator.md) - Zalando Postgres Operator deep dive.
+- [disaster-recovery.md](../disaster-recovery.md) - HA, DR, PITR, RTO, and RPO operating model.
 
 ## Executive Summary
 
 | Dimension | CloudNativePG | Zalando Postgres Operator |
 |-----------|---------------|---------------------------|
-| Current version in repo | Operator image `1.30.0` | Operator `v1.15.1` |
+| Repository status | Operator image `1.30.0`, deployed | Last recorded operator `v1.15.1`, retired |
 | HA model | CNPG operator + instance manager | Patroni inside Spilo pods |
 | Pod model | Custom pod controller, no StatefulSets | StatefulSet-managed Spilo pods |
 | Coordination | Kubernetes API | Patroni DCS via Kubernetes Endpoints/ConfigMaps |
@@ -128,11 +128,11 @@ temporarily unavailable.
 
 ## Related Documentation
 
-- [003.1-operator-cnpg.md](./003.1-operator-cnpg.md) - CloudNativePG feature and operations deep dive.
-- [003.2-operator-zalando.md](./003.2-operator-zalando.md) - Zalando operator feature and operations deep dive.
-- [004-replication-strategy.md](./004-replication-strategy.md) - Sync vs async replication and commit behavior.
-- [006-backup-strategy.md](./006-backup-strategy.md) - Backup, WAL archiving, PITR, and retention.
-- [010-drp.md](./010-drp.md) - Production-ready DRP model for this homelab.
+- [cloudnativepg.md](../cloudnativepg.md) - CloudNativePG feature and operations deep dive.
+- [reference/zalando/operator.md](./zalando/operator.md) - Zalando operator feature and operations deep dive.
+- [Replication fundamentals](../fundamentals/replication.md) - Sync vs async replication and commit behavior.
+- [Backup policy](../backup-policy.md) - Deployed backup, WAL archiving, PITR, and retention policy.
+- [disaster-recovery.md](../disaster-recovery.md) - Production-ready DRP model for this homelab.
 
 ---
 _Last updated: 2026-07-17 (RFC-0018: 3-cluster inventory)_

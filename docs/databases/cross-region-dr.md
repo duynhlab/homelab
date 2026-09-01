@@ -17,7 +17,7 @@ flowchart TB
   subgraph host ["Single host / single Kind cluster"]
     subgraph productNs ["Namespace product"]
       primary["product-db (3 instances)"]
-      dr["product-db-replica (1 instance)"]
+      dr["product-db-replica (3 instances)"]
     end
     subgraph rustfsNs ["Namespace rustfs"]
       rustfs["RustFS S3"]
@@ -116,4 +116,4 @@ write. RPO in region B is therefore bounded by object-replication lag on top of
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — the promotion drill that validates this.
 
 ---
-_Last updated: 2026-07-11_
+_Last updated: 2026-09-01 — DR cluster taken to 3 instances._

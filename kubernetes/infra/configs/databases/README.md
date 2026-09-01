@@ -25,7 +25,7 @@ PgBouncer pooler and one PgDog pooler
 | -------------------- | ------------- | ---------- | --------- | ------- | ----------------------------------------- | ------------------------------------ |
 | platform-db          | CloudNativePG | 18.1       | platform  | 3 nodes (1 primary + 1 sync + 1 async) | CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`, ADR-026) | User, Notification, Shipping, Review, Keycloak, Temporal |
 | product-db              | CloudNativePG | 18.1       | product   | 3 nodes (1 primary + 1 sync + 1 async) | PgDog v0.39 (`pgdog-product`) | Product, Cart, Order, Checkout, Inventory, Payment (payment app: direct-TLS) |
-| product-db-replica      | CloudNativePG | 18.1       | product   | 1 node  | —                                         | DR (continuous WAL recovery)         |
+| product-db-replica      | CloudNativePG | 18.1       | product   | 3 nodes (designated primary + 2 cascading) | —                                         | DR (continuous WAL recovery)         |
 
 
 ## Connection Endpoints
@@ -45,17 +45,17 @@ All CNPG clusters expose the built-in exporter on `:9187` (scraped by a
 per-cluster `PodMonitor`); pgaudit + `auto_explain` logs go to stdout and are
 picked up by the cluster-wide Vector DaemonSet → VictoriaLogs. Backups use the
 **Barman Cloud Plugin** (per-cluster `ObjectStore`) into a single bucket
-`pg-backups-cnpg` with per-cluster prefixes. Only the two **writable** clusters
-have `ScheduledBackup`s (daily 02:00 + every 6h); `product-db-replica` archives
-WAL under its own prefix but has no base backups, so its prefix is not an
-independently restorable chain. The `30d`/`7d` values are Barman **recovery
-windows**, not plain retention.
+`pg-backups-cnpg` with per-cluster prefixes. The two writable clusters run daily
+02:00 + every-6h `ScheduledBackup`s; `product-db-replica` runs one daily backup
+of its own (`target: primary`) so its prefix is a restorable chain and its
+retention pass has something to act on. The `30d`/`7d` values are Barman
+**recovery windows**, not plain retention.
 
 | Cluster              | Metrics Exporter                                                         | Log Shipper              | Backup Method       | Backup Target                                            |
 | -------------------- | ------------------------------------------------------------------------ | ------------------------ | ------------------- | -------------------------------------------------------- |
 | platform-db          | CNPG built-in :9187 (PodMonitor) + PgBouncer PodMonitor              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore (daily + every-6h `ScheduledBackup`) | `s3://pg-backups-cnpg/platform-db/`, recovery window 30d           |
 | product-db              | CNPG built-in :9187 (PodMonitor) + PgDog OpenMetrics :9090              | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore (daily + every-6h `ScheduledBackup`) | `s3://pg-backups-cnpg/product-db/`, recovery window 30d           |
-| product-db-replica      | CNPG built-in :9187 — **no PodMonitor, not scraped**                    | CNPG stdout → Vector DaemonSet | WAL archive only via Barman Cloud Plugin — no `Backup`/`ScheduledBackup` | `s3://pg-backups-cnpg/product-db-replica/`, recovery window 7d (WAL only)    |
+| product-db-replica      | CNPG built-in :9187 (PodMonitor)                                        | CNPG stdout → Vector DaemonSet | Barman Cloud Plugin + ObjectStore (daily `ScheduledBackup`, `target: primary`) | `s3://pg-backups-cnpg/product-db-replica/`, recovery window 7d    |
 
 
 ## Extensions

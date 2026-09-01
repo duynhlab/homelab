@@ -7,7 +7,7 @@ cluster provides a co-located DR copy of product data.
 |---|---|---:|---:|---|
 | `platform-db` | `platform` | 18.1 | 3 | Platform and supporting-service databases |
 | `product-db` | `product` | 18.1 | 3 | Catalog and checkout-domain databases |
-| `product-db-replica` | `product` | 18.1 | 1 | Object-store-fed recovery copy of `product-db` |
+| `product-db-replica` | `product` | 18.1 | 3 | Object-store-fed recovery copy of `product-db` |
 
 ## Current topology
 
@@ -33,7 +33,7 @@ flowchart TB
     PgDog["PgDog<br/>pgdog-product :6432"]
     Platform[("platform-db<br/>3 instances")]
     Product[("product-db<br/>3 instances")]
-    DR[("product-db-replica<br/>1 instance")]
+    DR[("product-db-replica<br/>3 instances")]
     Store[("RustFS object storage")]
 
     CNPG --> Platform
@@ -123,4 +123,4 @@ services, not by the infrastructure manifests.
 - [CloudNativePG 1.30 service management](https://cloudnative-pg.io/docs/1.30/service_management/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 
-_Last updated: 2026-08-31._
+_Last updated: 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._

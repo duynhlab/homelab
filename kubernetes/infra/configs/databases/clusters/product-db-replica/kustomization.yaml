@@ -6,3 +6,5 @@ kind: Kustomization
 resources:
   - objectstore.yaml
   - instance.yaml
+  - monitoring/podmonitor.yaml
+  - backup/backup-daily.yaml

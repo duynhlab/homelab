@@ -59,10 +59,13 @@ scraped by a **per-cluster `PodMonitor`**. PgDog poolers expose OpenMetrics on `
 PostgreSQL `PrometheusRule`s. Full VM topology and rule pipeline:
 [../victoriametrics.md](../victoriametrics.md).
 
-**Scraped clusters:** only `platform-db` (ns `platform`) and `product-db` (ns `product`) export
-metrics. `product-db-replica` is a DR replica and is **not scraped** — its pods carry
-`cnpg.io/cluster=product-db-replica`, which no PodMonitor selects (live `cnpg_io_cluster` label
-values are exactly `platform-db` and `product-db`).
+**Scraped clusters:** all three — `platform-db` (ns `platform`), `product-db` and
+`product-db-replica` (ns `product`), each via its own `PodMonitor` selecting
+`cnpg.io/cluster`. The DR replica was deliberately unscraped until it gained a
+`ScheduledBackup`: the backup alerts are cluster-agnostic, so an unscraped cluster
+emits nothing and `PostgresBackupTooOld` can never fire for it — a scheduled
+backup nobody watches. Expect `cnpg_io_cluster` values `platform-db`,
+`product-db`, `product-db-replica`.
 
 **Alert rules** — chart-generated per cluster under
 `prometheusrules/postgres/{cnpg,cnpg-platform-db}/`, plus `backup-alerts.yaml` and hand-authored
@@ -81,4 +84,4 @@ pod logs, tailed by the Vector DaemonSet into VictoriaLogs (no separate exporter
 - [Metrics hub](../README.md)
 
 ---
-_Last updated: 2026-08-31 — backup alerts migrated to Barman Cloud plugin metrics; rule count re-derived (55)._
+_Last updated: 2026-09-01 — the DR replica is now scraped (its own `PodMonitor`), so backup alerting covers it. Previously 2026-08-31 — backup alerts migrated to Barman Cloud plugin metrics; rule count re-derived (55)._

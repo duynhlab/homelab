@@ -1,0 +1,35 @@
+# Base backups for the DR cluster's own object-store prefix.
+#
+# Why this exists: the cluster already archives WAL to s3://pg-backups-cnpg/product-db-replica/
+# (isWALArchiver: true), but WAL alone cannot restore anything, and Barman only
+# deletes WAL as a side effect of retiring an obsolete *base backup* -- so with no
+# base backup the 7d recovery window on the ObjectStore never removes a single
+# object. This anchors the chain and lets retention actually run.
+#
+# target: primary is deliberate. The cluster-level default is prefer-standby,
+# which on a 3-instance replica cluster elects a cascading standby; the
+# designated primary (Status.TargetPrimary) is the instance upstream documents
+# for replica-cluster backups, and backing up from a standby does not force a WAL
+# switch on the source -- unhelpful on a low-write DR follower.
+#
+# Once daily only: this is a spare, not the system of record. The primary's
+# schedule is what the recovery window is sized around.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: product-db-replica-daily
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-replica-backup
+    app.kubernetes.io/component: scheduled-backup
+    backup-frequency: daily
+spec:
+  schedule: "0 30 3 * * *"
+  cluster:
+    name: product-db-replica
+  target: primary
+  backupOwnerReference: self
+  immediate: true
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

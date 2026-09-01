@@ -46,7 +46,8 @@ Expected:
 
 - `product-db` has a recent completed backup.
 - `product-db` reports `ContinuousArchiving=True`.
-- `product-db-replica` reaches healthy state with one ready pod.
+- `product-db-replica` reaches healthy state with three ready pods (designated
+  primary plus two cascading standbys).
 
 ## Common Failure Points
 
@@ -72,4 +73,4 @@ into a replica requires destroying the cluster and re-bootstrapping (re-cloning)
 from the then-current primary.
 
 ---
-_Last updated: 2026-08-31 — replica prefix clarified as WAL-only (no base-backup chain), promotion/re-clone semantics documented._
+_Last updated: 2026-09-01 — the cluster now runs 3 instances and takes its own daily base backup, so its prefix is a restorable chain. Previously 2026-08-31 — promotion/re-clone semantics documented._

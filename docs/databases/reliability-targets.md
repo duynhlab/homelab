@@ -40,7 +40,7 @@ the target table above is the DR backlog.
 | Cluster | RPO driver (as-built) | Effective RPO | RTO posture | Evidence |
 |---------|----------------------|---------------|-------------|----------|
 | `product-db` | 3 instances, sync quorum `ANY 1`; `archive_timeout 5m`; daily + every-6h base backups → `s3://pg-backups-cnpg/product-db/` (30-day retention) | **0** on quorum-ack commits (**measured 0**); **≤ 5 min** to DR replica | Planned switchover **measured 11.4 s** RTO; **PITR measured 2 m 12 s** to a validated throwaway; DR promotion still **not drill-recorded** | ✅ [DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) (switchover, 2026-08-06) · ✅ [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) (PITR, 2026-08-07); ⏳ promotion pending durable hardware |
-| `product-db-replica` | Follows `product-db` via object-store recovery; own archive retention is 7 days | Tracks primary minus replay lag | Promote via `replica.enabled: false` | ⏳ promotion drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)) — on an ephemeral Kind cluster the rehearsal cannot honour the runbook's "never promote the live DR target" rule except by disposability |
+| `product-db-replica` | Follows `product-db` via object-store recovery; 3 instances; own daily base backup into a 7-day recovery window | Tracks primary minus replay lag | Promote via `replica.enabled: false` | ⏳ promotion drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)) — on an ephemeral Kind cluster the rehearsal cannot honour the runbook's "never promote the live DR target" rule except by disposability |
 | `platform-db` | 3 instances, sync quorum `ANY 1`; Barman → `s3://pg-backups-cnpg/platform-db/` (30-day retention); includes `temporal` + `temporal_visibility` | **0** on quorum-ack commits | CNPG auto-failover; restore is manual | ⏳ restore drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)); the mechanism itself is proven by [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) on the identical CNPG + Barman plugin path |
 
 ## How targets map to backup cadence
@@ -88,4 +88,4 @@ These widen the gap between target and as-built; tracked in
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — how the targets get verified.
 
 ---
-_Last updated: 2026-08-31._
+_Last updated: 2026-09-01 — DR cluster taken to 3 instances with its own daily base backup._

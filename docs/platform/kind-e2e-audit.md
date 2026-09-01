@@ -116,19 +116,24 @@ the tag exists; running it earlier audits the previous release.
 - [ ] **K0.1** A container runtime answers, and `kind` will use it.
   `scripts/kind-up.sh` and `scripts/kind-down.sh` call `docker inspect|run|network
   connect|rm` **unconditionally** — they never probe for a provider — so a podman
-  host needs both a `docker` CLI shim and kind's podman provider opted in.
+  host needs the podman socket exported as `DOCKER_HOST`.
 
   On **macOS + podman** the full sequence, including two load-bearing kernel
-  settings, is [`setup.md` § Prerequisites](setup.md#prerequisites). Read it
+  settings and the disk-headroom check, is
+  [`setup.md` § Prerequisites](setup.md#prerequisites). Read it
   rather than transcribing it; the short version is:
 
   ```bash
-  export KIND_EXPERIMENTAL_PROVIDER=podman
   export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')"
   podman machine ssh 'sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80'
   podman machine ssh 'sudo sysctl -w kernel.keys.maxkeys=20000 kernel.keys.maxbytes=4000000'
+  podman machine ssh 'df -h /'   # a near-full VM fails as RBAC/EOF errors, not as "no space"
   docker info >/dev/null && echo ok
   ```
+
+  Do **not** set `KIND_EXPERIMENTAL_PROVIDER=podman`: with the socket exported,
+  kind's Docker provider drives podman's Docker-compatible API, and the
+  2026-09-01 full rebuild ran clean without it.
 
   **Neither sysctl survives `podman machine stop`.** Re-apply them after every
   VM restart, before `make cluster-up`.

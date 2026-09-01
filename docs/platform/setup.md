@@ -70,11 +70,9 @@ Before the first `make up`, one host-side prerequisite must be in place:
    ```
 
 2. **Podman instead of Docker (macOS)** — `kind-up.sh` speaks the Docker CLI, so
-   export the podman socket as `DOCKER_HOST` and opt into kind's podman
-   provider. Two kernel settings inside the podman machine are load-bearing;
-   both were found the hard way on the 2026-08-20 bring-up:
+   point it at the podman socket. Two kernel settings inside the podman machine
+   are load-bearing; both were found the hard way on the 2026-08-20 bring-up:
    ```bash
-   export KIND_EXPERIMENTAL_PROVIDER=podman
    export DOCKER_HOST="unix://$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}')"
    # kind-up.sh maps container 30080/30443 -> host 80/443; rootless podman
    # refuses privileged ports, failing at "Preparing nodes" with
@@ -86,8 +84,28 @@ Before the first `make up`, one host-side prerequisite must be in place:
    # disk quota exceeded" — a runtime error, not a Postgres or manifest fault.
    podman machine ssh 'sudo sysctl -w kernel.keys.maxkeys=20000 kernel.keys.maxbytes=4000000'
    ```
-   Neither setting survives a `podman machine stop`; persist them in the VM's
-   `/etc/sysctl.conf` if you bring clusters up often.
+   `DOCKER_HOST` is enough — do **not** set `KIND_EXPERIMENTAL_PROVIDER=podman`.
+   With the socket exported, kind's Docker provider drives podman's
+   Docker-compatible API, and the 2026-09-01 rebuild (`make down && make up`,
+   full platform) ran clean without the variable. It is also worth knowing that
+   the machine must be **rootful** (`podman machine inspect --format
+   '{{.Rootful}}'`), which is what actually makes the privileged-port mapping
+   possible.
+
+   Neither sysctl survives a `podman machine stop` — after a restart
+   `kernel.keys.maxkeys` is back to 200, the exact value that crash-loops CNPG,
+   so re-apply both before bringing a cluster up. Persist them in the VM's
+   `/etc/sysctl.conf` if you do this often.
+
+   **Check VM disk before a rebuild.** A full bring-up on a near-full machine
+   fails in ways that name the wrong culprit — RBAC `Forbidden`, API `EOF`,
+   Flux dependencies stalling — none of which mention disk, and `kubectl` cannot
+   see the host filesystem. On 2026-09-01 the machine was at 94 % (6.2 G free)
+   with 36 GB of unused images; `podman image prune -a -f` took it to 26 %.
+   ```bash
+   podman machine ssh 'df -h /'
+   podman system df          # RECLAIMABLE column
+   ```
 
 On **local Kind** that is enough: `envoy-gateway-config.yaml` in the `clusters/local` overlay patches the `platform-edge-tls` Certificate to the self-signed **`homelab-ca`** issuer, so the edge terminates HTTPS with a self-signed wildcard (expect a browser warning unless `homelab-ca` is trusted). **No Cloudflare token or Let's Encrypt is needed locally.**
 

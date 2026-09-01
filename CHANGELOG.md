@@ -727,9 +727,9 @@ Skeleton (copy what you need):
 - **The DR cluster was a spare that could not be restored from and could not
   survive its own promotion.** `product-db-replica` ran a single instance and
   archived WAL to `s3://pg-backups-cnpg/product-db-replica/` with no
-  `Backup`/`ScheduledBackup` anywhere — so that prefix held loose WAL that
-  ["cannot restore a PostgreSQL cluster"](https://cloudnative-pg.io/documentation/1.30/backup/),
-  and its `retentionPolicy: "7d"` was inert: the plugin sidecar runs the
+  `Backup`/`ScheduledBackup` anywhere — so that prefix held loose WAL, which as
+  CloudNativePG's backup documentation puts it "cannot restore a PostgreSQL
+  cluster", and its `retentionPolicy: "7d"` was inert: the plugin sidecar runs the
   retention pass on a timer (`retentionPolicyIntervalSeconds`, default 1800) but
   `barman-cloud-backup-delete` only removes WAL as a side effect of retiring an
   obsolete base backup, so with zero backups the pass ran on schedule and deleted

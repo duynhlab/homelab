@@ -100,7 +100,7 @@ spec:
     - apiVersion: grafana.integreatly.org/v1beta1
       kind: GrafanaManifest
       inProgress: >-
-        !has(status) || !has(status.conditions) ||
+        !has(status.conditions) ||
         status.conditions.filter(e,
           e.type == 'ManifestSynchronized' &&
           e.observedGeneration == metadata.generation).size() == 0

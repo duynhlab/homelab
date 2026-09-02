@@ -2312,6 +2312,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Dashboard V2 rollout failed before applying any manifest.** The Flux custom
+  health evaluator used `has(status)`, but CEL's `has()` macro requires a field
+  selection and rejects a top-level identifier. Check `status.conditions`
+  directly so `obs-as-code-dashboards-local` can evaluate GrafanaManifest
+  readiness while the status field is still absent.
+
 - **ClickHouse came up with no Keeper and said it was fine.** On the 2026-09-01
   cold rebuild `clickhouse-schema` crash-looped with
   `Coordination::Exception: No hosts passed to ZooKeeper constructor` because the

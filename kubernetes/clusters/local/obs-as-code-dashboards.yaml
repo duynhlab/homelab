@@ -1,0 +1,59 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: obs-as-code-dashboards-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: observability
+spec:
+  interval: 10m
+  timeout: 5m
+  retryInterval: 2m
+
+  sourceRef:
+    kind: OCIRepository
+    name: obs-as-code-oci
+
+  path: ./cluster/manifests
+  targetNamespace: monitoring
+
+  prune: true
+
+  dependsOn:
+    - name: monitoring-local
+
+  healthChecks:
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: platform-infrastructure-folder
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: kubernetes-cluster-overview
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: kubernetes-workloads
+      namespace: monitoring
+
+  # GrafanaManifest reports ManifestSynchronized rather than the conventional
+  # Ready condition, so kstatus cannot infer readiness without this contract.
+  healthCheckExprs:
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      inProgress: >-
+        !has(status) || !has(status.conditions) ||
+        status.conditions.filter(e,
+          e.type == 'ManifestSynchronized' &&
+          e.observedGeneration == metadata.generation).size() == 0
+      failed: >-
+        status.conditions.exists(e,
+          e.type == 'ManifestSynchronized' &&
+          e.status == 'False' &&
+          e.observedGeneration == metadata.generation)
+      current: >-
+        status.conditions.exists(e,
+          e.type == 'ManifestSynchronized' &&
+          e.status == 'True' &&
+          e.observedGeneration == metadata.generation)

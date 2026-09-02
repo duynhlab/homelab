@@ -13,8 +13,10 @@ spec:
     # Pinned like every other chart here (was a floating ">=5.0.0"). The pin is
     # load-bearing now: GrafanaServiceAccount — how the Grafana MCP server gets
     # its token — is an operator v5.20.0 feature, so a float resolving to
-    # anything older would silently break that CR. Chart 5.24.0 ships operator
-    # v5.24.0, and its crds/ carries
+    # anything older would silently break that CR. Chart 5.25.0 also contains
+    # the GrafanaManifest update fix required by dashboard.grafana.app/v2;
+    # 5.24.0 created V2 resources but omitted resourceVersion on updates.
+    # Its crds/ carries
     # grafana.integreatly.org_grafanaserviceaccounts.yaml (verified by
     # unpacking the chart, not from release notes).
-    semver: "5.24.0"
+    semver: "5.25.0"

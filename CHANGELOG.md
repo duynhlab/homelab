@@ -80,6 +80,14 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Feature
+
+#### Observability
+
+- Run the obs-as-code Dashboard V2 manifests as isolated `-v2` canaries while
+  retaining the classic `GrafanaDashboard.spec.oci` resources at v0.3.0, so
+  both delivery paths can be compared and rolled back independently.
+
 ### Breaking Change
 
 #### Gateway

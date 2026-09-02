@@ -24,6 +24,7 @@ resources:
   - databases.yaml       # DB Instances (Must be before apps)
   - databases-cnpg-dr.yaml  # CNPG DR replica (depends on databases-local)
   - monitoring.yaml      # Grafana + Prometheus Configs
+  - obs-as-code-dashboards.yaml # Dashboard V2 manifests from the release artifact
   - kyverno.yaml         # Admission policies (depends on controllers + monitoring)
   - policy-reporter.yaml # Kyverno's PolicyReports, browsable (depends on kyverno-policies-local)
   - network-policies.yaml   # Ingress NetworkPolicies (inert on kindnet; depends on controllers)

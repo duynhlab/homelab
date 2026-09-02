@@ -14,9 +14,9 @@
 #     unpinned branch of a repository whose own README says not to add
 #     dashboards to it (audit rows K0.5 / K5.7)
 #
-# spec.oci needs grafana-operator >= 5.24.0. The operator is pinned there, and
-# the field was confirmed present by unpacking that chart's CRD rather than from
-# release notes.
+# spec.oci needs grafana-operator >= 5.24.0. The operator is pinned at 5.25.0,
+# and the field was confirmed present by unpacking the chart's CRD rather than
+# from release notes.
 #
 # `path` must match the filename inside the artifact exactly, profile directory
 # included. A mismatch fails the fetch and reports it on this resource's
@@ -30,6 +30,9 @@
 # Bumping the board means bumping `reference` here. Once a second board arrives,
 # replace that with one kustomize patch over every GrafanaDashboard so a release
 # is a single line — see obs-as-code/docs/flux/README.md.
+#
+# During the V2 trial this classic resource remains pinned at v0.3.0. The
+# parallel GrafanaManifest path uses distinct UIDs and a separate folder.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:

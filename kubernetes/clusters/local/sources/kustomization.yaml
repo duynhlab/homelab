@@ -9,6 +9,7 @@ resources:
   - oci/mop-chart-oci.yaml
   - oci/grafana-dashboards-chart-oci.yaml
   - oci/grafana-operator-oci.yaml
+  - oci/obs-as-code-oci.yaml
   - oci/victoria-metrics-operator-oci.yaml
   - oci/cronjobs-oci.yaml
   - oci/victoria-metrics-mcp-oci.yaml

@@ -9,6 +9,9 @@
 # every workload panel joins through it. Without the rule the dropdowns and
 # workload panels are empty — that is the failure signature to recognise, and
 # the fix is the rule, not the board.
+#
+# During the V2 trial this classic resource remains pinned at v0.3.0; the
+# parallel GrafanaManifest uses a distinct UID and folder.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:

@@ -1,0 +1,13 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: obs-as-code-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: dashboards
+spec:
+  interval: 10m
+  url: oci://ghcr.io/duynhlab/obs-as-code
+  ref:
+    semver: "0.4.0"

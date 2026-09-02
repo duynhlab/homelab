@@ -26,6 +26,18 @@ spec:
     prometheus:
       monitor:
         enabled: true
+        # Pin the job label the same way vmnodescrape-kubelet.yaml pins
+        # job=kubelet. Without this it is a chart default (the Service name),
+        # which happens to be right — but every kube_* query in the cluster
+        # keys on job="kube-state-metrics": 12 panels of the cluster-overview
+        # board and every PrometheusRule touching kube_*. A chart upgrade that
+        # changed the default would blank them all with no other symptom,
+        # which is exactly the failure shape the PR 963 live audit flagged
+        # (its §4). A no-op today, a guarantee tomorrow.
+        relabelings:
+          - action: replace
+            targetLabel: job
+            replacement: kube-state-metrics
     resources:
       requests:
         cpu: 20m

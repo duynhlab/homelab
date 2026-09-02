@@ -25,6 +25,13 @@
 # Simplification vs upstream: no CronJob unwinding (Job pods map to their Job,
 # not the owning CronJob) and no static/bare-pod records — add them from the
 # mixin if the need appears.
+#
+# One deliberate ADDITION over upstream: owner_kind="Cluster" (the cnpg-cluster
+# record below). CNPG owns its instance pods directly — no StatefulSet in
+# between — so without it every database pod is invisible to consumers of this
+# rule, measured live as product covering 1.1% and platform 3.5% of their real
+# cAdvisor CPU while monitoring matched to fifteen significant digits (re-audit
+# 2026-09-02). The mixin has no such rule because CNPG is not in its world.
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -109,6 +116,25 @@ spec:
                 label_replace(
                   label_replace(
                     kube_pod_owner{job="kube-state-metrics", owner_kind="DaemonSet"},
+                    "namespace", "$1", "exported_namespace", "(.+)"),
+                  "pod", "$1", "exported_pod", "(.+)"),
+                "workload", "$1", "owner_name", "(.*)")
+            )
+
+        # CNPG: postgresql.cnpg.io/v1 Cluster owns its pods directly. The
+        # matcher is on the owner KIND, which is just "Cluster" — today only
+        # CNPG uses that kind here; the workload_type value names CNPG
+        # specifically so the dropdown reads as what it is. If another operator
+        # with an owning kind "Cluster" ever appears, split this rule.
+        - record: namespace_workload_pod:kube_pod_owner:relabel
+          labels:
+            workload_type: cnpg-cluster
+          expr: |
+            max by (namespace, workload, pod) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    kube_pod_owner{job="kube-state-metrics", owner_kind="Cluster"},
                     "namespace", "$1", "exported_namespace", "(.+)"),
                   "pod", "$1", "exported_pod", "(.+)"),
                 "workload", "$1", "owner_name", "(.*)")

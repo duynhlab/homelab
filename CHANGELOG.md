@@ -2164,6 +2164,20 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **The metrics store was capped at 0.2 of a core and throttled 99% of the
+  time.** `vmsingle` — what every dashboard, alert and k6 assertion reads
+  through — ran with `limits.cpu: 200m`, and the cgroup counters said it was
+  throttled in **3012 of 3043 periods**, burning **313 s** of forced idle with
+  `usage_usec` pinned at 0.196 core. Nothing looked broken: the process stayed
+  up and kept ingesting. Only the readiness probe failed, because `/health`
+  could not answer inside its 5 s timeout even when curled from inside the pod,
+  so the pod flapped `0/1` and every query through it was slow or empty. Raised
+  to `1000m` (request 50m → 200m). Found while investigating an unrelated
+  `exit=2` crash, whose first cause was a stale `flock.lock` left by restarting
+  the Kind node containers rather than rebuilding — a shortcut worth not taking.
+  This is the same shape as the API service's 50m cap; memory stays at 512Mi
+  because it was not the constraint and has not been measured under query load.
+
 - **Three memory limits sized before anything ran, trimmed against measurement.**
   A Kind rebuild on 2026-09-02 degraded with six containers SIGKILLed across
   unrelated namespaces (envoy-gateway, openbao, clickhouse-keeper, temporal,

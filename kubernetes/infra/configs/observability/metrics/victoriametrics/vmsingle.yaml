@@ -19,12 +19,24 @@ spec:
       requests:
         storage: 20Gi
 
+  # CPU raised 200m -> 1000m (request 50m -> 200m) on 2026-09-02. At 200m this
+  # container was throttled in 3012 of 3043 cgroup periods -- 99% -- burning
+  # 313s of forced idle, and `usage_usec` sat at 0.196 core, pinned to the
+  # ceiling. The process stayed up and kept ingesting, so nothing looked broken
+  # except the readiness probe: /health could not answer inside its 5s timeout
+  # even when curled from inside the pod, so the store that every dashboard,
+  # every alert and every k6 assertion reads through flapped 0/1 and back.
+  #
+  # This is the same shape as the API service's 50m limit (peak = L/(1-t) is
+  # meaningless once t approaches 1 -- it only says demand is far above the
+  # cap). Memory is left at 512Mi: it was not the constraint here and has not
+  # been measured under a real query load.
   resources:
     requests:
-      cpu: 50m
+      cpu: 200m
       memory: 256Mi
     limits:
-      cpu: 200m
+      cpu: 1000m
       memory: 512Mi
 
   extraArgs:

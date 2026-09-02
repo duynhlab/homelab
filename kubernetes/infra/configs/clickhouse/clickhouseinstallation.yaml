@@ -127,12 +127,25 @@ spec:
                     - ALL
                 seccompProfile:
                   type: RuntimeDefault
+              # The memory limit is not just a ceiling here: ClickHouse ships
+              # max_server_memory_usage=0 with max_server_memory_usage_to_ram_ratio=0.9
+              # and reads the cgroup, so it sizes its own budget at 0.9x this
+              # value. Lowering it lowers what the server will ever take, which
+              # on a Kind node -- where every node container advertises the whole
+              # VM and the scheduler cannot see the real ceiling -- is the
+              # difference between a bounded process and one that helps starve
+              # the host.
+              #
+              # 1280Mi measured against 711-739Mi steady state across the three
+              # replicas on 2026-09-02 (~1.75x headroom, self-cap 1152Mi). Raise
+              # it if a real query workload arrives; 3x2Gi was sized before
+              # anything ran.
               resources:
                 requests:
                   cpu: 200m
                   memory: 1Gi
                 limits:
-                  memory: 2Gi
+                  memory: 1280Mi
               livenessProbe:
                 httpGet:
                   path: /ping

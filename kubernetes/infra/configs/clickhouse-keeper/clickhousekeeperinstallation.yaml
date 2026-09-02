@@ -147,8 +147,14 @@ spec:
                 # A keeper OOM costs the quorum, which is worse than a ClickHouse
                 # OOM costing one replica — so this limit has headroom over the
                 # request rather than sitting on top of it.
+                #
+                # 512Mi keeps that principle (2x the request) on measured data:
+                # 141Mi and 219Mi across the quorum on 2026-09-02, so this is
+                # ~2.3x the observed peak. The previous 1Gi predated any
+                # measurement and was 4-7x — headroom that only ever existed on
+                # paper, and on a Kind node it is paper the host pays for.
                 limits:
-                  memory: 1Gi
+                  memory: 512Mi
               # NO livenessProbe or readinessProbe here, deliberately. The
               # operator fills probes only when it finds them nil, and its
               # defaults are strictly better than anything expressible in this

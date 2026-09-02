@@ -174,12 +174,21 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 15
             timeoutSeconds: 5
+          # No JAVA_OPTS here, so Quarkus sizes the heap from the container
+          # limit — this number is an input to how much Keycloak allocates, not
+          # only a ceiling it may reach.
+          #
+          # Trimmed conservatively: 690Mi measured on 2026-09-02, so 1536Mi is
+          # ~2.2x observed. Kept well above the 1280Mi used for ClickHouse
+          # because Keycloak is the single dependency of every SSO path on the
+          # platform — a heap too small here GC-thrashes under login load, and
+          # the blast radius is every UI at once.
           resources:
             requests:
               cpu: 500m
               memory: 1Gi
             limits:
-              memory: 2Gi
+              memory: 1536Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

@@ -2164,6 +2164,28 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **Three memory limits sized before anything ran, trimmed against measurement.**
+  A Kind rebuild on 2026-09-02 degraded with six containers SIGKILLed across
+  unrelated namespaces (envoy-gateway, openbao, clickhouse-keeper, temporal,
+  two workers), a CNPG replica join dying on `Temporary failure in name
+  resolution` mid-`pg_basebackup`, and Kubernetes reporting **zero** `OOMKilled`,
+  **zero** `MemoryPressure` and **zero** Pending pods — because it cannot see the
+  constraint: four Kind node containers each advertise the whole VM, so the
+  scheduler believes it has 62.28 GiB where 15 GiB exists, and memory *requests
+  alone* already total 15.31 GiB. Measured actual use against declared limits and
+  cut the three worst gaps: ClickHouse 2Gi → 1280Mi (711–739Mi used), Keeper 1Gi
+  → 512Mi (141–219Mi used, keeping the deliberate 2x-over-request headroom the
+  manifest argues for), Keycloak 2Gi → 1536Mi (690Mi used, trimmed least because
+  every SSO path depends on it). For ClickHouse and Keycloak this lowers real
+  consumption rather than just the ceiling — ClickHouse sizes itself at 0.9× the
+  cgroup limit (`max_server_memory_usage_to_ram_ratio`) and Keycloak's Quarkus
+  heap is derived from it, both verified by reading `memory.max` inside the
+  container. **RustFS was deliberately left at 2Gi**: it was raised from 1Gi on
+  2026-08-25 after OOM-looping, and while it idles at 355Mi the recorded incident
+  notes spikes past 1Gi — the low reading is the trap, not the evidence. This
+  reclaims ~4.25 GiB of ceiling and does not by itself fix a 4× overcommit; the
+  VM has 16 GiB of the host's 48.
+
 - **The `clickhouse-local` wave gated on nothing, and had never gated on
   anything.** `wait` and `healthChecks` are mutually exclusive in Flux and
   `wait` wins, so `wait: true` waited on the health of what the overlay applies

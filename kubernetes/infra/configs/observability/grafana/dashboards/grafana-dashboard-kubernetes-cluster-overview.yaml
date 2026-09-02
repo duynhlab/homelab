@@ -49,5 +49,5 @@ spec:
   # still reverts an edit inside ten minutes.
   resyncPeriod: 10m
   oci:
-    reference: ghcr.io/duynhlab/obs-as-code:v0.2.2
+    reference: ghcr.io/duynhlab/obs-as-code:v0.3.0
     path: cluster/dashboards/kubernetes-cluster-overview.json

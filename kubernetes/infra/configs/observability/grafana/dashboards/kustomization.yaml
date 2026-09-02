@@ -15,6 +15,8 @@ resources:
   - grafana-dashboard-pg-io-waits.yaml
   - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-redis.yaml
+  - grafana-dashboard-kubernetes-cluster-overview.yaml
+  - grafana-dashboard-kubernetes-workloads.yaml
   # Envoy Gateway first-party dashboards (RFC-0024 P4 edge slice) — JSON vendored
   # from envoyproxy/gateway v1.9.0 via configMapGenerator below
   - grafana-dashboard-envoy-gateway.yaml

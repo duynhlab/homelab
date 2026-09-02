@@ -18,6 +18,63 @@ spec:
   path: ./cluster/manifests
   targetNamespace: monitoring
 
+  # Keep the Dashboard V2 trial isolated from the production classic boards.
+  # The suffix changes the outer GrafanaManifest names; the patches below
+  # change the Grafana resource UIDs, titles and folder UID inside each
+  # manifest. Removing this Kustomization rolls back the canary without
+  # touching the GrafanaDashboard resources pinned to v0.3.0.
+  nameSuffix: -v2
+
+  patches:
+    - target:
+        group: grafana.integreatly.org
+        version: v1beta1
+        kind: GrafanaManifest
+        name: platform-infrastructure-folder
+      patch: |
+        - op: replace
+          path: /spec/template/metadata/name
+          value: platform-infrastructure-v2
+        - op: replace
+          path: /spec/template/spec/title
+          value: Platform / Infrastructure V2
+    - target:
+        group: grafana.integreatly.org
+        version: v1beta1
+        kind: GrafanaManifest
+        name: kubernetes-cluster-overview
+      patch: |
+        - op: replace
+          path: /spec/template/metadata/name
+          value: kubernetes-cluster-overview-v2
+        - op: replace
+          path: /spec/template/metadata/annotations/grafana.app~1folder
+          value: platform-infrastructure-v2
+        - op: replace
+          path: /spec/template/spec/title
+          value: Kubernetes Cluster Overview [V2]
+        - op: replace
+          path: /spec/template/spec/links/1/url
+          value: /d/kubernetes-workloads-v2
+    - target:
+        group: grafana.integreatly.org
+        version: v1beta1
+        kind: GrafanaManifest
+        name: kubernetes-workloads
+      patch: |
+        - op: replace
+          path: /spec/template/metadata/name
+          value: kubernetes-workloads-v2
+        - op: replace
+          path: /spec/template/metadata/annotations/grafana.app~1folder
+          value: platform-infrastructure-v2
+        - op: replace
+          path: /spec/template/spec/title
+          value: Kubernetes Workloads [V2]
+        - op: replace
+          path: /spec/template/spec/links/1/url
+          value: /d/kubernetes-cluster-overview-v2
+
   prune: true
 
   dependsOn:
@@ -26,15 +83,15 @@ spec:
   healthChecks:
     - apiVersion: grafana.integreatly.org/v1beta1
       kind: GrafanaManifest
-      name: platform-infrastructure-folder
+      name: platform-infrastructure-folder-v2
       namespace: monitoring
     - apiVersion: grafana.integreatly.org/v1beta1
       kind: GrafanaManifest
-      name: kubernetes-cluster-overview
+      name: kubernetes-cluster-overview-v2
       namespace: monitoring
     - apiVersion: grafana.integreatly.org/v1beta1
       kind: GrafanaManifest
-      name: kubernetes-workloads
+      name: kubernetes-workloads-v2
       namespace: monitoring
 
   # GrafanaManifest reports ManifestSynchronized rather than the conventional

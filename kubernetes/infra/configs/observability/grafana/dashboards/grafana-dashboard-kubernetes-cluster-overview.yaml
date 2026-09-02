@@ -5,7 +5,11 @@
 #
 #   - the board is generated Go, and the artifact is what CI publishes, so there
 #     is no JSON copied into this repository to drift from its source
-#   - the model is fetched at reconcile time and never stored in etcd
+#   - the resource spec stays a dozen declarative lines with no embedded JSON.
+#     (Precision from the live audit follow-up: the operator does write a
+#     gzipped copy of the model into status.contentCache after each reconcile —
+#     a cache nothing reads back for OCI sources — so "never in etcd" would be
+#     an overclaim. The wins are the small spec and the single source of truth.)
 #   - it retires a runtime fetch from duynhlab/grafana-dashboards@main, an
 #     unpinned branch of a repository whose own README says not to add
 #     dashboards to it (audit rows K0.5 / K5.7)
@@ -19,7 +23,7 @@
 # DashboardSynchronized condition — nowhere else. List an artifact's contents
 # with:
 #
-#   flux pull artifact oci://ghcr.io/duynhlab/obs-as-code:v0.2.1 --output /tmp/a
+#   flux pull artifact oci://ghcr.io/duynhlab/obs-as-code:latest --output /tmp/a
 #
 # No pullSecretRef: the GHCR package is public and pulls anonymously.
 #
@@ -36,7 +40,14 @@ spec:
       dashboards: grafana
   folder: "Platform / Infrastructure"
   allowCrossNamespaceImport: true
-  resyncPeriod: 30s
+  # 10m, not the 30s the url: boards carry. Read from operator 5.24.0 source:
+  # the OCI fetcher has no cache read path (GetContentCache is only consulted
+  # for url: and grafanaCom: sources), so EVERY resync is a full GHCR pull —
+  # at 30s that is ~2,880 pulls/day against an artifact that is immutable per
+  # tag, measured live in the PR 963 audit (§8). Resync exists here only to
+  # revert UI edits on an editable board; 10m bounds that at 144 pulls/day and
+  # still reverts an edit inside ten minutes.
+  resyncPeriod: 10m
   oci:
-    reference: ghcr.io/duynhlab/obs-as-code:v0.2.1
+    reference: ghcr.io/duynhlab/obs-as-code:v0.2.2
     path: cluster/dashboards/kubernetes-cluster-overview.json

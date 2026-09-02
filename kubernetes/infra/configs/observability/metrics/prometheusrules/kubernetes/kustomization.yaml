@@ -5,6 +5,7 @@ resources:
   - controlplane-alerts.yaml
   - node-alerts.yaml
   - workload-alerts.yaml
+  - workload-recording-rules.yaml
   - pod-resources-alerts.yaml
   - network-rules.yaml
   - apiserver-alerts.yaml

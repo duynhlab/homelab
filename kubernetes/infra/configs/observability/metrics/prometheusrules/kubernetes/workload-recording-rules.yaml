@@ -1,0 +1,155 @@
+# Pod → workload ownership mapping, from kubernetes-mixin.
+#
+# Record names and label shape match the mixin's
+# namespace_workload_pod:kube_pod_owner:relabel exactly, so any upstream mixin
+# dashboard dropped into this cluster finds the series it expects. Consumers:
+# the kubernetes-workloads board in duynhlab/obs-as-code — both its panel
+# queries (join cAdvisor `on (namespace, pod) group_left (workload,
+# workload_type)`) and its $workload/$workload_type variables, which are
+# label_values() over these series.
+#
+# ADAPTED FOR THIS CLUSTER'S SCRAPE CONFIG, and this is the point of the file:
+# kube-state-metrics is scraped WITHOUT honorLabels, so a workload's own
+# namespace/pod arrive as exported_namespace/exported_pod while the plain
+# labels name the KSM pod itself (repo convention — see the CNPG rules README,
+# and the triple-label_replace scar tissue on KubePodMemoryNearLimit and
+# MicroserviceHighMemoryUsage, both marked "dead fleet-wide, audit
+# 2026-07-17"). These rules absorb that rename INSIDE the expr: the recorded
+# series carry clean namespace/workload/pod labels, so every consumer joins
+# cAdvisor with a plain `on (namespace, pod)` and no other file ever needs to
+# know the quirk exists.
+#
+# owner_name / owner_kind / replicaset are not scrape-target labels, so they
+# survive un-renamed; only namespace and pod need the label_replace.
+#
+# Simplification vs upstream: no CronJob unwinding (Job pods map to their Job,
+# not the owning CronJob) and no static/bare-pod records — add them from the
+# mixin if the need appears.
+#
+# One deliberate ADDITION over upstream: owner_kind="Cluster" (the cnpg-cluster
+# record below). CNPG owns its instance pods directly — no StatefulSet in
+# between — so without it every database pod is invisible to consumers of this
+# rule, measured live as product covering 1.1% and platform 3.5% of their real
+# cAdvisor CPU while monitoring matched to fifteen significant digits (re-audit
+# 2026-09-02). The mixin has no such rule because CNPG is not in its world.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubernetes-workload-recording-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: recording-rules
+spec:
+  groups:
+    - name: k8s.rules.pod_owner
+      interval: 30s
+      rules:
+        # Deployments: pod → ReplicaSet → Deployment, two hops. The topk(1, …)
+        # collapses duplicate owner rows during a rollout, exactly as upstream.
+        - record: namespace_workload_pod:kube_pod_owner:relabel
+          labels:
+            workload_type: deployment
+          expr: |
+            max by (namespace, workload, pod) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    label_replace(
+                      kube_pod_owner{job="kube-state-metrics", owner_kind="ReplicaSet"},
+                      "namespace", "$1", "exported_namespace", "(.+)"),
+                    "pod", "$1", "exported_pod", "(.+)"),
+                  "replicaset", "$1", "owner_name", "(.*)")
+                * on (namespace, replicaset) group_left (owner_name) topk by (namespace, replicaset) (
+                    1, max by (namespace, replicaset, owner_name) (
+                      label_replace(
+                        kube_replicaset_owner{job="kube-state-metrics", owner_kind="Deployment"},
+                        "namespace", "$1", "exported_namespace", "(.+)")
+                    )
+                  ),
+                "workload", "$1", "owner_name", "(.*)")
+            )
+
+        # Standalone ReplicaSets (no Deployment above them).
+        - record: namespace_workload_pod:kube_pod_owner:relabel
+          labels:
+            workload_type: replicaset
+          expr: |
+            max by (namespace, workload, pod) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    label_replace(
+                      kube_pod_owner{job="kube-state-metrics", owner_kind="ReplicaSet"},
+                      "namespace", "$1", "exported_namespace", "(.+)"),
+                    "pod", "$1", "exported_pod", "(.+)"),
+                  "replicaset", "$1", "owner_name", "(.*)")
+                * on (namespace, replicaset) group_left (owner_name) topk by (namespace, replicaset) (
+                    1, max by (namespace, replicaset, owner_name) (
+                      label_replace(
+                        kube_replicaset_owner{job="kube-state-metrics", owner_kind=""},
+                        "namespace", "$1", "exported_namespace", "(.+)")
+                    )
+                  ),
+                "workload", "$1", "replicaset", "(.*)")
+            )
+
+        - record: namespace_workload_pod:kube_pod_owner:relabel
+          labels:
+            workload_type: statefulset
+          expr: |
+            max by (namespace, workload, pod) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    kube_pod_owner{job="kube-state-metrics", owner_kind="StatefulSet"},
+                    "namespace", "$1", "exported_namespace", "(.+)"),
+                  "pod", "$1", "exported_pod", "(.+)"),
+                "workload", "$1", "owner_name", "(.*)")
+            )
+
+        - record: namespace_workload_pod:kube_pod_owner:relabel
+          labels:
+            workload_type: daemonset
+          expr: |
+            max by (namespace, workload, pod) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    kube_pod_owner{job="kube-state-metrics", owner_kind="DaemonSet"},
+                    "namespace", "$1", "exported_namespace", "(.+)"),
+                  "pod", "$1", "exported_pod", "(.+)"),
+                "workload", "$1", "owner_name", "(.*)")
+            )
+
+        # CNPG: postgresql.cnpg.io/v1 Cluster owns its pods directly. The
+        # matcher is on the owner KIND, which is just "Cluster" — today only
+        # CNPG uses that kind here; the workload_type value names CNPG
+        # specifically so the dropdown reads as what it is. If another operator
+        # with an owning kind "Cluster" ever appears, split this rule.
+        - record: namespace_workload_pod:kube_pod_owner:relabel
+          labels:
+            workload_type: cnpg-cluster
+          expr: |
+            max by (namespace, workload, pod) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    kube_pod_owner{job="kube-state-metrics", owner_kind="Cluster"},
+                    "namespace", "$1", "exported_namespace", "(.+)"),
+                  "pod", "$1", "exported_pod", "(.+)"),
+                "workload", "$1", "owner_name", "(.*)")
+            )
+
+        - record: namespace_workload_pod:kube_pod_owner:relabel
+          labels:
+            workload_type: job
+          expr: |
+            max by (namespace, workload, pod) (
+              label_replace(
+                label_replace(
+                  label_replace(
+                    kube_pod_owner{job="kube-state-metrics", owner_kind="Job"},
+                    "namespace", "$1", "exported_namespace", "(.+)"),
+                  "pod", "$1", "exported_pod", "(.+)"),
+                "workload", "$1", "owner_name", "(.*)")
+            )

@@ -2312,6 +2312,30 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The Dashboard V2 wave went red for six minutes on every cold bring-up before
+  repairing itself.** The Grafana Operator applies each `GrafanaManifest`
+  independently and in no guaranteed order, so a dashboard whose
+  `grafana.app/folder` annotation named the folder lost the race against the
+  folder's own manifest and failed with `folders.folder.grafana.app
+  "platform-infrastructure-v2" not found`. Measured: folder `ApplySuccessful`
+  and both dashboards `ApplyFailed` at 01:39, wave `HealthCheckFailed`, then
+  `ApplySuccessful` at 01:44:37 and the wave green at 01:45:14.
+
+  The wave could not ride it out, either: the operator's `resyncPeriod` is 10m
+  while the wave's `timeout` is 5m, so the retry always arrives after the
+  deadline.
+
+  Ordering inside one Kustomization guarantees nothing — only `dependsOn`
+  between two does, which is the same lesson as `clickhouse-keeper-local`
+  gating `clickhouse-local`. obs-as-code v0.5.0 ships the artifact split into
+  `./cluster/manifests/{folders,dashboards}`, and this repo now applies them as
+  two waves with the dashboards depending on the folder. The folder's
+  `nameSuffix` patch moved to the new wave with it.
+
+  v0.5.0 also turns off `allowCustomValue` on the query variables, which was
+  true only because it is the SDK's default and let a reader type a namespace
+  the cluster does not have — an empty panel with nothing saying why.
+
 - **The Dashboard V2 boards were empty for a second reason, and the first fix is
   what exposed it.** Every query variable shipped with nothing selected: V2
   serialises `QueryVariableSpec.Current` whether or not anyone sets it, so an

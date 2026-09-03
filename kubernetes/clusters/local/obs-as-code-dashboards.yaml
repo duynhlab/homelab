@@ -15,7 +15,7 @@ spec:
     kind: OCIRepository
     name: obs-as-code-oci
 
-  path: ./cluster/manifests
+  path: ./cluster/manifests/dashboards
   targetNamespace: monitoring
 
   # Keep the Dashboard V2 trial isolated from the production classic boards.
@@ -23,21 +23,13 @@ spec:
   # change the Grafana resource UIDs, titles and folder UID inside each
   # manifest. Removing this Kustomization rolls back the canary without
   # touching the GrafanaDashboard resources pinned to v0.3.0.
+  #
+  # The folder's own suffix and patch live in obs-as-code-folders.yaml, which
+  # this wave dependsOn — both must carry nameSuffix or the folder UID patched
+  # in below would point at a name the other wave never created.
   nameSuffix: -v2
 
   patches:
-    - target:
-        group: grafana.integreatly.org
-        version: v1beta1
-        kind: GrafanaManifest
-        name: platform-infrastructure-folder
-      patch: |
-        - op: replace
-          path: /spec/template/metadata/name
-          value: platform-infrastructure-v2
-        - op: replace
-          path: /spec/template/spec/title
-          value: Platform / Infrastructure V2
     - target:
         group: grafana.integreatly.org
         version: v1beta1
@@ -79,12 +71,14 @@ spec:
 
   dependsOn:
     - name: monitoring-local
+    # The folder must exist before these are applied. The operator applies
+    # manifests in no guaranteed order, so a dashboard naming a missing folder
+    # fails outright and the wave sits red until the next 10m resync — longer
+    # than this wave's own timeout. See obs-as-code-folders.yaml for the
+    # measurement.
+    - name: obs-as-code-folders-local
 
   healthChecks:
-    - apiVersion: grafana.integreatly.org/v1beta1
-      kind: GrafanaManifest
-      name: platform-infrastructure-folder-v2
-      namespace: monitoring
     - apiVersion: grafana.integreatly.org/v1beta1
       kind: GrafanaManifest
       name: kubernetes-cluster-overview-v2

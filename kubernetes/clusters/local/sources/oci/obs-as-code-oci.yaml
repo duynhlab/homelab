@@ -25,4 +25,21 @@ spec:
     # An exact pin, not a range: this artifact carries dashboards straight to a
     # live Grafana, so a floating constraint would let a board change reach the
     # cluster without a homelab commit recording it.
-    semver: "0.4.1"
+    # 0.4.2 fixes the SECOND cause of empty boards, which the 0.4.1 datasource
+    # fix uncovered rather than caused. Dashboard V2 serialises a query
+    # variable's `current` whether or not anyone set it, so every variable
+    # shipped {"text":"","value":""} and Grafana read that as a real selection
+    # of the empty string. $namespace expanded to "" and the panels filtering on
+    # it matched nothing — 7 of 22 on the cluster overview, and all 11 on the
+    # workloads board.
+    #
+    # The classic boards kept working through the same migration because they
+    # emitted `current: null`, which Grafana resolves from the options. The
+    # regression came from the schema, not from a change of intent.
+    #
+    # MEASURED 2026-09-03 against this backend:
+    #   namespace=~""    ->  1 frame,  0 data points
+    #   namespace=~".*"  -> 28 frames, 28 data points
+    #   workloads with all three variables empty  ->   0 points
+    #   workloads with all three as .*            -> 104 points
+    semver: "0.4.2"

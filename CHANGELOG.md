@@ -2312,6 +2312,26 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The Dashboard V2 boards were empty for a second reason, and the first fix is
+  what exposed it.** Every query variable shipped with nothing selected: V2
+  serialises `QueryVariableSpec.Current` whether or not anyone sets it, so an
+  unset variable carried `{"text":"","value":""}` and Grafana honoured that as a
+  real selection of the empty string rather than "nothing chosen yet".
+  `$namespace` expanded to `""`, so 7 of the 22 panels on the cluster overview
+  and **all 11** on the workloads board matched nothing. The 15 panels that do
+  not filter by namespace kept working, which is exactly the split the owner
+  reported.
+
+  The classic boards survived the same migration because they emitted
+  `current: null`, which Grafana resolves from the options — so the regression
+  came from the schema rather than from any change of intent in the generator.
+
+  Measured here: `namespace=~""` returned 0 data points where `namespace=~".*"`
+  returned 28, and the workloads board went from 0 points to 104. Fixed upstream
+  in obs-as-code v0.4.2, which sets All with an explicit `.*` on all five query
+  variables and adds a conformance rule rejecting a variable that selects
+  nothing. This bumps the pin.
+
 - **Both Dashboard V2 boards rendered empty, and nothing in either repo could
   see it.** The `obs-as-code` generator wrote the datasource's DISPLAY NAME into
   the datasource variable's `current.value`, while Grafana resolves a datasource

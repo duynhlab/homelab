@@ -10,4 +10,19 @@ spec:
   interval: 10m
   url: oci://ghcr.io/duynhlab/obs-as-code
   ref:
-    semver: "0.4.0"
+    # 0.4.1 fixes the defect that made both Dashboard V2 boards render empty:
+    # the generator wrote the datasource's DISPLAY NAME into the datasource
+    # variable's current.value, and Grafana resolves a datasource reference by
+    # uid alone. ${ds} therefore expanded to a string no lookup could match, so
+    # every panel queried nothing while the boards themselves looked fine.
+    #
+    # MEASURED 2026-09-03 against this Grafana, which is how the cause was
+    # isolated — the server log stays silent because the resolution fails in the
+    # browser:
+    #   /api/ds/query uid=victoriametrics-prometheus    -> 76 frames
+    #   /api/ds/query uid=VictoriaMetrics (Prometheus)  -> 404
+    #
+    # An exact pin, not a range: this artifact carries dashboards straight to a
+    # live Grafana, so a floating constraint would let a board change reach the
+    # cluster without a homelab commit recording it.
+    semver: "0.4.1"

@@ -2312,6 +2312,26 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Both Dashboard V2 boards rendered empty, and nothing in either repo could
+  see it.** The `obs-as-code` generator wrote the datasource's DISPLAY NAME into
+  the datasource variable's `current.value`, while Grafana resolves a datasource
+  reference by uid alone — so `${ds}` expanded to a string no lookup could match
+  and every panel queried nothing. The boards existed, the folder existed, Flux
+  was green, and the Grafana server log was silent, because the resolution fails
+  in the browser rather than server-side.
+
+  Isolated by asking Grafana directly rather than reading code:
+  `/api/ds/query` with uid `victoriametrics-prometheus` returns 76 frames while
+  the display name returns 404, and every working V1 board in this repo already
+  put the uid in `current.value` with the label in `current.text`. The PromQL
+  was never at fault — all 37 shipped expressions parse and 36 of 37 return
+  series against the live backend, and all three template variables resolve.
+
+  Fixed upstream in obs-as-code v0.4.1, which also adds the conformance rule
+  that would have caught it: the previous rule proved a panel pointed at a
+  DECLARED variable and never that the variable pointed at something
+  resolvable. This bumps the OCIRepository pin to pick it up.
+
 - **Dashboard V2 rollout failed before applying any manifest.** The Flux custom
   health evaluator used `has(status)`, but CEL's `has()` macro requires a field
   selection and rejects a top-level identifier. Check `status.conditions`

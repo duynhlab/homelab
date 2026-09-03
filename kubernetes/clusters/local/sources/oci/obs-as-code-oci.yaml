@@ -42,4 +42,14 @@ spec:
     #   namespace=~".*"  -> 28 frames, 28 data points
     #   workloads with all three variables empty  ->   0 points
     #   workloads with all three as .*            -> 104 points
-    semver: "0.4.2"
+    # 0.5.0 is a BREAKING layout change, which is why it is a minor bump: the
+    # deployable manifests moved out of ./cluster/manifests into
+    # ./cluster/manifests/{folders,dashboards}, each its own kustomize root, so
+    # this repo can apply them as two waves with the dashboards depending on
+    # the folder. Pinning 0.5.0 without splitting the Kustomization would fail
+    # the build — there is no longer a kustomization at the old path.
+    #
+    # It also turns off allowCustomValue on the query variables, which was true
+    # only because it is the SDK default and let a reader type a namespace the
+    # cluster does not have.
+    semver: "0.5.0"

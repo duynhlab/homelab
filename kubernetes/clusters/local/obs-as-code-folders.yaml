@@ -1,0 +1,95 @@
+---
+# Grafana folder for the Dashboard V2 trial, applied as its own wave so the
+# dashboards can depend on it.
+#
+# Splitting this out is not tidiness. The Grafana Operator applies each
+# GrafanaManifest independently and in no guaranteed order, so a dashboard whose
+# `grafana.app/folder` annotation names a folder that does not exist yet fails
+# outright with:
+#
+#   applying resource: creating resource:
+#   folders.folder.grafana.app "platform-infrastructure-v2" not found
+#
+# MEASURED on a cold bring-up while all three manifests shared one wave: the
+# folder applied, both dashboards failed, and the wave reported
+# HealthCheckFailed for six minutes until the operator's next resync repaired
+# it. The wave could not ride it out either — the operator's resyncPeriod is
+# 10m while the wave timeout is 5m, so the retry always arrives after the
+# deadline.
+#
+# Ordering inside one Kustomization guarantees nothing; only `dependsOn` between
+# two does. Same lesson as clickhouse-keeper-local gating clickhouse-local
+# (RFC-0028 / #962): a wave that gates on nothing is worse than no gate.
+#
+# obs-as-code v0.5.0 ships the artifact already split into
+# ./cluster/manifests/{folders,dashboards}, each its own kustomize root.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: obs-as-code-folders-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: observability
+spec:
+  interval: 10m
+  timeout: 5m
+  retryInterval: 2m
+
+  sourceRef:
+    kind: OCIRepository
+    name: obs-as-code-oci
+
+  path: ./cluster/manifests/folders
+  targetNamespace: monitoring
+
+  # The suffix and the patch keep the V2 trial's folder distinct from the
+  # classic "Platform / Infrastructure" the pinned GrafanaDashboard resources
+  # still use. Removing this Kustomization rolls the folder back without
+  # touching them.
+  nameSuffix: -v2
+
+  patches:
+    - target:
+        group: grafana.integreatly.org
+        version: v1beta1
+        kind: GrafanaManifest
+        name: platform-infrastructure-folder
+      patch: |
+        - op: replace
+          path: /spec/template/metadata/name
+          value: platform-infrastructure-v2
+        - op: replace
+          path: /spec/template/spec/title
+          value: Platform / Infrastructure V2
+
+  prune: true
+
+  dependsOn:
+    - name: monitoring-local
+
+  healthChecks:
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: platform-infrastructure-folder-v2
+      namespace: monitoring
+
+  # GrafanaManifest reports ManifestSynchronized rather than the conventional
+  # Ready condition, so kstatus cannot infer readiness without this contract.
+  healthCheckExprs:
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      inProgress: >-
+        !has(status.conditions) ||
+        status.conditions.filter(e,
+          e.type == 'ManifestSynchronized' &&
+          e.observedGeneration == metadata.generation).size() == 0
+      failed: >-
+        status.conditions.exists(e,
+          e.type == 'ManifestSynchronized' &&
+          e.status == 'False' &&
+          e.observedGeneration == metadata.generation)
+      current: >-
+        status.conditions.exists(e,
+          e.type == 'ManifestSynchronized' &&
+          e.status == 'True' &&
+          e.observedGeneration == metadata.generation)

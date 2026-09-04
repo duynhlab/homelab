@@ -82,8 +82,9 @@ Measured compression on local-stack (see the hub [Operations](README.md#operatio
 
 MergeTree is **not** a Postgres B-tree heap. Writes append **immutable parts**.
 Background **merges** combine parts while keeping the table's `ORDER BY`.
-**Partitions** here are calendar days (`PARTITION BY toDate(Timestamp)`); TTL
-drops whole parts (`ttl_only_drop_parts = 1`) instead of rewriting rows.
+**Partitions** group those parts for lifecycle purposes — here, calendar days
+(`PARTITION BY toDate(Timestamp)`). Why that grain, and what it costs to get it
+wrong, is [Partitions and TTL](#partitions-and-ttl--the-lifecycle-pair) below.
 
 | | PostgreSQL B-tree | ClickHouse MergeTree |
 |---|---|---|
@@ -96,8 +97,6 @@ drops whole parts (`ttl_only_drop_parts = 1`) instead of rewriting rows.
 
 ![Inserts produce parts; background merges combine them while preserving sort order](./image/ch-vldb-fig-03-inserts-merges.png)
 
-*Source: [Architecture overview](https://clickhouse.com/docs/concepts/core-concepts/academic-overview), Figure 3 (VLDB 2024).*
-
 **Sparse primary index** (vendor Figure 4): the index stores the first row's
 sort key of each granule, not every row. A `WHERE` that matches the `ORDER BY`
 prefix can skip granules. A filter on a column that is *not* a prefix (for
@@ -105,8 +104,6 @@ example a bare `TraceId` on `otel_traces`) does **not** get that prune — that
 is why traces also have a bloom skip index and a [materialized view](materialized-views.md).
 
 ![Sparse primary index: one mark per granule, not per row](./image/ch-vldb-fig-04-primary-index.png)
-
-*Source: [Architecture overview](https://clickhouse.com/docs/concepts/core-concepts/academic-overview), Figure 4 (VLDB 2024).*
 
 **Skipping indexes** (minmax, set, bloom, text) are extra prune aids on columns
 that are not the primary sort. **Projections** are an alternative extra
@@ -119,6 +116,122 @@ workloads that rewrite or pre-aggregate in place. OTel ingest here is
 
 Hands-on: [Playground](README.md#playground--mergetree-by-hand) (`system.parts`,
 `EXPLAIN indexes = 1`).
+
+---
+
+## Partitions and TTL — the lifecycle pair
+
+A newcomer's first instinct is that a partition is a kind of index: chop the
+table finer and queries get faster. It is not. **A partition is a lifecycle
+boundary.** Its job is to make *deleting* and *moving* data cheap, and to keep
+the blast radius of maintenance small.
+
+The query win from partitions is real but **coarse**: a `WHERE` on the
+partition key skips whole partitions before a single granule is read. The
+fine-grained win — the one that decides whether a dashboard query is cheap —
+comes from `ORDER BY` and granule skipping
+([schema-and-queries](schema-and-queries.md)). Picking a finer partition to
+"speed up queries" buys very little and costs metadata and part overhead.
+
+### One rule explains the rest
+
+**A part never spans two partitions.** That is why `DROP PARTITION` is a
+directory removal rather than a rewrite — and TTL is just a scheduled delete,
+so it inherits the same economics.
+
+### The alignment rule
+
+**Partition granularity should match TTL granularity.** When every row in a
+part expires at the same moment, expiry becomes a file delete. When it does
+not, ClickHouse has to separate live rows from dead ones *inside* the part.
+
+Which of those happens is decided by MergeTree settings — and the default is
+the expensive one. Values below are read from this cluster's
+`system.merge_tree_settings`:
+
+| Setting | Default here | Meaning |
+|---|---|---|
+| `ttl_only_drop_parts` | **`0`** | Delete expired **rows**, which means **rewriting the part** |
+| `ttl_only_drop_parts = 1` | set per table | Drop the **whole part** — but only once *every* row in it has expired |
+| `merge_with_ttl_timeout` | **`14400`** (4 h) | Minimum delay before repeating a delete-TTL merge over the same data |
+| `max_number_of_merges_with_ttl_in_pool` | **`2`** | Cap so TTL merges cannot starve ordinary merges |
+
+Now the failure mode. Take a **monthly** partition carrying a **15-day** TTL:
+
+- With `ttl_only_drop_parts = 1` the part is dropped only when its *newest* row
+  has also expired. A merged month-wide part therefore survives until roughly
+  **month + 15 days** — the data outlives the retention you wrote down.
+- With `ttl_only_drop_parts = 0` (the default) the rows do disappear on time,
+  but ClickHouse gets there by **rewriting month-sized parts**, and that work
+  can repeat as often as every **4 hours** — not once a day.
+
+Neither is a correctness bug. Both are a bill: either retention nobody asked
+for, or I/O nobody needed. On object storage that I/O is also egress.
+
+```mermaid
+flowchart TB
+  Q["A row reaches its TTL"] --> A{"Does partition granularity<br/>match TTL granularity?"}
+
+  A -->|"aligned — daily partition, day-multiple TTL"| D{"ttl_only_drop_parts"}
+  A -->|"misaligned — monthly partition, 30d TTL"| M{"ttl_only_drop_parts"}
+
+  D -->|"1"| Drop["Whole part dropped<br/>directory delete, near-free"]
+  D -->|"0"| Small["One day's part rewritten<br/>small and bounded"]
+  M -->|"1"| Late["Part survives until the<br/>WHOLE month expires<br/>retention overshoots"]
+  M -->|"0"| Heavy["Month-sized parts rewritten<br/>repeatable every 4h"]
+
+  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  class Q,A,D,M platform;
+  class Drop,Small,Late,Heavy data;
+```
+
+### Read it straight off the partition name
+
+The cheapest way to tell which scheme a table uses is to look at what the
+partition is *called* — `toDate()` yields a date, `toYYYYMM()` yields a month:
+
+```sql
+SELECT table, any(partition) AS example
+FROM system.parts
+WHERE database = 'system' AND active
+GROUP BY table ORDER BY table;
+-- trace_log   2026-09-04   <- daily
+-- metric_log  202609       <- monthly
+```
+
+### What this platform actually runs
+
+Measured on the deployed cluster:
+
+| Tables | `PARTITION BY` | TTL | `ttl_only_drop_parts` | Verdict |
+|---|---|---|---|---|
+| `otel_logs`, `otel_traces`, `otel_traces_trace_id_ts` | `toDate(Timestamp)` — **daily** | 90 d | **`1`** | aligned; expiry is a part drop |
+| `query_log`, `part_log`, `trace_log` | `event_date` — **daily** | 30 d | `0` | aligned; one day rewritten at a time |
+| `processors_profile_log`, `aggregated_zookeeper_log`, `zookeeper_connection_log` | `toYYYYMM(event_date)` — **monthly** | 30 d | `0` | **misaligned** — month-sized rewrites |
+| `metric_log`, `asynchronous_metric_log`, `text_log`, `error_log`, `background_schedule_pool_log` | `toYYYYMM(event_date)` — **monthly** | **none** | `0` | **never expires** |
+
+Two things are worth reading twice.
+
+First, the `otel.*` row is the textbook case, and it is deliberate: daily
+partition + `ttl_only_drop_parts = 1` means a 90-day expiry costs one directory
+delete per table per day.
+
+Second, the operator did the same homework. The Altinity operator ships config
+that **overrides** `query_log`, `part_log` and `trace_log` to
+`PARTITION BY event_date` at the same time as it gives them a 30-day TTL — it
+aligned them on purpose. The three tables that inherit an upstream 30-day TTL
+without that override are the ones left monthly, and they are the misaligned
+row above. Retention for the tables in the last row is an
+[open operational gap](README.md#retention--compression).
+
+### Do not over-partition
+
+Hourly partitions exist, and they are almost always the wrong answer here:
+every partition carries metadata and its own parts, so a finer grain trades a
+lifecycle win you already have for merge pressure you did not need. Reach for
+daily when the volume is large and the lifecycle is measured in days; monthly
+is fine for low-volume tables retained for months.
 
 ---
 
@@ -158,16 +271,12 @@ pipeline, storage, coordination). Grafana on this platform talks **native
 
 ![ClickHouse engine layers from the VLDB architecture overview](./image/ch-vldb-fig-02-architecture.png)
 
-*Source: [Architecture overview](https://clickhouse.com/docs/concepts/core-concepts/academic-overview), Figure 2 (VLDB 2024).*
-
 **Deployed replication** is **1 shard × 3 replicas** with **ClickHouse Keeper**
 holding replica metadata. A replica that loses its Keeper session serves
 reads and refuses writes. Vendor Figure 6 shows replication + Keeper; the
 paper's **2 shard × 2 replica** drawing is **reference, not deployed**.
 
 ![Replication coordinated through ClickHouse Keeper](./image/ch-vldb-fig-06-replication.png)
-
-*Source: [Architecture overview](https://clickhouse.com/docs/concepts/core-concepts/academic-overview), Figure 6 (VLDB 2024).*
 
 ```mermaid
 flowchart TB
@@ -194,6 +303,16 @@ flowchart TB
 Ingest topology (Collector fan-out, metrics never land here) stays on the
 [hub Architecture](README.md#architecture). S3 TTL-move of cold parts is
 **planned** for cloud; Kind uses PVC + TTL **drop**.
+
+**A trap to carry into that planned move:** ClickHouse keeps metadata that
+references every object it wrote, so the object store must never delete parts
+behind its back. A bucket lifecycle rule that expires objects on the same
+schedule as the table TTL will race the engine, and the loser is a query that
+reads metadata pointing at an object that is gone. Give the engine room to
+finish its own cleanup — table TTL first, bucket lifecycle a few days later as
+a **backstop for orphans only**, never as the primary retention mechanism. The
+[alignment rule](#the-alignment-rule) matters more here than on a PVC, because
+a month-sized part rewritten every 4 hours is egress you pay for.
 
 ---
 
@@ -239,4 +358,4 @@ Connect commands: [Playground](README.md#playground--mergetree-by-hand).
 
 ---
 
-_Last updated: 2026-09-04_
+_Last updated: 2026-09-04 — added **Partitions and TTL**: the alignment rule between `PARTITION BY` and TTL granularity, both `ttl_only_drop_parts` modes with the settings read off the deployed cluster, the audit of which `otel.*` and `system.*` tables are aligned, and the object-store lifecycle trap for the planned S3 tier. Inline vendor-figure source links removed (References already cites the overview). Earlier the same day: page created._

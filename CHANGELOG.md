@@ -90,11 +90,47 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Partitions are a lifecycle tool, not an index** — `fundamentals.md` gains a
+  "Partitions and TTL" section: the alignment rule between `PARTITION BY` and
+  TTL granularity, the two `ttl_only_drop_parts` modes with the values read off
+  the deployed cluster (`0` by default, `merge_with_ttl_timeout` 14400s), a
+  decision diagram for what a row's expiry actually costs, and the object-store
+  lifecycle trap to carry into the planned S3 tier.
 - **ClickHouse learning path for logs+traces SRE:** `fundamentals.md` (OLAP vs
   LogsQL, MergeTree, local VLDB figures), `schema-and-queries.md` (ORDER BY →
   `EXPLAIN` granules → codecs on live `otel_*` DDL), and
   `materialized-views.md` (incremental `TO` trace-id table). The hub README
   stays platform + Grafana + alerts + playground.
+
+### Bugfix
+
+#### Docs
+
+- **The ClickHouse disk runbook contradicted its own alert.** The hub told the
+  responder to "grow the PVC" while `ClickHouseDiskCritical` says that is
+  impossible on local-path (hostPath PVs, no quota, no
+  `allowVolumeExpansion`). The runbook now matches the alert and says why the
+  disk ratio measures the node filesystem rather than the 10Gi request.
+- **`system.*` retention was undocumented.** The hub now audits which engine
+  log tables carry a TTL and where it comes from — three from an Altinity
+  operator config override that also re-partitions them daily, three from
+  upstream defaults, and five (`metric_log`, `asynchronous_metric_log`,
+  `text_log`, `error_log`, `background_schedule_pool_log`) with none at all —
+  plus the two constraints that make the fix non-trivial: monthly partitions,
+  and the `*_0` table ClickHouse leaves behind when an engine definition
+  changes.
+- Inline `*Source: …*` links under the vendor figures are dropped per the docs
+  convention against embedding third-party links; figure numbers stay in prose
+  and both files already cite the overview under References.
+
+#### Proposals
+
+- **RFC-0028 research overstated the system-table gap.** Its "vs platform
+  as-built" row read "no TTLs — `query_log` et al. grow unbounded on the 10Gi
+  PVC". Audited on the deployed cluster: `query_log`/`part_log`/`trace_log`
+  carry a 30-day TTL, the untouched set is five tables, and local-path makes
+  the 10Gi request advisory. The remediation column now names the
+  partition-alignment and `*_0`-leftover constraints.
 
 ### Breaking Change
 

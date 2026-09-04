@@ -68,8 +68,6 @@ timestamps per `TraceId` on an ordinary ReplicatedMergeTree.
 
 ![Aggregating materialized view with State combinators — observability rollup pattern, not the deployed trace-id MV](./image/ch-vldb-fig-05-aggregating-mv.png)
 
-*Source: [Architecture overview](https://clickhouse.com/docs/concepts/core-concepts/academic-overview), Figure 5 (VLDB 2024). Contrast only.*
-
 ---
 
 ## How an SRE inspects it

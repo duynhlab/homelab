@@ -82,6 +82,80 @@ spec:
       prometheus/events: "true"
       prometheus/asynchronous_metrics: "true"
       prometheus/errors: "true"
+    # Retention for the engine's OWN log tables. Until this landed the repo
+    # configured none, and what TTL existed came from two places we do not own:
+    # ClickHouse upstream defaults, and three files the Altinity operator injects
+    # (config.d/01-clickhouse-0{3,4,5}-*.xml, giving query_log / part_log /
+    # trace_log 30 days and removing query_thread_log). That left FIVE tables
+    # with no expiry at all, growing for the life of the cluster -- and
+    # system.* tables are plain local MergeTree, so per replica, on each node's
+    # own filesystem. metric_log is the one that matters: ~1,900 columns and one
+    # row per second whether or not anything queries, a fixed cost that does not
+    # scale down when idle.
+    #
+    # PARTITION BY moves WITH the TTL, and that pairing is the point. These five
+    # ship monthly-partitioned (toYYYYMM). A 7-day TTL on a monthly partition is
+    # the misaligned case in docs/observability/clickhouse/fundamentals.md:
+    # ttl_only_drop_parts is 0 by default (verified on this cluster) so expiry
+    # deletes ROWS, which means rewriting month-sized parts to trim 7-day-old
+    # data. Daily partitions make each expiry a bounded, one-day rewrite. This is
+    # exactly what the operator does for its own three tables -- it re-partitions
+    # them daily at the same time as it gives them a TTL.
+    #
+    # `replace="1"` swaps the whole section, so every non-default setting each
+    # table had must be repeated here or it silently reverts. Read off the live
+    # config, and note asynchronous_metric_log flushes at 7000ms, not 7500.
+    #
+    # Verified on clickhouse-server 26.7.3.19 before committing: all five tables
+    # come up with PARTITION BY event_date, TTL 7d, their original sorting key
+    # (asynchronous_metric_log keeps `metric, event_date, event_time`), and their
+    # collect_interval / level / duration_threshold intact.
+    #
+    # ONE MANUAL STEP REMAINS -- see docs/observability/clickhouse/README.md
+    # "The engine's own log tables". Changing a system table's engine definition
+    # does not ALTER it: ClickHouse renames the old table to `<name>_0` and
+    # creates a fresh one, and the renamed copy keeps its rows with NO TTL. Those
+    # have to be dropped per replica or this change frees nothing. The rename is
+    # also LAZY -- measured, it happens at each table's first write after the
+    # config change, so the cleanup cannot be a single pass straight after apply.
+    files:
+      02-system-log-retention.xml: |
+        <clickhouse>
+            <metric_log replace="1">
+                <database>system</database>
+                <table>metric_log</table>
+                <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY (event_date, event_time) TTL event_date + INTERVAL 7 DAY</engine>
+                <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+                <collect_interval_milliseconds>1000</collect_interval_milliseconds>
+            </metric_log>
+            <asynchronous_metric_log replace="1">
+                <database>system</database>
+                <table>asynchronous_metric_log</table>
+                <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY (metric, event_date, event_time) TTL event_date + INTERVAL 7 DAY</engine>
+                <flush_interval_milliseconds>7000</flush_interval_milliseconds>
+            </asynchronous_metric_log>
+            <text_log replace="1">
+                <database>system</database>
+                <table>text_log</table>
+                <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY (event_date, event_time) TTL event_date + INTERVAL 7 DAY</engine>
+                <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+                <level>trace</level>
+            </text_log>
+            <error_log replace="1">
+                <database>system</database>
+                <table>error_log</table>
+                <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY (event_date, event_time) TTL event_date + INTERVAL 7 DAY</engine>
+                <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+                <collect_interval_milliseconds>1000</collect_interval_milliseconds>
+            </error_log>
+            <background_schedule_pool_log replace="1">
+                <database>system</database>
+                <table>background_schedule_pool_log</table>
+                <engine>ENGINE = MergeTree PARTITION BY event_date ORDER BY (event_date, event_time) TTL event_date + INTERVAL 7 DAY</engine>
+                <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+                <duration_threshold_milliseconds>30</duration_threshold_milliseconds>
+            </background_schedule_pool_log>
+        </clickhouse>
     clusters:
       - name: otel
         layout:

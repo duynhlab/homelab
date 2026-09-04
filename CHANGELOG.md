@@ -104,6 +104,24 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Observability
+
+- **The five `system.*` log tables with no expiry now have one.** `metric_log`,
+  `asynchronous_metric_log`, `text_log`, `error_log` and
+  `background_schedule_pool_log` grew for the life of the cluster — ~59 % of all
+  system-log bytes — because this repo configured no `system.*` retention at all
+  and neither upstream nor the Altinity operator covered them. They now carry a
+  **7-day TTL** via `configuration.files` on the `ClickHouseInstallation`, with
+  `PARTITION BY` moved from `toYYYYMM` to `event_date` in the same change:
+  `ttl_only_drop_parts` is `0` here, so a short TTL on a monthly partition means
+  rewriting month-sized parts. Each table's original sorting key and its
+  `collect_interval` / `level` / `duration_threshold` are preserved, since
+  `replace="1"` swaps the whole section. Verified on 26.7.3.19 before commit. One
+  manual step remains and is documented: ClickHouse renames the pre-existing
+  table to `<name>_0` rather than altering it, that copy inherits no TTL, and the
+  rename is lazy — it happens at each table's first write after the change, so
+  the cleanup needs more than one pass.
+
 #### Docs
 
 - **The ClickHouse disk runbook contradicted its own alert.** The hub told the

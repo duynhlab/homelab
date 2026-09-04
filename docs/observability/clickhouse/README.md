@@ -13,7 +13,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 | **Operator** | Altinity `clickhouse-operator` `0.27.3` + a `ClickHouseInstallation` CR and a `ClickHouseKeeperInstallation` CR |
 | **Ingest** | OTel Collector contrib `clickhouse` exporter — fan-out on the **traces + logs** pipelines (metrics stay on VictoriaMetrics — **never** here) |
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), created by the **`clickhouse-schema` Job** from DDL committed in git; the exporter only INSERTs |
-| **Retention** | `otel.*`: **TTL 90 days** (`ttl_only_drop_parts`) vs 7d on the ops primaries — the long-retention payoff. The engine's own `system.*` log tables are a [separate, partly unmanaged story](#the-engines-own-log-tables) |
+| **Retention** | `otel.*`: **TTL 90 days** (`ttl_only_drop_parts`) vs 7d on the ops primaries — the long-retention payoff. The engine's own `system.*` log tables run [7–30 days from three different owners](#the-engines-own-log-tables) |
 | **Storage** | local PVC `standard` `10Gi` **per replica** (cluster) + small keeper PVCs; a named `clickhouse-data` volume (local-stack, which stays single-node) |
 | **Query** | Grafana `grafana-clickhouse-datasource` **4.20.0** (`uid: clickhouse`, native `:9000`) + 5 provisioned dashboards in the **ClickHouse** folder (suite Overview→Logs→Traces, service deep dive, platform SQL) |
 | **App code** | **Unchanged** — `pkg/obsx` / `pkg/grpcx` untouched; adding ClickHouse is a Collector-exporter change |
@@ -223,59 +223,77 @@ ClickHouse exists on this platform.
 #### The engine's own log tables
 
 `otel.*` is only half the disk story. ClickHouse writes its own operational
-history into `system.*` log tables, and **this repository configures no
-retention for any of them**. What TTL exists arrives from two places we do not
-own — upstream server defaults, and three config files the Altinity operator
-injects (`/etc/clickhouse-server/config.d/01-clickhouse-0{3,4,5}-*.xml`).
+history into `system.*` log tables, and the retention on them comes from three
+different places — two of which this platform does not own.
 
-Audited on the deployed cluster:
-
-| `system.*` table | Partition | TTL | Source of the TTL |
+| `system.*` table | Partition | TTL | Owner of the TTL |
 |---|---|---|---|
-| `query_log`, `part_log`, `trace_log` | daily (`event_date`) | 30 d | Altinity operator override |
-| `processors_profile_log`, `aggregated_zookeeper_log`, `zookeeper_connection_log` | monthly | 30 d | upstream default |
-| `metric_log`, `asynchronous_metric_log`, `text_log`, `error_log`, `background_schedule_pool_log` | monthly | **none** | — |
+| `query_log`, `part_log`, `trace_log` | daily (`event_date`) | 30 d | Altinity operator, via `config.d/01-clickhouse-0{3,4,5}-*.xml` |
+| `processors_profile_log`, `aggregated_zookeeper_log`, `zookeeper_connection_log` | monthly | 30 d | ClickHouse upstream default |
+| `metric_log`, `asynchronous_metric_log`, `text_log`, `error_log`, `background_schedule_pool_log` | **daily** | **7 d** | **this repo** — `configuration.files` on the `ClickHouseInstallation` |
 
-The last row is an **open gap**: those tables grow for the life of the cluster.
-`metric_log` is the one to watch — it carries roughly 1,900 columns and writes
-a row every second whether or not anything is querying, so it is a fixed cost
-that does not scale down with idle traffic. `system.*` tables are ordinary
-local `MergeTree` (not replicated), so the growth is per replica, on each
-node's own filesystem.
-
-Two things make the fix less trivial than adding a `<ttl>`:
-
-1. Those tables are **monthly-partitioned**, so a short TTL on them lands in
-   the misaligned case described in
-   [Partitions and TTL](fundamentals.md#the-alignment-rule) — partition and TTL
-   have to move together.
-2. Changing a system table's engine definition does **not** alter the existing
-   table. ClickHouse renames it (`metric_log` → `metric_log_0`) and creates a
-   new one; the renamed table keeps its rows and inherits **no** TTL. Any fix
-   has to drop the `_0` leftovers, per replica, or it frees nothing.
+Before the last row existed, those five had **no expiry at all** and grew for the
+life of the cluster: ~59 % of all system-log bytes at 46 minutes uptime.
+`metric_log` is the one that matters — roughly 1,900 columns and one row per
+second whether or not anything is querying, a fixed cost that does not scale down
+when idle. `system.*` tables are ordinary local `MergeTree`, not replicated, so
+that growth is **per replica**, on each node's own filesystem.
 
 `query_thread_log` is absent by design — the same operator config removes it.
+
+**Why the partition key moves with the TTL.** All five shipped monthly
+(`toYYYYMM`). A 7-day TTL on a monthly partition is the misaligned case in
+[Partitions and TTL](fundamentals.md#the-alignment-rule): `ttl_only_drop_parts`
+is `0` by default here, so expiry deletes rows, which means rewriting
+month-sized parts to trim 7-day-old data. Daily partitions make each expiry a
+bounded one-day rewrite. The operator reached the same conclusion for its own
+three tables.
 
 > Count these yourself rather than trusting the table. ClickHouse creates a
 > system log table **lazily**, on its first write, so a freshly built cluster
 > shows fewer of them than one that has been running for days —
-> `query_views_log`, `asynchronous_insert_log` and `blob_storage_log` all
-> arrive later. The audit above is a fresh cluster; the shape of the finding
-> (which tables the operator manages, which upstream manages, which nobody
-> does) is what is stable.
+> `query_views_log`, `asynchronous_insert_log` and `blob_storage_log` all arrive
+> later, carrying upstream defaults. What is stable is the shape: which tables
+> the operator manages, which upstream manages, and which this repo manages.
 
 ```sql
 -- the audit, re-run: which engine log tables have an expiry, and on what grain
 SELECT name, partition_key,
-       if(position(create_table_query, ' TTL ') = 0, 'NONE', 'has TTL') AS ttl
+       if(position(create_table_query, 'TTL event_date + toIntervalDay') = 0,
+          'NONE', 'has TTL') AS ttl
 FROM system.tables
 WHERE database = 'system' AND engine = 'MergeTree'
 ORDER BY ttl, name;
 ```
 
-Watch the `' TTL '` spacing in that predicate: `metric_log` has ~1,900 columns
-and one of their *comments* contains the word TTL, so a bare
-`position(create_table_query,'TTL')` reports a TTL the table does not have.
+**Do not shorten that predicate.** Neither `'TTL'` nor `' TTL '` works:
+`metric_log` has ~1,900 columns and one of their *comments* reads `"... TTL
+remove requests successfully enqueued"`, so both forms report a TTL the table
+does not have. Match the clause, or read what follows `ORDER BY`.
+
+##### After changing a system table's engine: drop the `_0` leftovers
+
+Changing the engine definition does **not** ALTER the table. ClickHouse renames
+the old one to `<name>_0` and creates a fresh one; the renamed copy keeps every
+row and inherits **no** TTL. Skip this and the change frees nothing.
+
+The rename is **lazy** — measured on 26.7.3.19, it happens at each table's first
+write after the config change, not at startup. So this cannot be a single pass
+straight after apply: re-run it until nothing is returned.
+
+```bash
+# per replica -- system.* tables are local, so all three need it
+for i in 0 1 2; do
+  kubectl exec -n monitoring chi-clickhouse-otel-0-${i}-0 -- \
+    clickhouse-client --password="$CH_PASSWORD" --query "
+      SELECT name, formatReadableSize(total_bytes)
+      FROM system.tables
+      WHERE database='system' AND match(name, '_log_[0-9]+$')"
+done
+```
+
+Drop what that lists (`DROP TABLE system.<name>_0 SYNC`), then repeat after a
+few hours to catch the tables that had not been written to yet.
 
 ### Query examples
 
@@ -835,4 +853,4 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-04 — Retention now audits the engine's own `system.*` log tables: six carry a TTL (three from an Altinity operator override that also re-partitions them daily), five carry none, and the fix is constrained by monthly partitioning plus the `*_0` table left behind when an engine definition changes. The `ClickHouseDiskCritical` runbook no longer says "grow the PVC", which its own alert calls impossible on local-path. Earlier the same day: engine learning split into fundamentals / schema-and-queries / materialized-views; this hub stays platform + Grafana + alerts + playground._
+_Last updated: 2026-09-04 — the five unmanaged `system.*` log tables now carry a **7-day TTL owned by this repo**, with `PARTITION BY` moved to daily in the same change because a short TTL on a monthly partition is the misaligned case; a new sub-section covers the lazy `_0` rename the change leaves behind. The audit predicate was also corrected — neither `'TTL'` nor `' TTL '` is safe, both match a column comment in `metric_log`. Earlier the same day: Retention began auditing the engine's own `system.*` log tables: six carry a TTL (three from an Altinity operator override that also re-partitions them daily), five carry none, and the fix is constrained by monthly partitioning plus the `*_0` table left behind when an engine definition changes. The `ClickHouseDiskCritical` runbook no longer says "grow the PVC", which its own alert calls impossible on local-path. Earlier the same day: engine learning split into fundamentals / schema-and-queries / materialized-views; this hub stays platform + Grafana + alerts + playground._

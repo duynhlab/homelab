@@ -209,7 +209,7 @@ Measured on the deployed cluster:
 | `otel_logs`, `otel_traces`, `otel_traces_trace_id_ts` | `toDate(Timestamp)` — **daily** | 90 d | **`1`** | aligned; expiry is a part drop |
 | `query_log`, `part_log`, `trace_log` | `event_date` — **daily** | 30 d | `0` | aligned; one day rewritten at a time |
 | `processors_profile_log`, `aggregated_zookeeper_log`, `zookeeper_connection_log` | `toYYYYMM(event_date)` — **monthly** | 30 d | `0` | **misaligned** — month-sized rewrites |
-| `metric_log`, `asynchronous_metric_log`, `text_log`, `error_log`, `background_schedule_pool_log` | `toYYYYMM(event_date)` — **monthly** | **none** | `0` | **never expires** |
+| `metric_log`, `asynchronous_metric_log`, `text_log`, `error_log`, `background_schedule_pool_log` | `event_date` — **daily** | 7 d | `0` | aligned; set by this repo after they shipped monthly with no TTL at all |
 
 Two things are worth reading twice.
 
@@ -222,8 +222,12 @@ that **overrides** `query_log`, `part_log` and `trace_log` to
 `PARTITION BY event_date` at the same time as it gives them a 30-day TTL — it
 aligned them on purpose. The three tables that inherit an upstream 30-day TTL
 without that override are the ones left monthly, and they are the misaligned
-row above. Retention for the tables in the last row is an
-[open operational gap](README.md#retention--compression).
+row above.
+
+The last row is this platform's own work, and it is the same lesson applied: the
+five tables shipped monthly-partitioned with no TTL, so giving them a 7-day
+expiry meant moving `PARTITION BY` to daily in the same change. Details and the
+`_0` cleanup it requires: [the engine's own log tables](README.md#the-engines-own-log-tables).
 
 ### Do not over-partition
 
@@ -358,4 +362,4 @@ Connect commands: [Playground](README.md#playground--mergetree-by-hand).
 
 ---
 
-_Last updated: 2026-09-04 — added **Partitions and TTL**: the alignment rule between `PARTITION BY` and TTL granularity, both `ttl_only_drop_parts` modes with the settings read off the deployed cluster, the audit of which `otel.*` and `system.*` tables are aligned, and the object-store lifecycle trap for the planned S3 tier. Inline vendor-figure source links removed (References already cites the overview). Earlier the same day: page created._
+_Last updated: 2026-09-04 — the platform audit table now shows the five formerly unmanaged `system.*` tables on a 7-day TTL with daily partitions, set by this repo. Earlier the same day: added **Partitions and TTL**: the alignment rule between `PARTITION BY` and TTL granularity, both `ttl_only_drop_parts` modes with the settings read off the deployed cluster, the audit of which `otel.*` and `system.*` tables are aligned, and the object-store lifecycle trap for the planned S3 tier. Inline vendor-figure source links removed (References already cites the overview). Earlier the same day: page created._

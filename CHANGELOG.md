@@ -94,8 +94,7 @@ Skeleton (copy what you need):
   LogsQL, MergeTree, local VLDB figures), `schema-and-queries.md` (ORDER BY →
   `EXPLAIN` granules → codecs on live `otel_*` DDL), and
   `materialized-views.md` (incremental `TO` trace-id table). The hub README
-  stays platform + Grafana + alerts + playground; ingest topology is also in
-  `clickhouse-architecture.drawio`.
+  stays platform + Grafana + alerts + playground.
 
 ### Breaking Change
 

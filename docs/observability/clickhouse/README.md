@@ -126,9 +126,6 @@ flowchart LR
   class VM,VL,VT,CH data;
 ```
 
-Ingest topology (1 shard × 3, PVC vs planned S3) is also in
-[`clickhouse-architecture.drawio`](clickhouse-architecture.drawio).
-
 **Logs-first analytics.** Traces are head-sampled at the edge (50% cluster baseline / 100% local), so
 `otel_traces` counts undercount real traffic; `otel_logs` is **100% unsampled**
 and is the counting workhorse. Traces are exemplars joined back on `trace_id`.

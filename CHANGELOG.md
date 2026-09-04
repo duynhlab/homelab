@@ -2312,6 +2312,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Every query-variable dropdown on the Dashboard V2 boards was empty, so the
+  pickers were stuck on `All`.** A Prometheus variable query is not PromQL, and
+  the `label_values()` expression sat in the datasource query's `expr` field —
+  where Grafana hands it to VictoriaMetrics as PromQL and gets back `422:
+  unsupported function "label_values"`. Nothing went red: panels use real
+  PromQL and rendered (25/25 and 11/12 expressions returned data), `All` works
+  because it substitutes `allValue: ".*"` without needing options, and Flux,
+  the operator, the conformance rules and the test suite were all green. The
+  classic string form that every V1 board uses cannot be expressed in V2, whose
+  `QueryVariableSpec.query` is a `DataQueryKind` with no string variant. Fixed
+  in obs-as-code v0.5.1, which puts the expression in `query` beside `qryType`
+  — the shape the working Envoy, CloudNativePG and PGDog boards on this cluster
+  already use — and adds a rule rejecting `expr` on a variable. Found by
+  looking at the board; no query-level check could see it.
+
 - **The Dashboard V2 wave went red for six minutes on every cold bring-up before
   repairing itself.** The Grafana Operator applies each `GrafanaManifest`
   independently and in no guaranteed order, so a dashboard whose

@@ -88,6 +88,15 @@ Skeleton (copy what you need):
   retaining the classic `GrafanaDashboard.spec.oci` resources at v0.3.0, so
   both delivery paths can be compared and rolled back independently.
 
+#### Docs
+
+- **ClickHouse learning path for logs+traces SRE:** `fundamentals.md` (OLAP vs
+  LogsQL, MergeTree, local VLDB figures), `schema-and-queries.md` (ORDER BY →
+  `EXPLAIN` granules → codecs on live `otel_*` DDL), and
+  `materialized-views.md` (incremental `TO` trace-id table). The hub README
+  stays platform + Grafana + alerts + playground; ingest topology is also in
+  `clickhouse-architecture.drawio`.
+
 ### Breaking Change
 
 #### Gateway

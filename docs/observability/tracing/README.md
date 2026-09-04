@@ -15,7 +15,7 @@ Track requests as they flow through multiple microservices to understand perform
 **Technologies:**
 - **OpenTelemetry**: Industry-standard tracing instrumentation
 - **VictoriaTraces**: the fast trace path (`v0.11.0`, VM-operator-managed, VictoriaLogs engine) — PVC-backed, **7-day** retention, queried through the Jaeger API and, experimentally, TraceQL; see [victoriatraces.md](victoriatraces.md)
-- **ClickHouse**: `otel_traces`, **90-day** SQL tier with a `trace_id` JOIN against `otel_logs` ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)); see [clickhouse](../clickhouse/README.md)
+- **ClickHouse**: `otel_traces`, **90-day** SQL tier with a `trace_id` JOIN against `otel_logs` ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)); see [clickhouse](../clickhouse/README.md), [schema-and-queries](../clickhouse/schema-and-queries.md), [materialized-views](../clickhouse/materialized-views.md)
 - **W3C Trace Context**: Standard for trace propagation between services
 - **Retired**: Tempo and Jaeger were removed under [RFC-0027](../../proposals/rfc/RFC-0027/README.md) ([ADR-058](../../proposals/adr/ADR-058-retire-jaeger/), [ADR-059](../../proposals/adr/ADR-059-retire-tempo/)). Their manifests stay in the tree as `*.yaml.bak`, and what running them taught is archived in [tempo.md](tempo.md) and [jaeger.md](jaeger.md) — frozen, kept as learning material
 - **Span metrics**: RED series are derived by the collector's `span_metrics` **connector**, not by a trace backend ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)) — so they no longer depend on which store survives

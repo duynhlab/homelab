@@ -12,7 +12,7 @@ every ingest contract, retention, and the scale-out path. Collection is
 |---|---|
 | **Deployment** | `VLSingle` CRD (VM Operator), name `victoria-logs`, ns `monitoring` |
 | **Service** | `vlsingle-victoria-logs.monitoring.svc` `:9428` |
-| **Retention** | `7d`, 20Gi PVC (ClickHouse `otel_logs` is the 90-day second store) |
+| **Retention** | `7d`, 20Gi PVC (ClickHouse `otel_logs` is the 90-day second store — [schema-and-queries](../clickhouse/schema-and-queries.md)) |
 | **Ingest** | `/insert/jsonline` (Vector) · `/insert/opentelemetry/v1/logs` (Collector) |
 | **Query** | LogsQL — `/select/logsql/query` + Grafana datasource `victorialogs` |
 | **Manifest** | [`kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml`](../../../kubernetes/infra/configs/observability/logging/victorialogs/vlsingle.yaml) |
@@ -206,7 +206,7 @@ Pipeline-side failures (nothing ingested at all, PG plans missing) are
 - [Vector pipeline](vector.md) · [LogsQL guide](logsql-guide.md)
 - [Application logging (app contract)](../../api/logs.md) — the
   [OTel LogRecord data model](../../api/logs.md#otel-log-data-model) every exported record follows
-- [ClickHouse `otel_logs`](../clickhouse/README.md) — the 90-day SQL second store
+- [ClickHouse `otel_logs`](../clickhouse/README.md) — the 90-day SQL second store ([schema-and-queries](../clickhouse/schema-and-queries.md))
 - [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/) ·
   [data ingestion](https://docs.victoriametrics.com/victorialogs/data-ingestion/) ·
   [VLSingle operator resource](https://docs.victoriametrics.com/operator/resources/vlsingle/)

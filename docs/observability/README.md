@@ -455,6 +455,9 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [ClickHouse OTel logs+traces OLAP](clickhouse/README.md) -- deployed supplementary OLAP; long-retention SQL + trace_id JOIN ([RFC-0019](../proposals/rfc/RFC-0019/) · [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/))
+- [ClickHouse fundamentals](clickhouse/fundamentals.md) -- OLAP vs search, MergeTree, 1×3 vs VLDB paper
+- [ClickHouse schema and queries](clickhouse/schema-and-queries.md) -- ORDER BY → EXPLAIN granules → codecs
+- [ClickHouse materialized views](clickhouse/materialized-views.md) -- incremental `TO` trace-id table
 - [Grafana on ClickHouse](clickhouse/README.md#grafana) -- datasource OTel mapping, Explore + trace-log linking, dashboard grammar, and the standard suite (Overview → Logs Explorer → Trace Explorer with in-dashboard waterfall)
 
 ---

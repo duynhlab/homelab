@@ -233,7 +233,7 @@ Connect commands: [Playground](README.md#playground--mergetree-by-hand).
 
 - [Architecture overview (academic / VLDB 2024)](https://clickhouse.com/docs/concepts/core-concepts/academic-overview)
 - [MergeTree](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree)
-- [Choosing a primary key](https://clickhouse.com/docs/guides/best-practices/choosing-a-primary-key)
+- [Choosing a primary key](https://clickhouse.com/docs/best-practices/choosing-a-primary-key)
 - Platform: [ClickHouse hub](README.md) · [schema-and-queries](schema-and-queries.md) · [materialized views](materialized-views.md)
 - Postgres contrast: [storage and WAL](../../databases/fundamentals/storage-and-wal.md)
 

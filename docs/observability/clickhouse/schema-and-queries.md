@@ -207,17 +207,16 @@ ReplicatedMergeTree is a mutation; it is not a playground first step.
 ## Operations snippets
 
 Full connect + `system.parts` recipes: [Playground](README.md#playground--mergetree-by-hand).
-Vietnamese ops notes (unchanged by this learning split): [van-hanh.vi.md](van-hanh.vi.md).
 
 ---
 
 ## References
 
 - [Schema design](https://clickhouse.com/docs/data-modeling/schema-design)
-- [Choosing a primary key](https://clickhouse.com/docs/guides/best-practices/choosing-a-primary-key)
+- [Choosing a primary key](https://clickhouse.com/docs/best-practices/choosing-a-primary-key)
 - [EXPLAIN](https://clickhouse.com/docs/sql-reference/statements/explain)
 - [Column compression codecs](https://clickhouse.com/docs/sql-reference/statements/create/table#column-compression-codecs)
-- [Observability schema design](https://clickhouse.com/docs/observability/schema-design)
+- [Observability schema design](https://clickhouse.com/docs/use-cases/observability/schema-design)
 - DDL: [`configmap-schema.yaml`](../../../kubernetes/infra/configs/clickhouse-schema/configmap-schema.yaml)
 - [Fundamentals](fundamentals.md) · [Materialized views](materialized-views.md) · [Hub](README.md)
 

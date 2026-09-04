@@ -34,7 +34,7 @@ All datasources are managed as `GrafanaDatasource` CRDs (GitOps, no manual confi
 | VictoriaMetrics (Prometheus) | `prometheus` | No | same VMSingle URL | prometheus-TYPE alias — what `query: prometheus` datasource variables (Envoy Gateway, Temporal, cert-manager, VM self-boards) resolve against |
 | VictoriaLogs | `victoriametrics-logs-datasource` | No | `vlsingle-victoria-logs:9428` | Log queries (LogsQL), trace correlation, [plugin](https://grafana.com/grafana/plugins/victoriametrics-logs-datasource/) |
 | VictoriaTraces | `jaeger` | No | `vtsingle…:10428/select/jaeger` | Trace queries + node graph. The **type** stays `jaeger` — that is the query API VictoriaTraces serves, not a leftover deployment ([RFC-0027](../../proposals/rfc/RFC-0027/README.md)) |
-| ClickHouse | `grafana-clickhouse-datasource` | No | `clickhouse…:9000` | SQL over `otel.otel_logs` / `otel.otel_traces` (RFC-0019) |
+| ClickHouse | `grafana-clickhouse-datasource` | No | `clickhouse…:9000` | SQL over `otel.otel_logs` / `otel.otel_traces` (RFC-0019) — [ClickHouse Grafana chapter](../clickhouse/README.md#grafana), [schema-and-queries](../clickhouse/schema-and-queries.md) |
 | Pyroscope | `grafana-pyroscope-datasource` | No | `pyroscope:4040` | Flamegraphs |
 
 See [datasources.md](datasources.md) for metrics datasource details and Grafana Alerting UI notes.

@@ -86,7 +86,8 @@ your head.
 No measurement of ClickHouse against VictoriaTraces or VictoriaLogs exists on this
 platform, and the public claims do not settle it either: both ClickHouse and
 VictoriaLogs publish their compression advantage against *Elasticsearch and Loki*,
-not against each other. Treat any sizing statement here as unproven.
+not against each other. Treat any sizing statement here as unproven. Reading `EXPLAIN indexes = 1` on
+the live `otel_*` tables: [schema-and-queries](../clickhouse/schema-and-queries.md).
 
 ## References
 

@@ -171,7 +171,9 @@ The platform standardised on VictoriaLogs and **removed Loki** (CHANGELOG
 `v0.83.0` architectural switch, `v0.94.0` dead-manifest cleanup): one **ops** backend
 instead of two, native trace correlation, and `auto_explain` plan analysis out of the box.
 The ClickHouse tier added later by [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)
-is a deliberate second store for long-retention SQL, not a second ops system.
+is a deliberate second store for long-retention SQL (`GROUP BY`, correlation over
+90 days), **not** a second LogsQL engine and not a replacement for find/triage —
+[schema-and-queries](../clickhouse/schema-and-queries.md).
 
 | | **VictoriaLogs** (chosen) | Loki | ELK / OpenSearch |
 |---|---|---|---|
@@ -263,7 +265,8 @@ logging/
 
 App-side contract (how services emit logs): [`../../api/logs.md`](../../api/logs.md).
 The Collector's logs pipeline: [`../opentelemetry/collector.md`](../opentelemetry/collector.md).
-The 90-day SQL store: [`../clickhouse/README.md`](../clickhouse/README.md).
+The 90-day SQL store: [`../clickhouse/README.md`](../clickhouse/README.md)
+([fundamentals](../clickhouse/fundamentals.md), [schema-and-queries](../clickhouse/schema-and-queries.md)).
 
 ## Operations quick-start
 
@@ -292,6 +295,7 @@ blank-Grafana-panel case in
 - [VictoriaLogs store](victorialogs.md) · [Vector pipeline](vector.md) · [LogsQL guide](logsql-guide.md)
 - [Application logging (app contract)](../../api/logs.md) — includes the [OTel LogRecord data model](../../api/logs.md#otel-log-data-model) every exported record follows (SeverityNumber, Body, Resource, trace correlation)
 - [OpenTelemetry Collector](../opentelemetry/collector.md) — the logs pipeline this hub's OTLP path runs through (VictoriaLogs + ClickHouse fan-out)
+- [ClickHouse](../clickhouse/README.md) · [fundamentals](../clickhouse/fundamentals.md) · [schema and queries](../clickhouse/schema-and-queries.md)
 - [Observability overview](../README.md) · [Grafana datasources](../grafana/datasources.md)
 - [External API auth (planned)](../metrics/victoriametrics.md#vmauth--vmauth-planned) — VMAuth in the VictoriaMetrics stack doc
 - [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/) · [LogsQL](https://docs.victoriametrics.com/victorialogs/logsql/) · [Vector docs](https://vector.dev/docs/)

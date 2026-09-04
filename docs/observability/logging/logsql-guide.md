@@ -14,7 +14,7 @@ against this cluster before being written down.
 | **Golden rule** | Address logs by stream first (`_stream:{...}`), then filter fields |
 | **Trap #1** | App services stream on `"service.name"`; Vector-shipped pods stream on `service` — not interchangeable |
 | **Trap #2** | App records carry `severity_text` (OTLP model); only Vector-path records carry `level` |
-| **Retention** | 7 days — for older data, SQL on ClickHouse [`otel_logs`](../clickhouse/README.md) (90d) |
+| **Retention** | 7 days — for older data, SQL on ClickHouse [`otel_logs`](../clickhouse/README.md) (90d); how to prune granules: [schema-and-queries](../clickhouse/schema-and-queries.md) |
 
 ---
 
@@ -209,7 +209,8 @@ _time:6h | stats by ("service.name") count() as n | sort by (n desc) | limit 10
 Since [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/) the edge's
 **access logs are not in VictoriaLogs** — they are ClickHouse-only, where the
 questions they answer live (SQL aggregations + `JOIN otel_traces ON TraceId`;
-[hub § edge](README.md#edge-logs-adr-061-access--clickhouse-runtime--victorialogs)).
+[hub § edge](README.md#edge-logs-adr-061-access--clickhouse-runtime--victorialogs);
+[schema-and-queries](../clickhouse/schema-and-queries.md)).
 One representative SQL (Grafana → ClickHouse datasource / otel-logs-explorer):
 
 ```sql

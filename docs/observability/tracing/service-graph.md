@@ -109,6 +109,9 @@ ORDER BY callCount DESC
 In the dashboard panel the two `now() - INTERVAL 24 HOUR` bounds are
 `$__fromTime` / `$__toTime`, so the table follows the time picker.
 
+To see whether this self-join prunes granules (`EXPLAIN indexes = 1`), use
+[schema-and-queries](../clickhouse/schema-and-queries.md).
+
 Result on the Kind cluster, 2026-08-25, immediately after the K0–K6 gate:
 
 ```
@@ -190,7 +193,7 @@ Note the cluster's ClickHouse user is **not** the local-stack one — compose us
 - [ADR-059 — Retire Tempo](../../proposals/adr/ADR-059-retire-tempo/README.md) — the decision, its trade, and when to re-open it
 - [VictoriaTraces](victoriatraces.md) — the backend and its Jaeger-API surface
 - [Tracing architecture](architecture.md) — how spans reach both stores
-- [ClickHouse](../clickhouse/README.md) — the OTel schema and retention
+- [ClickHouse](../clickhouse/README.md) — the OTel schema and retention ([schema-and-queries](../clickhouse/schema-and-queries.md))
 - [Grafana](../grafana/README.md) — datasources, dashboards and how they are provisioned
 
 ---

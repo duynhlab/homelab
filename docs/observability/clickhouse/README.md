@@ -31,18 +31,17 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 2. [Reading path](#reading-path)
 3. [What ClickHouse is](#what-clickhouse-is)
 4. [Core components](#core-components)
-5. [MergeTree mechanism](#mergetree-mechanism)
-6. [Architecture](#architecture)
-7. [How it works in this platform](#how-it-works-in-this-platform)
-8. [Operations](#operations)
-9. [Grafana](#grafana) — datasource, Explore, dashboard grammar, the standard suite
-10. [Metrics & alerting](#metrics--alerting) — engine-health scrape, alert catalog, runbook stubs
-11. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
-12. [Glossary](#glossary)
-13. [ClickHouse vs PostgreSQL](#clickhouse-vs-postgresql)
-14. [Commerce analytics (Phase A — not deployed)](#commerce-analytics-phase-a--not-deployed)
-15. [FAQ](#faq)
-16. [References](#references)
+5. [Architecture](#architecture)
+6. [How it works in this platform](#how-it-works-in-this-platform)
+7. [Operations](#operations)
+8. [Grafana](#grafana) — datasource, Explore, dashboard grammar, the standard suite
+9. [Metrics & alerting](#metrics--alerting) — engine-health scrape, alert catalog, runbook stubs
+10. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
+11. [Glossary](#glossary)
+12. [Where each store belongs](#where-each-store-belongs)
+13. [Commerce analytics (Phase A — not deployed)](#commerce-analytics-phase-a--not-deployed)
+14. [FAQ](#faq)
+15. [References](#references)
 
 ---
 
@@ -63,10 +62,12 @@ or for the primary observability stack.
 
 ## Reading path
 
-1. **Foundations** — [What ClickHouse is](#what-clickhouse-is) → [MergeTree](#mergetree-mechanism) → [vs PostgreSQL](#clickhouse-vs-postgresql)
-2. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform)
-3. **Use it** — [Operations](#operations) → [Playground](#playground--mergetree-by-hand)
-4. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
+1. **Engine** — [fundamentals](fundamentals.md) (OLAP, columnar, MergeTree, 1×3 vs the VLDB paper)
+2. **Junior skill** — [schema-and-queries](schema-and-queries.md) (`ORDER BY` → `EXPLAIN` granules → codecs last)
+3. **Trace-id lookup** — [materialized-views](materialized-views.md) (incremental `TO`, not a Postgres index)
+4. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Operations](#operations) → [Grafana](#grafana)
+5. **Hands-on** — [Playground](#playground--mergetree-by-hand)
+6. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
 
 Pair with the PostgreSQL [storage and WAL fundamentals](../../databases/fundamentals/storage-and-wal.md)
 if you already know Postgres heap / WAL / B-tree.
@@ -75,45 +76,14 @@ if you already know Postgres heap / WAL / B-tree.
 
 ## What ClickHouse is
 
-**ClickHouse** is an open-source **OLAP** (Online Analytical Processing) database
-built for aggregation over huge row counts, time-series/event analytics, and
-near-real-time dashboards after append ingest. It is **not** a replacement for
-PostgreSQL orders, payments, or user accounts — those are **OLTP** workloads on
-CNPG (`product-db`, `platform-db`).
+**ClickHouse** is an open-source **OLAP** database: append ingest, columnar
+parts, SQL aggregation. On this platform it is the **90-day** store for
+`GROUP BY`, percentiles, and `trace_id` correlation — not LogsQL "find this
+line", and not a replacement for PostgreSQL OLTP.
 
-### OLAP vs OLTP
-
-| | OLTP (PostgreSQL) | OLAP (ClickHouse) |
-|---|---|---|
-| Typical question | "Order #123 for user X?" | "Error rate by service over 30 days?" |
-| Write pattern | Frequent UPDATE/DELETE, ACID | Append INSERT, read-heavy aggregation |
-| Indexing | B-tree on heap | Sparse index on sort key + skipping indexes |
-| Read scale | Point lookup, moderate joins | Column scans, large aggregations |
-
-> **In plain terms:** aggregation folds many rows into a few meaningful numbers —
-> `COUNT` failures by service, `quantile` latency by operation. OLTP answers
-> *"what is this row?"*; OLAP answers *"how does the whole set look?"*.
-
-### Columnar storage
-
-PostgreSQL is **row-oriented** (a page holds many columns of one row). ClickHouse
-is **column-oriented** (each column is its own file inside a **part**).
-`SELECT ServiceName, count()` reads only the `ServiceName` column files — and
-compresses them hard because a column holds like values (see the **10.5×**
-compression measured [below](#operations)).
-
-```mermaid
-flowchart LR
-  subgraph rowStore ["PostgreSQL — row pages"]
-    Page["8KB page<br/>all columns of a row together"]
-  end
-  subgraph colStore ["ClickHouse — column files in a part"]
-    C1["ServiceName file"]
-    C2["Duration file"]
-    C3["Timestamp file"]
-  end
-  Q["SELECT ServiceName, count()"] --> C1
-```
+Full engine lesson (OLAP vs OLTP vs search, columnar files, MergeTree,
+VLDB figures, 1 shard × 3 vs the paper's 2×2): **[fundamentals.md](fundamentals.md)**.
+Making `otel_*` queries cheap: **[schema-and-queries.md](schema-and-queries.md)**.
 
 ---
 
@@ -126,35 +96,10 @@ flowchart LR
 | **Table engine** | Storage semantics — **MergeTree** is the analytics default |
 | **Part** | Immutable on-disk chunk produced by an insert batch |
 | **Granule** | ~8192-row read unit; the sparse index points at the first row of each granule |
-| **Materialized view** | Here, `otel_traces_trace_id_ts` — a trace-id→time-range index for fast single-trace lookup |
+| **Materialized view** | Incremental `TO` table `otel_traces_trace_id_ts` — [materialized-views.md](materialized-views.md) |
 
----
-
-## MergeTree mechanism
-
-MergeTree is **not** a Postgres B-tree row store.
-
-| | PostgreSQL B-tree | ClickHouse MergeTree |
-|---|---|---|
-| Primary purpose | Point lookup / range on heap | Sort + prune granules for scans |
-| Write path | Update pages / WAL | Append new **parts** |
-| Background | Autovacuum / checkpoints | **Merges** combining parts |
-
-**Insert → part → merge:**
-
-```mermaid
-flowchart LR
-  I1["INSERT batch"] --> P1["Part 1"]
-  I2["INSERT batch"] --> P2["Part 2"]
-  P1 & P2 --> Merge["Background merge"]
-  Merge --> PMerged["Larger part<br/>same sort order"]
-```
-
-The sparse primary index stores **one entry per granule** (the first row's sort
-key), not a row-level index. Skipping indexes (minmax, set, bloom) are optional
-secondary pruning. This is exactly what the deployed `otel_traces` table uses —
-see its **real DDL** in [Operations](#operations) and watch pruning happen in the
-[Playground](#playground--mergetree-by-hand).
+MergeTree parts, sparse granules, and skipping indexes: [fundamentals](fundamentals.md).
+Prove prune on the live tables: [Playground](#playground--mergetree-by-hand).
 
 ---
 
@@ -245,10 +190,12 @@ SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1;
 
 - **`ORDER BY (ServiceName, SpanName, …)`** — the sparse index; filtering by
   `ServiceName` prunes granules (proven in the [Playground](#playground--mergetree-by-hand)).
+  Why that prefix, and how to read `EXPLAIN`: [schema-and-queries](schema-and-queries.md).
 - **`PARTITION BY toDate(Timestamp)`** + **`ttl_only_drop_parts = 1`** — TTL drops
   whole day-partitions, so 90-day expiry is a cheap `DROP PARTITION`, not a rewrite.
 - **`bloom_filter` on `TraceId`** + the `otel_traces_trace_id_ts` materialized view
-  make single-trace lookups fast despite the service-first sort key.
+  make single-trace lookups fast despite the service-first sort key —
+  [materialized-views](materialized-views.md).
 - **`ENGINE = ReplicatedMergeTree`** with no arguments — the server's
   `default_replica_path` (`/clickhouse/tables/{uuid}/{shard}`) and
   `default_replica_name` (`{replica}`) apply, so every `CREATE` mints a fresh
@@ -713,6 +660,9 @@ Envoy Gateway (`<gateway>.<namespace>`, locally `platform` in
 `envoy-gateway-system`) — not configured, and environment-dependent since it
 embeds the namespace.
 
+How to turn that `Granules: a/b` line into a habit on `otel_logs` too:
+[schema-and-queries](schema-and-queries.md).
+
 ### 4. Inspect partitions & TTL
 
 ```sql
@@ -733,6 +683,9 @@ SHOW CREATE TABLE otel.otel_traces_trace_id_ts_mv;
 --   service-sorted main table.
 ```
 
+Inspect `system.parts` on the **target** table `otel_traces_trace_id_ts`, then
+`EXPLAIN` both tables: [materialized-views](materialized-views.md).
+
 > **Safe to experiment:** local-stack storage is ephemeral. `CREATE TABLE playground …`,
 > insert rows, `OPTIMIZE`, and `DROP` freely — you cannot hurt the ops primaries.
 
@@ -747,29 +700,26 @@ SHOW CREATE TABLE otel.otel_traces_trace_id_ts_mv;
 | **Granule** | Default ~8192-row read block |
 | **Sparse index** | Index of first-row keys per granule (from `ORDER BY`) |
 | **Skipping index** | Extra prune aid (minmax / set / bloom) |
-| **Materialized view** | Incrementally maintained derived table (here: `trace_id` index) |
+| **Materialized view** | Incremental `TO` table (here: `trace_id` time range) — [materialized-views.md](materialized-views.md) |
 | **TTL** | Time-based expiry; here drops whole day-partitions |
 | **CHI** | `ClickHouseInstallation` — the Altinity operator's CR |
+| **Keeper** | ClickHouse Keeper quorum — replica metadata; lost session → replica read-only |
+| **`TO` table** | Storage target of an incremental MV; `system.parts` is inspected here, not on the view |
+| **Sparse primary index** | One mark per granule from `ORDER BY` — see [fundamentals](fundamentals.md) |
 
 ---
 
-## ClickHouse vs PostgreSQL
+## Where each store belongs
 
-| Dimension | PostgreSQL (deployed) | ClickHouse (deployed) |
-|-----------|----------------------|----------------------|
-| Workload | OLTP — orders, users, payments | OLAP — OTel logs/traces SQL |
-| Consistency | Full ACID | OLAP tradeoffs; not a source of truth |
-| Updates | First-class | Prefer append; mutations are expensive |
-| Joins | Strength | Prefer denormalized; `trace_id` JOIN is the key use here |
-
-**Where each belongs on this platform:**
+Engine contrast (Postgres B-tree vs MergeTree, VL vs CH): [fundamentals](fundamentals.md).
+On this platform:
 
 | Need | Store |
 |------|-------|
 | Order/payment source of truth | PostgreSQL (`product-db` / `platform-db`) |
 | RED metrics, alerting | VictoriaMetrics |
-| Live ops log/trace triage | VictoriaLogs / VictoriaTraces |
-| Long-retention SQL on OTel logs/traces, `trace_id` JOIN | **ClickHouse** |
+| Live ops log/trace triage (7d) | VictoriaLogs / VictoriaTraces |
+| Long-retention SQL, `GROUP BY`, `trace_id` JOIN (90d) | **ClickHouse** |
 
 ---
 
@@ -812,14 +762,15 @@ dev password in local-stack.
 
 ## References
 
+- Learning: [fundamentals](fundamentals.md) · [schema and queries](schema-and-queries.md) · [materialized views](materialized-views.md)
+- [Architecture overview (VLDB 2024)](https://clickhouse.com/docs/concepts/core-concepts/academic-overview)
 - [ClickHouse docs — MergeTree](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree)
 - [Altinity clickhouse-operator](https://github.com/Altinity/clickhouse-operator)
 - [OpenTelemetry Collector — ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter)
 - [Grafana ClickHouse datasource](https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/) · [ClickHouse docs — Using Grafana](https://clickhouse.com/docs/observability/grafana)
-- [Grafana ClickHouse datasource](https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/)
 - Design: [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)
 - Observability hub: [`docs/observability/README.md`](../README.md)
 
 ---
 
-_Last updated: 2026-08-28 — **schema ownership moved out of the collector**: a committed-DDL bootstrap Job now creates the `otel` database as `ENGINE = Replicated` and its tables, and the exporter runs `create_schema: false` ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). Exporter-owned `ON CLUSTER` DDL was measured reaching 1 of 3 then 2 of 3 replicas, and upstream recommends `create_schema: false` for production to prevent exactly that startup race. Earlier the same day: the store became 1 shard × 3 replicas on a ClickHouse Keeper quorum with the engine-native `:9363` scrape enabled per replica; two corrections found while writing it — the per-pod endpoint is `:9363`, not `:8001`, and the § Alerts count had been stale since three rules were deleted in August._
+_Last updated: 2026-09-04 — engine learning split into fundamentals / schema-and-queries / materialized-views; this hub stays platform + Grafana + alerts + playground._

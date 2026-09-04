@@ -274,6 +274,9 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 7. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 8. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 9. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
+    - [Fundamentals](./observability/clickhouse/fundamentals.md) - OLAP vs LogsQL, MergeTree, deployed 1×3
+    - [Schema and queries](./observability/clickhouse/schema-and-queries.md) - ORDER BY, EXPLAIN granules, codecs
+    - [Materialized views](./observability/clickhouse/materialized-views.md) - incremental `TO` trace-id table
 10. **[Logging](./observability/logging/README.md)** - Hub: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
     - [VictoriaLogs store](./observability/logging/victorialogs.md) - streams model, VLSingle, ingest contracts, retention
     - [Vector pipeline](./observability/logging/vector.md) - DaemonSet, transforms, PG plans/pgaudit, self-monitoring
@@ -358,6 +361,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [ClickHouse OTel OLAP](./observability/clickhouse/README.md) - Deployed supplementary OLAP; OTel logs/traces SQL ([RFC-0019](./proposals/rfc/RFC-0019/))
+- [ClickHouse fundamentals](./observability/clickhouse/fundamentals.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md)
 - [Logging (platform)](./observability/logging/README.md) - OTLP app logs + Vector for non-instrumented pods
 - [Application logging](./api/logs.md) - App-side logging contract (libraries, levels, JSON fields)
 - [Application observability](./api/observability.md) - Cross-cutting policy, env, middleware, three-layer spans

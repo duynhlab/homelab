@@ -81,12 +81,52 @@ spec:
   values:
     server:
       replicaCount: 1
+      # Shared default for frontend / matching / worker. `history` overrides it
+      # below -- it is the only service that carries the 512 history shards, and
+      # measurement says it needs an order of magnitude more than its siblings.
       resources:
         requests:
           cpu: 50m
           memory: 128Mi
         limits:
           memory: 512Mi
+      # history-only sizing. The chart takes a per-service override:
+      # server-deployment.yaml renders
+      #   default $.Values.server.resources $serviceValues.resources
+      # so a non-empty server.history.resources wins over the block above
+      # (verified in chart 1.6.0, not assumed).
+      #
+      # Measured, not guessed. On this platform history steadily used **337m
+      # CPU** against a 50m request -- 6.7x over -- and its RSS reached
+      # **363Mi of the shared 512Mi limit (71%)** while acquiring shards, versus
+      # 16-20Mi for frontend, matching and worker. The old block was one profile
+      # copied across four services with very different jobs.
+      #
+      # Headroom here is 2.8x the observed 363Mi rather than this repo's usual
+      # ~1.75x, for two reasons. First, that 363Mi is a floor and not a steady
+      # state: it was recorded on a cluster where shard acquisition never
+      # finished, so history had not yet reached its working set. Second, cgroup
+      # v2 charges **socket buffers** to the same limit, and history holds
+      # connections for every shard -- measured on that cluster,
+      # `memory.events` reported `sock_throttled` climbing 189 -> 243 in 40s
+      # with no OOM at all, which is memory pressure that never shows up as a
+      # kill.
+      #
+      # Deliberately no CPU limit: throttling the service that owns the shards
+      # is worse than letting it burst on an idle node.
+      #
+      # This does NOT address the restarts seen on every cold bring-up. Those
+      # are a startup race, not memory -- the services boot before the
+      # `temporal-schema` Job has run and exit 1 on
+      # `relation "schema_version" does not exist`, with `oom_kill 0`. Raising
+      # memory cannot fix an ordering problem.
+      history:
+        resources:
+          requests:
+            cpu: 300m
+            memory: 384Mi
+          limits:
+            memory: 1Gi
       metrics:
         # vmagent runs selectAllByDefault, so a plain ServiceMonitor is scraped
         # with no extra labels; the temporal PrometheusRule matches
@@ -114,6 +154,39 @@ spec:
                 secretKey: password
                 createDatabase: false # pre-created by CNPG postInitSQL; role has no CREATEDB
                 manageSchema: true
+                # Persistence pool, sized against numHistoryShards above.
+                #
+                # A History Shard is, in the vendor's words, "a unit of
+                # scalability that maps to a single persistence partition,
+                # representing the number of concurrent database operations
+                # possible". This platform declares 512 of them and, until this
+                # landed, left the pool at the server default -- measured on the
+                # cluster, history held FOUR connections. The two halves of the
+                # same setting were two orders of magnitude apart.
+                #
+                # 20 rather than anything near 512, because this config file is
+                # shared: ONE `temporal-config` ConfigMap is mounted by
+                # frontend, history, matching AND worker (verified on the
+                # cluster), and each opens its own pool per datastore. So the
+                # ceiling is 4 services x 2 datastores x maxConns = 8 x 20 = 160
+                # against `platform-db`'s 197 usable connections
+                # (max_connections 200 - superuser_reserved 3), which is shared
+                # with Keycloak and the app fleet (~12 in use). Raising
+                # max_connections is the lever if this ever binds; the worst
+                # case does not materialise at homelab load.
+                #
+                # maxIdleConns is half maxConns deliberately: the pool was
+                # observed churning (8 connections in `starting` state at one
+                # sample), so some warm capacity is worth holding, but holding
+                # 160 idle connections on a shared database is not.
+                #
+                # NOT a chart or server defect. The chart documents these keys
+                # and renders them correctly (verified against chart 1.6.0); it
+                # simply has no default, and nothing warns when shards greatly
+                # exceed the pool.
+                maxConns: 20
+                maxIdleConns: 10
+                maxConnLifetime: 1h
             visibility:
               sql:
                 pluginName: postgres12
@@ -125,6 +198,11 @@ spec:
                 secretKey: password
                 createDatabase: false
                 manageSchema: true
+                # Same reasoning as the default datastore above; the
+                # visibility store is the other half of the 8-pool ceiling.
+                maxConns: 20
+                maxIdleConns: 10
+                maxConnLifetime: 1h
         # Replaces the retired TemporalNamespace CRD: the chart's namespace job
         # registers `mop` with the same 7-day retention the platform ran before.
         namespaces:

@@ -122,6 +122,28 @@ Skeleton (copy what you need):
   rename is lazy — it happens at each table's first write after the change, so
   the cleanup needs more than one pass.
 
+#### Temporal
+
+- **`numHistoryShards: 512` was running against a four-connection pool.** A
+  History Shard is the vendor's unit of concurrent database operations, so 512
+  of them declare capacity for 512 concurrent persistence calls — while
+  `maxConns` was never set and history was measured holding **four** connections
+  to `platform-db`. The two halves of one setting were two orders of magnitude
+  apart, and the shard count itself was inherited from the retired operator
+  rather than chosen. Both datastores now set `maxConns: 20` /
+  `maxIdleConns: 10` / `maxConnLifetime: 1h`, sized against a real budget: one
+  `temporal-config` ConfigMap is shared by frontend, history, matching and
+  worker, so the ceiling is 8 pools x 20 = 160 of `platform-db`'s 197 usable
+  connections. `server.history.resources` also gets its own profile — 1Gi limit
+  and a 300m CPU request against the 50m it had while steadily using 337m, and
+  71% of the old shared 512Mi limit. Not a chart or server defect: the chart
+  documents these keys and renders them correctly, it simply has no default and
+  nothing warns when shards greatly exceed the pool. Proven by a one-variable
+  experiment on a rebuilt cluster: history log errors fell from **9,337 to 0 per
+  minute**, `GetTimerTasks` from **19.2 s to 0.87 s**, both `WorkerDeployment`
+  CRs reached `Current`, and `apps-local` went Ready for the first time — 29/29
+  Kustomizations.
+
 #### Docs
 
 - **The ClickHouse disk runbook contradicted its own alert.** The hub told the

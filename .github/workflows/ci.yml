@@ -34,7 +34,7 @@ jobs:
         uses: fluxcd/pkg/actions/kubeconform@dfc427c54394de76e0053c2eba45699fad01c3b4 # main 2026-08-19
 
       - name: Setup kustomize
-        uses: fluxcd/pkg/actions/kustomize@dfc427c54394de76e0053c2eba45699fad01c3b4 # main 2026-08-19
+        uses: fluxcd/pkg/actions/kustomize@c437e4fbd78f4be7376d78d980add852ff6aa329 # main 2026-08-19
 
       # Pinned to the engine the cluster runs: chart 3.8.2 ships Kyverno
       # v1.18.2. A CLI ahead of the engine can agree with itself and disagree

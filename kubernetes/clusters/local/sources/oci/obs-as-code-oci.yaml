@@ -52,4 +52,13 @@ spec:
     # It also turns off allowCustomValue on the query variables, which was true
     # only because it is the SDK default and let a reader type a namespace the
     # cluster does not have.
-    semver: "0.5.0"
+    #
+    # 0.5.1 makes the query-variable dropdowns populate at all. Before it, the
+    # label_values() expression sat in the datasource query's expr field, so
+    # Grafana handed it to VictoriaMetrics as PromQL and got back
+    # `unsupported function "label_values"` — leaving every picker with no
+    # options and stuck on All. The expression now sits in query alongside
+    # qryType, the shape the working boards on this cluster already use.
+    # Panels were unaffected throughout, which is why nothing here went red and
+    # a reader looking at the dropdown is what found it.
+    semver: "0.5.1"

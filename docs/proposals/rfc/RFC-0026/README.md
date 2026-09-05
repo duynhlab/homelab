@@ -316,6 +316,12 @@ replace the human reading `describe-version`.
   `OrderSagaNotCompleting`, remains the backstop for the failure mode this RFC removes.
 - **ADR-055** is where the backlog and schedule-to-start alerts belong, because that is when
   something can act on them.
+- **Domain doc (2026-09-05):** the operating side of all this is distilled into
+  [`docs/platform/worker-autoscaling.md`](../../../platform/worker-autoscaling.md) — the
+  spin-off this RFC's research earns under the Proposals mechanism. It carries what a
+  reader needs to *run* the thing (add a scaler, tune the numbers, pause safely, upgrade
+  KEDA) plus the mechanics the Kind drill exposed that neither this RFC nor the ADR
+  predicted.
 
 ## Rollout & rollback
 

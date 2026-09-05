@@ -297,6 +297,16 @@ Skeleton (copy what you need):
   changes); and sunset delays that **add**, so making them equal widens the flap
   window instead of closing it. Two Mermaid diagrams, both rendered before commit.
   Linked from the docs index and the platform hub.
+  Completed as RFC-0026's **domain spin-off** under the Proposals mechanism — the
+  RFC and its `research.md` now link forward to it and it links back to both, and
+  it gained the day-2 half that was missing: adding a scaler to a new worker (with
+  the two sentinel traps that make a wrong one look healthy), a tuning table with
+  the Temporal API budget the poll spends, how rollout/drain/retirement interact,
+  how to pause a rendered `ScaledObject` without putting the controller back into
+  managed mode, and the 2.21 upgrade grep. Same pass added a dated correction to
+  `RFC-0026/research.md`: its "a metric a self-hosted server does not publish" line
+  is false — the analysis is left standing because it is what the research gate was
+  passed on, with the measured reality recorded beside it.
 
 - **Partitions are a lifecycle tool, not an index** — `fundamentals.md` gains a
   "Partitions and TTL" section: the alignment rule between `PARTITION BY` and

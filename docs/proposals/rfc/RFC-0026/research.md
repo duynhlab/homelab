@@ -252,6 +252,21 @@ returns the backlog directly"*.
 > for a self-hosted server it is the shorter path — and the only one that can start
 > from zero pollers.
 
+> **Correction, 2026-09-05 (measured, not re-read).** The sentence above about a metric
+> "a self-hosted server does not publish" is wrong, and it survived into the first draft
+> of ADR-055 before a live query caught it. This platform's matching service **does**
+> publish `approximate_backlog_count` per `worker_build_id` / `worker_deployment_name` /
+> `task_type` / `partition` — 87 series on a loaded cluster — and ADR-055's own
+> `TemporalTaskQueueBacklogGrowing` alerts on exactly that. What is genuinely missing is
+> the **pipeline**, not the signal: no external-metrics adapter is installed, and
+> upstream's HPA recipe selects on `temporal_approximate_backlog_count` with
+> `temporal_worker_*` label names this server does not emit, so the HPA path needs an
+> adapter *and* a relabeling layer. The conclusion holds; the reason did not. The
+> paragraph is left standing rather than rewritten because it is what the gate was
+> passed on — see [`docs/platform/worker-autoscaling.md`](../../../platform/worker-autoscaling.md)
+> § 2 for the corrected version, and for the 16-second measurement that turned out to be
+> the stronger argument anyway.
+
 ---
 
 ## Glossary

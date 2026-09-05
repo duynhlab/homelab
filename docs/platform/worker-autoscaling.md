@@ -11,7 +11,8 @@ only showed up when the design was run on a real cluster instead of read about.
 | **Who renders the scaler** | Temporal Worker Controller `v1.9.0` — one `ScaledObject` per *worker version*, from a `WorkerResourceTemplate` |
 | **Bounds** | `minReplicaCount: 1`, `maxReplicaCount: 3`, `targetQueueSize: 5`, `cooldownPeriod: 120` |
 | **Who owns `replicas`** | The autoscaler. `spec.replicas` is **absent** from both `WorkerDeployment` CRs |
-| **Design records** | [ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/), [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/), [RFC-0026](../proposals/rfc/RFC-0026/) |
+| **Design records** | [ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/) (the KEDA decision), [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) (who owns the version lifecycle) |
+| **Distilled from** | [RFC-0026](../proposals/rfc/RFC-0026/) § Observability & SLO impact and [`research.md`](../proposals/rfc/RFC-0026/research.md) § Autoscaling mechanics — this page is that RFC's domain spin-off, plus what the Kind drill added |
 | **Alerts** | [§8c KEDA](../observability/alerting/alert-catalog.md#8c-keda-autoscaling) + the two Temporal capacity rules in [§8](../observability/alerting/alert-catalog.md#8-temporal--pyroscope--watchdog) |
 
 ---
@@ -277,34 +278,130 @@ period expires — comfortably inside one 15-second KEDA poll.
 
 ## Operations
 
-```bash
-# Is the scaler rendered, and did the controller inject the version identity?
-kubectl get scaledobject -A -o yaml | yq '.items[].spec.triggers'
-#   expect workerDeploymentName: order/order-fulfillment, workerDeploymentBuildId,
-#   namespace: mop — all three written by the controller from "" sentinels
+### Add a scaler to a new worker
 
-# Does the autoscaler own replicas?
+Four things have to line up. Three of them are copied; the fourth is the one
+people get wrong.
+
+1. **The template** — copy `kubernetes/apps/order-fulfillment-scaler.yaml`. Change
+   `metadata.name`, `metadata.namespace`, `spec.workerDeploymentRef.name`, and
+   `triggers[0].metadata.taskQueue`. `taskQueue` must equal the worker's
+   `TASK_QUEUE` env value exactly — it is the one trigger field the controller
+   does **not** inject, so a typo here scales on a queue that does not exist and
+   the scaler quietly reports a backlog of zero forever.
+2. **Leave the three sentinels as `""`.** `workerDeploymentName`,
+   `workerDeploymentBuildId` and `namespace` are controller-owned. Present-and-empty
+   means "inject"; **absent means "leave alone"**, which silently scales on the whole
+   queue instead of this version's share; non-empty is rejected by the webhook.
+   Same for `scaleTargetRef: {}`.
+3. **Remove `spec.replicas`** from the worker's `WorkerDeployment` (§1).
+   `make validate` fails if you forget.
+4. **Nothing to add to the KEDA release.** `ScaledObject` is already in
+   `workerResourceTemplate.allowedResources`, which drives both the webhook
+   allow-list and the controller's RBAC.
+
+Then `make validate && make sync`, and verify with the block below.
+
+### Verify a scaler after any change
+
+```bash
+# 1. Did the controller render one per live version, and inject the identity?
+kubectl get scaledobject -A -o yaml | yq '.items[] | {
+  "name": .metadata.name, "target": .spec.scaleTargetRef.name,
+  "trigger": .spec.triggers[0].metadata }'
+#    expect workerDeploymentName: <ns>/<wd-name>, workerDeploymentBuildId: <build>,
+#    namespace: mop — all three written by the controller from the "" sentinels
+
+# 2. Does the autoscaler actually own replicas?
 kubectl -n order get wd order-fulfillment -o jsonpath='{.spec.replicas}'   # must print nothing
 
-# What does KEDA think the backlog is, versus what the metric says?
-#   keda_scaler_metrics_value{scaler="temporalScaler"}
-#   sum by (taskqueue, task_type, worker_version) (approximate_backlog_count)
+# 3. Is the HPA healthy, or starved of its metric?
+kubectl -n order describe hpa | grep -E "ScalingActive|AbleToScale|FailedGetExternalMetric"
 
-# Prove an alert can fire (the only proof there is)
-kubectl -n keda scale deploy keda-operator-metrics-apiserver --replicas=0   # then back to 1
-kubectl -n order describe hpa | grep -E "ScalingActive|FailedGetExternalMetric"
+# 4. Per-version status, including render failures the webhook let through
+kubectl get workerresourcetemplate -A -o jsonpath='{.items[*].status.versions}' | jq .
 ```
+
+### Tune the numbers
+
+| Knob | Now | Raise it when | Cost of raising |
+|---|---|---|---|
+| `targetQueueSize` | `5` | scale-out is too twitchy — desired replicas is `ceil(backlog / target)`, so `5` first scales out at a backlog of 6 | slower reaction to a real burst |
+| `maxReplicaCount` | `3` | the queue stays deep at max — `KubeHPAMaxedOut` is the signal | Kind has been CPU-starved before; check node allocatable first |
+| `minReplicaCount` | `1` | — | **do not lower.** A draining version with no pollers stalls its pinned workflows silently. Scale-from-zero is declined here on purpose |
+| `pollingInterval` | `15s` | the API budget binds (below) | up to `pollingInterval` of extra latency before a burst is seen |
+| `cooldownPeriod` | `120s` | replicas flap after a spike | idle pods held longer |
+
+**The API budget.** KEDA polls rather than scrapes, against
+`FrontendGlobalWorkerDeploymentReadRPS = 50` per Temporal namespace. The cost is
+`(number of ScaledObjects) / pollingInterval` requests per second — two templates
+at one version each on a 15 s poll is **≈ 0.13 RPS**, under 0.3 % of the budget.
+It only becomes a real constraint in the hundreds of queues × versions; the
+upstream table puts 250 scalers on a 10 s poll at half the budget.
+
+### Rollouts, rollbacks and retirement
+
+Nothing here needs a human step, but three interactions are worth knowing:
+
+- **A new build id gets its own `ScaledObject`** as soon as its Deployment exists,
+  and the old one keeps its own. That is the entire reason the scaler is a
+  *template* — a hand-attached HPA would keep pointing at the outgoing Deployment.
+- **A draining version keeps `minReplicaCount: 1`** until the server reports it
+  drained. Do not "clean it up" by hand.
+- **Retirement is `scaledownDelay: 1h` then an immediate delete** (`deleteDelay: 0s`).
+  Both the Deployment and its `ScaledObject` go in the same reconcile — see §6 for
+  why any gap between the two is a flap rather than a grace period.
+
+### Pause scaling safely
+
+For a drain drill or a debugging session, pause the **rendered** `ScaledObject`
+rather than patching replicas — patching `WorkerDeployment.spec.replicas` puts the
+controller back into managed mode and reintroduces §1.
+
+```bash
+SO=$(kubectl -n order get scaledobject -o name | head -1)
+kubectl -n order annotate $SO autoscaling.keda.sh/paused=true --overwrite
+# ... do the thing, then:
+kubectl -n order annotate $SO autoscaling.keda.sh/paused-
+```
+
+`handlePaused` returns before any scaling logic, so the replica count freezes
+where it is. Note the controller re-renders the object on reconcile — check the
+annotation survived if the pause needs to outlive a rollout.
+
+### Upgrading KEDA
+
+`2.21` **removes** three trigger fields that `2.20` only deprecates: `buildId`,
+`selectAllActive`, `selectUnversioned`. Neither template here uses them, so the
+bump is expected to be uneventful — grep before believing it:
+
+```bash
+grep -rE "buildId|selectAllActive|selectUnversioned" kubernetes/apps/*-scaler.yaml
+```
+
+Also unused on purpose: `includeRunningWorkflowCount` (2.20), because the Floor
+rule already keeps one replica.
+
+### Signals
 
 Labels to expect on `keda_*` series: KEDA stamps its own `namespace` (the
 `ScaledObject`'s), and the ServiceMonitor scrape stamps the target's — so KEDA's
 becomes **`exported_namespace`**. Dashboards and alerts filter on that, not on
 `namespace`.
 
+| Where | What |
+|---|---|
+| Dashboard | Workflows / Async → **KEDA — Worker Autoscaling** (`uid: keda`) |
+| KEDA's own health | [§8c](../observability/alerting/alert-catalog.md#8c-keda-autoscaling) — 4 rules, [runbooks](../observability/runbooks/keda/README.md) |
+| Whether scaling is *working* | `TemporalTaskQueueBacklogGrowing` and `TemporalScheduleToStartLatencyHigh` (§8). These fire when the scaler is at its ceiling, not rendered, or failing its poll |
+| The only proof an alert can fire | break the thing and watch (§4) |
+
 ## References
 
 - [ADR-055 — KEDA worker autoscaling](../proposals/adr/ADR-055-keda-worker-autoscaling/) — the decision, and the drill results in § As-built
 - [ADR-054 — Temporal Worker Controller](../proposals/adr/ADR-054-temporal-worker-controller/) — who owns the version lifecycle
 - [Alert catalog §8c](../observability/alerting/alert-catalog.md#8c-keda-autoscaling) and [runbooks/keda/](../observability/runbooks/keda/README.md)
+- [RFC-0026](../proposals/rfc/RFC-0026/) and its [`research.md`](../proposals/rfc/RFC-0026/research.md) — the proposal this page is distilled from; § Autoscaling mechanics is the `WorkerResourceTemplate` deep dive
 - [`docs/api/temporal.md`](../api/temporal.md) — worker versioning from the application side
 - KEDA Temporal scaler — <https://keda.sh/docs/latest/scalers/temporal/>
 

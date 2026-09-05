@@ -16,6 +16,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/CertManagerCertExpiringSoon.md"
             summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 7 days"
             description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} will expire in {{ $value | humanizeDuration }}."
 
@@ -25,6 +26,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/CertManagerCertExpiryCritical.md"
             summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 24 hours"
             description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} will expire in {{ $value | humanizeDuration }}. Immediate action required."
 
@@ -34,5 +36,6 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/CertManagerCertNotReady.md"
             summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} is not ready"
             description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} has not been issued or renewed. Check cert-manager logs."

@@ -31,5 +31,6 @@ spec:
             severity: critical
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/observability/OtelCollectorDown.md"
             summary: "OTel collector is down ({{ $labels.instance }})"
             description: "The OpenTelemetry collector target has been down for more than 5 minutes — application metrics, traces and logs (the whole OTLP path) are not being ingested."

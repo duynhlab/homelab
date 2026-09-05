@@ -26,5 +26,6 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/observability/PolicyReporterDown.md"
             summary: "Policy Reporter is down ({{ $labels.instance }})"
             description: "Policy Reporter target {{ $labels.instance }} (job {{ $labels.job }}) has been down for more than 10 minutes — Kyverno PolicyReports are still being written and policy enforcement is unaffected, but kyverno.duynh.me and the policy metrics are unavailable. Fall back to `kubectl get policyreport -A`."

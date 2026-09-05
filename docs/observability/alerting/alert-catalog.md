@@ -303,14 +303,14 @@ Per-alert runbooks: [`runbooks/kubernetes/README.md`](../runbooks/kubernetes/REA
 
 | Alert | Sev | Metric & trigger | Impact | for | Runbook |
 |-------|-----|------------------|--------|-----|---------|
-| EtcdMembersDown 💤 | critical | `up{etcd}==0` | Quorum / split-brain risk; state at risk | 3m | — |
-| EtcdHighFsyncDurations 💤 | warning | WAL fsync P99 >0.5s | Leader instability | 10m | — |
-| EtcdHighCommitDurations 💤 | warning | commit P99 >0.25s | API/controller latency | 10m | — |
-| EtcdHighNumberOfLeaderChanges 💤 | warning | >3 elections/1h | Cluster instability | 5m | — |
-| CoreDNSDown | critical | `absent(up{kube-dns}==1)` | All DNS fails — cluster networking broken | 5m | — |
-| CoreDNSHighErrorRate | warning | SERVFAIL >3% | Service discovery failing | 10m | — |
-| KubeletDown | critical | `absent(up{kubelet}==1)` | Pod lifecycle unmanageable | 5m | — |
-| KubeletTooManyPods | warning | running/capacity >90% | Scheduling will fail | 15m | — |
+| EtcdMembersDown 💤 | critical | `up{etcd}==0` | Quorum / split-brain risk; state at risk | 3m | [EtcdMembersDown](../runbooks/kubernetes/EtcdMembersDown.md) |
+| EtcdHighFsyncDurations 💤 | warning | WAL fsync P99 >0.5s | Leader instability | 10m | [EtcdHighFsyncDurations](../runbooks/kubernetes/EtcdHighFsyncDurations.md) |
+| EtcdHighCommitDurations 💤 | warning | commit P99 >0.25s | API/controller latency | 10m | [EtcdHighCommitDurations](../runbooks/kubernetes/EtcdHighCommitDurations.md) |
+| EtcdHighNumberOfLeaderChanges 💤 | warning | >3 elections/1h | Cluster instability | 5m | [EtcdHighNumberOfLeaderChanges](../runbooks/kubernetes/EtcdHighNumberOfLeaderChanges.md) |
+| CoreDNSDown | critical | `absent(up{kube-dns}==1)` | All DNS fails — cluster networking broken | 5m | [CoreDNSDown](../runbooks/kubernetes/CoreDNSDown.md) |
+| CoreDNSHighErrorRate | warning | SERVFAIL >3% | Service discovery failing | 10m | [CoreDNSHighErrorRate](../runbooks/kubernetes/CoreDNSHighErrorRate.md) |
+| KubeletDown | critical | `absent(up{kubelet}==1)` | Pod lifecycle unmanageable | 5m | [KubeletDown](../runbooks/kubernetes/KubeletDown.md) |
+| KubeletTooManyPods | warning | running/capacity >90% | Scheduling will fail | 15m | [KubeletTooManyPods](../runbooks/kubernetes/KubeletTooManyPods.md) |
 
 **Network** (`network-rules.yaml`)
 
@@ -330,9 +330,9 @@ Source: `prometheusrules/gitops/flux-alerts.yaml`, `prometheusrules/gitops/cert-
 | FluxKustomizationNotReady | critical | Kustomization ready=False | Manifests not applied | 5m | [FluxKustomizationNotReady](../runbooks/gitops/FluxKustomizationNotReady.md) |
 | FluxSourceNotReady | critical | source ready=False | Whole pipeline frozen | 10m | [FluxSourceNotReady](../runbooks/gitops/FluxSourceNotReady.md) |
 | FluxReconcileDurationHigh | warning | reconcile P99 >300s | Slow deploy cycles | 15m | [FluxReconcileDurationHigh](../runbooks/gitops/FluxReconcileDurationHigh.md) |
-| CertManagerCertExpiringSoon | warning | expiry <7d | TLS will fail → HTTPS breaks | 1h | — |
-| CertManagerCertExpiryCritical | critical | expiry <24h | Imminent TLS outage | 15m | — |
-| CertManagerCertNotReady | warning | ready=False | Issuance/renewal failed | 15m | — |
+| CertManagerCertExpiringSoon | warning | expiry <7d | TLS will fail → HTTPS breaks | 1h | [CertManagerCertExpiringSoon](../runbooks/gitops/CertManagerCertExpiringSoon.md) |
+| CertManagerCertExpiryCritical | critical | expiry <24h | Imminent TLS outage | 15m | [CertManagerCertExpiryCritical](../runbooks/gitops/CertManagerCertExpiryCritical.md) |
+| CertManagerCertNotReady | warning | ready=False | Issuance/renewal failed | 15m | [CertManagerCertNotReady](../runbooks/gitops/CertManagerCertNotReady.md) |
 
 The three CertManager* alerts now have a visual surface: the **cert-manager**
 dashboard (folder GitOps, `grafana-dashboard-cert-manager.yaml`) — per-cert
@@ -426,8 +426,8 @@ Source: `prometheusrules/observability/pyroscope-alerts.yaml`, `prometheusrules/
 
 | Alert | Sev | Metric & trigger | Impact | for | Runbook |
 |-------|-----|------------------|--------|-----|---------|
-| PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m | — |
-| PolicyReporterDown | warning | `up{job=~".*policy-reporter.*"}==0` | `kyverno.duynh.me` and the policy metrics unavailable; enforcement and report writing unaffected — fall back to `kubectl get policyreport -A` | 10m | — |
+| PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m | [PyroscopeDown](../runbooks/observability/PyroscopeDown.md) |
+| PolicyReporterDown | warning | `up{job=~".*policy-reporter.*"}==0` | `kyverno.duynh.me` and the policy metrics unavailable; enforcement and report writing unaffected — fall back to `kubectl get policyreport -A` | 10m | [PolicyReporterDown](../runbooks/observability/PolicyReporterDown.md) |
 | TemporalServerDown | critical | `up{temporal}==0` | Durable workflows halt — order fulfilment blocked | 5m | [TemporalServerDown](../runbooks/temporal/TemporalServerDown.md) |
 | TemporalServiceErrorRateHigh | warning | `service_error_with_type`/`service_requests` >5% | Clients can't submit/query workflows | 10m | [TemporalServiceErrorRateHigh](../runbooks/temporal/TemporalServiceErrorRateHigh.md) |
 | TemporalPersistenceErrorRateHigh | warning | `persistence_error_with_type`/`persistence_requests` >2% | Workflow state not persisting — data risk | 10m | [TemporalPersistenceErrorRateHigh](../runbooks/temporal/TemporalPersistenceErrorRateHigh.md) |
@@ -435,8 +435,8 @@ Source: `prometheusrules/observability/pyroscope-alerts.yaml`, `prometheusrules/
 | TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m | [TemporalActivityFailureRateHigh](../runbooks/temporal/TemporalActivityFailureRateHigh.md) |
 | TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m | [TemporalWorkerRequestErrorRateHigh](../runbooks/temporal/TemporalWorkerRequestErrorRateHigh.md) |
 | TemporalWorkerTaskSlotsExhausted | warning | `min(temporal_worker_task_slots_available)==0` | Worker saturated; tasks queue and stall | 10m | [TemporalWorkerTaskSlotsExhausted](../runbooks/temporal/TemporalWorkerTaskSlotsExhausted.md) |
-| OtelCollectorDown | critical | `up{job=~".*otel-collector.*"}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m | — |
-| **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — | — |
+| OtelCollectorDown | critical | `up{job=~".*otel-collector.*"}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m | [OtelCollectorDown](../runbooks/observability/OtelCollectorDown.md) |
+| **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — | [Watchdog](../runbooks/observability/Watchdog.md) |
 
 Temporal is now monitored at **both** the infra layer (server/service/persistence health) and
 the **work layer** (workflow/activity failure rates, worker→server RPC health, task-slot

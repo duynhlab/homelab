@@ -84,6 +84,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Runbook coverage for hand-written alerts is complete: 229/229.** The last 15
+  land here — kubernetes control plane (8), cert-manager (3), OTel Collector,
+  Pyroscope, Policy Reporter and Watchdog. Five of them **cannot fire on Kind**
+  and their pages say so in the Status row rather than leaving a reader to
+  discover it: the four etcd rules have no scrape at all, and
+  `KubeletTooManyPods` has a numerator but no denominator, so the ratio matches
+  nothing while vmalert reports no error. Each explains what it would mean on a
+  cluster that does have the metric, and gives the direct `kubectl` check to use
+  instead. The **Watchdog** page is the one to read first: it is a
+  dead-man's-switch whose absence is the signal, it walks the four-step pipeline
+  check that locates the broken link, and it says never to silence it — a
+  silenced dead-man's-switch looks exactly like a working pipeline.
+
+
 - **The VictoriaMetrics alert groups have runbooks — all 31, across four files
   that had none.** `health` (10), `vmagent` (8), `vmalert` (7) and `vmsingle` (6)
   each get a page per alert, a `runbook_url` on every rule, and a Runbook column

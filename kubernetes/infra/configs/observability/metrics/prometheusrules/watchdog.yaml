@@ -15,5 +15,6 @@ spec:
           labels:
             severity: none
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/observability/Watchdog.md"
             summary: "Alerting pipeline is functional"
             description: "This alert is always firing. If you stop receiving it, the alerting pipeline is broken."

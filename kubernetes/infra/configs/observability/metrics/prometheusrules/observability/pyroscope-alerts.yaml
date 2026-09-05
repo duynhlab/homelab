@@ -21,5 +21,6 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/observability/PyroscopeDown.md"
             summary: "Pyroscope is down ({{ $labels.instance }})"
             description: "Pyroscope profiling backend target {{ $labels.instance }} (job {{ $labels.job }}) has been down for more than 5 minutes — continuous profiles are not being ingested or queryable."

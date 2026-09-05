@@ -322,17 +322,17 @@ Per-alert runbooks: [`runbooks/kubernetes/README.md`](../runbooks/kubernetes/REA
 
 Source: `prometheusrules/gitops/flux-alerts.yaml`, `prometheusrules/gitops/cert-manager-alerts.yaml`.
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| FluxReconciliationFailure | warning | `gotk_resource_info{ready="False"}==1` | GitOps drift; desired state not applied | 10m |
-| FluxSuspendedResource | warning | `suspended="true"` | Reconciliation paused; indefinite drift | 24h |
-| FluxHelmReleaseNotReady | critical | HelmRelease ready=False | App not deployed / stuck on old version | 5m |
-| FluxKustomizationNotReady | critical | Kustomization ready=False | Manifests not applied | 5m |
-| FluxSourceNotReady | critical | source ready=False | Whole pipeline frozen | 10m |
-| FluxReconcileDurationHigh | warning | reconcile P99 >300s | Slow deploy cycles | 15m |
-| CertManagerCertExpiringSoon | warning | expiry <7d | TLS will fail → HTTPS breaks | 1h |
-| CertManagerCertExpiryCritical | critical | expiry <24h | Imminent TLS outage | 15m |
-| CertManagerCertNotReady | warning | ready=False | Issuance/renewal failed | 15m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| FluxReconciliationFailure | warning | `gotk_resource_info{ready="False"}==1` | GitOps drift; desired state not applied | 10m | [FluxReconciliationFailure](../runbooks/gitops/FluxReconciliationFailure.md) |
+| FluxSuspendedResource | warning | `suspended="true"` | Reconciliation paused; indefinite drift | 24h | [FluxSuspendedResource](../runbooks/gitops/FluxSuspendedResource.md) |
+| FluxHelmReleaseNotReady | critical | HelmRelease ready=False | App not deployed / stuck on old version | 5m | [FluxHelmReleaseNotReady](../runbooks/gitops/FluxHelmReleaseNotReady.md) |
+| FluxKustomizationNotReady | critical | Kustomization ready=False | Manifests not applied | 5m | [FluxKustomizationNotReady](../runbooks/gitops/FluxKustomizationNotReady.md) |
+| FluxSourceNotReady | critical | source ready=False | Whole pipeline frozen | 10m | [FluxSourceNotReady](../runbooks/gitops/FluxSourceNotReady.md) |
+| FluxReconcileDurationHigh | warning | reconcile P99 >300s | Slow deploy cycles | 15m | [FluxReconcileDurationHigh](../runbooks/gitops/FluxReconcileDurationHigh.md) |
+| CertManagerCertExpiringSoon | warning | expiry <7d | TLS will fail → HTTPS breaks | 1h | — |
+| CertManagerCertExpiryCritical | critical | expiry <24h | Imminent TLS outage | 15m | — |
+| CertManagerCertNotReady | warning | ready=False | Issuance/renewal failed | 15m | — |
 
 The three CertManager* alerts now have a visual surface: the **cert-manager**
 dashboard (folder GitOps, `grafana-dashboard-cert-manager.yaml`) — per-cert

@@ -16,7 +16,7 @@
 - Owner approved **ready for RFC** — 2026-08-21, with the clean-slate direction
 - Mechanism deep-dive is **not** repeated here — see [`./research.md`](./research.md)
 - ADR folders: [`ADR-054`](../../adr/ADR-054-temporal-worker-controller/) (controller),
-  [`ADR-055`](../../adr/ADR-055-keda-worker-autoscaling/) (KEDA, `Proposed` only)
+  [`ADR-055`](../../adr/ADR-055-keda-worker-autoscaling/) (KEDA — `Accepted`, installed 2026-09-05)
 - `docs/api/` files to touch: [`temporal.md`](../../../api/temporal.md) § Worker Deployment
   Versioning — the as-built section describes the env contract and the per-build file layout,
   both of which change
@@ -32,7 +32,7 @@ version once the server reports it drained. `pkg/temporalx` moves onto Temporal'
 environment-variable names, which is what makes the worker readable by the controller at all.
 
 KEDA task-queue autoscaling is designed here and recorded as ADR-055, but **not installed**
-in this RFC.
+in this RFC — it landed later in ADR-055's own change (2026-09-05).
 
 ## Motivation
 
@@ -72,8 +72,9 @@ documentation"*. Both are now satisfied.
 
 ### Non-Goals
 
-- **KEDA is not installed here.** ADR-055 stays `Proposed`; it needs `ScaledObject` added to
-  `workerResourceTemplate.allowedResources` plus a `WorkerResourceTemplate`.
+- **KEDA is not installed here.** ADR-055 stayed `Proposed` at this RFC; it needed `ScaledObject` added to
+  `workerResourceTemplate.allowedResources` plus a `WorkerResourceTemplate` — both landed 2026-09-05
+  (ADR-055 § As-built).
 - **`checkout-worker` is not versioned here.** It is unversioned today and turning it on
   before the controller owns activation would add a *second* hand-run step per bring-up.
 - **The three unbuilt Temporal alerts** (`TemporalScheduleToStartLatencyHigh`,
@@ -155,7 +156,8 @@ flowchart LR
 > is for.
 
 **Target topology.** Everything solid already runs; the controller and its custom resources
-are what this RFC adds. KEDA is dashed because ADR-055 is `Proposed` only.
+are what this RFC adds. KEDA was dashed at acceptance because ADR-055 was `Proposed` only; it
+is drawn solid since 2026-09-05, when ADR-055 installed it.
 
 ```mermaid
 flowchart TD
@@ -178,7 +180,7 @@ flowchart TD
     d2["Deployment build N-1<br/>draining, sunset 1h / 24h"]
   end
 
-  keda["KEDA + ScaledObject per version<br/>planned — ADR-055"]
+  keda["KEDA + ScaledObject per version<br/>ADR-055 — installed 2026-09-05"]
 
   flux --> crds --> twc
   cm --> twc
@@ -190,8 +192,8 @@ flowchart TD
   twc -->|"register version,<br/>set Current / Ramping"| ts
   d1 -->|"poll as build N"| ts
   d2 -->|"poll as build N-1"| ts
-  keda -.->|"planned: DescribeTaskQueue backlog"| ts
-  keda -.->|"planned: replicas"| d1
+  keda -->|"DescribeTaskQueue backlog"| ts
+  keda -->|"replicas 1–3"| d1
 
   classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
   classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
@@ -200,7 +202,7 @@ flowchart TD
   class flux,appsk,cm,crds,twc platform
   class conn,wd,d1,d2 worker
   class ts data
-  class keda planned
+  class keda platform
 ```
 
 Legend: purple = platform/control plane · orange = the worker and its versions · green =
@@ -369,9 +371,10 @@ KEDA without the controller has no per-version template to attach to.
 | 2026-08-21 | Research gate passed; RFC Accepted; ADR-054 and ADR-055 created at `Proposed` |
 | 2026-08-21 | Implementation merged: #866 (controller + design record), #867 (`docs/api` staleness), #868 (diagrams + `AGENTS.md` diagram rules), #869 (the JWKS NetworkPolicy fix and the K4.10 row) |
 | 2026-08-22 | **Kind-verified.** `CURRENT` set with no human step (K1.7); a saga completing `Pinned` on `order/order-fulfillment` (K4.10, a row this RFC added because none existed); a `Progressive` rollout walking 10 → 50 → promoted from a pod-template change alone; a rollback re-promoting the previous build id rather than minting a new one; `service_version` carrying the derived build id (K5.4). ADR-054 Adoption → Complete |
+| 2026-09-05 | **ADR-055 installed.** KEDA 2.20.2 as wave `keda-local`; `ScaledObject` in the controller allow-list; one `WorkerResourceTemplate` per worker (`order-fulfillment`, `checkout-abandon`; min 1 / max 3 / target 5 / poll 15 s); `TemporalScheduleToStartLatencyHigh` + `TemporalTaskQueueBacklogGrowing` with runbooks. ADR-055 → Accepted / Partial; Kind audit on the Ubuntu machine flips it to Complete |
 
 - [x] ADR-054 Adoption → Complete
-- [ ] ADR-055 Adoption → decided (installed, or deferred with a trigger) — still `Proposed`
+- [x] ADR-055 Adoption → decided: **installed** 2026-09-05 (Accepted / Partial; Kind verification pending)
 - [x] `docs/api/temporal.md` § Worker Deployment Versioning synced to the as-built env
       contract and the single-file layout
 - [x] `kind-e2e-audit.md` K1.7 **repurposed** rather than removed — it now proves no
@@ -399,4 +402,4 @@ started before the rollout completed on the old build).
 - [Temporal — Kubernetes controller](https://docs.temporal.io/production-deployment/worker-deployments/kubernetes-controller)
 
 ---
-_Last updated: 2026-08-21_
+_Last updated: 2026-09-05 — ADR-055 installed; KEDA drawn solid; Implementation History row added_

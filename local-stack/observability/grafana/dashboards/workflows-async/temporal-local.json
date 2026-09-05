@@ -1708,20 +1708,20 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(approximate_backlog_count{job=~\".*temporal.*\"}) by (task_queue)",
+          "expr": "sum(approximate_backlog_count{job=~\".*temporal.*\"}) by (taskqueue)",
           "range": true,
           "refId": "A",
-          "legendFormat": "backlog {{task_queue}}"
+          "legendFormat": "backlog {{taskqueue}}"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(approximate_backlog_age_seconds{job=~\".*temporal.*\"}) by (task_queue)",
+          "expr": "max(approximate_backlog_age_seconds{job=~\".*temporal.*\"}) by (taskqueue)",
           "range": true,
           "refId": "B",
-          "legendFormat": "age(s) {{task_queue}}"
+          "legendFormat": "age(s) {{taskqueue}}"
         }
       ],
       "description": "approximate_backlog_count is a SERVER metric — the SDK does not emit it."

@@ -30,6 +30,10 @@ spec:
     # temporal-config-local itself dependsOn temporal-local, so this edge
     # covers both.
     - name: temporal-config-local
+    # The two WorkerResourceTemplates (order-fulfillment-scaler.yaml,
+    # checkout-abandon-scaler.yaml) embed a keda.sh ScaledObject; the controller
+    # cannot render one until the CRD exists (ADR-055).
+    - name: keda-local
 
   # Health checks for apps (per-domain ResourceSets)
   healthChecks:

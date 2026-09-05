@@ -346,15 +346,17 @@ Every manifest applied to the cluster must satisfy admission:
   envoy-gateway-config (after envoy-gateway + cert-manager + keycloak)
   openbao-oidc-config (after secrets + envoy-gateway-config) — ADR-062
   flux-web (after secrets + cert-manager) — Flux web UI SSO objects
-  monitoring → {kyverno-policies, mcp, caching}
+  monitoring → {kyverno-policies, mcp, caching, keda}
+  keda (ADR-055) → {temporal, apps-local}
   temporal → temporal-config
   kyverno-policies → policy-reporter
-  apps-local (depends: databases + monitoring + temporal-config)
+  apps-local (depends: databases + monitoring + temporal-config + keda)
   ```
-  (27 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
-  commented out of its kustomization since 2026-08-21, so 26 apply; `flux-system`
+  (28 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
+  commented out of its kustomization since 2026-08-21, so 27 apply; `flux-system`
   is created by the FluxInstance rather than this directory, and a cluster
-  therefore reports **27** — 26 was the figure before `clickhouse-keeper-local`
+  therefore reports **28** — 27 was the figure before `keda-local` landed
+  (2026-09-05, ADR-055 autoscaling), 26 before `clickhouse-keeper-local`
   landed (2026-09-01, splitting the Keeper quorum out so the CHI cannot be applied
   before it), 25 before `clickhouse-schema-local`
   (RFC-0028 DDL bootstrap, 2026-08-28), and 24 before `flux-web-local`

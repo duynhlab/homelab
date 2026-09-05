@@ -130,3 +130,53 @@ spec:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalWorkerTaskSlotsExhausted.md"
             summary: "Temporal worker task slots exhausted"
             description: "A worker task-slot pool has been at zero available slots for >10m — the worker is saturated and cannot accept new workflow/activity tasks; consider raising concurrency or replicas."
+
+        # --- Leading indicators (ADR-055). Both ship WITH the KEDA scaler because
+        # autoscaling without them is a system that hides its own saturation.
+        # Schedule-to-start is an SDK histogram (pkg/temporalx via OTLP): how long
+        # a workflow task waited in the queue before a worker picked it up. Two
+        # rules share the name; the severity label separates them (the Sloth
+        # page/ticket pairs are the precedent). Grouped by task_queue — the SDK
+        # label — so a page names the queue whose workers are short.
+        - alert: TemporalScheduleToStartLatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (le, task_queue) (rate(temporal_workflow_task_schedule_to_start_latency_seconds_bucket[5m]))) > 0.2
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalScheduleToStartLatencyHigh.md"
+            summary: "Temporal workflow-task schedule-to-start p99 > 200ms ({{ $labels.task_queue }})"
+            description: "Workflow tasks on queue {{ $labels.task_queue }} waited more than 200ms (p99) for a worker over 10m — the workers are under-provisioned for the load. With ADR-055 the KEDA scaler should already be adding replicas; if it is not, check the ScaledObject."
+
+        - alert: TemporalScheduleToStartLatencyHigh
+          expr: |
+            histogram_quantile(0.99, sum by (le, task_queue) (rate(temporal_workflow_task_schedule_to_start_latency_seconds_bucket[5m]))) > 1
+          for: 5m
+          labels:
+            severity: critical
+            category: platform
+          annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalScheduleToStartLatencyHigh.md"
+            summary: "Temporal workflow-task schedule-to-start p99 > 1s ({{ $labels.task_queue }})"
+            description: "Workflow tasks on queue {{ $labels.task_queue }} waited more than 1s (p99) for a worker over 5m — sagas are visibly stalling; the scaler is at its ceiling, blocked, or the workers cannot poll."
+
+        # Backlog is a SERVER metric (matching service; the SDK emits no backlog
+        # series), scraped through the chart's ServiceMonitors. The label is
+        # `taskqueue` — measured live (scripts/k6/load.js), NOT the SDK's
+        # `task_queue` — and its value uses underscores: order_fulfillment.
+        # 10 tasks for 10m is twice the KEDA targetQueueSize (5): a backlog that
+        # size that long means the scaler is not keeping up, is at
+        # maxReplicaCount, or is not scaling this queue at all.
+        - alert: TemporalTaskQueueBacklogGrowing
+          expr: |
+            max by (taskqueue) (approximate_backlog_count{job=~".*temporal.*"}) > 10
+          for: 10m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalTaskQueueBacklogGrowing.md"
+            summary: "Temporal task-queue backlog > 10 for 10m ({{ $labels.taskqueue }})"
+            description: "Task queue {{ $labels.taskqueue }} has held more than 10 pending tasks for 10m — consumers cannot keep up. Twice the ADR-055 targetQueueSize, so either the KEDA ScaledObject is at maxReplicaCount, not rendered for this version, or its poll is failing."

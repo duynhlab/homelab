@@ -21,6 +21,10 @@ resources:
   # so it can dependsOn databases-local (keycloak DB on platform-db) + secrets-local
   # (ESO bootstrap-admin Secret). Namespace `identity` stays here (namespaces.yaml).
   # - keycloak/
+  # keda/ — excluded like temporal/ above: its own Kustomization (keda-local) so
+  # it can dependsOn monitoring-local (ServiceMonitor CRD) and so temporal-local
+  # and apps-local can dependsOn the ScaledObject CRD being present (ADR-055).
+  # - keda/
   # gateway-api-crds/ — excluded like temporal/ above: its own Kustomization
   # (gateway-api-crds-local) so envoy-gateway-local can dependsOn applied CRDs
   # (RFC-0024 P2).

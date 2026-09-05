@@ -483,7 +483,7 @@ homelab/
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind local environment (24 Kustomization CRs declared — see kustomization.yaml; mcp commented out, a cluster shows 24 incl. flux-system)
+│       └── local/                      # Kind local environment (28 Kustomization CRs declared — see kustomization.yaml; mcp commented out so 27 apply, and a cluster shows 28 incl. flux-system)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration
@@ -542,11 +542,12 @@ homelab/
 11. `cnpg-barman-plugin-local`: CNPG Barman Cloud Plugin + `ObjectStore` CRD (depends on `controllers-local`, `cert-manager-local`).
 12. `databases-local`: CNPG `platform-db` and `product-db` clusters (depends on `secrets-local`, `monitoring-local`, `cnpg-barman-plugin-local`, `storage-local`, `network-policies-local`).
 13. `databases-cnpg-dr-local`: CNPG DR replica (depends on `databases-local`, `secrets-local`).
-14. `temporal-local`: Temporal server via the official `temporalio` HelmRelease (server 1.31.2 — ADR-030), `mop` namespace created by the chart's namespace Job, persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `databases-local`, `monitoring-local`). **Also ships the Temporal Worker Controller** — CRDs chart first via `dependsOn`, then the manager (ADR-054). That placement is load-bearing: `apps-local` `dependsOn: temporal-config-local`, which in turn depends on `temporal-local` — and that chain is the only thing ordering the CRDs and manager before any `WorkerDeployment` is applied. Note the `healthChecks` list names only the Temporal HelmRelease and frontend Deployment, so `wait: true` — not a health check — is what covers the manager.
+13b. `keda-local`: KEDA 2.20.2 — the `temporal` scaler that sizes the versioned workers from task-queue backlog ([ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/README.md)); its own wave because the chart ships a ServiceMonitor (depends on `controllers-local`, `monitoring-local`). `temporal-local` depends on it so the controller's `scaledobjects.keda.sh` RBAC names an API group that exists, and `apps-local` depends on it so the `WorkerResourceTemplate`s can render a `ScaledObject`.
+14. `temporal-local`: Temporal server via the official `temporalio` HelmRelease (server 1.31.2 — ADR-030), `mop` namespace created by the chart's namespace Job, persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `databases-local`, `monitoring-local`, `keda-local`). **Also ships the Temporal Worker Controller** — CRDs chart first via `dependsOn`, then the manager (ADR-054). That placement is load-bearing: `apps-local` `dependsOn: temporal-config-local`, which in turn depends on `temporal-local` — and that chain is the only thing ordering the CRDs and manager before any `WorkerDeployment` is applied. Note the `healthChecks` list names only the Temporal HelmRelease and frontend Deployment, so `wait: true` — not a health check — is what covers the manager.
 14a. `temporal-config-local`: the Temporal config half (`./configs/temporal` — server alerts + the `temporal-search-attributes` Job registering the custom Search Attributes `OrderId`/`SessionId` on namespace `mop`; the Web UI HTTPRoute lives in `configs/envoy-gateway/routes/temporal.yaml`) (depends on `temporal-local`).
 15. `kyverno-policies-local`: Admission policies (depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
 15a. `mcp-local`: MCP servers (depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
-16. `apps-local`: Business logic — ResourceSets + workers (`dependsOn` `databases-local`, `monitoring-local`, `temporal-config-local`; workers dial Temporal at startup, and services stamp Search Attributes that must be registered first — the config half's Job, which its `wait: true` covers).
+16. `apps-local`: Business logic — ResourceSets + workers (`dependsOn` `databases-local`, `monitoring-local`, `temporal-config-local`, `keda-local`; workers dial Temporal at startup, and services stamp Search Attributes that must be registered first — the config half's Job, which its `wait: true` covers).
 
 > **`make flux-sync` caveat:** `scripts/flux-sync.sh` reconciles only six Kustomizations
 > (`flux-system`, `controllers-local`, `databases-local`, `monitoring-local`,
@@ -562,4 +563,4 @@ For persistence layer details, refer to [architecture.md](../databases/architect
 
 ---
 
-_Last updated: 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._
+_Last updated: 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count 28 declared / 27 applied (the 24 recorded on 2026-08-27 had already fallen behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`). 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

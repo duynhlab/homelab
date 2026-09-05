@@ -56,6 +56,9 @@ kustomize_overlays=(
   # keycloak/ is excluded from controllers/kustomization.yaml for the same
   # reason (its own Kustomization, keycloak-local) — validate it explicitly.
   "kubernetes/infra/controllers/keycloak"
+  # keda/ is excluded from controllers/kustomization.yaml for the same reason
+  # (its own Kustomization, keda-local; ADR-055) — validate it explicitly.
+  "kubernetes/infra/controllers/keda"
   "kubernetes/infra/configs/temporal"
   # clickhouse/ has its own Kustomization (clickhouse-local), so a build of
   # configs/ never reached it — before RFC-0028 it got nothing but a bare

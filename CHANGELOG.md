@@ -52,6 +52,14 @@ Rules:
 
 Skeleton (copy what you need):
 
+#### Proposals
+
+- **ADR-055 `Proposed` → `Accepted`, Adoption `Partial`** — KEDA installed with
+  both workers as the canary (owner decision 2026-09-05: both, not just order),
+  bounds min 1 / max 3 / target 5 / poll 15 s; Adoption flips to Complete on the
+  Kind audit. RFC-0026's last open checkbox is ticked; KEDA is drawn solid in
+  `docs/api/workflows.md`, `docs/api/temporal.md` and the RFC's target topology.
+
 ### Breaking Change
 #### <Component>
 - ...
@@ -82,8 +90,32 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### GitOps
+
+- **KEDA 2.20.2 installed as its own Flux wave, `keda-local`** ([ADR-055](docs/proposals/adr/ADR-055-keda-worker-autoscaling/README.md)).
+  `HelmRepository keda` + `HelmRelease keda` in a new `keda` namespace, Kind-sized
+  resources, ServiceMonitors on, TLS self-generated (no cert-manager dependency).
+  Its own wave for the reason policy-reporter and caching were split out — the
+  chart ships a ServiceMonitor whose CRD `controllers-local` installs — and two
+  waves now depend on it: `temporal-local` (the Worker Controller's RBAC names
+  `scaledobjects.keda.sh`) and `apps-local` (the templates embed a `ScaledObject`).
+  Kustomization count 27 → 28. `scripts/flux-validate.sh` validates the new
+  overlay explicitly, like every controller with its own wave.
+
 #### Observability
 
+- **The two Temporal capacity alerts finally exist, and ship with something that
+  acts on them.** `TemporalScheduleToStartLatencyHigh` (SDK schedule-to-start p99
+  > 0.2 s for 10m warning, > 1 s for 5m critical, by `task_queue`) and
+  `TemporalTaskQueueBacklogGrowing` (server `approximate_backlog_count` by
+  `taskqueue` > 10 for 10m) — the two leading indicators the alert catalog had
+  carried as its #2 gap since 2026-08-18, held back because nothing could
+  respond. Runbooks for both, plus the folder README `runbooks/temporal/` that
+  the seven existing Temporal runbooks never got. While writing the backlog rule:
+  the Temporal dashboard's server-side backlog panel grouped by the SDK label
+  `task_queue`, but the server emits `taskqueue` (values with underscores), so the
+  per-queue split had never rendered — fixed in both dashboard twins.
+  `KubeHPAMaxedOut` loses its 💤: KEDA renders an HPA behind every `ScaledObject`.
 - **Runbook coverage for hand-written alerts is complete: 229/229.** The last 15
   land here — kubernetes control plane (8), cert-manager (3), OTel Collector,
   Pyroscope, Policy Reporter and Watchdog. Five of them **cannot fire on Kind**
@@ -162,6 +194,23 @@ Skeleton (copy what you need):
 - Run the obs-as-code Dashboard V2 manifests as isolated `-v2` canaries while
   retaining the classic `GrafanaDashboard.spec.oci` resources at v0.3.0, so
   both delivery paths can be compared and rolled back independently.
+
+#### Temporal
+
+- **Both versioned workers autoscale from their task-queue backlog** — one
+  `ScaledObject` per running build id, rendered by the Worker Controller from a
+  `WorkerResourceTemplate` (`apps/order-fulfillment-scaler.yaml`,
+  `apps/checkout-abandon-scaler.yaml`): `minReplicaCount 1` (the Floor rule — a
+  draining build keeps its poller), `maxReplicaCount 3`, `targetQueueSize 5`,
+  `pollingInterval 15`, `cooldownPeriod 120`; ≈ 0.13 RPS against the frontend's
+  50 RPS per-namespace budget. `ScaledObject` added to
+  `workerResourceTemplate.allowedResources`, the single value that is both the
+  webhook allow-list and the controller's RBAC. One finding worth the line: the
+  controller injects `workerDeploymentName` / `workerDeploymentBuildId` /
+  `namespace` into a `temporal` trigger **only when the key is present with an
+  empty string** — the RFC-0026 research example omitted the keys, which would
+  have scaled every version on the whole queue's backlog. Kind verification is
+  the Ubuntu audit's job; ADR-055 § As-built carries the checklist.
 
 #### Docs
 

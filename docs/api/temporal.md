@@ -1010,12 +1010,33 @@ flowchart LR
     end
     subgraph ns_order[ns order]
         WD[WorkerDeployment<br/>order-fulfillment]
+        WRT[WorkerResourceTemplate<br/>order-fulfillment-scaler]
+        SO[ScaledObject per version<br/>min 1 · max 3 · target 5]
         OW[order worker pods<br/>one Deployment per version<br/>task queue: order-fulfillment]
+    end
+    subgraph ns_checkout[ns checkout]
+        WDC[WorkerDeployment<br/>checkout-abandon]
+        SOC[ScaledObject per version<br/>from checkout-abandon-scaler]
+        CW[checkout worker pods<br/>one Deployment per version<br/>task queue: checkout]
+    end
+    subgraph ns_keda[ns keda]
+        KEDA[KEDA 2.20.2<br/>temporal scaler · ADR-055]
     end
     WC --> WD
     WD --> OW
+    WC -- "renders per build id" --> SO
+    WRT --> SO
+    SO -- "replicas 1–3" --> OW
+    WC --> WDC
+    WDC --> CW
+    WC --> SOC
+    SOC -- "replicas 1–3" --> CW
+    KEDA -- "DescribeTaskQueue stats :7233<br/>per build id" --> TC
+    KEDA -- "backlog metric" --> SO
+    KEDA -- "backlog metric" --> SOC
     WC -- "set Current / Ramping" --> TC
     OW -- gRPC :7233 --> TC
+    CW -- gRPC :7233 --> TC
     Edge[Envoy Gateway] -- temporal.duynh.me --> UI
     TC -- /metrics --> VM[VictoriaMetrics]
     OW -- OTLP --> OTC[OTel Collector]
@@ -1026,15 +1047,16 @@ flowchart LR
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class Edge edge;
     class OW worker;
-    class HR,TC,UI,VM,OTC,WC platform;
-    class WD worker;
+    class HR,TC,UI,VM,OTC,WC,KEDA platform;
+    class WD,WRT,SO,WDC,SOC,CW worker;
     class TDB data;
 ```
 
 Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/)** for the re-platform and the Worker Versioning requirement that forced it; **[ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/)** records the retired operator choice it superseded):
 
 - **`HelmRelease temporal`** — `controllers/temporal/helmrelease.yaml`: chart `1.6.0` (server **`1.31.2`** — Worker Versioning needs ≥ 1.29.1, which the retired operator could not run), `numHistoryShards: 512`, persistence → `platform-db-rw.platform:5432` (`temporal` + `temporal_visibility`, `createDatabase: false` — the role has no CREATEDB) via **`platform-db-temporal-secret`**, `mop` namespace (retention 168h) created by the chart's namespace Job, `web.enabled`, `admintools.enabled`, `server.metrics.serviceMonitor.enabled`, `schema.useHelmHooks: false` (Flux does not reconcile Helm hooks), resources set on every component. The frontend Service keeps the name **`temporal-frontend`**, so `TEMPORAL_HOSTPORT` is unchanged across the re-platform; the UI Service is **`temporal-web`** (was `temporal-ui`).
-- **`HelmRelease temporal-worker-controller-crds` → `temporal-worker-controller`** — `controllers/temporal/worker-controller-{crds-,}helmrelease.yaml` (ADR-054): charts `0.28.0` (appVersion `1.9.0`) from `docker.io/temporalio`, pinned as OCIRepositories in `clusters/local/sources/oci/`. CRDs chart first via `dependsOn`; the manager runs **one** replica — it is a single-writer controller with no HA requirement locally, not because of node count (the cluster has 4), `metrics.disableAuth: true` (nothing scrapes it, so the kube-rbac-proxy sidecar would guard a port with no reader), and the optional `WorkerDeployment` webhook stays off — the CRD's own CEL rules already reject the mistakes that matter, and `make validate` never sees an admission webhook. The always-on `WorkerResourceTemplate` webhook is why cert-manager is required; the chart issues that cert from its own namespaced self-signed `Issuer`, not from the `homelab-ca` root.
+- **`HelmRelease temporal-worker-controller-crds` → `temporal-worker-controller`** — `controllers/temporal/worker-controller-{crds-,}helmrelease.yaml` (ADR-054): charts `0.28.0` (appVersion `1.9.0`) from `docker.io/temporalio`, pinned as OCIRepositories in `clusters/local/sources/oci/`. CRDs chart first via `dependsOn`; the manager runs **one** replica — it is a single-writer controller with no HA requirement locally, not because of node count (the cluster has 4), `metrics.disableAuth: true` (nothing scrapes it, so the kube-rbac-proxy sidecar would guard a port with no reader), and the optional `WorkerDeployment` webhook stays off — the CRD's own CEL rules already reject the mistakes that matter, and `make validate` never sees an admission webhook. The always-on `WorkerResourceTemplate` webhook is why cert-manager is required; the chart issues that cert from its own namespaced self-signed `Issuer`, not from the `homelab-ca` root. Since 2026-09-05 `workerResourceTemplate.allowedResources` also lists `ScaledObject` (`keda.sh`), which is both the webhook allow-list and the controller's RBAC.
+- **`HelmRelease keda`** — `controllers/keda/helmrelease.yaml` ([ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/)): chart `2.20.2` in namespace `keda`, its own Flux wave `keda-local` (after `controllers-local` + `monitoring-local`; `temporal-local` and `apps-local` depend on it). One `WorkerResourceTemplate` per worker — `apps/order-fulfillment-scaler.yaml`, `apps/checkout-abandon-scaler.yaml` — embeds a `ScaledObject` (`minReplicaCount 1`, `maxReplicaCount 3`, `targetQueueSize 5`, `pollingInterval 15`, `cooldownPeriod 120`) with a `temporal` trigger against `temporal-frontend:7233`; the controller renders one copy per running build id and injects `workerDeploymentName`, `workerDeploymentBuildId` and `namespace` wherever the template carries the `""` sentinel. KEDA polls `DescribeTaskQueue(stats=true)` for that version's backlog, so this is the per-version signal the upstream HPA + prometheus-adapter recipe cannot provide on a self-hosted server. Kind verification pending (Ubuntu audit).
 - **Retired operator** — its HelmRelease, both CRs and its HelmRepository are kept as `*.yaml.bak` beside their replacements: readable, and inert because no kustomization lists them (ADR-030). The `TemporalCluster`/`TemporalNamespace` CRDs and the cert-manager admission webhook are gone with the operator.
 - **`platform-db`** — `configs/databases/clusters/platform-db/`: consolidated CloudNativePG cluster (RFC-0018) hosting `temporal` + `temporal_visibility` alongside auth and supporting databases. 3-node HA; Barman backups at `s3://pg-backups-cnpg/platform-db/`.
 - **Edge & alerts** — the edge `HTTPRoute temporal-ui` (`configs/envoy-gateway/routes/temporal.yaml`, hostname `temporal.duynh.me`, **planned** — not yet exercised on Kind) plus `TemporalServerDown` and service/persistence error-rate `PrometheusRule`s in `configs/temporal/` (applied by `temporal-config-local`, after the chart).
@@ -1139,18 +1161,19 @@ version's own state, green is a fact or a timer the Temporal server owns.
 flowchart TD
   tag["Image tag edited in<br/>order-worker.yaml<br/>(the only routine edit)"] --> bid["Build id derived<br/>image ref + pod-template hash"]
   bid --> dep["Versioned Deployment created<br/>one per build id"]
-  dep --> reg["Version registered<br/>with the Temporal server"]
+  dep --> so["ScaledObject rendered for this build id<br/>from the WorkerResourceTemplate (ADR-055)"]
+  so --> reg["Version registered<br/>with the Temporal server"]
   reg --> ramp["Ramping version<br/>rollout.steps, pause >= 30s"]
   ramp --> cur["Promoted to Current<br/>new workflows stamp here"]
   cur --> dpr["Previous version deprecated<br/>keeps serving its pinned work"]
   dpr --> drn["Server reports drained<br/>status.deprecatedVersions[].drainedSince"]
-  drn --> sd["scaledownDelay 1h<br/>replicas -> 0"]
-  sd --> del["deleteDelay 24h<br/>eligibleForDeletion, resources removed"]
+  drn --> sd["scaledownDelay 1h<br/>replicas -> 0<br/>(ScaledObject minReplicaCount 1 still attached — verify at Kind)"]
+  sd --> del["deleteDelay 24h<br/>eligibleForDeletion, Deployment and its ScaledObject removed"]
 
   classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
   classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
   classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  class tag,bid,dep platform
+  class tag,bid,dep,so platform
   class ramp,cur,dpr worker
   class reg,drn,sd,del data
 ```

@@ -48,13 +48,12 @@ flowchart TD
 
   subgraph ctl["Lifecycle owners"]
     WC["Temporal Worker Controller<br/>derives build id · ramps · sunsets"]
-    HR["HelmRelease checkout-worker<br/>ordinary release, tag move is safe"]
   end
 
   subgraph run["Workers"]
     OWc["order-worker · Current build<br/>takes new workflows"]
     OWd["order-worker · draining build<br/>serves only its pinned work"]
-    CKW["checkout-worker<br/>single replica"]
+    CKW["checkout-worker · Current build<br/>1–3 replicas, scaled by KEDA"]
   end
 
   subgraph down["What activities reach"]
@@ -62,7 +61,7 @@ flowchart TD
     CDB[("checkout DB<br/>its own rows only")]
   end
 
-  KEDA["KEDA + one ScaledObject per version<br/>scales on task-queue backlog<br/>planned — ADR-055, not installed"]
+  KEDA["KEDA + one ScaledObject per version<br/>scales on task-queue backlog<br/>ADR-055 — installed 2026-09-05, Kind audit pending"]
 
   OAPI --> OFW
   OAPI --> CW
@@ -77,14 +76,16 @@ flowchart TD
   WC -->|"creates one Deployment<br/>per build id"| OWc
   WC --> OWd
   WC -->|"sets Current / Ramping<br/>via the Temporal API"| TS
-  HR --> CKW
+  WC -->|"creates one Deployment<br/>per build id (ADR-064)"| CKW
 
   OWc --> DS
   OWd --> DS
   CKW --> CDB
 
-  KEDA -.->|"planned: reads backlog"| TS
-  KEDA -.->|"planned: sets replicas"| OWc
+  KEDA -->|"DescribeTaskQueue backlog<br/>per build id"| TS
+  KEDA -->|"replicas 1–3"| OWc
+  KEDA -->|"replicas 1–3"| CKW
+  KEDA -.->|"floor 1 while draining"| OWd
 
   classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
   classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
@@ -94,16 +95,16 @@ flowchart TD
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
   class OAPI,CAPI,OFW,CW,ACW service
   class OWc,OWd,CKW worker
-  class WC,HR platform
+  class WC platform
   class TS,DS,CDB data
   class QF,QC external
-  class KEDA planned
+  class KEDA platform
 ```
 
 Legend: cyan = application code · orange = running worker pods · purple = what owns a
 worker's lifecycle · green = Temporal and the stores activities write to · grey = task queues, drawn inside the
-Temporal subgraph because the server owns them · dashed white = **planned**, not installed. Dotted edges are task dispatch
-(the server chooses the worker; nothing pushes) and the planned scaling path.
+Temporal subgraph because the server owns them. Dotted edges are task dispatch
+(the server chooses the worker; nothing pushes) and the one-replica floor KEDA keeps under a draining build.
 
 > **In plain terms:** three workflows, two queues, two workers — and since
 > [ADR-064](../proposals/adr/ADR-064-all-workers-under-controller/) ONE lifecycle:
@@ -121,10 +122,12 @@ Temporal subgraph because the server owns them · dashed white = **planned**, no
 > own rows — and it Continue-as-News every ≤30 minutes, so under Pinned versioning an
 > old build drains in about one timer cycle: the cheapest drain on the platform.
 >
-> KEDA is drawn because the shape is decided, not because it runs. Nothing scales
-> today: every worker is one replica, and the backlog it would read is already scraped
-> and graphed with nothing acting on it — see
-> [ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/).
+> KEDA runs since 2026-09-05 ([ADR-055](../proposals/adr/ADR-055-keda-worker-autoscaling/)):
+> the controller renders one `ScaledObject` per running build id from a
+> `WorkerResourceTemplate`, and KEDA's `temporal` scaler polls the frontend for that
+> version's backlog every 15 s — replicas 1 → 3 at five queued tasks per replica, never
+> below 1 while a build may still hold pinned workflows. The Kind audit that proves the
+> loop end to end is pending; until it lands, treat the numbers as configured, not measured.
 
 ### What each one is for
 

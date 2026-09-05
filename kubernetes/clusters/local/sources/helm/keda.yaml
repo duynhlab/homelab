@@ -1,0 +1,17 @@
+# KEDA Helm repository — the autoscaler behind ADR-055.
+# KEDA's `temporal` scaler reads task-queue backlog straight from the Temporal
+# frontend API (DescribeTaskQueue with stats), which is the only backlog signal a
+# self-hosted server offers per worker version; the upstream HPA recipe reads a
+# Temporal Cloud OpenMetrics series this platform does not have. One
+# ScaledObject per running worker version is rendered by the Worker Controller's
+# WorkerResourceTemplate (kubernetes/apps/{order-fulfillment,checkout-abandon}-scaler.yaml).
+# https://keda.sh/docs/latest/scalers/temporal/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: keda
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://kedacore.github.io/charts

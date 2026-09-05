@@ -1,0 +1,75 @@
+# Autoscaling for the checkout-abandon worker — one ScaledObject per worker
+# version (ADR-055).
+#
+# This is a TEMPLATE, not a ScaledObject. The Worker Controller renders one
+# ScaledObject per Worker Deployment Version that has a running Deployment,
+# points each at its own versioned Deployment, and deletes each copy with its
+# version. Attaching a single ScaledObject to a Deployment directly would break on
+# every rollover — the old scaler keeps targeting the old Deployment and the new
+# one has none — which is exactly what WorkerResourceTemplate exists to prevent.
+#
+# THREE THINGS THIS FILE DOES NOT WRITE DOWN, on purpose:
+#   - scaleTargetRef. `{}` is the controller's opt-in sentinel: it injects
+#     {apiVersion: apps/v1, kind: Deployment, name: <versioned Deployment>}.
+#     A non-empty value is rejected by the WorkerResourceTemplate webhook.
+#   - workerDeploymentName / workerDeploymentBuildId / namespace in the trigger.
+#     The sentinel for string metadata is the EMPTY STRING, not an absent key
+#     (controller >= v1.8.0, internal/k8s/workerresourcetemplates.go
+#     appendKEDATriggerMetadata): present-and-empty is injected, absent is left
+#     alone, non-empty is rejected. So `""` below is load-bearing — dropping the
+#     keys would render a ScaledObject that scales on the WHOLE queue's backlog
+#     instead of this version's share. The injected values are the server-side
+#     name `checkout/checkout-abandon`, the build id, and Temporal namespace `mop`
+#     (from the Connection).
+#   - taskQueue is the author's to supply: it must equal TASK_QUEUE in
+#     checkout-worker.yaml.
+#
+# WHY THESE NUMBERS (owner decision 2026-09-05, recorded in ADR-055):
+#   - minReplicaCount: 1 — the Floor rule. A draining version may still hold
+#     pinned workflows; scaling it to 0 removes its pollers and stalls them
+#     silently, the failure ADR-030 was bitten by. Scale-from-zero is therefore
+#     NOT used here even though KEDA supports it.
+#   - maxReplicaCount: 3 — Kind sizing; the node has been CPU-starved before.
+#   - targetQueueSize: "5" — desired replicas = ceil(backlog / 5), so the first
+#     scale-out needs a backlog of 6; load.js has produced peaks of 20–36.
+#   - pollingInterval: 15 — one DescribeTaskQueue call per version per 15 s.
+#     Two templates at one version each is ~0.13 RPS against the
+#     FrontendGlobalWorkerDeploymentReadRPS budget of 50 per namespace.
+#   - cooldownPeriod: 120 — time at zero-backlog before scaling back down to
+#     the floor; long enough that a burst does not flap.
+#
+# NOT scaled on slot utilisation: KEDA 2.20's temporal scaler reads backlog only.
+# Drift guard: `buildId` / `selectAllActive` / `selectUnversioned` are deprecated
+# in KEDA 2.20 and removed in 2.21 — do not add them here.
+---
+apiVersion: temporal.io/v1alpha1
+kind: WorkerResourceTemplate
+metadata:
+  name: checkout-abandon-scaler
+  namespace: checkout
+  labels:
+    app.kubernetes.io/name: checkout-worker
+    app.kubernetes.io/component: worker
+    platform.duynhlab.dev/rfc: "0026"
+    platform.duynhlab.dev/adr: "055"
+spec:
+  workerDeploymentRef:
+    name: checkout-abandon
+  template:
+    apiVersion: keda.sh/v1alpha1
+    kind: ScaledObject
+    spec:
+      scaleTargetRef: {}
+      minReplicaCount: 1
+      maxReplicaCount: 3
+      pollingInterval: 15
+      cooldownPeriod: 120
+      triggers:
+        - type: temporal
+          metadata:
+            endpoint: temporal-frontend.temporal.svc.cluster.local:7233
+            taskQueue: checkout
+            targetQueueSize: "5"
+            workerDeploymentName: ""
+            workerDeploymentBuildId: ""
+            namespace: ""

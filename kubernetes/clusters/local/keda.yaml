@@ -1,0 +1,37 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: keda-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: infrastructure
+spec:
+  interval: 10m
+  timeout: 15m
+  retryInterval: 2m
+  sourceRef:
+    kind: OCIRepository
+    name: infrastructure-oci
+  path: ./controllers/keda
+  prune: true
+  # `wait: true` and no healthChecks — deliberately. The wave applies one
+  # HelmRelease, which kstatus can assess, so `wait` is a real gate here; a
+  # healthChecks list beside it would be inert (AGENTS.md: `wait` wins).
+  wait: true
+  # Its own wave, not controllers-local, for the same reason policy-reporter and
+  # caching were split out: the chart ships a ServiceMonitor that needs the CRD
+  # controllers-local itself installs, and ordering WITHIN a Kustomization is not
+  # guaranteed, so a HelmRelease waiting on a sibling's CRD can deadlock a wave
+  # that has wait: true. monitoring-local already depends on controllers-local,
+  # so both the `keda` namespace (controllers/namespaces.yaml) and the CRD are in
+  # place by the time this applies.
+  #
+  # Two waves depend on THIS one: temporal-local (the Worker Controller's RBAC
+  # grants create/update on scaledobjects.keda.sh — the API group should exist
+  # before the WorkerResourceTemplate webhook runs its SubjectAccessReview) and
+  # apps-local (the WorkerResourceTemplates embed a ScaledObject, whose CRD must
+  # exist before the controller can render one). See ADR-055.
+  dependsOn:
+    - name: controllers-local
+    - name: monitoring-local

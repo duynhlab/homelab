@@ -27,6 +27,11 @@ spec:
     - name: controllers-local      # `temporal` namespace (controllers/namespaces.yaml)
     - name: databases-local        # platform-db Ready (+ platform-db-temporal-secret in temporal ns)
     - name: monitoring-local       # ServiceMonitor CRD + Grafana/VM stack
+    # The Worker Controller's RBAC now grants create/update on
+    # scaledobjects.keda.sh (workerResourceTemplate.allowedResources, ADR-055);
+    # the WorkerResourceTemplate webhook SubjectAccessReviews that permission, so
+    # the API group should exist before the manager comes up.
+    - name: keda-local
 
   healthChecks:
     # The operator CRs are retired (ADR-030 revision), so health is the

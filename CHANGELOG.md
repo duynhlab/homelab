@@ -84,6 +84,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The Flux alert group has runbooks — it had none.** All six
+  (`FluxSourceNotReady`, `FluxKustomizationNotReady`, `FluxHelmReleaseNotReady`,
+  `FluxReconciliationFailure`, `FluxSuspendedResource`,
+  `FluxReconcileDurationHigh`) now carry a `runbook_url` and a page under
+  `docs/observability/runbooks/gitops/`, and the catalog's §6 table gained the
+  Runbook column it was missing. Written whole-group rather than
+  critical-only, because the `## Related` sections cross-link the
+  Source → Kustomization → HelmRelease chain and half a set would link into
+  gaps. Two facts the pages record that the alert text does not: the metric
+  comes from **kube-state-metrics**, so these alerts go silent rather than red
+  if KSM is down; and `ready` also takes the value **`Unknown`**, which no rule
+  in the group matches, so a resource that retries forever without settling
+  never pages.
+
+
 - Run the obs-as-code Dashboard V2 manifests as isolated `-v2` canaries while
   retaining the classic `GrafanaDashboard.spec.oci` resources at v0.3.0, so
   both delivery paths can be compared and rolled back independently.

@@ -17,6 +17,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/FluxReconciliationFailure.md"
             summary: "Flux {{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} reconciliation failing"
             description: "{{ $labels.customresource_kind }} {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been in a non-ready state for more than 10 minutes."
 
@@ -27,6 +28,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/FluxSuspendedResource.md"
             summary: "Flux {{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} has been suspended for 24h"
             description: "{{ $labels.customresource_kind }} {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been suspended for more than 24 hours. Verify if this is intentional."
 
@@ -37,6 +39,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/FluxHelmReleaseNotReady.md"
             summary: "Flux HelmRelease {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready"
             description: "HelmRelease {{ $labels.name }} (chart: {{ $labels.chart_name }}) in namespace {{ $labels.exported_namespace }} has been failing for more than 5 minutes."
 
@@ -47,6 +50,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/FluxKustomizationNotReady.md"
             summary: "Flux Kustomization {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready"
             description: "Kustomization {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been failing for more than 5 minutes."
 
@@ -57,6 +61,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/FluxSourceNotReady.md"
             summary: "Flux Source {{ $labels.customresource_kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} is not ready"
             description: "{{ $labels.customresource_kind }} {{ $labels.name }} in namespace {{ $labels.exported_namespace }} has been failing for more than 10 minutes. Source fetch errors will block all dependent Kustomizations and HelmReleases."
 
@@ -67,5 +72,6 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/gitops/FluxReconcileDurationHigh.md"
             summary: "Flux {{ $labels.kind }} reconciliation in {{ $labels.namespace }} is taking more than 5 minutes (P99)"
             description: "High reconciliation duration may indicate complex or large resources, controller resource pressure, or dependency issues."

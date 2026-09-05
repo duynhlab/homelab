@@ -170,6 +170,22 @@ Skeleton (copy what you need):
   KEDA itself scales on. The label fix that started it stands: that panel had
   grouped a server metric by the SDK's `task_queue` and never split, fixed in
   both dashboard twins.
+- **ADR-055 drill close-out: 11 of 12 rows verified.** After #996 merged, three
+  more rows were closed on the same cluster. The `absent()` fix that the drill
+  forced is now **verified rather than reasoned**: the same injection that had
+  left the rule `inactive` forever now takes it `pending` **4 seconds** after the
+  scrape target vanishes and `firing` at 6 m 16 s, with `KedaOperatorDown` silent
+  throughout — the contrast that justifies two rules. The rollover row passed: a
+  new build id gets its own `ScaledObject` within 24 s while the outgoing version
+  holds its floor of one replica, and reverting **re-promotes the existing build
+  id** rather than minting a third. One row remains — the drained-version delete,
+  which needs a `drainedSince + 1h` wait and is armed on the cluster.
+  Recorded with it, because it cost an hour and is not autoscaling-specific:
+  **merging is not deploying** on this platform. Flux serves the OCI artifact
+  `make flux-push` publishes from the working tree, so a cluster keeps running
+  whatever was last pushed — the first verification attempt tested the pre-fix
+  expression and passed a stale negative. `make sync` from an up-to-date `main`,
+  and read the live object back, before trusting any post-merge check.
 - **The ADR-055 Kind drill ran, and broke one of its own alerts.** A from-scratch
   cluster off this branch closed 10 of the 12 checklist rows: the `""` sentinel
   injects `order/order-fulfillment` + the build id + `mop`, the versioned

@@ -130,6 +130,7 @@ docs/
 │   ├── gitflow.md                # Git branching & release standard
 │   ├── sonarcloud.md             # SonarCloud integration
 │   ├── envoy-gateway.md          # Platform edge — Gateway API resource model, both provider modes, edge telemetry
+│   ├── worker-autoscaling.md     # KEDA + Worker Controller: who owns replicas, backlog signal, the alert traps a drill found
 │   ├── keycloak.md               # Identity provider — deployment, realm import, database, reset, signals, gaps
 │   ├── kong-gateway.md           # Archived — the platform's previous API gateway
 │   ├── kyverno.md                # Kyverno admission-policy platform guide
@@ -442,6 +443,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 - [Envoy Gateway](./platform/envoy-gateway.md) - The platform edge: Gateway API resource model, policy attachment, Kubernetes vs standalone providers, edge JWT, and the telemetry the proxy itself produces
+- [Worker Autoscaling](./platform/worker-autoscaling.md) - How a versioned Temporal worker gets its replica count (KEDA + Worker Controller), and five mechanics a Kind drill exposed: the two-writer replica trap, API-poll vs scrape latency, the 17-series backlog metric, why `up == 0` cannot see a vanished target, and sunset delays that add
 - [Kong API Gateway](./platform/kong-gateway.md) - **Archived.** The platform's previous API gateway, kept for reference
 - [Kyverno](./platform/kyverno.md) - Admission policies: tiers, Audit→Enforce rollout, exceptions
 - [Keycloak](./platform/keycloak.md) - The platform identity provider: deployment shape, realm import and its one-shot limitation, the bypassed pooler, reset procedure, signals, and known gaps

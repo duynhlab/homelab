@@ -9,6 +9,9 @@ resources:
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml
   - grafana-dashboard-temporal.yaml
+  # KEDA — Worker Autoscaling (ADR-055): scaler value/errors, HPA replicas, the Temporal
+  # backlog it drains, KEDA health; JSON via configMapGenerator below
+  - grafana-dashboard-keda.yaml
   - grafana-dashboard-cloudnative-pg.yaml
   - grafana-dashboard-pg-query-performance.yaml
   - grafana-dashboard-pg-maintenance.yaml
@@ -96,6 +99,10 @@ configMapGenerator:
   - name: grafana-dashboard-temporal
     files:
       - temporal.json
+  # KEDA board, hand-authored (ADR-055); see grafana-dashboard-keda.yaml
+  - name: grafana-dashboard-keda
+    files:
+      - keda.json
   - name: grafana-dashboard-cert-manager
     files:
       - cert-manager.json

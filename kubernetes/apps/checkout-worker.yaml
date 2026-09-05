@@ -46,7 +46,10 @@ metadata:
     app.kubernetes.io/component: worker
     platform.duynhlab.dev/adr: "064"
 spec:
-  replicas: 1
+  # NO `replicas` -- the ADR-055 hand-off to KEDA. order-worker.yaml carries the
+  # full rationale; the short version is that the field is the controller's mode
+  # switch, and leaving it set makes the controller and the autoscaler fight over
+  # the same number. The floor lives in checkout-abandon-scaler.yaml.
 
   workerOptions:
     connectionRef:
@@ -64,13 +67,15 @@ spec:
       - rampPercentage: 50
         pauseDuration: 30s
 
-  # Chart-default retirement policy, stated explicitly (order-worker.yaml has
-  # the full rationale). For THIS workflow the drain is naturally fast: every
-  # run ContinueAsNews within its ≤30-minute timer, and the continuation
-  # routes to the Current version.
+  # Retirement policy, stated explicitly (order-worker.yaml has the full
+  # rationale, including why deleteDelay is 0s under an autoscaler: the delete
+  # fires at scaledownDelay + deleteDelay, so any positive deleteDelay is a
+  # controller-writes-0 / KEDA-writes-1 flap window). For THIS workflow the drain
+  # is naturally fast: every run ContinueAsNews within its ≤30-minute timer, and
+  # the continuation routes to the Current version.
   sunset:
     scaledownDelay: 1h
-    deleteDelay: 24h
+    deleteDelay: 0s
 
   template:
     metadata:

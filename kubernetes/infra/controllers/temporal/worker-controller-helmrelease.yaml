@@ -90,16 +90,22 @@ spec:
       enabled: false
 
     # Which resource kinds a WorkerResourceTemplate may embed. This value drives
-    # BOTH the webhook allow-list and the controller's RBAC, so it is the single
-    # place autoscaling gets unblocked: ADR-055 adds
-    #   - kinds: ["ScaledObject"], apiGroups: ["keda.sh"], resources: ["scaledobjects"]
-    # here. Left at the chart default until then — an unused grant is still a
-    # grant.
+    # BOTH the webhook allow-list and the controller's RBAC (create/update on the
+    # listed resources in the controller's ClusterRole), so it is the single place
+    # autoscaling is unblocked. ADR-055 adds ScaledObject: the two
+    # WorkerResourceTemplates in kubernetes/apps/{order-fulfillment,checkout-abandon}-scaler.yaml embed one,
+    # and KEDA itself ships in the keda-local wave, which temporal-local now
+    # dependsOn so the keda.sh API group exists before the webhook's
+    # SubjectAccessReview runs. HorizontalPodAutoscaler stays because it is the
+    # chart default and dropping it would be a change nobody asked for.
     workerResourceTemplate:
       allowedResources:
         - kinds: ["HorizontalPodAutoscaler"]
           apiGroups: ["autoscaling"]
           resources: ["horizontalpodautoscalers"]
+        - kinds: ["ScaledObject"]
+          apiGroups: ["keda.sh"]
+          resources: ["scaledobjects"]
 
     # PSS baseline is what applies here (pss-restricted-apps is disabled
     # platform-wide since 2026-08-17, and it only ever matched app namespaces).

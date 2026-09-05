@@ -1,0 +1,37 @@
+# KEDA — Worker Autoscaling (ADR-055). The board that closes the gap the Temporal
+# runbook README recorded: KEDA's own metrics were scraped with nothing reading
+# them. Structure follows KEDA's official config/grafana/keda-dashboard.json
+# (v2.20.2) — scaler value and errors, HPA current/max — with a Temporal row
+# (server backlog, versioned-Deployment replicas, SDK schedule-to-start) and a
+# KEDA-health row added, so the two ADR-055 alerts and the three Keda* alerts
+# each have a panel to land on.
+#
+# JSON is hand-authored in-repo (keda.json, configMapGenerator below) with a
+# DS_PROMETHEUS datasource variable and no __inputs, so no `datasources:` remap
+# block is needed (the same shape as grafana-dashboard-temporal.yaml).
+#
+# Label caveat carried from upstream: the official board filters KEDA series on
+# `exported_namespace` because KEDA stamps its own `namespace` label and the
+# scrape renames it. Every panel description says which label it depends on. No
+# longer a Kind-audit row -- the same collision is already observable here, where
+# Temporal's ServiceMonitor-scraped approximate_backlog_count lands as
+# namespace="temporal", exported_namespace="mop".
+#
+# No local-stack twin, on purpose: compose runs no KEDA, so a twin would be a
+# board with no series. Recorded in local-stack/docs/observability.md § 3.
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: keda-worker-autoscaling
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folder: "Workflows / Async"
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-keda
+    key: keda.json

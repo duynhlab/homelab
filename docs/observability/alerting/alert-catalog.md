@@ -19,35 +19,40 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**224 statically-defined alerts** across 10 domains (re-derive with
+**228 statically-defined alerts** across 11 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
-— by domain: postgres 55, microservices 52, victoriametrics 31, kubernetes 29,
-observability 19, envoy-gateway 12, gitops 9, valkey 7, keycloak 5, kyverno 4,
-+ the watchdog), plus **68 Sloth-generated** SLO
-burn-rate alerts (2 × 34 SLOs). The 34 SLOs cover all 11 Go services plus Keycloak:
-30 rendered by the `mop` chart through the five domain ResourceSets, plus inventory's 2
-hand-written gRPC SLOs and Keycloak's 2 hand-written identity SLOs. Two CNPG topology rules are **gated** (not
-deployed) and a subset is **inactive on Kind** (platform limitations) — both
-marked inline below.
+— by domain, re-counted 2026-09-05: postgres 55, microservices 52,
+victoriametrics 31, kubernetes 29, observability 17, envoy-gateway 12, gitops 9,
+valkey 7, keycloak 5, kyverno 4, keda 4, + the watchdog at the directory root =
+226 in `.yaml`, plus the 2 in the retired `.bak` the glob also sees). The
+`observability 19` this list carried was stale — that directory holds 17.
+Plus **62 Sloth-generated** SLO burn-rate alerts (2 × 31 SLOs); the `68 / 34`
+this paragraph used to state was corrected in the domain table on 2026-09-05 and
+missed here. The 31 SLOs are 9 HTTP services × 3, inventory × 2 gRPC, and
+Keycloak × 2 identity — `inventory` serves no HTTP. Two CNPG topology rules are
+**gated** (not deployed) and a subset is **inactive on Kind** (platform
+limitations) — both marked inline below.
 
 The count is re-derived from the manifests (`- alert:` occurrences under
 `prometheusrules/**`), never incremented by hand — and re-deriving on 2026-08-21
 showed why that rule exists. One caveat the command itself carries: it has no
 `--include`, so it also counts the **2 alerts in the retired
 `observability/tempo-alerts.yaml.bak`**, which nothing deploys. The deployed
-number is therefore **222**.
+number is therefore **226**.
 
 That command has a second blind spot, found 2026-09-05: it globs
-`prometheusrules/**` only, so it misses the **7 Temporal alerts** that live in
+`prometheusrules/**` only, so it misses the **12 Temporal rules** (9 names) that live in
 `configs/temporal/prometheusrule.yaml`. They are documented in §8 below but sit
 outside the count. Counted against the cluster instead, the hand-written total is
-**227** — 222 here, minus the 2 gated CNPG topology rules that never deploy, plus
-those 7. The Sloth-generated 62 are separate by design and are not in this
-number.
+**236** — 226 here, minus the 2 gated CNPG topology rules that never deploy,
+plus the 12 in `configs/temporal/` (the five ADR-055 capacity rules landed
+2026-09-05, alongside the three `Keda*` self-health rules that DO fall inside
+the glob). With the 62 Sloth-generated rules, which are separate by design and
+not in this number, a cluster deploys **298**.
 
-Of those 222, **6 cannot fire on Kind** and are documented as such rather than
+Of those 226, **6 cannot fire on Kind** and are documented as such rather than
 counted as coverage — the PVC and CNPG disk rules plus `KubeletTooManyPods`; see
-§8b's "Alerts that are inert on Kind". Effective coverage is **216**. Naming that
+§8b's "Alerts that are inert on Kind". Effective coverage is **220**. Naming that
 subtraction is the point: three ClickHouse rules spent months inside a count that
 read as coverage before anyone pasted their expressions into a query window.
 
@@ -70,7 +75,8 @@ error forward a fourth time.
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
-| [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 11 | Tracing, workflows, profiling, dead-man's-switch, OTLP collector |
+| [KEDA autoscaling](#8c-keda-autoscaling) | 4 | The autoscaler that sizes the Temporal workers — operator scrape, **external-metrics adapter scrape**, scaler errors, ScaledObject errors (ADR-055) |
+| [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 16 | Tracing, workflows, worker capacity (ADR-055), profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 62 (generated) | Error-budget burn: **9** HTTP services × 3 SLOs + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs = 31 SLOs, two burn-rate alerts each. Counted 68 until 2026-09-05, which assumed 10 HTTP services — `inventory` serves **no HTTP** (`rpc_server_*` only), so it has the gRPC pair and nothing more |
 
@@ -274,7 +280,7 @@ Per-alert runbooks: [`runbooks/kubernetes/README.md`](../runbooks/kubernetes/REA
 | KubeDeploymentReplicasMismatch | warning | spec ≠ ready replicas | Service degraded; can't scale | 15m | [KubeDeploymentReplicasMismatch](../runbooks/kubernetes/KubeDeploymentReplicasMismatch.md) |
 | KubeStatefulSetReplicasMismatch | warning | spec ≠ ready replicas | Data-consistency risk | 15m | [KubeStatefulSetReplicasMismatch](../runbooks/kubernetes/KubeStatefulSetReplicasMismatch.md) |
 | KubeJobFailed | warning | `kube_job_status_failed>0` | Batch/backup task failed | 5m | [KubeJobFailed](../runbooks/kubernetes/KubeJobFailed.md) |
-| KubeHPAMaxedOut 💤 | warning | current == max replicas | Can't elastically absorb load | 15m | [KubeHPAMaxedOut](../runbooks/kubernetes/KubeHPAMaxedOut.md) |
+| KubeHPAMaxedOut | warning | current == max replicas | Can't elastically absorb load — since ADR-055 there are HPAs to observe: KEDA renders one per worker-version `ScaledObject` (`maxReplicaCount: 3`) | 15m | [KubeHPAMaxedOut](../runbooks/kubernetes/KubeHPAMaxedOut.md) |
 | KubePersistentVolumeFillingUp 💤 *inactive on Kind — local-path CSI reports no kubelet VolumeStats* | warning | PVC free <15% | Write failures imminent | 10m | [KubePersistentVolumeFillingUp](../runbooks/kubernetes/KubePersistentVolumeFillingUp.md) |
 | KubePersistentVolumeFillingUpCritical 💤 *inactive on Kind (same)* | critical | PVC free <5% | Immediate data-loss risk | 5m | [KubePersistentVolumeFillingUpCritical](../runbooks/kubernetes/KubePersistentVolumeFillingUpCritical.md) |
 
@@ -435,12 +441,19 @@ Source: `prometheusrules/observability/pyroscope-alerts.yaml`, `prometheusrules/
 | TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m | [TemporalActivityFailureRateHigh](../runbooks/temporal/TemporalActivityFailureRateHigh.md) |
 | TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m | [TemporalWorkerRequestErrorRateHigh](../runbooks/temporal/TemporalWorkerRequestErrorRateHigh.md) |
 | TemporalWorkerTaskSlotsExhausted | warning | `min(temporal_worker_task_slots_available)==0` | Worker saturated; tasks queue and stall | 10m | [TemporalWorkerTaskSlotsExhausted](../runbooks/temporal/TemporalWorkerTaskSlotsExhausted.md) |
+| TemporalScheduleToStartLatencyHigh | warning / critical | p99 of `temporal_{workflow_task,activity}_schedule_to_start_latency_seconds` >0.2s (warning) / >1s (critical), by `task_queue`; `task_kind` says which | Workers under-provisioned — tasks wait for a poller before any error fires; the KEDA scaler (ADR-055) should already be reacting. **4 rules, one name:** activity carries 224 series on a loaded cluster against 32 for workflow tasks, and is what `targetQueueSize` scales against | 10m / 5m | [TemporalScheduleToStartLatencyHigh](../runbooks/temporal/TemporalScheduleToStartLatencyHigh.md) |
+| TemporalTaskQueueBacklogGrowing | warning | `sum by (taskqueue, task_type, worker_version) (approximate_backlog_count)` >10 — server metric, label `taskqueue`. Summed over `partition` **only**: that is what `DescribeWorkerDeploymentVersion` → `sumDeploymentBacklog` aggregates for a versioned template. It splits `task_type`, which the scaler does not (`queueTypes` unset ⇒ Workflow + Activity combined), so it trails the scaler in the mixed case — correct for a rule that means *not coping* | Queue depth twice the scaler's `targetQueueSize`: scaler at its ceiling, not rendered for that version, or failing its poll | 10m | [TemporalTaskQueueBacklogGrowing](../runbooks/temporal/TemporalTaskQueueBacklogGrowing.md) |
 | OtelCollectorDown | critical | `up{job=~".*otel-collector.*"}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m | [OtelCollectorDown](../runbooks/observability/OtelCollectorDown.md) |
 | **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — | [Watchdog](../runbooks/observability/Watchdog.md) |
 
-Temporal is now monitored at **both** the infra layer (server/service/persistence health) and
+Temporal is now monitored at **all three** layers: infra (server/service/persistence health),
 the **work layer** (workflow/activity failure rates, worker→server RPC health, task-slot
-saturation). 2026-08-18 correction: `TemporalServiceErrorRateHigh` had been written against
+saturation), and since 2026-09-05 **capacity** — schedule-to-start latency and server-side
+backlog, the two leading indicators that ship with the KEDA scaler
+([ADR-055](../../proposals/adr/ADR-055-keda-worker-autoscaling/)) because an autoscaler without
+them hides its own saturation. `TemporalScheduleToStartLatencyHigh` is four rules under one
+name — warning/critical × workflow/activity, separated by `severity` and `task_kind` (the
+Sloth page/ticket precedent for name reuse) — so the group holds 12 rules for 9 names. 2026-08-18 correction: `TemporalServiceErrorRateHigh` had been written against
 `service_errors`, a series that does not exist on temporal server 1.31.2 — the alert could
 never fire. Verified against a live `/metrics` dump and fixed to `service_error_with_type`.
 Both Temporal alert groups are visualized by the **Temporal — Workflows & Activities**
@@ -577,7 +590,7 @@ YAML notes live in chart-generated files that a re-render will erase:
 | `KubePersistentVolumeFillingUp` + `…Critical` | `kubelet_volume_stats_*` | inert on Kind |
 | `CNPGClusterLowDiskSpaceWarning` + `…Critical`, ×2 clusters | `kubelet_volume_stats_*` | inert on Kind |
 | `KubeletTooManyPods` | `kubelet_node_config_assigned_pod_cidr_max_pods` | inert on Kind |
-| `KubeHPAMaxedOut` | `kube_horizontalpodautoscaler_*` | inert — the platform declares no HPA |
+| `KubeHPAMaxedOut` | `kube_horizontalpodautoscaler_*` | **un-marked 2026-09-05** — KEDA (ADR-055) creates an HPA behind every rendered `ScaledObject`, so the series exist once the scaler wave is up; VERIFY-AT-KIND |
 
 ### Alerts waiting on instrumentation that was never built
 
@@ -640,6 +653,40 @@ Closing the gap means either a storage class with a real CSI driver, or building
 the signal from CNPG's and ClickHouse's own metrics instead of the kubelet's.
 
 ---
+
+## 8c. KEDA autoscaling
+
+Source: `prometheusrules/keda/alerts.yaml`. Runbooks: [`runbooks/keda/`](../runbooks/keda/README.md).
+Dashboard: Workflows / Async → **KEDA — Worker Autoscaling** (`grafana/dashboards/keda.json`).
+
+KEDA ([ADR-055](../../proposals/adr/ADR-055-keda-worker-autoscaling/)) is the autoscaler behind
+both Temporal workers; when it fails, the failure is silent — no `ScaledObject` is evaluated and
+every worker freezes at its current replica count — so these four rules name the cause before
+`TemporalTaskQueueBacklogGrowing` (§8) names the symptom.
+
+KEDA is **two** processes and both are covered, because only one of them holds the `keda_*`
+series. The operator evaluates triggers and publishes every `keda_scaler_*` metric; the
+external-metrics adapter registers `external.metrics.k8s.io` and is what the HPAs actually
+query. Lose the adapter and the operator stays healthy, every series keeps flowing, and scaling
+still stops — a failure the first three rules structurally cannot see.
+
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| KedaOperatorDown | critical | `up{keda-operator}==0 or absent(keda_build_info)` | Nothing evaluates a ScaledObject; both workers stop following the backlog | 5m | [KedaOperatorDown](../runbooks/keda/KedaOperatorDown.md) |
+| KedaMetricsApiServerDown | critical | `up{keda-operator-metrics-apiserver}==0 or absent(…)` — the absent() half is required: scaling the Deployment to 0 removes the target, so `up` vanishes rather than reading 0 (measured on Kind 2026-09-05) | The `external.metrics.k8s.io` adapter is gone: every KEDA-owned HPA reports `ScalingActive=False` and freezes, while the operator looks healthy | 5m | [KedaMetricsApiServerDown](../runbooks/keda/KedaMetricsApiServerDown.md) |
+| KedaScalerErrors | warning | `rate(keda_scaler_detail_errors_total[5m]) > 0` by scaledObject, scaler | One worker version's trigger cannot fetch its backlog (frontend unreachable, unknown build id, API budget) — it keeps its last replica count | 5m | [KedaScalerErrors](../runbooks/keda/KedaScalerErrors.md) |
+| KedaScaledObjectErrors | warning | `rate(keda_scaled_object_errors_total[5m]) > 0` by scaledObject | The object itself fails to reconcile — usually lifecycle skew: its target Deployment was already deleted by the Worker Controller | 5m | [KedaScaledObjectErrors](../runbooks/keda/KedaScaledObjectErrors.md) |
+
+Two things to know before reading these rules. Metric names are KEDA **2.20**'s:
+`keda_scaler_detail_errors_total` is the per-scaler counter, `keda_scaler_errors_total` does not
+exist, and the chart's own values example still cites a pre-2.x name. And KEDA stamps its own
+`namespace` label, so under a ServiceMonitor scrape it surfaces as **`exported_namespace`** —
+the label the official KEDA board filters on and the one used here. That is no longer an
+assumption: the same collision is already observable on this cluster, where Temporal's
+ServiceMonitor-scraped `approximate_backlog_count` lands as
+`namespace="temporal", exported_namespace="mop"`. The **VERIFY-AT-KIND** marker is retired;
+what remains for the drill is confirming the two job names, which were read off a render of
+chart 2.20.2 (`keda-operator`, `keda-operator-metrics-apiserver`) rather than guessed.
 
 ## 9. RFC-0021 order-side stock
 
@@ -802,7 +849,7 @@ implemented yet — they are recommendations.
 ### Top 5 highest-value additions
 
 1. **AlertmanagerFailedToSendAlerts** — Watchdog proves the pipeline *up to* Alertmanager; nothing proves AM can actually reach the receiver (Slack/PagerDuty/email). A silent receiver failure swallows every other alert. (`VMAlertAlertmanagerErrors` covers only vmalert→AM, not AM→receiver.)
-2. **Temporal schedule-to-start latency + task-queue backlog** — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. The work layer is now covered for failure rates and task-slot saturation (§8), and both signals are now **visualized** (the Temporal dashboard's schedule-to-start and server-side `approximate_backlog_count` panels — the backlog is a server metric, not an SDK one) — the *alerts* on them are still missing.
+2. ~~**Temporal schedule-to-start latency + task-queue backlog**~~ ✅ **Addressed** 2026-09-05 by `TemporalScheduleToStartLatencyHigh` (warning/critical) and `TemporalTaskQueueBacklogGrowing` (§8), shipped with the KEDA scaler that acts on them ([ADR-055](../../proposals/adr/ADR-055-keda-worker-autoscaling/)) — the best leading indicators that workers are under-provisioned; tasks pile up before any error fires. Both signals were already visualized (the backlog is a server metric, not an SDK one); what was missing was an actuator, and an alert whose only runbook was "open a PR".
 3. **ValkeyReplicationLinkDown** (`redis_master_link_up==0`) — the actual Valkey HA/durability failure mode; currently unmonitored.
 4. ~~**CNPGContinuousArchivingFailing**~~ ✅ **Addressed** by `CNPGWALArchiveFailing` (§4b) — WAL archiving can stall (breaking PITR) while the last base backup still looks "recent", so `PostgresBackupTooOld` alone is insufficient.
 5. **etcdDatabaseQuotaLowSpace** + **KubeStateMetricsListErrors** — the two classic cluster-wide *silent* failures: an etcd quota freeze (`mvcc: database space exceeded`), and a KSM outage that silently stops every KSM-sourced k8s alert from evaluating.
@@ -814,8 +861,8 @@ implemented yet — they are recommendations.
 | AlertmanagerFailedToSendAlerts | Alert pipeline | `rate(alertmanager_notifications_failed_total[5m])>0` by integration | critical | Silent receiver failure = total blind incident | general (kube-prometheus `alertmanager.rules`) |
 | Cross-service dependency alerts (downstream failure ratio, circuit-breaker state) | Microservices | needs `http_client_*` client-side instrumentation — no service emits it yet | warning | Caller-side view of a failing dependency; today only the callee's server-side RED alerts see it | phase 4 of the original application-alert expansion plan (the one phase not shipped) |
 | AlertmanagerConfigInconsistent / MembersInconsistent | Alert pipeline | AM config-hash / cluster membership mismatch | warning | HA split config silently drops routes | general (kube-prometheus) |
-| TemporalScheduleToStartLatencyHigh | Temporal | `histogram_quantile(0.99, temporal_workflow_task_schedule_to_start_latency_seconds_bucket)` >0.2s | warning/critical | Leading indicator of unhealthy/under-provisioned workers | ✅ context7 `/temporalio/documentation` (worker-health) |
-| TemporalTaskQueueBacklogGrowing | Temporal | `approximate_backlog_count` rising (server metric — verified live 2026-08-18; the SDK emits no backlog series) | warning | Direct queue depth; consumers can't keep up | ✅ context7 `/temporalio/documentation` |
+| ~~TemporalScheduleToStartLatencyHigh~~ ✅ shipped (§8, ADR-055, 2026-09-05) | Temporal | `histogram_quantile(0.99, temporal_workflow_task_schedule_to_start_latency_seconds_bucket)` >0.2s | warning/critical | Leading indicator of unhealthy/under-provisioned workers | ✅ context7 `/temporalio/documentation` (worker-health) |
+| ~~TemporalTaskQueueBacklogGrowing~~ ✅ shipped (§8, ADR-055, 2026-09-05) | Temporal | `approximate_backlog_count` rising (server metric — verified live 2026-08-18; the SDK emits no backlog series; label is `taskqueue`) | warning | Direct queue depth; consumers can't keep up | ✅ context7 `/temporalio/documentation` |
 | TemporalSyncMatchRateLow | Temporal | `poll_success_sync / poll_success < 0.95` | warning | Tasks not handed off synchronously → added latency | ✅ context7 `/temporalio/documentation` |
 | ValkeyReplicationLinkDown | Valkey | `redis_master_link_up==0` | critical | Replica link loss — data durability/HA failure | general (redis_exporter community) |
 | ~~CNPGContinuousArchivingFailing~~ ✅ shipped as `CNPGWALArchiveFailing` (§4b) | CNPG | archiver failed-count rising / `last_archived_wal` stalled | critical | PITR silently broken while backup-age looks healthy | ✅ context7 `/cloudnative-pg/cloudnative-pg` |
@@ -854,4 +901,4 @@ Recorded in [disaster-recovery.md → Known Gaps](../../databases/disaster-recov
 
 ---
 
-_Last updated: 2026-09-05 — a full audit ran **every** alert expression's metric names against the 7,976 series a loaded cluster holds (seeded + saga + load first, so idle metrics were present). 289 alerts deploy: 227 hand-written, 62 Sloth-generated. **Fixed:** `edge:rq_429_ratio:rate5m` named a series that never existed — a v1.8.3-era guess left behind when the platform moved to Envoy Gateway v1.9.0 — so `Edge429RatioHigh` had produced `samples=0` on every evaluation with no error reported anywhere; it now reads `envoy_http_local_rate_limit_enforced`, chosen over `rate_limited` because only `enforced` counts requests actually answered with a 429. **Newly marked 💤:** eleven RFC-0021 phase-5/6 and reconciler alerts waiting on counters no service emits, plus `KubeHPAMaxedOut` (no HPA is declared); they were deliberately **not** repointed at neighbouring metrics, which would have made them fire for the wrong reason. **Corrected:** the Sloth row read 68, which assumed 10 HTTP services — `inventory` is gRPC-only, so 31 SLOs generate 62. Also recorded: the count command globs `prometheusrules/**` and therefore misses the 7 Temporal alerts in `configs/temporal/`. Three things the audit checked and left alone — 49 same-name alert pairs (Sloth page/ticket burn-rate pairs and per-cluster CNPG rules, both correct), 151 runbook links (none broken), and `ClickHouseExporterUnhealthy` (its metric family exists; the log/span variants are simply unborn until a failure, and `for: 10m` covers that). Earlier: 2026-09-01 — backup alerting migrated to the Barman Cloud plugin metrics. `PostgresBackupTooOld` and `PostgresBackupFailed` queried `cnpg_collector_last_{available,failed}_backup_timestamp`, which the plugin supersedes with `barman_cloud_cloudnative_pg_io_*` (upstream migration guide, "Verify your metrics") — the same class of defect as the ClickHouse three below: a rule vmalert reports healthy while its series does not exist, so a failed or stale backup passed silently. The freshness threshold also followed no schedule: 26 h with `for: 1h` against an every-6h `ScheduledBackup` allowed four consecutive missed runs before warning; it is now 8 h (`for: 30m`) = schedule + 2 h grace. New `PostgresBackupMetricsMissing` covers the failure the freshness rule structurally cannot see — no series means no alert — via `absent()` per writable-cluster namespace. Summary re-derived to **224** (222 deployed, 216 able to fire); §4 to **55**. Previously 2026-08-31 — §8b: three ClickHouse alerts that could never fire were repaired, and the Keeper quorum finally got a consumer. `ClickHouseServerErrorsElevated` named `chi_clickhouse_system_errors_value`, which returns zero series; it now reads `ClickHouseErrorMetric_ALL` from the `:9363` scrape, per-replica via `max by (replica)` (a deliberate move from fleet census to worst-replica outlier, documented in the rule). `ClickHouseDiskAlmostFull` and `ClickHouseDiskCritical` divided `DiskFreeBytes` (label `disk="default"`) by a sum containing `DiskDataBytes` (no `disk` label), so PromQL matched nothing on every evaluation since the day they were written; the denominator is now `DiskTotalBytes`, and both summaries were retitled to say "node filesystem" because on local-path that is what the ratio measures — not the 10Gi PVC. Two new rules, `ClickHouseKeeperNoLeader` (critical) and `ClickHouseKeeperQuorumDegraded` (warning), read the `:7000` Keeper scrape that had been collected since RFC-0028 with nothing consuming it; both use `OR on() vector(0)` so they still fire when every keeper series disappears, and `max()` because only the leader reports a real synced-follower count. Every expression in the group was run in two forms — unthresholded (must return series) and complete (must return nothing on a healthy store) — which is what caught the three. Also recorded: 6 alerts outside ClickHouse are inert on Kind because kubelet publishes no volume stats for hostPath volumes, leaving the platform with no working PVC-level disk signal; they are kept, not deleted, since the names are correct on any CSI cluster. Summary re-derived to **223** (221 deployed, 215 able to fire). Previously 2026-08-28 — §8b re-graded for a replicated ClickHouse ([RFC-0028](../../proposals/rfc/RFC-0028/) / [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)): `ClickHouseServerUnreachable` split into a warning `ClickHouseReplicaUnreachable` plus a critical `ClickHouseAllReplicasUnreachable`, and two replication rules added (`ClickHouseZooKeeperExceptions` re-enabled, `ClickHouseReadonlyReplica` new on the per-pod `:9363` scrape) — both carrying `VERIFY-AT-KIND` markers because neither series has ever been observed here. The §8b table also still listed the three alerts deleted in August; they are gone. Summary re-derived to **221** (219 deployed — the canonical command counts 2 alerts in a retired `.bak`), which surfaced two offsetting per-domain errors. Previously 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated._
+_Last updated: 2026-09-05 — **ADR-055 shipped its two capacity alerts** with the KEDA scaler, plus a new **§8c KEDA autoscaling** (3 self-health rules — `KedaOperatorDown`, `KedaScalerErrors`, `KedaScaledObjectErrors` — with runbooks and a board, `keda.json`); Summary re-derived to **227** (225 deployed), cluster total 233. Same change: `TemporalScheduleToStartLatencyHigh` (a warning/critical pair on the SDK schedule-to-start histogram, by `task_queue`) and `TemporalTaskQueueBacklogGrowing` (server `approximate_backlog_count` by `taskqueue` — the underscore-valued server label, which the Temporal dashboard's backlog panel had been grouping by the SDK's `task_queue` and therefore never split; fixed in both dashboard twins). Gap #2 and both gap rows closed; §8 counts 14 (10 Temporal rules for 9 names); `KubeHPAMaxedOut` loses its 💤 because KEDA renders an HPA behind every `ScaledObject` — verify at Kind. Earlier the same day — a full audit ran **every** alert expression's metric names against the 7,976 series a loaded cluster holds (seeded + saga + load first, so idle metrics were present). At that audit 289 alerts deployed: 227 hand-written, 62 Sloth-generated (superseded above once the ADR-055 rules landed). **Fixed:** `edge:rq_429_ratio:rate5m` named a series that never existed — a v1.8.3-era guess left behind when the platform moved to Envoy Gateway v1.9.0 — so `Edge429RatioHigh` had produced `samples=0` on every evaluation with no error reported anywhere; it now reads `envoy_http_local_rate_limit_enforced`, chosen over `rate_limited` because only `enforced` counts requests actually answered with a 429. **Newly marked 💤:** eleven RFC-0021 phase-5/6 and reconciler alerts waiting on counters no service emits, plus `KubeHPAMaxedOut` (no HPA is declared); they were deliberately **not** repointed at neighbouring metrics, which would have made them fire for the wrong reason. **Corrected:** the Sloth row read 68, which assumed 10 HTTP services — `inventory` is gRPC-only, so 31 SLOs generate 62. Also recorded: the count command globs `prometheusrules/**` and therefore misses the 7 Temporal alerts in `configs/temporal/`. Three things the audit checked and left alone — 49 same-name alert pairs (Sloth page/ticket burn-rate pairs and per-cluster CNPG rules, both correct), 151 runbook links (none broken), and `ClickHouseExporterUnhealthy` (its metric family exists; the log/span variants are simply unborn until a failure, and `for: 10m` covers that). Earlier: 2026-09-01 — backup alerting migrated to the Barman Cloud plugin metrics. `PostgresBackupTooOld` and `PostgresBackupFailed` queried `cnpg_collector_last_{available,failed}_backup_timestamp`, which the plugin supersedes with `barman_cloud_cloudnative_pg_io_*` (upstream migration guide, "Verify your metrics") — the same class of defect as the ClickHouse three below: a rule vmalert reports healthy while its series does not exist, so a failed or stale backup passed silently. The freshness threshold also followed no schedule: 26 h with `for: 1h` against an every-6h `ScheduledBackup` allowed four consecutive missed runs before warning; it is now 8 h (`for: 30m`) = schedule + 2 h grace. New `PostgresBackupMetricsMissing` covers the failure the freshness rule structurally cannot see — no series means no alert — via `absent()` per writable-cluster namespace. Summary re-derived to **224** (222 deployed, 216 able to fire); §4 to **55**. Previously 2026-08-31 — §8b: three ClickHouse alerts that could never fire were repaired, and the Keeper quorum finally got a consumer. `ClickHouseServerErrorsElevated` named `chi_clickhouse_system_errors_value`, which returns zero series; it now reads `ClickHouseErrorMetric_ALL` from the `:9363` scrape, per-replica via `max by (replica)` (a deliberate move from fleet census to worst-replica outlier, documented in the rule). `ClickHouseDiskAlmostFull` and `ClickHouseDiskCritical` divided `DiskFreeBytes` (label `disk="default"`) by a sum containing `DiskDataBytes` (no `disk` label), so PromQL matched nothing on every evaluation since the day they were written; the denominator is now `DiskTotalBytes`, and both summaries were retitled to say "node filesystem" because on local-path that is what the ratio measures — not the 10Gi PVC. Two new rules, `ClickHouseKeeperNoLeader` (critical) and `ClickHouseKeeperQuorumDegraded` (warning), read the `:7000` Keeper scrape that had been collected since RFC-0028 with nothing consuming it; both use `OR on() vector(0)` so they still fire when every keeper series disappears, and `max()` because only the leader reports a real synced-follower count. Every expression in the group was run in two forms — unthresholded (must return series) and complete (must return nothing on a healthy store) — which is what caught the three. Also recorded: 6 alerts outside ClickHouse are inert on Kind because kubelet publishes no volume stats for hostPath volumes, leaving the platform with no working PVC-level disk signal; they are kept, not deleted, since the names are correct on any CSI cluster. Summary re-derived to **223** (221 deployed, 215 able to fire). Previously 2026-08-28 — §8b re-graded for a replicated ClickHouse ([RFC-0028](../../proposals/rfc/RFC-0028/) / [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)): `ClickHouseServerUnreachable` split into a warning `ClickHouseReplicaUnreachable` plus a critical `ClickHouseAllReplicasUnreachable`, and two replication rules added (`ClickHouseZooKeeperExceptions` re-enabled, `ClickHouseReadonlyReplica` new on the per-pod `:9363` scrape) — both carrying `VERIFY-AT-KIND` markers because neither series has ever been observed here. The §8b table also still listed the three alerts deleted in August; they are gone. Summary re-derived to **221** (219 deployed — the canonical command counts 2 alerts in a retired `.bak`), which surfaced two offsetting per-domain errors. Previously 2026-08-21 — new domain §6b Kyverno admission (4 alerts), and the Summary re-derived to **218**: it had said 202 with `observability 3` where that directory holds 15. The admission webhook on the write path of every apply had no scrape, dashboard, alert or runbook, because the values set `serviceMonitor` at a nesting level chart 3.8.2 does not define. Every expression live-verified before it was written. Previously 2026-08-20 — Keycloak login SLO shipped (`sloth/keycloak-login-slo.yaml`; gap row closed, 32 → 34 SLOs / 64 → 68 burn-rate alerts); previously 2026-08-19 — §3 + §5 gained Runbook columns (infrastructure-alerts.md split into `runbooks/kubernetes/` + `runbooks/valkey/`); previously 2026-08-18 — TemporalServiceErrorRateHigh's dead `service_errors` expr corrected to `service_error_with_type` (live-verified), dashboard cross-references added, gap #2 annotated. **Corrections found by a review pass on the same PR, before merge:** schedule-to-start covered workflow tasks only, while the activity histogram carries **224 series** on a loaded cluster against 32 for workflow tasks and activity backlog is what the scaler's `targetQueueSize` sizes against — so it now runs both kinds under one name with a `task_kind` label, four rules. The backlog rule used `max by (taskqueue)`; one app queue holds **17 series** (`partition` 0–3 + `__sticky__` × `task_type` × versioned/`__unversioned__`), so `max` reads one partition's share and needed roughly 4× the backlog to trip, while the dashboard panel in the same commit used `sum by (taskqueue)` and over-counted by adding Workflow to Activity and versioned to unversioned. Both now read `sum by (taskqueue, task_type, worker_version)` — collapsing `partition` only, which is what `DescribeTaskQueueEnhanced` aggregates and therefore the number KEDA itself scales on. Same class as the `keda_scaler_errors_total` name above and as `edge:rq_429_ratio` below: an expression can be syntactically perfect, pass CI, and still measure the wrong thing._

@@ -32,6 +32,7 @@ resources:
   # - mcp.yaml           # DISABLED 2026-08-21 — owner: the MCP servers are not in use, and they were
   # the biggest idle consumers on the Kind host (victoria-metrics-mcp alone held
   # 662Mi). Re-enable by uncommenting this line; nothing else is needed.
+  - keda.yaml            # KEDA autoscaler (controllers/keda; ADR-055) — before temporal-local and apps-local
   - temporal.yaml        # Temporal server chart (controllers/temporal)
   - temporal-config.yaml # its ingress + alerts (configs/temporal, after temporal-local)
   - keycloak.yaml        # Keycloak identity provider (controllers/keycloak, RFC-0024 P1)

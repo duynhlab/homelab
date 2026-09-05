@@ -140,6 +140,7 @@ Keycloak alert set.
 | RED spanmetrics / business dashboards | ✅ | ✅ | — |
 | Envoy dashboards (3 of 4) | ✅ (envoyproxy/gateway v1.9.0) | ✅ same tag, Gateway folder | `resources-monitor` is cluster-only (cAdvisor series) |
 | Temporal dashboard | ✅ `temporal.json` (uid `temporal-worker`) | ✅ `temporal-local.json` (uid `temporal-worker-local`) | generated from one panel set; SDK + Server rows |
+| KEDA dashboard (ADR-055) | ✅ `keda.json` (uid `keda`) | — no twin, by design | compose runs no KEDA, so a twin would be a board with no series; cluster-only is the documented exception, not parity rot |
 | Inventory + Cutover Baseline boards (`inventory`, `rfc0021-baseline` — RFC-0021-era) | ✅ | ✅ local copies + vendored recording rules | `app=` → `service_name=` rewrite, see rule file headers |
 | Keycloak metrics scrape (`up{job="keycloak"}`, `keycloak_user_events_total`, agroal, http SLO buckets) | ✅ ServiceMonitor (management :9000) | ✅ vmagent job `keycloak` (:9000) | same job name + labels both stacks — no rewrite |
 | Keycloak alerts | ✅ PrometheusRule (5 rules) | ✅ ported subset (`keycloak.yaml`, 4 rules) | KeycloakRestartLoop is kube-state-only, cluster-only |

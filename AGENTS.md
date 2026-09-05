@@ -346,19 +346,24 @@ Every manifest applied to the cluster must satisfy admission:
   envoy-gateway-config (after envoy-gateway + cert-manager + keycloak)
   openbao-oidc-config (after secrets + envoy-gateway-config) — ADR-062
   flux-web (after secrets + cert-manager) — Flux web UI SSO objects
-  monitoring → {kyverno-policies, mcp, caching}
+  monitoring → {kyverno-policies, mcp, caching, keda}
+  keda (ADR-055) → {temporal, apps-local}
   temporal → temporal-config
   kyverno-policies → policy-reporter
-  apps-local (depends: databases + monitoring + temporal-config)
+  apps-local (depends: databases + monitoring + temporal-config + keda)
   ```
-  (27 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
-  commented out of its kustomization since 2026-08-21, so 26 apply; `flux-system`
+  (30 Kustomization CRs are declared in `clusters/local/`, but `mcp-local` has been
+  commented out of its kustomization since 2026-08-21, so 29 apply; `flux-system`
   is created by the FluxInstance rather than this directory, and a cluster
-  therefore reports **27** — 26 was the figure before `clickhouse-keeper-local`
-  landed (2026-09-01, splitting the Keeper quorum out so the CHI cannot be applied
-  before it), 25 before `clickhouse-schema-local`
-  (RFC-0028 DDL bootstrap, 2026-08-28), and 24 before `flux-web-local`
-  (Flux web UI SSO, 2026-08-27). Count them at run
+  therefore reports **30** — 29 was the figure before `keda-local` landed
+  (2026-09-05, ADR-055 autoscaling), and a cluster on that commit reports exactly
+  29 today. The series before it: 28 before `clickhouse-keeper-local`
+  (2026-09-01, splitting the Keeper quorum out so the CHI cannot be applied
+  before it), 27 before `clickhouse-schema-local` (RFC-0028 DDL bootstrap,
+  2026-08-28), and 26 before `flux-web-local` (Flux web UI SSO, 2026-08-27).
+  Every one of those figures was two low until 2026-09-05, because each was
+  derived by adding one to the last rather than re-counting — which is the exact
+  failure the next sentence warns about. Count them at run
   time rather than trusting this number; full graph in
   [`docs/platform/setup.md`](docs/platform/setup.md).)
 - **CHANGELOG.** Entries grouped **`### Category` → `#### Component`** per the hidden template comment at the top of `CHANGELOG.md` (categories, fixed order: `Breaking Change`/`Feature`/`Bugfix`/`Performance`/`Dependency`/`Deprecation`; components: GitOps, Gateway, Observability, Databases, Secrets, Security, Services, Temporal, Local-stack, Docs, Proposals, CI). New entries go at the **top** of the matching group in `[Unreleased]`. **Released sections are append-only** — never edit or remove `[X.Y.Z]` history (older releases keep the format they shipped with). Cutting a release = rename `[Unreleased]` → `[X.Y.Z] - YYYY-MM-DD` (condensing the entries then is fine) and add a fresh empty `[Unreleased]` under the template comment.

@@ -77,7 +77,7 @@ spec:
 
 ## Dashboards
 
-**31 `GrafanaDashboard` CRs across 9 folders**, delivered three ways —
+**42 `GrafanaDashboard` CRs across 12 folders** (re-derive with `grep -h -c '^kind: GrafanaDashboard' kubernetes/infra/configs/observability/grafana/dashboards/**/*.yaml`), delivered three ways —
 `configMapRef` to a JSON vendored in this repo (preferred; auditable and
 pinned), `configMapRef` to a ConfigMap the `grafana-dashboards` HelmRelease
 renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), or `spec.url`
@@ -87,7 +87,7 @@ renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), or `spec.url`
 |--------|--------|--------|
 | Platform / Infrastructure | Kubernetes Cluster Overview, **OTel Collector Health** (ADR-057 consumer), Vector Cluster Monitoring, **Keycloak — Identity** (login/token KPIs) | in-repo JSON ×2 · `spec.url` ×2 |
 | Microservices / Golden Signals | Microservices (OTel) (~41 panels), **Microservices — RED Span Metrics** (ADR-057 consumer) | helm-charts ConfigMaps ×1 · in-repo JSON ×1 |
-| Workflows / Async | **Temporal — Workflows & Activities** (SDK + Server rows) | in-repo JSON ×1 |
+| Workflows / Async | **Temporal — Workflows & Activities** (SDK + Server rows) · **KEDA — Worker Autoscaling** (scaler value/errors, HPA replicas, the Temporal backlog it drains, KEDA health; ADR-055; no local twin — compose runs no KEDA) | in-repo JSON ×2 |
 | Business & Product | Order Saga & Payment — Cutover Baseline, Microservices — Business KPIs, Inventory Service — Stock Authority (all RFC-0021-era) | helm-charts ConfigMaps ×1 · in-repo JSON ×2 |
 | ClickHouse | Server/Engine, OTel logs+traces SQL, Service deep dive, OTel Overview / Logs Explorer / Trace Explorer | in-repo JSON ×6 (RFC-0019 / ADR-023) |
 | API Gateway | Envoy Global, Envoy Clusters, Envoy Gateway Global, Resources Monitor, **Envoy Gateway — Edge Overview** | in-repo JSON ×4 vendored from `envoyproxy/gateway` v1.9.0 + ×1 hand-authored (golden signals / control plane / infra) |
@@ -157,12 +157,13 @@ kubernetes/infra/configs/observability/grafana/
     ├── grafana-dashboard-main.yaml      # Microservices Observability (configMapRef → chart ConfigMap)
     ├── grafana-dashboard-business.yaml  # Business KPIs (configMapRef → chart ConfigMap)
     ├── grafana-dashboard-temporal.yaml  # Temporal (configMapRef → temporal.json, vendored in-repo)
+    ├── grafana-dashboard-keda.yaml      # KEDA — Worker Autoscaling (configMapRef → keda.json, ADR-055)
     ├── grafana-dashboard-cert-manager.yaml  # cert-manager (configMapRef → cert-manager.json)
     ├── grafana-dashboard-clickhouse*.yaml   # ClickHouse suite (configMapRef → clickhouse-*.json)
     ├── grafana-dashboard-envoy-gateway.yaml # 4 CRs (configMapRef → envoy-gateway/*.json, vendored v1.9.0)
     ├── grafana-dashboard-cutover-baseline.yaml · grafana-dashboard-inventory.yaml
     ├── grafana-dashboard-*.yaml         # remaining boards (spec.url → grafana.com or legacy repo)
-    ├── temporal.json · cert-manager.json · clickhouse-*.json · cutover-baseline.json · inventory.json
+    ├── temporal.json · keda.json · cert-manager.json · clickhouse-*.json · cutover-baseline.json · inventory.json
     └── envoy-gateway/*.json             # vendored envoyproxy/gateway v1.9.0 dashboards
 ```
 
@@ -177,4 +178,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

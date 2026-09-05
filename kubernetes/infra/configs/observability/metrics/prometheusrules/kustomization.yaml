@@ -12,4 +12,5 @@ resources:
   - valkey/
   - gitops/
   - kyverno/
+  - keda/
   - watchdog.yaml

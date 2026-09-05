@@ -37,6 +37,8 @@ resources:
   - helm/jetstack.yaml
   - helm/kyverno.yaml
   - helm/policy-reporter.yaml
+  # KEDA — task-queue autoscaling for the Temporal workers (ADR-055).
+  - helm/keda.yaml
   # temporal-operator source retired with the operator; kept as
   # helm/temporal-operator.yaml.bak (ADR-030).
   - helm/temporalio.yaml

@@ -1,0 +1,131 @@
+# KEDA alerts — the autoscaler's own health (ADR-055). KEDA sizes both Temporal
+# workers from task-queue backlog; when KEDA itself fails, the failure is silent:
+# no ScaledObject is evaluated, every worker freezes at its current replica
+# count, and the only symptom is TemporalTaskQueueBacklogGrowing firing later for
+# a reason nothing else names. These three rules name it.
+#
+# Metric names are KEDA 2.20's (docs/2.20/integrations/prometheus.md):
+# keda_scaler_detail_errors_total is the per-scaler error counter —
+# `keda_scaler_errors_total` does NOT exist and the chart's own values.yaml example
+# still cites the pre-2.x `keda_metrics_adapter_scaler_errors`, so neither name
+# above was taken from an example. keda_build_info is the one series present even
+# with zero scalers, which is why it anchors the absent() check.
+#
+# Label caveat, now CONFIRMED rather than assumed: KEDA stamps its own `namespace`
+# label (the ScaledObject's), and under a ServiceMonitor scrape the target's
+# namespace wins, so KEDA's is renamed `exported_namespace` — the label the official
+# KEDA board filters on, used here for the same reason. The mechanism was verified on
+# this cluster against an existing analogue rather than predicted: Temporal's
+# `approximate_backlog_count` is ServiceMonitor-scraped from the `temporal` namespace
+# and carries its own Temporal namespace, and it lands as
+# `namespace="temporal", exported_namespace="mop"`. Same collision, same rename.
+#
+# Job names come from the chart's Services, read off a render of keda 2.20.2 rather
+# than guessed: `keda-operator` (ports metricsservice:9666, metrics:8080) and
+# `keda-operator-metrics-apiserver`, each with its own ServiceMonitor selecting
+# `app.kubernetes.io/name`. `keda-admission-webhooks` has no ServiceMonitor here, so
+# no job. Still worth `count by (job) (up{job=~".*keda.*"})` on the first bring-up.
+#
+# COLD BRING-UP: this rule ships in the `monitoring-local` wave, which precedes
+# `keda-local` — so between the two waves `absent(keda_build_info)` is true and
+# KedaOperatorDown can fire once, critical, before KEDA has been installed at all.
+# `for: 5m` absorbs a normal install; a slow cold bring-up may still page once. That
+# is the cost of an absent() check that is deliberately not scoped to "KEDA exists",
+# since a scrape that silently selects nothing is exactly what it is for.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: keda-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    - name: keda
+      interval: 1m
+      rules:
+        - alert: KedaOperatorDown
+          # absent() covers the silent mode where the ServiceMonitor selects
+          # nothing (chart values regressing, label drift) — the same lesson the
+          # Kyverno group learned on 2026-08-21.
+          expr: |
+            up{job=~".*keda-operator.*", job!~".*metrics-apiserver.*"} == 0
+            or absent(keda_build_info)
+          for: 5m
+          labels:
+            severity: critical
+            category: platform
+          annotations:
+            summary: "KEDA operator down or not scraped"
+            description: "The KEDA operator is unreachable, or no keda_* series is being scraped at all. No ScaledObject is being evaluated: both Temporal workers are frozen at their current replica count and will not follow the backlog."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaOperatorDown.md"
+
+        # The OTHER half of KEDA, and the one the group header's promise requires.
+        # `keda-operator-metrics-apiserver` (cmd/adapter) is what serves
+        # external.metrics.k8s.io; the HPAs KEDA owns query it on every cycle. The
+        # operator evaluates the scalers and holds the keda_scaler_* series, so
+        # KedaOperatorDown above deliberately excludes this job — but with the
+        # adapter gone the operator is healthy, every keda_* series keeps flowing,
+        # and the HPAs still freeze because their metric source returns errors
+        # (ScalingActive=False). Without this rule the only symptom would be
+        # TemporalTaskQueueBacklogGrowing later "for a reason nothing else names",
+        # which is precisely the failure this group exists to name.
+        #
+        # The absent() half is NOT optional, and the first draft of this rule left
+        # it out on the reasoning that "the adapter exports no keda_* series of its
+        # own, so `up` is the signal". Measured on Kind 2026-09-05, that reasoning
+        # was wrong: `kubectl -n keda scale deploy keda-operator-metrics-apiserver
+        # --replicas=0` removes the Service endpoint, so the target disappears and
+        # `up` for that job is **absent** rather than 0. `== 0` then matches nothing
+        # and the rule cannot fire -- while `kubectl -n order describe hpa` showed
+        # `ScalingActive=False` / `FailedGetExternalMetric` and the operator stayed
+        # healthy at `up=1`, which is exactly the blind spot this rule exists to
+        # close. absent() over the same selector returned 1 in the same instant.
+        #
+        # KedaOperatorDown does not have this hole because its second half,
+        # absent(keda_build_info), covers the vanished-target case for the operator.
+        # There is no equivalent keda_* series for the adapter, so the absent() has
+        # to be on `up` itself.
+        - alert: KedaMetricsApiServerDown
+          expr: |
+            up{job=~".*keda.*metrics-apiserver.*"} == 0
+            or absent(up{job=~".*keda.*metrics-apiserver.*"})
+          for: 5m
+          labels:
+            severity: critical
+            category: platform
+          annotations:
+            summary: "KEDA external-metrics adapter down"
+            description: "keda-operator-metrics-apiserver is unreachable. It serves external.metrics.k8s.io, so every HPA KEDA owns now fails its metric fetch and reports ScalingActive=False: both Temporal workers freeze at their current replica count even though the operator is healthy and still publishing keda_* series."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaMetricsApiServerDown.md"
+
+        - alert: KedaScalerErrors
+          # Any sustained error from the temporal trigger: frontend unreachable
+          # from ns keda, the injected build id unknown to the server, or the
+          # 50 RPS per-namespace API budget refusing the poll.
+          expr: |
+            sum by (exported_namespace, scaledObject, scaler) (rate(keda_scaler_detail_errors_total[5m])) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "KEDA scaler errors ({{ $labels.scaler }} on {{ $labels.exported_namespace }}/{{ $labels.scaledObject }})"
+            description: "The {{ $labels.scaler }} trigger on ScaledObject {{ $labels.scaledObject }} has been failing its metric fetch for 5m. The worker version behind it keeps its last replica count; the backlog it should drain is invisible to KEDA."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaScalerErrors.md"
+
+        - alert: KedaScaledObjectErrors
+          # Reconcile errors on the object itself, not its trigger: scaleTargetRef
+          # missing (the controller deleted the versioned Deployment first), the
+          # HPA rejected, or a paused ScaledObject.
+          expr: |
+            sum by (exported_namespace, scaledObject) (rate(keda_scaled_object_errors_total[5m])) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "KEDA ScaledObject errors ({{ $labels.exported_namespace }}/{{ $labels.scaledObject }})"
+            description: "ScaledObject {{ $labels.scaledObject }} has failed to reconcile for 5m — usually its scaleTargetRef Deployment is gone (a version the controller already deleted) or the HPA it owns was rejected. Check the WorkerResourceTemplate status for that build id."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaScaledObjectErrors.md"

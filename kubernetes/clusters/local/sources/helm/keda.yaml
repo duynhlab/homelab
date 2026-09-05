@@ -1,0 +1,49 @@
+# KEDA Helm repository — the autoscaler behind ADR-055.
+#
+# KEDA's `temporal` scaler reads task-queue backlog straight from the Temporal
+# frontend API (DescribeTaskQueue with stats). One ScaledObject per running
+# worker version is rendered by the Worker Controller's WorkerResourceTemplate
+# (kubernetes/apps/{order-fulfillment,checkout-abandon}-scaler.yaml).
+#
+# WHY THE API AND NOT THE METRIC, stated accurately because the first draft of
+# this header got it backwards. The platform DOES have a per-version backlog
+# metric: `approximate_backlog_count` from the matching service
+# (job="temporal-matching-headless") carries worker_build_id, worker_version and
+# worker_deployment_name — measured, 87 series — and TemporalTaskQueueBacklogGrowing
+# in configs/temporal/prometheusrule.yaml alerts on exactly that. So the reason
+# is not that the signal is missing. It is:
+#   1. Nothing can turn that series into a replica count. HPA reads the
+#      external-metrics API, and no adapter (prometheus-adapter or otherwise) is
+#      installed. KEDA ships one as part of the install.
+#   2. The names do not line up. Upstream's HPA recipe wants an external metric
+#      `temporal_approximate_backlog_count` selected by
+#      temporal_worker_deployment_name / temporal_worker_build_id /
+#      temporal_namespace — the three labels the controller injects into
+#      metrics[*].external.metric.selector.matchLabels. This platform emits
+#      `approximate_backlog_count` with worker_deployment_name / worker_build_id
+#      / exported_namespace. The HPA path needs a relabeling layer; the KEDA path
+#      skips it, because the scaler asks the server instead of the TSDB.
+#
+# WHAT THIS TRADES AWAY. Upstream's own docs/scaling-recommendations.md points
+# the other way for a workload like this one: it recommends HPA +
+# prometheus-adapter for "continuous traffic (task queue always loaded)" and
+# reserves KEDA for scale-from-zero, idle periods over five minutes, or
+# sub-60s reactivity. Two of its arguments do not apply here — the stale
+# OpenMetrics timestamps and the five-minute queue unload are Temporal CLOUD
+# properties, and this is a self-hosted server scraped by VictoriaMetrics. Two
+# do: this platform sets minReplicaCount: 1 (the Floor rule) and therefore
+# forgoes scale-from-zero, KEDA's documented differentiator; and KEDA 2.20's
+# temporal scaler reads backlog ONLY, so the slot-utilisation signal that
+# upstream credits for damping scale-down is unavailable. Both are accepted in
+# ADR-055 § Consequences, not overlooked.
+#
+# https://keda.sh/docs/latest/scalers/temporal/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: keda
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://kedacore.github.io/charts

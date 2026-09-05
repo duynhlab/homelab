@@ -217,6 +217,16 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # No app-tier label: KEDA is a platform controller (like temporal), not a
+    # domain service — the app-tier default-deny generation does not apply.
+    # Installed by the keda-local wave (controllers/keda), ADR-055.
+  name: keda
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
     # No app-tier label: Keycloak is a platform component (like temporal),
     # not a domain service — the app-tier default-deny generation and
     # pss-restricted-apps policy do not apply here (RFC-0022 / RFC-0024 P1).

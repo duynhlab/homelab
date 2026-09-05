@@ -103,7 +103,10 @@ The controller owns the lifecycle. Concretely:
 4. **`Progressive` rollout**, two steps at 10% then 50%, `pauseDuration: 30s` each
    (30 s is the CEL-enforced floor). No gate workflow — that is service-repo work.
 5. **`sunset` defaults** — `scaledownDelay: 1h`, `deleteDelay: 24h` — driven by
-   `status.deprecatedVersions[].drainedSince` / `.eligibleForDeletion`.
+   `status.deprecatedVersions[].drainedSince` / `.eligibleForDeletion`. *Amended by
+   [ADR-055](../ADR-055-keda-worker-autoscaling/) (2026-09-05): `deleteDelay` is `0s`
+   once a KEDA `ScaledObject` is attached, because the controller's drained-version
+   zeroing and KEDA's `minReplicaCount` flap for the whole delete window.*
 6. **`pkg/temporalx` reads Temporal's names.** Breaking change, owner-authorised while
    the platform is pre-release.
 

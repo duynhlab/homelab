@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0026 § Implementation History; ADR-054 Adoption `Complete` (2026-08-22) unblocked it |
-| **Adoption** | **Partial** — merged 2026-09-05 (KEDA 2.20.2 as wave `keda-local`, `ScaledObject` in the controller allow-list, one `WorkerResourceTemplate` per worker, the two capacity alerts + runbooks); **Kind verification pending** — the Ubuntu audit checklist in § As-built flips this to Complete |
+| **Adoption** | **Partial** — merged 2026-09-05 in #996 (KEDA 2.20.2 as wave `keda-local`, `ScaledObject` in the controller allow-list, one `WorkerResourceTemplate` per worker, the two capacity alerts + runbooks); **Kind verification pending** — the Ubuntu audit checklist in § As-built flips this to Complete |
 
 ## Context
 
@@ -262,7 +262,7 @@ where KEDA trigger injection arrived).
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-21 | Proposed / Not started | Proposed with RFC-0026 at architecture review. Recorded, not installed. |
-| 2026-09-05 | Accepted / **Partial** | Installed: KEDA 2.20.2 wave, allow-list, one `WorkerResourceTemplate` per worker (both workers, owner decision), the two capacity alerts with runbooks. Kind verification handed to the Ubuntu audit; Adoption → Complete on its evidence. |
+| 2026-09-05 | Accepted / **Partial** | Installed in #996: KEDA 2.20.2 wave, allow-list, one `WorkerResourceTemplate` per worker (both workers, owner decision), the two capacity alerts with runbooks. Kind verification handed to the Ubuntu audit; Adoption → Complete on its evidence. |
 
 ---
 _Last updated: 2026-09-05 — Accepted and installed (Adoption Partial pending the Kind audit); As-built section added; the `""` sentinel recorded_

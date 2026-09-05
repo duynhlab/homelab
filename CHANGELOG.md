@@ -54,7 +54,7 @@ Skeleton (copy what you need):
 
 #### Proposals
 
-- **ADR-055 `Proposed` → `Accepted`, Adoption `Partial`** — KEDA installed with
+- **ADR-055 `Proposed` → `Accepted`, Adoption `Partial`** (#996) — KEDA installed with
   both workers as the canary (owner decision 2026-09-05: both, not just order),
   bounds min 1 / max 3 / target 5 / poll 15 s; Adoption flips to Complete on the
   Kind audit. RFC-0026's last open checkbox is ticked; KEDA is drawn solid in

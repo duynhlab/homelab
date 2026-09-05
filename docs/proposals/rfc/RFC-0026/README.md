@@ -371,10 +371,10 @@ KEDA without the controller has no per-version template to attach to.
 | 2026-08-21 | Research gate passed; RFC Accepted; ADR-054 and ADR-055 created at `Proposed` |
 | 2026-08-21 | Implementation merged: #866 (controller + design record), #867 (`docs/api` staleness), #868 (diagrams + `AGENTS.md` diagram rules), #869 (the JWKS NetworkPolicy fix and the K4.10 row) |
 | 2026-08-22 | **Kind-verified.** `CURRENT` set with no human step (K1.7); a saga completing `Pinned` on `order/order-fulfillment` (K4.10, a row this RFC added because none existed); a `Progressive` rollout walking 10 → 50 → promoted from a pod-template change alone; a rollback re-promoting the previous build id rather than minting a new one; `service_version` carrying the derived build id (K5.4). ADR-054 Adoption → Complete |
-| 2026-09-05 | **ADR-055 installed.** KEDA 2.20.2 as wave `keda-local`; `ScaledObject` in the controller allow-list; one `WorkerResourceTemplate` per worker (`order-fulfillment`, `checkout-abandon`; min 1 / max 3 / target 5 / poll 15 s); `TemporalScheduleToStartLatencyHigh` + `TemporalTaskQueueBacklogGrowing` with runbooks. ADR-055 → Accepted / Partial; Kind audit on the Ubuntu machine flips it to Complete |
+| 2026-09-05 | **ADR-055 installed (#996).** KEDA 2.20.2 as wave `keda-local`; `ScaledObject` in the controller allow-list; one `WorkerResourceTemplate` per worker (`order-fulfillment`, `checkout-abandon`; min 1 / max 3 / target 5 / poll 15 s); `TemporalScheduleToStartLatencyHigh` + `TemporalTaskQueueBacklogGrowing` with runbooks. ADR-055 → Accepted / Partial; Kind audit on the Ubuntu machine flips it to Complete |
 
 - [x] ADR-054 Adoption → Complete
-- [x] ADR-055 Adoption → decided: **installed** 2026-09-05 (Accepted / Partial; Kind verification pending)
+- [x] ADR-055 Adoption → decided: **installed** 2026-09-05, #996 (Accepted / Partial; Kind verification pending)
 - [x] `docs/api/temporal.md` § Worker Deployment Versioning synced to the as-built env
       contract and the single-file layout
 - [x] `kind-e2e-audit.md` K1.7 **repurposed** rather than removed — it now proves no

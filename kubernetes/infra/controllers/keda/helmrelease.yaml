@@ -100,9 +100,9 @@ spec:
 
     # ServiceMonitors for the operator and the metrics adapter. vmagent runs
     # selectAllByDefault, so a plain ServiceMonitor is scraped with no extra
-    # labels. keda_scaler_metrics_value / keda_scaler_errors_total are what a
-    # future "scaler cannot reach Temporal" alert would read; recorded as a gap
-    # in ADR-055, not built here.
+    # labels. keda_scaler_metrics_value / keda_scaler_detail_errors_total feed the
+    # KEDA board (grafana/dashboards/keda.json) and the Keda* alert group
+    # (prometheusrules/keda/alerts.yaml).
     prometheus:
       operator:
         enabled: true

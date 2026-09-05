@@ -116,6 +116,14 @@ Skeleton (copy what you need):
   `task_queue`, but the server emits `taskqueue` (values with underscores), so the
   per-queue split had never rendered — fixed in both dashboard twins.
   `KubeHPAMaxedOut` loses its 💤: KEDA renders an HPA behind every `ScaledObject`.
+  KEDA itself is observed too: a **KEDA — Worker Autoscaling** board (uid `keda`,
+  Workflows / Async — the official board's structure plus a Temporal row and a
+  KEDA-health row; no local twin, compose runs no KEDA) and a new §8c with three
+  self-health rules, `KedaOperatorDown` / `KedaScalerErrors` /
+  `KedaScaledObjectErrors`, each with a runbook in `runbooks/keda/`. Metric names
+  are KEDA 2.20's — `keda_scaler_detail_errors_total`; the `keda_scaler_errors_total`
+  this PR first wrote does not exist — and the `exported_namespace` label the
+  official board relies on is marked VERIFY-AT-KIND. Catalog re-derived to 227.
 - **Runbook coverage for hand-written alerts is complete: 229/229.** The last 15
   land here — kubernetes control plane (8), cert-manager (3), OTel Collector,
   Pyroscope, Policy Reporter and Watchdog. Five of them **cannot fire on Kind**

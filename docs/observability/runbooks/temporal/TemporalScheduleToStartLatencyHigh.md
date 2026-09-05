@@ -54,7 +54,7 @@ kube_deployment_status_replicas{namespace=~"order|checkout", deployment=~"order-
 
 # Is KEDA reading the queue at all
 keda_scaler_metrics_value{scaler="temporalScaler"}
-keda_scaler_errors_total{scaler="temporalScaler"}
+keda_scaler_detail_errors_total{scaler="temporalScaler"}
 ```
 
 ### Grafana
@@ -64,6 +64,10 @@ keda_scaler_errors_total{scaler="temporalScaler"}
   *and* rising schedule-to-start is a polling problem.
 - **Temporal → Server** — the backlog panel (`approximate_backlog_count`) tells
   whether tasks are queued at all.
+
+- **Workflows / Async → KEDA — Worker Autoscaling** — what the scaler computed
+  per version, what the HPA did, and KEDA's own errors; the first place to look
+  when replicas do not follow the backlog.
 
 ### kubectl / logs
 

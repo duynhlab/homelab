@@ -229,6 +229,8 @@ where KEDA trigger injection arrived).
 | 2 | `ScaledObject` added to `workerResourceTemplate.allowedResources` (webhook allow-list + controller RBAC) | `controllers/temporal/worker-controller-helmrelease.yaml` |
 | 3 | One `WorkerResourceTemplate` per worker: `minReplicaCount: 1`, `maxReplicaCount: 3`, `targetQueueSize: "5"`, `pollingInterval: 15`, `cooldownPeriod: 120`, trigger `temporal` with the three `""` sentinels; ≈ 0.13 RPS against the 50 RPS budget | `apps/order-fulfillment-scaler.yaml`, `apps/checkout-abandon-scaler.yaml` |
 | 4 | `TemporalScheduleToStartLatencyHigh` (p99 > 0.2 s / 10m warning, > 1 s / 5m critical, by SDK `task_queue`) and `TemporalTaskQueueBacklogGrowing` (`max by (taskqueue)` > 10 / 10m — the server label, underscore values) with runbooks; `runbooks/temporal/README.md` created | `configs/temporal/prometheusrule.yaml`, `docs/observability/runbooks/temporal/` |
+| 4b | KEDA's own health: `KedaOperatorDown` (critical), `KedaScalerErrors`, `KedaScaledObjectErrors` (warning) with runbooks in `runbooks/keda/`; catalog §8c | `prometheusrules/keda/alerts.yaml`, `docs/observability/runbooks/keda/` |
+| 4c | Dashboard **KEDA — Worker Autoscaling** (uid `keda`, folder Workflows / Async): structure of KEDA's official board + a Temporal row and a KEDA-health row; no local-stack twin (compose has no KEDA) | `grafana/dashboards/keda.json`, `grafana-dashboard-keda.yaml` |
 | 5 | Gap rows and Top-5 item 2 closed; `KubeHPAMaxedOut` un-marked 💤; the Temporal dashboard's backlog panel grouped by the wrong label (`task_queue` for a server metric) — fixed in both twins | `alert-catalog.md`, `grafana/dashboards/temporal.json`, `local-stack/.../temporal-local.json` |
 | 6 | **Not yet run** — the Kind drill below | Ubuntu audit |
 
@@ -245,6 +247,11 @@ where KEDA trigger injection arrived).
 - vmalert `/api/v1/rules` lists both alerts; `TemporalTaskQueueBacklogGrowing` fires
   during the load run with `taskqueue="order_fulfillment"`.
 - KEDA operator logs show no `temporal` errors; poll rate ≈ 0.13 RPS.
+- The KEDA board loads (`/api/dashboards/uid/keda`) and shows data during `make e2e-load`;
+  confirm whether the `keda_*` series carry `exported_namespace` (assumed, from the official
+  board) or `namespace`, and fix the board variable + the three `Keda*` rules in one commit if
+  not. `KedaOperatorDown` is silent on a healthy cluster and fires within 6 min of
+  `kubectl -n keda scale deploy keda-operator --replicas=0` (then scale back to 1).
 - **Sunset interaction, not yet observed:** after `drainedSince` + `scaledownDelay` (1h) the
   controller sets the drained version's replicas to 0 while its `ScaledObject`
   (`minReplicaCount: 1`) stays attached until `deleteDelay` (24h) removes the Deployment.

@@ -15,6 +15,7 @@ runbook links it via its `runbook_url` annotation.
 | [Valkey runbooks](valkey/README.md) | Per-alert investigation for the cache (7 files) | On-call, when a Valkey alert fires |
 | [Kyverno runbooks](kyverno/README.md) | Per-alert investigation for the admission webhook (4 files) | On-call, when a Kyverno alert fires |
 | [Temporal runbooks](temporal/README.md) | Per-alert investigation for the server, the versioned workers and the KEDA scaler that sizes them (9 files covering 10 rules) | On-call, when a Temporal alert fires |
+| [KEDA runbooks](keda/README.md) | Per-alert investigation for the autoscaler's own health — operator scrape, scaler and ScaledObject errors (3 files) | On-call, when a `Keda*` alert fires |
 | [Keycloak runbooks](keycloak/) | Per-alert investigation for the identity provider (5 files, no folder README yet) | On-call, when a Keycloak alert fires |
 | [Logging troubleshooting](../logging/vector.md#troubleshooting) | Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana) | On-call, when logs are missing in Grafana |
 
@@ -53,4 +54,4 @@ Domain-specific rows and diagnosis dialects live in each folder README's
 - [Prepared Databases](../../databases/reference/zalando/prepared-databases.md) -- preparedDatabases issue runbook
 
 ---
-_Last updated: 2026-09-05 — Temporal folder indexed (it had 7 runbooks and no row here); two capacity runbooks added with ADR-055. Previously 2026-08-19 — infrastructure-alerts.md split into kubernetes/ + valkey/; one canonical template_
+_Last updated: 2026-09-05 — KEDA folder added (3 runbooks, ADR-055); Temporal folder indexed (it had 7 runbooks and no row here); two capacity runbooks added with ADR-055. Previously 2026-08-19 — infrastructure-alerts.md split into kubernetes/ + valkey/; one canonical template_

@@ -49,9 +49,9 @@ alert name; the schedule-to-start warning/critical pair shares one file.
   is reverted within seconds by one or the other. Capacity changes go through
   the scaler template by PR.
 - **Dashboards:** **Temporal — Workflows & Activities** (SDK rows) and its
-  **Server** row (backlog, backlog age); KEDA's own metrics
-  (`keda_scaler_metrics_value`, `keda_scaler_errors_total`) are scraped but have
-  no board yet — a recorded gap.
+  **Server** row (backlog, backlog age); **KEDA — Worker Autoscaling** (same
+  folder) for what the scaler computed per version, what its HPA did, and KEDA's
+  own errors (`keda_scaler_metrics_value`, `keda_scaler_detail_errors_total`).
 - **Local-stack:** the compose stack runs the server and both workers and
   scrapes the same series, so every alert here is present locally; the scaler
   is not (compose has no KEDA), so the autoscaling rows describe a condition

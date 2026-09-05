@@ -1,0 +1,79 @@
+# KEDA alerts — the autoscaler's own health (ADR-055). KEDA sizes both Temporal
+# workers from task-queue backlog; when KEDA itself fails, the failure is silent:
+# no ScaledObject is evaluated, every worker freezes at its current replica
+# count, and the only symptom is TemporalTaskQueueBacklogGrowing firing later for
+# a reason nothing else names. These three rules name it.
+#
+# Metric names are KEDA 2.20's (docs/2.20/integrations/prometheus.md):
+# keda_scaler_detail_errors_total is the per-scaler error counter —
+# `keda_scaler_errors_total` does NOT exist and the chart's own values.yaml example
+# still cites the pre-2.x `keda_metrics_adapter_scaler_errors`, so neither name
+# above was taken from an example. keda_build_info is the one series present even
+# with zero scalers, which is why it anchors the absent() check.
+#
+# Label caveat: KEDA stamps its own `namespace` label (the ScaledObject's), so under
+# the Prometheus-operator scrape the target namespace wins and KEDA's becomes
+# `exported_namespace` — the label the official KEDA board filters on, used here for
+# the same reason. VERIFY-AT-KIND: if the live series carry `namespace` instead,
+# change the `by (...)` clauses here and the dashboard variable in one commit.
+# The job regexes follow the chart's Service names (keda-operator,
+# keda-operator-metrics-apiserver); read `label_values(up, job)` on the cluster
+# before trusting them.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: keda-alerts
+  namespace: monitoring
+  labels:
+    prometheus: victoria-metrics
+    role: alert-rules
+spec:
+  groups:
+    - name: keda
+      interval: 1m
+      rules:
+        - alert: KedaOperatorDown
+          # absent() covers the silent mode where the ServiceMonitor selects
+          # nothing (chart values regressing, label drift) — the same lesson the
+          # Kyverno group learned on 2026-08-21.
+          expr: |
+            up{job=~".*keda-operator.*", job!~".*metrics-apiserver.*"} == 0
+            or absent(keda_build_info)
+          for: 5m
+          labels:
+            severity: critical
+            category: platform
+          annotations:
+            summary: "KEDA operator down or not scraped"
+            description: "The KEDA operator is unreachable, or no keda_* series is being scraped at all. No ScaledObject is being evaluated: both Temporal workers are frozen at their current replica count and will not follow the backlog."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaOperatorDown.md"
+
+        - alert: KedaScalerErrors
+          # Any sustained error from the temporal trigger: frontend unreachable
+          # from ns keda, the injected build id unknown to the server, or the
+          # 50 RPS per-namespace API budget refusing the poll.
+          expr: |
+            sum by (exported_namespace, scaledObject, scaler) (rate(keda_scaler_detail_errors_total[5m])) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "KEDA scaler errors ({{ $labels.scaler }} on {{ $labels.exported_namespace }}/{{ $labels.scaledObject }})"
+            description: "The {{ $labels.scaler }} trigger on ScaledObject {{ $labels.scaledObject }} has been failing its metric fetch for 5m. The worker version behind it keeps its last replica count; the backlog it should drain is invisible to KEDA."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaScalerErrors.md"
+
+        - alert: KedaScaledObjectErrors
+          # Reconcile errors on the object itself, not its trigger: scaleTargetRef
+          # missing (the controller deleted the versioned Deployment first), the
+          # HPA rejected, or a paused ScaledObject.
+          expr: |
+            sum by (exported_namespace, scaledObject) (rate(keda_scaled_object_errors_total[5m])) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: platform
+          annotations:
+            summary: "KEDA ScaledObject errors ({{ $labels.exported_namespace }}/{{ $labels.scaledObject }})"
+            description: "ScaledObject {{ $labels.scaledObject }} has failed to reconcile for 5m — usually its scaleTargetRef Deployment is gone (a version the controller already deleted) or the HPA it owns was rejected. Check the WorkerResourceTemplate status for that build id."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaScaledObjectErrors.md"

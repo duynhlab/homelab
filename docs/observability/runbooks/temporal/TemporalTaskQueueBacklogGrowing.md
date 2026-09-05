@@ -57,7 +57,7 @@ kube_deployment_status_replicas{namespace=~"order|checkout", deployment=~"order-
 
 # KEDA's own view: the value it computed and any scaler errors
 keda_scaler_metrics_value{scaler="temporalScaler"}
-rate(keda_scaler_errors_total{scaler="temporalScaler"}[5m])
+rate(keda_scaler_detail_errors_total{scaler="temporalScaler"}[5m])
 ```
 
 ### Grafana
@@ -66,6 +66,10 @@ rate(keda_scaler_errors_total{scaler="temporalScaler"}[5m])
   with a flat count means the queue is starved of pollers, not flooded.
 - **Kubernetes → Workloads** — replicas of the versioned worker Deployments over
   the same window.
+
+- **Workflows / Async → KEDA — Worker Autoscaling** — what the scaler computed
+  per version, what the HPA did, and KEDA's own errors; the first place to look
+  when replicas do not follow the backlog.
 
 ### kubectl / logs
 

@@ -17,6 +17,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMAlertConfigurationReloadFailure.md"
             summary: "Configuration reload failed for VMAlert {{ $labels.instance }}"
             description: "Configuration hot-reload failed. Check vmalert's logs for detailed error message."
 
@@ -26,6 +27,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMAlertAlertingRulesError.md"
             summary: "Alerting rules are failing for VMAlert {{ $labels.instance }}"
             description: "Alerting rules execution is failing for {{ $labels.alertname }} from group {{ $labels.group }} in file {{ $labels.file }}."
 
@@ -35,6 +37,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMAlertRecordingRulesError.md"
             summary: "Recording rules are failing for VMAlert {{ $labels.instance }}"
             description: "Recording rules execution is failing for {{ $labels.recording }} from group {{ $labels.group }} in file {{ $labels.file }}."
 
@@ -44,6 +47,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMAlertTooManyMissedIterations.md"
             summary: "VMAlert {{ $labels.instance }} is missing rules evaluations"
             description: "Group evaluation time takes longer than the configured evaluation interval. This may result in missed alerting notifications."
 
@@ -53,6 +57,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMAlertRemoteWriteErrors.md"
             summary: "VMAlert {{ $labels.instance }} is failing to push metrics to remote write URL"
             description: "Check vmalert's logs for detailed error message."
 
@@ -62,6 +67,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMAlertRemoteWriteDroppingData.md"
             summary: "VMAlert {{ $labels.instance }} is dropping data sent to remote write URL"
             description: "This may result in gaps in recording rules or alerts state."
 
@@ -71,5 +77,6 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMAlertAlertmanagerErrors.md"
             summary: "VMAlert {{ $labels.instance }} is failing to send notifications to Alertmanager"
             description: "VMAlert is failing to send alert notifications to {{ $labels.addr }}."

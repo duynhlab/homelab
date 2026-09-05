@@ -84,6 +84,22 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The Temporal alert group has runbooks — all 7, where it had none.** Pages
+  under `docs/observability/runbooks/temporal/`, a `runbook_url` on every rule,
+  and §8's table gained a Runbook column (rows without a page are marked `—`
+  rather than left looking covered). The persistence page carries the
+  2026-09-05 incident in full, because its shape is not obvious: compare
+  Temporal's `persistence_latency` against Postgres `pg_stat_statements` for the
+  same statements — a large gap means the time is **not in the database** but in
+  Temporal's own SQL pool, which is what `numHistoryShards: 512` has to be sized
+  against. Two more things the pages record: `up{job=~".*temporal.*"}` matches
+  four **server** jobs and deliberately not the application workers, so
+  `TemporalServerDown` means what its name says; and
+  `TemporalWorkerTaskSlotsExhausted` is a global `min` over 27 series from three
+  different workers, so it says *someone* is saturated but not who — the page
+  opens with the `min by (service_name, worker_type)` that answers it.
+
+
 - **The Flux alert group has runbooks — it had none.** All six
   (`FluxSourceNotReady`, `FluxKustomizationNotReady`, `FluxHelmReleaseNotReady`,
   `FluxReconciliationFailure`, `FluxSuspendedResource`,

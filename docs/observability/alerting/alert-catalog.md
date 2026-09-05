@@ -424,19 +424,19 @@ Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watchi
 
 Source: `prometheusrules/observability/pyroscope-alerts.yaml`, `prometheusrules/observability/otel-collector-alerts.yaml`, `prometheusrules/observability/policy-reporter-alerts.yaml`, `temporal/prometheusrule.yaml`, `prometheusrules/watchdog.yaml`.
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m |
-| PolicyReporterDown | warning | `up{job=~".*policy-reporter.*"}==0` | `kyverno.duynh.me` and the policy metrics unavailable; enforcement and report writing unaffected — fall back to `kubectl get policyreport -A` | 10m |
-| TemporalServerDown | critical | `up{temporal}==0` | Durable workflows halt — order fulfilment blocked | 5m |
-| TemporalServiceErrorRateHigh | warning | `service_error_with_type`/`service_requests` >5% | Clients can't submit/query workflows | 10m |
-| TemporalPersistenceErrorRateHigh | warning | `persistence_error_with_type`/`persistence_requests` >2% | Workflow state not persisting — data risk | 10m |
-| TemporalWorkflowFailureRateHigh | warning | failed-workflow ratio >5% | Order-fulfilment saga compensating/rolling back | 10m |
-| TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m |
-| TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m |
-| TemporalWorkerTaskSlotsExhausted | warning | `min(temporal_worker_task_slots_available)==0` | Worker saturated; tasks queue and stall | 10m |
-| OtelCollectorDown | critical | `up{job=~".*otel-collector.*"}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m |
-| **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| PyroscopeDown | warning | `up{job=~".*pyroscope.*"}==0` | Continuous profiles not ingested/queryable | 5m | — |
+| PolicyReporterDown | warning | `up{job=~".*policy-reporter.*"}==0` | `kyverno.duynh.me` and the policy metrics unavailable; enforcement and report writing unaffected — fall back to `kubectl get policyreport -A` | 10m | — |
+| TemporalServerDown | critical | `up{temporal}==0` | Durable workflows halt — order fulfilment blocked | 5m | [TemporalServerDown](../runbooks/temporal/TemporalServerDown.md) |
+| TemporalServiceErrorRateHigh | warning | `service_error_with_type`/`service_requests` >5% | Clients can't submit/query workflows | 10m | [TemporalServiceErrorRateHigh](../runbooks/temporal/TemporalServiceErrorRateHigh.md) |
+| TemporalPersistenceErrorRateHigh | warning | `persistence_error_with_type`/`persistence_requests` >2% | Workflow state not persisting — data risk | 10m | [TemporalPersistenceErrorRateHigh](../runbooks/temporal/TemporalPersistenceErrorRateHigh.md) |
+| TemporalWorkflowFailureRateHigh | warning | failed-workflow ratio >5% | Order-fulfilment saga compensating/rolling back | 10m | [TemporalWorkflowFailureRateHigh](../runbooks/temporal/TemporalWorkflowFailureRateHigh.md) |
+| TemporalActivityFailureRateHigh | warning | failed-activity ratio >5% | A downstream call (product/shipping/notification/cart) erroring; retries may exhaust | 10m | [TemporalActivityFailureRateHigh](../runbooks/temporal/TemporalActivityFailureRateHigh.md) |
+| TemporalWorkerRequestErrorRateHigh | warning | worker→frontend RPC error ratio >5% | Worker can't reach `temporal-frontend` | 10m | [TemporalWorkerRequestErrorRateHigh](../runbooks/temporal/TemporalWorkerRequestErrorRateHigh.md) |
+| TemporalWorkerTaskSlotsExhausted | warning | `min(temporal_worker_task_slots_available)==0` | Worker saturated; tasks queue and stall | 10m | [TemporalWorkerTaskSlotsExhausted](../runbooks/temporal/TemporalWorkerTaskSlotsExhausted.md) |
+| OtelCollectorDown | critical | `up{job=~".*otel-collector.*"}==0` | The OTLP pipeline is down: metrics, traces and logs from every service stop arriving — most other alerts go blind rather than firing | 5m | — |
+| **Watchdog** | none | `vector(1)` (always fires) | Dead-man's-switch: if it stops, the **entire alert pipeline is dead** (no alert can be delivered) | — | — |
 
 Temporal is now monitored at **both** the infra layer (server/service/persistence health) and
 the **work layer** (workflow/activity failure rates, worker→server RPC health, task-slot

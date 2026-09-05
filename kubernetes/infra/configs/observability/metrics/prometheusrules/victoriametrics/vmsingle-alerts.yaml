@@ -33,6 +33,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMSingleDiskRunsOutOfSpaceIn3Days.md"
             summary: "VMSingle {{ $labels.instance }} will run out of disk space in 3 days"
             description: "Taking into account current ingestion rate, free disk space will be enough only for {{ $value | humanizeDuration }}."
 
@@ -48,6 +49,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMSingleDiskRunsOutOfSpace.md"
             summary: "VMSingle {{ $labels.instance }} disk utilization is above 80%"
             description: "Disk utilisation on instance {{ $labels.instance }} is more than 80%. Having less than 20% of free disk space could cripple merge processes and overall performance."
 
@@ -57,6 +59,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMSingleRequestErrorsToAPI.md"
             summary: "Too many errors served for path {{ $labels.path }} (instance {{ $labels.instance }})"
             description: "Requests to path {{ $labels.path }} are receiving errors. Please verify if clients are sending correct requests."
 
@@ -70,6 +73,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMSingleTooHighChurnRate.md"
             summary: "Churn rate is more than 10% on {{ $labels.instance }}"
             description: "VM constantly creates new time series. High Churn Rate is tightly connected with database performance and may result in unexpected OOMs or slow queries."
 
@@ -83,6 +87,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMSingleTooHighSlowInsertsRate.md"
             summary: "Percentage of slow inserts is more than 5% on {{ $labels.instance }}"
             description: "High rate of slow inserts may be a sign of resource exhaustion. It is likely more RAM is needed for optimal handling of the current number of active time series."
 
@@ -94,5 +99,6 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/victoriametrics/VMSingleMetadataCacheUtilizationIsTooHigh.md"
             summary: "Metadata cache on {{ $labels.instance }} is utilized for more than 95%"
             description: "When cache is overutilized, the oldest entries will be dropped out automatically. It may result into incomplete response for /api/v1/metadata API calls."

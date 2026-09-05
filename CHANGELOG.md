@@ -84,6 +84,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The VictoriaMetrics alert groups have runbooks — all 31, across four files
+  that had none.** `health` (10), `vmagent` (8), `vmalert` (7) and `vmsingle` (6)
+  each get a page per alert, a `runbook_url` on every rule, and a Runbook column
+  in their catalog tables. The monitoring system needs these more than most,
+  because its failures are **self-referential**: `vmalert` down means no alert
+  fires at all including that one, `VMAlertAlertmanagerErrors` means alerts fire
+  into nothing, and `VMAlertConfigurationReloadFailure` keeps evaluating a stale
+  rule set so a newly added alert silently does not exist. Each page names the
+  surviving signal — the Watchdog dead-man's-switch — and says to escalate out of
+  band rather than through the system that cannot page. `VMAgentScrapePoolHasNoTargets`
+  gets the same treatment for the same reason: a pool matching nothing reads as
+  coverage, which is how the Kyverno webhook once ran unscraped behind a values
+  flag the chart did not define.
+
+
 - **The ClickHouse alert group has runbooks — all 14, where it had none.** One
   page per alert under `docs/observability/runbooks/clickhouse/`, a
   `runbook_url` on every rule, and the catalog table gained the Runbook column

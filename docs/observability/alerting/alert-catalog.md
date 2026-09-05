@@ -371,54 +371,54 @@ Source: `prometheusrules/victoriametrics/*.yaml`. **The monitoring system watchi
 
 **Core health** (`health-alerts.yaml`)
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| VMServiceDown | critical | `up{vm component}==0` | Metrics collection stopped; monitoring blind | 2m |
-| VMTooManyRestarts | critical | `changes(process_start_time_seconds[15m])>2` | VM component crashlooping | 0m |
-| VMProcessNearFDLimits | critical | `(max_fds-open_fds)<100` | Process degradation imminent | 5m |
-| VMTooHighMemoryUsage | critical | resident/available >80% | OOMKill / metrics loss risk | 5m |
-| VMTooHighCPUUsage | critical | CPU usage >90% | Queries slow; ingest backlog | 5m |
-| VMTooManyLogs | warning | non-info `vm_log_messages_total` rising | Internal issues developing | 15m |
-| VMTooManyTSIDMisses | critical | `increase(vm_missing_tsids_for_metric_id_total[5m])>0` | Index corruption; wrong query results | 15m |
-| VMConcurrentInsertsHitTheLimit | warning | concurrency ≥ capacity | Ingest overloaded; writes may drop | 15m |
-| VMRowsRejectedOnIngestion | warning | `rate(vm_rows_ignored_total[5m])>0` | Metrics loss on ingest | 15m |
-| VMTooHighQueryLoad | warning | `increase(vm_concurrent_select_limit_timeout_total[5m])>0` | Queries time out; dashboards/alerts incomplete | 15m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| VMServiceDown | critical | `up{vm component}==0` | Metrics collection stopped; monitoring blind | 2m | [VMServiceDown](../runbooks/victoriametrics/VMServiceDown.md) |
+| VMTooManyRestarts | critical | `changes(process_start_time_seconds[15m])>2` | VM component crashlooping | 0m | [VMTooManyRestarts](../runbooks/victoriametrics/VMTooManyRestarts.md) |
+| VMProcessNearFDLimits | critical | `(max_fds-open_fds)<100` | Process degradation imminent | 5m | [VMProcessNearFDLimits](../runbooks/victoriametrics/VMProcessNearFDLimits.md) |
+| VMTooHighMemoryUsage | critical | resident/available >80% | OOMKill / metrics loss risk | 5m | [VMTooHighMemoryUsage](../runbooks/victoriametrics/VMTooHighMemoryUsage.md) |
+| VMTooHighCPUUsage | critical | CPU usage >90% | Queries slow; ingest backlog | 5m | [VMTooHighCPUUsage](../runbooks/victoriametrics/VMTooHighCPUUsage.md) |
+| VMTooManyLogs | warning | non-info `vm_log_messages_total` rising | Internal issues developing | 15m | [VMTooManyLogs](../runbooks/victoriametrics/VMTooManyLogs.md) |
+| VMTooManyTSIDMisses | critical | `increase(vm_missing_tsids_for_metric_id_total[5m])>0` | Index corruption; wrong query results | 15m | [VMTooManyTSIDMisses](../runbooks/victoriametrics/VMTooManyTSIDMisses.md) |
+| VMConcurrentInsertsHitTheLimit | warning | concurrency ≥ capacity | Ingest overloaded; writes may drop | 15m | [VMConcurrentInsertsHitTheLimit](../runbooks/victoriametrics/VMConcurrentInsertsHitTheLimit.md) |
+| VMRowsRejectedOnIngestion | warning | `rate(vm_rows_ignored_total[5m])>0` | Metrics loss on ingest | 15m | [VMRowsRejectedOnIngestion](../runbooks/victoriametrics/VMRowsRejectedOnIngestion.md) |
+| VMTooHighQueryLoad | warning | `increase(vm_concurrent_select_limit_timeout_total[5m])>0` | Queries time out; dashboards/alerts incomplete | 15m | [VMTooHighQueryLoad](../runbooks/victoriametrics/VMTooHighQueryLoad.md) |
 
 **VMAlert** (`vmalert-alerts.yaml`) — the rule-evaluation + notification engine
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| VMAlertConfigurationReloadFailure | warning | `vmalert_config_last_reload_successful!=1` | New/updated rules not applied | 5m |
-| VMAlertAlertingRulesError | warning | `increase(vmalert_alerting_rules_errors_total[5m])>0` | Specific alerts not evaluating | 5m |
-| VMAlertRecordingRulesError | warning | `increase(vmalert_recording_rules_errors_total[5m])>0` | Pre-aggregated metrics missing | 5m |
-| VMAlertTooManyMissedIterations | warning | `increase(vmalert_iteration_missed_total[5m])>0` | Rules fire late or not at all | 15m |
-| VMAlertRemoteWriteErrors | warning | `increase(vmalert_remotewrite_errors_total[5m])>0` | Rule-result metrics not stored | 15m |
-| VMAlertRemoteWriteDroppingData | critical | `increase(vmalert_remotewrite_dropped_rows_total[5m])>0` | Permanent loss of alert-state metrics | 5m |
-| VMAlertAlertmanagerErrors | warning | `increase(vmalert_alerts_send_errors_total[5m])>0` | vmalert→Alertmanager send failing — alerts may not page | 15m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| VMAlertConfigurationReloadFailure | warning | `vmalert_config_last_reload_successful!=1` | New/updated rules not applied | 5m | [VMAlertConfigurationReloadFailure](../runbooks/victoriametrics/VMAlertConfigurationReloadFailure.md) |
+| VMAlertAlertingRulesError | warning | `increase(vmalert_alerting_rules_errors_total[5m])>0` | Specific alerts not evaluating | 5m | [VMAlertAlertingRulesError](../runbooks/victoriametrics/VMAlertAlertingRulesError.md) |
+| VMAlertRecordingRulesError | warning | `increase(vmalert_recording_rules_errors_total[5m])>0` | Pre-aggregated metrics missing | 5m | [VMAlertRecordingRulesError](../runbooks/victoriametrics/VMAlertRecordingRulesError.md) |
+| VMAlertTooManyMissedIterations | warning | `increase(vmalert_iteration_missed_total[5m])>0` | Rules fire late or not at all | 15m | [VMAlertTooManyMissedIterations](../runbooks/victoriametrics/VMAlertTooManyMissedIterations.md) |
+| VMAlertRemoteWriteErrors | warning | `increase(vmalert_remotewrite_errors_total[5m])>0` | Rule-result metrics not stored | 15m | [VMAlertRemoteWriteErrors](../runbooks/victoriametrics/VMAlertRemoteWriteErrors.md) |
+| VMAlertRemoteWriteDroppingData | critical | `increase(vmalert_remotewrite_dropped_rows_total[5m])>0` | Permanent loss of alert-state metrics | 5m | [VMAlertRemoteWriteDroppingData](../runbooks/victoriametrics/VMAlertRemoteWriteDroppingData.md) |
+| VMAlertAlertmanagerErrors | warning | `increase(vmalert_alerts_send_errors_total[5m])>0` | vmalert→Alertmanager send failing — alerts may not page | 15m | [VMAlertAlertmanagerErrors](../runbooks/victoriametrics/VMAlertAlertmanagerErrors.md) |
 
 **VMAgent** (`vmagent-alerts.yaml`) — scrape + remote-write pipeline
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| VMAgentPersistentQueueIsDroppingData | critical | `increase(vm_persistentqueue_bytes_dropped_total[5m])>0` | Metrics permanently lost; monitoring gaps | 10m |
-| VMAgentTooManyScrapeErrors | warning | `increase(vm_promscrape_scrapes_failed_total[5m])>0` | Targets' metrics missing | 15m |
-| VMAgentScrapePoolHasNoTargets | warning | scrape pool targets == 0 | Whole pool uncollected | 30m |
-| VMAgentTooManyRemoteWriteErrors | warning | remote-write retries occurring | Backlog growing; potential loss | 15m |
-| VMAgentRemoteWriteConnectionIsSaturated | warning | send duration/queue >90% | Ingest latency; eventual loss | 15m |
-| VMAgentConfigurationReloadFailure | warning | scrape/relabel reload != 1 | New targets/labels not applied | 5m |
-| VMAgentPersistentQueueRunsOutOfSpaceIn12Hours | warning | queue space depletes in 12h | Data loss if remote-write stays down | 10m |
-| VMAgentPersistentQueueRunsOutOfSpaceIn4Hours | critical | queue space depletes in 4h | Imminent data loss | 10m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| VMAgentPersistentQueueIsDroppingData | critical | `increase(vm_persistentqueue_bytes_dropped_total[5m])>0` | Metrics permanently lost; monitoring gaps | 10m | [VMAgentPersistentQueueIsDroppingData](../runbooks/victoriametrics/VMAgentPersistentQueueIsDroppingData.md) |
+| VMAgentTooManyScrapeErrors | warning | `increase(vm_promscrape_scrapes_failed_total[5m])>0` | Targets' metrics missing | 15m | [VMAgentTooManyScrapeErrors](../runbooks/victoriametrics/VMAgentTooManyScrapeErrors.md) |
+| VMAgentScrapePoolHasNoTargets | warning | scrape pool targets == 0 | Whole pool uncollected | 30m | [VMAgentScrapePoolHasNoTargets](../runbooks/victoriametrics/VMAgentScrapePoolHasNoTargets.md) |
+| VMAgentTooManyRemoteWriteErrors | warning | remote-write retries occurring | Backlog growing; potential loss | 15m | [VMAgentTooManyRemoteWriteErrors](../runbooks/victoriametrics/VMAgentTooManyRemoteWriteErrors.md) |
+| VMAgentRemoteWriteConnectionIsSaturated | warning | send duration/queue >90% | Ingest latency; eventual loss | 15m | [VMAgentRemoteWriteConnectionIsSaturated](../runbooks/victoriametrics/VMAgentRemoteWriteConnectionIsSaturated.md) |
+| VMAgentConfigurationReloadFailure | warning | scrape/relabel reload != 1 | New targets/labels not applied | 5m | [VMAgentConfigurationReloadFailure](../runbooks/victoriametrics/VMAgentConfigurationReloadFailure.md) |
+| VMAgentPersistentQueueRunsOutOfSpaceIn12Hours | warning | queue space depletes in 12h | Data loss if remote-write stays down | 10m | [VMAgentPersistentQueueRunsOutOfSpaceIn12Hours](../runbooks/victoriametrics/VMAgentPersistentQueueRunsOutOfSpaceIn12Hours.md) |
+| VMAgentPersistentQueueRunsOutOfSpaceIn4Hours | critical | queue space depletes in 4h | Imminent data loss | 10m | [VMAgentPersistentQueueRunsOutOfSpaceIn4Hours](../runbooks/victoriametrics/VMAgentPersistentQueueRunsOutOfSpaceIn4Hours.md) |
 
 **VMSingle** (`vmsingle-alerts.yaml`) — storage backend
 
-| Alert | Sev | Metric & trigger | Impact | for |
-|-------|-----|------------------|--------|-----|
-| VMSingleDiskRunsOutOfSpaceIn3Days | critical | disk depletes in 3 days | Imminent write failure | 30m |
-| VMSingleDiskRunsOutOfSpace | critical | disk utilization >80% | Merges degraded; writes at risk | 30m |
-| VMSingleRequestErrorsToAPI | warning | `increase(vm_http_request_errors_total[5m])>0` | Read/write of metrics failing | 15m |
-| VMSingleTooHighChurnRate | warning | new-series / inserts >10% | High cardinality; memory/OOM risk | 15m |
-| VMSingleTooHighSlowInsertsRate | warning | slow inserts >5% | Insufficient RAM for active series | 15m |
-| VMSingleMetadataCacheUtilizationIsTooHigh | warning | metadata cache >95% | Metadata API responses incomplete | 15m |
+| Alert | Sev | Metric & trigger | Impact | for | Runbook |
+|-------|-----|------------------|--------|-----|---------|
+| VMSingleDiskRunsOutOfSpaceIn3Days | critical | disk depletes in 3 days | Imminent write failure | 30m | [VMSingleDiskRunsOutOfSpaceIn3Days](../runbooks/victoriametrics/VMSingleDiskRunsOutOfSpaceIn3Days.md) |
+| VMSingleDiskRunsOutOfSpace | critical | disk utilization >80% | Merges degraded; writes at risk | 30m | [VMSingleDiskRunsOutOfSpace](../runbooks/victoriametrics/VMSingleDiskRunsOutOfSpace.md) |
+| VMSingleRequestErrorsToAPI | warning | `increase(vm_http_request_errors_total[5m])>0` | Read/write of metrics failing | 15m | [VMSingleRequestErrorsToAPI](../runbooks/victoriametrics/VMSingleRequestErrorsToAPI.md) |
+| VMSingleTooHighChurnRate | warning | new-series / inserts >10% | High cardinality; memory/OOM risk | 15m | [VMSingleTooHighChurnRate](../runbooks/victoriametrics/VMSingleTooHighChurnRate.md) |
+| VMSingleTooHighSlowInsertsRate | warning | slow inserts >5% | Insufficient RAM for active series | 15m | [VMSingleTooHighSlowInsertsRate](../runbooks/victoriametrics/VMSingleTooHighSlowInsertsRate.md) |
+| VMSingleMetadataCacheUtilizationIsTooHigh | warning | metadata cache >95% | Metadata API responses incomplete | 15m | [VMSingleMetadataCacheUtilizationIsTooHigh](../runbooks/victoriametrics/VMSingleMetadataCacheUtilizationIsTooHigh.md) |
 
 ## 8. Temporal / Pyroscope / Watchdog
 

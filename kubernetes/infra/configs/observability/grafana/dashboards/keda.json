@@ -297,7 +297,7 @@
       },
       "id": 5,
       "type": "timeseries",
-      "title": "Scaler metric latency p95",
+      "title": "Scaler metric latency (last fetch)",
       "gridPos": {
         "h": 6,
         "w": 12,
@@ -357,7 +357,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, scaler) (rate(keda_scaler_metrics_latency_seconds_bucket{exported_namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "max by (scaler, scaledObject) (keda_scaler_metrics_latency_seconds{exported_namespace=~\"$namespace\"})",
           "range": true,
           "refId": "A",
           "legendFormat": "{{scaler}}"
@@ -708,7 +708,7 @@
       },
       "id": 12,
       "type": "timeseries",
-      "title": "Task-queue backlog (server, by taskqueue)",
+      "title": "Task-queue backlog (server; summed over partition only)",
       "gridPos": {
         "h": 8,
         "w": 8,

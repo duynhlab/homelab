@@ -41,7 +41,9 @@ sum by (exported_namespace, scaledObject, scaler) (rate(keda_scaler_detail_error
 count by (scaler) (rate(keda_scaler_detail_errors_total[5m]) > 0)
 
 # Latency of the calls that do succeed
-histogram_quantile(0.95, sum by (le) (rate(keda_scaler_metrics_latency_seconds_bucket[5m])))
+max by (scaler, scaledObject) (keda_scaler_metrics_latency_seconds{exported_namespace=~"order|checkout"})
+# (a GAUGE of the last fetch, not a histogram — keda_scaler_metrics_latency_seconds_bucket
+#  does not exist; verified against pkg/metricscollector/prommetrics.go at v2.20.2)
 
 # Is the frontend itself unhappy
 sum(rate(service_error_with_type{job=~".*temporal.*"}[5m]))

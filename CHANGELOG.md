@@ -136,8 +136,23 @@ Skeleton (copy what you need):
   self-health rules, `KedaOperatorDown` / `KedaScalerErrors` /
   `KedaScaledObjectErrors`, each with a runbook in `runbooks/keda/`. Metric names
   are KEDA 2.20's — `keda_scaler_detail_errors_total`; the `keda_scaler_errors_total`
-  this PR first wrote does not exist — and the `exported_namespace` label the
-  official board relies on is marked VERIFY-AT-KIND.
+  this PR first wrote does not exist. Every name was then re-verified against
+  `pkg/metricscollector/prommetrics.go` at v2.20.2, which caught one more: the
+  board's "Scaler metric latency p95" read
+  `keda_scaler_metrics_latency_seconds_bucket`, but that metric is a **GaugeVec**
+  and has no buckets, so the panel could never draw. It is now a gauge panel. The
+  board had also reintroduced `max by (taskqueue)` on the Temporal backlog and
+  showed workflow-task schedule-to-start only — the same two defects corrected
+  above, so both are re-applied there. A fourth rule,
+  `KedaMetricsApiServerDown`, covers the half of KEDA the other three
+  structurally cannot see: the operator holds every `keda_*` series while
+  `keda-operator-metrics-apiserver` serves `external.metrics.k8s.io`, so losing
+  the adapter freezes every HPA (`ScalingActive=False`) with the operator healthy
+  and all metrics still flowing. The `exported_namespace` VERIFY-AT-KIND is
+  retired against evidence rather than a drill: Temporal's
+  ServiceMonitor-scraped `approximate_backlog_count` already lands on this
+  cluster as `namespace="temporal", exported_namespace="mop"` — the identical
+  collision.
   The two Temporal expressions were corrected against the live cluster before
   merge as well, and all three defects are the same lesson as `edge:rq_429_ratio`
   below — an expression can be syntactically perfect, pass CI, and still measure

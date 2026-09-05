@@ -19,37 +19,40 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**227 statically-defined alerts** across 11 domains (re-derive with
+**228 statically-defined alerts** across 11 domains (re-derive with
 `grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
-— by domain: postgres 55, microservices 52, victoriametrics 31, kubernetes 29,
-observability 19, envoy-gateway 12, gitops 9, valkey 7, keycloak 5, kyverno 4,
-keda 3, + the watchdog), plus **68 Sloth-generated** SLO
-burn-rate alerts (2 × 34 SLOs). The 34 SLOs cover all 11 Go services plus Keycloak:
-30 rendered by the `mop` chart through the five domain ResourceSets, plus inventory's 2
-hand-written gRPC SLOs and Keycloak's 2 hand-written identity SLOs. Two CNPG topology rules are **gated** (not
-deployed) and a subset is **inactive on Kind** (platform limitations) — both
-marked inline below.
+— by domain, re-counted 2026-09-05: postgres 55, microservices 52,
+victoriametrics 31, kubernetes 29, observability 17, envoy-gateway 12, gitops 9,
+valkey 7, keycloak 5, kyverno 4, keda 4, + the watchdog at the directory root =
+226 in `.yaml`, plus the 2 in the retired `.bak` the glob also sees). The
+`observability 19` this list carried was stale — that directory holds 17.
+Plus **62 Sloth-generated** SLO burn-rate alerts (2 × 31 SLOs); the `68 / 34`
+this paragraph used to state was corrected in the domain table on 2026-09-05 and
+missed here. The 31 SLOs are 9 HTTP services × 3, inventory × 2 gRPC, and
+Keycloak × 2 identity — `inventory` serves no HTTP. Two CNPG topology rules are
+**gated** (not deployed) and a subset is **inactive on Kind** (platform
+limitations) — both marked inline below.
 
 The count is re-derived from the manifests (`- alert:` occurrences under
 `prometheusrules/**`), never incremented by hand — and re-deriving on 2026-08-21
 showed why that rule exists. One caveat the command itself carries: it has no
 `--include`, so it also counts the **2 alerts in the retired
 `observability/tempo-alerts.yaml.bak`**, which nothing deploys. The deployed
-number is therefore **225**.
+number is therefore **226**.
 
 That command has a second blind spot, found 2026-09-05: it globs
 `prometheusrules/**` only, so it misses the **12 Temporal rules** (9 names) that live in
 `configs/temporal/prometheusrule.yaml`. They are documented in §8 below but sit
 outside the count. Counted against the cluster instead, the hand-written total is
-**235** — 225 here, minus the 2 gated CNPG topology rules that never deploy,
+**236** — 226 here, minus the 2 gated CNPG topology rules that never deploy,
 plus the 12 in `configs/temporal/` (the five ADR-055 capacity rules landed
 2026-09-05, alongside the three `Keda*` self-health rules that DO fall inside
 the glob). With the 62 Sloth-generated rules, which are separate by design and
-not in this number, a cluster deploys **297**.
+not in this number, a cluster deploys **298**.
 
-Of those 225, **6 cannot fire on Kind** and are documented as such rather than
+Of those 226, **6 cannot fire on Kind** and are documented as such rather than
 counted as coverage — the PVC and CNPG disk rules plus `KubeletTooManyPods`; see
-§8b's "Alerts that are inert on Kind". Effective coverage is **219**. Naming that
+§8b's "Alerts that are inert on Kind". Effective coverage is **220**. Naming that
 subtraction is the point: three ClickHouse rules spent months inside a count that
 read as coverage before anyone pasted their expressions into a query window.
 
@@ -72,7 +75,7 @@ error forward a fourth time.
 | [GitOps (Flux + cert-manager)](#6-gitops-flux--cert-manager) | 9 | Delivery pipeline + TLS |
 | [Kyverno admission](#6b-kyverno-admission) | 4 | The admission webhook on the write path of every apply — four controllers, four different impacts |
 | [VictoriaMetrics self-health](#7-victoriametrics-self-health) | 31 | The monitoring system itself |
-| [KEDA autoscaling](#8c-keda-autoscaling) | 3 | The autoscaler that sizes the Temporal workers — operator scrape, scaler errors, ScaledObject errors (ADR-055) |
+| [KEDA autoscaling](#8c-keda-autoscaling) | 4 | The autoscaler that sizes the Temporal workers — operator scrape, **external-metrics adapter scrape**, scaler errors, ScaledObject errors (ADR-055) |
 | [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 16 | Tracing, workflows, worker capacity (ADR-055), profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
 | [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 62 (generated) | Error-budget burn: **9** HTTP services × 3 SLOs + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs = 31 SLOs, two burn-rate alerts each. Counted 68 until 2026-09-05, which assumed 10 HTTP services — `inventory` serves **no HTTP** (`rpc_server_*` only), so it has the gRPC pair and nothing more |
@@ -658,21 +661,32 @@ Dashboard: Workflows / Async → **KEDA — Worker Autoscaling** (`grafana/dashb
 
 KEDA ([ADR-055](../../proposals/adr/ADR-055-keda-worker-autoscaling/)) is the autoscaler behind
 both Temporal workers; when it fails, the failure is silent — no `ScaledObject` is evaluated and
-every worker freezes at its current replica count — so these three rules name the cause before
+every worker freezes at its current replica count — so these four rules name the cause before
 `TemporalTaskQueueBacklogGrowing` (§8) names the symptom.
+
+KEDA is **two** processes and both are covered, because only one of them holds the `keda_*`
+series. The operator evaluates triggers and publishes every `keda_scaler_*` metric; the
+external-metrics adapter registers `external.metrics.k8s.io` and is what the HPAs actually
+query. Lose the adapter and the operator stays healthy, every series keeps flowing, and scaling
+still stops — a failure the first three rules structurally cannot see.
 
 | Alert | Sev | Metric & trigger | Impact | for | Runbook |
 |-------|-----|------------------|--------|-----|---------|
 | KedaOperatorDown | critical | `up{keda-operator}==0 or absent(keda_build_info)` | Nothing evaluates a ScaledObject; both workers stop following the backlog | 5m | [KedaOperatorDown](../runbooks/keda/KedaOperatorDown.md) |
+| KedaMetricsApiServerDown | critical | `up{keda-operator-metrics-apiserver}==0` | The `external.metrics.k8s.io` adapter is gone: every KEDA-owned HPA reports `ScalingActive=False` and freezes, while the operator looks healthy | 5m | [KedaMetricsApiServerDown](../runbooks/keda/KedaMetricsApiServerDown.md) |
 | KedaScalerErrors | warning | `rate(keda_scaler_detail_errors_total[5m]) > 0` by scaledObject, scaler | One worker version's trigger cannot fetch its backlog (frontend unreachable, unknown build id, API budget) — it keeps its last replica count | 5m | [KedaScalerErrors](../runbooks/keda/KedaScalerErrors.md) |
 | KedaScaledObjectErrors | warning | `rate(keda_scaled_object_errors_total[5m]) > 0` by scaledObject | The object itself fails to reconcile — usually lifecycle skew: its target Deployment was already deleted by the Worker Controller | 5m | [KedaScaledObjectErrors](../runbooks/keda/KedaScaledObjectErrors.md) |
 
 Two things to know before reading these rules. Metric names are KEDA **2.20**'s:
 `keda_scaler_detail_errors_total` is the per-scaler counter, `keda_scaler_errors_total` does not
 exist, and the chart's own values example still cites a pre-2.x name. And KEDA stamps its own
-`namespace` label, so under the operator scrape it surfaces as **`exported_namespace`** — the
-label the official KEDA board filters on and the one used here; confirming it live is an
-ADR-055 Kind-audit row (**VERIFY-AT-KIND**).
+`namespace` label, so under a ServiceMonitor scrape it surfaces as **`exported_namespace`** —
+the label the official KEDA board filters on and the one used here. That is no longer an
+assumption: the same collision is already observable on this cluster, where Temporal's
+ServiceMonitor-scraped `approximate_backlog_count` lands as
+`namespace="temporal", exported_namespace="mop"`. The **VERIFY-AT-KIND** marker is retired;
+what remains for the drill is confirming the two job names, which were read off a render of
+chart 2.20.2 (`keda-operator`, `keda-operator-metrics-apiserver`) rather than guessed.
 
 ## 9. RFC-0021 order-side stock
 

@@ -15,7 +15,7 @@ runbook links it via its `runbook_url` annotation.
 | [Valkey runbooks](valkey/README.md) | Per-alert investigation for the cache (7 files) | On-call, when a Valkey alert fires |
 | [Kyverno runbooks](kyverno/README.md) | Per-alert investigation for the admission webhook (4 files) | On-call, when a Kyverno alert fires |
 | [Temporal runbooks](temporal/README.md) | Per-alert investigation for the server, the versioned workers and the KEDA scaler that sizes them (9 files covering 10 rules) | On-call, when a Temporal alert fires |
-| [KEDA runbooks](keda/README.md) | Per-alert investigation for the autoscaler's own health — operator scrape, scaler and ScaledObject errors (3 files) | On-call, when a `Keda*` alert fires |
+| [KEDA runbooks](keda/README.md) | Per-alert investigation for the autoscaler's own health — operator scrape, external-metrics adapter scrape, scaler and ScaledObject errors (4 files) | On-call, when a `Keda*` alert fires |
 | [Keycloak runbooks](keycloak/) | Per-alert investigation for the identity provider (5 files, no folder README yet) | On-call, when a Keycloak alert fires |
 | [Logging troubleshooting](../logging/vector.md#troubleshooting) | Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana) | On-call, when logs are missing in Grafana |
 

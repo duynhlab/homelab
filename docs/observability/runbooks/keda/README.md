@@ -2,9 +2,12 @@
 
 Per-alert investigation guides for KEDA, the autoscaler
 [ADR-055](../../../proposals/adr/ADR-055-keda-worker-autoscaling/) installed to
-size both Temporal workers from task-queue backlog. Three rules, all about
-KEDA's own health: the operator being scraped, a trigger failing its metric
-fetch, and a `ScaledObject` failing to reconcile. What the scaler *does* to the
+size both Temporal workers from task-queue backlog. Four rules, all about
+KEDA's own health: the operator being scraped, the external-metrics adapter
+being scraped, a trigger failing its metric fetch, and a `ScaledObject` failing
+to reconcile. The first two are separate on purpose — the operator publishes
+every `keda_*` series while the adapter serves `external.metrics.k8s.io`, so the
+adapter can die with the operator perfectly healthy and scaling still stops. What the scaler *does* to the
 workers is alerted on the Temporal side
 (`TemporalTaskQueueBacklogGrowing`, `TemporalScheduleToStartLatencyHigh` —
 [runbooks/temporal/](../temporal/README.md)). One file per alert name.
@@ -23,6 +26,7 @@ workers is alerted on the Temporal side
 | Alert | Sev | Source | Status | Runbook |
 |-------|-----|--------|--------|---------|
 | KedaOperatorDown | critical | keda/alerts | active | [KedaOperatorDown.md](KedaOperatorDown.md) |
+| KedaMetricsApiServerDown | critical | keda/alerts | active | [KedaMetricsApiServerDown](KedaMetricsApiServerDown.md) |
 | KedaScalerErrors | warning | keda/alerts | active | [KedaScalerErrors.md](KedaScalerErrors.md) |
 | KedaScaledObjectErrors | warning | keda/alerts | active | [KedaScaledObjectErrors.md](KedaScaledObjectErrors.md) |
 

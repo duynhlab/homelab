@@ -11,14 +11,27 @@
 # above was taken from an example. keda_build_info is the one series present even
 # with zero scalers, which is why it anchors the absent() check.
 #
-# Label caveat: KEDA stamps its own `namespace` label (the ScaledObject's), so under
-# the Prometheus-operator scrape the target namespace wins and KEDA's becomes
-# `exported_namespace` — the label the official KEDA board filters on, used here for
-# the same reason. VERIFY-AT-KIND: if the live series carry `namespace` instead,
-# change the `by (...)` clauses here and the dashboard variable in one commit.
-# The job regexes follow the chart's Service names (keda-operator,
-# keda-operator-metrics-apiserver); read `label_values(up, job)` on the cluster
-# before trusting them.
+# Label caveat, now CONFIRMED rather than assumed: KEDA stamps its own `namespace`
+# label (the ScaledObject's), and under a ServiceMonitor scrape the target's
+# namespace wins, so KEDA's is renamed `exported_namespace` — the label the official
+# KEDA board filters on, used here for the same reason. The mechanism was verified on
+# this cluster against an existing analogue rather than predicted: Temporal's
+# `approximate_backlog_count` is ServiceMonitor-scraped from the `temporal` namespace
+# and carries its own Temporal namespace, and it lands as
+# `namespace="temporal", exported_namespace="mop"`. Same collision, same rename.
+#
+# Job names come from the chart's Services, read off a render of keda 2.20.2 rather
+# than guessed: `keda-operator` (ports metricsservice:9666, metrics:8080) and
+# `keda-operator-metrics-apiserver`, each with its own ServiceMonitor selecting
+# `app.kubernetes.io/name`. `keda-admission-webhooks` has no ServiceMonitor here, so
+# no job. Still worth `count by (job) (up{job=~".*keda.*"})` on the first bring-up.
+#
+# COLD BRING-UP: this rule ships in the `monitoring-local` wave, which precedes
+# `keda-local` — so between the two waves `absent(keda_build_info)` is true and
+# KedaOperatorDown can fire once, critical, before KEDA has been installed at all.
+# `for: 5m` absorbs a normal install; a slow cold bring-up may still page once. That
+# is the cost of an absent() check that is deliberately not scoped to "KEDA exists",
+# since a scrape that silently selects nothing is exactly what it is for.
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -47,6 +60,33 @@ spec:
             summary: "KEDA operator down or not scraped"
             description: "The KEDA operator is unreachable, or no keda_* series is being scraped at all. No ScaledObject is being evaluated: both Temporal workers are frozen at their current replica count and will not follow the backlog."
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaOperatorDown.md"
+
+        # The OTHER half of KEDA, and the one the group header's promise requires.
+        # `keda-operator-metrics-apiserver` (cmd/adapter) is what serves
+        # external.metrics.k8s.io; the HPAs KEDA owns query it on every cycle. The
+        # operator evaluates the scalers and holds the keda_scaler_* series, so
+        # KedaOperatorDown above deliberately excludes this job — but with the
+        # adapter gone the operator is healthy, every keda_* series keeps flowing,
+        # and the HPAs still freeze because their metric source returns errors
+        # (ScalingActive=False). Without this rule the only symptom would be
+        # TemporalTaskQueueBacklogGrowing later "for a reason nothing else names",
+        # which is precisely the failure this group exists to name.
+        #
+        # No absent() twin: the adapter exports no keda_* series of its own (its
+        # /metrics is apiserver + gRPC-client instrumentation), so `up` is the
+        # signal, and KedaOperatorDown's absent() already covers a scrape that
+        # selects nothing at all.
+        - alert: KedaMetricsApiServerDown
+          expr: |
+            up{job=~".*keda.*metrics-apiserver.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: platform
+          annotations:
+            summary: "KEDA external-metrics adapter down"
+            description: "keda-operator-metrics-apiserver is unreachable. It serves external.metrics.k8s.io, so every HPA KEDA owns now fails its metric fetch and reports ScalingActive=False: both Temporal workers freeze at their current replica count even though the operator is healthy and still publishing keda_* series."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/keda/KedaMetricsApiServerDown.md"
 
         - alert: KedaScalerErrors
           # Any sustained error from the temporal trigger: frontend unreachable

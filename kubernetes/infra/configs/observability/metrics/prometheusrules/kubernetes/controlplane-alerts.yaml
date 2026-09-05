@@ -19,6 +19,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/EtcdMembersDown.md"
             summary: "Etcd cluster members are down"
             description: "Etcd cluster has unhealthy members. Cluster stability is at risk."
 
@@ -31,6 +32,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/EtcdHighFsyncDurations.md"
             summary: "Etcd WAL fsync duration is high (P99 > 500ms)"
             description: "High fsync duration indicates disk I/O issues that can affect etcd stability."
 
@@ -43,6 +45,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/EtcdHighCommitDurations.md"
             summary: "Etcd backend commit duration is high (P99 > 250ms)"
             description: "High commit duration indicates disk I/O pressure on etcd."
 
@@ -52,6 +55,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/EtcdHighNumberOfLeaderChanges.md"
             summary: "Etcd has seen {{ $value }} leader changes in the last hour"
             description: "Frequent leader changes indicate network or resource issues in the etcd cluster."
 
@@ -61,6 +65,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/CoreDNSDown.md"
             summary: "CoreDNS is down"
             description: "CoreDNS has no running instances. DNS resolution in the cluster will fail."
 
@@ -73,6 +78,7 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/CoreDNSHighErrorRate.md"
             summary: "CoreDNS SERVFAIL error rate is above 3%"
             description: "{{ $value | humanizePercentage }} of DNS queries are failing with SERVFAIL."
 
@@ -82,6 +88,7 @@ spec:
           labels:
             severity: critical
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeletDown.md"
             summary: "Kubelet is down"
             description: "No kubelet instances are reporting metrics. Node health cannot be determined."
 
@@ -107,5 +114,6 @@ spec:
           labels:
             severity: warning
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeletTooManyPods.md"
             summary: "Kubelet on {{ $labels.instance }} is running more than 90% of max pods"
             description: "Node is approaching the pod capacity limit. New pods may fail to schedule."

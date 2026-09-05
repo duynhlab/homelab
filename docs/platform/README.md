@@ -10,6 +10,7 @@ day-2 platform patterns for the duynhlab homelab.
 | **GitOps** | Flux Operator + OCI artifacts + Kustomize — [`setup.md`](setup.md) |
 | **App onboarding** | Domain ResourceSets + InputProviders — [`application-delivery.md`](application-delivery.md) |
 | **Edge** | Envoy Gateway on the Gateway API — [`envoy-gateway.md`](envoy-gateway.md) |
+| **Worker scaling** | KEDA per worker version — [`worker-autoscaling.md`](worker-autoscaling.md) |
 | **Planned (not in homelab yet)** | Prod cluster overlay (`kubernetes/clusters/production/` stub); dev/uat branch CI promotion — see [`gitflow.md`](gitflow.md) + [`cicd.md`](cicd.md) callouts |
 
 > **Homelab vs target:** docs in this folder describe both what runs on **local Kind
@@ -95,6 +96,7 @@ specific Kustomization or run `make sync`.
 | [`kind-e2e-audit.md`](kind-e2e-audit.md) | **The Kind cluster gate** — K0–K6 runbook proving Flux delivered the pinned images, admission, the real edge, and cluster-only telemetry. Twin of the [Compose E2E audit](../../local-stack/docs/e2e-audit.md) |
 | [`application-delivery.md`](application-delivery.md) | Add a service, ResourceSet contract, image pins, domain labels |
 | [`envoy-gateway.md`](envoy-gateway.md) | The edge: resource model, policy attachment, both provider modes, failure modes |
+| [`worker-autoscaling.md`](worker-autoscaling.md) | Who owns `replicas`, the backlog signal and how to read it, the alert traps a Kind drill exposed |
 | [`kong-gateway.md`](kong-gateway.md) | **Archived** — the previous gateway's guide, kept for reference |
 | [`keycloak.md`](keycloak.md) | The identity provider: deployment, realm import, database, reset procedure, signals |
 | [`cicd.md`](cicd.md) | Polyrepo CI standards, scan-before-push, signing targets |

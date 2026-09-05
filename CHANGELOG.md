@@ -285,6 +285,19 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **New: [`docs/platform/worker-autoscaling.md`](docs/platform/worker-autoscaling.md)** —
+  written from the ADR-055 Kind drill, for a reader who has to operate this rather
+  than re-derive it. Six sections, each one a mistake that was actually made and
+  measured: `spec.replicas` as a mode switch and the two-writer fight it causes;
+  the 16-second gap between KEDA acting and the metric an HPA would have read
+  existing at all (12:11:44 vs 12:12:00, from the drill); why one task queue is
+  **17 series** and which single label may be summed; why `up == 0` cannot see a
+  scrape target that disappeared and every "X is down" rule needs an `absent()`
+  half; two ways a counter lies (deleted on rebuild, sampled slower than it
+  changes); and sunset delays that **add**, so making them equal widens the flap
+  window instead of closing it. Two Mermaid diagrams, both rendered before commit.
+  Linked from the docs index and the platform hub.
+
 - **Partitions are a lifecycle tool, not an index** — `fundamentals.md` gains a
   "Partitions and TTL" section: the alignment rule between `PARTITION BY` and
   TTL granularity, the two `ttl_only_drop_parts` modes with the values read off

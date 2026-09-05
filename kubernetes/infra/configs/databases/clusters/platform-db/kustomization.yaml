@@ -14,6 +14,7 @@ resources:
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - objectstore.yaml
   - instance.yaml
+  - vault-rotator.yaml
   - services/
   - openbao-db-config.yaml  # RFC-0008/ADR-025: enable DB engine + notification static-role (after platform-db)
   - configmaps/monitoring-queries.yaml

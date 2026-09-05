@@ -9,6 +9,7 @@ poolers, backups, and RFC-0012 service-database lifecycle.
 |---|---|
 | Add a service database to `product-db` (RFC-0012 triplet) | [add-service-database.md](./add-service-database.md) |
 | Rotate a `product-db` service password end-to-end | [rotate-cnpg-service-password.md](./rotate-cnpg-service-password.md) |
+| Rotate the privileged `platform-db` OpenBAO database administrator | [rotate-vault-rotator-credential.md](./rotate-vault-rotator-credential.md) |
 | Unknown database outage or recovery path | [emergency-recovery.md](./emergency-recovery.md) |
 | Pooler ops — PgDog (`pgdog-product`) + CNPG PgBouncer (`platform-db-pooler-rw`) | [pooler-operations.md](./pooler-operations.md) |
 | Bootstrap or promote `product-db-replica` | [cnpg-dr-replica-bootstrap.md](./cnpg-dr-replica-bootstrap.md) |
@@ -32,4 +33,4 @@ poolers, backups, and RFC-0012 service-database lifecycle.
 
 ---
 
-_Last updated: 2026-08-31._
+_Last updated: 2026-09-05._

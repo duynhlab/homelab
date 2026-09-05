@@ -58,7 +58,7 @@ docs/
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
-│   │   └── RFC-0001 … RFC-0033   # 31 records; reserve number → research.md → README.md
+│   │   └── RFC-0001 … RFC-0033   # 32 records; reserve number → research.md → README.md
 ├── databases/                    # Database documentation
 │   ├── README.md                 # Learn / understand / operate / reference hub
 │   ├── architecture.md           # Current cluster and connection topology
@@ -344,6 +344,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 3. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 4. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 5. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
+6. **[Rotate the OpenBAO database administrator](./databases/runbooks/rotate-vault-rotator-credential.md)** - Pre-seed, converge, and prove revocation of `vault_rotator`
 6. **[Pooler operations](./databases/runbooks/pooler-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
 7. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
 
@@ -417,7 +418,7 @@ here is how an index starts disagreeing with the records it points at.
 
 - [**ADR index**](./proposals/adr/README.md) — all **83** decisions, each with
   its `Status` and `Adoption`. The *why* behind significant choices.
-- [**RFC index**](./proposals/rfc/README.md) — all **31** proposals, plus the
+- [**RFC index**](./proposals/rfc/README.md) — all **32** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.
 - [Proposals hub](./proposals/) — templates and how to open a new record.
 
@@ -534,7 +535,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-10-01 — infra drift pass: ADR count re-derived (83), VictoriaTraces is the fast path not a pilot, MCP servers marked not deployed, the `mop` chart lives in helm-charts, TLS issuer split matches the manifests. Earlier: 2026-10-01 — added the duynhlab/images repository. Earlier: 2026-10-01 — the PostgreSQL internals chapters are live-verified on Kind. Earlier: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
+_Last updated: 2026-10-05 — added the `vault_rotator` credential-rotation runbook and indexed RFC-0029 (32 RFC records). Earlier: 2026-10-01 — infra drift pass: ADR count re-derived (83), VictoriaTraces is the fast path not a pilot, MCP servers marked not deployed, the `mop` chart lives in helm-charts, TLS issuer split matches the manifests. Earlier: 2026-10-01 — added the duynhlab/images repository. Earlier: 2026-10-01 — the PostgreSQL internals chapters are live-verified on Kind. Earlier: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
 authored chapters) from the observability section. Earlier the same day —
 **RFC-0033** is provisional: its human-gated control-loop
 proposal and Documentation Steward design are linked from the learning path; no runtime

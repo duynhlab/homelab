@@ -5,7 +5,7 @@
 | **Severity** | critical |
 | **Category** | platform |
 | **Source** | `kubernetes/infra/configs/observability/metrics/prometheusrules/keda/alerts.yaml` |
-| **Metrics** | `up{job=~".*keda.*metrics-apiserver.*"}` (the chart's ServiceMonitor for `keda-operator-metrics-apiserver`) |
+| **Metrics** | `up{job=~".*keda.*metrics-apiserver.*"}` **or `absent()` of it** (the chart's ServiceMonitor for `keda-operator-metrics-apiserver`) |
 | **Status** | active |
 | **Dashboard** | Workflows / Async → KEDA — Worker Autoscaling (row "KEDA health", stat "Metrics adapter up") |
 | **Local-stack** | not present — compose runs no KEDA |
@@ -45,8 +45,12 @@ fail, and an unavailable APIService can slow API discovery for other clients.
 ### PromQL
 
 ```promql
-# The alert expr
+# The alert expr, both halves. The absent() half is load-bearing: scaling the
+# Deployment to 0 removes the Service endpoint, so the target disappears and `up`
+# is ABSENT rather than 0 — measured on Kind 2026-09-05, where `== 0` alone
+# matched nothing while the HPA was already reporting ScalingActive=False.
 up{job=~".*keda.*metrics-apiserver.*"}
+absent(up{job=~".*keda.*metrics-apiserver.*"})
 
 # The contrast that identifies this failure: operator healthy, adapter not
 up{job=~".*keda-operator.*"}

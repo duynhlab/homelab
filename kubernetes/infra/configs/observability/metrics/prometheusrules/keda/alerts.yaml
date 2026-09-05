@@ -72,13 +72,25 @@ spec:
         # TemporalTaskQueueBacklogGrowing later "for a reason nothing else names",
         # which is precisely the failure this group exists to name.
         #
-        # No absent() twin: the adapter exports no keda_* series of its own (its
-        # /metrics is apiserver + gRPC-client instrumentation), so `up` is the
-        # signal, and KedaOperatorDown's absent() already covers a scrape that
-        # selects nothing at all.
+        # The absent() half is NOT optional, and the first draft of this rule left
+        # it out on the reasoning that "the adapter exports no keda_* series of its
+        # own, so `up` is the signal". Measured on Kind 2026-09-05, that reasoning
+        # was wrong: `kubectl -n keda scale deploy keda-operator-metrics-apiserver
+        # --replicas=0` removes the Service endpoint, so the target disappears and
+        # `up` for that job is **absent** rather than 0. `== 0` then matches nothing
+        # and the rule cannot fire -- while `kubectl -n order describe hpa` showed
+        # `ScalingActive=False` / `FailedGetExternalMetric` and the operator stayed
+        # healthy at `up=1`, which is exactly the blind spot this rule exists to
+        # close. absent() over the same selector returned 1 in the same instant.
+        #
+        # KedaOperatorDown does not have this hole because its second half,
+        # absent(keda_build_info), covers the vanished-target case for the operator.
+        # There is no equivalent keda_* series for the adapter, so the absent() has
+        # to be on `up` itself.
         - alert: KedaMetricsApiServerDown
           expr: |
             up{job=~".*keda.*metrics-apiserver.*"} == 0
+            or absent(up{job=~".*keda.*metrics-apiserver.*"})
           for: 5m
           labels:
             severity: critical

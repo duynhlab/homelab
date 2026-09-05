@@ -170,6 +170,23 @@ Skeleton (copy what you need):
   KEDA itself scales on. The label fix that started it stands: that panel had
   grouped a server metric by the SDK's `task_queue` and never split, fixed in
   both dashboard twins.
+- **The ADR-055 Kind drill ran, and broke one of its own alerts.** A from-scratch
+  cluster off this branch closed 10 of the 12 checklist rows: the `""` sentinel
+  injects `order/order-fulfillment` + the build id + `mop`, the versioned
+  Deployment moves 1 → 3 under load with **zero** `scaling deployment` writes from
+  the Worker Controller, `keda_scaler_active` really does carry
+  `exported_namespace`, vmalert loads exactly **298** rules (236 hand-written + 62
+  Sloth, matching the catalog), and no `Keda*` alert fired during the cold-start
+  gap. The failure: `KedaMetricsApiServerDown` was `up{…} == 0`, but scaling the
+  adapter to 0 removes the Service endpoint, so `up` for that job goes **absent**
+  rather than 0 — the rule matched nothing while `describe hpa` already showed
+  `ScalingActive=False` and the operator sat healthy. It now carries an
+  `absent(up{…})` twin, the same shape `KedaOperatorDown` already had via
+  `absent(keda_build_info)`. Also recorded: `make e2e-load`'s `Backlog peak` line
+  reads 0 even when KEDA's own value peaks at 24, because the harness samples a
+  30 s-scrape metric during a 30 s run — evidence for that row has to come from
+  VictoriaMetrics or `keda_scaler_metrics_value`, and the harness's misleading
+  hint is a follow-up in `scripts/k6/load.js`.
 - **Runbook coverage for hand-written alerts is complete: 229/229.** The last 15
   land here — kubernetes control plane (8), cert-manager (3), OTel Collector,
   Pyroscope, Policy Reporter and Watchdog. Five of them **cannot fire on Kind**

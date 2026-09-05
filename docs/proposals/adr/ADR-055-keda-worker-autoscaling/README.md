@@ -261,7 +261,7 @@ nothing — and neither was visible to `make validate`.
 | 4c | KEDA's own health, **four** rules with runbooks in `runbooks/keda/`; catalog §8c. `KedaOperatorDown` and `KedaMetricsApiServerDown` (critical) are separate because KEDA is two processes and only the operator holds the `keda_*` series — the adapter serves `external.metrics.k8s.io`, so it can die with every series still flowing and every HPA frozen. Plus `KedaScalerErrors` and `KedaScaledObjectErrors` (warning) | `prometheusrules/keda/alerts.yaml`, `docs/observability/runbooks/keda/` |
 | 4d | Dashboard **KEDA — Worker Autoscaling** (uid `keda`, folder Workflows / Async): structure of KEDA's official board + a Temporal row and a KEDA-health row; no local-stack twin (compose has no KEDA) | `grafana/dashboards/keda.json`, `grafana-dashboard-keda.yaml` |
 | 5 | Gap rows and Top-5 item 2 closed; `KubeHPAMaxedOut` un-marked 💤; the Temporal dashboard's backlog panel grouped by the wrong label (`task_queue` for a server metric) — fixed in both twins, and then re-grouped to match 4b so the panel and the alert cannot disagree | `alert-catalog.md`, `grafana/dashboards/temporal.json`, `local-stack/.../temporal-local.json` |
-| 6 | **Not yet run** — the Kind drill below | Ubuntu audit |
+| 6 | **Run 2026-09-05 on a from-scratch Kind cluster** (`make down` + `make up` off this branch). 10 of 12 checklist rows pass; the two that need a `drainedSince + 1h` wait are still open. The run found one defect **in row 4c** — see the History row — which is fixed in the same commit | Ubuntu audit |
 
 **Kind audit checklist (flips Adoption to Complete):**
 
@@ -276,6 +276,19 @@ nothing — and neither was visible to `make validate`.
   cooldown; `KubeHPAMaxedOut` now has an object to observe. **This is the row that
   proves 3b:** with `spec.replicas` still set it would have failed, because the
   controller would have scaled the current version back to 1 on every reconcile.
+  **Do not read the peak off the k6 summary.** Measured 2026-09-05: the harness
+  reported `Backlog peak 0` while KEDA's own value peaked at 24 and the versioned
+  Deployment went 1 → 3. `load.js` samples `approximate_backlog_count` from
+  VictoriaMetrics during a 30 s run, but the matching ServiceMonitor scrapes every
+  30 s — the series first read non-zero at 12:12:00, one second before the run
+  ended. Read the peak from
+  `max_over_time(sum by (taskqueue, task_type, worker_version) (approximate_backlog_count{taskqueue="order_fulfillment"})[15m:15s])`
+  or from `keda_scaler_metrics_value`. The harness's own hint ("`order_fulfillment`
+  is the wrong label to trigger on") is misleading and belongs to `scripts/k6/load.js`,
+  which this ADR does not own — filed as a follow-up, not fixed here.
+  The gap is also, incidentally, the clearest evidence for the decision itself:
+  KEDA scaled at 12:11:44, **before** the metric an HPA + adapter would have read
+  was ever scraped.
 - `kubectl -n order get wd order-fulfillment -o yaml | yq .spec.replicas` → `null`,
   and the versioned Deployment's `.spec.replicas` moves without the controller
   writing it back. Watch for alternating `scaling deployment` lines in the controller
@@ -297,8 +310,12 @@ nothing — and neither was visible to `make validate`.
   `namespace="temporal", exported_namespace="mop"` — so what is left to confirm is the two job
   names, read off a render of chart 2.20.2: `count by (job) (up{job=~".*keda.*"})` should give
   `keda-operator` and `keda-operator-metrics-apiserver` and nothing else.
-- `KedaOperatorDown` is silent on a healthy cluster and fires within 6 min of
+- `KedaOperatorDown` is silent on a healthy cluster and fires shortly after
   `kubectl -n keda scale deploy keda-operator --replicas=0` (then scale back to 1).
+  Measured 2026-09-05: scaled to 0 at 12:18:39, fired at **12:25:16 — 6 m 37 s**.
+  The latency is `for: 5m` plus the time `absent(keda_build_info)` needs to turn
+  true; that turned out to be under a minute on VictoriaMetrics, so the old
+  "within 6 min" was slightly optimistic rather than wrong.
   `KedaMetricsApiServerDown` the same with `keda-operator-metrics-apiserver`; while it is down,
   `kubectl -n order describe hpa` should show `ScalingActive=False` /
   `FailedGetExternalMetric` — that pairing is the whole reason the rule is separate.
@@ -329,6 +346,48 @@ nothing — and neither was visible to `make validate`.
   `kubectl -n order get events --field-selector reason=ScalingReplicaSet` shows no 0↔1
   alternation.
 
+**Drill results — 2026-09-05, from-scratch Kind off this branch.**
+
+| Row | Result |
+|---|---|
+| `flux get kustomizations` = 30, `keda-local` Ready | **pass** — cluster reports 30; KEDA 2.20.2, all three Deployments 1/1 |
+| One `ScaledObject` + HPA per running build id | **pass** — `order-fulfillment-…-79d7b671` → `Deployment/order-fulfillment-2-7-0-9bf5`, min 1 / max 3, `0/5 (avg)` |
+| Injected trigger metadata (the `""` sentinel) | **pass** — `workerDeploymentName: order/order-fulfillment`, `workerDeploymentBuildId: 2.7.0-9bf5`, `namespace: mop`; checkout likewise |
+| `wd .spec.replicas` is `null` | **pass** — both `WorkerDeployment`s |
+| Replicas move, no two-writer fight | **pass** — one `ScalingReplicaSet 1 → 3` event under load, no alternation, and **zero** `scaling deployment` lines in the controller log. This is 3b proven from both ends |
+| Cooldown returns to 1 | **pass** — the full cycle is exactly three `ScalingReplicaSet` events: `0 → 1` (create), `1 → 3` at 12:11:44, `3 → 1` at 12:25:48. Nothing in between |
+| 12 Temporal rules for 9 names | **pass** — `task_kind` workflow/activity × warning/critical all loaded, `health=ok` |
+| `TemporalTaskQueueBacklogGrowing` labels | **pass** — pending with `taskqueue="order_fulfillment"`, `task_type="Workflow"`, `worker_version="order_order_fulfillment_2_7_0_9bf5"` |
+| Activity schedule-to-start fires too | **pass** — both `task_kind` values went pending; the workflow-only draft would have missed the activity one |
+| Two `keda` jobs, `exported_namespace` | **pass** — exactly `keda-operator` + `keda-operator-metrics-apiserver`; `keda_scaler_active` carries `namespace="keda"`, `exported_namespace="order"\|"checkout"`, so the alerts' `by (exported_namespace, …)` returns the two expected series |
+| Total rules | **pass** — vmalert loads **298** = 236 hand-written + 62 Sloth, matching the catalog exactly |
+| `KedaOperatorDown` fault injection | **pass** — silent while healthy; with the operator at 0, `absent(keda_build_info)` went to 1 inside a minute and the alert fired at **6 m 37 s** (`for: 5m` plus staleness) |
+| `KedaMetricsApiServerDown` fault injection | **FAILED, then fixed** — see below |
+| Cold bring-up false page | **did not happen** — no `Keda*` alert fired during the gap between `monitoring-local` and `keda-local`; all four rules were loaded and `health=ok`, so this is a real negative |
+| Sunset delete within one poll | **not run** — needs `drainedSince + 1h` |
+| Tag bump renders a second `ScaledObject` | **not run** |
+
+**What the drill caught.** `KedaMetricsApiServerDown` was written as
+`up{job=~".*keda.*metrics-apiserver.*"} == 0`, with a comment arguing no `absent()`
+twin was needed. Scaling the Deployment to 0 removes the Service endpoint, so the
+target disappears and `up` for that job is **absent**, not 0 — `== 0` matched
+nothing and the rule could not fire, while `kubectl -n order describe hpa` showed
+`ScalingActive=False` / `FailedGetExternalMetric` and the operator sat healthy at
+`up=1`. The exact blind spot the rule was added to close, reproduced by the rule
+itself. `absent(up{…})` returned 1 in the same instant and is now the second half.
+`KedaOperatorDown` never had the hole because `absent(keda_build_info)` covers it.
+
+**Two cold-bring-up behaviours worth knowing, neither a defect.** The worker
+registers its version with the server *after* the `ScaledObject` is rendered, so
+the temporal trigger logs `Worker Deployment Version not found` for a short window
+— measured 12:08:28 → 12:08:43, 15 occurrences. `KedaScalerErrors` correctly stayed
+silent (`for: 5m`). The burst landed on `keda_scaled_object_errors_total`
+(order 3, checkout 1) rather than `keda_scaler_detail_errors_total`, which read 0:
+`DeleteScalerMetrics` wipes the scaler counters when KEDA rebuilds a
+`ScaledObject`'s scalers, which is what happens once the version appears. A
+*sustained* trigger failure — the case the alert targets — keeps incrementing and
+is unaffected.
+
 **Drift to watch:** KEDA 2.21 removes `buildId` / `selectAllActive` /
 `selectUnversioned` — the templates use none of them; `includeRunningWorkflowCount`
 (2.20) is deliberately unused because the Floor rule already keeps one replica.
@@ -340,8 +399,12 @@ nothing — and neither was visible to `make validate`.
 | 2026-08-21 | Proposed / Not started | Proposed with RFC-0026 at architecture review. Recorded, not installed. |
 | 2026-09-05 | Accepted / **Partial** | Installed in #996: KEDA 2.20.2 wave, allow-list, one `WorkerResourceTemplate` per worker (both workers, owner decision), the capacity alerts with runbooks. Kind verification handed to the Ubuntu audit; Adoption → Complete on its evidence. |
 | 2026-09-05 | Accepted / **Partial** | Review pass on the same PR, against the v1.9.0 source and the live cluster. Four corrections before merge: `spec.replicas` removed so the controller yields replica ownership (it would otherwise have fought KEDA every reconcile); `sunset.deleteDelay` cut to 0s to close the drained-version flap window (the first draft set `scaledownDelay` = `deleteDelay` = 24h, which — since the delete fires at their sum — only moved the window); the backlog alert re-aggregated from `max by (taskqueue)` to `sum by (taskqueue, task_type, worker_version)`; schedule-to-start extended to activity tasks, which are the dominant series. Also: the KEDA source header had claimed a self-hosted server publishes no per-version backlog metric — it does, and this ADR's own alert reads it — and every Kustomization count was two low. |
+| 2026-09-05 | Accepted / **Partial** | **Kind drill run** on a from-scratch cluster off this branch (`make down` + `make up`). 10 of 12 rows pass, including the two that only a running cluster can settle: the `""` sentinel injects `order/order-fulfillment` + `2.7.0-9bf5` + `mop`, and the versioned Deployment goes 1 → 3 under load with **zero** `scaling deployment` writes from the controller. `keda_scaler_active` carries `exported_namespace`, vmalert loads exactly 298 rules, and no cold-bring-up page appeared. The drill also broke one rule it was meant to prove: `KedaMetricsApiServerDown` used `up == 0`, but scaling the adapter to 0 removes the target so `up` goes **absent** — the alert could not fire while the HPAs were already failing. Fixed with an `absent(up{…})` twin. Two rows remain, both needing a `drainedSince + 1h` wait. |
 | 2026-09-05 | Accepted / **Partial** | Second review pass, this time over the KEDA observability commit. `keda_scaler_metrics_latency_seconds` is a gauge, not a histogram, so the board's `..._bucket` p95 panel could never draw; the board also reintroduced `max by (taskqueue)` on the backlog and showed workflow-task schedule-to-start only — both defects this ADR had already corrected once on the Temporal side. And KEDA's external-metrics adapter, the process the HPAs actually query, had no alert: `KedaMetricsApiServerDown` closes that. All metric names re-verified against `pkg/metricscollector/prommetrics.go` at v2.20.2; the `exported_namespace` VERIFY-AT-KIND retired against an existing analogue on this cluster. |
 
 ---
 
-_Last updated: 2026-09-05 — Accepted and installed (Adoption Partial pending the Kind audit); As-built section added; the `""` sentinel recorded. Same-day review pass added rows 3b/4b, two Decision rules (replica ownership, sunset), and resolved the sunset-interaction question from source instead of deferring it to a >1h drill; corrected the same day to `deleteDelay: 0s` once `planner.go:733` showed the delays add. A second pass then went over the KEDA observability commit: it fixed a dead board panel (`keda_scaler_metrics_latency_seconds` is a gauge, so the `_bucket` p95 could never draw), re-applied the backlog and schedule-to-start shapes the new board had reverted, and added `KedaMetricsApiServerDown` for the half of KEDA the other rules structurally cannot see._
+_Last updated: 2026-09-05 — Accepted and installed (Adoption Partial pending the Kind audit); As-built section added; the `""` sentinel recorded. Same-day review pass added rows 3b/4b, two Decision rules (replica ownership, sunset), and resolved the sunset-interaction question from source instead of deferring it to a >1h drill; corrected the same day to `deleteDelay: 0s` once `planner.go:733` showed the delays add. A second pass then went over the KEDA observability commit: it fixed a dead board panel (`keda_scaler_metrics_latency_seconds` is a gauge, so the `_bucket` p95 could never draw), re-applied the backlog and schedule-to-start shapes the new board had reverted, and added `KedaMetricsApiServerDown` for the half of KEDA the other rules structurally cannot see. A Kind
+drill then ran the checklist end to end: 10 of 12 rows pass and the results are recorded in
+§ As-built, including the one rule the drill falsified (`up == 0` cannot see a target that
+disappears) and the k6 harness caveat that makes its `Backlog peak` line unusable as evidence._

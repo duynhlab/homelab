@@ -136,8 +136,14 @@ spec:
         # target role (not bare CREATEROLE); postInitSQL runs as the initdb
         # superuser, so the GRANT is done here (no persistent superuser access).
         - CREATE ROLE notification WITH LOGIN
-        - CREATE ROLE vault_rotator WITH LOGIN CREATEROLE PASSWORD 'V4ult-R0t8-2026!'
-        - GRANT notification TO vault_rotator WITH ADMIN OPTION
+        # Password and ordinary attributes converge through DatabaseRole from a
+        # per-cluster OpenBAO value. SQL retains only the ADMIN OPTION that the
+        # DatabaseRole API cannot express or audit.
+        - CREATE ROLE vault_rotator WITH LOGIN CREATEROLE NOINHERIT
+        # ALTER ROLE needs CREATEROLE plus ADMIN on the target. INHERIT/SET are
+        # deliberately false: the administrator rotates a credential but must
+        # not inherit notification data access or become the notification role.
+        - GRANT notification TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
 
   storage:
     size: 10Gi

@@ -49,7 +49,7 @@ docs/
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
-│   │   └── RFC-0001 … RFC-0027   # 26 records; reserve number → research.md → README.md
+│   │   └── RFC-0001 … RFC-0029   # 28 records; reserve number → research.md → README.md
 ├── databases/                    # Database documentation
 │   ├── README.md                 # Learn / understand / operate / reference hub
 │   ├── architecture.md           # Current cluster and connection topology
@@ -321,6 +321,7 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 2. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
 3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
 4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
+5. **[Rotate the OpenBAO database administrator](./databases/runbooks/rotate-vault-rotator-credential.md)** — pre-seed, converge, and prove revocation of `vault_rotator`
 6. **[Pooler operations](./databases/runbooks/pooler-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
 7. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
 
@@ -393,7 +394,7 @@ here is how an index starts disagreeing with the records it points at.
 
 - [**ADR index**](./proposals/adr/README.md) — all **65** decisions, each with
   its `Status` and `Adoption`. The *why* behind significant choices.
-- [**RFC index**](./proposals/rfc/README.md) — all **26** proposals, plus the
+- [**RFC index**](./proposals/rfc/README.md) — all **28** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.
 - [Proposals hub](./proposals/) — templates and how to open a new record.
 
@@ -506,4 +507,4 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-08-06 — RFC-0021 closed (P0–P7); inventory is the sole stock authority._
+_Last updated: 2026-09-05 — added the `vault_rotator` credential-rotation runbook and indexed RFC-0029._

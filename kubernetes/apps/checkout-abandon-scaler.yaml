@@ -50,7 +50,10 @@ metadata:
   labels:
     app.kubernetes.io/name: checkout-worker
     app.kubernetes.io/component: worker
-    platform.duynhlab.dev/rfc: "0026"
+    # `adr: 064` matches the WorkerDeployment this scales in checkout-worker.yaml;
+    # `055` is the ADR that added the scaler itself. No `rfc` label, for the same
+    # reason checkout-worker.yaml carries none — this worker came from ADR-064,
+    # not RFC-0026.
     platform.duynhlab.dev/adr: "055"
 spec:
   workerDeploymentRef:

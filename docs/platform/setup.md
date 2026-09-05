@@ -483,7 +483,7 @@ homelab/
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
-│       └── local/                      # Kind local environment (28 Kustomization CRs declared — see kustomization.yaml; mcp commented out so 27 apply, and a cluster shows 28 incl. flux-system)
+│       └── local/                      # Kind local environment (30 Kustomization CRs declared — see kustomization.yaml; mcp commented out so 29 apply, and a cluster shows 30 incl. flux-system)
 │           ├── flux-system/            # Bootstrap FluxInstance resource
 │           ├── sources/                # OCI and Helm source definitions
 │           ├── controllers.yaml        # Operator orchestration
@@ -563,4 +563,4 @@ For persistence layer details, refer to [architecture.md](../databases/architect
 
 ---
 
-_Last updated: 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count 28 declared / 27 applied (the 24 recorded on 2026-08-27 had already fallen behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`). 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._
+_Last updated: 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

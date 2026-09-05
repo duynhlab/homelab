@@ -90,6 +90,8 @@ rendered by the controller's `WorkerResourceTemplate`.
 | **Signal** | Task-queue backlog, read from the Temporal API. Not slot utilisation alone — slots saturate first but say nothing about queued work |
 | **Per-version** | The `ScaledObject` is a template rendered per build id. `workerDeploymentName`, `workerDeploymentBuildId` and `namespace` are **controller-owned** — the webhook rejects a template that hardcodes them; `taskQueue` stays the author's. Opt-in is the **empty-string sentinel** (`workerDeploymentName: ""` etc.): present-and-empty is injected, an absent key is left alone and the scaler would then read the whole queue (controller ≥ v1.8.0, `internal/k8s/workerresourcetemplates.go` `appendKEDATriggerMetadata`) |
 | **Floor** | `minReplicaCount: 1` for any version that may still hold pinned workflows. Scaling a draining version to zero removes its pollers, which is the silent-stall shape this platform has already been bitten by |
+| **Replica ownership** | `spec.replicas` must be **absent** from the `WorkerDeployment`. It is the controller's mode switch, not a default: *"When set, the controller manages replicas for all active worker versions. When omitted (nil), the controller … never calls UpdateScale on active versions"* (`api/v1alpha1/workerdeployment_types.go`). Left set, every reconcile scales the current version back down while KEDA scales it up |
+| **Sunset** | `scaledownDelay` **equals** `deleteDelay`. Drained versions are zeroed by the controller regardless of who owns replicas, and the `ScaledObject` outlives that zeroing, so any gap between the two delays is a flap window |
 | **Allow-list** | `ScaledObject` must be added to `workerResourceTemplate.allowedResources` — the chart defaults to `HorizontalPodAutoscaler` only, and that value drives both the webhook allow-list **and** the controller's RBAC |
 | **Observability first** | `TemporalScheduleToStartLatencyHigh` and `TemporalTaskQueueBacklogGrowing` ship **with** the scaler. Autoscaling without them is a system that hides its own saturation |
 
@@ -152,7 +154,7 @@ and re-deriving per-version selectors — more moving parts than the thing it re
 - The platform gets its **first** autoscaling actuator, on a signal it already graphs
 - `KubeHPAMaxedOut` stops being an alert with nothing to observe
 - Two of the three named-but-unbuilt Temporal alerts ship with something to act on them
-- Scale-from-zero becomes possible for versions with no pinned workflows
+- Scale-from-zero becomes *available*, though the Floor rule declines it — see below
 
 ### Negative consequences and accepted trade-offs
 
@@ -162,7 +164,24 @@ and re-deriving per-version selectors — more moving parts than the thing it re
   `FrontendGlobalWorkerDeploymentReadRPS = 50` per namespace. Irrelevant at two task
   queues, decisive at hundreds — recorded so the ceiling is known before it is hit
 - **Backlog only.** As of KEDA 2.20 the scaler uses backlog count alone, so slot
-  utilisation cannot act as a fast-path or an anti-flap backstop
+  utilisation cannot act as a fast-path or an anti-flap backstop. Upstream's
+  `docs/scaling-recommendations.md` credits exactly that signal to the HPA path,
+  for damping scale-down when the backlog is zero but the workers are well used
+- **The Floor rule declines KEDA's differentiator.** `minReplicaCount: 1` means this
+  platform does not scale from zero — which is the first row of upstream's own
+  recommendation table for choosing KEDA over HPA. Taken with the point above, the
+  two properties that would have made KEDA the obvious choice are both unused here.
+  The choice still holds on operational grounds (see § Why the selected option won),
+  but it is a narrower win than "KEDA is the recommended path", and this ADR should
+  not be read as claiming Temporal recommends it for a continuously-loaded queue —
+  the same upstream table recommends **HPA + prometheus-adapter** for that case
+- **`sunset.scaledownDelay` had to be raised to equal `deleteDelay`.** The controller
+  keeps one replica write even when an autoscaler owns replicas: it zeroes drained
+  versions "regardless", and its drained branch re-fires on any non-zero value it
+  observes, while the version's `ScaledObject` stays attached until the Deployment is
+  deleted. A 1h/24h split was therefore 23 hours of controller-writes-0 against
+  `minReplicaCount`-writes-1. Collapsing the delays costs one idle pod per drained
+  version for a day and removes the flap
 - **Version-aware metadata needs controller ≥ v1.8.0** — satisfied by the `0.28.0`
   chart (appVersion `1.9.0`), but it couples the two decisions
 - **RBAC widening.** `ScaledObject` in `allowedResources` grants the controller
@@ -219,46 +238,77 @@ and re-deriving per-version selectors — more moving parts than the thing it re
 
 What the adoption PR landed, so the Ubuntu Kind audit has a checklist rather than a
 description. Chart and API facts were re-verified against upstream on 2026-09-05:
-KEDA **v2.20.2** (chart 2.20.2, latest), Temporal Worker Controller **v1.10.1**
-latest while the platform pins chart 0.28.0 / app **1.9.0** (≥ v1.8.0, which is
-where KEDA trigger injection arrived).
+KEDA **v2.20.2** (chart 2.20.2, latest — confirmed against the repo `index.yaml`),
+Temporal Worker Controller **v1.10.1** latest while the platform pins chart 0.28.0 /
+app **1.9.0** (≥ v1.8.0, which is where KEDA trigger injection arrived; the running
+image confirms `v1.9.0`).
+
+Rows **3b** and **4b** came out of a review pass that read the controller's v1.9.0
+source and queried the live cluster rather than trusting this document. Both are the
+same class of defect — a thing that renders, validates and passes CI while doing
+nothing — and neither was visible to `make validate`.
 
 | # | Landed | Where |
 |---|--------|-------|
 | 1 | Wave `keda-local` — `HelmRepository keda` + `HelmRelease keda` 2.20.2 in namespace `keda`, Kind-sized resources, ServiceMonitors on; `dependsOn: controllers-local, monitoring-local`; `temporal-local` and `apps-local` now depend on it | `clusters/local/keda.yaml`, `clusters/local/sources/helm/keda.yaml`, `controllers/keda/`, `controllers/namespaces.yaml`, `scripts/flux-validate.sh` |
 | 2 | `ScaledObject` added to `workerResourceTemplate.allowedResources` (webhook allow-list + controller RBAC) | `controllers/temporal/worker-controller-helmrelease.yaml` |
 | 3 | One `WorkerResourceTemplate` per worker: `minReplicaCount: 1`, `maxReplicaCount: 3`, `targetQueueSize: "5"`, `pollingInterval: 15`, `cooldownPeriod: 120`, trigger `temporal` with the three `""` sentinels; ≈ 0.13 RPS against the 50 RPS budget | `apps/order-fulfillment-scaler.yaml`, `apps/checkout-abandon-scaler.yaml` |
-| 4 | `TemporalScheduleToStartLatencyHigh` (p99 > 0.2 s / 10m warning, > 1 s / 5m critical, by SDK `task_queue`) and `TemporalTaskQueueBacklogGrowing` (`max by (taskqueue)` > 10 / 10m — the server label, underscore values) with runbooks; `runbooks/temporal/README.md` created | `configs/temporal/prometheusrule.yaml`, `docs/observability/runbooks/temporal/` |
-| 4b | KEDA's own health: `KedaOperatorDown` (critical), `KedaScalerErrors`, `KedaScaledObjectErrors` (warning) with runbooks in `runbooks/keda/`; catalog §8c | `prometheusrules/keda/alerts.yaml`, `docs/observability/runbooks/keda/` |
-| 4c | Dashboard **KEDA — Worker Autoscaling** (uid `keda`, folder Workflows / Async): structure of KEDA's official board + a Temporal row and a KEDA-health row; no local-stack twin (compose has no KEDA) | `grafana/dashboards/keda.json`, `grafana-dashboard-keda.yaml` |
-| 5 | Gap rows and Top-5 item 2 closed; `KubeHPAMaxedOut` un-marked 💤; the Temporal dashboard's backlog panel grouped by the wrong label (`task_queue` for a server metric) — fixed in both twins | `alert-catalog.md`, `grafana/dashboards/temporal.json`, `local-stack/.../temporal-local.json` |
+| 3b | **`spec.replicas` removed** from both `WorkerDeployment` CRs and `sunset.scaledownDelay` raised 1h → 24h to equal `deleteDelay` — the two Decision-rule rows added above. Without 3b the scaler renders correctly and moves nothing | `apps/order-worker.yaml`, `apps/checkout-worker.yaml` |
+| 4 | `TemporalScheduleToStartLatencyHigh` — **four** rules under one name: p99 > 0.2 s / 10m warning and > 1 s / 5m critical, each for `task_kind: workflow` **and** `task_kind: activity`, by SDK `task_queue`. Activity is the dominant series on a loaded cluster (224 vs 32) and is what `targetQueueSize` scales against, so a workflow-only rule would have missed the usual case | `configs/temporal/prometheusrule.yaml`, `docs/observability/runbooks/temporal/` |
+| 4b | `TemporalTaskQueueBacklogGrowing` — `sum by (taskqueue, task_type, worker_version)` > 10 / 10m on the server metric. One app queue holds **17 series** (`partition` 0–3 + `__sticky__` × `task_type` × versioned/`__unversioned__`); only `partition` may be collapsed, because that is what `DescribeTaskQueueEnhanced` — the call KEDA makes — aggregates. `max by (taskqueue)` would need ~4× the backlog to trip; a bare `sum by (taskqueue)` would add Workflow to Activity and versioned to unversioned | same, plus both dashboard twins, which now carry the identical expression |
+| 4c | KEDA's own health: `KedaOperatorDown` (critical), `KedaScalerErrors`, `KedaScaledObjectErrors` (warning) with runbooks in `runbooks/keda/`; catalog §8c | `prometheusrules/keda/alerts.yaml`, `docs/observability/runbooks/keda/` |
+| 4d | Dashboard **KEDA — Worker Autoscaling** (uid `keda`, folder Workflows / Async): structure of KEDA's official board + a Temporal row and a KEDA-health row; no local-stack twin (compose has no KEDA) | `grafana/dashboards/keda.json`, `grafana-dashboard-keda.yaml` |
+| 5 | Gap rows and Top-5 item 2 closed; `KubeHPAMaxedOut` un-marked 💤; the Temporal dashboard's backlog panel grouped by the wrong label (`task_queue` for a server metric) — fixed in both twins, and then re-grouped to match 4b so the panel and the alert cannot disagree | `alert-catalog.md`, `grafana/dashboards/temporal.json`, `local-stack/.../temporal-local.json` |
 | 6 | **Not yet run** — the Kind drill below | Ubuntu audit |
 
 **Kind audit checklist (flips Adoption to Complete):**
 
-- `flux get kustomizations` — `keda-local` Ready; 28 Kustomizations reported.
+- `flux get kustomizations` — `keda-local` Ready; **30** Kustomizations reported
+  (30 declared, `mcp-local` commented out so 29 apply, plus `flux-system`). A cluster
+  on the commit before this one reports 29; every count in this repo was two low
+  until 2026-09-05 because each was incremented rather than re-derived.
 - `kubectl get scaledobject,hpa -n order -n checkout` — one per running build id,
   `scaleTargetRef` naming the versioned Deployment, trigger metadata carrying
   `order/order-fulfillment` (or `checkout/checkout-abandon`), the build id, and `mop`.
 - `make e2e-load` — backlog peak > 5 → replicas 1 → n ≤ 3 → back to 1 after the
-  cooldown; `KubeHPAMaxedOut` now has an object to observe.
+  cooldown; `KubeHPAMaxedOut` now has an object to observe. **This is the row that
+  proves 3b:** with `spec.replicas` still set it would have failed, because the
+  controller would have scaled the current version back to 1 on every reconcile.
+- `kubectl -n order get wd order-fulfillment -o yaml | yq .spec.replicas` → `null`,
+  and the versioned Deployment's `.spec.replicas` moves without the controller
+  writing it back. Watch for alternating `scaling deployment` lines in the controller
+  log against KEDA's HPA events — that pattern is the two-writer fight, and its
+  absence is the check.
 - Bump an image tag — a second `ScaledObject` appears for the new build id; the
   draining version keeps 1 replica until `drainedSince`.
-- vmalert `/api/v1/rules` lists both alerts; `TemporalTaskQueueBacklogGrowing` fires
-  during the load run with `taskqueue="order_fulfillment"`.
+- vmalert `/api/v1/rules` lists **12** rules for 9 names in the Temporal groups (7
+  pre-existing + 4 schedule-to-start + 1 backlog); `TemporalTaskQueueBacklogGrowing`
+  fires during the load run with `taskqueue="order_fulfillment"` and a `task_type` /
+  `worker_version` pair on the label set. Expect the **activity** schedule-to-start
+  rule to fire before the workflow one — on the pre-fix cluster the loaded-window p99
+  sat at the top bucket (4.95 s) for both kinds, so the critical threshold is the one
+  to re-read after a clean load run rather than trust from this note.
 - KEDA operator logs show no `temporal` errors; poll rate ≈ 0.13 RPS.
 - The KEDA board loads (`/api/dashboards/uid/keda`) and shows data during `make e2e-load`;
   confirm whether the `keda_*` series carry `exported_namespace` (assumed, from the official
   board) or `namespace`, and fix the board variable + the three `Keda*` rules in one commit if
   not. `KedaOperatorDown` is silent on a healthy cluster and fires within 6 min of
   `kubectl -n keda scale deploy keda-operator --replicas=0` (then scale back to 1).
-- **Sunset interaction, not yet observed:** after `drainedSince` + `scaledownDelay` (1h) the
-  controller sets the drained version's replicas to 0 while its `ScaledObject`
-  (`minReplicaCount: 1`) stays attached until `deleteDelay` (24h) removes the Deployment.
-  Record which of the two wins in that window — a drained version parked at 1 replica for
-  a day is tolerable, a flap between 0 and 1 is not — and whether the fix is
-  `idleReplicaCount: 0` on the template or nothing at all. Needs a run longer than one
-  hour; the ADR-054 gate never observed the scale-to-zero either.
+- **Sunset interaction — resolved from source before the drill, not deferred to it.**
+  The open question here used to be "which of the two wins" in the window between
+  `scaledownDelay` (1h) and `deleteDelay` (24h). Neither does. `getScaleDeployments`
+  zeroes a drained version *regardless* of who owns replicas, and its drained branch
+  is `if !(replicas == 0) { → 0 }`, so it re-fires on every non-zero value it sees;
+  meanwhile `getWorkerResourceApplies` renders the `ScaledObject` for every Deployment
+  in state, not only those with replicas, so `minReplicaCount: 1` keeps writing 1
+  back. That is 23 hours of flap — the outcome this ADR called intolerable — and it
+  was predictable from the v1.9.0 source without a run. The fix in 3b is
+  `scaledownDelay: 24h`, collapsing the window: the drained version simply holds the
+  scaler's floor of one pod until deletion. `idleReplicaCount: 0` was considered and
+  rejected — it triggers on *no active trigger*, which is also true of a draining
+  version still holding pinned workflows, so it would reintroduce the silent stall the
+  Floor rule exists to prevent. **Still worth observing at Kind:** that the drained
+  version sits at a steady 1 replica for the full day and is then deleted cleanly.
 
 **Drift to watch:** KEDA 2.21 removes `buildId` / `selectAllActive` /
 `selectUnversioned` — the templates use none of them; `includeRunningWorkflowCount`
@@ -269,7 +319,8 @@ where KEDA trigger injection arrived).
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-21 | Proposed / Not started | Proposed with RFC-0026 at architecture review. Recorded, not installed. |
-| 2026-09-05 | Accepted / **Partial** | Installed in #996: KEDA 2.20.2 wave, allow-list, one `WorkerResourceTemplate` per worker (both workers, owner decision), the two capacity alerts with runbooks. Kind verification handed to the Ubuntu audit; Adoption → Complete on its evidence. |
+| 2026-09-05 | Accepted / **Partial** | Installed in #996: KEDA 2.20.2 wave, allow-list, one `WorkerResourceTemplate` per worker (both workers, owner decision), the capacity alerts with runbooks. Kind verification handed to the Ubuntu audit; Adoption → Complete on its evidence. |
+| 2026-09-05 | Accepted / **Partial** | Review pass on the same PR, against the v1.9.0 source and the live cluster. Four corrections before merge: `spec.replicas` removed so the controller yields replica ownership (it would otherwise have fought KEDA every reconcile); `scaledownDelay` raised to `deleteDelay` to close a 23-hour flap window; the backlog alert re-aggregated from `max by (taskqueue)` to `sum by (taskqueue, task_type, worker_version)`; schedule-to-start extended to activity tasks, which are the dominant series. Also: the KEDA source header had claimed a self-hosted server publishes no per-version backlog metric — it does, and this ADR's own alert reads it — and every Kustomization count was two low. |
 
 ---
-_Last updated: 2026-09-05 — Accepted and installed (Adoption Partial pending the Kind audit); As-built section added; the `""` sentinel recorded_
+_Last updated: 2026-09-05 — Accepted and installed (Adoption Partial pending the Kind audit); As-built section added; the `""` sentinel recorded. Same-day review pass added rows 3b/4b, two Decision rules (replica ownership, sunset), and resolved the sunset-interaction question from source instead of deferring it to a >1h drill._

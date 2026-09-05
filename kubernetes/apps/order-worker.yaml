@@ -63,7 +63,16 @@ metadata:
     app.kubernetes.io/component: worker
     platform.duynhlab.dev/rfc: "0026"
 spec:
-  replicas: 1
+  # NO `replicas`. That absence is the ADR-055 hand-off, not an omission.
+  # The controller reads this field as its own mode switch
+  # (api/v1alpha1/workerdeployment_types.go): "When set, the controller manages
+  # replicas for all active worker versions. When omitted (nil), the controller
+  # creates versioned Deployments with nil replicas and never calls UpdateScale
+  # on active versions -- following the Kubernetes-recommended pattern for HPA
+  # and other external autoscalers." Setting it back to 1 does not just pin the
+  # floor: it makes every reconcile Scale-subresource the current version back
+  # down while KEDA pushes it up, which is a two-writer fight, not autoscaling.
+  # The floor now lives in order-fulfillment-scaler.yaml (`minReplicaCount: 1`).
 
   workerOptions:
     connectionRef:
@@ -87,14 +96,26 @@ spec:
       - rampPercentage: 50
         pauseDuration: 30s
 
-  # Chart defaults, stated explicitly because they are the retirement policy this
-  # platform used to run by hand: a version scales to zero an hour after Temporal
-  # reports it drained, and its resources are deleted a day later. The hour is the
-  # window to notice that "drained" was wrong; the day is the window to roll back
-  # without a rebuild. Watch it with
+  # The retirement policy this platform used to run by hand: a drained version is
+  # retired a day after Temporal reports it drained -- the window to notice that
+  # "drained" was wrong, and to roll back without a rebuild. Watch it with
   #   kubectl -n order get wd order-fulfillment -o yaml | yq .status.deprecatedVersions
+  #
+  # scaledownDelay EQUALS deleteDelay on purpose, and that is a change from the
+  # 1h/24h chart default. Scaling a drained version to zero is the ONE replica
+  # write the controller keeps even when an autoscaler owns replicas -- the same
+  # API comment quoted above ends "The controller still scales drained versions
+  # ... to zero regardless." Its drained branch re-fires on any non-zero value it
+  # observes (`if !(replicas == 0) { -> 0 }`), while the version's ScaledObject
+  # stays attached until the Deployment is deleted: getWorkerResourceApplies
+  # renders for every Deployment in state, not only the ones with replicas. So a
+  # 1h/24h split is 23 hours of controller-writes-0 against
+  # minReplicaCount-writes-1, every reconcile. Collapsing the two delays removes
+  # the window instead of shortening it: the drained version simply holds the
+  # scaler's floor of one pod until it is deleted at 24h. One idle pod for a day
+  # is the cost; a flapping one for a day was the alternative.
   sunset:
-    scaledownDelay: 1h
+    scaledownDelay: 24h
     deleteDelay: 24h
 
   template:

@@ -1,26 +1,37 @@
 # TemporalScheduleToStartLatencyHigh
 
-Shared by the warning and critical rules of the same name — the procedure is
-identical; only the threshold differs.
+Shared by the four rules of the same name — the procedure is identical; only the
+threshold (`severity`) and the task kind (`task_kind`) differ. Read `task_kind`
+off the firing alert first: it says whether the wait is on **workflow** tasks or
+**activity** tasks, and those have different fixes.
 
 | | |
 |---|---|
-| **Severity** | warning at p99 > 200 ms for 10m; critical at p99 > 1 s for 5m |
+| **Severity** | warning at p99 > 200 ms for 10m; critical at p99 > 1 s for 5m — each for both task kinds |
 | **Category** | platform |
 | **Source** | `kubernetes/infra/configs/temporal/prometheusrule.yaml` |
-| **Metrics** | `temporal_workflow_task_schedule_to_start_latency_seconds_bucket` — **Go SDK** histogram via OTLP |
+| **Metrics** | `temporal_workflow_task_schedule_to_start_latency_seconds_bucket` and `temporal_activity_schedule_to_start_latency_seconds_bucket` — **Go SDK** histograms via OTLP, selected by the `task_kind` label on the alert |
 | **Status** | active |
 | **Dashboard** | Temporal → Workflows (panel "Workflow task schedule-to-start latency") |
 | **Local-stack** | present (SDK metric arrives through the same OTLP path); the KEDA half is not — compose has no autoscaler |
 
 ## Meaning
 
-Schedule-to-start is the time a workflow task sat in its task queue between the
-server scheduling it and a worker actually picking it up. It is the purest
-"not enough workers" signal Temporal has: it grows *before* slots are exhausted
-and before any error fires. p99 above 200 ms for ten minutes means the queue is
-regularly waiting on a poller; above 1 s for five minutes means sagas are
-visibly stalling.
+Schedule-to-start is the time a task sat in its task queue between the server
+scheduling it and a worker actually picking it up. It is the purest "not enough
+workers" signal Temporal has: it grows *before* slots are exhausted and before
+any error fires. p99 above 200 ms for ten minutes means the queue is regularly
+waiting on a poller; above 1 s for five minutes means sagas are visibly stalling.
+
+**Which kind fired matters.** `task_kind: activity` is the common case on this
+platform and the one to expect: measured on a loaded cluster the activity
+histogram carries 224 series across the real activity types (`AuthorizePayment`,
+`CapturePayment`, `ClearCart`, `CommitInventory`, `Complete`) against 32 for the
+workflow-task one, because workflow tasks are short and largely served from the
+sticky queue. An activity wait points at activity slots, at a slow downstream
+holding those slots, or at too few replicas. A `task_kind: workflow` wait is the
+rarer and more serious shape — the worker cannot even accept the decision task,
+so look at worker health and the poller count before capacity.
 
 The honest qualifier: a brief spike on every deploy is normal — a new version's
 pollers take a few seconds to register — and `for: 10m` is what filters that out.
@@ -43,11 +54,13 @@ stay `confirming` longer than the budget in
 ### PromQL
 
 ```promql
-# The alert expr, per queue
+# The alert expr, per queue — run the one matching the alert's task_kind
 histogram_quantile(0.99, sum by (le, task_queue) (rate(temporal_workflow_task_schedule_to_start_latency_seconds_bucket[5m])))
+histogram_quantile(0.99, sum by (le, task_queue) (rate(temporal_activity_schedule_to_start_latency_seconds_bucket[5m])))
 
-# Is the backlog behind it real (server view; note the label is taskqueue, underscore values)
-max by (taskqueue) (approximate_backlog_count{job=~".*temporal.*"})
+# Is the backlog behind it real (server view; note the label is taskqueue, underscore
+# values, and it is summed over partitions only — see TemporalTaskQueueBacklogGrowing)
+sum by (taskqueue, task_type, worker_version) (approximate_backlog_count{job=~".*temporal.*"})
 
 # Did the scaler react — replicas per versioned Deployment
 kube_deployment_status_replicas{namespace=~"order|checkout", deployment=~"order-fulfillment.*|checkout-abandon.*"}

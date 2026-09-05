@@ -12,11 +12,27 @@
 
 ## Meaning
 
-`max by (taskqueue) (approximate_backlog_count) > 10` for 10 minutes — more than
-ten tasks have been waiting in one queue for ten minutes. The label is the
-server's `taskqueue` (no underscore in the name, underscores in the value:
-`order_fulfillment`), which is *not* the SDK's `task_queue` label used by the
-schedule-to-start rule.
+`sum by (taskqueue, task_type, worker_version) (approximate_backlog_count) > 10`
+for 10 minutes — more than ten tasks of one kind have been waiting in one queue,
+on one worker version, for ten minutes. The label is the server's `taskqueue`
+(no underscore in the name, underscores in the value: `order_fulfillment`), which
+is *not* the SDK's `task_queue` label used by the schedule-to-start rule.
+
+**Why the grouping is exactly that.** One app queue holds **17 series** on this
+platform, and only one of the four dimensions may be collapsed:
+
+| Label | Values | Treatment |
+|---|---|---|
+| `partition` | `0`, `1`, `2`, `3`, `__sticky__` | **summed** — the queue's backlog is spread across partitions, and `DescribeTaskQueueEnhanced` (the call KEDA's scaler makes) returns the aggregate |
+| `task_type` | `Workflow`, `Activity` | kept — separate pools with separate slots |
+| `worker_version` | the build id, or `__unversioned__` | kept — different populations, and grouping rather than filtering keeps the unversioned `temporal_sys_*` queues alerting on their own series |
+| `taskqueue` | `order_fulfillment`, `checkout`, … | kept |
+
+`max by (taskqueue)` reads one partition's share and would need roughly four
+times the backlog to trip; a bare `sum by (taskqueue)` adds Workflow to Activity
+and the versioned series to `__unversioned__`. Both were wrong in opposite
+directions, which is why the alert and the dashboard panel now use the same
+expression.
 
 Ten is twice the `targetQueueSize` (5) that the KEDA `ScaledObject` scales on
 ([ADR-055](../../../proposals/adr/ADR-055-keda-worker-autoscaling/)). A backlog
@@ -43,10 +59,13 @@ firing late, which is tolerable for far longer.
 
 ```promql
 # The alert expr
-max by (taskqueue) (approximate_backlog_count{job=~".*temporal.*"})
+sum by (taskqueue, task_type, worker_version) (approximate_backlog_count{job=~".*temporal.*"})
 
-# How old is the oldest waiting task
-max by (taskqueue) (approximate_backlog_age_seconds{job=~".*temporal.*"})
+# How old is the oldest waiting task (max, not sum — it is an age, not a count)
+max by (taskqueue, task_type, worker_version) (approximate_backlog_age_seconds{job=~".*temporal.*"})
+
+# Confirm the partition spread the alert sums over, for the queue that fired
+sum by (partition) (approximate_backlog_count{taskqueue="order_fulfillment", task_type="Activity"})
 
 # Is anyone polling: worker-side poll counters (SDK label task_queue)
 sum by (task_queue) (rate(temporal_workflow_task_queue_poll_succeed_total[5m]))

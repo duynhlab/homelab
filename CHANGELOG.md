@@ -99,23 +99,37 @@ Skeleton (copy what you need):
   chart ships a ServiceMonitor whose CRD `controllers-local` installs — and two
   waves now depend on it: `temporal-local` (the Worker Controller's RBAC names
   `scaledobjects.keda.sh`) and `apps-local` (the templates embed a `ScaledObject`).
-  Kustomization count 27 → 28. `scripts/flux-validate.sh` validates the new
-  overlay explicitly, like every controller with its own wave.
+  Kustomization count 29 → 30 (29 apply — `mcp-local` stays commented out — and a
+  cluster reports 30 with `flux-system`). Re-counted, not incremented: every
+  figure recorded in this repo since 2026-08-27 had been two low, and the repo's
+  own guidance already said to count at run time.
+  `scripts/flux-validate.sh` validates the new overlay explicitly, like every
+  controller with its own wave.
+- **The Temporal `WorkerDeployment` CRs hand replica ownership to the autoscaler.**
+  `spec.replicas` is now absent from `order-fulfillment` and `checkout-abandon`,
+  and `sunset.scaledownDelay` is raised 1h → 24h to equal `deleteDelay`. Neither
+  is cosmetic. `spec.replicas` is the controller's mode switch — set, it "manages
+  replicas for all active worker versions"; absent, it "never calls UpdateScale on
+  active versions" — so leaving it at 1 would have had the controller scale each
+  version back down on every reconcile while KEDA scaled it up, an autoscaler that
+  renders correctly and moves nothing. The sunset change closes the other half:
+  drained versions are zeroed by the controller *regardless* of who owns replicas,
+  its drained branch re-fires on any non-zero value, and the `ScaledObject` stays
+  attached until the Deployment is deleted — so a 1h/24h split was 23 hours of
+  controller-writes-0 against `minReplicaCount`-writes-1. Equal delays cost one
+  idle pod per drained version for a day and remove the flap.
 
 #### Observability
 
 - **The two Temporal capacity alerts finally exist, and ship with something that
   acts on them.** `TemporalScheduleToStartLatencyHigh` (SDK schedule-to-start p99
   > 0.2 s for 10m warning, > 1 s for 5m critical, by `task_queue`) and
-  `TemporalTaskQueueBacklogGrowing` (server `approximate_backlog_count` by
-  `taskqueue` > 10 for 10m) — the two leading indicators the alert catalog had
-  carried as its #2 gap since 2026-08-18, held back because nothing could
-  respond. Runbooks for both, plus the folder README `runbooks/temporal/` that
-  the seven existing Temporal runbooks never got. While writing the backlog rule:
-  the Temporal dashboard's server-side backlog panel grouped by the SDK label
-  `task_queue`, but the server emits `taskqueue` (values with underscores), so the
-  per-queue split had never rendered — fixed in both dashboard twins.
-  `KubeHPAMaxedOut` loses its 💤: KEDA renders an HPA behind every `ScaledObject`.
+  `TemporalTaskQueueBacklogGrowing` (server `approximate_backlog_count` > 10 for
+  10m) — the two leading indicators the alert catalog had carried as its #2 gap
+  since 2026-08-18, held back because nothing could respond. Runbooks for both,
+  plus the folder README `runbooks/temporal/` that the seven existing Temporal
+  runbooks never got. `KubeHPAMaxedOut` loses its 💤: KEDA renders an HPA behind
+  every `ScaledObject`.
   KEDA itself is observed too: a **KEDA — Worker Autoscaling** board (uid `keda`,
   Workflows / Async — the official board's structure plus a Temporal row and a
   KEDA-health row; no local twin, compose runs no KEDA) and a new §8c with three
@@ -123,7 +137,24 @@ Skeleton (copy what you need):
   `KedaScaledObjectErrors`, each with a runbook in `runbooks/keda/`. Metric names
   are KEDA 2.20's — `keda_scaler_detail_errors_total`; the `keda_scaler_errors_total`
   this PR first wrote does not exist — and the `exported_namespace` label the
-  official board relies on is marked VERIFY-AT-KIND. Catalog re-derived to 227.
+  official board relies on is marked VERIFY-AT-KIND.
+  The two Temporal expressions were corrected against the live cluster before
+  merge as well, and all three defects are the same lesson as `edge:rq_429_ratio`
+  below — an expression can be syntactically perfect, pass CI, and still measure
+  the wrong thing. **Schedule-to-start** covered workflow tasks only; the activity
+  histogram carries 224 series on a loaded cluster against 32 for workflow tasks,
+  and activity backlog is what the scaler sizes against, so it now runs both kinds
+  under one name with a `task_kind` label — four rules, 12 in the Temporal groups
+  for 9 names. **Backlog** used `max by (taskqueue)`; one app queue holds 17
+  series (`partition` 0–3 + `__sticky__` × `task_type` × versioned /
+  `__unversioned__`), so `max` reads one partition's share and needed roughly 4×
+  the backlog to trip, while the dashboard panel in the same change used
+  `sum by (taskqueue)` and over-counted. Both now read
+  `sum by (taskqueue, task_type, worker_version)` — collapsing `partition` only,
+  which is what `DescribeTaskQueueEnhanced` aggregates and therefore the number
+  KEDA itself scales on. The label fix that started it stands: that panel had
+  grouped a server metric by the SDK's `task_queue` and never split, fixed in
+  both dashboard twins.
 - **Runbook coverage for hand-written alerts is complete: 229/229.** The last 15
   land here — kubernetes control plane (8), cert-manager (3), OTel Collector,
   Pyroscope, Policy Reporter and Watchdog. Five of them **cannot fire on Kind**
@@ -304,6 +335,22 @@ Skeleton (copy what you need):
   Kustomizations.
 
 #### Docs
+
+- **ADR-055's stated reason for choosing KEDA was the opposite of what this
+  cluster measures.** The `sources/helm/keda.yaml` header claimed the Temporal API
+  is "the only backlog signal a self-hosted server offers per worker version" and
+  that the upstream HPA recipe "reads a Temporal Cloud OpenMetrics series this
+  platform does not have". Measured: `approximate_backlog_count` from the matching
+  service returns 87 series carrying `worker_build_id`, `worker_version` and
+  `worker_deployment_name` — and `TemporalTaskQueueBacklogGrowing`, shipped in the
+  same change, alerts on exactly that. The decision holds; the reason is now the
+  real one — no external-metrics adapter is installed, and upstream's HPA recipe
+  expects `temporal_approximate_backlog_count` with `temporal_worker_*` selector
+  labels where this platform emits `approximate_backlog_count` with `worker_*`, so
+  the HPA path needs a relabeling layer the KEDA path skips. Recorded with it: the
+  two things this choice trades away, since `minReplicaCount: 1` declines
+  scale-from-zero and KEDA 2.20 reads backlog only — the two properties upstream's
+  own `scaling-recommendations.md` credits to each path.
 
 - **The ClickHouse disk runbook contradicted its own alert.** The hub told the
   responder to "grow the PVC" while `ClickHouseDiskCritical` says that is

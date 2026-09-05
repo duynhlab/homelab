@@ -1708,23 +1708,23 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(approximate_backlog_count{job=~\".*temporal.*\"}) by (taskqueue)",
+          "expr": "sum by (taskqueue, task_type, worker_version) (approximate_backlog_count{job=~\".*temporal.*\"})",
           "range": true,
           "refId": "A",
-          "legendFormat": "backlog {{taskqueue}}"
+          "legendFormat": "backlog {{taskqueue}} {{task_type}} {{worker_version}}"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(approximate_backlog_age_seconds{job=~\".*temporal.*\"}) by (taskqueue)",
+          "expr": "max by (taskqueue, task_type, worker_version) (approximate_backlog_age_seconds{job=~\".*temporal.*\"})",
           "range": true,
           "refId": "B",
-          "legendFormat": "age(s) {{taskqueue}}"
+          "legendFormat": "age(s) {{taskqueue}} {{task_type}} {{worker_version}}"
         }
       ],
-      "description": "approximate_backlog_count is a SERVER metric — the SDK does not emit it."
+      "description": "approximate_backlog_count is a SERVER metric — the SDK does not emit it. Summed over `partition` ONLY: one queue holds 4 partitions plus __sticky__, and the queue backlog is spread across them, so `sum by (taskqueue)` alone would also add Workflow to Activity and the versioned series to __unversioned__. This grouping is the one TemporalTaskQueueBacklogGrowing alerts on."
     }
   ],
   "refresh": "30s",

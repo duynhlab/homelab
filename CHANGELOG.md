@@ -106,6 +106,33 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`Edge429RatioHigh` could never fire, and nothing said so.** Its recording
+  rule `edge:rq_429_ratio:rate5m` named
+  `envoy_http_local_rate_limiter_http_local_rate_limit_rate_limited`, a series
+  that does not exist: the name was a documented *prediction* made against Envoy
+  Gateway v1.8.3, which pinned that filter StatPrefix, and the platform now runs
+  **EG v1.9.0 / Envoy v1.39.0**, which does not. The rule returned `samples=0` on
+  every evaluation while vmalert reported no error — a rule matching nothing is
+  not a rule failing. It now reads `envoy_http_local_rate_limit_enforced`, taken
+  off the running proxy, and `enforced` rather than `rate_limited` because only
+  `enforced` counts requests actually answered with a 429 (under shadow-mode
+  enforcement `rate_limited` climbs while no 429 is served).
+- **Twelve alerts that cannot fire are now marked `💤` in the catalog instead of
+  reading as coverage.** Eleven RFC-0021 phase-5/6 and reconciler rules wait on
+  counters no service emits (`order_saga_complete_failures_total`,
+  `payment_attempt_write_failures_total`, `order_reconciler_repairs_total` and
+  the rest); `KubeHPAMaxedOut` waits on an HPA the platform never declares. They
+  were deliberately **not** repointed at neighbouring metrics —
+  `order_saga_outcome_total{outcome="failed"}` is not a refused Complete-write —
+  because that would trade eleven silent alerts for eleven that fire for the
+  wrong reason.
+- **The Sloth row said 68 burn-rate alerts; it is 62.** The arithmetic assumed 10
+  HTTP services, but `inventory` serves no HTTP at all (`rpc_server_*` only), so
+  it contributes the gRPC pair and nothing more: 31 SLOs, two alerts each. Also
+  recorded — the catalog's count command globs `prometheusrules/**` and so misses
+  the 7 Temporal alerts in `configs/temporal/`.
+
+
 - **The five `system.*` log tables with no expiry now have one.** `metric_log`,
   `asynchronous_metric_log`, `text_log`, `error_log` and
   `background_schedule_pool_log` grew for the life of the cluster — ~59 % of all

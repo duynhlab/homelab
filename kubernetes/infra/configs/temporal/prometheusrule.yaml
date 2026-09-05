@@ -38,6 +38,7 @@ spec:
             severity: critical
             category: platform
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalServerDown.md"
             summary: "Temporal server target down ({{ $labels.instance }})"
             description: "Temporal server target {{ $labels.instance }} (job {{ $labels.job }}) has been down for >5m — durable workflow execution is impaired."
 
@@ -53,6 +54,7 @@ spec:
             severity: warning
             category: platform
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalServiceErrorRateHigh.md"
             summary: "Temporal service error rate high (>5%)"
             description: "Temporal frontend/service error ratio has exceeded 5% for >10m — RPCs into the cluster are failing; check the history/matching/frontend services and persistence."
 
@@ -64,6 +66,7 @@ spec:
             severity: warning
             category: platform
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalPersistenceErrorRateHigh.md"
             summary: "Temporal persistence error rate high (>2%)"
             description: "Temporal persistence error ratio has exceeded 2% for >10m — platform-db (CNPG) may be degraded; durable state writes are at risk."
 
@@ -87,6 +90,7 @@ spec:
             severity: warning
             category: platform
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalWorkflowFailureRateHigh.md"
             summary: "Temporal workflow failure rate high (>5%)"
             description: "More than 5% of workflows reached a failed terminal state over 10m — the order-fulfillment saga is compensating/rolling back; check the worker logs and the activities it calls."
 
@@ -99,6 +103,7 @@ spec:
             severity: warning
             category: platform
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalActivityFailureRateHigh.md"
             summary: "Temporal activity failure rate high (>5%)"
             description: "More than 5% of activity executions failed over 10m — a downstream call (product/shipping/notification/cart) is erroring; retries are firing and may exhaust."
 
@@ -110,6 +115,7 @@ spec:
             severity: warning
             category: platform
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalWorkerRequestErrorRateHigh.md"
             summary: "Temporal worker→server request error rate high (>5%)"
             description: "The worker's RPCs to the Temporal frontend are failing (>5% over 10m) — check connectivity to temporal-frontend and the server's health."
 
@@ -121,5 +127,6 @@ spec:
             severity: warning
             category: platform
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalWorkerTaskSlotsExhausted.md"
             summary: "Temporal worker task slots exhausted"
             description: "A worker task-slot pool has been at zero available slots for >10m — the worker is saturated and cannot accept new workflow/activity tasks; consider raising concurrency or replicas."

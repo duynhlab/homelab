@@ -226,6 +226,7 @@ OpenBAO-backed secrets. No `-vault` suffix is used.
 | `platform-db-review-secret` | review, platform | `secret/data/local/databases/shared-db/review` (compat) |
 | `platform-db-temporal-secret` | temporal, platform | `secret/data/local/databases/platform-db/temporal` |
 | `platform-db-keycloak-secret` | identity | `secret/data/local/databases/platform-db/keycloak` |
+| `platform-db-vault-rotator-secret` | platform | `secret/data/local/databases/platform-db/vault-rotator` (random per cluster; CNPG + OpenBAO database configurator) |
 | `product-db-secret` | product | `secret/data/local/databases/product-db/product` |
 | `product-db-cart-secret` | cart | `secret/data/local/databases/product-db/cart` |
 | `product-db-order-secret` | order | `secret/data/local/databases/product-db/order` |
@@ -359,4 +360,6 @@ present as active).
 
 ---
 
-_Last updated: 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._
+_Last updated: 2026-09-05 — added the random per-cluster `vault_rotator`
+credential projection. Previously 2026-08-27: ADR-062 staff OIDC login shipped;
+ceremony references became fallback-only._

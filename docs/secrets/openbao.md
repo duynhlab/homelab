@@ -385,6 +385,7 @@ secret/{environment}/{category}/{service}/{resource}
 | `secret/local/databases/shared-db/review` | `username`, `password` | platform-db review owner (compat path) |
 | `secret/local/databases/platform-db/temporal` | `username`, `password` | platform-db temporal owner (Temporal server) |
 | `secret/local/databases/platform-db/keycloak` | `username`, `password` | Keycloak persistence role — RFC-0012 triplet in ns `platform` (`platform-db/services/keycloak.yaml`) + copy in ns `identity` (`platform-db-keycloak-secret-identity-ns.yaml`) |
+| `secret/local/databases/platform-db/vault-rotator` | `username`, `password` | OpenBAO database-engine administrator — random per cluster; projected to `platform-db-vault-rotator-secret` for CNPG and the configurator Job |
 | `secret/local/databases/product-db/product` | `username`, `password` | CNPG bootstrap owner |
 | `secret/local/databases/product-db/cart` | `username`, `password` | CNPG cart owner |
 | `secret/local/databases/product-db/order` | `username`, `password` | CNPG order owner |
@@ -427,8 +428,10 @@ role instead of minting per-request users:
   runs in the **databases wave** — after `platform-db` is up, because
   `database/config` validates the live PG connection, which the bootstrap (secrets
   wave) cannot. It logs in via Kubernetes auth (no root token), enables the engine,
-  writes `database/config/platform-db` (postgresql plugin, `allowed_roles=notification`),
-  and creates static role `notification` with `rotation_period=720h`.
+  reads its PostgreSQL administrator credential from the ESO-managed
+  `platform-db-vault-rotator-secret`, writes `database/config/platform-db`
+  (postgresql plugin, `allowed_roles=notification`), and creates static role
+  `notification` with `rotation_period=720h`.
 - ESO reads the rotated credential through a **second ClusterSecretStore `openbao-db`**
   (`configs/secrets/cluster-secret-store-db.yaml`): the default `openbao` store is
   pinned to the KV v2 mount, so this store uses `version: "v1"` with no `path` to read
@@ -997,6 +1000,7 @@ Operational commands are kept out of this architecture document so the learning 
 | `kubernetes/infra/configs/secrets/cluster-secret-store-db.yaml` | ClusterSecretStore (openbao-db — raw `database/` engine paths, v1 semantics) |
 | `kubernetes/infra/configs/secrets/payment-webhook-external-secrets.yaml` | `payment-webhook-hmac` ExternalSecret (ns payment) |
 | `kubernetes/infra/configs/databases/clusters/platform-db/openbao-db-config.yaml` | `openbao-db-config` Job — enables DB engine + static role `notification` (ADR-025 pilot) |
+| `kubernetes/infra/configs/databases/clusters/platform-db/vault-rotator.yaml` | ESO credential projection + CNPG `DatabaseRole` for the database-engine administrator |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/` | ClusterExternalSecret definitions |
 | `kubernetes/infra/configs/secrets/cluster-external-secrets/cloudflare.yaml` | `ExternalSecret` (per-namespace) for cert-manager DNS-01 — file lives in CES dir but is `kind: ExternalSecret` since cert-manager only needs the Secret in one namespace |
 | `kubernetes/infra/configs/databases/clusters/*/secrets/` | Per-cluster ExternalSecret definitions |
@@ -1057,4 +1061,6 @@ gantt
 
 ---
 
-_Last updated: 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_
+_Last updated: 2026-09-05 — `vault_rotator` is backed by a random per-cluster
+OpenBAO value shared by CNPG and the database configurator. Previous sync
+2026-08-26 (OIDC staff SSO)._

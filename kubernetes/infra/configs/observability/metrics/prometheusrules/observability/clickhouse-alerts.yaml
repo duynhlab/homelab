@@ -71,6 +71,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseReplicaUnreachable.md"
             summary: "ClickHouse replica unreachable ({{ $labels.hostname }})"
             description: "The metrics-exporter has failed to fetch system tables from {{ $labels.hostname }} for 5 minutes. With three replicas its peers keep serving reads and writes, so this is a degraded topology rather than an outage — but a replica that stays unreachable is one disk failure away from mattering, and it stops catching up on replication."
 
@@ -98,6 +99,7 @@ spec:
             severity: critical
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseAllReplicasUnreachable.md"
             summary: "ClickHouse: every replica unreachable"
             description: "The metrics-exporter cannot reach any ClickHouse replica — the OTel logs/traces store is down and edge access logs (ClickHouse-only per ADR-061) are being dropped. The collector survives this now that it owns no DDL, but its ClickHouse sink backpressures and then drops; the schema bootstrap Job would also fail until the store returns."
 
@@ -108,6 +110,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseOperatorDown.md"
             summary: "ClickHouse operator is down"
             description: "The Altinity operator target (job {{ $labels.job }}) has been down for 10 minutes — CHI reconciles are frozen. The running server keeps serving; config changes and self-healing stop."
 
@@ -149,6 +152,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseDiskAlmostFull.md"
             summary: "Node filesystem under 15% free behind ClickHouse {{ $labels.hostname }}"
             description: "The filesystem backing this replica is filling. MergeTree starts refusing writes near full, and the 90-day table TTL cannot outrun a sustained ingest spike on its own. On local-path storage this is the node's filesystem, shared with every other pod on that node — check the node, not just ClickHouse."
 
@@ -161,6 +165,7 @@ spec:
             severity: critical
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseDiskCritical.md"
             summary: "Node filesystem under 5% free behind ClickHouse {{ $labels.hostname }}"
             description: "Write failures are imminent on the OTel logs/traces store. Drop the oldest partitions (ALTER TABLE … DROP PARTITION) or free space on the node. Growing the PVC is NOT an option on local-path: allowVolumeExpansion is unset and the volume has no quota to grow."
 
@@ -176,6 +181,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseTooManyParts.md"
             summary: "ClickHouse active parts high ({{ $labels.hostname }})"
             description: "Active part count is sustained above 300 — merges are not keeping up with inserts. Left alone this ends in delayed, then rejected inserts."
 
@@ -219,6 +225,7 @@ spec:
             severity: info
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseInsertsDelayed.md"
             summary: "ClickHouse throttling inserts ({{ $labels.hostname }})"
             description: "Inserts are being slowed by the parts_to_delay_insert guard — the step before outright rejection. Watch the parts and merges panels."
 
@@ -282,6 +289,7 @@ spec:
             severity: info
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseServerErrorsElevated.md"
             summary: "ClickHouse error rate elevated ({{ $labels.replica }})"
             description: "This replica is accumulating errors across every system.errors code faster than 5/s for 10 minutes. The counter is deliberately broad and includes harmless codes — a mistyped query raises UNKNOWN_IDENTIFIER too — which is why this is info and not a page. Break it down by code with the ClickHouseErrorMetric_* series, or the top-N errors table on the server-engine dashboard."
 
@@ -292,6 +300,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseOperatorReconcileErrors.md"
             summary: "ClickHouse operator reconcile errors"
             description: "Host reconciles are erroring — the CHI may be stuck between spec and reality. Check operator logs and recent CHI changes."
 
@@ -307,6 +316,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseExporterUnhealthy.md"
             summary: "OTel → ClickHouse export failing"
             description: "The Collector's clickhouse exporter has been failing sends for 10 minutes — OTel logs/traces are not landing in the OLAP store (VictoriaLogs/VictoriaTraces keep their own copies)."
 
@@ -337,6 +347,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseZooKeeperExceptions.md"
             summary: "ClickHouse Keeper exceptions ({{ $labels.replica }})"
             description: "Network-level Keeper exceptions on the replication path from this replica. A replica that cannot reach the quorum stops accepting writes and stops fetching parts from its peers — it drifts silently while still answering reads. Check the quorum: kubectl -n monitoring get pods -l clickhouse-keeper.altinity.com/chk=keeper."
 
@@ -403,6 +414,7 @@ spec:
             severity: critical
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseKeeperNoLeader.md"
             summary: "ClickHouse Keeper has no leader — replicated writes are blocked"
             description: "No Keeper reports itself leader, so the quorum is gone: every ReplicatedMergeTree table becomes read-only, INSERTs fail, and replicas stop fetching parts. SELECTs keep working, which is why nothing else looks wrong. Check the pods (kubectl -n monitoring get po -l clickhouse-keeper.altinity.com/chk=keeper) and ask each one directly: echo mntr | nc 127.0.0.1 2181 — healthy is exactly one leader with zk_synced_followers 2. Do not delete Keeper PVCs; they hold the raft log."
 
@@ -442,6 +454,7 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseKeeperQuorumDegraded.md"
             summary: "ClickHouse Keeper quorum degraded — no redundancy left"
             description: "The Keeper leader has fewer than two synced followers, so the 3-node quorum has lost a member. Writes still work; losing one more takes the quorum down and turns every replicated table read-only. Usually a pod or PVC problem rather than a Keeper problem — treat it as Kubernetes first. This fires alongside ClickHouseKeeperNoLeader on a total loss, by design: the pair reads the same way as the ReplicaUnreachable/AllReplicasUnreachable pair above."
 
@@ -465,5 +478,6 @@ spec:
             severity: warning
             category: observability
           annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseReadonlyReplica.md"
             summary: "ClickHouse replica is read-only ({{ $labels.replica }})"
             description: "This replica has lost its ClickHouse Keeper session and can no longer accept writes or fetch parts. Reads still succeed, so the topology looks healthy from the outside while one of three copies falls behind. Check the keeper quorum first: kubectl -n monitoring get pods -l clickhouse-keeper.altinity.com/chk=keeper."

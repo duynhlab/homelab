@@ -84,6 +84,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The ClickHouse alert group has runbooks — all 14, where it had none.** One
+  page per alert under `docs/observability/runbooks/clickhouse/`, a
+  `runbook_url` on every rule, and the catalog table gained the Runbook column
+  it was missing. Written whole-group so the `## Related` chains resolve:
+  Keeper → readonly replica → unreachable, and parts → delayed → rejected
+  inserts. Three things the pages record that the alert text does not. The disk
+  ratio measures the **Kind node's filesystem, not the 10Gi PVC** — local-path
+  PVs are hostPath with no quota, so growing the PVC is not a mitigation and the
+  blast radius includes every pod on that worker. `chi_clickhouse_metric_*` all
+  come from the operator's metrics-exporter, so
+  `ClickHouseOperatorDown` makes six other ClickHouse alerts go **silent rather
+  than red** while the per-pod `:9363` ones survive. And
+  `ClickHouseAllReplicasUnreachable` cannot fire if the replicas *vanish* —
+  `fetch_errors` goes absent rather than exceeding zero, which no rule in the
+  group covers.
 - **The Temporal alert group has runbooks — all 7, where it had none.** Pages
   under `docs/observability/runbooks/temporal/`, a `runbook_url` on every rule,
   and §8's table gained a Runbook column (rows without a page are marked `—`

@@ -97,26 +97,29 @@ spec:
         pauseDuration: 30s
 
   # The retirement policy this platform used to run by hand: a drained version is
-  # retired a day after Temporal reports it drained -- the window to notice that
-  # "drained" was wrong, and to roll back without a rebuild. Watch it with
+  # zeroed an hour after Temporal reports it drained -- the window to notice that
+  # "drained" was wrong -- and deleted on the very next reconcile. Watch it with
   #   kubectl -n order get wd order-fulfillment -o yaml | yq .status.deprecatedVersions
   #
-  # scaledownDelay EQUALS deleteDelay on purpose, and that is a change from the
-  # 1h/24h chart default. Scaling a drained version to zero is the ONE replica
-  # write the controller keeps even when an autoscaler owns replicas -- the same
-  # API comment quoted above ends "The controller still scales drained versions
-  # ... to zero regardless." Its drained branch re-fires on any non-zero value it
-  # observes (`if !(replicas == 0) { -> 0 }`), while the version's ScaledObject
-  # stays attached until the Deployment is deleted: getWorkerResourceApplies
-  # renders for every Deployment in state, not only the ones with replicas. So a
-  # 1h/24h split is 23 hours of controller-writes-0 against
-  # minReplicaCount-writes-1, every reconcile. Collapsing the two delays removes
-  # the window instead of shortening it: the drained version simply holds the
-  # scaler's floor of one pod until it is deleted at 24h. One idle pod for a day
-  # is the cost; a flapping one for a day was the alternative.
+  # deleteDelay is 0s, and that is the ADR-055 change from the 1h/24h chart default.
+  # Scaling a drained version to zero is the ONE replica write the controller keeps
+  # even when an autoscaler owns replicas -- the API comment quoted above ends "The
+  # controller still scales drained versions ... to zero regardless." Its drained
+  # branch re-fires on any non-zero value (`if !(replicas == 0) { -> 0 }`), while
+  # KEDA's executor raises an inactive target back to minReplicaCount on every poll
+  # (scale_scaledobjects.go RequestScale, 2.20.2) and the version's ScaledObject
+  # stays attached until the Deployment is deleted. Any window between the zero
+  # and the delete is therefore a 0<->1 flap. The delete happens only once
+  # drainedSince > scaledownDelay + deleteDelay AND the observed replicas are 0
+  # (planner.go:733, v1.9.0) -- the delays ADD, so setting them equal (24h/24h)
+  # does not collapse the window, it moves it to [24h, 48h]. With deleteDelay 0s
+  # the reconcile that first observes the zero deletes the Deployment, and the
+  # WorkerResourceTemplate copy goes with it: the flap is at most one KEDA poll.
+  # What is given up is ADR-054's 24h retention of a drained version; it has no
+  # pinned work left, so rollback to it was only ever meaningful before it drained.
   sunset:
-    scaledownDelay: 24h
-    deleteDelay: 24h
+    scaledownDelay: 1h
+    deleteDelay: 0s
 
   template:
     metadata:

@@ -768,13 +768,13 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max by (taskqueue) (approximate_backlog_count{job=~\".*temporal.*\"})",
+          "expr": "sum by (taskqueue, task_type, worker_version) (approximate_backlog_count{job=~\".*temporal.*\"})",
           "range": true,
           "refId": "A",
-          "legendFormat": "{{taskqueue}}"
+          "legendFormat": "{{taskqueue}} {{task_type}} {{worker_version}}"
         }
       ],
-      "description": "approximate_backlog_count is a SERVER metric from the matching service; its label is `taskqueue` with underscore values (order_fulfillment), not the SDK's `task_queue`. TemporalTaskQueueBacklogGrowing fires at > 10 for 10m. Whole-queue view — KEDA's per-version share is the panel top-left."
+      "description": "approximate_backlog_count is a SERVER metric from the matching service; label `taskqueue` with underscore values (order_fulfillment), not the SDK's `task_queue`. One queue is 17 series (partition x task_type x worker_version): SUM over partitions only, keep task_type and worker_version apart (__unversioned__ shows as its own series — nothing versioned drains it) — the same shape as TemporalTaskQueueBacklogGrowing (> 10 for 10m) and as the aggregate KEDA polls."
     },
     {
       "datasource": {
@@ -858,7 +858,7 @@
       },
       "id": 14,
       "type": "timeseries",
-      "title": "Workflow-task schedule-to-start p99 (SDK)",
+      "title": "Schedule-to-start p99 by task type (SDK)",
       "gridPos": {
         "h": 8,
         "w": 8,
@@ -918,13 +918,13 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.99, sum by (le, task_queue) (rate(temporal_workflow_task_schedule_to_start_latency_seconds_bucket[$__rate_interval])))",
+          "expr": "label_replace(histogram_quantile(0.99, sum by (le, task_queue) (rate(temporal_workflow_task_schedule_to_start_latency_seconds_bucket[$__rate_interval]))), \"task_type\", \"Workflow\", \"\", \"\") or label_replace(histogram_quantile(0.99, sum by (le, task_queue) (rate(temporal_activity_schedule_to_start_latency_seconds_bucket[$__rate_interval]))), \"task_type\", \"Activity\", \"\", \"\")",
           "range": true,
           "refId": "A",
-          "legendFormat": "{{task_queue}}"
+          "legendFormat": "{{task_type}} {{task_queue}}"
         }
       ],
-      "description": "The SDK's leading indicator: time a workflow task waited for a poller. TemporalScheduleToStartLatencyHigh at p99 > 0.2 s (warning) / > 1 s (critical). Label here is the SDK's `task_queue` (order-fulfillment, with a hyphen)."
+      "description": "The SDK's leading indicator for BOTH task types: time a workflow task or an activity waited for a poller. Activity is the dominant case on this platform (224 series vs 32 at audit #996). TemporalScheduleToStartLatencyHigh at p99 > 0.2 s (warning) / > 1 s (critical), per task_type. Label is the SDK's `task_queue` (order-fulfillment, with a hyphen)."
     },
     {
       "id": 15,

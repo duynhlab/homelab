@@ -9,13 +9,19 @@
 # are not written by hand: the Worker Controller renders one per running version
 # from a WorkerResourceTemplate (kubernetes/apps/{order-fulfillment,checkout-abandon}-scaler.yaml).
 #
-# Why not HPA + prometheus-adapter, upstream's default recommendation: its recipe
-# reads temporal_cloud_v1_approximate_backlog_count from Temporal Cloud's
-# OpenMetrics endpoint. A self-hosted server does not publish that series, and
-# its own approximate_backlog_count carries no build-id label — the per-version
-# number exists only behind the API KEDA polls. Manufacturing the HPA path would
-# mean an external-metrics adapter in front of VictoriaMetrics plus hand-derived
-# per-version selectors, for a weaker signal (ADR-055 § Alternatives).
+# Why not HPA + prometheus-adapter, upstream's default recommendation for
+# continuously loaded queues: not because the signal is missing — the self-hosted
+# matching service exposes approximate_backlog_count per worker_build_id /
+# worker_deployment_name / task_type / partition, and this platform alerts on it
+# — but because the HPA path needs two things this platform does not have: an
+# external-metrics adapter in front of VictoriaMetrics (KEDA ships its own), and
+# a relabeling layer, since upstream's recipe expects
+# temporal_approximate_backlog_count with temporal_worker_deployment_name /
+# temporal_worker_build_id / temporal_namespace selectors while this server emits
+# different names and labels. The Cloud-only limitations upstream lists (stale
+# OpenMetrics timestamps, 5-minute queue unload) do not apply here. Traded away
+# in return: scale-from-zero (the Floor rule keeps minReplicaCount 1) and
+# slot-utilisation damping (KEDA 2.20 reads backlog only). ADR-055 § Alternatives.
 #
 # Three Deployments come out of this release — operator, metrics-apiserver
 # (the external.metrics.k8s.io adapter the HPAs KEDA creates read from) and the

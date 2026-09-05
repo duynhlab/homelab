@@ -235,7 +235,18 @@ validate_worker_versioning() {
     exit 1
   fi
 
-  echo "INFO - $(basename "${wd}" .yaml) versioning: single WorkerDeployment wired to Connection '${conn_name}', no per-build manifests, no hand-set version identity"
+  # --- spec.replicas must be ABSENT (ADR-055). It is the controller's mode
+  # switch: set, and the controller rewrites every active version's replicas on
+  # each reconcile, fighting the KEDA HPA that owns them; nil is the documented
+  # external-autoscaler mode (api/v1alpha1/workerdeployment_types.go, v1.9.0).
+  local replicas
+  replicas=$(yq eval-all 'select(.kind == "WorkerDeployment") | .spec.replicas' "${wd}")
+  if [[ -n "${replicas}" && "${replicas}" != "null" ]]; then
+    echo "ERROR - ${wd}: spec.replicas is set (${replicas}). KEDA owns replicas per version (ADR-055); a controller-managed count is a second writer on the same field. Remove the key." >&2
+    exit 1
+  fi
+
+  echo "INFO - $(basename "${wd}" .yaml) versioning: single WorkerDeployment wired to Connection '${conn_name}', no per-build manifests, no hand-set version identity, replicas left to the autoscaler"
 
   done
 }

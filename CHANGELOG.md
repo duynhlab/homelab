@@ -107,7 +107,7 @@ Skeleton (copy what you need):
   controller with its own wave.
 - **The Temporal `WorkerDeployment` CRs hand replica ownership to the autoscaler.**
   `spec.replicas` is now absent from `order-fulfillment` and `checkout-abandon`,
-  and `sunset.scaledownDelay` is raised 1h → 24h to equal `deleteDelay`. Neither
+  and `sunset.deleteDelay` is cut 24h → 0s (the delete fires at `scaledownDelay + deleteDelay`, so equalising the two at 24h would only have moved the flap to the following day). Neither
   is cosmetic. `spec.replicas` is the controller's mode switch — set, it "manages
   replicas for all active worker versions"; absent, it "never calls UpdateScale on
   active versions" — so leaving it at 1 would have had the controller scale each

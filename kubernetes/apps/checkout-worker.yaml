@@ -68,13 +68,14 @@ spec:
         pauseDuration: 30s
 
   # Retirement policy, stated explicitly (order-worker.yaml has the full
-  # rationale, including why scaledownDelay equals deleteDelay under an
-  # autoscaler). For THIS workflow the drain is naturally fast: every run
-  # ContinueAsNews within its ≤30-minute timer, and the continuation routes to
-  # the Current version.
+  # rationale, including why deleteDelay is 0s under an autoscaler: the delete
+  # fires at scaledownDelay + deleteDelay, so any positive deleteDelay is a
+  # controller-writes-0 / KEDA-writes-1 flap window). For THIS workflow the drain
+  # is naturally fast: every run ContinueAsNews within its ≤30-minute timer, and
+  # the continuation routes to the Current version.
   sunset:
-    scaledownDelay: 24h
-    deleteDelay: 24h
+    scaledownDelay: 1h
+    deleteDelay: 0s
 
   template:
     metadata:

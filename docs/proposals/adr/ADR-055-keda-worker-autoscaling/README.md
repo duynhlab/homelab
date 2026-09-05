@@ -91,7 +91,7 @@ rendered by the controller's `WorkerResourceTemplate`.
 | **Per-version** | The `ScaledObject` is a template rendered per build id. `workerDeploymentName`, `workerDeploymentBuildId` and `namespace` are **controller-owned** — the webhook rejects a template that hardcodes them; `taskQueue` stays the author's. Opt-in is the **empty-string sentinel** (`workerDeploymentName: ""` etc.): present-and-empty is injected, an absent key is left alone and the scaler would then read the whole queue (controller ≥ v1.8.0, `internal/k8s/workerresourcetemplates.go` `appendKEDATriggerMetadata`) |
 | **Floor** | `minReplicaCount: 1` for any version that may still hold pinned workflows. Scaling a draining version to zero removes its pollers, which is the silent-stall shape this platform has already been bitten by |
 | **Replica ownership** | `spec.replicas` must be **absent** from the `WorkerDeployment`. It is the controller's mode switch, not a default: *"When set, the controller manages replicas for all active worker versions. When omitted (nil), the controller … never calls UpdateScale on active versions"* (`api/v1alpha1/workerdeployment_types.go`). Left set, every reconcile scales the current version back down while KEDA scales it up |
-| **Sunset** | `scaledownDelay` **equals** `deleteDelay`. Drained versions are zeroed by the controller regardless of who owns replicas, and the `ScaledObject` outlives that zeroing, so any gap between the two delays is a flap window |
+| **Sunset** | `sunset.deleteDelay: 0s` (keep `scaledownDelay: 1h`). Drained versions are zeroed by the controller regardless of who owns replicas, KEDA raises an inactive target back to `minReplicaCount` on every poll (`RequestScale`, 2.20.2), and the `ScaledObject` outlives the zeroing until the Deployment is deleted — so the window between zero and delete is a 0↔1 flap. The delete fires at `drainedSince > scaledownDelay + deleteDelay` **and** observed replicas 0 (`planner.go:733`, v1.9.0): the delays *add*, so `24h/24h` moves the window to [24h, 48h] rather than closing it. `0s` deletes on the reconcile after the zero. Every KEDA-side lever fails: `minReplicaCount: 0` and `idleReplicaCount: 0` let an idle Current reach 0, which the controller's target floor (`planner.go:786`) undoes — a flap on the live version; `paused-scale-in` also sets the HPA `ScaleDown.SelectPolicy: Disabled`, so replicas never return from 3 to 1 |
 | **Allow-list** | `ScaledObject` must be added to `workerResourceTemplate.allowedResources` — the chart defaults to `HorizontalPodAutoscaler` only, and that value drives both the webhook allow-list **and** the controller's RBAC |
 | **Observability first** | `TemporalScheduleToStartLatencyHigh` and `TemporalTaskQueueBacklogGrowing` ship **with** the scaler. Autoscaling without them is a system that hides its own saturation |
 
@@ -175,13 +175,15 @@ and re-deriving per-version selectors — more moving parts than the thing it re
   but it is a narrower win than "KEDA is the recommended path", and this ADR should
   not be read as claiming Temporal recommends it for a continuously-loaded queue —
   the same upstream table recommends **HPA + prometheus-adapter** for that case
-- **`sunset.scaledownDelay` had to be raised to equal `deleteDelay`.** The controller
-  keeps one replica write even when an autoscaler owns replicas: it zeroes drained
-  versions "regardless", and its drained branch re-fires on any non-zero value it
-  observes, while the version's `ScaledObject` stays attached until the Deployment is
-  deleted. A 1h/24h split was therefore 23 hours of controller-writes-0 against
-  `minReplicaCount`-writes-1. Collapsing the delays costs one idle pod per drained
-  version for a day and removes the flap
+- **`sunset.deleteDelay` is 0s.** The controller keeps one replica write even when an
+  autoscaler owns replicas: it zeroes drained versions "regardless", and its drained
+  branch re-fires on any non-zero value it observes, while KEDA writes
+  `minReplicaCount` back on every poll and the `ScaledObject` stays attached until the
+  Deployment is deleted. A 1h/24h split was 23 hours of that flap; because the delete
+  fires at `scaledownDelay + deleteDelay`, a 24h/24h split would have been the same 24
+  hours of flap one day later. Deleting on the reconcile after the zero removes the
+  window; the cost is ADR-054's day of drained-version retention, which protected a
+  rollback that is only meaningful before the version drains
 - **Version-aware metadata needs controller ≥ v1.8.0** — satisfied by the `0.28.0`
   chart (appVersion `1.9.0`), but it couples the two decisions
 - **RBAC widening.** `ScaledObject` in `allowedResources` grants the controller
@@ -253,7 +255,7 @@ nothing — and neither was visible to `make validate`.
 | 1 | Wave `keda-local` — `HelmRepository keda` + `HelmRelease keda` 2.20.2 in namespace `keda`, Kind-sized resources, ServiceMonitors on; `dependsOn: controllers-local, monitoring-local`; `temporal-local` and `apps-local` now depend on it | `clusters/local/keda.yaml`, `clusters/local/sources/helm/keda.yaml`, `controllers/keda/`, `controllers/namespaces.yaml`, `scripts/flux-validate.sh` |
 | 2 | `ScaledObject` added to `workerResourceTemplate.allowedResources` (webhook allow-list + controller RBAC) | `controllers/temporal/worker-controller-helmrelease.yaml` |
 | 3 | One `WorkerResourceTemplate` per worker: `minReplicaCount: 1`, `maxReplicaCount: 3`, `targetQueueSize: "5"`, `pollingInterval: 15`, `cooldownPeriod: 120`, trigger `temporal` with the three `""` sentinels; ≈ 0.13 RPS against the 50 RPS budget | `apps/order-fulfillment-scaler.yaml`, `apps/checkout-abandon-scaler.yaml` |
-| 3b | **`spec.replicas` removed** from both `WorkerDeployment` CRs and `sunset.scaledownDelay` raised 1h → 24h to equal `deleteDelay` — the two Decision-rule rows added above. Without 3b the scaler renders correctly and moves nothing | `apps/order-worker.yaml`, `apps/checkout-worker.yaml` |
+| 3b | **`spec.replicas` removed** from both `WorkerDeployment` CRs and `sunset.deleteDelay` cut 24h → 0s (first draft of this row raised `scaledownDelay` to 24h instead; the delete fires at the *sum* of the two delays, so that only moved the flap) — the two Decision-rule rows added above. Without 3b the scaler renders correctly and moves nothing | `apps/order-worker.yaml`, `apps/checkout-worker.yaml` |
 | 4 | `TemporalScheduleToStartLatencyHigh` — **four** rules under one name: p99 > 0.2 s / 10m warning and > 1 s / 5m critical, each for `task_kind: workflow` **and** `task_kind: activity`, by SDK `task_queue`. Activity is the dominant series on a loaded cluster (224 vs 32) and is what `targetQueueSize` scales against, so a workflow-only rule would have missed the usual case | `configs/temporal/prometheusrule.yaml`, `docs/observability/runbooks/temporal/` |
 | 4b | `TemporalTaskQueueBacklogGrowing` — `sum by (taskqueue, task_type, worker_version)` > 10 / 10m on the server metric. One app queue holds **17 series** (`partition` 0–3 + `__sticky__` × `task_type` × versioned/`__unversioned__`); only `partition` may be collapsed, because that is what `DescribeTaskQueueEnhanced` — the call KEDA makes — aggregates. `max by (taskqueue)` would need ~4× the backlog to trip; a bare `sum by (taskqueue)` would add Workflow to Activity and versioned to unversioned | same, plus both dashboard twins, which now carry the identical expression |
 | 4c | KEDA's own health: `KedaOperatorDown` (critical), `KedaScalerErrors`, `KedaScaledObjectErrors` (warning) with runbooks in `runbooks/keda/`; catalog §8c | `prometheusrules/keda/alerts.yaml`, `docs/observability/runbooks/keda/` |
@@ -303,12 +305,18 @@ nothing — and neither was visible to `make validate`.
   in state, not only those with replicas, so `minReplicaCount: 1` keeps writing 1
   back. That is 23 hours of flap — the outcome this ADR called intolerable — and it
   was predictable from the v1.9.0 source without a run. The fix in 3b is
-  `scaledownDelay: 24h`, collapsing the window: the drained version simply holds the
-  scaler's floor of one pod until deletion. `idleReplicaCount: 0` was considered and
-  rejected — it triggers on *no active trigger*, which is also true of a draining
-  version still holding pinned workflows, so it would reintroduce the silent stall the
-  Floor rule exists to prevent. **Still worth observing at Kind:** that the drained
-  version sits at a steady 1 replica for the full day and is then deleted cleanly.
+  `sunset.deleteDelay: 0s`: the delete fires at `drainedSince > scaledownDelay + deleteDelay`
+  with replicas already 0 (`planner.go:733`), so the reconcile after the zero removes the
+  Deployment and, with it, the `ScaledObject` — the flap lasts at most one KEDA poll. The
+  first draft raised `scaledownDelay` to 24h instead; because the delays add, that moved
+  the flap to [24h, 48h] rather than closing it. `idleReplicaCount: 0` and
+  `minReplicaCount: 0` were rejected because they let an idle Current reach 0, which the
+  controller's target floor (`planner.go:786`) immediately undoes — the same flap on the
+  live version; `paused-scale-in` was rejected because it also disables the HPA's
+  scale-down. **Kind rows:** after a tag bump and `drainedSince` + 1h, the old
+  Deployment and its `ScaledObject` are gone within one poll, and
+  `kubectl -n order get events --field-selector reason=ScalingReplicaSet` shows no 0↔1
+  alternation.
 
 **Drift to watch:** KEDA 2.21 removes `buildId` / `selectAllActive` /
 `selectUnversioned` — the templates use none of them; `includeRunningWorkflowCount`
@@ -320,7 +328,7 @@ nothing — and neither was visible to `make validate`.
 |------|-------------------|--------|
 | 2026-08-21 | Proposed / Not started | Proposed with RFC-0026 at architecture review. Recorded, not installed. |
 | 2026-09-05 | Accepted / **Partial** | Installed in #996: KEDA 2.20.2 wave, allow-list, one `WorkerResourceTemplate` per worker (both workers, owner decision), the capacity alerts with runbooks. Kind verification handed to the Ubuntu audit; Adoption → Complete on its evidence. |
-| 2026-09-05 | Accepted / **Partial** | Review pass on the same PR, against the v1.9.0 source and the live cluster. Four corrections before merge: `spec.replicas` removed so the controller yields replica ownership (it would otherwise have fought KEDA every reconcile); `scaledownDelay` raised to `deleteDelay` to close a 23-hour flap window; the backlog alert re-aggregated from `max by (taskqueue)` to `sum by (taskqueue, task_type, worker_version)`; schedule-to-start extended to activity tasks, which are the dominant series. Also: the KEDA source header had claimed a self-hosted server publishes no per-version backlog metric — it does, and this ADR's own alert reads it — and every Kustomization count was two low. |
+| 2026-09-05 | Accepted / **Partial** | Review pass on the same PR, against the v1.9.0 source and the live cluster. Four corrections before merge: `spec.replicas` removed so the controller yields replica ownership (it would otherwise have fought KEDA every reconcile); `sunset.deleteDelay` cut to 0s to close the drained-version flap window (the first draft set `scaledownDelay` = `deleteDelay` = 24h, which — since the delete fires at their sum — only moved the window); the backlog alert re-aggregated from `max by (taskqueue)` to `sum by (taskqueue, task_type, worker_version)`; schedule-to-start extended to activity tasks, which are the dominant series. Also: the KEDA source header had claimed a self-hosted server publishes no per-version backlog metric — it does, and this ADR's own alert reads it — and every Kustomization count was two low. |
 
 ---
-_Last updated: 2026-09-05 — Accepted and installed (Adoption Partial pending the Kind audit); As-built section added; the `""` sentinel recorded. Same-day review pass added rows 3b/4b, two Decision rules (replica ownership, sunset), and resolved the sunset-interaction question from source instead of deferring it to a >1h drill._
+_Last updated: 2026-09-05 — Accepted and installed (Adoption Partial pending the Kind audit); As-built section added; the `""` sentinel recorded. Same-day review pass added rows 3b/4b, two Decision rules (replica ownership, sunset), and resolved the sunset-interaction question from source instead of deferring it to a >1h drill; corrected the same day to `deleteDelay: 0s` once `planner.go:733` showed the delays add._

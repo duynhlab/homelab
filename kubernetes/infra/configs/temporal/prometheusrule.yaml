@@ -219,16 +219,30 @@ spec:
         #   task_type     Workflow | Activity      -- separate pools
         #   worker_version <version> | __unversioned__ -- different populations
         # `sum` collapses ONLY the partitions, which is what makes the number
-        # comparable to the scaler's: DescribeTaskQueueEnhanced, the call KEDA's
-        # temporal scaler makes, returns the per-version aggregate across
-        # partitions. `max by (taskqueue)` would read one partition's share and need
-        # roughly 4x the backlog to trip; a bare `sum by (taskqueue)` would add
-        # Workflow to Activity and the versioned series to __unversioned__.
+        # comparable to the scaler's. With the three `""` sentinels set, KEDA's
+        # temporal scaler takes getDeploymentBacklogCount ->
+        # DescribeWorkerDeploymentVersion -> sumDeploymentBacklog (temporal_scaler.go
+        # 256-293, v2.20.2), which sums ApproximateBacklogCount across the version's
+        # task queues -- already aggregated over partitions. (Not
+        # DescribeTaskQueueEnhanced: that is the getBuildIDBacklogCount branch, for
+        # the deprecated `buildId` metadata.) `max by (taskqueue)` would read one
+        # partition's share and need roughly 4x the backlog to trip; a bare
+        # `sum by (taskqueue)` would add the versioned series to __unversioned__.
         # Grouping rather than filtering keeps the unversioned system queues
         # (temporal_sys_*) alerting on their own series instead of dropping them.
         #
-        # 10 tasks for 10m is twice the KEDA targetQueueSize (5): a backlog that
-        # size that long means the scaler is not keeping up, is at
+        # ONE DELIBERATE DIFFERENCE from the scaler: this splits task_type, the
+        # scaler does not. `queueTypes` is unset in both templates, so
+        # sumDeploymentBacklog's type filter is nil and KEDA scales on
+        # Workflow + Activity COMBINED. Splitting is the right call for a page --
+        # it names the starved pool -- but it means the alert is not literally
+        # "twice targetQueueSize": KEDA reaches maxReplicaCount at a combined 15,
+        # while this needs 10 in a single pool. In the mixed case the alert
+        # therefore trails the scaler rather than leading it, which is the correct
+        # direction for a rule whose job is to say the scaler is NOT coping.
+        #
+        # 10 tasks for 10m is two targetQueueSize units (5) in one pool: a backlog
+        # that size that long means the scaler is not keeping up, is at
         # maxReplicaCount, or is not scaling this queue at all.
         - alert: TemporalTaskQueueBacklogGrowing
           expr: |

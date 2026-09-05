@@ -14,7 +14,7 @@
 
 A trigger on one `ScaledObject` has returned an error on every poll for five
 minutes. Here the only trigger type is `temporal`, so the failing call is
-`DescribeTaskQueueEnhanced` against `temporal-frontend.temporal.svc:7233` for
+`DescribeWorkerDeploymentVersion` against `temporal-frontend.temporal.svc:7233` for
 one worker version's task queue. While the trigger errors, KEDA keeps that
 version at its last replica count; the backlog it should drain is invisible.
 

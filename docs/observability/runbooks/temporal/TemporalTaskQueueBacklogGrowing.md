@@ -23,7 +23,7 @@ platform, and only one of the four dimensions may be collapsed:
 
 | Label | Values | Treatment |
 |---|---|---|
-| `partition` | `0`, `1`, `2`, `3`, `__sticky__` | **summed** — the queue's backlog is spread across partitions, and `DescribeTaskQueueEnhanced` (the call KEDA's scaler makes) returns the aggregate |
+| `partition` | `0`, `1`, `2`, `3`, `__sticky__` | **summed** — the queue's backlog is spread across partitions, and `DescribeWorkerDeploymentVersion` → `sumDeploymentBacklog` (the call KEDA's scaler makes for a versioned template) returns the aggregate |
 | `task_type` | `Workflow`, `Activity` | kept — separate pools with separate slots |
 | `worker_version` | the build id, or `__unversioned__` | kept — different populations, and grouping rather than filtering keeps the unversioned `temporal_sys_*` queues alerting on their own series |
 | `taskqueue` | `order_fulfillment`, `checkout`, … | kept |
@@ -34,9 +34,14 @@ and the versioned series to `__unversioned__`. Both were wrong in opposite
 directions, which is why the alert and the dashboard panel now use the same
 expression.
 
-Ten is twice the `targetQueueSize` (5) that the KEDA `ScaledObject` scales on
-([ADR-055](../../../proposals/adr/ADR-055-keda-worker-autoscaling/)). A backlog
-that size for that long therefore means one of three things: the scaler is at
+Ten is two `targetQueueSize` units (5) of the KEDA `ScaledObject`
+([ADR-055](../../../proposals/adr/ADR-055-keda-worker-autoscaling/)) — in **one
+pool**. The scaler does not split by `task_type` (`queueTypes` is unset, so
+`sumDeploymentBacklog` applies no type filter and KEDA acts on Workflow +
+Activity combined), so when both pools are loaded the scaler saturates before
+this fires. That is the right direction: the alert exists to say the scaler is
+*not coping*, not to duplicate it. A backlog this size for this long therefore
+means one of three things: the scaler is at
 `maxReplicaCount`, it is not rendered for the version that owns the backlog, or
 its poll against the frontend is failing. A healthy scaler keeps this alert quiet.
 

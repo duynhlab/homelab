@@ -455,6 +455,11 @@ Skeleton (copy what you need):
   remediation command use kube-state-metrics' `exported_namespace`; the plain
   `namespace` label identifies the `kube-system` scrape target on this platform.
 
+- **The complete loss of `product-db-replica` is now observable.** New
+  `CNPGDRClusterOffline` retains an `OR on() vector(0)` absence path, and
+  `PostgresBackupMetricsMissing` is scoped to each `cnpg_io_cluster` so healthy
+  `product-db` series cannot mask a vanished DR cluster in the same namespace.
+
 - **`CNPGClusterStandbyNotStreaming` no longer fires on a DR designated
   primary.** The expression is scoped to `cnpg_io_instanceRole!="primary"`. The
   designated primary of a replica cluster stays in recovery for the life of the

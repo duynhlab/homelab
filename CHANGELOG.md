@@ -451,6 +451,10 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`KubeJobFailed` now renders the observed Job namespace.** Its summary and
+  remediation command use kube-state-metrics' `exported_namespace`; the plain
+  `namespace` label identifies the `kube-system` scrape target on this platform.
+
 - **`CNPGClusterStandbyNotStreaming` no longer fires on a DR designated
   primary.** The expression is scoped to `cnpg_io_instanceRole!="primary"`. The
   designated primary of a replica cluster stays in recovery for the life of the

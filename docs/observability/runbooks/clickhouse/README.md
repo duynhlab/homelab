@@ -33,6 +33,7 @@ alert name.
 | ClickHouseDiskCritical | critical | homelab | active | [ClickHouseDiskCritical.md](ClickHouseDiskCritical.md) |
 | ClickHouseTooManyParts | warning | homelab | active | [ClickHouseTooManyParts.md](ClickHouseTooManyParts.md) |
 | ClickHouseTooManyPartsPerPartition | warning | homelab | active — VERIFY-AT-KIND | [ClickHouseTooManyPartsPerPartition.md](ClickHouseTooManyPartsPerPartition.md) |
+| ClickHouseOtelTTLLagging | warning | homelab | active — live-signal | [ClickHouseOtelTTLLagging.md](ClickHouseOtelTTLLagging.md) |
 | ClickHouseInsertsDelayed | info | homelab | active | [ClickHouseInsertsDelayed.md](ClickHouseInsertsDelayed.md) |
 | ClickHouseInsertsRejected | warning | homelab + compose | active — VERIFY-AT-KIND | [ClickHouseInsertsRejected.md](ClickHouseInsertsRejected.md) |
 | ClickHouseInsertsFailing | warning | homelab + compose | active — VERIFY-AT-KIND | [ClickHouseInsertsFailing.md](ClickHouseInsertsFailing.md) |

@@ -38,10 +38,12 @@ Postgres and every other pod on that worker are on the same filesystem.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
 
 # Which table is the eater -- includes system.* tables, which is often the answer
-kubectl exec -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password="$PW" --query "
+kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
   SELECT database, table, formatReadableSize(sum(bytes_on_disk)) AS disk, sum(rows) AS rows
   FROM system.parts WHERE active GROUP BY database, table ORDER BY sum(bytes_on_disk) DESC LIMIT 15"
 

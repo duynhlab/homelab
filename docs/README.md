@@ -60,6 +60,7 @@ docs/
 │   ├── poolers.md                # Current PgBouncer and PgDog inventory
 │   ├── extensions.md             # Current extension policy and inventory
 │   ├── fundamentals/             # Vendor-neutral PostgreSQL learning path
+│   ├── observability-and-troubleshooting.md # Symptom-to-runbook SRE map
 │   ├── runbooks/                 # Current task-focused procedures
 │   └── reference/                # Comparisons and historical learning notes
 ├── observability/                # Observability documentation
@@ -92,7 +93,9 @@ docs/
 │   ├── profiling/                # Pillar 4: Continuous Profiling
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
 │   ├── clickhouse/               # ClickHouse OTel logs+traces OLAP (deployed)
-│   │   └── README.md             # OLAP fundamentals, MergeTree, schema + ops, Grafana chapter
+│   │   ├── README.md             # Platform hub, architecture, and Grafana
+│   │   ├── parts-merges-and-ttl.md # Storage lifecycle deep dive
+│   │   └── operations.md         # Day-2 diagnosis and recovery
 │   ├── grafana/                  # Visualization layer
 │   │   ├── README.md             # Grafana overview + plugins
 │   │   ├── rbac-multi-team.md    # Staff-SSO group→role mapping (ADR-062), Teams, folder permissions
@@ -101,6 +104,7 @@ docs/
 │   │   └── variables.md          # Dashboard variables & regex
 │   ├── alerting/                 # Alerting rules
 │   │   ├── README.md             # 2-layer alerting strategy
+│   │   ├── alert-lifecycle-and-runbooks.md # Signal and runbook engineering
 │   │   ├── alert-catalog.md      # Full alert reference + coverage gaps
 │   │   ├── slo-burn-rate-alerts.md # Multi-window burn-rate alerts
 │   │   └── dashboard-comparison.md
@@ -278,6 +282,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
     - [Fundamentals](./observability/clickhouse/fundamentals.md) - OLAP vs LogsQL, MergeTree, deployed 1×3
     - [Schema and queries](./observability/clickhouse/schema-and-queries.md) - ORDER BY, EXPLAIN granules, codecs
     - [Materialized views](./observability/clickhouse/materialized-views.md) - incremental `TO` trace-id table
+    - [Parts, merges, and TTL](./observability/clickhouse/parts-merges-and-ttl.md) - insert lifecycle, merge debt, retention, and RustFS cold tier
+    - [ClickHouse operations](./observability/clickhouse/operations.md) - symptom-first day-2 guide and alert evidence
 10. **[Logging](./observability/logging/README.md)** - Hub: OTLP app logs (otelzap tee) + Vector for non-instrumented pods
     - [VictoriaLogs store](./observability/logging/victorialogs.md) - streams model, VLSingle, ingest contracts, retention
     - [Vector pipeline](./observability/logging/vector.md) - DaemonSet, transforms, PG plans/pgaudit, self-monitoring
@@ -318,10 +324,11 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Runbooks & Troubleshooting
 
-1. **[PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md)** - Backup and restore procedures (CNPG Barman)
-2. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
-3. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
-4. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
+1. **[Alert lifecycle and runbook engineering](./observability/alerting/alert-lifecycle-and-runbooks.md)** - Signal contracts, validation levels, and safe on-call decisions
+2. **[PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md)** - Backup and restore procedures (CNPG Barman)
+3. **[Logging troubleshooting](./observability/logging/vector.md#troubleshooting)** - Missing/blank Kubernetes logs (Vector → VictoriaLogs → Grafana)
+4. **[Add a service database](./databases/runbooks/add-service-database.md)** - RFC-0012 triplet flow on product-db
+5. **[Rotate a product-db service password](./databases/runbooks/rotate-cnpg-service-password.md)** - End-to-end rotation via OpenBAO → triplet → PgDog
 6. **[Pooler operations](./databases/runbooks/pooler-operations.md)** — day-2 ops for both poolers: PgDog (`pgdog-product`) and the CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`)
 7. **[Kind E2E audit](./platform/kind-e2e-audit.md)** — the cluster release gate: Flux delivery vs pins, admission, the real edge, cluster-only telemetry
 
@@ -362,7 +369,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [ClickHouse OTel OLAP](./observability/clickhouse/README.md) - Deployed supplementary OLAP; OTel logs/traces SQL ([RFC-0019](./proposals/rfc/RFC-0019/))
-- [ClickHouse fundamentals](./observability/clickhouse/fundamentals.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md)
+- [ClickHouse fundamentals](./observability/clickhouse/fundamentals.md) · [parts/merges/TTL](./observability/clickhouse/parts-merges-and-ttl.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md) · [operations](./observability/clickhouse/operations.md)
+- [Alert lifecycle and runbook engineering](./observability/alerting/alert-lifecycle-and-runbooks.md) - Rule validation and on-call runbook contract
 - [Logging (platform)](./observability/logging/README.md) - OTLP app logs + Vector for non-instrumented pods
 - [Application logging](./api/logs.md) - App-side logging contract (libraries, levels, JSON fields)
 - [Application observability](./api/observability.md) - Cross-cutting policy, env, middleware, three-layer spans
@@ -425,7 +433,8 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Cross-Region / Cross-Zone DR](./databases/cross-region-dr.md) - Planned roadmap to independent failure domains
 - [Declarative Role & Database Management](./databases/declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
 - [PostgreSQL Further Reading](./databases/reference/further-reading.md) - Curated external references
-- [PostgreSQL Internals](./databases/fundamentals/README.md) - Vendor-neutral learning path for processes, storage, WAL, MVCC, queries, and replication
+- [PostgreSQL Internals](./databases/fundamentals/README.md) - Vendor-neutral SRE path from processes and storage to schema, indexes, replication, and investigation
+- [PostgreSQL observability and troubleshooting](./databases/observability-and-troubleshooting.md) - Symptom-to-evidence-to-runbook map
 
 ### Caching
 
@@ -470,6 +479,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ### Runbooks
 
+- [Alert lifecycle and runbook engineering](./observability/alerting/alert-lifecycle-and-runbooks.md) - Validate signals before relying on a runbook
 - [Kind E2E audit](./platform/kind-e2e-audit.md) - The cluster release gate (K0–K6), twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [k6 assertion layer](./testing/k6.md) - One suite for both gates: rows as thresholds, saga over HTTP, edge limiter, Temporal backlog
 - [PostgreSQL Backup/Restore](./databases/runbooks/backup-restore.md) - Backup and restore procedures
@@ -491,7 +501,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively
 - **40 Data Panels + 6 Row Groups** - Complete monitoring dashboard
 - **4 Custom Metrics** - Application-level metrics (RED method)
-- **9 Microservices** - All services with v1 API (canonical)
+- **10 Microservices** - Deployed service inventory; contracts are canonical in `docs/api/`
 - **Monitoring Stack** - VictoriaMetrics Operator (VMAgent, VMSingle, VMAlert, VMAlertmanager) + prometheus-operator-crds + Grafana Operator + metrics-server
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - VictoriaTraces + ClickHouse (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)

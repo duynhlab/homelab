@@ -32,9 +32,11 @@ on a 30-second fuse toward readonly.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
 
-kubectl exec -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password="$PW" --query "
+kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
   SELECT name, host, is_expired, session_uptime_elapsed_seconds, session_timeout_ms
   FROM system.zookeeper_connection"
 

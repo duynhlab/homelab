@@ -35,7 +35,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 6. [How it works in this platform](#how-it-works-in-this-platform)
 7. [Operations](#operations)
 8. [Grafana](#grafana) — datasource, Explore, dashboard grammar, the standard suite
-9. [Metrics & alerting](#metrics--alerting) — engine-health scrape, alert catalog, runbook stubs
+9. [Metrics & alerting](#metrics--alerting) — engine-health scrape, alert catalog, runbook entry points
 10. [Playground — MergeTree by hand](#playground--mergetree-by-hand)
 11. [Glossary](#glossary)
 12. [Where each store belongs](#where-each-store-belongs)
@@ -48,7 +48,8 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 ## Overview
 
 VictoriaLogs and VictoriaTraces both cap at **7-day** retention and answer
-**LogsQL / the Jaeger query API only**. There is no cross-day **SQL/OLAP** over
+**LogsQL / VictoriaTraces' Jaeger-compatible query API only**. There is no
+cross-day **SQL/OLAP** over
 structured log/trace fields (errors by service over weeks, duration percentiles,
 status mixes) and no way to **JOIN** logs↔traces on `trace_id` in one store. RED
 metrics on VictoriaMetrics do not substitute for log/trace search.
@@ -65,9 +66,11 @@ or for the primary observability stack.
 1. **Engine** — [fundamentals](fundamentals.md) (OLAP, columnar, MergeTree, 1×3 vs the VLDB paper)
 2. **Junior skill** — [schema-and-queries](schema-and-queries.md) (`ORDER BY` → `EXPLAIN` granules → codecs last)
 3. **Trace-id lookup** — [materialized-views](materialized-views.md) (incremental `TO`, not a Postgres index)
-4. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Operations](#operations) → [Grafana](#grafana)
-5. **Hands-on** — [Playground](#playground--mergetree-by-hand)
-6. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
+4. **Storage lifecycle** — [parts, merges, partitions, and TTL](parts-merges-and-ttl.md)
+5. **On call** — [operations](operations.md) → [alert runbooks](../runbooks/clickhouse/README.md)
+6. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Grafana](#grafana)
+7. **Hands-on** — [Playground](#playground--mergetree-by-hand)
+8. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
 
 Pair with the PostgreSQL [storage and WAL fundamentals](../../databases/fundamentals/storage-and-wal.md)
 if you already know Postgres heap / WAL / B-tree.
@@ -105,9 +108,11 @@ Prove prune on the live tables: [Playground](#playground--mergetree-by-hand).
 
 ## Architecture
 
-The Collector fans telemetry out to every backend in parallel. ClickHouse is the
-5th trace sink and the 2nd log sink; a failure there cannot stall the ops
-primaries (`sending_queue` + `retry_on_failure` isolate it).
+The Collector fans telemetry out to the current backends in parallel.
+ClickHouse is the supplementary SQL sink for logs and traces; a failure there
+must not stall the VictoriaLogs or VictoriaTraces operational paths
+(`sending_queue` + `retry_on_failure` isolate it). Older sink ordinals included
+retired Tempo and Jaeger deployments and are historical, not current topology.
 
 ```mermaid
 flowchart LR
@@ -158,6 +163,12 @@ keep receiving, and the metrics pipeline never routes to ClickHouse.
 ---
 
 ## Operations
+
+This section is the platform configuration reference. For symptom-first triage,
+bounded diagnostics, recovery checks, and alert evidence levels, start with
+**[operations.md](operations.md)**. For the storage mechanics behind part
+pressure, merge memory, cold-tier moves, and retention, read
+**[parts-merges-and-ttl.md](parts-merges-and-ttl.md)**.
 
 ### Deployed schema (real DDL)
 
@@ -732,10 +743,11 @@ not appearing → [Runbook](#runbook--data-not-appearing).
 
 ## Metrics & alerting
 
-> **Planned** — the manifests below are merged; the first scrape, the alert
-> load into VMAlert, and the expression tuning all happen at the Kind gate.
-> local-stack does not run the operator, so nothing here is exercisable on
-> compose.
+> **Deployed and audited.** The 2026-09-10 Kind audit observed all three server
+> scrapes, all four ClickHouse engine metric-producer paths, and all 22 rules loaded with
+> `health=ok`. See the [dated evidence](audits/2026-09-10-kind.md). The
+> local-stack does not run the operator, so operator and replication rules are
+> cluster-only.
 
 The five dashboards above watch the **data** (OTel rows over the SQL
 datasource). This chapter is the **engine**: is the server up, is the disk
@@ -774,10 +786,16 @@ operator-generated Services carry only the native, HTTP and interserver ports.
 Rules live in
 `configs/observability/metrics/prometheusrules/observability/clickhouse-alerts.yaml`,
 catalogued in [alert-catalog § 8b](../alerting/alert-catalog.md#8b-clickhouse-otel-olap-engine).
-Three of the twelve this section once claimed were deleted on 2026-08-22 for
-naming series the exporter does not publish — count the file, not the prose. The
-file holds **22** since the 2026-09-08 awesome-prometheus-alerts audit added
-seven.
+Do not preserve a hand-maintained count as architecture. The canonical command
+is:
+
+```bash
+yq '.spec.groups[] | select(.name == "observability-clickhouse") | .rules | length' \
+  kubernetes/infra/configs/observability/metrics/prometheusrules/observability/clickhouse-alerts.yaml
+```
+
+It returned **22** in the 2026-09-10 audit; VMAlert loaded the same 22 and every
+`runbook_url` resolved.
 
 The spine: the **reachability pair** — `ClickHouseReplicaUnreachable` (warning:
 one of three cannot be fetched, its peers still serve) escalating to
@@ -813,64 +831,26 @@ not the SQL one): up/uptime, query and insert rates, the insert-pressure
 ladder, parts and merges, disk and memory, a `system.errors` top-N table, and
 the operator's reconcile counters.
 
-### Runbook stubs
+### Runbook entry points
 
-- **ClickHouseReplicaUnreachable / ClickHouseAllReplicasUnreachable** —
-  `kubectl -n monitoring get po -l clickhouse.altinity.com/chi=clickhouse`, then
-  pod logs. If the pod is up but fetch fails, check the
-  `clickhouse-credentials` Secret sync (ESO). Remember the blast radius:
-  a collector restart no longer blocks on DDL (`create_schema: false`), so
-  bouncing collectors is safe — but the ClickHouse sink will backpressure and
-  then drop until the store returns.
-- **A table that reports fewer replicas than the topology has** — historically
-  this meant the exporter's `ON CLUSTER` DDL had run before every replica joined
-  the distributed-DDL queue, which no retry could repair. Since the schema moved
-  to the `clickhouse-schema` Job that path is gone, and the repair is to re-run
-  the Job rather than to drop anything:
+Use the [ClickHouse runbook index](../runbooks/clickhouse/README.md) for the
+one-file-per-alert inventory and evidence level. Start with
+[ClickHouse operations](operations.md) when the symptom is not yet mapped to an
+alert. The main paths are:
 
-  ```bash
-  kubectl -n monitoring delete job clickhouse-schema
-  flux -n flux-system reconcile kustomization clickhouse-schema-local
-  kubectl -n monitoring logs job/clickhouse-schema
-  ```
-  The Job asserts `total_replicas` on every replica before exiting 0, so a green
-  Job is now evidence rather than a guess. Confirm with:
+- Reachability and replication: degraded replica, full outage, Keeper quorum,
+  read-only state, lag, and replicated data loss.
+- Storage lifecycle: node filesystem pressure, RustFS/S3 errors, part debt,
+  delayed or rejected inserts, merges, and TTL.
+- Control and ingest: operator health, server scrape coverage, Collector queue,
+  and exporter failures.
 
-  ```sql
-  -- the symptom, read on EVERY replica (loop the pods; see § Playground)
-  SELECT table, is_readonly, total_replicas, active_replicas FROM system.replicas;
-  -- the database must be Replicated; Atomic means table DDL will not propagate
-  SELECT name, engine FROM system.databases WHERE name = 'otel';
-  -- should be EMPTY for schema objects: the bootstrap deliberately avoids
-  -- ON CLUSTER, so an entry here means someone reintroduced it
-  SELECT entry, host, status, exception_code FROM system.distributed_ddl_queue ORDER BY entry, host;
-  ```
-
-  Verify any repair with a cross-replica read, never with pod status: insert on
-  one replica, read from another. Every other signal — pod readiness, engine
-  name, quorum health — stayed green through the original failure, which is why
-  it survived two bring-ups unnoticed.
-
-  Dropping the database is **no longer** part of this procedure. If it is ever
-  necessary, remember it must be dropped on each replica (`DROP DATABASE IF
-  EXISTS otel SYNC` per pod) and then re-created by the Job — the collector will
-  not rebuild it.
-- **ClickHouseDiskCritical** — `SELECT sum(bytes_on_disk) FROM system.parts
-  GROUP BY table` to find the eater, then drop the oldest partitions
-  (`ALTER TABLE … DROP PARTITION …`) or free space on the node. **Growing the
-  PVC is not an option on Kind**: the `standard` StorageClass is
-  `rancher.io/local-path`, whose PVs are hostPath directories with no quota and
-  no `allowVolumeExpansion` — which is also why the disk alerts measure the
-  *node* filesystem rather than the 10Gi request. The 90-day TTL cannot rescue
-  a same-day spike. If the eater is a `system.*` table rather than `otel.*`,
-  see [Retention & compression](#retention--compression).
-- **ClickHouseTooManyParts** — inserts too small or merges starved. Check the
-  collector's batch processor settings first (bigger, fewer inserts), then
-  merge failures on the dashboard.
-- **ClickHouseExporterUnhealthy** — engine-side cause fires alongside it if
-  CH is the problem; alone, it points at the collector's exporter config or
-  the network path. VictoriaLogs/VictoriaTraces hold their own copies, so
-  loss is scoped to the OLAP store.
+Schema disagreement is a manual workflow rather than a deployed alert. Compare
+`SHOW CREATE TABLE` and `system.replicas` on all three replicas, then inspect the
+`clickhouse-schema` Job. Re-running that Job changes cluster state: capture the
+failed assertion, verify committed DDL, state the blast radius, and reconcile
+only the `clickhouse-schema-local` wave. Never drop the `otel` database as first
+response; the Collector runs `create_schema: false` and cannot rebuild it.
 
 ---
 
@@ -892,13 +872,16 @@ docker compose exec clickhouse clickhouse-client --password otel
 # system.* question: system.parts, system.replicas and system.replication_queue
 # are per-replica views, and the round-robin Service will not tell you who
 # answered. Loop over the pods when comparing them.
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password "$PW"
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password
 
 # all three, e.g. to confirm a table really has three live replicas
 for p in $(kubectl -n monitoring get po -l clickhouse.altinity.com/chi=clickhouse -o name); do
   echo "== $p"
-  kubectl -n monitoring exec "${p#pod/}" -- clickhouse-client --password "$PW" -q \
+  kubectl -n monitoring exec -it "${p#pod/}" -- \
+    clickhouse-client --user="$CH_USER" --ask-password --query \
     "SELECT table, is_readonly, total_replicas, active_replicas, absolute_delay
      FROM system.replicas WHERE database='otel' FORMAT PrettyCompact"
 done
@@ -1071,4 +1054,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-04 — the five unmanaged `system.*` log tables now carry a **7-day TTL owned by this repo**, with `PARTITION BY` moved to daily in the same change because a short TTL on a monthly partition is the misaligned case; a new sub-section covers the lazy `_0` rename the change leaves behind. The audit predicate was also corrected — neither `'TTL'` nor `' TTL '` is safe, both match a column comment in `metric_log`. Earlier the same day: Retention began auditing the engine's own `system.*` log tables: six carry a TTL (three from an Altinity operator override that also re-partitions them daily), five carry none, and the fix is constrained by monthly partitioning plus the `*_0` table left behind when an engine definition changes. The `ClickHouseDiskCritical` runbook no longer says "grow the PVC", which its own alert calls impossible on local-path. Earlier the same day: engine learning split into fundamentals / schema-and-queries / materialized-views; this hub stays platform + Grafana + alerts + playground._
+_Last updated: 2026-09-14 — added the operator learning path, real Kind audit,
+credential-safe query examples, and current runtime evidence for parts, TTL,
+cold storage, and the 22-rule ClickHouse alert group._

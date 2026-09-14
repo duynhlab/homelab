@@ -13,41 +13,55 @@ alert name.
 | Alert rules | [`prometheusrules/observability/clickhouse-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/observability/clickhouse-alerts.yaml) |
 | Alert catalog | [§8b ClickHouse](../../alerting/alert-catalog.md#8b-clickhouse-otel-olap-engine) |
 | Platform hub | [docs/observability/clickhouse/README.md](../../clickhouse/README.md) — deployed schema, retention, playground |
-| Engine learning | [fundamentals.md](../../clickhouse/fundamentals.md) · [schema-and-queries.md](../../clickhouse/schema-and-queries.md) |
+| Engine learning | [fundamentals.md](../../clickhouse/fundamentals.md) · [parts/merges/TTL](../../clickhouse/parts-merges-and-ttl.md) · [schema-and-queries.md](../../clickhouse/schema-and-queries.md) |
+| Operations | [ClickHouse operations](../../clickhouse/operations.md) |
+| Validation contract | [Alert lifecycle and runbook engineering](../../alerting/alert-lifecycle-and-runbooks.md) |
+| Live evidence | [2026-09-10 Kind audit](../../clickhouse/audits/2026-09-10-kind.md) |
 | Design | [RFC-0028](../../../proposals/rfc/RFC-0028/) · [ADR-065](../../../proposals/adr/ADR-065-clickhouse-replicated-topology/) |
 
 ## Index
 
-| Alert | Sev | Source | Status | Runbook |
-|-------|-----|--------|--------|---------|
-| ClickHouseAllReplicasUnreachable | critical | homelab | active | [ClickHouseAllReplicasUnreachable.md](ClickHouseAllReplicasUnreachable.md) |
-| ClickHouseReplicaUnreachable | warning | homelab | active | [ClickHouseReplicaUnreachable.md](ClickHouseReplicaUnreachable.md) |
-| ClickHouseKeeperNoLeader | critical | homelab | active | [ClickHouseKeeperNoLeader.md](ClickHouseKeeperNoLeader.md) |
-| ClickHouseKeeperQuorumDegraded | warning | homelab | active | [ClickHouseKeeperQuorumDegraded.md](ClickHouseKeeperQuorumDegraded.md) |
-| ClickHouseZooKeeperExceptions | warning | homelab | active | [ClickHouseZooKeeperExceptions.md](ClickHouseZooKeeperExceptions.md) |
-| ClickHouseReadonlyReplica | warning | homelab | active | [ClickHouseReadonlyReplica.md](ClickHouseReadonlyReplica.md) |
-| ClickHouseKeeperSessionLost | warning | homelab | active — VERIFY-AT-KIND | [ClickHouseKeeperSessionLost.md](ClickHouseKeeperSessionLost.md) |
-| ClickHouseReplicationLag | warning | homelab | active — VERIFY-AT-KIND | [ClickHouseReplicationLag.md](ClickHouseReplicationLag.md) |
-| ClickHouseReplicatedDataLoss | critical | homelab | active — VERIFY-AT-KIND | [ClickHouseReplicatedDataLoss.md](ClickHouseReplicatedDataLoss.md) |
-| ClickHouseDiskAlmostFull | warning | homelab | active | [ClickHouseDiskAlmostFull.md](ClickHouseDiskAlmostFull.md) |
-| ClickHouseDiskCritical | critical | homelab | active | [ClickHouseDiskCritical.md](ClickHouseDiskCritical.md) |
-| ClickHouseTooManyParts | warning | homelab | active | [ClickHouseTooManyParts.md](ClickHouseTooManyParts.md) |
-| ClickHouseTooManyPartsPerPartition | warning | homelab | active — VERIFY-AT-KIND | [ClickHouseTooManyPartsPerPartition.md](ClickHouseTooManyPartsPerPartition.md) |
-| ClickHouseOtelTTLLagging | warning | homelab | active — live-signal | [ClickHouseOtelTTLLagging.md](ClickHouseOtelTTLLagging.md) |
-| ClickHouseInsertsDelayed | info | homelab | active | [ClickHouseInsertsDelayed.md](ClickHouseInsertsDelayed.md) |
-| ClickHouseInsertsRejected | warning | homelab + compose | active — VERIFY-AT-KIND | [ClickHouseInsertsRejected.md](ClickHouseInsertsRejected.md) |
-| ClickHouseInsertsFailing | warning | homelab + compose | active — VERIFY-AT-KIND | [ClickHouseInsertsFailing.md](ClickHouseInsertsFailing.md) |
-| ClickHouseServerErrorsElevated | info | homelab | active | [ClickHouseServerErrorsElevated.md](ClickHouseServerErrorsElevated.md) |
-| ClickHouseS3Errors | warning | homelab | active — VERIFY-AT-KIND | [ClickHouseS3Errors.md](ClickHouseS3Errors.md) |
-| ClickHouseExporterUnhealthy | warning | homelab | active | [ClickHouseExporterUnhealthy.md](ClickHouseExporterUnhealthy.md) |
-| ClickHouseServerNotScraped | warning | homelab | active — VERIFY-AT-KIND | [ClickHouseServerNotScraped.md](ClickHouseServerNotScraped.md) |
-| ClickHouseOperatorDown | warning | homelab | active | [ClickHouseOperatorDown.md](ClickHouseOperatorDown.md) |
-| ClickHouseOperatorReconcileErrors | warning | homelab | active | [ClickHouseOperatorReconcileErrors.md](ClickHouseOperatorReconcileErrors.md) |
+| Alert | Sev | Source | Evidence | Runbook |
+|-------|-----|--------|----------|---------|
+| ClickHouseAllReplicasUnreachable | critical | homelab | live-signal | [ClickHouseAllReplicasUnreachable.md](ClickHouseAllReplicasUnreachable.md) |
+| ClickHouseReplicaUnreachable | warning | homelab | live-signal | [ClickHouseReplicaUnreachable.md](ClickHouseReplicaUnreachable.md) |
+| ClickHouseKeeperNoLeader | critical | homelab | live-signal | [ClickHouseKeeperNoLeader.md](ClickHouseKeeperNoLeader.md) |
+| ClickHouseKeeperQuorumDegraded | warning | homelab | live-signal | [ClickHouseKeeperQuorumDegraded.md](ClickHouseKeeperQuorumDegraded.md) |
+| ClickHouseZooKeeperExceptions | warning | homelab | live-signal | [ClickHouseZooKeeperExceptions.md](ClickHouseZooKeeperExceptions.md) |
+| ClickHouseReadonlyReplica | warning | homelab | live-signal | [ClickHouseReadonlyReplica.md](ClickHouseReadonlyReplica.md) |
+| ClickHouseKeeperSessionLost | warning | homelab | live-signal | [ClickHouseKeeperSessionLost.md](ClickHouseKeeperSessionLost.md) |
+| ClickHouseReplicationLag | warning | homelab | live-signal | [ClickHouseReplicationLag.md](ClickHouseReplicationLag.md) |
+| ClickHouseReplicatedDataLoss | critical | homelab | live-signal | [ClickHouseReplicatedDataLoss.md](ClickHouseReplicatedDataLoss.md) |
+| ClickHouseDiskAlmostFull | warning | homelab | live-signal | [ClickHouseDiskAlmostFull.md](ClickHouseDiskAlmostFull.md) |
+| ClickHouseDiskCritical | critical | homelab | live-signal | [ClickHouseDiskCritical.md](ClickHouseDiskCritical.md) |
+| ClickHouseTooManyParts | warning | homelab | live-signal | [ClickHouseTooManyParts.md](ClickHouseTooManyParts.md) |
+| ClickHouseTooManyPartsPerPartition | warning | homelab | live-signal | [ClickHouseTooManyPartsPerPartition.md](ClickHouseTooManyPartsPerPartition.md) |
+| ClickHouseOtelTTLLagging | warning | homelab | live-signal | [ClickHouseOtelTTLLagging.md](ClickHouseOtelTTLLagging.md) |
+| ClickHouseInsertsDelayed | info | homelab | live-signal | [ClickHouseInsertsDelayed.md](ClickHouseInsertsDelayed.md) |
+| ClickHouseInsertsRejected | warning | homelab + compose | predicate-exercised | [ClickHouseInsertsRejected.md](ClickHouseInsertsRejected.md) |
+| ClickHouseInsertsFailing | warning | homelab + compose | predicate-exercised | [ClickHouseInsertsFailing.md](ClickHouseInsertsFailing.md) |
+| ClickHouseServerErrorsElevated | info | homelab | live-signal | [ClickHouseServerErrorsElevated.md](ClickHouseServerErrorsElevated.md) |
+| ClickHouseS3Errors | warning | homelab | live-signal | [ClickHouseS3Errors.md](ClickHouseS3Errors.md) |
+| ClickHouseExporterUnhealthy | warning | homelab | static-valid | [ClickHouseExporterUnhealthy.md](ClickHouseExporterUnhealthy.md) |
+| ClickHouseServerNotScraped | warning | homelab | live-signal | [ClickHouseServerNotScraped.md](ClickHouseServerNotScraped.md) |
+| ClickHouseOperatorDown | warning | homelab | live-signal | [ClickHouseOperatorDown.md](ClickHouseOperatorDown.md) |
+| ClickHouseOperatorReconcileErrors | warning | homelab | live-signal | [ClickHouseOperatorReconcileErrors.md](ClickHouseOperatorReconcileErrors.md) |
 
 Rows are grouped by the failure they describe — reachability, quorum, disk,
 insert pressure, the collector's view, the operator — not by severity. Count the
 rule file, not this table: the catalog's count is re-derived from `- alert:`
 occurrences.
+
+## Validation levels
+
+A runbook status describes deployment; its evidence level describes what was
+actually tested. Use `static-valid`, `live-signal`, `predicate-exercised`, or
+`alert-observed` exactly as defined in the
+[shared alert contract](../../alerting/alert-lifecycle-and-runbooks.md#validation-levels).
+Querying a zero-valued series closes metric-name and label uncertainty, but it
+does not prove the alert can fire. Dangerous conditions such as quorum loss,
+disk fill, S3 outage, or replicated data loss are never induced only to improve
+an evidence label.
 
 ## Domain specifics
 
@@ -55,8 +69,12 @@ occurrences.
   PromQL. The engine's own `system.*` tables answer most questions faster and
   more precisely than any exported series:
   ```bash
-  PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-  kubectl -n monitoring exec chi-clickhouse-otel-0-0-0 -- clickhouse-client --password "$PW" -q "SELECT 1"
+  # The username is not secret. Enter only the password at the client prompt.
+  CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+    -o jsonpath='{.data.username}' | base64 -d)"
+  kubectl -n monitoring exec -it chi-clickhouse-otel-0-0-0 -- \
+    clickhouse-client --user="$CH_USER" --ask-password --query "SELECT 1"
+  unset CH_USER
   ```
   Replicas are `chi-clickhouse-otel-0-{0,1,2}-0`; the round-robin Service is
   `clickhouse-clickhouse.monitoring.svc:9000` (native) / `:8123` (HTTP).
@@ -193,4 +211,4 @@ Diagnosis → Mitigation → Escalation). In this folder the Diagnosis section l
 with a `clickhouse-client` block, then `### PromQL`.
 
 ---
-_Last updated: 2026-09-08 — seven runbooks added from the awesome-prometheus-alerts audit (`ServerNotScraped`, `TooManyPartsPerPartition`, `InsertsRejected`, `InsertsFailing`, `ReplicationLag`, `KeeperSessionLost`, `ReplicatedDataLoss`), and the index gained the `ClickHouseS3Errors` row it had been missing since 2026-09-07; 15 → 22 rules, every new one marked VERIFY-AT-KIND until its two-form pass runs on Kind. Previously 2026-09-07 — folder README created; the 14 per-alert files existed since 2026-09-05 with no index. Investigation workflows distilled from the #1025 live audit_
+_Last updated: 2026-09-09 — added explicit evidence levels and linked the lifecycle/operations guides; live marker results are recorded in the dated Kind audit._

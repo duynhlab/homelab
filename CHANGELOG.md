@@ -121,6 +121,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse now has a beginner-to-day-2 learning path and dated Kind
+  evidence.** Parts, merges, partitions, TTL, cold-tier ownership, secure
+  diagnosis, alert validation levels, and runbook design are separated into
+  focused guides. The 2026-09-10 audit records a 30/30 Flux rollout, seeded
+  log/trace data, bounded merge/delete/move/insert-pressure drills, all 22
+  VMAlert rules, and every alert-to-runbook mapping.
+
 - **Envoy and ClickHouse alert groups audited against awesome-prometheus-alerts;
   11 rules adopted, 22 declined with reasons.** The community Envoy (20) and
   ClickHouse (23) sets were mapped rule by rule against `prometheusrules/envoy-gateway/alerts.yaml`
@@ -375,6 +382,11 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The PostgreSQL learning path now connects engine mechanics to SRE
+  investigation.** New modules cover schema integrity, index access paths,
+  partitioning/retention, monitoring/performance, and a platform
+  symptom-to-metric/log/trace/SQL troubleshooting map.
+
 - **New: [`docs/observability/runbooks/clickhouse/README.md`](docs/observability/runbooks/clickhouse/README.md)** —
   the ClickHouse alert group had 14 per-alert runbooks since 2026-09-05 and no
   folder index, no row in the runbook hub, and no `Per-alert runbooks:` line in
@@ -467,6 +479,14 @@ Skeleton (copy what you need):
   docs now state that renamed system-log tables retain their old TTL and that
   ClickHouse 26.7 exposes no wide compatibility view for transposed
   `metric_log` queries.
+
+- **Alert and runbook drift found by the Kind audit is corrected.** The
+  ClickHouse catalog no longer calls deployed metrics planned or repeats stale
+  300-part rejection defaults; S3, scrape, replication, session, and insert
+  evidence is graded precisely. The missing deployed
+  `CNPGClusterHighReplicationLag` runbook now explains the idle-standby false
+  positive, and ClickHouse runbooks no longer put passwords in process
+  arguments.
 
 - **`CNPGClusterStandbyNotStreaming` no longer fires on a DR designated
   primary.** The expression is scoped to `cnpg_io_instanceRole!="primary"`. The

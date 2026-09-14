@@ -34,18 +34,21 @@ what makes this easy to miss from a dashboard.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
 
 # Which tables, on which replica -- system.replicas is LOCAL, so loop all three
 for i in 0 1 2; do
   echo "--- 0-$i"
-  kubectl exec -n monitoring chi-clickhouse-otel-0-$i-0 -- clickhouse-client --password="$PW" --query "
+  kubectl exec -it -n monitoring chi-clickhouse-otel-0-$i-0 -- \
+    clickhouse-client --user="$CH_USER" --ask-password --query "
     SELECT database, table, is_readonly, active_replicas, total_replicas, queue_size
     FROM system.replicas WHERE is_readonly"
 done
 
 # The cause is nearly always the Keeper session
-kubectl exec -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password="$PW" --query "
+kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
   SELECT name, host, is_expired, session_uptime_elapsed_seconds FROM system.zookeeper_connection"
 ```
 

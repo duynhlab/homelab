@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `ClickHouseAsyncMetrics_MaxPartCountForPartition` > 300, `max by (replica)`, from `:9363` |
-| **Status** | active — VERIFY-AT-KIND (added 2026-09-08; record the live `parts_to_*_insert` values in the rule comment) |
+| **Status** | active · `live-signal` on Kind 2026-09-10 (3 series at 5; guards 1,000/3,000) |
 | **Dashboard** | ClickHouse → Server engine (parts and merges row) |
 | **Local-stack** | same series under `job="clickhouse"`; the compose rule file has only the server-wide `ClickHouseTooManyParts` |
 
@@ -35,8 +35,10 @@ every part is a file set to open.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-CH="kubectl -n monitoring exec chi-clickhouse-otel-0-0-0 -- clickhouse-client --password=$PW -q"
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+# The client prompts for the password; it never enters shell history or argv.
+CH="kubectl -n monitoring exec -it chi-clickhouse-otel-0-0-0 -- clickhouse-client --user=$CH_USER --ask-password --query"
 
 # Which partition, which table
 $CH "SELECT database, table, partition, count() AS parts, sum(rows) AS rows,

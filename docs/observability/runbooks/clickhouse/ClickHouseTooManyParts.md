@@ -6,16 +6,16 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `chi_clickhouse_metric_PartsActive > 300` |
-| **Status** | active · currently ~98 on a loaded cluster |
+| **Status** | active · `live-signal` on Kind 2026-09-10 (62–86 after seeded traffic) |
 | **Dashboard** | ClickHouse → Data analysis |
 | **Local-stack** | present — `ClickHouseMetrics_PartsActive > 300` from the server's `:9363` endpoint |
 
 ## Meaning
 
-Active parts exceeded **300** for 10 minutes. ClickHouse's own
-`parts_to_throw_insert` default is 300 **per partition**; this alert watches the
-table-wide count instead, so it is an earlier, blunter signal than the point at
-which inserts actually start failing.
+Active parts exceeded **300** for 10 minutes. The 2026-09-10 Kind audit measured
+the live per-partition guards at 1,000 for delay and 3,000 for rejection. This
+alert watches the server-wide count instead, so 300 is an early trend threshold,
+not a copy of either insert guard.
 
 Each insert batch creates a part; background merges combine them. A rising part
 count means **inserts are arriving faster than merges retire them**, which has
@@ -31,8 +31,10 @@ On-disk size also inflates, because small parts compress worse than merged ones.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-CH="kubectl exec -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password=$PW"
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+# The client prompts for the password; it never enters shell history or argv.
+CH="kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --user=$CH_USER --ask-password"
 
 # Which table, and how parts are distributed across partitions
 $CH --query "

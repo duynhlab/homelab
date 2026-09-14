@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `absent(up{job="clickhouse-server"} == 1)` — the per-pod `:9363` scrape |
-| **Status** | active — VERIFY-AT-KIND (added 2026-09-08) |
+| **Status** | active · `live-signal` on Kind 2026-09-10 (3 targets at `up=1`) |
 | **Dashboard** | ClickHouse → Server engine (every `ClickHouseMetrics_*` panel goes blank together) |
 | **Local-stack** | not present — compose scrapes `:9363` under `job="clickhouse"` and `ClickHouseAllReplicasUnreachable` reads `up` there directly |
 

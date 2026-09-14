@@ -11,6 +11,7 @@ the two that existed drifted apart within a month). Rules of use:
   * Every alert that has a runbook carries a `runbook_url` annotation pointing
     at it (absolute GitHub URL, the house convention). An alert without a
     runbook is a recorded gap, not a default.
+  * Validation levels are defined by `alerting/alert-lifecycle-and-runbooks.md`. A live zero-valued series proves signal compatibility, not firing semantics.
   * DOMAIN SPECIFICS — extra quick-facts rows, the preferred diagnosis dialect,
     domain dashboards — live in the folder README's "Domain specifics" section,
     never in a forked template.
@@ -25,6 +26,7 @@ the two that existed drifted apart within a month). Rules of use:
 | **Source** | repo path of the rule manifest that defines the alert |
 | **Metrics** | the metric families the expr reads |
 | **Status** | active / inactive on Kind / gated (`flag`) / not deployed — same vocabulary as the folder index |
+| **Validation** | `static-valid` / `live-signal` / `predicate-exercised` / `alert-observed`, with date/evidence link |
 | **Dashboard** | the Grafana board (folder → title) where verification starts |
 | **Local-stack** | only when the compose twin differs: job name, port, or "not present locally" |
 
@@ -43,6 +45,10 @@ incident.
 (required) The business or operational consequence if this is ignored — what
 the shopper/operator experiences, not a restatement of the expr. Say when the
 impact is conditional ("only during a deploy", "only if X co-fires").
+
+## Safety
+
+(optional, required when any command changes state) Context, prerequisites, blast radius, timeout, stop condition, and cleanup/rollback. Classify commands as read-only, reversible local Kind, or destructive incident-only.
 
 ## Diagnosis
 
@@ -73,6 +79,10 @@ LogsQL or a trace pivot, when the metric alone cannot name the culprit.
 (required) Safe immediate actions, cheapest and most reversible first, numbered.
 Name the parameters that must NOT be touched casually. Link procedural runbooks
 instead of inlining multi-step surgery.
+
+## Recovery validation
+
+(optional, strongly recommended) Prove both layers: the alert expression stays false for two evaluation intervals, and the original user/platform symptom is gone. Include backlog, replica, or queue drain checks when a zero instantaneous value can hide unfinished recovery.
 
 ## Escalation
 

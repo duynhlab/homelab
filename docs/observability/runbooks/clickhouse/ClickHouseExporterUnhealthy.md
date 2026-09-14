@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `otelcol_exporter_send_failed_log_records{exporter="clickhouse"}`, `…_send_failed_spans` |
-| **Status** | active |
+| **Status** | active · `static-valid` on Kind 2026-09-10; exact failure counters absent at rest |
 | **Dashboard** | ClickHouse → Overview · OTel Collector |
 | **Local-stack** | present — the compose stack runs the same collector |
 
@@ -17,14 +17,12 @@ minutes. This is the consumer-side view: the collector can be perfectly up while
 this one exporter backpressures, which is why it complements
 `OtelCollectorDown` rather than duplicating it.
 
-**Why this alert reads as "dead" in a metric audit, and is not.** Both series are
-counters that OpenTelemetry creates only on the **first failure** — until then
-they do not exist, and an audit checking "does this metric exist" will flag the
-rule. Their sibling `otelcol_exporter_send_failed_metric_points` *is* present on
-this cluster, which confirms the family name is right. `for: 10m` is what makes
-the rule sound: by the time a sustained failure has run ten minutes there are
-plenty of samples for `rate()`. A brief burst is genuinely missed — that is the
-deliberate trade of a 10-minute window.
+**Why this rule remains only `static-valid`.** Neither exact failure counter
+exists on the healthy 2026-09-10 Kind cluster. Queue, sent-log, and sent-span
+series do exist with `exporter="clickhouse"`, which proves the exporter label
+but not the two rule inputs. A dedicated exporter-failure drill must observe
+those exact names before this rule can claim `live-signal`. `for: 10m` filters
+a brief retry burst, but it cannot repair a wrong or never-created metric name.
 
 ## Impact
 
@@ -56,8 +54,10 @@ kubectl logs -n monitoring deploy/otel-collector-opentelemetry-collector --tail=
 Then ask ClickHouse whether it is accepting writes:
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password="$PW" --query "
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
   SELECT table, max(modification_time) FROM system.parts
   WHERE database='otel' AND active GROUP BY table"
 ```

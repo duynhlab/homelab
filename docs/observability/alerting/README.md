@@ -2,6 +2,10 @@
 
 Two-layer alerting approach combining immediate threshold detection with SLO-based burn-rate alerts.
 
+Start with [Alert lifecycle and runbook engineering](alert-lifecycle-and-runbooks.md)
+for signal contracts, validation levels, safe on-call decisions, and the
+rule-to-runbook audit method.
+
 ## Full Alerting Pipeline
 
 End-to-end view of how metrics become alerts, from ingestion through evaluation to notification and visibility.
@@ -77,7 +81,10 @@ flowchart TD
 
 ### Current State
 
-- Stages 1-4 are fully operational (163 static alerts, 68 Sloth SLO burn-rate alerts — see the [alert catalog](alert-catalog.md)).
+- Stages 1-4 are operational. On the 2026-09-10 local Kind audit, VMAlert
+  loaded 307 alert rules: 62 Sloth burn-rate rules and 245 other deployed
+  rules. Re-derive at runtime; environment gates make a repository text count
+  differ from the local cluster. See the [alert catalog](alert-catalog.md).
 - Stage 5 (VMAlertmanager) routes by severity to `slack-default` (`#alerts`) and `slack-critical` (`#alerts-critical`), with `watchdog-null` for the Watchdog and inhibition rules to suppress cascades. **Caveat:** `slack_api_url` is a committed placeholder (`<SLACK_WEBHOOK_URL>`), so no notifications actually deliver until it is set — ideally injected via External Secrets / OpenBAO rather than inlined in `configRawYaml`.
 - Stage 6: Grafana provides read-only rule visibility via `vmalert.proxyURL`. **Karma** is the dedicated alert dashboard (reads VMAlertmanager API directly), but it is **scaled to 0 replicas** on the local cluster to keep the idle footprint down — `kubectl scale deploy/karma -n monitoring --replicas=1` before using it. Slack receivers are wired (webhook URL pending injection); PagerDuty is planned.
 
@@ -101,14 +108,14 @@ This project uses the **VictoriaMetrics stack** instead of Prometheus. VM Operat
 ```mermaid
 flowchart TD
     subgraph layer1 ["Layer 1: Threshold Alerts"]
-        PR1["PrometheusRule CRDs<br/>microservices/alerts.yaml<br/>postgres/cnpg + cnpg-platform-db"]
-        T1["16 application alerts<br/>PostgreSQL: 42 all-CNPG (per cluster)"]
+        PR1["PrometheusRule CRDs<br/>application + platform<br/>database + infrastructure"]
+        T1["Symptom and cause alerts<br/>counts derived at runtime"]
     end
 
     subgraph layer2 ["Layer 2: SLO Burn-Rate Alerts"]
-        PSL["PrometheusServiceLevel CRDs<br/>10 services x 3 HTTP SLOs<br/>+ inventory x 2 gRPC SLOs<br/>+ keycloak x 2 identity SLOs"]
+        PSL["PrometheusServiceLevel CRDs<br/>9 services x 3 HTTP SLOs<br/>+ inventory x 2 gRPC SLOs<br/>+ keycloak x 2 identity SLOs"]
         Sloth["Sloth Operator<br/>generates multi-window burn-rate rules"]
-        T2["68 SLO alerts<br/>page + ticket severity"]
+        T2["62 SLO alerts<br/>page + ticket severity"]
     end
 
     subgraph pipeline ["Alert Pipeline"]
@@ -303,4 +310,5 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 
 ---
 
-_Last updated: 2026-07-17 — RFC-0018: PostgreSQL alerts 42 (cnpg + cnpg-platform-db per-cluster); diagram totals aligned with manifests._
+_Last updated: 2026-09-14 — reconciled the alert inventory with the live Kind
+rule set and linked the alert-lifecycle and runbook evidence guide._

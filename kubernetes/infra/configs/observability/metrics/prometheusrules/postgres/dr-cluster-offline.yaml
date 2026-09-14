@@ -1,0 +1,37 @@
+# The generated CNPG cluster-offline rules cover platform-db and product-db.
+# The replica cluster is hand-authored because it is a distinct recovery layer,
+# not a second serving database. Keep the absent-target half: a bare
+# cnpg_collector_up comparison cannot fire after every DR pod disappears.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: product-db-replica-offline
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: alerting-rules
+spec:
+  groups:
+    - name: postgres-dr-availability
+      interval: 1m
+      rules:
+        - alert: CNPGDRClusterOffline
+          expr: |
+            (
+              count(
+                cnpg_collector_up{
+                  namespace="product",
+                  cnpg_io_cluster="product-db-replica"
+                }
+              )
+              OR on() vector(0)
+            ) == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: databases
+            namespace: product
+            cnpg_cluster: product-db-replica
+          annotations:
+            summary: "CNPG DR cluster has no running instances"
+            description: "product/product-db-replica has exposed no CNPG collector target for 5 minutes. The serving product-db cluster may remain healthy, but the platform has lost its continuously recovering DR layer and promotion target. Check the Cluster phase, recovery Jobs, and Barman archive preconditions."
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGDRClusterOffline.md"

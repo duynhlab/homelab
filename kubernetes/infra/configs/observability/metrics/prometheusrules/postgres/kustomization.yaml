@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   - backup-alerts.yaml
   - deep-signals-alerts.yaml
+  - dr-cluster-offline.yaml
   - replication-health.yaml
   - cnpg/cluster-fenced.yaml
   - cnpg/cluster-ha-critical.yaml

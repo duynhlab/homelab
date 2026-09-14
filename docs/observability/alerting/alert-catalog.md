@@ -229,6 +229,7 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 | Alert | Sev | Metric & trigger | Impact | for | Runbook |
 |-------|-----|------------------|--------|-----|---------|
 | CNPGClusterOffline | critical | `cnpg_collector_up` ready instances = 0 | DB fully down — total outage + data-loss risk | 5m | [CNPGClusterOffline](../runbooks/postgresql/CNPGClusterOffline.md) |
+| CNPGDRClusterOffline | critical | `cnpg_collector_up` for `product-db-replica` absent/zero | DR layer and promotion target unavailable | 5m | [CNPGDRClusterOffline](../runbooks/postgresql/CNPGDRClusterOffline.md) |
 | CnpgClusterFenced | critical | `cnpg_collector_fencing_on==1` | All writes blocked (split-brain guard) | 1m | [CnpgClusterFenced](../runbooks/postgresql/CnpgClusterFenced.md) |
 | CNPGClusterHACritical | critical | streaming replicas <1 | No standby — primary failure = data loss | 5m | [CNPGClusterHACritical](../runbooks/postgresql/CNPGClusterHACritical.md) |
 | CNPGClusterHAWarning | warning | streaming replicas <2 | Degraded HA redundancy | 5m | [CNPGClusterHAWarning](../runbooks/postgresql/CNPGClusterHAWarning.md) |
@@ -246,7 +247,7 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 | CNPGClusterInstancesOnSameNode ⏸ *gated — commented out in kustomization until production* | warning | >1 instance per node (`kube_pod_info`) | Node loss = total cluster loss | 5m | [CNPGClusterInstancesOnSameNode](../runbooks/postgresql/CNPGClusterInstancesOnSameNode.md) |
 | PostgresBackupTooOld | warning | `barman_cloud_cloudnative_pg_io_last_available_backup_timestamp` >8h (6h schedule + 2h grace) | Stale backups → data-loss exposure | 30m | [backup-restore.md](../../databases/runbooks/backup-restore.md) |
 | PostgresBackupFailed | critical | `barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp` recent & > last success | Backup pipeline broken — unprotected | 5m | [backup-restore.md](../../databases/runbooks/backup-restore.md) |
-| PostgresBackupMetricsMissing | warning | `absent(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp)` per writable-cluster ns | Backup alerting blind — plugin/sidecar/scrape broken | 30m | [backup-restore.md](../../databases/runbooks/backup-restore.md) |
+| PostgresBackupMetricsMissing | warning | `absent(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp)` per exact `cnpg_io_cluster` | Backup alerting blind — plugin/sidecar/scrape broken | 30m | [backup-restore.md](../../databases/runbooks/backup-restore.md) |
 | CNPGClusterLogicalReplicationErrors 💤 | warning | apply+sync error counters increasing | Logical-replication divergence | 1m | [CNPGClusterLogicalReplicationErrors](../runbooks/postgresql/CNPGClusterLogicalReplicationErrors.md) |
 | CNPGClusterLogicalReplicationErrorsCritical 💤 | critical | ≥5 errors in 5m | Persistent logical-replication failure | 0m | [CNPGClusterLogicalReplicationErrorsCritical](../runbooks/postgresql/CNPGClusterLogicalReplicationErrorsCritical.md) |
 | CNPGClusterLogicalReplicationLagging 💤 | warning | receipt/apply lag >60s or buffered >1GB | Subscriber falling behind | 5m | [CNPGClusterLogicalReplicationLagging](../runbooks/postgresql/CNPGClusterLogicalReplicationLagging.md) |

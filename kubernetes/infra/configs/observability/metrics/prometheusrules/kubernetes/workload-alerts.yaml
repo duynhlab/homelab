@@ -49,6 +49,11 @@ spec:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeStatefulSetReplicasMismatch.md"
 
         - alert: KubeJobFailed
+          # kube-state-metrics is scraped without honorLabels. The monitored
+          # Job namespace is therefore exported_namespace; namespace names the
+          # kube-state-metrics target (kube-system). Keep the source label
+          # explicit here because changing honorLabels would alter every kube_*
+          # consumer and the recording rules deliberately normalize that shape.
           expr: |
             kube_job_status_failed > 0
           for: 5m
@@ -56,8 +61,8 @@ spec:
             severity: warning
             category: workloads
           annotations:
-            summary: "Job failed ({{ $labels.namespace }}/{{ $labels.job_name }})"
-            description: "Job {{ $labels.job_name }} in {{ $labels.namespace }} has failed. Check job logs: kubectl logs -n {{ $labels.namespace }} job/{{ $labels.job_name }}"
+            summary: "Job failed ({{ $labels.exported_namespace }}/{{ $labels.job_name }})"
+            description: "Job {{ $labels.job_name }} in {{ $labels.exported_namespace }} has failed. Check job logs: kubectl logs -n {{ $labels.exported_namespace }} job/{{ $labels.job_name }}"
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeJobFailed.md"
 
     # --- Autoscaling Saturation ---

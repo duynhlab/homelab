@@ -212,6 +212,24 @@ connects **directly** to `platform-db-rw.platform:5432` (no pooler).
 - Physical backups and WAL archiving to `s3://pg-backups-cnpg/product-db/`.
 - Daily and every-6h `ScheduledBackup` resources.
 - `product-db-replica` bootstrapped from the primary object-store backup path.
+- A separate daily backup and WAL chain for `product-db-replica`, retained for
+  seven days under its own Barman `serverName`.
+
+### DR replica rebuild precondition
+
+The Git manifest is not the only state involved in a re-clone. The DR cluster
+reads from the primary's `product-db-cluster` Barman identity but archives to a
+different `product-db-replica-cluster*` identity. A fresh bootstrap refuses to
+write to a non-empty identity, correctly preventing unrelated PostgreSQL
+timeline histories from being mixed.
+
+Deleting the CNPG `Cluster` does not clear that object-store state. Every
+rebuild must therefore include an explicit, database-owner-approved precondition:
+rotate the DR write `serverName` to a new unique generation in Git while the
+`databases-cnpg-dr-local` Flux wave is suspended. Preserve the old generation;
+cleaning it is a separate retention-controlled action. The exact procedure and
+validation gates live in
+[CNPG DR replica bootstrap](./runbooks/cnpg-dr-replica-bootstrap.md#owner-approved-rebuild-procedure).
 
 ```mermaid
 sequenceDiagram
@@ -378,6 +396,9 @@ Capture the following for every restore or DR drill:
 
 - `product-db-replica` shares the same Kubernetes cluster and namespace as the primary.
 - RustFS shares the homelab failure domain.
+- DR re-clones require an owner-approved GitOps rotation of the Barman write
+  `serverName`; automatic safe lifecycle management for orphaned generations is
+  not implemented.
 - Restore drills and DR promotions are not yet recorded as recurring evidence —
   **partly closed**: two records exist —
   [DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) (a
@@ -465,4 +486,5 @@ retire. The hold stays meaningful for a durable store ([RFC-0011](../proposals/r
 
 ---
 
-_Last updated: 2026-09-01 — Known Gaps and the plugin acceptance note now record DR-2026-08-A (product-db PITR, 2026-08-07); the remaining gaps are a platform-db restore, a DR-promotion rehearsal, and drill cadence._
+_Last updated: 2026-09-14 — made the non-empty Barman archive precondition and
+owner-approved DR write-identity rotation part of the canonical rebuild path._

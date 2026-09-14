@@ -739,6 +739,12 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The `product-db-replica` rebuild procedure now handles Barman's non-empty
+  archive gate explicitly.** The owner-approved path suspends the leaf Flux
+  wave, rotates only the DR write `serverName` to a unique Git-tracked
+  generation, recreates the cluster, and preserves the old chain for separate
+  retention-controlled cleanup.
+
 - **414 lines of planning notes removed from the dashboard reference.** The page
   the docs index calls the *complete* SRE/DevOps dashboard reference ended in a
   `## Grafana Annotations (Planned Feature)` appendix: a five-phase implementation

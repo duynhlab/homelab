@@ -168,13 +168,16 @@ spec:
     # not by the interval -- 1 row in the same 10-minute window, 490 KiB total --
     # and per-second resolution on errors is worth having.
     #
-    # ONE MANUAL STEP REMAINS -- see docs/observability/clickhouse/README.md
+    # ONE OPTIONAL CLEANUP STEP REMAINS -- see docs/observability/clickhouse/README.md
     # "The engine's own log tables". Changing a system table's engine definition
     # does not ALTER it: ClickHouse renames the old table to `<name>_N` and
-    # creates a fresh one, and the renamed copy keeps its rows with NO TTL. Those
-    # have to be dropped per replica or this change frees nothing. The rename is
-    # also LAZY -- measured, it happens at each table's first write after the
-    # config change, so the cleanup cannot be a single pass straight after apply.
+    # creates a fresh one. The renamed copy keeps its OLD engine, including its
+    # old TTL when one existed. It therefore self-drains; dropping it only
+    # reclaims space immediately. A prior table with no TTL (query_metric_log)
+    # does require an explicit drop on upgraded clusters because remove="1"
+    # stops future writes but does not delete an already-born table. The rename
+    # is also LAZY -- measured, it happens at each table's first write after the
+    # config change, so an optional cleanup is not a single pass after apply.
     # Match `_log_[0-9]+$`, not `_0`: a cleanup that matched `LIKE '%\_0'`
     # missed `trace_log_1` holding 153 MiB.
     #
@@ -188,11 +191,12 @@ spec:
     #     the part to reach an empty one. The setting has to live INSIDE the
     #     engine string: once <engine> is declared, partition_by/ttl/order_by/
     #     settings are refused as siblings.
-    #   * processors_profile_log, aggregated_zookeeper_log and
-    #     zookeeper_connection_log shipped monthly (toYYYYMM) with a 30-day TTL:
+    #   * processors_profile_log, aggregated_zookeeper_log,
+    #     zookeeper_connection_log and blob_storage_log shipped monthly
+    #     (toYYYYMM) with a 30-day TTL:
     #     the misaligned case, 30 distinct event_dates per partition expiring on
     #     30 different days, a rewrite pass each. No `replace="1"` on these
-    #     three, on purpose: no <engine> is declared, so partition_by / ttl /
+    #     four, on purpose: no <engine> is declared, so partition_by / ttl /
     #     settings MERGE into upstream's block and the sorting key, flush and
     #     collect intervals stay whatever upstream ships. Sized on 2026-09-07:
     #     12 MiB, 6 MiB and 7 KiB, so the win is correctness, not bytes. The 30 d
@@ -206,12 +210,12 @@ spec:
     #     trace is simply that expensive (135 MiB in two days, the largest
     #     system.* table). Information keeps every warning and error line.
     #   * metric_log schema_type transposed_with_wide_view (25.x+). Stores one
-    #     row per (metric, value) instead of ~1,900 columns and exposes a wide
-    #     VIEW under the old name, so the operator's queries keep working. Merge
-    #     memory scales with column count -- this is the root fix for a single
-    #     metric_log merge peaking at 1.27 GiB of a 1.80 GiB self-cap in the
-    #     clean window. Only stated limitation is no sub-second resolution,
-    #     irrelevant at 15 s.
+    #     row per (metric, value) instead of ~1,900 columns. On the deployed
+    #     26.7 server this does NOT expose a compatibility view under the old
+    #     wide column names; that is safe only because this platform has no SQL
+    #     reader of system.metric_log. Merge memory scales with column count --
+    #     this is the root fix for a merge that peaked at 1.27 GiB of a 1.80 GiB
+    #     self-cap in the clean window.
     #
     # part_log and query_log (operator-owned, daily, 30 d) still run
     # ttl_only_drop_parts = 0. Their operator XML has not been read off a pod
@@ -282,6 +286,11 @@ spec:
                 <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
                 <settings>ttl_only_drop_parts = 1</settings>
             </zookeeper_connection_log>
+            <blob_storage_log>
+                <partition_by>event_date</partition_by>
+                <ttl>event_date + INTERVAL 30 DAY DELETE</ttl>
+                <settings>ttl_only_drop_parts = 1</settings>
+            </blob_storage_log>
             <query_metric_log remove="1"/>
         </clickhouse>
       # Cold tier on RustFS (2026-09-07). Prose here, not in the XML: XML forbids

@@ -267,6 +267,31 @@ spec:
             summary: "ClickHouse partition with too many parts ({{ $labels.replica }})"
             description: "One partition on this replica holds more than 300 active parts for 10 minutes — the dimension parts_to_delay_insert and parts_to_throw_insert actually enforce. Today's otel.* partition is the usual culprit: small, frequent inserts outrunning merges. Delayed inserts come next, then Too many parts rejections."
 
+        # Retention SLI for the three daily-partitioned OTel tables. With a
+        # 90-day DELETE TTL, a healthy table can briefly hold 91-92 active date
+        # partitions around UTC boundaries and asynchronous TTL merges. More
+        # than 93 for six hours means expiration is no longer advancing. Pin
+        # active="1": the exporter publishes another series for inactive parts.
+        # `max` removes the replica/hostname dimension without tripling the
+        # count. Live Kind audit 2026-09-14: all three tables returned 6.
+        - alert: ClickHouseOtelTTLLagging
+          expr: |
+            max by (database, table) (
+              chi_clickhouse_table_partitions{
+                database="otel",
+                table=~"otel_logs|otel_traces|otel_traces_trace_id_ts",
+                active="1"
+              }
+            ) > 93
+          for: 6h
+          labels:
+            severity: warning
+            category: observability
+          annotations:
+            runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/clickhouse/ClickHouseOtelTTLLagging.md"
+            summary: "ClickHouse OTel TTL is not retiring partitions ({{ $labels.table }})"
+            description: "The daily-partitioned otel.{{ $labels.table }} table has retained more than 93 active partitions for 6 hours despite its 90-day DELETE TTL. Ingestion can remain healthy while retention, TTL merges, or object-store access is stuck; verify partition ages and TTL merge errors before forcing any materialization."
+
         # Event-counter names verified on the Kind cluster 2026-08-22, and THREE
         # of the four alerts that stood here were deleted because the series they
         # named do not exist. The exporter publishes 166 chi_clickhouse_event_*

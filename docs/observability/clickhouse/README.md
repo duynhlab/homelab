@@ -303,7 +303,7 @@ different places — two of which this platform does not own.
 |---|---|---|---|
 | `query_log`, `part_log` | daily (`event_date`) | 30 d | Altinity operator, via `config.d/01-clickhouse-0{3,4}-*.xml` |
 | `trace_log` | daily (`event_date`) | **7 d** | operator sets 30 d; **this repo overrides it** — `02-` loads after `01-`, see below |
-| `processors_profile_log`, `aggregated_zookeeper_log`, `zookeeper_connection_log` | **daily** (`event_date`) since 2026-09-07 | 30 d | upstream ships the TTL and a **monthly** partition; **this repo** re-partitions them by merging `partition_by` / `ttl` / `settings` into upstream's block (no `replace`, no `<engine>`, so the sorting key and intervals stay upstream's) |
+| `processors_profile_log`, `aggregated_zookeeper_log`, `zookeeper_connection_log`, `blob_storage_log` | **daily** (`event_date`) | 30 d | upstream ships the TTL and a **monthly** partition; **this repo** re-partitions them by merging `partition_by` / `ttl` / `settings` into upstream's block (no `replace`, no `<engine>`, so the sorting key and intervals stay upstream's) |
 | `metric_log`, `asynchronous_metric_log`, `text_log`, `error_log`, `background_schedule_pool_log`, `query_views_log` | **daily** | **7 d** | **this repo** — `configuration.files` on the `ClickHouseInstallation` |
 | `query_metric_log` | — | — | **removed** by this repo (`<query_metric_log remove="1"/>`, 2026-09-07): upstream ships it with no TTL, 1,391 columns, and nothing here reads it |
 
@@ -316,9 +316,10 @@ operator XML has been read off a pod. `text_log` runs at `level` **information**
 since the same date — at `trace` it was the largest `system.*` table (~60 k
 rows/hour, measured flat after the merge retry storm ended, so the storm was not
 the cause). `metric_log` uses `schema_type` **`transposed_with_wide_view`**: one
-row per metric instead of ~1,900 columns, with a wide view under the old name so
-existing queries keep working; merge memory scales with column count, and one
-`metric_log` merge had peaked at 1.27 GiB of a 1.80 GiB self-cap.
+row per metric instead of ~1,900 columns. On ClickHouse 26.7 this mode does not
+expose the old wide columns through a compatibility view; that is safe here
+because nothing on the platform queries `system.metric_log`. Merge memory scales
+with column count, and one merge peaked at 1.27 GiB of a 1.80 GiB self-cap.
 
 Before the last row existed, those five had **no expiry at all** and grew for the
 life of the cluster: ~59 % of all system-log bytes at 46 minutes uptime.
@@ -472,22 +473,22 @@ tables**, which is why this is a step to repeat rather than a one-shot.
 > already did and the drop example below did not.
 
 Changing the engine definition does **not** ALTER the table. ClickHouse renames
-the old one to `<name>_0` and creates a fresh one; the renamed copy keeps every
-row and inherits **no** TTL. Skip this and the change frees nothing.
+the old one to `<name>_N` and creates a fresh one. The renamed copy keeps its old
+engine, including its old TTL, so it self-drains when the former table already
+had retention. Dropping it is optional immediate reclamation. The exception is
+an old `query_metric_log`: it had no TTL, and `remove="1"` prevents new writes
+without deleting the table, so an upgraded cluster must drop that leftover
+explicitly after review.
 
 The rename is **lazy** — measured on 26.7.3.19, it happens at each table's first
 write after the config change, not at startup. So this cannot be a single pass
 straight after apply: re-run it until nothing is returned.
 
-```bash
-# per replica -- system.* tables are local, so all three need it
-for i in 0 1 2; do
-  kubectl exec -n monitoring chi-clickhouse-otel-0-${i}-0 -- \
-    clickhouse-client --password="$CH_PASSWORD" --query "
-      SELECT name, formatReadableSize(total_bytes)
-      FROM system.tables
-      WHERE database='system' AND match(name, '_log_[0-9]+$')"
-done
+```sql
+-- Run interactively on each replica with clickhouse-client --ask-password.
+SELECT name, formatReadableSize(total_bytes), engine_full
+FROM system.tables
+WHERE database = 'system' AND match(name, '_log_[0-9]+$');
 ```
 
 Drop what that lists — `DROP TABLE system.<name> SYNC` for **each** name it

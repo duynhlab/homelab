@@ -460,6 +460,14 @@ Skeleton (copy what you need):
   `PostgresBackupMetricsMissing` is scoped to each `cnpg_io_cluster` so healthy
   `product-db` series cannot mask a vanished DR cluster in the same namespace.
 
+- **ClickHouse retention closes the remaining issue #1025 gaps.**
+  `blob_storage_log` now aligns its 30-day TTL with daily partitions and
+  whole-part drops; `ClickHouseOtelTTLLagging` alerts when any 90-day OTel table
+  remains above 93 active daily partitions for six hours. Runtime comments and
+  docs now state that renamed system-log tables retain their old TTL and that
+  ClickHouse 26.7 exposes no wide compatibility view for transposed
+  `metric_log` queries.
+
 - **`CNPGClusterStandbyNotStreaming` no longer fires on a DR designated
   primary.** The expression is scoped to `cnpg_io_instanceRole!="primary"`. The
   designated primary of a replica cluster stays in recovery for the life of the

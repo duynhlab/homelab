@@ -44,11 +44,11 @@ flowchart TD
 | Reusable CI workflows | `duynhlab/gha-workflows` |
 | Cluster manifest, GitOps pin, ingress, NetworkPolicy, observability for a service | **homelab** |
 
-Repo index: [`docs/README.md` § Repositories](../../docs/README.md#repositories).
+Repo index: [`docs/README.md` § Repositories](../../../docs/README.md#repositories).
 
 ## API truth — read `docs/api/`, do not copy it
 
-Homelab agents **trust [`docs/api/`](../../docs/api/README.md)** — not
+Homelab agents **trust [`docs/api/`](../../../docs/api/README.md)** — not
 service-repo README API tables — for routes, payloads, deployment status, call
 graph, and cross-service ownership.
 
@@ -57,39 +57,39 @@ canonical file and link it. `docs/api/` is the learning store.
 
 | Question | Open |
 |----------|------|
-| Shared URL, auth, gRPC, call graph, user journeys | [`docs/api/api.md`](../../docs/api/api.md) |
-| Per-service routes, RPCs, payloads | [`docs/api/{service}.md`](../../docs/api/README.md#service-contracts) |
-| Feature ownership + gaps | [`docs/api/microservices.md`](../../docs/api/microservices.md) |
-| Temporal / workflows | [`docs/api/workflows.md`](../../docs/api/workflows.md), [`docs/api/temporal.md`](../../docs/api/temporal.md) |
-| Document ownership rules | [`docs/api/README.md` § Document Ownership](../../docs/api/README.md#document-ownership) |
+| Shared URL, auth, gRPC, call graph, user journeys | [`docs/api/api.md`](../../../docs/api/api.md) |
+| Per-service routes, RPCs, payloads | [`docs/api/{service}.md`](../../../docs/api/README.md#service-contracts) |
+| Feature ownership + gaps | [`docs/api/microservices.md`](../../../docs/api/microservices.md) |
+| Temporal / workflows | [`docs/api/workflows.md`](../../../docs/api/workflows.md), [`docs/api/temporal.md`](../../../docs/api/temporal.md) |
+| Document ownership rules | [`docs/api/README.md` § Document Ownership](../../../docs/api/README.md#document-ownership) |
 
 **Before API-facing homelab edits** (routes, gateway, NetworkPolicy, service
 manifests): read the owning `docs/api/{service}.md`, hub rollup, and
-[`api.md` edge exposure](../../docs/api/api.md#edge-exposure). Cross-service
-topology → [`api.md` call graph](../../docs/api/api.md#current-east-west-call-graph)
+[`api.md` edge exposure](../../../docs/api/api.md#edge-exposure). Cross-service
+topology → [`api.md` call graph](../../../docs/api/api.md#current-east-west-call-graph)
 only.
 
 When ADR **Adoption** is **Complete** (or RFC **`implemented`**), sync
-[`docs/api/`](../../docs/api/README.md) — owning service files, hub rollup,
+[`docs/api/`](../../../docs/api/README.md) — owning service files, hub rollup,
 Design records links. ADR = why; contract = as-built.
 
 ## Platform domains
 
 One task = **one primary domain**. Cross-cutting work must state rollout order
-and respect the Flux dependency chain (see [AGENTS.md](../../AGENTS.md) Gotchas).
+and respect the Flux dependency chain (see [AGENTS.md](../../../AGENTS.md) Gotchas).
 
 | Domain | Start here |
 |--------|------------|
-| API / microservices | [`docs/api/README.md`](../../docs/api/README.md) |
-| GitOps / delivery | [`docs/platform/application-delivery.md`](../../docs/platform/application-delivery.md) |
-| Controllers / infra | [`kubernetes/infra/README.md`](../../kubernetes/infra/README.md) |
-| Observability | [`docs/observability/README.md`](../../docs/observability/README.md) |
-| Databases | [`docs/databases/architecture.md`](../../docs/databases/architecture.md) |
-| Secrets / TLS | [`docs/secrets/README.md`](../../docs/secrets/README.md) |
-| Security / policy | [`docs/security/README.md`](../../docs/security/README.md) |
-| Bootstrap | [`terraform/README.md`](../../terraform/README.md) |
-| Local e2e | [`local-stack/README.md`](../../local-stack/README.md) |
-| Design record | [`docs/proposals/README.md`](../../docs/proposals/README.md) |
+| API / microservices | [`docs/api/README.md`](../../../docs/api/README.md) |
+| GitOps / delivery | [`docs/platform/application-delivery.md`](../../../docs/platform/application-delivery.md) |
+| Controllers / infra | [`kubernetes/infra/README.md`](../../../kubernetes/infra/README.md) |
+| Observability | [`docs/observability/README.md`](../../../docs/observability/README.md) |
+| Databases | [`docs/databases/architecture.md`](../../../docs/databases/architecture.md) |
+| Secrets / TLS | [`docs/secrets/README.md`](../../../docs/secrets/README.md) |
+| Security / policy | [`docs/security/README.md`](../../../docs/security/README.md) |
+| Bootstrap | [`terraform/README.md`](../../../terraform/README.md) |
+| Local e2e | [`local-stack/README.md`](../../../local-stack/README.md) |
+| Design record | [`docs/proposals/README.md`](../../../docs/proposals/README.md) |
 
 ## Before coding
 
@@ -103,7 +103,7 @@ and respect the Flux dependency chain (see [AGENTS.md](../../AGENTS.md) Gotchas)
 6. **Security:** Kyverno + NetworkPolicy + no secrets in git; exceptions →
    PolicyException + catalog.
 7. **Done:** `make validate`; e2e when touching local-stack or gateway (Phase B:
-   **agent-browser** skill + [`local-stack/docs/e2e-audit.md`](../../local-stack/docs/e2e-audit.md)).
+   **agent-browser** skill + [`local-stack/docs/e2e-audit.md`](../../../local-stack/docs/e2e-audit.md)).
 
 ## RFC / ADR gate
 
@@ -113,13 +113,13 @@ Design **before** building when the change is substantial or contested.
   Context7 audit, homelab proof. **Owner approves RFC number** first. Status
   **`researching`** until review gate passes.
 - **RFC** (`RFC-NNNN/README.md`) — after research gate + owner **ready for RFC**.
-  Template: [`RFC-0000/`](../../docs/proposals/rfc/RFC-0000/). Status →
+  Template: [`RFC-0000/`](../../../docs/proposals/rfc/RFC-0000/). Status →
   **`Accepted`** when architecture approved.
 - **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) — one decision each; **`Proposed`**
   during RFC review, **`Accepted`** with the RFC. Template:
-  [`ADR-0000-template/`](../../docs/proposals/adr/ADR-0000-template/).
+  [`ADR-0000-template/`](../../../docs/proposals/adr/ADR-0000-template/).
 - Small bugs, cleanups, dependency bumps → **no RFC**; focused PR.
-- Hub: [`docs/proposals/`](../../docs/proposals/), [`adr/README.md`](../../docs/proposals/adr/README.md).
+- Hub: [`docs/proposals/`](../../../docs/proposals/), [`adr/README.md`](../../../docs/proposals/adr/README.md).
 
 ```mermaid
 flowchart TD
@@ -152,7 +152,7 @@ surgical + verify.
 
 ## IDE skills map
 
-Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)), not in this repo. This project skill lives in `.cursor/skills/platform-engineer/`.
+Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)), not in this repo. This project skill lives in `.agents/skills/platform-engineer/` (Agent Skills standard — Cursor reads it natively; Claude Code reads it through the `.claude/skills/platform-engineer` symlink).
 
 | Homelab work | IDE skill | Homelab gate |
 |--------------|-----------|--------------|
@@ -164,13 +164,13 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 | Secrets / high stakes | `doubt-driven-development`, `security-and-hardening` | Kyverno catalog |
 | Observability | `observability-and-instrumentation` | alert catalog + runbook |
 | CI | `ci-cd-and-automation` | often `gha-workflows` |
-| E2E Phase B | `agent-browser` | [e2e-audit Phase B](../../local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-8-min) |
+| E2E Phase B | `agent-browser` | [e2e-audit Phase B](../../../local-stack/docs/e2e-audit.md#phase-b--real-browser-agent-browser-8-min) |
 | GitOps incident | `gitops-cluster-debug` | `make flux-status` |
 | Before PR | `code-review-and-quality` | one change per branch |
 | Rollout | `shipping-and-launch`, `deprecation-and-migration` | Flux chain + CHANGELOG |
 
 **Homelab overrides** (win over generic skill defaults): RFC/ADR paths and owner
-gates → Proposals; commits → above; Kyverno/netpol/secrets → [AGENTS.md](../../AGENTS.md);
+gates → Proposals; commits → above; Kyverno/netpol/secrets → [AGENTS.md](../../../AGENTS.md);
 API truth → **`docs/api/`** whole tree.
 
 ## Behavioral guidelines

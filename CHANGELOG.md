@@ -382,6 +382,13 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`platform-engineer` project skill added at `.agents/skills/`** (#1050) — the
+  Senior Platform Engineer operating procedure (repo routing, `docs/api/` trust,
+  domains, RFC/ADR gate, commit rules) moved out of `AGENTS.md` into one
+  Agent-Skills-standard file; Cursor reads it natively and Claude Code through the
+  `.claude/skills/platform-engineer` symlink, so there is a single copy.
+  `AGENTS.md` keeps repo facts only (layout, make targets, Kyverno, Flux gotchas).
+
 - **The PostgreSQL learning path now connects engine mechanics to SRE
   investigation.** New modules cover schema integrity, index access paths,
   partitioning/retention, monitoring/performance, and a platform

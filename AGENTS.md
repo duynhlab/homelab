@@ -5,12 +5,13 @@ build commands, admission rules, Flux gotchas, docs conventions. **Operating
 procedure** (role, API trust, domains, RFC/ADR, commits, IDE skill map) lives in
 the project skill:
 
-**→ [`.cursor/skills/platform-engineer/SKILL.md`](.cursor/skills/platform-engineer/SKILL.md)**
+**→ [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md)**
 
 Read that skill before any non-trivial task. Generic workflows
 ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)) stay in
 the agent IDE; **this repo's platform-engineer skill** lives under
-`.cursor/skills/`.
+`.agents/skills/` (Agent Skills standard — Cursor reads it natively, Claude Code
+through the `.claude/skills/platform-engineer` symlink; one file, no copies).
 
 This repo (`homelab`) is the platform's **Infrastructure, GitOps,
 Observability, and Docs** hub; application code lives in separate repos — see
@@ -64,7 +65,7 @@ make flux-sync    # force reconciliation
   All A/B/C rows must pass; paste the evidence table into the PR or release record.
   A failed row blocks the tag.
   **Phase B (browser):** read the **agent-browser** skill from the agent IDE and run
-  `agent-browser skills get core` (see [platform-engineer skill](.cursor/skills/platform-engineer/SKILL.md)),
+  `agent-browser skills get core` (see [platform-engineer skill](.agents/skills/platform-engineer/SKILL.md)),
   then the Phase B commands in the local-stack E2E runbook.
 - **k6 assertion layer:** the HTTP-shaped rows of both gates are asserted by
   `make e2e GATE=compose|kind` ([`scripts/k6/`](scripts/k6/),
@@ -228,7 +229,7 @@ reference style.
 
 | Topic | Start here |
 |-------|-----------|
-| Agent operating procedure | [`.cursor/skills/platform-engineer/SKILL.md`](.cursor/skills/platform-engineer/SKILL.md) |
+| Agent operating procedure | [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md) |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

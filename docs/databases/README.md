@@ -25,13 +25,18 @@ manifests, and cluster names are intentionally excluded.
 3. [Storage and WAL](./fundamentals/storage-and-wal.md)
 4. [MVCC, locking, and vacuum](./fundamentals/mvcc-locking-and-vacuum.md)
 5. [Query planning and execution](./fundamentals/query-planning-and-execution.md)
-6. [Replication](./fundamentals/replication.md)
+6. [Schema and integrity](./fundamentals/schema-and-integrity.md)
+7. [Indexes and access paths](./fundamentals/indexes-and-access-paths.md)
+8. [Partitioning and retention](./fundamentals/partitioning-and-retention.md)
+9. [Replication](./fundamentals/replication.md)
+10. [Monitoring and performance investigation](./fundamentals/monitoring-and-performance-investigation.md)
 
 ### Understand this homelab
 
 These pages describe current or explicitly planned platform state.
 
 - [Database architecture and integration](./architecture.md)
+- [Observability and troubleshooting](./observability-and-troubleshooting.md)
 - [CloudNativePG](./cloudnativepg.md)
 - [Backup policy](./backup-policy.md)
 - [HA and disaster recovery](./disaster-recovery.md)
@@ -106,6 +111,7 @@ flowchart LR
 | Database, role, and credential reconciliation | `declarative-role-management.md` |
 | Commands used during operations | [`runbooks/`](./runbooks/README.md) |
 | PostgreSQL internal mechanics | `fundamentals/` |
+| Symptom-to-signal troubleshooting | `observability-and-troubleshooting.md` |
 
 Architecture decisions remain in [RFC and ADR records](../proposals/README.md);
 this area documents the resulting platform and its operation.
@@ -116,4 +122,4 @@ this area documents the resulting platform and its operation.
 - [CloudNativePG documentation](https://cloudnative-pg.io/documentation/current/)
 - [PgDog documentation](https://docs.pgdog.dev/)
 
-_Last updated: 2026-08-31._
+_Last updated: 2026-09-09 — added the SRE learning and symptom-first troubleshooting paths._

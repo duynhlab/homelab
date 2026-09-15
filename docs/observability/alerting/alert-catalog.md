@@ -19,50 +19,29 @@ the end-to-end pipeline (ingestion → VMAlert → Alertmanager → notify), see
 
 ## Summary
 
-**243 statically-defined alerts** across 11 domains (re-derive with
-`grep -rhoE "^\s+- alert: " kubernetes/infra/configs/observability/metrics/prometheusrules/ | wc -l`
-— by domain, re-counted 2026-09-08: postgres 58, microservices 52,
-victoriametrics 31, kubernetes 29, observability 25, envoy-gateway 16, gitops 9,
-valkey 7, keycloak 5, kyverno 4, keda 4, + the watchdog at the directory root =
-241 in `.yaml`, plus the 2 in the retired `.bak` the glob also sees). Two
-directories grew on 2026-09-08 with the awesome-prometheus-alerts audit —
-observability 18 → 25 (seven ClickHouse rules, §8b) and envoy-gateway 12 → 16
-(§2) — and the same re-derive found `postgres 55` stale: that directory holds
-58, so the **229** this paragraph stated was already 232 before the audit added
-anything. The `observability 19` an earlier version carried was stale the same
-way (17, then 18 with `ClickHouseS3Errors`).
-Plus **62 Sloth-generated** SLO burn-rate alerts (2 × 31 SLOs); the `68 / 34`
-this paragraph used to state was corrected in the domain table on 2026-09-05 and
-missed here. The 31 SLOs are 9 HTTP services × 3, inventory × 2 gRPC, and
-Keycloak × 2 identity — `inventory` serves no HTTP. Two CNPG topology rules are
-**gated** (not deployed) and a subset is **inactive on Kind** (platform
-limitations) — both marked inline below.
+**243 statically defined alerts** exist in `.yaml` files under
+`prometheusrules/**`. Re-derive that number rather than incrementing it:
 
-The count is re-derived from the manifests (`- alert:` occurrences under
-`prometheusrules/**`), never incremented by hand — and re-deriving on 2026-08-21
-showed why that rule exists. One caveat the command itself carries: it has no
-`--include`, so it also counts the **2 alerts in the retired
-`observability/tempo-alerts.yaml.bak`**, which nothing deploys. The deployed
-number is therefore **241**.
+```bash
+rg '^\s*- alert:' \
+  kubernetes/infra/configs/observability/metrics/prometheusrules \
+  -g '*.yaml' | wc -l
+```
 
-That command has a second blind spot, found 2026-09-05: it globs
-`prometheusrules/**` only, so it misses the **12 Temporal rules** (9 names) that live in
-`configs/temporal/prometheusrule.yaml`. They are documented in §8 below but sit
-outside the count. Counted against the cluster instead, the hand-written total is
-**251** — 241 here, minus the 2 gated CNPG topology rules that never deploy,
-plus the 12 in `configs/temporal/` (the five ADR-055 capacity rules landed
-2026-09-05, alongside the three `Keda*` self-health rules that DO fall inside
-the glob). With the 62 Sloth-generated rules, which are separate by design and
-not in this number, a cluster deploys **313**.
+The 2026-09-14 breakdown is: postgres 59, microservices 52,
+victoriametrics 31, kubernetes 29, observability 26, envoy-gateway 16, gitops 9,
+valkey 7, keycloak 5, kyverno 4, keda 4, and one root watchdog. The glob excludes
+retired `.yaml.bak` files. Two CNPG topology rules are gated and therefore not
+applied, leaving **241 deployed rules** from this tree.
 
-Of those 241, **6 cannot fire on Kind** and are documented as such rather than
-counted as coverage — the PVC and CNPG disk rules plus `KubeletTooManyPods`; see
-§8b's "Alerts that are inert on Kind". Effective coverage is **235** — a number
-that counts the eleven rules added 2026-09-08 on the strength of their
-`VERIFY-AT-KIND` markers, not a live pass, the same standing `ClickHouseS3Errors`
-had the day before. Naming that
-subtraction is the point: three ClickHouse rules spent months inside a count that
-read as coverage before anyone pasted their expressions into a query window.
+The tree above does not include the **12 Temporal rules** in
+`configs/temporal/prometheusrule.yaml`. The cluster therefore has **253
+hand-written rule entries**. Sloth adds **62 generated burn-rate entries** for
+31 SLOs, bringing the cluster total to **315**. Of the 241 deployed entries from
+the main tree, six are inert on Kind because the local-path/kubelet signals they
+need do not exist; effective Kind coverage for that tree is **235**. The inert
+rules and both gated rules are marked inline rather than presented as working
+coverage.
 
 Re-deriving on 2026-08-28 also found two offsetting
 per-domain errors that had left the total right for the wrong reasons: postgres
@@ -581,25 +560,25 @@ Per-alert runbooks: [`runbooks/clickhouse/README.md`](../runbooks/clickhouse/REA
 | ClickHouseAllReplicasUnreachable | critical | fraction of distinct hosts with fetch errors `== 1` | OTel logs/traces store down; edge access logs (ClickHouse-only) dropped. Expressed as a ratio, not a count: a `>= 3` threshold would have paged when ONE replica had three failing fetch types (measured), and a ratio needs no edit on scale-out | 5m | [ClickHouseAllReplicasUnreachable](../runbooks/clickhouse/ClickHouseAllReplicasUnreachable.md) |
 | ClickHouseZooKeeperExceptions | warning | Keeper exception rate >0 | A replica cannot reach the quorum: no writes, no part fetches, silent drift | 5m | [ClickHouseZooKeeperExceptions](../runbooks/clickhouse/ClickHouseZooKeeperExceptions.md) |
 | ClickHouseKeeperNoLeader | critical | `count(KeeperIsLeader == 1) == 0`, guarded with `OR on() vector(0)` | Quorum gone: every replicated table read-only, INSERTs fail, part fetches stop. SELECTs keep working, so nothing else looks wrong. The guard is what makes it fire when every keeper series disappears rather than only when a keeper reports a loss | 5m | [ClickHouseKeeperNoLeader](../runbooks/clickhouse/ClickHouseKeeperNoLeader.md) |
-| ClickHouseKeeperQuorumDegraded | warning | `max(KeeperSyncedFollowers) < 2`, same guard | Leader has lost a follower — writes still work, one more failure takes the quorum down. `max` because only the leader reports a real synced-follower count; followers publish 0, so `min`/`avg` would read a healthy quorum as broken. The `< 2` literal assumes the CHK's 3 replicas and carries a VERIFY-AT-KIND marker for scale-out | 5m | [ClickHouseKeeperQuorumDegraded](../runbooks/clickhouse/ClickHouseKeeperQuorumDegraded.md) |
+| ClickHouseKeeperQuorumDegraded | warning | `max(KeeperSyncedFollowers) < 2`, same guard | Leader has lost a follower — writes still work, one more failure takes the quorum down. `max` because only the leader reports a real synced-follower count. Live-signal verified 2026-09-10: leader reported two synced followers | 5m | [ClickHouseKeeperQuorumDegraded](../runbooks/clickhouse/ClickHouseKeeperQuorumDegraded.md) |
 | ClickHouseReadonlyReplica | warning | `ClickHouseMetrics_ReadonlyReplica >0` | Replica lost its Keeper session — still answers reads, so nothing else notices | 5m | [ClickHouseReadonlyReplica](../runbooks/clickhouse/ClickHouseReadonlyReplica.md) |
 | ClickHouseOperatorDown | warning | `up{clickhouse-operator}==0` | CHI reconciles frozen (server keeps serving) | 10m | [ClickHouseOperatorDown](../runbooks/clickhouse/ClickHouseOperatorDown.md) |
-| ClickHouseDiskAlmostFull | warning | `DiskFreeBytes{disk="default"} / DiskTotalBytes{disk="default"} < 0.15` — pinned to the hot disk since the RustFS cold tier gave the exporter `s3` / `s3_cache` series (VERIFY-AT-KIND: label set unread) | MergeTree refuses writes near full; the 90-day TTL can't outrun sustained ingest. On local-path this ratio is the NODE filesystem, not the PVC — see the note below | 15m | [ClickHouseDiskAlmostFull](../runbooks/clickhouse/ClickHouseDiskAlmostFull.md) |
+| ClickHouseDiskAlmostFull | warning | `DiskFreeBytes{disk="default"} / DiskTotalBytes{disk="default"} < 0.15` — pinned to the hot disk; label-compatible ratio live-verified 2026-09-10 | MergeTree refuses writes near full; the 90-day TTL cannot outrun sustained ingest. On local-path this ratio is the node filesystem, not the PVC | 15m | [ClickHouseDiskAlmostFull](../runbooks/clickhouse/ClickHouseDiskAlmostFull.md) |
 | ClickHouseDiskCritical | critical | same ratio `< 0.05`, same `disk="default"` pin | Write failures imminent. Growing the PVC is not an option on local-path; drop partitions or free the node | 5m | [ClickHouseDiskCritical](../runbooks/clickhouse/ClickHouseDiskCritical.md) |
 | ClickHouseTooManyParts | warning | active parts >300 | Merge backlog → delayed → rejected inserts | 10m | [ClickHouseTooManyParts](../runbooks/clickhouse/ClickHouseTooManyParts.md) |
 | ClickHouseInsertsDelayed | info | `chi_clickhouse_metric_DelayedInserts > 0` (gauge, not a rate) | The step before rejection | 10m | [ClickHouseInsertsDelayed](../runbooks/clickhouse/ClickHouseInsertsDelayed.md) |
 | ClickHouseServerErrorsElevated | info | `max by (replica) (rate(ClickHouseErrorMetric_ALL[5m])) > 5` | Worst-replica error census. Deliberately broad — includes routine codes, which is why it is info. Moved from a fleet-wide `sum` to a per-replica `max` when the metric changed, so three replicas at 3/s each no longer trips it; the trade buys attribution | 10m | [ClickHouseServerErrorsElevated](../runbooks/clickhouse/ClickHouseServerErrorsElevated.md) |
 | ClickHouseOperatorReconcileErrors | warning | host-reconcile errors >0 | CHI stuck between spec and reality | 15m | [ClickHouseOperatorReconcileErrors](../runbooks/clickhouse/ClickHouseOperatorReconcileErrors.md) |
-| ClickHouseExporterUnhealthy | warning | collector `send_failed_*{exporter="clickhouse"}` >0 | OTel→CH backpressure/loss (VictoriaLogs/Traces keep their copies) | 10m | [ClickHouseExporterUnhealthy](../runbooks/clickhouse/ClickHouseExporterUnhealthy.md) |
-| ClickHouseS3Errors | warning | `max by (replica) (rate(ClickHouseErrorMetric_S3_ERROR{job="clickhouse-server"}[5m])) > 0` | A replica cannot reach the RustFS cold tier: hot-window reads and INSERTs survive, cold-partition reads fail, TTL moves and cold drops retry, a restarting pod stays down on the disk access check. VERIFY-AT-KIND: the per-code series is born on the first S3 error | 10m | [ClickHouseS3Errors](../runbooks/clickhouse/ClickHouseS3Errors.md) |
-| ClickHouseServerNotScraped | warning | `absent(up{job="clickhouse-server"} == 1)` | The `:9363` PodMonitor selects nothing or every replica's endpoint is down — ten rules in this group read only that scrape and report healthy while blind. `absent()` because `up == 0` needs a target to exist. VERIFY-AT-KIND | 10m | [ClickHouseServerNotScraped](../runbooks/clickhouse/ClickHouseServerNotScraped.md) |
-| ClickHouseTooManyPartsPerPartition | warning | `max by (replica) (ClickHouseAsyncMetrics_MaxPartCountForPartition) > 300` | The guards count parts in ONE partition; today's `otel.*` day fills while the server-wide `PartsActive` barely moves. 300 is the value ClickHouse's own metric description calls abnormal (upstream uses 100). VERIFY-AT-KIND: record the live `parts_to_*_insert` values | 10m | [ClickHouseTooManyPartsPerPartition](../runbooks/clickhouse/ClickHouseTooManyPartsPerPartition.md) |
-| ClickHouseOtelTTLLagging | warning | active daily partitions per `otel` table >93 | The 90-day DELETE TTL has stopped retiring partitions | 6h | [ClickHouseOtelTTLLagging](../runbooks/clickhouse/ClickHouseOtelTTLLagging.md) |
-| ClickHouseInsertsRejected | warning | `max by (replica) (rate(ClickHouseProfileEvents_RejectedInserts[5m])) > 0` | The `Too many parts` guard refusing INSERTs — the terminal link of parts → delayed → rejected, restored on a series the server publishes at zero. The collector queues, then drops. VERIFY-AT-KIND | 5m | [ClickHouseInsertsRejected](../runbooks/clickhouse/ClickHouseInsertsRejected.md) |
-| ClickHouseInsertsFailing | warning | `max by (replica) (rate(ClickHouseProfileEvents_FailedInsertQuery[5m])) > 0` | Every INSERT error for any reason — too many parts, readonly replica, schema drift after a collector bump, credentials. The runbook starts with "which code". VERIFY-AT-KIND | 5m | [ClickHouseInsertsFailing](../runbooks/clickhouse/ClickHouseInsertsFailing.md) |
-| ClickHouseReplicationLag | warning | `max by (replica) (ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay) > 300` s | A replica five minutes behind its peers serves stale data to a third of Grafana queries with no error anywhere; a healthy replica sits at 0–2 s, so 300 means a stuck fetch queue, not a busy one. VERIFY-AT-KIND | 10m | [ClickHouseReplicationLag](../runbooks/clickhouse/ClickHouseReplicationLag.md) |
-| ClickHouseKeeperSessionLost | warning | `max by (replica) (ClickHouseMetrics_ZooKeeperSession) < 1` | No live Keeper session: after `session_timeout_ms` (30 s) every Replicated table on the replica turns readonly. The gauge drops the instant the connection goes, so unlike ReadonlyReplica a Keeper pod restart exercises it. `job=` filter load-bearing. VERIFY-AT-KIND | 2m | [ClickHouseKeeperSessionLost](../runbooks/clickhouse/ClickHouseKeeperSessionLost.md) |
-| ClickHouseReplicatedDataLoss | critical | `max by (replica) (increase(ClickHouseProfileEvents_ReplicatedDataLoss[10m])) > 0` | A part exists on no replica, online or offline — rows are gone and ClickHouse has stopped trying. No threshold at which this is fine; `[10m]` keeps one increment visible against a 30 s scrape. VERIFY-AT-KIND | 1m | [ClickHouseReplicatedDataLoss](../runbooks/clickhouse/ClickHouseReplicatedDataLoss.md) |
+| ClickHouseExporterUnhealthy | warning | collector `send_failed_*{exporter="clickhouse"}` >0 | OTel→CH backpressure/loss. Static-valid only on 2026-09-10: exact failure counters were absent at rest, while queue and sent counters proved the exporter label | 10m | [ClickHouseExporterUnhealthy](../runbooks/clickhouse/ClickHouseExporterUnhealthy.md) |
+| ClickHouseS3Errors | warning | `max by (replica) (rate(ClickHouseErrorMetric_S3_ERROR{job="clickhouse-server"}[5m])) > 0` | A replica cannot reach the RustFS cold tier: hot-window reads and INSERTs survive, cold reads and TTL work fail. Live-signal verified 2026-09-10: three exact zero-valued series | 10m | [ClickHouseS3Errors](../runbooks/clickhouse/ClickHouseS3Errors.md) |
+| ClickHouseServerNotScraped | warning | `absent(up{job="clickhouse-server"} == 1)` | The `:9363` PodMonitor selects nothing or every replica's endpoint is down — ten rules report healthy while blind. Live-signal verified 2026-09-10: three targets at one | 10m | [ClickHouseServerNotScraped](../runbooks/clickhouse/ClickHouseServerNotScraped.md) |
+| ClickHouseTooManyPartsPerPartition | warning | `max by (replica) (ClickHouseAsyncMetrics_MaxPartCountForPartition) > 300` | The guards count parts in one partition. Live-signal verified 2026-09-10: three series at five; live delay/throw guards 1,000/3,000 | 10m | [ClickHouseTooManyPartsPerPartition](../runbooks/clickhouse/ClickHouseTooManyPartsPerPartition.md) |
+| ClickHouseOtelTTLLagging | warning | active daily partitions per `otel` table >93 | The 90-day DELETE TTL has stopped retiring partitions. Live-signal verified 2026-09-14: all three tables exported six active partitions | 6h | [ClickHouseOtelTTLLagging](../runbooks/clickhouse/ClickHouseOtelTTLLagging.md) |
+| ClickHouseInsertsRejected | warning | `max by (replica) (rate(ClickHouseProfileEvents_RejectedInserts[5m])) > 0` | The terminal link of parts → delayed → rejected. Predicate exercised 2026-09-10 on an isolated low-guard table | 5m | [ClickHouseInsertsRejected](../runbooks/clickhouse/ClickHouseInsertsRejected.md) |
+| ClickHouseInsertsFailing | warning | `max by (replica) (rate(ClickHouseProfileEvents_FailedInsertQuery[5m])) > 0` | Every INSERT error for any reason. Predicate exercised 2026-09-10 on an isolated failed INSERT | 5m | [ClickHouseInsertsFailing](../runbooks/clickhouse/ClickHouseInsertsFailing.md) |
+| ClickHouseReplicationLag | warning | `max by (replica) (ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay) > 300` s | A replica five minutes behind serves stale data to a third of Grafana queries. Live-signal verified 2026-09-10: three series at zero | 10m | [ClickHouseReplicationLag](../runbooks/clickhouse/ClickHouseReplicationLag.md) |
+| ClickHouseKeeperSessionLost | warning | `max by (replica) (ClickHouseMetrics_ZooKeeperSession) < 1` | No live Keeper session: after `session_timeout_ms` every replicated table turns readonly. Live-signal verified 2026-09-10: three gauges at one | 2m | [ClickHouseKeeperSessionLost](../runbooks/clickhouse/ClickHouseKeeperSessionLost.md) |
+| ClickHouseReplicatedDataLoss | critical | `max by (replica) (increase(ClickHouseProfileEvents_ReplicatedDataLoss[10m])) > 0` | A part exists on no replica — rows are gone. Live-signal verified 2026-09-10: three zero-valued series; destructive predicate not induced | 1m | [ClickHouseReplicatedDataLoss](../runbooks/clickhouse/ClickHouseReplicatedDataLoss.md) |
 
 The consumer-side `ClickHouseExporterUnhealthy` complements `OtelCollectorDown`:
 the collector can be perfectly up while its ClickHouse exporter backpressures. A

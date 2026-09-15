@@ -42,10 +42,13 @@ effect.
 The aggregate says how many, not which. Go to `system.errors` for that:
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+# Enter the password at each client prompt; it never enters argv.
 for i in 0 1 2; do
   echo "--- replica 0-$i"
-  kubectl exec -n monitoring chi-clickhouse-otel-0-$i-0 -- clickhouse-client --password="$PW" --query "
+  kubectl exec -it -n monitoring chi-clickhouse-otel-0-$i-0 -- \
+    clickhouse-client --user="$CH_USER" --ask-password --query "
     SELECT name, code, value, last_error_time, substring(last_error_message,1,90) AS msg
     FROM system.errors WHERE value > 0 ORDER BY value DESC LIMIT 10"
 done

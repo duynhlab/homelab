@@ -297,7 +297,13 @@ docs/observability/
 │   └── README.md                 # Pyroscope (CPU, heap, goroutine)
 │
 ├── clickhouse/                   # ClickHouse OTel logs+traces OLAP (deployed)
-│   └── README.md                 # MergeTree, deployed architecture, ops, playground
+│   ├── README.md                 # Platform architecture, schema, Grafana, playground
+│   ├── fundamentals.md           # Columnar OLAP and MergeTree mental model
+│   ├── schema-and-queries.md      # Sorting keys, granules, EXPLAIN, codecs
+│   ├── materialized-views.md      # Trace-id lookup materialized view
+│   ├── parts-merges-and-ttl.md    # Part lifecycle, merge debt, TTL, cold tier
+│   ├── operations.md             # Symptom-first day-2 diagnosis and recovery
+│   └── audits/                   # Dated, sanitized Kind evidence
 │
 ├── grafana/                      # Visualization layer
 │   ├── README.md                 # Grafana overview: 42 dashboard CRs / 12 folders, delivery patterns, plugins
@@ -308,7 +314,8 @@ docs/observability/
 │
 ├── alerting/                     # Alerting rules
 │   ├── README.md                 # 2-layer alerting strategy
-│   ├── alert-catalog.md          # Full alert reference (198 static + 68 SLO burn-rate) + coverage gaps
+│   ├── alert-lifecycle-and-runbooks.md # Signal validation and runbook contract
+│   ├── alert-catalog.md          # Full alert reference + coverage gaps
 │   ├── slo-burn-rate-alerts.md   # SLO burn-rate methodology + config
 │   └── dashboard-comparison.md   # Alerting/dashboard tooling comparison
 │
@@ -323,7 +330,7 @@ docs/observability/
 └── runbooks/                     # Operational runbooks
     ├── README.md                 # Runbook index
     ├── _TEMPLATE.md              # Canonical per-alert runbook template
-    ├── clickhouse/                 # OTel OLAP store per-alert runbooks (14 files)
+    ├── clickhouse/                 # OTel OLAP store per-alert runbooks
     ├── envoy-gateway/              # Edge per-alert runbooks (10 files)
     ├── gitops/                     # Flux per-alert runbooks (9 files)
     ├── keda/                       # Autoscaler per-alert runbooks (4 files)
@@ -332,7 +339,7 @@ docs/observability/
     ├── kyverno/                    # Admission per-alert runbooks (4 files)
     ├── microservices/              # Per-alert runbooks (50 files)
     ├── observability/              # Stack self-monitoring runbooks (4 files)
-    ├── postgresql/                 # CNPG per-alert runbooks (35 files)
+    ├── postgresql/                 # CNPG per-alert runbooks + investigation workflow
     ├── temporal/                   # Server + worker per-alert runbooks (9 files)
     ├── valkey/                     # Cache per-alert runbooks (7 files)
     └── victoriametrics/            # Metrics-plane per-alert runbooks (31 files)
@@ -470,9 +477,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-08-25 — ADR-061: the edge's access log is ClickHouse-only
-(filtered from the VictoriaLogs pipeline) and its runtime lines are now collected
-by a dedicated Vector source; the topology diagram also stops drawing the edge
-access log through Vector (stale since ADR-060). Earlier the same day: VM Operator
-bumped to chart 0.67.2 / app v0.74.0 — cluster VictoriaLogs converges with
-local-stack at v1.52.0, VTSingle's explicit v0.11.0 pin unaffected._
+_Last updated: 2026-09-14 — added the ClickHouse operations, lifecycle, alert
+engineering, and dated Kind-audit learning paths; removed stale hand-maintained
+alert counts from the navigation map._

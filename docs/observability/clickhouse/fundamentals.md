@@ -24,8 +24,8 @@ is **aggregation, GROUP BY, correlation, and analytics over very large
 volumes** — not when the job is full-text search. This Kind cluster is not
 petabytes; the **granule prune** is the same idea at a smaller row count.
 
-It is **not** a replacement for CloudNativePG (OLTP source of truth) or for
-LogsQL / the Jaeger query API.
+It is **not** a replacement for CloudNativePG (OLTP source of truth), LogsQL,
+or VictoriaTraces' Jaeger-compatible query API.
 
 ---
 
@@ -34,7 +34,7 @@ LogsQL / the Jaeger query API.
 | | OLTP (PostgreSQL here) | Search / triage (VL / VT) | OLAP (ClickHouse here) |
 |---|---|---|---|
 | Typical question | "Order #123 for user X?" | "Find this error line / this trace" | "Error rate by service over 30 days?" |
-| Language | SQL (row lookup, ACID) | LogsQL / Jaeger API | SQL (`GROUP BY`, `quantile`, JOIN) |
+| Language | SQL (row lookup, ACID) | LogsQL / Jaeger-compatible API | SQL (`GROUP BY`, `quantile`, JOIN) |
 | Write pattern | UPDATE/DELETE | Append streams | Append INSERT |
 | Retention on this platform | Durable business data | **7 days** | **90 days** |
 

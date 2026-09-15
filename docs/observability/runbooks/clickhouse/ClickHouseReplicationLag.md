@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay` > 300 s, `max by (replica)`, from `:9363` |
-| **Status** | active — VERIFY-AT-KIND (added 2026-09-08; expect 3 series at ~0) |
+| **Status** | active · `live-signal` on Kind 2026-09-10 (3 series at 0 seconds) |
 | **Dashboard** | ClickHouse → Server engine (replication row) |
 | **Local-stack** | not present — no replication in the compose stack |
 
@@ -36,8 +36,11 @@ to whichever replica it reaches and the others replicate.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-CH="kubectl -n monitoring exec <replica pod from the alert> -- clickhouse-client --password=$PW -q"
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+POD="<replica-pod-from-alert>"
+# The client prompts for the password; it never enters shell history or argv.
+CH="kubectl -n monitoring exec -it $POD -- clickhouse-client --user=$CH_USER --ask-password --query"
 
 # Which table, how far behind, and is the queue moving
 $CH "SELECT database, table, absolute_delay, queue_size, inserts_in_queue, merges_in_queue,

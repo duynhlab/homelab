@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `max by (replica) (rate(ClickHouseErrorMetric_S3_ERROR{job="clickhouse-server"}[5m])) > 0` |
-| **Status** | active — VERIFY-AT-KIND: the series is born on the first S3 error; run the unthresholded form after a deliberate RustFS outage |
+| **Status** | active · `live-signal` on Kind 2026-09-10 (3 exact `_S3_ERROR` series at 0) |
 | **Dashboard** | ClickHouse → Server engine (`system.errors` top-N table) |
 | **Local-stack** | not present — compose has no RustFS and no cold tier |
 
@@ -14,8 +14,8 @@
 
 A replica has been failing S3 requests against the RustFS cold tier for 10
 minutes. `otel.otel_logs` and `otel.otel_traces` keep parts older than 7 days on
-the `s3` disk (bucket `clickhouse-otel`, prefix per replica) behind a local
-cache; every read, write or delete of those parts is an HTTP call to
+the `cold` volume (`s3_cache` disk, backed by the `s3` disk; bucket
+`clickhouse-otel`, prefix per replica). A cache miss, write, or delete reaches
 `rustfs-svc.rustfs.svc.cluster.local:9000`, and each failure increments the
 server's `S3_ERROR` counter.
 
@@ -44,8 +44,10 @@ Bounded by design of the storage policy:
 ## Diagnosis
 
 ```bash
-PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-kubectl -n monitoring exec chi-clickhouse-otel-0-0-0 -- clickhouse-client --password "$PW" -q "
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+kubectl -n monitoring exec -it chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
 SELECT name, value, last_error_time, last_error_message
 FROM system.errors WHERE name = 'S3_ERROR' FORMAT Vertical"
 ```

@@ -37,8 +37,10 @@ deriv(chi_clickhouse_metric_DiskFreeBytes[1h])
 ```
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-kubectl exec -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password="$PW" --query "
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
   SELECT database, table, formatReadableSize(sum(bytes_on_disk)) d
   FROM system.parts WHERE active GROUP BY 1,2 ORDER BY sum(bytes_on_disk) DESC LIMIT 10"
 ```

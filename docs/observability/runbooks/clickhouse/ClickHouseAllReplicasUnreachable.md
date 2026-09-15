@@ -65,10 +65,12 @@ kubectl get pods -n monitoring -l clickhouse.altinity.com/chi=clickhouse -o wide
 kubectl get chi -n monitoring clickhouse
 
 # Can the server answer directly, bypassing the exporter
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
 for i in 0 1 2; do
-  kubectl exec -n monitoring chi-clickhouse-otel-0-$i-0 -- \
-    clickhouse-client --password="$PW" --query "SELECT 1" && echo "  0-$i OK"
+  kubectl exec -it -n monitoring chi-clickhouse-otel-0-$i-0 -- \
+    clickhouse-client --user="$CH_USER" --ask-password --query "SELECT 1" \
+    && echo "  0-$i OK"
 done
 ```
 

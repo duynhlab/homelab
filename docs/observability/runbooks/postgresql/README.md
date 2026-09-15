@@ -11,6 +11,8 @@ alerts, and operator health. One file per alert name — each file covers both
 | Metrics reference | [postgresql/custom-metrics.md](../../metrics/postgresql/custom-metrics.md) |
 | Emergency triage | [runbooks/emergency-recovery.md](../../../databases/runbooks/emergency-recovery.md) |
 | Pooler ops | [pooler-operations.md](../../../databases/runbooks/pooler-operations.md) |
+| Troubleshooting map | [Database observability](../../../databases/observability-and-troubleshooting.md) |
+| Validation contract | [Alert lifecycle and runbook engineering](../../alerting/alert-lifecycle-and-runbooks.md) |
 
 ## Index
 
@@ -26,6 +28,7 @@ alerts, and operator health. One file per alert name — each file covers both
 | CNPGClusterHighConnectionsCritical | critical | chart | active | [CNPGClusterHighConnectionsCritical.md](CNPGClusterHighConnectionsCritical.md) |
 | CNPGClusterHighConnectionsWarning | warning | chart | active | [CNPGClusterHighConnectionsWarning.md](CNPGClusterHighConnectionsWarning.md) |
 | CNPGClusterPhysicalReplicationLagCritical | critical | chart | active | [CNPGClusterPhysicalReplicationLagCritical.md](CNPGClusterPhysicalReplicationLagCritical.md) |
+| CNPGClusterHighReplicationLag | warning | chart | active; idle false-positive risk | [CNPGClusterHighReplicationLag.md](CNPGClusterHighReplicationLag.md) |
 | CNPGClusterStandbyNotStreaming | critical | homelab-authored | active | [CNPGClusterStandbyNotStreaming.md](CNPGClusterStandbyNotStreaming.md) |
 | CNPGClusterPhysicalReplicationLagWarning | warning | chart | active | [CNPGClusterPhysicalReplicationLagWarning.md](CNPGClusterPhysicalReplicationLagWarning.md) |
 | CNPGClusterLowDiskSpaceCritical | critical | chart | inactive on Kind | [CNPGClusterLowDiskSpaceCritical.md](CNPGClusterLowDiskSpaceCritical.md) |
@@ -54,6 +57,10 @@ alerts, and operator health. One file per alert name — each file covers both
 | CNPGIdleInTransaction | warning | deep-signal | active | [CNPGIdleInTransaction.md](CNPGIdleInTransaction.md) |
 | CNPGInstanceMetricsAbsent | — | chart upstream | not deployed | — |
 
+## Validation levels
+
+Use the shared `static-valid`, `live-signal`, `predicate-exercised`, and `alert-observed` levels. Kind validates selectors, expected labels, bounded SQL, and safe temporary-table procedures. It does not induce fencing, failover, disk exhaustion, archive loss, replica loss, or transaction-ID wraparound merely to claim alert-firing coverage. `inactive` means the feature or signal is not deployed; it is not a failed validation.
+
 ## Investigation workflows
 
 Cross-signal procedures that are not tied to one alert:
@@ -80,4 +87,4 @@ domain's additions.
 - **Dashboards:** Databases folder (CloudNativePG board per cluster).
 
 ---
-_Last updated: 2026-08-19 — template moved to the runbooks parent_
+_Last updated: 2026-09-09 — linked the symptom map and made safe validation levels explicit._

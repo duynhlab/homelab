@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `ClickHouseMetrics_ZooKeeperSession` < 1, `max by (replica)`, from `:9363` — the `job=` filter is load-bearing |
-| **Status** | active — VERIFY-AT-KIND (added 2026-09-08; expect 3 series at exactly 1) |
+| **Status** | active · `live-signal` on Kind 2026-09-10 (3 series at exactly 1) |
 | **Dashboard** | ClickHouse → Server engine (Keeper row) |
 | **Local-stack** | not present — no Keeper in the compose stack |
 
@@ -37,8 +37,11 @@ replicas lose their session — a quorum outage — the store is write-down.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-CH="kubectl -n monitoring exec <replica pod from the alert> -- clickhouse-client --password=$PW -q"
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+POD="<replica-pod-from-alert>"
+# The client prompts for the password; it never enters shell history or argv.
+CH="kubectl -n monitoring exec -it $POD -- clickhouse-client --user=$CH_USER --ask-password --query"
 
 # The replica's own view of its session
 $CH "SELECT name, host, port, index, connected_time, session_uptime_elapsed_seconds, is_expired, keeper_api_version

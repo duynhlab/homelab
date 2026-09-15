@@ -32,8 +32,10 @@ dropped from that stream has no second copy.
 This alert is a symptom of part pressure, so start there:
 
 ```bash
-PW=$(kubectl get secret -n monitoring clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-CH="kubectl exec -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --password=$PW"
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+# The client prompts for the password; it never enters shell history or argv.
+CH="kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- clickhouse-client --user=$CH_USER --ask-password"
 
 $CH --query "SELECT table, partition, count() parts FROM system.parts
              WHERE active AND database='otel' GROUP BY 1,2 ORDER BY parts DESC LIMIT 10"

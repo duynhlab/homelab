@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `rate(ClickHouseProfileEvents_RejectedInserts[5m]) > 0`, `max by (replica)`, from `:9363` |
-| **Status** | active — VERIFY-AT-KIND (added to the cluster 2026-09-08; the compose twin has carried it since 2026-08-13) |
+| **Status** | active · `predicate-exercised` on Kind 2026-09-10 with an isolated low-guard table |
 | **Dashboard** | ClickHouse → Server engine (inserts row); OTel Collector (exporter queue) |
 | **Local-stack** | same name, same expr, `job="clickhouse"` — this is the one ClickHouse alert that existed in compose before the cluster |
 
@@ -36,8 +36,11 @@ a slow leak rather than an outage — until the queue is full.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
-CH="kubectl -n monitoring exec <replica pod from the alert> -- clickhouse-client --password=$PW -q"
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
+POD="<replica-pod-from-alert>"
+# The client prompts for the password; it never enters shell history or argv.
+CH="kubectl -n monitoring exec -it $POD -- clickhouse-client --user=$CH_USER --ask-password --query"
 
 # The rejections themselves, with the table and the part count that triggered them
 $CH "SELECT event_time, query_kind, tables, exception

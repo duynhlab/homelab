@@ -6,7 +6,7 @@
 | **Category** | observability |
 | **Source** | `.../prometheusrules/observability/clickhouse-alerts.yaml` |
 | **Metrics** | `increase(ClickHouseProfileEvents_ReplicatedDataLoss[10m]) > 0`, `max by (replica)`, from `:9363` |
-| **Status** | active — VERIFY-AT-KIND (added 2026-09-08; expect 3 series at 0 — ProfileEvents publish at zero) |
+| **Status** | active · `live-signal` on Kind 2026-09-10 (3 ProfileEvent series at 0) |
 | **Dashboard** | ClickHouse → Server engine (replication row) |
 | **Local-stack** | not present — no replication in the compose stack |
 
@@ -35,7 +35,8 @@ not days.
 ## Diagnosis
 
 ```bash
-PW=$(kubectl -n monitoring get secret clickhouse-credentials -o jsonpath='{.data.password}' | base64 -d)
+CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
+  -o jsonpath='{.data.username}' | base64 -d)"
 
 # 1. Which part, from the replica's log
 kubectl -n monitoring logs <replica pod from the alert> --since=1h | grep -iE 'ReplicatedDataLoss|No active replica has part|not found on any replica' | tail -20
@@ -43,19 +44,22 @@ kubectl -n monitoring logs <replica pod from the alert> --since=1h | grep -iE 'R
 # 2. Is it really on nobody? Check every replica's active and detached parts for the name
 for i in 0 1 2; do
   echo "--- 0-$i"
-  kubectl -n monitoring exec chi-clickhouse-otel-0-$i-0 -- clickhouse-client --password="$PW" -q "
+  kubectl -n monitoring exec -it chi-clickhouse-otel-0-$i-0 -- \
+    clickhouse-client --user="$CH_USER" --ask-password --query "
     SELECT 'active' AS where, name, rows FROM system.parts WHERE name = '<part>' AND active
     UNION ALL
     SELECT 'detached', name, 0 FROM system.detached_parts WHERE name = '<part>'"
 done
 
 # 3. What was lost — the partition tells you the day; part_log tells you the rows
-kubectl -n monitoring exec chi-clickhouse-otel-0-0-0 -- clickhouse-client --password="$PW" -q "
+kubectl -n monitoring exec -it chi-clickhouse-otel-0-0-0 -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
   SELECT event_time, event_type, table, part_name, rows, error, exception
   FROM system.part_log WHERE part_name = '<part>' ORDER BY event_time"
 
 # 4. The queue entry that gave up
-kubectl -n monitoring exec <replica pod> -- clickhouse-client --password="$PW" -q "
+kubectl -n monitoring exec -it <replica pod> -- \
+  clickhouse-client --user="$CH_USER" --ask-password --query "
   SELECT table, type, new_part_name, num_tries, last_exception FROM system.replication_queue
   WHERE new_part_name = '<part>' OR last_exception LIKE '%<part>%'"
 ```

@@ -90,6 +90,12 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Observability
+
+- Added the 2026-09-16 logs, traces, metrics, and ClickHouse telemetry standards audit.
+
+### Feature
+
 #### GitOps
 
 - **KEDA 2.20.2 installed as its own Flux wave, `keda-local`** ([ADR-055](docs/proposals/adr/ADR-055-keda-worker-autoscaling/README.md)).

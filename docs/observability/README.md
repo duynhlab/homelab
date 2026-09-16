@@ -459,6 +459,8 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ## Related Documentation
 
+- [Telemetry standards audit (2026-09-16)](audits/2026-09-16-telemetry-standards.md) -- static logs, traces, metrics, and ClickHouse conformance review
+
 - [OpenTelemetry (platform)](opentelemetry/README.md) -- Collector topology, sampling, operations (app policy → [api/observability.md](../api/observability.md))
 - [OpenTelemetry fundamentals](opentelemetry/fundamentals.md) -- API vs SDK, signals and when to use each, OTLP transport, propagation & baggage, plus the RFC-0014 old-vs-new migration story in diagrams
 - [OpenTelemetry Collector](opentelemetry/collector.md) -- component model, deployment patterns, the deployed pipelines walked end to end

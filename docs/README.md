@@ -214,6 +214,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Observability
 
+0. **[Telemetry standards audit](./observability/audits/2026-09-16-telemetry-standards.md)** - Logs, traces, metrics and ClickHouse conformance review
+
 #### Metrics
 
 1. **[Metrics Guide](./observability/metrics/README.md)** - Complete metrics documentation

@@ -92,7 +92,7 @@ Skeleton (copy what you need):
 
 #### Observability
 
-- Added the 2026-09-16 logs, traces, metrics, and ClickHouse telemetry standards audit.
+- Added the 2026-09-16 logs, traces, metrics, profiling, and ClickHouse telemetry standards audit.
 
 ### Feature
 

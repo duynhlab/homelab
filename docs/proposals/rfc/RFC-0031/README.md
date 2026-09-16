@@ -1,4 +1,4 @@
-# RFC-0031 OTel-native telemetry standard and ClickHouse operations
+# RFC-0031 Cross-signal telemetry standard and ClickHouse operations
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
@@ -6,18 +6,29 @@
 
 ## Summary
 
-Adopt one Go telemetry logging interface, pkg/obslog, backed by log/slog for
-structured stdout and the direct OpenTelemetry Logs API for native EventName.
-The proposal replaces Zap, otelzap, custom event attributes and legacy
-ClickHouse access fields in one coordinated fleet release.
+Adopt one application telemetry contract across logs, metrics, traces and
+continuous profiles. Logging moves to pkg/obslog with native EventName;
+metrics retain the OTel Meter API and VictoriaMetrics with stricter instrument,
+bucket, cardinality and replay rules; profiling retains the shared Pyroscope
+SDK path with an explicit label, overhead, lifecycle and correlation contract.
+
+The detailed target contract is in [telemetry-contract.md](./telemetry-contract.md).
+The dependency-ordered implementation work is in
+[delivery-plan.md](./delivery-plan.md); neither document changes the current
+application contract until this RFC and its resulting ADRs are accepted.
 
 ## Motivation
 
-The platform transports OTLP logs and traces into ClickHouse, but application
-events, access records, resource data and queries do not share one contract.
+The platform transports logs and traces into ClickHouse, metrics into
+VictoriaMetrics and profiles into Pyroscope, but the signals do not yet share
+one enforceable application contract.
 Operators infer event identity from messages and must know which legacy HTTP or
 gRPC attributes each dashboard expects. The research audit also found
 privacy-policy violations and propagation coupled to export configuration.
+Two business histograms use generic defaults instead of reviewed
+operation-specific boundaries, API service versions are missing from
+cross-signal identity, and profiling has no reviewed overhead budget or
+explicit verification gate despite being enabled fleet-wide.
 
 ### Goals
 
@@ -25,6 +36,8 @@ privacy-policy violations and propagation coupled to export configuration.
 - Give all Go services and workers one context-first logging API with one tested redaction boundary.
 - Preserve W3C trace correlation whether telemetry export is enabled or not.
 - Provide stable ClickHouse queries for events, access records and trace-to-log investigation.
+- Keep application metrics bounded and meaningful in VictoriaMetrics, including Temporal replay semantics and explicit histogram boundaries.
+- Make Pyroscope coverage, profile labels, overhead, failure behavior and trace correlation verifiable.
 - Complete the migration as one release, leaving no legacy query contract.
 
 ### Non-Goals
@@ -32,6 +45,8 @@ privacy-policy violations and propagation coupled to export configuration.
 - Change product APIs, business workflows, retention periods or ClickHouse topology.
 - Turn every diagnostic line into a named event.
 - Add unbounded request, identity or payload data to logs or metrics.
+- Move metrics or profiles into ClickHouse.
+- Replace VictoriaMetrics or Pyroscope.
 
 ## Proposal
 
@@ -52,6 +67,13 @@ user_agent and peer. Access records use pinned OTel HTTP and RPC semantic
 conventions, with an explicit duration unit where needed. W3C traceparent and
 baggage propagation are installed independently of exporters.
 
+Metrics keep their current OTel-to-VictoriaMetrics path. RFC-0031 standardizes
+instrument ownership, units, bounded attributes, explicit histogram boundaries,
+temporality and Temporal replay semantics; it does not add a second metrics
+pipeline. Profiles keep the direct pyroscope-go path and receive a closed label
+allowlist, centrally owned runtime sampling, non-critical failure policy,
+bounded shutdown and an honest manual trace-to-profile workflow.
+
 ### User Stories
 
 - As an on-call engineer, I can find payment.authorization.failed by EventName,
@@ -60,6 +82,11 @@ baggage propagation are installed independently of exporters.
   Temporal activity and consumer, with correlation inherited from context.
 - As a security reviewer, I can prove that secrets, client IPs and full
   User-Agent values cannot leave through either stdout or OTLP.
+- As an on-call engineer, I can trust a VictoriaMetrics percentile because its
+  histogram buckets match the operation and its labels are bounded.
+- As a performance investigator, I can find CPU, heap, goroutine and
+  synchronization profiles for the same service/version and time window as a
+  slow trace.
 
 ### Alternatives
 
@@ -68,6 +95,8 @@ baggage propagation are installed independently of exporters.
 | pkg/obslog facade over slog plus direct OTel Logs API | Native events, one policy boundary, stable service API | Fleet migration; OTel Logs API remains pre-1.0 | Proposed |
 | Custom Zap facade | Smaller initial code diff | Requires a second native-event path and retains Zap | Rejected |
 | Raw OTel Logs API in every service | Full record control | Duplicates redaction, correlation and tests | Rejected |
+| Preserve VictoriaMetrics and Pyroscope with stricter shared contracts | No backend migration; fixes measured contract gaps | Requires metric/profile tests and service-version convergence | Proposed |
+| Replace metrics or profiles during this RFC | One large observability redesign | Expands blast radius without solving the audited application gaps | Rejected |
 
 For the detailed source comparison and migration inventory, see
 [research.md](./research.md).
@@ -93,24 +122,48 @@ architecture review.
 
 ## Architecture & Diagrams
 
-The target-state diagram answers how one application record reaches operational
-and long-retention stores.
+The target-state diagram answers where each application signal is created and
+stored.
+
+Legend: cyan is an application process, blue is the Collector, green is shared
+data, purple is the platform UI, and the pale signal colors distinguish logs,
+metrics, traces and profiles.
 
 ~~~mermaid
 flowchart LR
-    A["Service, worker or consumer"] --> B["pkg/obslog"]
-    B --> C["Structured stdout via slog"]
-    B --> D["OTel LogRecord<br/>EventName, attributes, trace context"]
-    D --> E["OTLP Collector"]
-    E --> F["VictoriaLogs<br/>short operational retention"]
-    E --> G["ClickHouse<br/>90-day SQL retention"]
-    G --> H["Grafana event and trace queries"]
+    A["Service or worker"] --> L["pkg/obslog<br/>logs"]
+    A --> M["OTel Meter API<br/>metrics"]
+    A --> T["OTel Tracer API<br/>traces"]
+    A --> P["pyroscope-go<br/>profiles"]
+    L --> O["OTLP Collector"]
+    M --> O
+    T --> O
+    O --> VL["VictoriaLogs<br/>7d logs"]
+    O --> VM["VictoriaMetrics<br/>metrics"]
+    O --> VT["VictoriaTraces<br/>7d traces"]
+    O --> CH["ClickHouse<br/>90d logs + traces"]
+    P --> PY["Pyroscope<br/>7d profiles"]
+    VL --> G["Grafana"]
+    VM --> G
+    VT --> G
+    CH --> G
+    PY --> G
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    class A,B service;
-    class C,D,E platform;
-    class F,G,H data;
+    classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
+    classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
+    classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
+    classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
+    class A service;
+    class O collector;
+    class G platform;
+    class CH data;
+    class L,VL log;
+    class M,VM metric;
+    class T,VT trace;
+    class P,PY profile;
 ~~~
 
 ## Design Details
@@ -137,6 +190,13 @@ compatibility risk to one shared package. The migration cost is intentional:
 the owner selected a clean cutover, so old and new attribute schemas do not
 coexist in production.
 
+The proposal preserves the existing docs/api invariants: SemConv v1.41.0 stays
+pinned until a deliberate obsx release; automatic HTTP/gRPC RED instruments are
+not duplicated; W3C propagation stays independent from exporters; workflow code
+stays deterministic and replay-safe; and telemetry shutdown remains bounded
+after readiness/work draining. [telemetry-contract.md](./telemetry-contract.md)
+defines the precise target data, privacy, Temporal and verification rules.
+
 ## Security considerations
 
 This RFC strengthens the existing data policy by making redaction executable and
@@ -148,11 +208,12 @@ before emission.
 
 ## Observability & SLO impact
 
-Existing logs and trace availability objectives remain unchanged. Grafana and
-ClickHouse queries move to native EventName, semantic HTTP/RPC attributes and
-native trace identifiers. The release adds migration health checks for
-redaction, event coverage, resource completeness and zero remaining legacy
-query references.
+Existing backend retention and availability objectives remain unchanged.
+Grafana and ClickHouse queries move to native EventName and semantic access
+attributes. VictoriaMetrics gains explicit checks for instrument ownership,
+histogram usefulness and series bounds. Pyroscope gains coverage, label,
+overhead and correlation checks. The release adds health gates for all four
+signals.
 
 ## Rollout & rollback
 
@@ -160,8 +221,12 @@ After acceptance and ADR approval, implementation lands in this order:
 
 1. Build and contract-test obslog, resource versioning and independent W3C propagation.
 2. Migrate all listed services, workers, consumers and mockpay using the remediation matrix in [research.md](./research.md).
-3. Replace ClickHouse dashboards, query examples and runbooks in the same release.
-4. Run Compose and Kind end-to-end audits, including browser checkout, HTTP, gRPC, Temporal and trace-log correlation.
+3. Verify metric contracts in VictoriaMetrics and profile coverage in Pyroscope.
+4. Replace ClickHouse dashboards, query examples and runbooks in the same release.
+5. Run Compose and Kind end-to-end audits across all four signals.
+
+The full dependency order, acceptance criteria, checkpoints and risks are in
+[delivery-plan.md](./delivery-plan.md).
 
 Rollback pins the shared package and all application releases back to their
 prior versions and restores the matching dashboard configuration together.
@@ -176,6 +241,10 @@ rollout and must not be promoted.
   Collector to a disposable ClickHouse schema and assert EventName, resource
   data and trace/span identifiers.
 - Dashboard query tests prove no remaining access to the removed legacy fields.
+- Metric tests prove bounded attributes, explicit business histogram
+  boundaries, temporality and Temporal replay semantics in VictoriaMetrics.
+- Profiling tests prove service/version labels, expected profile types,
+  non-critical failure behavior and the documented trace-to-profile pivot.
 - The full Compose and Kind E2E audit proves browser checkout, a business
   rejection, a dependency failure and both trace-to-log and log-to-trace paths.
 
@@ -186,6 +255,8 @@ rollout and must not be promoted.
 | Logging facade and native event representation | ../../adr/ADR-070-otel-native-logging-facade/ | Planned |
 | Canonical event, access and privacy data contract | ../../adr/ADR-071-telemetry-event-data-contract/ | Planned |
 | Fleet cutover and ClickHouse query migration | ../../adr/ADR-072-telemetry-clean-cutover/ | Planned |
+| Metric instrument, cardinality and replay contract | ../../adr/ADR-073-application-metrics-contract/ | Planned |
+| Continuous profiling identity and overhead contract | ../../adr/ADR-074-continuous-profiling-contract/ | Planned |
 
 ## Implementation History
 
@@ -196,9 +267,13 @@ or docs/api are changed as target state.
 ## Related
 
 - [./research.md](./research.md) — source research, audit evidence and remediation matrix
+- [telemetry-contract.md](./telemetry-contract.md) — proposed target contract
+- [delivery-plan.md](./delivery-plan.md) — implementation plan after acceptance
 - [Telemetry standards audit](../../../observability/audits/2026-09-16-telemetry-standards.md) — current-state evidence
 - [API logging contract](../../../api/logs.md) — current deployed contract
 - [API observability contract](../../../api/observability.md) — current deployed contract
+- [API metrics contract](../../../api/metrics.md) — current deployed contract
+- [API profiling contract](../../../api/profiling.md) — current deployed contract
 
 ---
 _Last updated: 2026-09-16_

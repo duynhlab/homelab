@@ -1,9 +1,9 @@
-# RFC-0031 — Research: OTel-native telemetry standard and ClickHouse operations
+# RFC-0031 — Research: cross-signal telemetry standard and ClickHouse operations
 
 | | |
 |---|---|
 | **RFC** | RFC-0031 |
-| **Status** | researching |
+| **Status** | researching → gate passed with provisional RFC |
 | **Scope** | platform-wide |
 | **Created** | 2026-09-16 |
 | **Last updated** | 2026-09-16 |
@@ -23,6 +23,9 @@
 
 ### What the audit proves
 
+- Application metrics correctly use VictoriaMetrics, but two seconds histograms lack operation-specific boundaries and the fleet pins three obsx versions.
+- All ten services and both worker modes enable shared Pyroscope profiling; the contract lacks a release gate for profile coverage, label bounds and runtime overhead.
+- The span profile ID is still emitted, but the VictoriaTraces Jaeger datasource cannot provide Grafana's Tempo-only one-click tracesToProfiles link.
 - All ten active services pin `zapx v0.36.0`; their `obsx` pins range from `v0.37.0` to `v0.38.0`.
 - No active service has a production call site that emits a stable `event` attribute or native OTel `EventName`.
 - The current access logger emits legacy `path`, `status`, `duration`, `client_ip`, and `user_agent`; the latter two contradict the API data policy.
@@ -78,6 +81,7 @@ The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0
 | Redaction | Deny sensitive names recursively before both stdout and OTLP. Redaction is tested, not a convention. |
 | Correlation | W3C `traceparent` and baggage are installed independently of exporter switches. Trace and span IDs are native LogRecord fields. |
 | Metrics | IDs never become labels; named business histograms require explicit boundaries or an approved View. |
+| Profiling | Direct push to Pyroscope, a closed resource-label allowlist, centrally owned runtime sampling and a non-critical failure policy. |
 
 ## Current migration surface
 
@@ -89,13 +93,17 @@ The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0
 | Workers | Order saga uses Temporal replay-safe logger; checkout worker emits Zap logs | Introduce replay-safe workflow adapter and context-first activity logger. |
 | Dashboards | Local ClickHouse explorers query legacy `path`, `status`, `code`, `duration` | Switch SQL, panels, variables and trace-log views to canonical fields and EventName. |
 | Contracts | `docs/api/logs.md` names legacy `event`; `docs/api/pkg.md` has stale httpmw adoption state | Rewrite as planned target only after implementation evidence; separately correct current facts. |
+| Metrics | VictoriaMetrics receives OTel application metrics; two business seconds histograms rely on generic defaults | Preserve the backend; enforce ownership, unit, bucket, cardinality and replay contracts. |
+| Profiling | Shared profiling runs fleet-wide; profile labels depend on uneven service.version, and trace pivot is manual | Preserve Pyroscope; add label, overhead, lifecycle, coverage and correlation gates. |
 
 ## Validation plan
 
 1. Unit-test EventName, severity, resource fields, W3C propagation with export disabled, recursive redaction, error metadata, attribute limits and bounded shutdown.
 2. Contract-test HTTP, gRPC and Temporal records from source through the Collector into a disposable ClickHouse schema pinned to the Collector version.
-3. Prove dashboards query native EventName and canonical attributes with no reference to legacy access keys.
-4. Run full Compose and Kind E2E audit: browser checkout, HTTP, gRPC, Temporal activity, expected business rejection, dependency failure, trace-to-log query and log-to-trace query.
+3. Prove VictoriaMetrics receives bounded application series and meaningful histogram distributions without replay overcount.
+4. Prove Pyroscope receives the expected profile types for every service and worker identity with only approved labels.
+5. Prove dashboards query native EventName and canonical attributes with no reference to legacy access keys.
+6. Run full Compose and Kind E2E audit: browser checkout, HTTP, gRPC, Temporal activity, expected business rejection, dependency failure and all supported signal pivots.
 
 ## Full-fleet remediation matrix
 
@@ -118,6 +126,24 @@ criteria concrete.
 | pkg/obsx and logger packages | Zap and otelzap cannot set native EventName; propagator installation is conditional | Add obslog, remove bridge, install W3C independently of export | Package unit and integration tests |
 | API ResourceSets and worker manifests | API services lack a uniform version source; workers use build metadata | Set a consistent service-version contract | Resource-record assertions |
 | ClickHouse, Grafana and documentation | Three dashboards and three documents query legacy access attributes | Move SQL, panels, examples and runbooks to EventName and canonical attributes | Query regression suite and rendered dashboard review |
+| VictoriaMetrics and metric catalog | Two seconds histograms use generic defaults; obsx pins differ | Converge shared Views/version and approve boundaries, attributes and replay semantics | Series/cardinality and p50/p95/p99 query tests |
+| Pyroscope and profiling clients | Shared helper runs in ten services and both workers; API versions are missing; trace pivot is manual | Enforce four-label allowlist, version identity, runtime-cost ownership and documented pivot | Profile coverage, label and failure-path tests |
+
+## docs/api contract review
+
+The target treats telemetry as one cross-signal application contract. The
+following docs/api rules constrain the RFC:
+
+| API source | Rule carried into RFC-0031 |
+|---|---|
+| README.md | docs/api remains the as-built source; RFC target text moves there only after verified implementation |
+| observability.md | One bootstrap, SemConv v1.41.0, shared Views, W3C, probe filtering and boundary-owned errors |
+| logs.md | One access summary, structured data safety and final-decision error ownership |
+| metrics.md | VictoriaMetrics is the application store; automatic RED/USE is not duplicated; IDs are forbidden labels; replay semantics and explicit business buckets are required |
+| tracing.md | ParentBased W3C propagation, meaningful spans/events and replay-safe Temporal instrumentation |
+| profiling.md | Shared Pyroscope push, ten profile types, a closed low-cardinality label policy and non-critical failure behavior |
+| temporal.md and workflows.md | Deterministic workflow code, idempotent activities, compensation, pinned workers and no telemetry side effects on replay |
+| graceful-shutdown.md | Readiness/work drain precedes bounded telemetry and profiler shutdown |
 
 ## Alternatives and trade-offs
 
@@ -137,6 +163,7 @@ workers, dashboards, and runbooks being converted together.
 - [OTel event semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/events/)
 - [OTel naming guidance](https://opentelemetry.io/docs/specs/semconv/general/naming/)
 - [OTel Metrics Data Model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/)
+- [Grafana Pyroscope documentation](https://grafana.com/docs/pyroscope/latest/)
 - [OTel Go log API](https://pkg.go.dev/go.opentelemetry.io/otel/log)
 - [Google: Building Secure and Reliable Systems, logging and tracing](https://google.github.io/building-secure-and-reliable-systems/raw/ch15.html)
 - [Datadog: cross-product correlation](https://docs.datadoghq.com/logs/guide/ease-troubleshooting-with-cross-product-correlation/)

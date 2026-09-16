@@ -24,7 +24,7 @@ are accepted.
 - Each sensitive field has an allow, deny or review classification.
 - HTTP, gRPC, Temporal and ClickHouse query schemas have one owner.
 
-**Verification:** owner sign-off against telemetry-contract.md.
+**Verification:** owner sign-off against the [normative target contract](./README.md#normative-target-contract).
 
 ## Phase 1 — shared foundations
 

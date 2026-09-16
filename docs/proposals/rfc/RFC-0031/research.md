@@ -97,6 +97,28 @@ The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0
 3. Prove dashboards query native EventName and canonical attributes with no reference to legacy access keys.
 4. Run full Compose and Kind E2E audit: browser checkout, HTTP, gRPC, Temporal activity, expected business rejection, dependency failure, trace-to-log query and log-to-trace query.
 
+## Full-fleet remediation matrix
+
+This matrix is the implementation boundary for the proposed full cutover. It
+does not authorize implementation; it makes the review and later acceptance
+criteria concrete.
+
+| Surface | Audited state | Required change | Evidence before rollout |
+|---|---|---|---|
+| user-service | 54 logging call sites; no stable event | Replace Zap calls and HTTP access contract with obslog | Event, redaction and HTTP-contract tests |
+| product-service | 111 logging call sites; HTTP and gRPC client paths | Replace logger and preserve client trace context | HTTP/gRPC correlation test |
+| inventory-service | 56 logging call sites; gRPC entry path | Replace gRPC access record and domain events | RPC-record contract test |
+| cart-service | 59 logging call sites; HTTP and gRPC paths | Replace access records and domain events | HTTP/RPC contract test |
+| order-service and worker | 319 logging call sites; Temporal workflow logger | Add replay-safe workflow adapter and context-first activity events | Replay, activity and trace-correlation test |
+| review-service | 50 logging call sites | Replace HTTP access record and domain events | HTTP-contract test |
+| shipping-service | 51 logging call sites | Replace HTTP/gRPC records and domain events | HTTP/RPC contract test |
+| notification-service | 60 logging call sites | Replace consumer and domain-event records | Consumer correlation and redaction test |
+| payment-service and mockpay | 109 logging call sites | Replace payment outcome records and mock-provider logs | Provider failure and safe-error test |
+| checkout-service and worker | 91 logging call sites | Replace checkout records and worker events | Checkout workflow and correlation test |
+| pkg/obsx and logger packages | Zap and otelzap cannot set native EventName; propagator installation is conditional | Add obslog, remove bridge, install W3C independently of export | Package unit and integration tests |
+| API ResourceSets and worker manifests | API services lack a uniform version source; workers use build metadata | Set a consistent service-version contract | Resource-record assertions |
+| ClickHouse, Grafana and documentation | Three dashboards and three documents query legacy access attributes | Move SQL, panels, examples and runbooks to EventName and canonical attributes | Query regression suite and rendered dashboard review |
+
 ## Alternatives and trade-offs
 
 The selected approach makes the current application logger API a deliberate
@@ -121,15 +143,17 @@ workers, dashboards, and runbooks being converted together.
 
 ## Context7 audit log
 
-Context7 is not available in this session. The audit used version-pinned local
-source for `otelzap v0.19.0` and official OTel documentation and package API
-references. This must be rerun with Context7 before the research gate passes.
+Context7 is not available in this session. Per owner direction, the gate uses
+the available authoritative fallback: version-pinned local source for otelzap
+v0.19.0, official OTel specifications and Go API references, plus the cited
+Google and Datadog operational guidance. A later Context7 run remains useful as
+a dependency refresh, but is not a blocker for this RFC.
 
 ## Research review gate
 
 - [x] Real problem and affected operators described
 - [x] Current manifests, Collector, schema, dashboards, `docs/api`, `pkg`, services and workers inspected
 - [x] Alternatives and selected direction record costs as well as benefits
-- [ ] Context7 audit complete
-- [ ] Full per-service remediation matrix complete
-- [ ] Owner says **ready for RFC**
+- [x] Authoritative-source audit complete; Context7 unavailable, official-source fallback recorded
+- [x] Full per-service remediation matrix complete
+- [x] Owner says **ready for RFC**

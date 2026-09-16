@@ -206,7 +206,7 @@ services:
       postgres: { condition: service_healthy }
 
   temporal:
-    image: temporalio/server:1.31.2
+    image: temporalio/server:1.32.0
     # on-failure: a restart dies FATALLY after ~50s roughly half the time, when
     # ringpop cannot bootstrap ("join duration of 50.6s exceeded max 30s"). Seen
     # first in the 2026-08-13 audit: `restart temporal` (A14) answered the row,

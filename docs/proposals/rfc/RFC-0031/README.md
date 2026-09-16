@@ -569,6 +569,7 @@ or docs/api are changed as target state.
 - [OTel Logs Data Model](https://opentelemetry.io/docs/specs/otel/logs/data-model/)
 - [OTel HTTP semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/)
 - [OTel RPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
+- [SigNoz events versus logs comparison](https://signoz.io/comparisons/opentelemetry-events-vs-logs/) — secondary operational guidance; OTel remains normative
 
 ---
 _Last updated: 2026-09-16_

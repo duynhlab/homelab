@@ -157,12 +157,29 @@ but would perpetuate two query contracts and hide incomplete migrations. The
 owner has selected a full cutover, so deployment is gated on all services,
 workers, dashboards, and runbooks being converted together.
 
+### Secondary-source review: SigNoz events versus logs
+
+The SigNoz comparison supports the RFC's selective split: named events represent
+specific state changes or outcomes with a stable schema, while diagnostic logs
+provide broader troubleshooting context. Its useful operational guidance is to
+name events consistently, keep both forms structured, avoid duplicating the same
+information, propagate trace context, control high-frequency volume and review
+the catalog regularly.
+
+It is not the normative event definition for this RFC. The article primarily
+demonstrates span events and an older Events API model, does not discuss the
+current top-level `LogRecord.EventName`, and includes example client IP,
+User-Agent and raw identity attributes that conflict with this platform's data
+policy. RFC-0031 therefore uses the OTel Logs Data Model for semantics and uses
+the SigNoz article only as secondary operational rationale.
+
 ## References
 
 - [OTel Logs Data Model](https://opentelemetry.io/docs/specs/otel/logs/data-model/)
 - [OTel event semantic conventions](https://opentelemetry.io/docs/specs/semconv/general/events/)
 - [OTel naming guidance](https://opentelemetry.io/docs/specs/semconv/general/naming/)
 - [OTel Metrics Data Model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/)
+- [SigNoz: OpenTelemetry events versus logs](https://signoz.io/comparisons/opentelemetry-events-vs-logs/)
 - [Grafana Pyroscope documentation](https://grafana.com/docs/pyroscope/latest/)
 - [OTel Go log API](https://pkg.go.dev/go.opentelemetry.io/otel/log)
 - [Google: Building Secure and Reliable Systems, logging and tracing](https://google.github.io/building-secure-and-reliable-systems/raw/ch15.html)

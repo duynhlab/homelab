@@ -38,6 +38,53 @@ Service dependency snapshot: `zapx v0.36.0` is pinned by all ten active services
 
 ## Findings and priority
 
+## Full-fleet re-audit
+
+The initial audit was incomplete because it inferred fleet state from shared packages. This re-audit treats `docs/api` as the intended application contract, then checks each active process and every shipped query consumer.
+
+| Process | Entry transport | Stable EventName | Current logging path | Result |
+|---|---|---:|---|---|
+| user | HTTP | no | `httpmw` + Zap | migrate |
+| product | HTTP + gRPC client | no | `httpmw` + Zap | migrate |
+| inventory | gRPC | no | `grpcx` + Zap | migrate |
+| cart | HTTP + gRPC | no | `httpmw`/`grpcx` + Zap | migrate |
+| order | HTTP + gRPC + Temporal | no | `httpmw`/`grpcx` + Temporal logger | migrate |
+| review | HTTP + gRPC | no | `httpmw`/`grpcx` + Zap | migrate |
+| shipping | HTTP + gRPC | no | `httpmw`/`grpcx` + Zap | migrate |
+| notification | HTTP + gRPC | no | `httpmw`/`grpcx` + Zap | migrate |
+| payment + mockpay | HTTP + gRPC | no | `httpmw`/`grpcx` + Zap | migrate |
+| checkout | HTTP + gRPC client + Temporal | no | `httpmw` + Zap + worker logger | migrate |
+| order worker | Temporal | no | Temporal replay-safe logger | migrate |
+| checkout worker | Temporal | no | Zap/Temporal logger | migrate |
+
+### F1 — no application EventName exists (P0)
+
+Search across the ten active service repositories found zero production Go callsites carrying `zap.String("event", ...)`, and the current `otelzap` bridge maps Zap fields only to LogRecord attributes. The database column `otel_logs.EventName` therefore exists but is empty for application records. ClickHouse cannot safely aggregate business outcomes without parsing `Body`.
+
+### F2 — privacy policy and access logger disagree (P0)
+
+`docs/api/observability.md` forbids IP and full User-Agent in logs by default. `pkg/httpmw/logging.go` emits both `client_ip` and `user_agent`; the value cap in its test limits size but does not make the data safe. `pkg/grpcx/logging.go` also records peer address. Remove these fields in the cutover and test redaction before both stdout and OTLP emission.
+
+### F3 — shared-package documentation is stale (P1)
+
+`docs/api/pkg.md` says `httpmw` is not adopted anywhere. The current mains for user, product, cart, order, review, shipping, notification, payment and checkout all mount `httpmw.Tracing` and `httpmw.Logging`. Correct this as an as-built defect, independently of the target standard.
+
+### F4 — all ClickHouse access-log consumers use legacy keys (P1)
+
+The local logs explorer, traces explorer and service deep-dive dashboard read `LogAttributes['path']`, `['status']`, `['code']` and `['duration']`; platform logging guides do the same. Dashboard JSON, SQL examples, trace-log links, alerts and runbooks must migrate in the same release gate.
+
+### F5 — event terminology is internally inconsistent (P1)
+
+`docs/api/logs.md` requires a legacy `event` attribute in lower snake case. OTel now deprecates the `event.name` attribute in favour of native `LogRecord.EventName`, which uses lowercase dot-namespaced names. RFC-0031 replaces the old contract rather than maps two names indefinitely.
+
+### F6 — W3C propagation has an exporter kill-switch failure mode (P1)
+
+`pkg/obsx/setup.go` installs the composite W3C propagator only in the branch that builds a tracer provider. Turning trace export off changes propagation behavior. The standard requires propagation to remain installed when recording or export is disabled.
+
+### F7 — resource and metric contracts drift across the fleet (P2)
+
+Only versioned workers reliably receive `service.version`; API ResourceSets do not provide a release/build value. `obsx` versions differ across active services. The order saga's inventory-commit and payment reconciliation histograms omit explicit business boundaries. These are separate defects: resource identity migration, package-version convergence, and two metric-instrument fixes.
+
 ### P0 — propagation is coupled to exporter enablement
 
 `pkg/obsx/setup.go:316-332` calls `otel.SetTextMapPropagator` only when a tracer provider exists. A process with tracing export disabled can still receive a valid `traceparent`, but its outbound calls will not reliably continue that context. Install the composite propagator independently during setup and add a test with `TRACING_ENABLED=false` that extracts and injects a remote context.

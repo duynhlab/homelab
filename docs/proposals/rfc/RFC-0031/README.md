@@ -614,22 +614,58 @@ outcome is known.
 
 #### Instrument and aggregation rules
 
-- Counter measures a monotonic event count. It never carries a current-state value.
-- UpDownCounter measures additive state that rises and falls.
-- Gauge measures a sampled non-additive value.
-- Histogram measures a distribution used for percentiles or threshold buckets.
+There are seven instrument types, not four — the synchronous family and its
+asynchronous counterparts are separate choices, and the contract names both:
+
+| Instrument | Sync / async | Measures |
+|---|---|---|
+| Counter | sync | a count of events that only grows |
+| Observable Counter | async | a monotonic total cheap to read on demand |
+| UpDownCounter | sync | a running total that rises and falls |
+| Observable UpDownCounter | async | current additive state sampled per collection |
+| Histogram | sync | the distribution of a measured value |
+| Gauge | sync | a last-value written at the event, non-additive |
+| Observable Gauge | async | a point-in-time sample read each collection |
+
+- Selection is two questions, in order: is the value **additive**, and is it
+  **monotonic**; then whether it is known at a decision point (sync) or sampled
+  (async).
 - Synchronous instruments record at the decision. Observable instruments sample
   cheap current state and must not perform blocking I/O in callbacks.
+- **An Observable Counter callback must report the cumulative total, not the
+  increment.** The SDK computes deltas between observations, so reporting
+  increments silently corrupts every `rate()` built on that series. This failure
+  is invisible in the instrument declaration and only shows up as a wrong rate,
+  so it is a required review item for any async counter.
 - Units use UCUM values and are instrument metadata, not suffixes in the OTel name.
 - Temporality remains cumulative at the application SDK; the Collector
   delta-to-cumulative processor is a defensive boundary.
 
-Business histograms require domain-appropriate explicit boundaries or an
-approved shared View. The current order.inventory.commit_lag and
-payment.reconciliation.run.duration histograms are known gaps because they use
-seconds but rely on generic SDK defaults. Boundaries must be chosen from the
-operational SLO or measured distribution, then tested with p50, p95 and p99
-queries.
+**The canonical fleet bucket set is fixed.** HTTP and gRPC duration histograms use
+`0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 2, 5, 10`, pinned by an SDK
+View in the shared package. Every service uses exactly these values: divergent
+boundaries break cross-service `histogram_quantile()` comparison and blunt SLO
+precision. A service that overrides the View is a defect even when its own
+dashboards look right.
+
+**Why a new seconds histogram must declare boundaries.** The shared View matches
+only the named HTTP and gRPC instruments. A brand-new business histogram matches no
+View and falls back to the SDK default boundaries, which are **millisecond-shaped**
+(`0, 5, 10, … 10000`). A sub-second operation then lands entirely in the first
+bucket and every quantile collapses to approximately zero — a silent failure that
+produces a plausible-looking dashboard. The instrument must pass the platform
+bucket set explicitly at declaration, or an approved View must cover it.
+
+This is exactly the state of the two known gaps: `order.inventory.commit_lag` and
+`payment.reconciliation.run.duration` declare seconds and match no View. Non-time
+histograms pick their own scale the same way — money at cent scale, ratings at
+`1,2,3,4,5`. Boundaries come from the operational SLO or a measured distribution and
+are then tested with p50, p95 and p99 queries.
+
+**Names on the wire.** Application code declares the dotted OTel name only. On
+ingest, a Counter gains `_total`, a Histogram explodes into
+`_bucket`/`_sum`/`_count`, and a seconds-unit histogram gains a `_seconds` infix.
+Dashboards and alerts query the rendered name; the contract is the dotted one.
 
 #### Cardinality and replay
 
@@ -656,15 +692,30 @@ startup failure emits a sanitized warning and does not make readiness false.
 
 #### Profile types and cost
 
-The shared helper owns CPU, allocation objects/bytes, in-use objects/bytes,
-goroutine, mutex count/duration and block count/duration profiles. Service code
-does not start a second profiler or change process-global runtime sampling.
+The shared helper owns ten profile types: CPU, allocation objects/bytes, in-use
+objects/bytes, goroutine, mutex count/duration and block count/duration. Service
+code does not start a second profiler or change process-global runtime sampling.
 
-Mutex and block profiles have measurable runtime cost. Their shared sampling
-rates remain centrally configured; a change requires workload benchmarks and a
-documented overhead budget. PROFILING_ENABLED is the emergency kill switch.
-Disabling profiling must not change logs, metrics, traces or application
-readiness.
+The Go SDK currently declares an eleventh type, `goroutine_leak`. It is **excluded
+by decision, not by omission**: goroutine growth is already visible through the
+goroutine profile and the runtime goroutine-count metric, and the platform has no
+alert or runbook that would consume a separate leak profile. Admitting it later is a
+change to this contract, reviewed with an overhead measurement like any other
+profile type.
+
+Mutex and block profiles have measurable runtime cost because they change
+process-global runtime sampling — the shared helper sets the mutex profile fraction
+and the block profile rate itself, and applies them only after the profiler has
+started successfully, so a misconfigured endpoint costs nothing. Those rates stay
+centrally configured; a change requires a workload benchmark and a documented
+overhead budget.
+
+`PROFILING_ENABLED` is the kill switch, and this contract states its real scope:
+today it is a literal in each domain ResourceSet, not a per-service input, so
+turning profiling off is a GitOps commit that disables **every service in that
+domain**. Either the delivery plan promotes it to a per-service input or the
+operational documentation says plainly that no per-service switch exists. Whichever
+is chosen, disabling profiling must not change logs, metrics, traces or readiness.
 
 #### Profile identity and labels
 
@@ -678,9 +729,23 @@ closed:
 
 No other OTel resource attribute automatically becomes a profile label. User,
 workflow, run, request, trace, order, session, payment, SKU and pod identifiers,
-raw paths, addresses, secrets and arbitrary input are forbidden. The uneven
-service.version coverage found in API ResourceSets is therefore also a
-profiling correlation defect.
+raw paths, addresses, secrets and arbitrary input are forbidden.
+
+**This narrows the deployed contract, and the change is deliberate.** The current
+as-built policy also permits "low-cardinality deployment identity from resource
+attributes", which is open-ended: it has no list, so two services can disagree about
+what qualifies and both be compliant. Closing the set to four labels makes profile
+identity comparable across services and makes a violation testable. Widening it
+again is a reviewed change to this table, not a judgement made per service.
+
+The uneven `service.version` coverage in API ResourceSets is therefore a profiling
+correlation defect as well as a resource-identity one. A concrete source already
+exists and is not currently wired: every service input provider carries an
+`image_tag` under Flux image automation, and it feeds only the container image tag.
+The delivery plan uses that input rather than inventing a second version source.
+Downstream consumers are already waiting for it — the metrics agent promotes
+`service.version`, and cluster dashboards render deployment annotations from it,
+so those panels are blank for every API service today.
 
 #### Trace-to-profile correlation
 

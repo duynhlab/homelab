@@ -280,6 +280,26 @@ cluster (`product` and `platform.envoy-gateway-system` here; `product-service` a
 `platform.envoy-gateway` there), so a query written for one environment does not run
 unchanged on the other.
 
+### Kind cluster, 2026-09-17
+
+A cold `make up` on a fresh Kind cluster, then `scripts/kind-seed.sh` (8 of 8 services
+seeded), then 100 GETs to `/product/v1/public/products` through the edge at four per
+second — well under the edge's local limit of 25 per second — and a 60-second wait.
+The bring-up itself surfaced a defect outside this RFC: the RustFS bucket Job pinned a
+MinIO client image whose Docker Hub repository no longer exists, so the first storage
+wave stalled and every wave behind it waited. The fix (pull the same tag from Quay)
+shipped separately; after it, 29 of 30 Kustomizations were Ready within minutes, the
+last being an OIDC configuration wave this verification does not need.
+
+| Claim | How it was measured | Observed | Verdict |
+|---|---|---|---|
+| Kubernetes identity reaches storage as three attributes; five materialised columns are empty | `countIf(col != '')` per materialised column over `otel.otel_logs` | 391 records; `k8s.pod.name`, `k8s.namespace.name`, `deployment.environment.name` present on 289 (the application records — the 102 edge access logs carry none); `k8s.cluster.name`, `k8s.container.name`, `k8s.deployment.name`, `k8s.node.name`, `k8s.pod.uid` present on **0** | **Confirmed** — the five columns are schema debt |
+| The edge is the root span and the applied rate is 100 | `countIf(ParentSpanId='')`, `uniqExact(TraceId)` over edge spans | 102 root spans, 102 traces, 204 edge spans for 100 requests plus two probes | **Confirmed** |
+| The span-metrics `http.method` dimension is empty for service spans | `count by (service_name, http_method)(spanmetrics_calls_total)` | edge: 1 series `GET`, 2 absent; `product` 5, `keycloak` 130, `mockpay` 1 — all absent | **Confirmed** on the cluster as on compose |
+| Two of the four profile labels are empty | Pyroscope querier `LabelValues` per label | `service_name`: 13 identities; `service_namespace`: all 10 services; `deployment_environment`: **empty**; `service_version`: only `0.10.0-6bb9` and `2.7.0-9bf5` — the two workers' build ids | **Confirmed** — API services have no version, no process has an environment label |
+| Which extra labels application profiles actually carry | `LabelNames` with a `service_name` matcher | `product`: `pyroscope_spy`, `service_name`, `service_namespace`, `span_name`; `order-worker`: the same plus `service_version`. The Kubernetes-shaped labels in the global list (`pod`, `container`, `namespace`, `app_kubernetes_io_*`, `statefulset_kubernetes_io_pod_name`, `service_git_ref`, `service_repository`) belong to the profiling agent's own self-scrape series (`monitoring/alloy`, `monitoring/pyroscope`), not to any service | **Refines the compose finding** — on the cluster the undeclared labels on application profiles are `pyroscope_spy` and `span_name`; a second, platform-side profile producer exists and is out of the application contract |
+| The Collector is one stateful replica with no Kubernetes enrichment | `kubectl get deploy`; grep of the rendered Collector config | `replicas=1`, `k8sattributes` absent, `delta_to_cumulative` present, span-metrics dimension `http.method` declared | **Confirmed** |
+
 ## Context7 audit log
 
 The first pass recorded Context7 as unavailable and passed the gate on an
@@ -303,5 +323,6 @@ merely supplemented.
 - [x] Current manifests, Collector, schema, dashboards, `docs/api`, `pkg`, services and workers inspected
 - [x] Alternatives and selected direction record costs as well as benefits
 - [x] Authoritative-source audit complete; Context7 rerun 2026-09-17 and logged above
+- [x] Live verification recorded on local-stack and a fresh Kind cluster, 2026-09-17
 - [x] Full per-service remediation matrix complete
 - [x] Owner says **ready for RFC**

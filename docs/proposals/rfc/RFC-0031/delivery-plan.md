@@ -155,10 +155,12 @@ no SDK or Zap type.
   empty fleet-wide; after this task both `deployment_environment` and
   `service_version` are populated on every process, verified by a Pyroscope
   label-values query.
-- The six labels the SDK adds outside the contract — `hostname`, `pyroscope_spy`,
-  `target`, `service_git_ref`, `service_repository`, `span_name` — are each admitted
-  to the contract or stripped in the shared helper; the Pyroscope label-names query
-  after this task returns exactly the admitted set.
+- The labels the SDK adds outside the contract — `pyroscope_spy` and `span_name` on
+  every application profile, plus `hostname`, `target`, `service_git_ref` and
+  `service_repository` where the SDK's environment supplies them — are each admitted
+  to the contract or stripped in the shared helper; a Pyroscope label-names query
+  scoped to each service after this task returns exactly the admitted set. The
+  profiling agent's self-scrape series are excluded from that check by service name.
 - Profiling failure/disable paths preserve readiness, and runtime sampling changes have benchmark evidence.
 
 **Dependencies:** Task 1.2.
@@ -380,4 +382,4 @@ between two tags reports a planted rename.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-17 — facade renamed to `pkg/logger/slogx`; module placement and depguard criteria added to Task 1.1; Task 1.1b retires the unused `logger/zerolog` and `logger/clog` adapters; the log-record representation question is out of scope, so named records keep the deployed `event` attribute._
+_Last updated: 2026-09-17 — third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

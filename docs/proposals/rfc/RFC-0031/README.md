@@ -9,6 +9,7 @@
 - [x] [./research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
 - [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research footer](./research.md#context7-audit-log) and it changed four normative statements
 - [x] Owner approved **ready for RFC**
+- [x] Live verification recorded — local-stack and a fresh, seeded Kind cluster, 2026-09-17, in [research § Live verification](./research.md#live-verification); every claim it contradicted was changed to match
 - [x] Mechanism detail stays in `./research.md`; this document summarises and links it
 - [ ] When Status → **`Accepted`**: create ADR-070 through ADR-076 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md`, `temporal.md` — the same seven the delivery plan names — synced only when Adoption is Complete, never at acceptance
 
@@ -903,14 +904,23 @@ No other OTel resource attribute automatically becomes a profile label. User,
 workflow, run, request, trace, order, session, payment, SKU and pod identifiers,
 raw paths, addresses, secrets and arbitrary input are forbidden.
 
-The closed set is a **target, not the as-built state**. Measured on local-stack,
-profiles carry `service_name` and six labels the contract does not name —
-`hostname`, `pyroscope_spy`, `target`, `service_git_ref`, `service_repository` and
-`span_name` — which arrive from the SDK's defaults and from the span-scoped CPU
-profile, not from resource attributes. Each is either admitted here explicitly
-(`span_name` is what makes a CPU profile span-scoped and stays; `hostname` duplicates
-pod identity and is bounded) or stripped in the shared helper; the delivery plan
-decides per label, and the verification gate counts the label set exactly.
+The closed set is a **target, not the as-built state**. Measured per service on the
+Kind cluster, an application profile carries the contract's `service_name` and
+`service_namespace` (workers also `service_version`) plus two labels the contract does
+not name: `pyroscope_spy`, which the SDK stamps on every profile, and `span_name`,
+which the span-scoped CPU profile adds. On local-stack the SDK additionally surfaces
+`hostname`, `target`, `service_git_ref` and `service_repository`. Each undeclared label
+is either admitted here explicitly — `span_name` is what makes a CPU profile
+span-scoped and stays; `pyroscope_spy` is a constant and is harmless — or stripped in
+the shared helper; the delivery plan decides per label, and the verification gate
+counts the label set exactly.
+
+The cluster also runs a **second profile producer** the application contract does not
+cover: the profiling agent scrapes itself and the Pyroscope server, and those series
+carry Kubernetes discovery labels (`pod`, `container`, `namespace`,
+`app_kubernetes_io_*`). They are platform self-observation, they never appear on a
+service's profiles, and they stay out of this contract — but a reader of the global
+label list must know they are there, or the closed set looks violated when it is not.
 
 **This narrows the deployed contract, and the change is deliberate.** The current
 as-built policy also permits "low-cardinality deployment identity from resource
@@ -1264,4 +1274,4 @@ in the metrics guide while the platform does not promise them.
 - [OTel RPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
 
 ---
-_Last updated: 2026-09-17 — Context7 rerun corrected the gRPC status attribute and the profile-type count; the facade was renamed to `pkg/logger/slogx`; a tracing contract and ADR-075 were added; the record model was rebuilt around one wide access record, a small named-event catalog and loose diagnostic logging, and the log-record representation question was taken out of scope._
+_Last updated: 2026-09-17 — third revision. Added the shared-package rule for all four signals with its enforcement mechanism, a tracing contract with gate, task and ADR-075, Collector and fleet-scale contracts, a semantic-convention registry as ADR-076, and the Design Details, Security considerations and Observability & SLO impact sections. Corrected the sampling table, Kubernetes enrichment, profile labels and mockpay scope to deployed reality, and verified the contract live on local-stack and a fresh Kind cluster (research § Live verification). The standard is greenfield: no migration mechanism. Earlier the same day: Context7 rerun, facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope._

@@ -37,7 +37,7 @@ are accepted.
   `logger/` parent module is created.
 - The module imports the OTel **API** only; a `depguard` run proves it links neither
   `go.opentelemetry.io/otel/sdk` nor `pkg/obsx`.
-- Native EventName, severity mapping, safe stdout JSON and OTLP record are emitted from one facade.
+- Stable event naming, severity mapping, safe stdout JSON and OTLP record are emitted from one facade.
 - Redaction runs before both sinks and is tested for nested values and errors.
 - Direct Zap and otelzap application usage has a documented removal path.
 
@@ -103,7 +103,7 @@ lists the expected set.
 
 - Shared package tests pass.
 - No resource or propagation regression is accepted.
-- Contract tests can assert native EventName in ClickHouse.
+- Contract tests can assert a stable event name in ClickHouse.
 - Metrics are queryable in VictoriaMetrics with bounded series.
 - CPU and heap profiles are queryable in Pyroscope with the expected labels.
 
@@ -188,7 +188,7 @@ lists the expected set.
 
 **Acceptance criteria:**
 
-- Dashboards, SQL examples, panel variables and trace-log pivots use EventName and canonical attributes.
+- Dashboards, SQL examples, panel variables and trace-log pivots use canonical attributes.
 - Removed access fields are absent from current queries and runbooks.
 - The duplicate `dashboards/ClickHouse/` tree is deleted, so no unfixed byte-identical copy survives the migration.
 - Event and trace queries work across the 90-day ClickHouse retention tier.
@@ -243,4 +243,4 @@ lists the expected set.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-17 — facade renamed to `pkg/logger/slogx`; module placement and depguard criteria added to Task 1.1; Task 1.1b retires the unused `logger/zerolog` and `logger/clog` adapters._
+_Last updated: 2026-09-17 — facade renamed to `pkg/logger/slogx`; module placement and depguard criteria added to Task 1.1; Task 1.1b retires the unused `logger/zerolog` and `logger/clog` adapters; the log-record representation question is out of scope, so named records keep the deployed `event` attribute._

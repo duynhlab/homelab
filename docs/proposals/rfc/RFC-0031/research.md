@@ -27,29 +27,33 @@
 - All ten services and both worker modes enable shared Pyroscope profiling; the contract lacks a release gate for profile coverage, label bounds and runtime overhead.
 - The span profile ID is still emitted, but the VictoriaTraces Jaeger datasource cannot provide Grafana's Tempo-only one-click tracesToProfiles link.
 - All ten active services pin `zapx v0.36.0`; their `obsx` pins range from `v0.37.0` to `v0.38.0`.
-- No active service has a production call site that emits a stable `event` attribute or native OTel `EventName`.
+- No active service has a production call site that emits a stable `event` attribute, so ClickHouse has to group business outcomes by parsing `Body`.
 - The current access logger emits legacy `path`, `status`, `duration`, `client_ip`, and `user_agent`; the latter two contradict the API data policy.
-- The ClickHouse schema supports native `EventName`, but three local-stack dashboards still read legacy `LogAttributes` access fields — and each is tracked twice, because `dashboards/ClickHouse/` is a byte-identical case-duplicate of `dashboards/clickhouse/` and only the lowercase tree is provisioned. No cluster-provisioned dashboard reads `LogAttributes` at all.
+- Three local-stack dashboards still read legacy `LogAttributes` access fields — and each is tracked twice, because `dashboards/ClickHouse/` is a byte-identical case-duplicate of `dashboards/clickhouse/` and only the lowercase tree is provisioned. No cluster-provisioned dashboard reads `LogAttributes` at all.
 - `docs/api/pkg.md` says `httpmw` is not adopted, while current service mains use it. This is a documentation defect that the audit must correct independently of the target standard.
 - `obsx` installs W3C propagation only when tracing is enabled, which couples correlation to export configuration.
 
 ## The data model we need
 
-OTel distinguishes a general log record from an event. A non-empty `EventName`
-turns a LogRecord into an Event; its name identifies a stable event structure.
-It is appropriate for state transitions, outcomes, checkpoints and lifecycle
-moments. A span remains the representation of work with a duration. A diagnostic
-message remains an unnamed log record.
+OTel distinguishes a general log record from an event. A named record identifies a
+stable structure and is appropriate for state transitions, outcomes, checkpoints and
+lifecycle moments. A span remains the representation of work with a duration. A
+diagnostic message remains an unnamed log record.
+
+How that name is carried in the record is a separate question with its own
+migration cost, and it is **out of scope here**: named records keep the deployed
+`event` attribute, so this RFC changes who emits a name and which names exist, not
+where the name sits on the wire.
 
 ```mermaid
 flowchart LR
     A["Go service or worker"] --> B["pkg/logger/slogx"]
     B --> C["JSON stdout<br/>slog"]
-    B --> D["OTel LogRecord<br/>EventName + attributes"]
+    B --> D["OTel LogRecord<br/>event + attributes"]
     D --> E["OTLP Collector"]
     E --> F["VictoriaLogs<br/>7d operations"]
     E --> G["ClickHouse<br/>90d SQL"]
-    G --> H["EventName + TraceId<br/>incident queries"]
+    G --> H["event + TraceId<br/>incident queries"]
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
@@ -63,23 +67,24 @@ flowchart LR
 | Option | Strength | Cost | Result |
 |---|---|---|---|
 | `pkg/logger/slogx` facade over `slog` plus direct OTel Logs API | One application API on the standard library, no logging dependency added to services, one redaction boundary | OTel Go Logs API is pre-1.0; all call sites migrate | **Recommended** |
-| Zap facade over `logger/zapx` plus the same direct OTel Logs API | Much smaller first diff; keeps the adapter every service already pins; reaches EventName by the identical path | Keeps a third-party logging dependency fleet-wide and splits the redaction boundary across adapters | Rejected — the audit recommends it; disagreement carried into the RFC |
+| Zap facade over `logger/zapx` | Much smaller first diff; keeps the adapter every service already pins | Keeps a third-party logging dependency fleet-wide and splits the redaction boundary across adapters | Rejected — the audit recommends it; disagreement carried into the RFC |
 | Raw OTel Logs API in every service | Full LogRecord control | Repeats severity, redaction, output and test logic | Rejected |
 
-**Neither official bridge sets EventName.** `otelzap` maps time, message, level and
-fields, with the message as `Body`. `otelslog` does the same — time, message, level
-and attributes, message as `Body`. So EventName is **not** a differentiator between
-Zap and slog; it is reached only by calling the OTel Logs API directly, which either
-facade can do. The choice therefore rests on dependency surface and on having one
-redaction implementation rather than one per adapter, not on conformance.
+**The two official bridges produce equivalent records.** `otelzap` maps time,
+message, level and fields with the message as `Body`; `otelslog` maps time, message,
+level and attributes the same way. Neither gives the other a conformance advantage,
+so the choice rests on dependency surface and on having one redaction implementation
+rather than one per adapter.
 
-The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0.20.0`) inside `pkg`. Services receive a stable context-first API. `slogx.Event` sets native `LogRecord.EventName`; `Debug`/`Info`/`Warn`/`Error` create diagnostic records without pretending every line is an event.
+Services receive a stable context-first API. `slogx.Event` sets the stable `event`
+attribute; `Debug`/`Info`/`Warn`/`Error` create diagnostic records without pretending
+every line is an event.
 
 ## Proposed contract to validate in RFC review
 
 | Concern | Target rule |
 |---|---|
-| Event identity | Lowercase, dot-separated `EventName`; no variable values in names. `payment.authorization.failed`, not `payment.failed.123`. |
+| Event identity | Lowercase, dot-separated `event` value; no variable values in names. `payment.authorization.failed`, not `payment.failed.123`. |
 | Body | Short display message only; no identifiers, secrets, request bodies, or parsing contract. |
 | Attributes | Use OTel semantic conventions first. Domain attributes are dot-namespaced, typed, documented, and only added when operationally justified. |
 | Access records | Use current pinned OTel HTTP/RPC semantic keys and explicit duration unit; do not emit IP, full User-Agent, raw path, or peer address. |
@@ -98,18 +103,18 @@ The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0
 | HTTP access | `pkg/httpmw/logging.go` | Emit canonical HTTP attributes; remove client IP and User-Agent. |
 | gRPC access | `pkg/grpcx/logging.go` | Emit canonical RPC attributes; remove peer address. |
 | Workers | Order saga uses Temporal replay-safe logger; checkout worker emits Zap logs | Introduce replay-safe workflow adapter and context-first activity logger. |
-| Dashboards | Local ClickHouse explorers query legacy `path`, `status`, `code`, `duration` | Switch SQL, panels, variables and trace-log views to canonical fields and EventName. The platform logging guides also query `LogAttributes['status']`, but those examples filter the **Envoy edge** stream where that key is current — they are out of scope for an application cutover. |
+| Dashboards | Local ClickHouse explorers query legacy `path`, `status`, `code`, `duration` | Switch SQL, panels, variables and trace-log views to canonical fields. The platform logging guides also query `LogAttributes['status']`, but those examples filter the **Envoy edge** stream where that key is current — they are out of scope for an application cutover. |
 | Contracts | `docs/api/logs.md` names legacy `event`; `docs/api/pkg.md` has stale httpmw adoption state | Rewrite as planned target only after implementation evidence; separately correct current facts. |
 | Metrics | VictoriaMetrics receives OTel application metrics; two business seconds histograms rely on generic defaults | Preserve the backend; enforce ownership, unit, bucket, cardinality and replay contracts. |
 | Profiling | Shared profiling runs fleet-wide; profile labels depend on uneven service.version, and trace pivot is manual | Preserve Pyroscope; add label, overhead, lifecycle, coverage and correlation gates. |
 
 ## Validation plan
 
-1. Unit-test EventName, severity, resource fields, W3C propagation with export disabled, recursive redaction, error metadata, attribute limits and bounded shutdown.
+1. Unit-test event naming, severity, resource fields, W3C propagation with export disabled, recursive redaction, error metadata, attribute limits and bounded shutdown.
 2. Contract-test HTTP, gRPC and Temporal records from source through the Collector into a disposable ClickHouse schema pinned to the Collector version.
 3. Prove VictoriaMetrics receives bounded application series and meaningful histogram distributions without replay overcount.
 4. Prove Pyroscope receives the expected profile types for every service and worker identity with only approved labels.
-5. Prove dashboards query native EventName and canonical attributes with no reference to legacy access keys.
+5. Prove dashboards query canonical attributes with no reference to legacy access keys.
 6. Run full Compose and Kind E2E audit: browser checkout, HTTP, gRPC, Temporal activity, expected business rejection, dependency failure and all supported signal pivots.
 
 ## Full-fleet remediation matrix
@@ -130,9 +135,9 @@ criteria concrete.
 | notification-service | 60 logging call sites | Replace consumer and domain-event records | Consumer correlation and redaction test |
 | payment-service and mockpay | 109 logging call sites | Replace payment outcome records and mock-provider logs | Provider failure and safe-error test |
 | checkout-service and worker | 91 logging call sites | Replace checkout records and worker events | Checkout workflow and correlation test |
-| pkg/obsx and logger packages | Zap and otelzap cannot set native EventName; propagator installation is conditional | Add slogx, remove bridge, install W3C independently of export | Package unit and integration tests |
+| pkg/obsx and logger packages | Redaction has no central boundary; propagator installation is conditional | Add slogx, remove bridge, install W3C independently of export | Package unit and integration tests |
 | API ResourceSets and worker manifests | API services lack a uniform version source; workers use build metadata | Set a consistent service-version contract | Resource-record assertions |
-| ClickHouse, Grafana and documentation | Three local-stack dashboards query legacy access attributes, each tracked twice under a case-duplicated directory | Move SQL, panels, examples and runbooks to EventName and canonical attributes, and delete the duplicate `dashboards/ClickHouse/` tree in the same change | Query regression suite and rendered dashboard review |
+| ClickHouse, Grafana and documentation | Three local-stack dashboards query legacy access attributes, each tracked twice under a case-duplicated directory | Move SQL, panels, examples and runbooks to canonical attributes, and delete the duplicate `dashboards/ClickHouse/` tree in the same change | Query regression suite and rendered dashboard review |
 | VictoriaMetrics and metric catalog | Two seconds histograms use generic defaults; obsx pins differ | Converge shared Views/version and approve boundaries, attributes and replay semantics | Series/cardinality and p50/p95/p99 query tests |
 | Pyroscope and profiling clients | Shared helper runs in ten services and both workers; API versions are missing; trace pivot is manual | Enforce four-label allowlist, version identity, runtime-cost ownership and documented pivot | Profile coverage, label and failure-path tests |
 
@@ -156,8 +161,8 @@ following docs/api rules constrain the RFC:
 
 The selected approach makes the current application logger API a deliberate
 platform interface. This is a larger one-time fleet migration than preserving
-Zap, and the OTel Go Logs API has not reached v1.0. It buys a single redaction
-boundary and a native EventName that the existing otelzap mapping cannot set.
+Zap. It buys a single redaction boundary and one logging API for the fleet, at the
+price of migrating every call site.
 
 Keeping legacy fields or dual-writing them would make partial deployment easier,
 but would perpetuate two query contracts and hide incomplete migrations. The
@@ -189,9 +194,9 @@ schema-free.
 comparison that prompted this review recommends events for specific structured
 occurrences and logs for broader context, and is explicit that the two complement
 each other rather than events replacing logs. It stops at the conceptual level: it
-demonstrates span events and an older Events API model, never discusses the current
-top-level `LogRecord.EventName`, and its examples include client IP, User-Agent and
-raw identity attributes that this platform's data policy forbids. It is therefore
+demonstrates span events and an older Events API model, and its examples include
+client IP, User-Agent and raw identity attributes that this platform's data policy
+forbids. It is therefore
 useful as operational rationale and is not the event definition for this RFC.
 
 The normative definition comes from the OTel Logs Data Model and the event semantic
@@ -222,10 +227,8 @@ supplemented.
 | Library ID | Query | Result and disposition |
 |------------|-------|------------------------|
 | `/open-telemetry/semantic-conventions` | RPC attribute names for gRPC server spans | **Changed the contract.** `rpc.response.status_code` is deprecated and replaced by `rpc.status_code`, which is *required* for gRPC server spans; `rpc.service` is deprecated in favour of a fully-qualified `rpc.method`. `rpc.system.name` confirmed correct. The canonical-attributes table was wrong and is fixed. |
-| `/open-telemetry/semantic-conventions` | `event.name` status; when to define an event | **Reshaped the record model.** The `event.name` attribute is deprecated in favour of the `EventName` field, confirming the direction — but the guidance on *when* to name an event is narrow: duration plus boundaries means span, operation-wide properties mean span attributes, unstructured text means a plain log record. |
-| `/websites/pkg_go_dev_go_opentelemetry_io_contrib_bridges_otelzap` | Does the Zap bridge set EventName? | Confirmed it does not: time, message as `Body`, level to severity, fields to attributes. Version constant `0.19.0` matches the fleet pin. |
-| `/websites/pkg_go_dev_go_opentelemetry_io_contrib` | Does the slog bridge set EventName? | **Removed the stated rationale for the migration.** `otelslog` maps time, message, level and attributes with the message as `Body` — identical to `otelzap`, and it does not set EventName either. |
-| `/open-telemetry/opentelemetry-go` | Logs API `EventName` accessors | Confirmed `Record.EventName()` / `Record.SetEventName()` exist, so the field is reachable from the API alone, without the SDK. |
+| `/open-telemetry/semantic-conventions` | When should something be an event at all? | **Reshaped the record model.** The guidance is narrow: duration plus boundaries means a span, operation-wide properties mean span attributes, unstructured text means a plain log record. A name is earned by a point-in-time occurrence, which is why the catalog here is small and the access record is not in it. |
+| `/websites/pkg_go_dev_go_opentelemetry_io_contrib_bridges_otelzap` · `/websites/pkg_go_dev_go_opentelemetry_io_contrib` | Do the Zap and slog bridges differ in what they produce? | **Removed a stated rationale for the migration.** They do not differ: both map time, message, level and attributes with the message as `Body`. `otelzap`'s version constant `0.19.0` matches the fleet pin. The slog case therefore rests on dependency surface, not conformance. |
 | `/grafana/pyroscope-go` | Declared profile types; `Stop` semantics | **Changed the profiling contract.** The SDK declares eleven `ProfileType` constants, not ten — `goroutine_leak` is the extra one — so the closed set now states its exclusion explicitly. `Stop()` takes no context at all and always returns nil, which is stricter than "does not honor its context". |
 | `/websites/grafana_grafana` | Does a Jaeger-type datasource support `tracesToProfiles`? | Conclusion held. The Jaeger datasource configure reference documents `tracesToLogsV2`, `tracesToMetrics`, `nodeGraph`, `traceIdTimeParams` and `spanBar` and no profiles link, while `tracesToProfiles` is documented under Tempo. Note the trace-integration overview page states the feature is available for Tempo, Jaeger and Zipkin, so a reviewer may meet a contradiction; the datasource reference is the one that matches deployed behaviour. |
 | `/websites/opentelemetry_io` | Profiling signal maturity | Confirmed OTLP is stable for traces, metrics and logs while **profiles remain in development** (`/v1development/profiles`). There is therefore no stable OTel profiling convention to conform to, which supports keeping the direct Pyroscope path rather than treating it as debt. |

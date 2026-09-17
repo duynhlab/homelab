@@ -43,7 +43,9 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: mc
-          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          # quay.io, not docker.io: the minio/mc repository was removed from Docker Hub
+          # (the tags API returns 404), so the same release is pulled from Quay.
+          image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh

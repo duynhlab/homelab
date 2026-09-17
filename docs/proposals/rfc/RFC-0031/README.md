@@ -353,27 +353,11 @@ attributes, and native trace and span identifiers when context exists. A named
 record additionally carries a stable `event` attribute. The stdout JSON and OTLP
 record are two renderings of the same safe record.
 
-Three forces shape the split below, and they pull in different directions.
-
-The first is the wide-record pattern that large-scale services converged on: emit
-**one** structured record per unit of work, with every field the investigation
-needs already attached, rather than five narrow lines that must be joined on a
-request ID afterwards. Field names in that record become muscle memory for
-on-call, so their stability matters more than their elegance.
-
-The second is the cost of enforcing a schema too widely. Operators of very large
-Go fleets report that forcing a rigid schema onto ordinary service logs slows
-developers down and produces field-name and type collisions, because log shape
-evolves organically across many authors. The workable line is to reserve a strict,
-reviewed schema for durable business outcomes and leave diagnostic logging loose.
-
-The third is the OpenTelemetry guidance on what an event actually is: work that has
-a duration and meaningful boundaries belongs in a **span**; properties describing an
-operation as a whole belong in **span attributes**; unstructured diagnostic text
-belongs in a **plain log record**. An event earns its name when something happens at
-a point in time — a state change, a checkpoint, a lifecycle moment — and
-particularly when it can happen several times inside one span or needs its own
-timestamp, severity and attributes.
+Three forces shape the split below — the wide-record pattern large fleets converged
+on, the cost of enforcing a schema too widely, and OpenTelemetry's own guidance on
+what an event is. The reasoning and its sources are in
+[research.md § How the wider industry splits events from logs](./research.md#how-the-wider-industry-splits-events-from-logs);
+this section states only the resulting rule.
 
 | Record kind | Use | Schema | Named |
 |---|---|---|---|
@@ -887,6 +871,7 @@ rollout and must not be promoted.
 | Redaction | Nested attributes, errors and exception data cannot leak forbidden values to either output |
 | Transport | HTTP/gRPC contract tests assert one summary, semantic attributes, low-cardinality route/method and probe filtering |
 | Temporal | Replay test proves no duplicate export/metric side effect; activity tests prove terminal and compensation records correlate |
+| Tracing | The effective sampling rate per environment is asserted against the edge configuration actually applied, not the base manifest; every manual span carries exactly one kind matching its layer and a package-path scope; an expected business rejection leaves span status unset while an unexpected failure sets Error with `error.type`; no application baggage key exists without a registered review; the probe skip-list is pinned by a unit test shared between the trace and metric paths |
 | Metrics | No IDs reach labels; each new histogram has approved seconds or domain buckets; retry semantics are tested |
 | Profiles | All processes expose the approved profile types and four-label allowlist; disable/failure paths preserve readiness; trace correlation is verified as manual or supported by the deployed datasource |
 | Resource and propagation | API and worker records contain required resource data; W3C extraction/injection works with exporters disabled |

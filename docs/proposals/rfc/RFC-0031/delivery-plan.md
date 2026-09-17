@@ -148,6 +148,30 @@ no SDK or Zap type.
 
 **Verification:** Pyroscope ingestion test, profile-label query, disable/failure test and trace-to-profile manual-pivot check.
 
+### Task 1.5: Enforce the tracing contract
+
+**Acceptance criteria:**
+
+- The sampling table in the RFC matches the edge configuration each environment
+  actually applies; a change to any rate is reviewed as a volume and cost change.
+- Every manual span created through the shared helper carries exactly one kind that
+  matches its layer and a package-path instrumentation scope; a wrapper span around
+  already-instrumented work fails review.
+- Span status follows the recording-errors rule: unset for an expected business
+  rejection, Error plus `error.type` for an unexpected failure; exceptions use the
+  standard exception span event with bounded attributes.
+- No application baggage key is set without a registered review, and no key carries
+  PII, tokens or secrets.
+- The probe and health skip-list is one shared list pinned by a unit test that the
+  trace and metric paths both read.
+
+**Dependencies:** Task 1.2.
+
+**Verification:** sampling assertion against the applied edge config, span-kind and
+scope tests in the shared helper, an error-status contract test with one expected
+rejection and one unexpected failure, a baggage-denylist test, and the shared
+skip-list test.
+
 ## Checkpoint — shared package
 
 - Shared package tests pass.

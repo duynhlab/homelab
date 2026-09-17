@@ -92,8 +92,32 @@ every line is an event.
 | Resources | Every process has service name/version, environment, namespace and pod where available. Kubernetes enrichment belongs in the platform, not application business code. |
 | Redaction | Deny sensitive names recursively before both stdout and OTLP. Redaction is tested, not a convention. |
 | Correlation | W3C `traceparent` and baggage are installed independently of exporter switches. Trace and span IDs are native LogRecord fields. |
+| Tracing | The edge is the root sampler and its **applied** rate governs the trace (base manifest 50, Kind and local-stack 100); spans are two-part operation classes with one kind per layer and a package-path scope; Error status only for unexpected failure; baggage is default-deny with a security rule; probe routes are filtered before the span starts. |
 | Metrics | IDs never become labels; named business histograms require explicit boundaries or an approved View. |
 | Profiling | Direct push to Pyroscope, a closed resource-label allowlist, centrally owned runtime sampling and a non-critical failure policy. |
+
+### Tracing: what the as-built contract already requires
+
+The tracing rules in the RFC are not new design; they restate the deployed contract
+so the RFC can be implemented from one document. Thirteen requirement areas were
+compared against the as-built tracing contract: the sampling model (`ParentBased`
+with the edge as root, services honouring a sampled parent), span naming as stable
+operation classes, span kind per layer, the attribute-before-event-before-child-span
+ladder, span events with stable names and no loops, error recording that keeps
+expected rejections out of Error status, W3C propagation with the edge starting the
+root span, baggage immutability and its security rule, Temporal replay safety,
+automatic instrumentation with no wrapper spans, probe filtering before span start,
+service identity from `OTEL_SERVICE_NAME`, and trace-to-log correlation through
+middleware order.
+
+Two deployed facts constrain what the RFC may claim. The edge `samplingRate: 50` in
+the base manifest is currently applied **nowhere** — the only running cluster
+overrides it to 100 and the production overlay is a stub — so the RFC states the
+applied rate per environment rather than the base value. And the collector's
+span-metrics connector declares `http.method` as a dimension while the pinned
+semantic conventions name that attribute `http.request.method`, so the dimension is
+expected to be empty for service spans; that is verified live below rather than
+assumed.
 
 ## Current migration surface
 

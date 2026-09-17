@@ -62,9 +62,16 @@ flowchart LR
 
 | Option | Strength | Cost | Result |
 |---|---|---|---|
-| `pkg/logger/slogx` facade over `slog` plus direct OTel Logs API | One application API, standard JSON logging, native EventName, one redaction boundary | OTel Go Logs API is pre-1.0; all call sites migrate | **Recommended** |
-| Custom Zap facade | Smaller first diff | Still requires a second direct-OTel path for EventName and retains Zap | Rejected |
+| `pkg/logger/slogx` facade over `slog` plus direct OTel Logs API | One application API on the standard library, no logging dependency added to services, one redaction boundary | OTel Go Logs API is pre-1.0; all call sites migrate | **Recommended** |
+| Zap facade over `logger/zapx` plus the same direct OTel Logs API | Much smaller first diff; keeps the adapter every service already pins; reaches EventName by the identical path | Keeps a third-party logging dependency fleet-wide and splits the redaction boundary across adapters | Rejected — the audit recommends it; disagreement carried into the RFC |
 | Raw OTel Logs API in every service | Full LogRecord control | Repeats severity, redaction, output and test logic | Rejected |
+
+**Neither official bridge sets EventName.** `otelzap` maps time, message, level and
+fields, with the message as `Body`. `otelslog` does the same — time, message, level
+and attributes, message as `Body`. So EventName is **not** a differentiator between
+Zap and slog; it is reached only by calling the OTel Logs API directly, which either
+facade can do. The choice therefore rests on dependency surface and on having one
+redaction implementation rather than one per adapter, not on conformance.
 
 The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0.20.0`) inside `pkg`. Services receive a stable context-first API. `slogx.Event` sets native `LogRecord.EventName`; `Debug`/`Info`/`Warn`/`Error` create diagnostic records without pretending every line is an event.
 

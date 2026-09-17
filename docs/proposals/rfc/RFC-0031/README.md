@@ -10,7 +10,7 @@
 - [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research footer](./research.md#context7-audit-log) and it changed four normative statements
 - [x] Owner approved **ready for RFC**
 - [x] Mechanism detail stays in `./research.md`; this document summarises and links it
-- [ ] When Status → **`Accepted`**: create ADR-070 through ADR-075 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `logs.md`, `observability.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` — synced only when Adoption is Complete, never at acceptance
+- [ ] When Status → **`Accepted`**: create ADR-070 through ADR-076 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `logs.md`, `observability.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` — synced only when Adoption is Complete, never at acceptance
 
 ## Summary
 
@@ -317,6 +317,54 @@ The linter versions must converge as part of this: the shared package lints at o
 golangci-lint version and the services at another, so a policy validated in one
 place is not proven in the other.
 
+### Semantic-convention registry
+
+The shared-package rule fixes *where* telemetry is produced. It does not fix *what
+the names are*, and at fleet scale names are the contract: a query written against
+`order.id` on one service must mean the same thing on the next one. Today the
+platform's own attributes and metrics — `order.*`, `payment.*`, `checkout.*`,
+`inventory.*` — are defined in prose across `docs/api/` and enforced by review. Two
+things are wrong with that at scale, and both are already visible at ten services.
+
+First, the names live in bare namespaces. OpenTelemetry's naming guidance asks
+application authors to prefix their own attributes with a unique application or
+reverse-domain name, and warns specifically against bare OpenTelemetry-style
+namespaces because a future semantic-convention release can claim them. No file in
+`docs/api/` states a namespace rule at all. Second, prose drifts from code: the audit
+found the shared-package contract describing a library as unadopted while every
+service used it, and three files disagreeing on how many trace sinks exist. Nothing
+generated those pages from a source of truth, so nothing could catch the drift.
+
+The mechanism the wider industry converged on, and that OpenTelemetry now ships as
+its own tool, is a **semantic-convention registry as code**: attributes, metrics and
+events declared in YAML, reviewed through pull requests like any other contract,
+with documentation and language constants **generated** from it and conformance
+**checked** in CI. OpenTelemetry Weaver provides exactly this:
+
+| Weaver capability | What it gives this platform |
+|---|---|
+| A registry manifest that **depends on** the upstream semantic conventions at a pinned version and **imports** the standard attributes it reuses | The platform defines only its own names; `http.*`, `rpc.*`, `db.*` come from upstream at the same version `pkg/obsx` pins |
+| `registry check` with **Rego policies** | Naming rules become executable — a prefix rule, a stability field, a unit on every metric — and a violation fails the pull request |
+| `registry generate` with a **Go target** | The attribute keys and metric names in the shared package are generated, so a name changes in one YAML file and every service picks it up through a version bump |
+| `registry generate` with a **markdown target** | The catalog sections of `docs/api/` are generated, which is the only durable cure for prose drift |
+| `registry diff` | A breaking rename is detected as a schema change, not discovered by a broken dashboard |
+| `registry live-check` against OTLP | Real telemetry from local-stack or Kind is compared to the registry, with a non-zero exit on violation — the conformance test a new service runs on day one |
+
+This RFC adopts the registry as a **resulting decision, ADR-076**, and states the
+one question it does not settle: **the namespace prefix.** Two honest options:
+
+| Option | Cost | Benefit |
+|---|---|---|
+| Prefix every platform attribute and metric with `duynhlab.` (`duynhlab.order.id`) | Every existing dashboard, alert and runbook that names a platform attribute changes once; names get longer | Zero future collision risk; the rule is mechanical and a Rego policy enforces it |
+| Keep bare `order.*`-style namespaces and register each one in the registry as a deliberate exception | Nothing changes today | A future upstream `order.*` or `payment.*` convention forces the rename anyway, at a worse time, and the exception list has to be maintained |
+
+The registry is required either way; the prefix is an owner decision at architecture
+review and is recorded in ADR-076. What this section does not do is call the registry
+a quick win. It touches the shared package, every service, the shared CI and
+`docs/api/`, and it is where the catalog rows the previous telemetry standard left as
+backlog finally get a home — it is program-sized work and is scheduled as such in the
+delivery plan.
+
 ### Design constraints inherited from docs/api
 
 | Existing contract | RFC-0031 target must preserve |
@@ -336,7 +384,7 @@ their existing storage and operational roles.
 
 | Signal | Application path | Backend | Primary question |
 |---|---|---|---|
-| Logs | stdout plus OTLP through the Collector | VictoriaLogs for 7-day operations; ClickHouse for 90-day SQL | What happened in this case and why? |
+| Logs | stdout plus OTLP through the Collector | VictoriaLogs for 7-day operations; ClickHouse for 90-day SQL. Edge gateway access logs are filtered out of the VictoriaLogs pipeline and kept only in ClickHouse | What happened in this case and why? |
 | Metrics | OTel Meter API through the Collector | VictoriaMetrics | How often, how slow and how saturated? |
 | Traces | OTel Tracer API through the Collector | VictoriaTraces for 7-day operations; ClickHouse for 90-day SQL | Where did time or failure propagate? |
 | Profiles | pyroscope-go SDK direct push | Pyroscope with 7-day profile retention | Which code consumed CPU, memory or synchronization time? |
@@ -673,7 +721,7 @@ name; application code declares only the OTel name.
 | Runtime | OTel Go runtime instrumentation | Process heartbeat and Go runtime state; no service-local duplicate |
 | Database/cache | Shared instrumented adapters | Use the adapter's instruments and Views; repositories do not wrap the same operation in another metric |
 | Business | Owning logic at the durable decision point | Only signals unavailable from automatic instrumentation |
-| Span-derived RED | Collector span-metrics connector | Operational service-graph view; it is not a second application metric API |
+| Span-derived RED | Collector span-metrics connector | Operational service-graph view; it is not a second application metric API. Its dimensions must use the attribute names of the pinned semantic conventions: the connector today declares `http.method`, a name the conventions have replaced with `http.request.method`, so that dimension is expected to be empty for service spans and is verified live in research; correcting it is an amendment to the span-metrics decision record, not a service change |
 
 Every business metric records the operational question, owner, canonical name,
 instrument type, unit, bounded attribute allowlist, retry/replay semantics,
@@ -883,12 +931,110 @@ logger and exporter enablement. A disabled exporter must not cause a service to
 stop extracting or injecting valid context. No application business logic
 generates trace_id, span_id or parent_span_id.
 
+### Collector contract
+
+The premise that "once the application contract is standard, shipping through the
+Collector is easy" is true only while the Collector is not itself a bottleneck. This
+section states what the Collector is today and the conditions under which its shape
+must change, so that the fleet does not discover them from an outage.
+
+**Today.** One Collector `Deployment` with a single replica, `memory_limiter` at
+800 MiB, `batch`, `delta_to_cumulative` (five-minute staleness) on the metrics
+pipeline, a `span_metrics` connector fed from the traces pipeline, and a
+`filter/drop_edge_logs` processor that removes the edge gateway's access logs from
+the VictoriaLogs pipeline while the ClickHouse pipeline keeps them. Exporters: OTLP
+HTTP to VictoriaTraces, VictoriaLogs and the metrics agent, Prometheus remote write for
+the span-derived metrics, and the ClickHouse exporter for logs and traces. No
+Kubernetes enrichment, no tail sampling, no load-balancing tier.
+
+**Why it cannot simply be scaled horizontally.** Two of those components are
+stateful per stream. `delta_to_cumulative` accumulates per series, and the
+span-metrics connector aggregates per trace; a second replica behind a plain Service
+splits a series or a trace across replicas and produces wrong numbers rather than
+half the load. OpenTelemetry's own deployment guidance is explicit that
+data-aware routing — a `loadbalancing` exporter keyed on trace ID or metric name —
+is **required** for tail-based sampling and for cumulative-to-delta conversion. So
+the Collector today is correct at one replica and incorrect at two, and that is a
+property of its configuration, not a capacity number.
+
+**Contract.**
+
+- The Collector is a **platform component with one owner**; a service never runs its
+  own Collector, sidecar or exporter, and never targets a backend directly.
+- The current single-replica shape is acceptable while all three hold: fewer than the
+  fleet-scale trigger of services, active series under the budget stated in
+  [§ Fleet scale](#fleet-scale), and no tail sampling. When any one fails, the shape
+  becomes **agent → gateway**: a stateless agent tier that receives OTLP, applies
+  `memory_limiter` and resource enrichment, and forwards through a `loadbalancing`
+  exporter to a gateway tier that owns the stateful processors and the exporters.
+  That change is an ADR, not a replica count.
+- **Degradation policy per signal when the Collector is unavailable.** The SDKs
+  queue and then drop; a service must never block a request on export, and readiness
+  must not depend on the Collector. Metrics are cumulative at the SDK so a gap heals
+  on reconnect; traces and logs in the gap are lost and the loss is visible in the
+  Collector's own health metrics, which VictoriaMetrics scrapes. Profiling already
+  behaves this way and is the model.
+- **Kubernetes enrichment moves to the Collector** when the agent tier exists, with
+  the `k8sattributes` processor and pod association by IP or UID; until then the
+  Downward API mechanism stated under
+  [§ Resource and propagation contract](#resource-and-propagation-contract) is the
+  contract, and the empty materialised columns are debt the delivery plan clears.
+- The edge-log exception is part of the routing table, not folklore: edge access
+  logs go to the 90-day store only, by decision, and the two log pipelines are the
+  mechanism.
+
+### Fleet scale
+
+Everything above is written for the current ten services and two workers and must
+still be true at a hundred or a thousand. These are the rules that only bite at that
+size, stated now because they are cheapest to adopt before they are needed.
+
+**Shared-package version policy.** Today the module that owns the SDK is pinned at
+three different versions across ten services, the transport module at two, and the
+mechanism that moves a version is a per-repository dependency bot that already groups
+all shared-package modules into one pull request. That mechanism scales; the absence
+of a rule does not. The rule: a service may run at most **one minor version behind**
+the shared package's current release; the release notes state the floor; a service
+below the floor fails the fleet lint policy. Converging the three current `obsx`
+versions is a prerequisite of the lint rollout, because a policy that depends on the
+shared API's shape cannot be checked against three shapes.
+
+**Contract changes are greenfield, not migrations.** This standard is defined once,
+fresh. A change to it is a shared-package release that every service adopts through
+the same version bump; there is **no compatibility shim, no dual-emission window and
+no contract-version attribute on records**. The rollout train is: shared package →
+services in domain waves → consumers (dashboards, alerts, runbooks) in the same
+release. A service that has not adopted the release is a service below the floor,
+and the lint policy names it.
+
+**Cardinality has a budget, and the budget has arithmetic.** The per-attribute
+denylist under [§ Cardinality and replay](#cardinality-and-replay) is necessary and
+not sufficient: the binding constraint at fleet scale is total active series.
+Today ten services emit roughly 2,800 active series between them, dominated by the
+13-bucket HTTP and gRPC histograms multiplied by route and method. The budget is a
+**per-service ceiling** set from that measurement, a **fleet ceiling** equal to the
+metrics store's tested ingest capacity, and the SDK's own attribute-set limit as the
+last backstop. A new service is admitted with a number, and a dashboard shows the
+budget against the fleet total.
+
+**Onboarding is a path, not a conversation.** A new service gets: the shared package
+at the current floor, the canonical `cmd/main.go` bootstrap from the as-built
+contract, the domain ResourceSet defaults for every telemetry variable, and a
+**conformance check** it can run on day one — `weaver registry live-check` against
+its own OTLP output in local-stack. Passing that check is the definition of
+"instrumented"; nothing else is.
+
+**Cost is written down before the rate is raised.** The edge manifest records that
+the storage arithmetic for fifty-percent sampling has never been done for either
+the 90-day or the 7-day trace store. This RFC does not change the rate and does not
+pretend the sum exists; raising the applied rate anywhere requires the sum first.
+
 ## Rollout & rollback
 
 After acceptance and ADR approval, implementation lands in this order:
 
 1. Build and contract-test slogx, resource versioning and independent W3C propagation.
-2. Migrate all listed services, workers, consumers and mockpay using the remediation matrix in [research.md](./research.md).
+2. Cut every listed service, worker, consumer and mockpay over to the shared package using the remediation matrix in [research.md](./research.md).
 3. Verify metric contracts in VictoriaMetrics and profile coverage in Pyroscope.
 4. Replace ClickHouse dashboards, query examples and runbooks in the same release.
 5. Run Compose and Kind end-to-end audits across all four signals.
@@ -896,10 +1042,15 @@ After acceptance and ADR approval, implementation lands in this order:
 The full dependency order, acceptance criteria, checkpoints and risks are in
 [delivery-plan.md](./delivery-plan.md).
 
+This is a **greenfield** standard. The contract is defined once, fresh, and adopted
+as one release train; there is **no migration mechanism** — no dual-write
+compatibility mode, no legacy-field window, no contract-version attribute to let two
+shapes coexist. The remediation matrix is an inventory of what each service replaces,
+not a bridge between two contracts.
+
 Rollback pins the shared package and all application releases back to their
-prior versions and restores the matching dashboard configuration together.
-There is no dual-write compatibility mode. A partial rollout is a failed
-rollout and must not be promoted.
+prior versions and restores the matching dashboard configuration together. A
+partial rollout is a failed rollout and must not be promoted.
 
 ## Verification gates
 
@@ -926,8 +1077,9 @@ rollout and must not be promoted.
 | Metric instrument, cardinality and replay contract | ../../adr/ADR-073-application-metrics-contract/ | Planned |
 | Continuous profiling identity and overhead contract | ../../adr/ADR-074-continuous-profiling-contract/ | Planned |
 | Tracing sampling, span and baggage contract | ../../adr/ADR-075-application-tracing-contract/ | Planned |
+| Platform semantic-convention registry and namespace rule | ../../adr/ADR-076-semantic-convention-registry/ | Planned |
 
-ADR-070 through ADR-075 are **reserved numbers**, not existing records — the highest
+ADR-070 through ADR-076 are **reserved numbers**, not existing records — the highest
 record in the repository today is ADR-069. The paths are written as plain text
 because the directories do not exist yet; they become links when each record is
 created at `Proposed` during architecture review.

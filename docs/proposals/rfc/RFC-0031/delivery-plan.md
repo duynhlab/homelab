@@ -311,6 +311,47 @@ skip-list test.
 
 **Verification:** docs ownership review, Mermaid rendering and link checks.
 
+### Task 4.4: Collector enrichment, schema debt and the span-metrics dimension
+
+**Acceptance criteria:**
+
+- A decision is recorded, as an amendment to the span-metrics decision record, on
+  the connector's `http.method` dimension: rename it to the pinned convention's
+  `http.request.method`, or declare both for as long as the edge emits the older name,
+  with the live measurement from research as the evidence.
+- The five materialised `k8s.*` columns that no producer writes are either populated
+  by a collector `k8sattributes` processor with pod association, or removed from the
+  schema; the choice is recorded with the collector topology it implies.
+- The routing documentation states the edge-log exception explicitly.
+
+**Dependencies:** Task 4.1.
+
+**Verification:** a span-metrics series carries a non-empty method dimension for a
+service span; a ClickHouse query shows no materialised column that is empty for every
+record.
+
+### Task 4.5: Platform semantic-convention registry
+
+**Acceptance criteria:**
+
+- A Weaver registry in the shared-package repository declares every platform-owned
+  attribute, metric and event, with a manifest that depends on the upstream semantic
+  conventions at the version `obsx` pins and imports the standard attributes it reuses.
+- The namespace decision from ADR-076 is enforced by a Rego policy in
+  `weaver registry check`, and that check runs in the shared package's CI.
+- The shared package's attribute keys and metric names are **generated** from the
+  registry; the catalog sections of `docs/api/` are generated from the same source.
+- `weaver registry live-check` runs against local-stack OTLP output in the end-to-end
+  gate and exits non-zero on a violation; a new service is "instrumented" when it
+  passes.
+
+**Dependencies:** Phase 3 (the fleet is on one shared-package version), Task 0.1
+(ADR-076 accepted).
+
+**Verification:** `registry check` green in CI; a deliberately mis-named attribute in
+a branch fails it; `live-check` green against the compose gate; `registry diff`
+between two tags reports a planted rename.
+
 ## Final release gate
 
 - Compose E2E audit passes HTTP, gRPC, browser checkout, Temporal workflow and provider failure cases.

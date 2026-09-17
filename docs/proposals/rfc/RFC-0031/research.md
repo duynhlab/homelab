@@ -119,9 +119,9 @@ semantic conventions name that attribute `http.request.method`, so the dimension
 expected to be empty for service spans; that is verified live below rather than
 assumed.
 
-## Current migration surface
+## Current adoption surface
 
-| Surface | Evidence | Required migration |
+| Surface | Evidence | Required change |
 |---|---|---|
 | Logger setup | `pkg/logger/zapx` and `pkg/obsx` use Zap plus `otelzap` | Replace with `slogx`; remove bridge-only context fields. |
 | HTTP access | `pkg/httpmw/logging.go` | Emit canonical HTTP attributes; remove client IP and User-Agent. |

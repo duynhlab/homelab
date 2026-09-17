@@ -10,7 +10,7 @@
 - [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research footer](./research.md#context7-audit-log) and it changed four normative statements
 - [x] Owner approved **ready for RFC**
 - [x] Mechanism detail stays in `./research.md`; this document summarises and links it
-- [ ] When Status → **`Accepted`**: create ADR-070 through ADR-076 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `logs.md`, `observability.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` — synced only when Adoption is Complete, never at acceptance
+- [ ] When Status → **`Accepted`**: create ADR-070 through ADR-076 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md`, `temporal.md` — the same seven the delivery plan names — synced only when Adoption is Complete, never at acceptance
 
 ## Summary
 
@@ -230,6 +230,59 @@ flowchart LR
     class T,VT trace;
     class P,PY profile;
 ~~~
+
+## Design Details
+
+The template asks five questions of any design; the contract below is long enough
+that they deserve direct answers here.
+
+**How is it enabled or disabled?** Per signal, through the environment the shared
+package already reads: `OTEL_LOGS_ENABLED` and `OTEL_METRICS_ENABLED` are inputs on
+every service's input provider, `TRACING_ENABLED` gates the tracer provider, and
+`PROFILING_ENABLED` gates the profiler. There is no switch below the facade: a service
+cannot enable "some" of the logging contract, because the contract is the facade.
+`PROFILING_ENABLED` is today a literal in each domain ResourceSet rather than an input,
+so its scope is a domain, not a service — the profiling contract says so and the
+delivery plan decides whether to promote it.
+
+**Does enabling it change default behaviour?** Yes, in three visible ways and in no
+hidden one. The access record changes shape (pinned semantic-convention attribute
+names replace `path`/`status`/`code`/`duration`, and `client_ip`/`user_agent`/`peer`
+disappear). Two business histograms gain explicit boundaries, so their quantiles
+become meaningful and stop being comparable with the numbers they produced before.
+Every service's `cmd/main.go` stops importing SDK and Zap types once the shared
+package closes its type leaks. Sampling rates, backends, retention and the Collector
+topology are unchanged by this RFC.
+
+**Can it be disabled again once enabled?** Per signal, yes, through the same flags,
+and disabling one signal must not disturb another — a rule the propagation section
+exists to enforce, since today turning tracing export off also removes W3C
+propagation. The contract as a whole cannot be "disabled back" to the previous
+shape: there is no compatibility mode, by decision, and rollback is a version pin of
+the shared package and the services together.
+
+**How does an operator determine the feature is in use?** From the telemetry itself,
+not from a config flag. A process on the new contract shows the four approved labels
+with non-empty values in Pyroscope, `spanmetrics_calls_total` series with its
+`service_name`, records in the 90-day store whose `ScopeName` is the shared facade's
+package path and whose attribute keys are the canonical ones, and — once the registry
+exists — a passing `weaver registry live-check`. A service on the old contract is
+visible by the same means: a `path` key in its log attributes is proof it has not
+adopted the release.
+
+**Drawbacks of enabling it.** They are real and this section is where they live.
+Every production logging call site in every service changes in one release train
+with no dual-emission window, so a half-finished rollout is a failed one and must be
+rolled back whole. The OpenTelemetry Go Logs API the facade wraps is pre-1.0; the
+facade exists to contain that, but a breaking upstream change lands on the shared
+package first and on the fleet second. The fleet lint policy adds a gate every repo
+must pass, and the shared package must first close type leaks in its own public API —
+a breaking release of the most-depended-on module. The closed profile-label set is
+stricter than the as-built policy and removes a latitude services currently have.
+The Collector stays a single, stateful replica until a separate decision splits it,
+so this RFC standardises production without yet standardising transport capacity.
+None of these is an argument against the change; each is a cost the owner accepts by
+accepting the RFC.
 
 ## Normative target contract
 
@@ -1029,6 +1082,60 @@ the storage arithmetic for fifty-percent sampling has never been done for either
 the 90-day or the 7-day trace store. This RFC does not change the rate and does not
 pretend the sum exists; raising the applied rate anywhere requires the sum first.
 
+## Security considerations
+
+The security content of this RFC is gathered here so a reviewer can find it in one
+place; the normative text stays in the subsections it belongs to.
+
+- **Data leaving the process.** Redaction runs before *both* sinks, stdout and OTLP,
+  recursing through groups, maps, arrays, errors and exception data, with a named
+  minimum key list and case-insensitive matching. Client IPs, full User-Agent strings,
+  peer addresses, request and response bodies, DSNs, payment secrets, PAN-shaped
+  values and arbitrary headers are removed by policy. The current access logger
+  emits two of those fields today, which the audit records as a privacy-policy
+  violation this RFC closes.
+- **Baggage.** Baggage rides every outbound call, including calls to third-party
+  providers. The platform default is no application baggage; an approved key must
+  never carry PII, tokens or secrets and must be stripped before an external call.
+- **Idempotency keys** are retained across retries and are never logged raw.
+- **Trust boundary.** The shared-package rule is also a network rule: a service talks
+  to the Collector and to nothing else in the telemetry plane. Backend credentials
+  — ClickHouse, Pyroscope, the metrics agent — exist only in the Collector's and the
+  shared package's configuration, never in a service. That is what the shared-package
+  rule buys the security reviewer.
+- **Admission and policy.** No new privileged workload, host access or namespace is
+  introduced; the Collector's `Deployment` is unchanged by this RFC. The lint policy
+  runs in CI, not in the cluster. When the agent tier is introduced later, the
+  `k8sattributes` processor needs a read-only cluster role for pods and namespaces,
+  which is recorded in that ADR.
+
+## Observability & SLO impact
+
+An observability standard changes the instruments the platform's own SLOs are built
+on, so this section states what moves and what an operator watches.
+
+- **Histogram boundaries change meaning.** The two business histograms that gain
+  explicit boundaries produce quantiles that are correct going forward and
+  incomparable with their history; any recording rule or Sloth SLO reading them is
+  re-baselined at the cutover, and the discontinuity is annotated on the dashboards
+  that show them. The HTTP and gRPC duration histograms keep the canonical 13-bucket
+  set and are unaffected.
+- **Dashboards and alerts move in the same release.** Every ClickHouse query and
+  Grafana panel that reads a legacy access key is replaced in the release that stops
+  emitting the key; an alert on a removed key would otherwise go silent rather than
+  fire, which is the failure mode to guard against. Error-budget panels may show a
+  step at the cutover and that step is expected.
+- **New signals to watch during rollout.** `spanmetrics_calls_total` per service, as
+  the RED continuity check that a service is still emitting after adoption; the
+  Collector's own health metrics for queue depth and dropped items, since a schema
+  mismatch on the ClickHouse exporter fails at insert time and shows up there first;
+  Pyroscope label coverage, as the proof that the four labels are populated; and the
+  count of records with a `path` attribute in the 90-day store, which must fall to
+  zero as the fleet adopts the release.
+- **What does not change.** Sampling rates, retention, the backends and the
+  Collector topology are unchanged, so no SLO that depends on volume or storage moves
+  because of this RFC.
+
 ## Rollout & rollback
 
 After acceptance and ADR approval, implementation lands in this order:
@@ -1104,6 +1211,17 @@ or docs/api are changed as target state.
 - [Temporal contract](../../../api/temporal.md) — current deployed workflow rules
 - [Workflow registry](../../../api/workflows.md) — current worker topology and ownership
 - [Graceful shutdown](../../../api/graceful-shutdown.md) — current lifecycle contract
+- [Shared package contract](../../../api/pkg.md) — module layout, layering and the per-service pin ledger
+
+`docs/api` defects found while writing this RFC, tracked separately from it (they
+describe the as-built contract and are fixed there, not here): the metrics contract's
+footer counts five trace sinks where the tracing and observability contracts count
+two; the logging contract's first example shows the target access-log schema as
+live output while a later section says it is not yet as-built; the shared-package
+contract still lists the archived `auth` service as a live consumer; the tracing
+contract's production-recommendations table still shows a ten-percent sampling row
+after the base rate moved to fifty; and the docs index still advertises exemplars
+in the metrics guide while the platform does not promise them.
 - [OTel Logs Data Model](https://opentelemetry.io/docs/specs/otel/logs/data-model/)
 - [OTel HTTP semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/)
 - [OTel RPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)

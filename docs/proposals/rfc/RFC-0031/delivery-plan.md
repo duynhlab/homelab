@@ -303,7 +303,9 @@ skip-list test.
 
 **Acceptance criteria:**
 
-- docs/api logging, observability, tracing, metrics, temporal and service references describe only verified deployed behavior.
+- The seven `docs/api/` files this RFC names — `observability.md`, `logs.md`,
+  `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md`, `temporal.md` — and the
+  per-service contracts describe only verified deployed behavior.
 - The event catalog and migration evidence are linked from the proper owners.
 - Platform runbooks and dashboards document investigation paths.
 

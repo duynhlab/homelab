@@ -179,7 +179,7 @@ lists the expected set.
 ## Checkpoint — full fleet
 
 - No service, worker or mockpay production import uses Zap or otelzap.
-- No legacy event or access key remains in emitted fixtures.
+- No legacy access key remains in emitted fixtures; the `event` attribute is present on every named record.
 - Full service-repository test suites pass at their pinned package version.
 
 ## Phase 4 — analytics and operations

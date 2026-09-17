@@ -104,7 +104,7 @@ every line is an event.
 | gRPC access | `pkg/grpcx/logging.go` | Emit canonical RPC attributes; remove peer address. |
 | Workers | Order saga uses Temporal replay-safe logger; checkout worker emits Zap logs | Introduce replay-safe workflow adapter and context-first activity logger. |
 | Dashboards | Local ClickHouse explorers query legacy `path`, `status`, `code`, `duration` | Switch SQL, panels, variables and trace-log views to canonical fields. The platform logging guides also query `LogAttributes['status']`, but those examples filter the **Envoy edge** stream where that key is current — they are out of scope for an application cutover. |
-| Contracts | `docs/api/logs.md` names legacy `event`; `docs/api/pkg.md` has stale httpmw adoption state | Rewrite as planned target only after implementation evidence; separately correct current facts. |
+| Contracts | `docs/api/logs.md` defines the `event` attribute this RFC keeps; `docs/api/pkg.md` has stale httpmw adoption state | Rewrite as planned target only after implementation evidence; separately correct current facts. |
 | Metrics | VictoriaMetrics receives OTel application metrics; two business seconds histograms rely on generic defaults | Preserve the backend; enforce ownership, unit, bucket, cardinality and replay contracts. |
 | Profiling | Shared profiling runs fleet-wide; profile labels depend on uneven service.version, and trace pivot is manual | Preserve Pyroscope; add label, overhead, lifecycle, coverage and correlation gates. |
 
@@ -220,9 +220,10 @@ inside one span or needs its own timestamp, severity and attributes.
 ## Context7 audit log
 
 The first pass recorded Context7 as unavailable and passed the gate on an
-official-source fallback. It was rerun on 2026-09-17, and the rerun changed three
-normative statements, so the earlier note is superseded rather than merely
-supplemented.
+official-source fallback. It was rerun on 2026-09-17, and the rerun changed four
+normative statements (the gRPC status attribute, the event guidance, the bridge
+rationale, the profile-type set), so the earlier note is superseded rather than
+merely supplemented.
 
 | Library ID | Query | Result and disposition |
 |------------|-------|------------------------|

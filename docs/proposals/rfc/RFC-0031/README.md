@@ -7,7 +7,7 @@
 ## Prerequisites
 
 - [x] [./research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
-- [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research footer](./research.md#context7-audit-log) and it changed three normative statements
+- [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research footer](./research.md#context7-audit-log) and it changed four normative statements
 - [x] Owner approved **ready for RFC**
 - [x] Mechanism detail stays in `./research.md`; this document summarises and links it
 - [ ] When Status → **`Accepted`**: create ADR-070 through ADR-075 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `logs.md`, `observability.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` — synced only when Adoption is Complete, never at acceptance
@@ -93,14 +93,15 @@ conformance argument for the other. The reasons that do hold are: `log/slog` is 
 library, so the facade adds no logging dependency to every service; its
 context-first `Handler` interface matches the correlation and redaction seam this
 contract needs; a single implementation gives one tested redaction boundary
-instead of one per adapter; and slog is already in the platform's path, since
-`temporalx` routes SDK logs through `zapslog` into slog today. The cost is a fleet
+instead of one per adapter; and the shared package already carries a slog bridge —
+`temporalx.WithLogger` routes SDK logs through `zapslog` into slog — although no
+service has wired it yet, so it is a capability, not a deployed fact. The cost is a fleet
 migration of roughly 950 call sites, and the OTel Go Logs API is still pre-1.0 —
 the facade exists to contain that instability in one module.
 
-The release removes the legacy application contract: Zap imports, otelzap,
-custom event, and access fields named path, status, code, duration, client_ip,
-user_agent and peer. Access records use pinned OTel HTTP and RPC semantic
+The release removes the legacy application contract: Zap imports, otelzap, and
+access fields named path, status, code, duration, client_ip, user_agent and
+peer. The `event` attribute is kept. Access records use pinned OTel HTTP and RPC semantic
 conventions, with an explicit duration unit where needed. W3C traceparent and
 baggage propagation are installed independently of exporters.
 
@@ -176,7 +177,7 @@ on standard-library, dependency and single-redaction-boundary grounds. It is
 explicitly **not** recommended on conformance grounds: the two official bridges
 produce equivalent records. The audit
 recommends keeping Zap; that disagreement is stated in
-[§ Other solutions considered](#open-disagreement-keep-zap) and is the main thing
+[§ Open disagreement: keep Zap](#open-disagreement-keep-zap) and is the main thing
 architecture review has to settle.
 
 **Decided:** pending architecture review.
@@ -436,9 +437,8 @@ operator would only read while following one request belongs in the access recor
 or a diagnostic log instead. Adding a class is a reviewed change to this table, not
 a decision made at a call site.
 
-The served HTTP or gRPC call is deliberately absent from this table — it is the
-canonical access record, owned by shared transport middleware, and its outcome is
-already carried by its span and by automatic RED metrics.
+The served HTTP or gRPC call is absent from this table by design; see
+[§ Record model](#record-model).
 
 | Event class | Owner boundary | Required outcome attributes | Metric relationship |
 |---|---|---|---|
@@ -824,7 +824,7 @@ rollout and must not be promoted.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Logging facade and native event representation | ../../adr/ADR-070-otel-native-logging-facade/ | Planned |
+| Logging facade and event catalog | ../../adr/ADR-070-logging-facade-and-event-catalog/ | Planned |
 | Canonical event, access and privacy data contract | ../../adr/ADR-071-telemetry-event-data-contract/ | Planned |
 | Fleet cutover and ClickHouse query migration | ../../adr/ADR-072-telemetry-clean-cutover/ | Planned |
 | Metric instrument, cardinality and replay contract | ../../adr/ADR-073-application-metrics-contract/ | Planned |

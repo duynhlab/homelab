@@ -106,7 +106,7 @@ The shared `zapx` and `obsx` paths do not expose a central redaction policy for 
 
 ### P1 — HTTP/gRPC attribute vocabulary is inconsistent with OTel
 
-HTTP middleware emits `method`, `path`, `status`, and `duration` (`pkg/httpmw/logging.go:171-177`); gRPC emits `method`, `code`, `duration`, and `peer` (`pkg/grpcx/logging.go:130-138`). Keep protocol-specific fields where their semantics differ, but emit the canonical OTel attributes (`http.request.method`, `url.path`/`http.route`, `http.response.status_code`, `rpc.method`, `rpc.grpc.status_code`) at the instrumentation boundary and move all query consumers in the same clean-cutover release.
+HTTP middleware emits `method`, `path`, `status`, and `duration` (`pkg/httpmw/logging.go:171-177`); gRPC emits `method`, `code`, `duration`, and `peer` (`pkg/grpcx/logging.go:130-138`). Keep protocol-specific fields where their semantics differ, but emit the canonical OTel attributes (`http.request.method`, `http.route`, `http.response.status_code`, `rpc.method`, `rpc.status_code`) at the instrumentation boundary and move all query consumers in the same clean-cutover release.
 
 ### P2 — service version coverage is uneven
 
@@ -150,4 +150,4 @@ The API tree is normative for application-side observability. It adds constraint
 
 The service-specific API pages should be the next audit slice for business event and metric names: they define intended operational interpretation, while this report identifies shared implementation and pipeline gaps.
 
-_Last updated: 2026-09-16_
+_Last updated: 2026-09-17 — canonical gRPC status attribute corrected to `rpc.status_code` and the conflicting `url.path` recommendation dropped; facade renamed to `pkg/logger/slogx`. Audit date and evidence are unchanged._

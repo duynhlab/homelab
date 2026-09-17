@@ -2,7 +2,16 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-09-16 | 2026-09-16 | 2026-09-16 |
+| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-09-16, Context7 rerun 2026-09-17 | 2026-09-16 | 2026-09-17 |
+
+## Prerequisites
+
+- [x] [./research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
+- [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research footer](./research.md#context7-audit-log) and it changed three normative statements
+- [x] Owner approved **ready for RFC**
+- [x] Mechanism detail stays in `./research.md`; this document summarises and links it
+- [ ] When Status → **`Accepted`**: create ADR-070 through ADR-075 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `logs.md`, `observability.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` — synced only when Adoption is Complete, never at acceptance
+- [ ] The logging-facade choice is **not settled** — see [Open disagreement: keep Zap](#open-disagreement-keep-zap)
 
 ## Summary
 
@@ -403,7 +412,7 @@ event catalog before use.
 | Situation | Required attributes | Forbidden or constrained attributes |
 |---|---|---|
 | HTTP server summary | http.request.method, http.route, http.response.status_code; error.type only for an error outcome | No raw URL path/query, client.address, network.peer.address or user_agent.original |
-| gRPC server summary | rpc.system.name=grpc, rpc.method, rpc.response.status_code; error.type only for an error outcome | No peer address, arbitrary metadata or raw protobuf |
+| gRPC server summary | rpc.system.name=grpc, rpc.method as the fully-qualified name, rpc.status_code; error.type only for an error outcome | No peer address, no rpc.service, arbitrary metadata or raw protobuf |
 | Database decision | db.system.name, db.operation.name where provided by the pinned instrumentation; error.type on failure | No SQL parameters, DSN or credentials |
 | Messaging consumer or producer | messaging.system and messaging.destination.name where a real broker exists | No message body or unrestricted headers |
 | Error | error.type and a safe, documented domain or dependency outcome | No raw error string if it may include credentials, payloads or customer data |
@@ -854,7 +863,6 @@ or docs/api are changed as target state.
 - [OTel Logs Data Model](https://opentelemetry.io/docs/specs/otel/logs/data-model/)
 - [OTel HTTP semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/)
 - [OTel RPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
-- [SigNoz events versus logs comparison](https://signoz.io/comparisons/opentelemetry-events-vs-logs/) — secondary operational guidance; OTel remains normative
 
 ---
-_Last updated: 2026-09-16_
+_Last updated: 2026-09-17 — Context7 rerun corrected the gRPC status attribute and the profile-type count; the facade was renamed to `pkg/logger/slogx`; EventName was scoped to a reviewed business-event catalog after the slog bridge proved unable to set it either; a tracing contract and ADR-075 were added._

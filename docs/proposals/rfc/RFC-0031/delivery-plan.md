@@ -14,7 +14,7 @@ are accepted.
 - The ADR records the pre-1.0 OTel Logs API containment and the clean-cutover cost.
 - The target contract is approved with SemConv v1.41.0 as its baseline.
 
-**Verification:** architecture review approves the five resulting ADRs.
+**Verification:** architecture review approves the six resulting ADRs, ADR-070 through ADR-075.
 
 ### Task 0.2: Freeze the catalog and privacy boundary
 
@@ -190,6 +190,7 @@ lists the expected set.
 
 - Dashboards, SQL examples, panel variables and trace-log pivots use EventName and canonical attributes.
 - Removed access fields are absent from current queries and runbooks.
+- The duplicate `dashboards/ClickHouse/` tree is deleted, so no unfixed byte-identical copy survives the migration.
 - Event and trace queries work across the 90-day ClickHouse retention tier.
 
 **Dependencies:** Phase 3.
@@ -242,4 +243,4 @@ lists the expected set.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-16_
+_Last updated: 2026-09-17 — facade renamed to `pkg/logger/slogx`; module placement and depguard criteria added to Task 1.1; Task 1.1b retires the unused `logger/zerolog` and `logger/clog` adapters._

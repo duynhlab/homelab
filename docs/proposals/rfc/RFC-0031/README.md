@@ -26,6 +26,8 @@ and its resulting ADRs are accepted.
 | What problem and outcome does this RFC cover? | [Motivation](#motivation) and [Proposal](#proposal) |
 | Which option is being reviewed? | [Decision outcome](#decision-outcome) and [Alternatives](#alternatives) |
 | What exact application contract is proposed? | [Normative target contract](#normative-target-contract) |
+| What does each signal have to do? | [Record model](#record-model) · [Tracing](#tracing-contract) · [Metrics](#metrics-contract) · [Profiling](#continuous-profiling-contract) |
+| Is the logging migration settled? | No — [Open disagreement: keep Zap](#open-disagreement-keep-zap) |
 | How will the fleet migrate and roll back? | [Rollout and rollback](#rollout--rollback) and the [delivery plan](./delivery-plan.md) |
 | What evidence must pass before promotion? | [Verification gates](#verification-gates) |
 | Where is the current-state evidence? | [Research](./research.md) and the [audit report](../../../observability/audits/2026-09-16-telemetry-standards.md) |
@@ -483,6 +485,110 @@ ParentBased trace sampler continues to decide tracing independently of logging
 and metrics. Log sampling must retain ERROR, FATAL, terminal retry and
 compensation-failure records.
 
+### Tracing contract
+
+Traces are the primary signal for "where did time or failure go", and every other
+signal in this contract correlates through the trace ID. The rules below are
+restated here rather than left as an inherited pointer, because a cross-signal
+standard that omits them cannot be implemented from this document alone.
+
+Tracing keeps its current shape: the OTel Tracer API through the shared provider,
+automatic transport and database instrumentation, export to VictoriaTraces for
+operations and ClickHouse for SQL. Nothing in this RFC changes the backends or the
+sampling rates.
+
+#### Sampling
+
+The sampler is `ParentBased(TraceIDRatioBased(rate))` and the **edge is the root**:
+Envoy starts a span for every request it accepts and sends `traceparent` upstream,
+so a browser request carrying no trace header still arrives already joined to the
+edge trace. The edge's rate therefore governs the whole trace it proxies.
+
+| Environment | Rate that decides | Service `OTEL_SAMPLE_RATE` |
+|---|---|---|
+| Cluster | 50% at the edge | `0.1`, applying only to traces a service starts itself |
+| Local-stack | 100% | `1.0` |
+
+A sampled remote parent is always honoured. There is no environment-to-rate
+auto-mapping: the rate is set explicitly per environment, and a change to it is a
+volume and cost change that must be reviewed as one.
+
+#### Span naming, kind and scope
+
+Span names are stable operation classes — `checkout.confirm`, `inventory.reserve`,
+`payment.capture`. Business identifiers never enter a span name; they are
+attributes, added only when operationally justified. Note that span names and
+EventNames are **different namespaces**: a span name is a two-part operation class,
+while an event name is the dot-separated class of a point-in-time occurrence. A
+service must not mint one from the other.
+
+Every span carries exactly one kind, and the kind follows the layer:
+
+| SpanKind | Layer | Created by |
+|---|---|---|
+| `SERVER` | HTTP/gRPC transport in | automatic transport instrumentation |
+| `INTERNAL` | `logic/v1` manual spans — the default | shared helper |
+| `CLIENT` | core adapters calling out: DB, cache, gRPC client, provider | automatic instrumentation |
+| `PRODUCER` / `CONSUMER` | queue and worker boundaries | supported Temporal integration |
+
+The instrumentation scope is the **package path** of the code creating the span,
+never the service name — deployment identity already rides as `service.name`.
+
+No wrapper spans around work that is already instrumented. The granularity ladder
+is: add attributes to the existing span first, then a span event, and only then a
+child span. A span per function call is the anti-pattern this rule exists to stop.
+
+#### Status, errors and exceptions
+
+Set Error status for a failed operation, not automatically for an expected business
+rejection. Outcomes such as not found, price changed, stock unavailable, payment
+declined and invalid transition are normal domain results unless the owning service
+contract says otherwise; they carry a bounded outcome attribute and leave the span
+status unset.
+
+An unexpected failure records the error on the span where it becomes meaningful,
+sets Error status, and carries `error.type`. An exception recorded on a span uses
+the standard exception span event with its `exception.type`, `exception.message`
+and bounded `exception.stacktrace` attributes. No secrets, raw payloads or
+sensitive provider responses reach any of them.
+
+#### Span events
+
+Span events use stable names — `payment.authorized`, `inventory.reserved`,
+`compensation.started`. Identifiers and error detail are attributes, subject to the
+same privacy rules as every other signal here.
+
+Span events are not emitted in a loop. A span is not built to hold hundreds of
+events; per-item detail belongs in correlated logs, and cross-trace fan-out belongs
+in span links.
+
+#### Baggage
+
+`pkg/obsx` installs the composite propagator, so baggage set on a context
+propagates automatically on every instrumented call. The platform default is **no
+application baggage**: a new key requires review, because it crosses every
+downstream hop and adds per-request header cost.
+
+When a key is approved:
+
+- Baggage is **immutable** — each set returns a new context, and only that context
+  carries the value downstream.
+- Backends **do not store baggage**. To analyse it later, copy the value onto a
+  span attribute or a log attribute at the service that consumes it.
+- Its legitimate use is steering behaviour at runtime — a feature flag or variant —
+  not retrospective analysis, which is what span attributes are for.
+- **Security:** baggage is attached to outbound calls indiscriminately, including
+  third-party calls. Never put PII, tokens or secrets in it, and strip keys before
+  calling an external provider. This rule is part of the privacy boundary in
+  [§ Privacy, redaction and sampling](#privacy-redaction-and-sampling), not a
+  tracing detail.
+
+#### Probe and health filtering
+
+Probe, health and reflection routes are filtered before the span starts, so a
+skipped route emits neither a span nor a metric. The skip list is shared between
+the trace and metric paths so the two cannot drift, and it is pinned by unit test.
+
 ### Metrics contract
 
 Metrics continue to use the OTel Meter API and OTLP export through the shared
@@ -653,6 +759,12 @@ rollout and must not be promoted.
 | Fleet cutover and ClickHouse query migration | ../../adr/ADR-072-telemetry-clean-cutover/ | Planned |
 | Metric instrument, cardinality and replay contract | ../../adr/ADR-073-application-metrics-contract/ | Planned |
 | Continuous profiling identity and overhead contract | ../../adr/ADR-074-continuous-profiling-contract/ | Planned |
+| Tracing sampling, span and baggage contract | ../../adr/ADR-075-application-tracing-contract/ | Planned |
+
+ADR-070 through ADR-075 are **reserved numbers**, not existing records — the highest
+record in the repository today is ADR-069. The paths are written as plain text
+because the directories do not exist yet; they become links when each record is
+created at `Proposed` during architecture review.
 
 ## Implementation History
 

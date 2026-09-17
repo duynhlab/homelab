@@ -566,10 +566,16 @@ Envoy starts a span for every request it accepts and sends `traceparent` upstrea
 so a browser request carrying no trace header still arrives already joined to the
 edge trace. The edge's rate therefore governs the whole trace it proxies.
 
-| Environment | Rate that decides | Service `OTEL_SAMPLE_RATE` |
+| Environment | Edge rate actually applied | Service `OTEL_SAMPLE_RATE` |
 |---|---|---|
-| Cluster | 50% at the edge | `0.1`, applying only to traces a service starts itself |
-| Local-stack | 100% | `1.0` |
+| Base manifest (inherited by a future production cluster) | 50 — **applied nowhere today** | `0.1`, applying only to traces a service starts itself |
+| Kind cluster | 100 — the local overlay patches the base value | `0.1` |
+| Local-stack | 100 | `1.0` |
+
+The base manifest says so itself: the 50 is "the number a future prod cluster
+inherits", and it also records that nobody has done the storage arithmetic for it.
+This RFC therefore states the applied rate per environment and does not describe 50
+as a running configuration.
 
 A sampled remote parent is always honoured. There is no environment-to-rate
 auto-mapping: the rate is set explicitly per environment, and a change to it is a
@@ -749,8 +755,11 @@ Correlation remains metric and time window to logs, then trace_id to trace.
 ### Continuous profiling contract
 
 All ten Go services and both worker modes use obsx.SetupProfiling and push
-directly to Pyroscope. Profiling remains non-critical to the business path:
-startup failure emits a sanitized warning and does not make readiness false.
+directly to Pyroscope. `mockpay` does not — its manifest carries no telemetry
+environment at all, for any signal — and this RFC brings it under the same contract
+rather than leaving one Go process outside a fleet-wide standard. Profiling remains
+non-critical to the business path: startup failure emits a sanitized warning and does
+not make readiness false.
 
 #### Profile types and cost
 
@@ -800,14 +809,26 @@ what qualifies and both be compliant. Closing the set to four labels makes profi
 identity comparable across services and makes a violation testable. Widening it
 again is a reviewed change to this table, not a judgement made per service.
 
-The uneven `service.version` coverage in API ResourceSets is therefore a profiling
-correlation defect as well as a resource-identity one. A concrete source already
-exists and is not currently wired: every service input provider carries an
-`image_tag` under Flux image automation, and it feeds only the container image tag.
-The delivery plan uses that input rather than inventing a second version source.
-Downstream consumers are already waiting for it — the metrics agent promotes
-`service.version`, and cluster dashboards render deployment annotations from it,
-so those panels are blank for every API service today.
+**Two of the four labels are empty today, not one.** The profiler builds its labels
+by parsing `OTEL_RESOURCE_ATTRIBUTES` and looking up `service.namespace`,
+`deployment.environment` and `service.version`. No manifest puts
+`deployment.environment` in that variable — environment arrives through a separate
+`DEPLOYMENT_ENVIRONMENT` variable that the tracer and meter path maps to the current
+key `deployment.environment.name`, which the profiler does not look for. So
+`deployment_environment` is empty on every profile, workers included, and would stay
+empty even if this contract were implemented exactly as written above. The fix is
+that the profiler derives its labels from the **same resource** the other signals
+use, not from a second parse of the environment; the delivery plan carries it.
+
+`service_version` is empty for a different reason: API services have no version
+source at all. A concrete one already exists and is not wired — every **domain
+service** input provider carries an `image_tag` under Flux image automation, and it
+feeds only the container image tag. The delivery plan uses that input rather than
+inventing a second version source. `mockpay` is the exception: its image is pinned by
+hand by design, so it needs its own version input. Downstream consumers are already
+waiting — the metrics agent promotes `service.version`, and cluster dashboards
+render deployment annotations from it, so those panels are blank for every API
+service today.
 
 #### Trace-to-profile correlation
 
@@ -835,10 +856,27 @@ that limitation explicitly.
 ### Resource and propagation contract
 
 All API and worker processes set service.name, service.version and
-deployment.environment.name. Kubernetes namespace, pod, container and region
-are platform enrichment where available. The implementation must eliminate the
-current difference where worker build metadata is present but API release
-version is absent.
+deployment.environment.name. Kubernetes identity is **application-side platform
+enrichment**: the manifests inject `K8S_NAMESPACE_NAME`, `K8S_POD_NAME` and
+`DEPLOYMENT_ENVIRONMENT` from the Downward API, and the shared package maps them to
+`k8s.namespace.name`, `k8s.pod.name` (plus `service.namespace`) and
+`deployment.environment.name`. No collector-side enrichment exists — the collector
+runs no `k8sattributes`, `resource` or `transform` processor — so **only those three
+Kubernetes attributes are present**. Nothing sets container, node, deployment,
+cluster, pod UID or region.
+
+That gap is visible in storage: the ClickHouse logs schema materialises eight
+`k8s.*` columns and five of them (`cluster.name`, `container.name`, `deployment.name`,
+`node.name`, `pod.uid`) are empty for every record, because no producer writes them.
+No dashboard reads them today, so it is schema debt rather than a broken consumer.
+The contract states the honest set and leaves two choices to the delivery plan:
+populate the missing keys with a collector `k8sattributes` processor — the
+OpenTelemetry-recommended path and the only one that can supply
+`k8s.deployment.name` — or drop the dead columns.
+
+The implementation must eliminate the current difference where worker build
+metadata is present but API release version is absent; the source for the latter is
+named under [§ Profile identity and labels](#profile-identity-and-labels).
 
 W3C Trace Context plus Baggage is configured once, independently of tracer,
 logger and exporter enablement. A disabled exporter must not cause a service to

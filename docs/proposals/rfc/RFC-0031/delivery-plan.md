@@ -118,6 +118,13 @@ no SDK or Zap type.
 
 - W3C extraction/injection works with all exporters disabled.
 - API services and workers emit service name, version and environment consistently.
+  The version source for domain services is the existing `image_tag` input, wired
+  into `OTEL_RESOURCE_ATTRIBUTES` as `service.version` in the domain ResourceSets;
+  `mockpay` gets an explicit version input because its image is hand-pinned.
+- Kubernetes identity keeps its current mechanism — Downward API into
+  `K8S_NAMESPACE_NAME` / `K8S_POD_NAME` / `DEPLOYMENT_ENVIRONMENT`, mapped by the
+  shared package — and the contract lists exactly the three attributes that mechanism
+  produces. Adding collector-side `k8sattributes` enrichment is decided in Phase 4.
 - Shutdown flush is bounded and follows readiness/work draining.
 
 **Dependencies:** Task 1.1.
@@ -142,6 +149,12 @@ no SDK or Zap type.
 
 - All services and both worker modes use one shared profiler lifecycle.
 - Profiles expose only the approved service, namespace, environment and version labels.
+- The profiler derives those labels from the same resource the tracer and meter use.
+  Today it re-parses `OTEL_RESOURCE_ATTRIBUTES` for the deprecated key
+  `deployment.environment`, which no manifest sets, so `deployment_environment` is
+  empty fleet-wide; after this task both `deployment_environment` and
+  `service_version` are populated on every process, verified by a Pyroscope
+  label-values query.
 - Profiling failure/disable paths preserve readiness, and runtime sampling changes have benchmark evidence.
 
 **Dependencies:** Task 1.2.
@@ -243,7 +256,11 @@ skip-list test.
 
 - Checkout's idempotency, required token redaction and abandonment workflow remain intact.
 - Expected business rejections remain distinguishable from infrastructure failure.
-- Mockpay follows the same safe provider logging contract.
+- Mockpay is onboarded to the shared package from zero: its manifest gains the same
+  telemetry environment as a domain service (`OTEL_SERVICE_NAME`, collector endpoint,
+  per-signal enable flags, `DEPLOYMENT_ENVIRONMENT`, `K8S_*`, `PROFILING_ENABLED`) and
+  an explicit version input, and it then follows the same safe provider logging
+  contract.
 
 **Dependencies:** Task 3.2.
 
@@ -300,7 +317,7 @@ skip-list test.
 - Kind E2E audit passes the equivalent deployed paths.
 - One trace-to-log and one log-to-trace investigation succeeds in both operational and ClickHouse retention windows.
 - The privacy regression suite shows no forbidden field at stdout, Collector or ClickHouse.
-- VictoriaMetrics receives bounded application series and Pyroscope receives profiles from all service and worker identities.
+- VictoriaMetrics receives bounded application series and Pyroscope receives profiles from all service and worker identities, mockpay included, each carrying all four approved labels with non-empty values.
 - The release has no dual-write or legacy dashboard compatibility path.
 
 ## Risks and mitigations

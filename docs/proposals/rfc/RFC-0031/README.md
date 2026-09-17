@@ -11,13 +11,13 @@
 - [x] Owner approved **ready for RFC**
 - [x] Mechanism detail stays in `./research.md`; this document summarises and links it
 - [ ] When Status → **`Accepted`**: create ADR-070 through ADR-075 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `logs.md`, `observability.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` — synced only when Adoption is Complete, never at acceptance
-- [ ] The logging-facade choice is **not settled** — see [Open disagreement: keep Zap](#open-disagreement-keep-zap)
 
 ## Summary
 
 Adopt one application telemetry contract across logs, metrics, traces and
-continuous profiles. Logging moves to pkg/logger/slogx behind one context-first
-API with one tested redaction boundary; tracing keeps its sampling, span and
+continuous profiles. Logging is proposed to move to pkg/logger/slogx behind one
+context-first API with one tested redaction boundary — the one choice architecture
+review still has to settle; tracing keeps its sampling, span and
 baggage rules and gains an explicit contract instead of an inherited pointer;
 metrics retain the OTel Meter API and VictoriaMetrics with stricter instrument,
 bucket, cardinality and replay rules; profiling retains the shared Pyroscope
@@ -76,8 +76,8 @@ explicit verification gate despite being enabled fleet-wide.
 
 ## Proposal
 
-pkg/logger/slogx becomes the only application logging facade. Its diagnostic methods
-emit structured slog records. Its context-first event method emits a record whose
+pkg/logger/slogx is proposed as the only application logging facade. Its diagnostic
+methods emit structured slog records. Its context-first event method emits a record whose
 stable `event` attribute is a lower-case dot-separated identifier. The message is
 short display text; values belong in typed attributes.
 
@@ -96,7 +96,7 @@ contract needs; a single implementation gives one tested redaction boundary
 instead of one per adapter; and the shared package already carries a slog bridge —
 `temporalx.WithLogger` routes SDK logs through `zapslog` into slog — although no
 service has wired it yet, so it is a capability, not a deployed fact. The cost is a fleet
-migration of roughly 950 call sites, and the OTel Go Logs API is still pre-1.0 —
+migration of every production logging call site, and the OTel Go Logs API is still pre-1.0 —
 the facade exists to contain that instability in one module.
 
 The release removes the legacy application contract: Zap imports, otelzap, and
@@ -131,8 +131,8 @@ bounded shutdown and an honest manual trace-to-profile workflow.
 
 | Option | Benefit | Cost | Status |
 |--------|---------|------|--------|
-| pkg/logger/slogx facade over slog plus direct OTel Logs API | Standard-library logging with no added dependency; one policy boundary; context-first handler seam; slog already reached through `zapslog` in `temporalx` | Fleet migration of roughly 950 call sites; OTel Logs API remains pre-1.0 | Proposed |
-| Zap facade over the existing `logger/zapx` | Much smaller diff; keeps the adapter every service already pins | Keeps a third-party logging dependency in every service and leaves the redaction boundary split across adapters | Rejected — but note the audit recommends it; see § Other solutions considered |
+| pkg/logger/slogx facade over slog plus direct OTel Logs API | Standard-library logging with no added dependency; one policy boundary; context-first handler seam; slog already reached through `zapslog` in `temporalx` | Fleet migration of every production logging call site; OTel Logs API remains pre-1.0 | Proposed |
+| Zap facade over the existing `logger/zapx` | Much smaller diff; keeps the adapter every service already pins | Keeps a third-party logging dependency in every service and leaves the redaction boundary split across adapters | Open — the audit recommends it; see § Open disagreement: keep Zap |
 | Raw OTel Logs API in every service | Full record control | Duplicates redaction, correlation and tests | Rejected |
 | Preserve VictoriaMetrics and Pyroscope with stricter shared contracts | No backend migration; fixes measured contract gaps | Requires metric/profile tests and service-version convergence | Proposed |
 | Replace metrics or profiles during this RFC | One large observability redesign | Expands blast radius without solving the audited application gaps | Rejected |
@@ -166,7 +166,7 @@ disagreement is recorded here rather than resolved, because § Decision outcome 
 owner-decided at architecture review. The evidence that would settle it is the
 evidence the audit already asked for: a benchmark of the two facades under fleet
 log volume, a redaction test suite that both must pass, and a measured estimate of
-the migration cost across roughly 950 call sites.
+the migration cost across every production logging call site.
 
 ## Decision outcome
 
@@ -180,7 +180,10 @@ recommends keeping Zap; that disagreement is stated in
 [§ Open disagreement: keep Zap](#open-disagreement-keep-zap) and is the main thing
 architecture review has to settle.
 
-**Decided:** pending architecture review.
+**Decided:** pending architecture review. The two backend rows in § Alternatives —
+keep VictoriaMetrics and Pyroscope, do not replace them in this RFC — are
+**Proposed with no alternative under review**; they are stated so the scope is
+explicit, not because a competing option is being weighed.
 
 ## Architecture & Diagrams
 
@@ -193,7 +196,7 @@ metrics, traces and profiles.
 
 ~~~mermaid
 flowchart LR
-    A["Service or worker"] --> L["pkg/logger/slogx<br/>logs"]
+    A["Service or worker"] --> L["pkg/logger/slogx (proposed)<br/>logs"]
     A --> M["OTel Meter API<br/>metrics"]
     A --> T["OTel Tracer API<br/>traces"]
     A --> P["pyroscope-go<br/>profiles"]
@@ -242,6 +245,77 @@ flowchart LR
 This section makes the target reviewable without replacing the deployed
 contracts in docs/api. The as-built rules remain authoritative until the clean
 cutover has passed every verification gate.
+
+### Shared-package rule
+
+This is the rule the rest of the contract exists to serve, so it comes first.
+
+A service does not choose its own telemetry libraries. It imports the shared
+package and the OpenTelemetry **API**; the SDK, every exporter, every bridge and
+every backend client are linked in exactly one place, `pkg/obsx`, and a change to
+how the fleet emits telemetry is a change to the shared package followed by a
+version bump, never an edit in a service. At ten services this is a convention. At
+a thousand it is the only thing that keeps four signals correlatable, because it
+turns "did every team do it right" into "did the one package do it right".
+
+The rule follows OpenTelemetry's own library guideline — instrumented code depends
+on the API alone, the SDK is configured once per process by its owner — so it is
+not stricter than upstream, it is upstream applied to a fleet. The as-built
+contract already states the boundary for the OTel packages
+([`docs/api/observability.md` § API vs SDK vs contrib](../../../api/observability.md));
+this RFC extends the same table to logging and profiling and, more importantly,
+gives it an enforcement mechanism, which today it does not have.
+
+| Signal | A service may import | A service must not import | Owned by |
+|---|---|---|---|
+| Logs | `pkg/logger/slogx` | `go.uber.org/zap`, `zapcore`, `log/slog` directly, `github.com/rs/zerolog`, `go.opentelemetry.io/contrib/bridges/*`, `go.opentelemetry.io/otel/log` | `slogx` (API), `obsx` (export) |
+| Metrics | `go.opentelemetry.io/otel/metric`, `otel/attribute`; instruments via `obsx` helpers | `go.opentelemetry.io/otel/sdk/metric`, `otel/exporters/*`, `github.com/prometheus/client_golang` | `obsx` |
+| Traces | `go.opentelemetry.io/otel/trace`, `otel/attribute`, `otel/codes`; spans via `obsx.StartSpan` | `go.opentelemetry.io/otel/sdk/trace`, `otel/exporters/*`, `otel/propagation` setup | `obsx`, `httpmw`, `grpcx` |
+| Profiles | nothing — `obsx.SetupProfiling` only | `github.com/grafana/pyroscope-go`, `runtime.SetMutexProfileFraction`, `runtime.SetBlockProfileRate` | `obsx` |
+| Transport | `pkg/httpmw`, `pkg/grpcx` | `contrib/instrumentation/*` directly | `httpmw`, `grpcx` |
+
+Tests are exempt, exactly as the shared package already exempts its own tests: an
+in-memory reader or exporter is the correct way to assert on telemetry.
+
+**Why the API is allowed and not merely tolerated.** A span kind, an attribute or a
+status code is an API type; the shared helpers take them as parameters
+(`obsx.StartSpan(ctx, scope, name, ...trace.SpanStartOption)`,
+`obsx.AddSpanAttributes(ctx, ...attribute.KeyValue)`). A rule that forbade the API
+would forbid using the helpers. The line is drawn where OpenTelemetry draws it: API
+in, SDK out. Profiling shows the model at its cleanest — the helper exposes no
+Pyroscope type, and today no service imports `pyroscope-go` at all.
+
+**Enforcement.** Today nothing enforces any row of this table. Every service lints
+with an identical `.golangci.yml` whose enabled set does not include `depguard`, and
+`go.uber.org/zap`, `log/slog`, `zerolog` and `client_golang` are unguarded fleet-wide,
+the shared package included. The shared CI workflow every service already calls at a
+pinned commit accepts only a config *path*, so a fleet policy has nowhere to live.
+The mechanism this RFC adopts:
+
+1. One policy file, `golangci-policy.yml`, in the shared-workflows repository,
+   containing only `depguard` rules shaped like the shared package's existing
+   `otel-sdk-only-in-obsx` rule (with the same `!$test` exemption) plus a
+   `forbidigo` rule that rejects a seconds-unit histogram declared without explicit
+   boundaries — the silent-failure mode described under
+   [§ Metrics contract](#metrics-contract).
+2. The shared lint job gains a second, additive pass that checks out that file and
+   runs `golangci-lint run --config=<policy>`; a service keeps its own quality config
+   untouched. The linter has no config inheritance or remote include, so a checked-out
+   file passed by path is the mechanism, not a workaround.
+3. The policy starts **non-blocking** for one release, then blocks. The shared
+   package's own wording travels with it: *if the rule rejects your import, the
+   import is wrong — not the rule; escalate to a human before touching it.*
+4. The policy exempts `cmd/**` **until Task 1.1c lands**, because today the shared
+   package itself forces `main()` to import SDK and Zap types through its public
+   signatures — `obsx.WithTracerProviderFactory(func(...sdktrace.TracerProviderOption))`,
+   `obsx.ZapCore(...) zapcore.Core`, `obsx.TraceContext(ctx) zap.Field`. Those are
+   leaks in the contract, not misbehaviour in services, and the rule cannot be honest
+   about the fleet until they are closed. When they are, the exemption is removed and
+   the rule says what the table says.
+
+The linter versions must converge as part of this: the shared package lints at one
+golangci-lint version and the services at another, so a policy validated in one
+place is not proven in the other.
 
 ### Design constraints inherited from docs/api
 
@@ -307,7 +381,6 @@ timestamp, severity and attributes.
 | Named business event | Durable outcome, state transition, retry exhaustion or compensation, at the commit point | Strict, registered in the event catalog | Yes |
 | Diagnostic log | Investigation detail without a stable schema | Free | No |
 | Span event | A milestone within a sampled span | Stable name, bounded count | Span-scoped |
-| Metric observation | A bounded aggregate at an authoritative decision point | Instrument catalog | Not applicable |
 
 The access record deliberately carries no event name. A served request already has a
 span that owns its duration and outcome, so naming it as an event would duplicate
@@ -374,8 +447,8 @@ behaviours are required:
 | Lifecycle | Flushes once with the process shutdown context after servers/workers finish draining |
 
 The facade replaces direct Zap, slog, otelzap and OTel Logs API use in
-application repositories. Instrumentation packages may remain the sole
-implementation boundary for the OTel API.
+application repositories; the import boundary and its enforcement are stated once in
+[§ Shared-package rule](#shared-package-rule).
 
 #### Placement in the shared package
 

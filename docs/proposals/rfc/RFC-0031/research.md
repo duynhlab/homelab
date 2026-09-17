@@ -123,6 +123,14 @@ This matrix is the implementation boundary for the proposed full cutover. It
 does not authorize implementation; it makes the review and later acceptance
 criteria concrete.
 
+The per-service call-site figures below are `grep`-derived upper bounds from the
+first audit pass and could not be reproduced on re-check (order-service: 319 in the
+matrix, 147 by counting `logger.<Level>(` including tests). They are kept as a
+relative size signal only. The sturdier measure is the number of files that import
+`go.uber.org/zap` outside `cmd/` — 17 in order-service, 7 in product, 5 in checkout
+and inventory, 2 in user — which shows the migration is concentrated in a few
+packages per service, not spread across every file.
+
 | Surface | Audited state | Required change | Evidence before rollout |
 |---|---|---|---|
 | user-service | 54 logging call sites; no stable event | Replace Zap calls and HTTP access contract with slogx | Event, redaction and HTTP-contract tests |

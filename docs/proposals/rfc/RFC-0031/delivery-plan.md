@@ -6,15 +6,35 @@ are accepted.
 
 ## Phase 0 — contract approval
 
-### Task 0.1: Approve the logging facade decision
+### Task 0.0: Decide the logging facade
+
+The RFC proposes `pkg/logger/slogx`; the audit recommends keeping `logger/zapx`. The
+decision belongs to architecture review, and this plan has to be executable either
+way, so it branches here.
+
+| Outcome | Phase 1 tasks that run | Tasks that are dropped |
+|---|---|---|
+| **slogx** (RFC proposal) | 1.1 build `slogx`, 1.1b retire unused adapters, 1.1c `obsx` drops its zap-typed API | — |
+| **Keep Zap** (audit recommendation) | 1.1c′ add the central redaction boundary and the stable event helper to `logger/zapx`; 1.1c still runs for the SDK-type leak only | 1.1, 1.1b |
+
+Either outcome leaves Tasks 1.2 through 1.5 and every later phase unchanged. The
+shared-package rule, the tracing, metrics and profiling contracts, and the fleet
+enforcement do not depend on which logger sits behind the facade.
+
+**Verification:** the decision is recorded in ADR-070 with the evidence the audit
+asked for — a benchmark of both facades under fleet log volume and a redaction test
+suite both pass — or with an explicit statement that acceptance proceeds without it.
+
+### Task 0.1: Approve the resulting decisions
 
 **Acceptance criteria:**
 
-- The ADR names pkg/logger/slogx as the sole service-facing facade.
-- The ADR records the pre-1.0 OTel Logs API containment and the clean-cutover cost.
+- ADR-070 names the facade chosen in Task 0.0 and records the pre-1.0 OTel Logs API
+  containment and the cutover cost.
+- ADR-071 through ADR-076 are created at `Proposed` and reviewed together.
 - The target contract is approved with SemConv v1.41.0 as its baseline.
 
-**Verification:** architecture review approves the six resulting ADRs, ADR-070 through ADR-075.
+**Verification:** architecture review approves the seven resulting ADRs, ADR-070 through ADR-076.
 
 ### Task 0.2: Freeze the catalog and privacy boundary
 
@@ -62,6 +82,35 @@ is retired.
 
 **Verification:** no service `go.mod` references a removed module; `make modules`
 lists the expected set.
+
+### Task 1.1c: Close the type leaks in the shared package's public API
+
+The fleet rule "a service imports only the shared package and the OTel API" cannot
+be enforced while the shared package itself forces `main()` to import SDK and Zap
+types. Today `obsx.WithTracerProviderFactory` takes
+`func(...sdktrace.TracerProviderOption)`, `obsx.ZapCore` returns `zapcore.Core`, and
+`obsx.TraceContext` returns `zap.Field`; every service `cmd/main.go` imports
+`go.opentelemetry.io/otel/sdk/trace`, `go.uber.org/zap` and `go.uber.org/zap/zapcore`
+solely to call them. `obsx` is also the fleet's `otelzap` consumer
+(`obsx.ZapCore` wraps `otelzap.NewCore`).
+
+**Acceptance criteria:**
+
+- `obsx` exposes no `go.opentelemetry.io/otel/sdk/*`, `go.uber.org/zap` or
+  `go.uber.org/zap/zapcore` type in any exported signature. The tracer-provider seam
+  takes an opaque option or returns the API `trace.TracerProvider`; the log bridge is
+  constructed inside the facade the Task 0.0 decision selects.
+- `obsx` drops its `otelzap` dependency when the slogx outcome is chosen; under the
+  keep-Zap outcome it keeps the bridge but still removes the zap-typed public API.
+- This is a **breaking** `obsx` release with a migration note; every service `cmd/main.go`
+  is updated in Phase 3.
+- The fleet lint policy's `!cmd/**` exemption is removed in the same release train.
+
+**Dependencies:** Task 0.0; Task 1.1 when slogx is chosen.
+
+**Verification:** a `depguard` run over `obsx` and over each migrated service's
+`cmd/` passes with no `cmd/**` exemption; `go doc` of the exported `obsx` API shows
+no SDK or Zap type.
 
 ### Task 1.2: Repair correlation and resource identity
 

@@ -221,7 +221,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 1. **[Metrics Guide](./observability/metrics/README.md)** - Complete metrics documentation
    - 4 custom application metrics (RED method)
    - 40 data panels across 6 row groups in the Grafana dashboard
-   - Exemplars, path normalization, auto-discovery
+   - Path normalization, auto-discovery (VictoriaMetrics does not support exemplars — RFC-0014 D-14)
 
 2. **[PromQL Guide](./observability/metrics/promql-guide.md)** - Complete guide to PromQL functions
    - `rate()` vs `increase()` functions
@@ -520,4 +520,4 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-08-06 — RFC-0021 closed (P0–P7); inventory is the sole stock authority._
+_Last updated: 2026-09-17 — the metrics guide bullet no longer advertises exemplars, which VictoriaMetrics does not support (RFC-0014 D-14). Previously 2026-08-06 — RFC-0021 closed (P0–P7); inventory is the sole stock authority._

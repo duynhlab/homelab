@@ -803,6 +803,20 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Seven as-built statements in `docs/` caught up with reality.** `metrics.md`,
+  `tracing.md`, `logs.md` and `observability.md` said traces reach **five** stores;
+  they reach two (VictoriaTraces and ClickHouse — the span-metrics connector is a
+  metrics source).
+  `logs.md` opened with the target access-log schema presented as what `kubectl
+  logs` shows, while a later section said it is not yet as-built; the sample is now
+  labelled as the target and the legacy keys the fleet still emits sit beside it.
+  `pkg.md` still listed the archived `auth` service as a live consumer, and it and
+  `api.md` counted eleven services; both say ten. `tracing.md`'s production table still carried a
+  `~10%` sampling row orphaned by the move to a 50 base rate. `docs/README.md`
+  advertised exemplars the metrics store does not support. `docs/platform/setup.md`'s
+  clone list omitted `admin-service`, which local-stack builds — a fresh checkout
+  failed at `docker compose up --build`. Found while verifying RFC-0031 live.
+
 - **The `product-db-replica` rebuild procedure now handles Barman's non-empty
   archive gate explicitly.** The owner-approved path suspends the leaf Flux
   wave, rotates only the DR write `serverName` to a unique Git-tracked

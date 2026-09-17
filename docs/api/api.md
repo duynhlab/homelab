@@ -683,7 +683,7 @@ A service starts its gRPC server whenever it implements one. There is no
 | Package name | `<service>.v1` | Mirrors HTTP major version |
 | Compatibility check | Buf lint and breaking checks | Breaking changes require a new version |
 
-Keeping protos in a shared module avoids copying request structs across eleven
+Keeping protos in a shared module avoids copying request structs across ten
 repositories. Since the per-module split, `proto` releases on its own tag line,
 so a contract change moves only the services that speak that contract — see
 [pkg.md](./pkg.md).
@@ -866,4 +866,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._
+_Last updated: 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._

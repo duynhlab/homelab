@@ -37,13 +37,21 @@ kubectl logs -n cart deployment/cart --tail=50
 
 ### Log output format
 
-Canonical access-log line (middleware-owned summary):
+Canonical access-log line (middleware-owned summary) — **the contract target, not
+yet what the fleet emits**; see [Access-log policy](#access-log-policy) for the
+as-built keys:
 
 ```json
 {"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"httpmw/logging.go:192","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"duration_seconds":0.042}
 ```
 
-The stdout line is what `kubectl logs` shows; the same record is also exported over OTLP by
+What `kubectl logs` shows **today** carries the legacy keys the same middleware
+still emits — `method`, `path`, `status`, `duration`, plus `client_ip` and
+`user_agent` — so a query written against the target keys above returns nothing on
+the current fleet. The envelope (`level`, `timestamp`, `caller`, `message`,
+`trace_id`) is identical in both shapes.
+
+The stdout line is also exported over OTLP by
 the otelzap tee, and the collector's `logs` pipeline writes it to **both** VictoriaLogs and
 ClickHouse. The two are retention tiers, not a mistake: 7 days of LogsQL for ops, 90 days of
 SQL for questions that cross days.
@@ -375,4 +383,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-23 — the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

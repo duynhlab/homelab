@@ -903,6 +903,15 @@ No other OTel resource attribute automatically becomes a profile label. User,
 workflow, run, request, trace, order, session, payment, SKU and pod identifiers,
 raw paths, addresses, secrets and arbitrary input are forbidden.
 
+The closed set is a **target, not the as-built state**. Measured on local-stack,
+profiles carry `service_name` and six labels the contract does not name —
+`hostname`, `pyroscope_spy`, `target`, `service_git_ref`, `service_repository` and
+`span_name` — which arrive from the SDK's defaults and from the span-scoped CPU
+profile, not from resource attributes. Each is either admitted here explicitly
+(`span_name` is what makes a CPU profile span-scoped and stays; `hostname` duplicates
+pod identity and is bounded) or stripped in the shared helper; the delivery plan
+decides per label, and the verification gate counts the label set exactly.
+
 **This narrows the deployed contract, and the change is deliberate.** The current
 as-built policy also permits "low-cardinality deployment identity from resource
 attributes", which is open-ended: it has no list, so two services can disagree about
@@ -1035,6 +1044,19 @@ property of its configuration, not a capacity number.
 - The edge-log exception is part of the routing table, not folklore: edge access
   logs go to the 90-day store only, by decision, and the two log pipelines are the
   mechanism.
+- **The edge and the fleet speak two semantic-convention generations, and the
+  Collector is where that is reconciled.** Measured on local-stack: spans from the
+  services carry the pinned names (`http.request.method`, `http.response.status_code`,
+  `http.route`, `url.path`, `user_agent.original`, `client.address`), while spans from
+  the edge gateway carry the pre-stability names (`http.method`, `http.status_code`,
+  `http.url`, `user_agent`, `peer.address`) plus Envoy's own (`upstream_cluster`,
+  `component`, `response_flags`, `guid:x-request-id`). Any consumer that joins edge
+  and service spans on an HTTP attribute, including the span-metrics dimensions,
+  sees two vocabularies. A service must not paper over this; the Collector owns the
+  normalisation — a `transform` processor that maps the edge's legacy keys onto the
+  pinned names at ingest, or an edge configuration change if the gateway gains
+  stable-convention output — and the span-metrics amendment in the delivery plan is
+  decided together with it.
 
 ### Fleet scale
 
@@ -1094,6 +1116,16 @@ place; the normative text stays in the subsections it belongs to.
   values and arbitrary headers are removed by policy. The current access logger
   emits two of those fields today, which the audit records as a privacy-policy
   violation this RFC closes.
+- **Spans carry more than the log policy allows, and the RFC says so rather than
+  hiding it.** Measured on local-stack: the shared HTTP instrumentation puts
+  `client.address`, `user_agent.original` and `url.path` on every server span, and the
+  shared database instrumentation puts `db.statement` and `db.connection_string` on
+  every query span. All are semantic-convention attributes emitted by upstream
+  instrumentation, not by service code, so a service cannot remove them and the
+  shared-package rule is the only place they can be governed. The tracing task in the
+  delivery plan decides, per attribute, whether it is permitted on spans (bounded,
+  operationally useful) or dropped by a shared span processor; until then the
+  asymmetry between the log policy and the span payload is a known, recorded gap.
 - **Baggage.** Baggage rides every outbound call, including calls to third-party
   providers. The platform default is no application baggage; an approved key must
   never carry PII, tokens or secrets and must be stripped before an external call.

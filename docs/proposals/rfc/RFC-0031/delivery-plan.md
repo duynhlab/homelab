@@ -155,6 +155,10 @@ no SDK or Zap type.
   empty fleet-wide; after this task both `deployment_environment` and
   `service_version` are populated on every process, verified by a Pyroscope
   label-values query.
+- The six labels the SDK adds outside the contract — `hostname`, `pyroscope_spy`,
+  `target`, `service_git_ref`, `service_repository`, `span_name` — are each admitted
+  to the contract or stripped in the shared helper; the Pyroscope label-names query
+  after this task returns exactly the admitted set.
 - Profiling failure/disable paths preserve readiness, and runtime sampling changes have benchmark evidence.
 
 **Dependencies:** Task 1.2.

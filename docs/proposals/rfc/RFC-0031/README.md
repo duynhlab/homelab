@@ -7,7 +7,7 @@
 ## Summary
 
 Adopt one application telemetry contract across logs, metrics, traces and
-continuous profiles. Logging moves to pkg/obslog with native EventName;
+continuous profiles. Logging moves to pkg/logger/slogx with native EventName;
 metrics retain the OTel Meter API and VictoriaMetrics with stricter instrument,
 bucket, cardinality and replay rules; profiling retains the shared Pyroscope
 SDK path with an explicit label, overhead, lifecycle and correlation contract.
@@ -61,7 +61,7 @@ explicit verification gate despite being enabled fleet-wide.
 
 ## Proposal
 
-pkg/obslog becomes the only application logging facade. Its diagnostic methods
+pkg/logger/slogx becomes the only application logging facade. Its diagnostic methods
 emit structured slog records. Its context-first event method emits an OTel log
 record whose native EventName is a lower-case dot-separated, stable identifier.
 The message is short display text; values belong in typed attributes.
@@ -103,7 +103,7 @@ bounded shutdown and an honest manual trace-to-profile workflow.
 
 | Option | Benefit | Cost | Status |
 |--------|---------|------|--------|
-| pkg/obslog facade over slog plus direct OTel Logs API | Native events, one policy boundary, stable service API | Fleet migration; OTel Logs API remains pre-1.0 | Proposed |
+| pkg/logger/slogx facade over slog plus direct OTel Logs API | Native events, one policy boundary, stable service API | Fleet migration; OTel Logs API remains pre-1.0 | Proposed |
 | Custom Zap facade | Smaller initial code diff | Requires a second native-event path and retains Zap | Rejected |
 | Raw OTel Logs API in every service | Full record control | Duplicates redaction, correlation and tests | Rejected |
 | Preserve VictoriaMetrics and Pyroscope with stricter shared contracts | No backend migration; fixes measured contract gaps | Requires metric/profile tests and service-version convergence | Proposed |
@@ -124,7 +124,7 @@ For the detailed source comparison and migration inventory, see
 
 **Chosen option:** undecided — architecture review pending.
 
-**Rationale:** The research recommendation is the pkg/obslog facade over slog
+**Rationale:** The research recommendation is the pkg/logger/slogx facade over slog
 plus the direct OTel Logs API because it is the only option that provides native
 EventName and a single redaction boundary. Formal selection belongs to
 architecture review.
@@ -142,7 +142,7 @@ metrics, traces and profiles.
 
 ~~~mermaid
 flowchart LR
-    A["Service or worker"] --> L["pkg/obslog<br/>logs"]
+    A["Service or worker"] --> L["pkg/logger/slogx<br/>logs"]
     A --> M["OTel Meter API<br/>metrics"]
     A --> T["OTel Tracer API<br/>traces"]
     A --> P["pyroscope-go<br/>profiles"]
@@ -292,6 +292,29 @@ behaviours are required:
 The facade replaces direct Zap, slog, otelzap and OTel Logs API use in
 application repositories. Instrumentation packages may remain the sole
 implementation boundary for the OTel API.
+
+#### Placement in the shared package
+
+The facade ships as `pkg/logger/slogx`, a sibling of the existing `logger/zapx`,
+`logger/zerolog` and `logger/clog` modules. Three constraints from `duynhlab/pkg`
+govern the placement and are binding on the resulting ADR:
+
+- **`logger/` is a namespace, not a module.** Each backend adapter carries its own
+  `go.mod` and its own `<module-path>/v<semver>` tag. The repository has no
+  top-level `go.mod` and none may be created, so the facade cannot be named
+  `pkg/logger`; it must be a named sibling.
+- **A logger module may link the OTel API but never the SDK.** `logger/*` may
+  import `go.opentelemetry.io/otel` and its API packages, including
+  `go.opentelemetry.io/otel/log`; importing `go.opentelemetry.io/otel/sdk` or
+  `pkg/obsx` is denied by `depguard`. Setting a native EventName needs only the
+  API, so the facade stays inside that boundary. This is also why the facade is
+  not named `obslog`: the `obs*` prefix belongs to `obsx`, the one module that is
+  allowed to link the SDK.
+- **The cutover retires adapters, it does not accumulate them.** `logger/zapx` is
+  the only adapter any service imports today; `logger/zerolog` and `logger/clog`
+  have no consumers. Adding a fourth adapter while two stay unused is not an
+  acceptable end state, so the same release that lands `slogx` removes `zerolog`
+  and `clog`.
 
 ### Canonical attributes
 
@@ -508,7 +531,7 @@ generates trace_id, span_id or parent_span_id.
 
 After acceptance and ADR approval, implementation lands in this order:
 
-1. Build and contract-test obslog, resource versioning and independent W3C propagation.
+1. Build and contract-test slogx, resource versioning and independent W3C propagation.
 2. Migrate all listed services, workers, consumers and mockpay using the remediation matrix in [research.md](./research.md).
 3. Verify metric contracts in VictoriaMetrics and profile coverage in Pyroscope.
 4. Replace ClickHouse dashboards, query examples and runbooks in the same release.

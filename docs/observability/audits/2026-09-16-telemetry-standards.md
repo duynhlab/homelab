@@ -13,7 +13,7 @@ OpenTelemetry LogRecords have top-level `Timestamp`, `ObservedTimestamp`, trace 
 | Area | Observed state | Assessment |
 |---|---|---|
 | Profiling | All ten services call `obsx.SetupProfiling`; both worker modes use the same binaries and enable profiling. The SDK is configured to push ten Go profile types directly to Pyroscope. | **Implemented with contract gaps.** The four-label allowlist exists, but API services lack `service.version`, runtime sampling has no reviewed overhead budget, and Grafana's VictoriaTraces datasource supports only a manual trace-to-profile pivot. |
-| Logger | All active services pin `github.com/duynhlab/pkg/logger/zapx v0.36.0`; OTLP bridge is `otelzap`. | **Conformant transport, insufficient target interface.** OTel conformance alone does not require migration, but RFC-0031 selects `obslog` to enforce native EventName, redaction and one fleet API if accepted. |
+| Logger | All active services pin `github.com/duynhlab/pkg/logger/zapx v0.36.0`; OTLP bridge is `otelzap`. | **Conformant transport, insufficient target interface.** OTel conformance alone does not require migration, but RFC-0031 selects `slogx` to enforce native EventName, redaction and one fleet API if accepted. |
 | Logs | HTTP middleware emits JSON and native OTLP trace IDs; gRPC access logs use `trace_id`, `method`, `code`, `duration`. | **Partial.** No production call sites use `EventName`/`event.name`; HTTP fields are `method`, `path`, `status`, rather than the OTel HTTP names. |
 | Resource | Kubernetes templates set `OTEL_SERVICE_NAME`, namespace, pod, and environment; workers additionally set `service.version` from build ID. | **Partial.** `service.version` is not consistently supplied to API services; `cloud.region` is not established. |
 | Tracing | HTTP middleware, gRPC interceptors, DB instrumentation, and Temporal workers are present. | **Partial.** W3C propagator is installed only inside the enabled tracer-provider branch. Export-disabled processes can therefore lose inbound/outbound propagation. |
@@ -123,7 +123,7 @@ The Collector `v0.159.0` exporter inserts the OTel fields and optional `EventNam
 ## Recommended rollout
 
 1. Fix propagation and add shared redaction tests; these are safety/correlation controls.
-2. Build the selected `obslog` facade and native EventName path, then complete the owner-selected clean cutover across every service, worker and access logger without a legacy dual-write window.
+2. Build the selected `slogx` facade and native EventName path, then complete the owner-selected clean cutover across every service, worker and access logger without a legacy dual-write window.
 3. Make `service.version` uniform, converge `obsx`, approve the two missing histogram boundary sets, and verify bounded series in VictoriaMetrics.
 4. Gate Pyroscope coverage for all services and workers, enforce the four-label allowlist, benchmark sampling changes, and verify the documented manual trace pivot.
 5. Add Collector/schema compatibility CI and migrate ClickHouse queries, dashboards and runbooks in the same promotion unit as the application cutover.

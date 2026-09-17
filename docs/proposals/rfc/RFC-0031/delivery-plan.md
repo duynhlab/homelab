@@ -10,7 +10,7 @@ are accepted.
 
 **Acceptance criteria:**
 
-- The ADR names pkg/obslog as the sole service-facing facade.
+- The ADR names pkg/logger/slogx as the sole service-facing facade.
 - The ADR records the pre-1.0 OTel Logs API containment and the clean-cutover cost.
 - The target contract is approved with SemConv v1.41.0 as its baseline.
 
@@ -28,15 +28,40 @@ are accepted.
 
 ## Phase 1 — shared foundations
 
-### Task 1.1: Build pkg/obslog
+### Task 1.1: Build pkg/logger/slogx
 
 **Acceptance criteria:**
 
+- The module lands at `logger/slogx` with its own `go.mod` and its own
+  `logger/slogx/v<semver>` tag, as a sibling of `logger/zapx`. No top-level or
+  `logger/` parent module is created.
+- The module imports the OTel **API** only; a `depguard` run proves it links neither
+  `go.opentelemetry.io/otel/sdk` nor `pkg/obsx`.
 - Native EventName, severity mapping, safe stdout JSON and OTLP record are emitted from one facade.
 - Redaction runs before both sinks and is tested for nested values and errors.
 - Direct Zap and otelzap application usage has a documented removal path.
 
-**Verification:** package unit tests and disposable Collector-to-ClickHouse integration test.
+**Verification:** package unit tests, `make test-logger:slogx`, and a disposable
+Collector-to-ClickHouse integration test.
+
+### Task 1.1b: Retire the unused logger adapters
+
+`logger/zapx` is the only adapter any service imports; `logger/zerolog` and
+`logger/clog` have no consumers. Shipping `slogx` beside two dead adapters leaves
+four logger modules where one is used.
+
+**Acceptance criteria:**
+
+- `logger/zerolog` and `logger/clog` are removed in the same release that retires
+  `logger/zapx` from the fleet.
+- The shared-package contract records which adapter each historical tag belongs to,
+  so an old service pin still resolves.
+
+**Dependencies:** Task 1.1, and the fleet migration in Phase 3 before `zapx` itself
+is retired.
+
+**Verification:** no service `go.mod` references a removed module; `make modules`
+lists the expected set.
 
 ### Task 1.2: Repair correlation and resource identity
 
@@ -208,7 +233,7 @@ are accepted.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| OTel Go Logs API changes before v1 | Shared package churn | Contain direct API use in obslog and version-pin integration tests |
+| OTel Go Logs API changes before v1 | Shared package churn | Contain direct API use in slogx and version-pin integration tests |
 | Partial fleet migration | Two incompatible query contracts | Promote only after all service, worker, dashboard and runbook gates pass |
 | Temporal replay duplicates telemetry | Misleading events and metric overcount | Use workflow-aware logger; test replay; emit side-effect telemetry only from activities |
 | Redaction bypass | Sensitive data reaches retained stores | One recursive boundary, deny-list tests and fixtures through both sinks |

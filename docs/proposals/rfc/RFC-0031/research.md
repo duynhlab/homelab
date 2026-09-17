@@ -43,7 +43,7 @@ message remains an unnamed log record.
 
 ```mermaid
 flowchart LR
-    A["Go service or worker"] --> B["pkg/obslog"]
+    A["Go service or worker"] --> B["pkg/logger/slogx"]
     B --> C["JSON stdout<br/>slog"]
     B --> D["OTel LogRecord<br/>EventName + attributes"]
     D --> E["OTLP Collector"]
@@ -62,11 +62,11 @@ flowchart LR
 
 | Option | Strength | Cost | Result |
 |---|---|---|---|
-| `pkg/obslog` facade over `slog` plus direct OTel Logs API | One application API, standard JSON logging, native EventName, one redaction boundary | OTel Go Logs API is pre-1.0; all call sites migrate | **Recommended** |
+| `pkg/logger/slogx` facade over `slog` plus direct OTel Logs API | One application API, standard JSON logging, native EventName, one redaction boundary | OTel Go Logs API is pre-1.0; all call sites migrate | **Recommended** |
 | Custom Zap facade | Smaller first diff | Still requires a second direct-OTel path for EventName and retains Zap | Rejected |
 | Raw OTel Logs API in every service | Full LogRecord control | Repeats severity, redaction, output and test logic | Rejected |
 
-The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0.20.0`) inside `pkg`. Services receive a stable context-first API. `obslog.Event` sets native `LogRecord.EventName`; `Debug`/`Info`/`Warn`/`Error` create diagnostic records without pretending every line is an event.
+The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0.20.0`) inside `pkg`. Services receive a stable context-first API. `slogx.Event` sets native `LogRecord.EventName`; `Debug`/`Info`/`Warn`/`Error` create diagnostic records without pretending every line is an event.
 
 ## Proposed contract to validate in RFC review
 
@@ -87,7 +87,7 @@ The facade isolates the unstable OTel Logs API (`go.opentelemetry.io/otel/log v0
 
 | Surface | Evidence | Required migration |
 |---|---|---|
-| Logger setup | `pkg/logger/zapx` and `pkg/obsx` use Zap plus `otelzap` | Replace with `obslog`; remove bridge-only context fields. |
+| Logger setup | `pkg/logger/zapx` and `pkg/obsx` use Zap plus `otelzap` | Replace with `slogx`; remove bridge-only context fields. |
 | HTTP access | `pkg/httpmw/logging.go` | Emit canonical HTTP attributes; remove client IP and User-Agent. |
 | gRPC access | `pkg/grpcx/logging.go` | Emit canonical RPC attributes; remove peer address. |
 | Workers | Order saga uses Temporal replay-safe logger; checkout worker emits Zap logs | Introduce replay-safe workflow adapter and context-first activity logger. |
@@ -113,7 +113,7 @@ criteria concrete.
 
 | Surface | Audited state | Required change | Evidence before rollout |
 |---|---|---|---|
-| user-service | 54 logging call sites; no stable event | Replace Zap calls and HTTP access contract with obslog | Event, redaction and HTTP-contract tests |
+| user-service | 54 logging call sites; no stable event | Replace Zap calls and HTTP access contract with slogx | Event, redaction and HTTP-contract tests |
 | product-service | 111 logging call sites; HTTP and gRPC client paths | Replace logger and preserve client trace context | HTTP/gRPC correlation test |
 | inventory-service | 56 logging call sites; gRPC entry path | Replace gRPC access record and domain events | RPC-record contract test |
 | cart-service | 59 logging call sites; HTTP and gRPC paths | Replace access records and domain events | HTTP/RPC contract test |
@@ -123,7 +123,7 @@ criteria concrete.
 | notification-service | 60 logging call sites | Replace consumer and domain-event records | Consumer correlation and redaction test |
 | payment-service and mockpay | 109 logging call sites | Replace payment outcome records and mock-provider logs | Provider failure and safe-error test |
 | checkout-service and worker | 91 logging call sites | Replace checkout records and worker events | Checkout workflow and correlation test |
-| pkg/obsx and logger packages | Zap and otelzap cannot set native EventName; propagator installation is conditional | Add obslog, remove bridge, install W3C independently of export | Package unit and integration tests |
+| pkg/obsx and logger packages | Zap and otelzap cannot set native EventName; propagator installation is conditional | Add slogx, remove bridge, install W3C independently of export | Package unit and integration tests |
 | API ResourceSets and worker manifests | API services lack a uniform version source; workers use build metadata | Set a consistent service-version contract | Resource-record assertions |
 | ClickHouse, Grafana and documentation | Three dashboards and three documents query legacy access attributes | Move SQL, panels, examples and runbooks to EventName and canonical attributes | Query regression suite and rendered dashboard review |
 | VictoriaMetrics and metric catalog | Two seconds histograms use generic defaults; obsx pins differ | Converge shared Views/version and approve boundaries, attributes and replay semantics | Series/cardinality and p50/p95/p99 query tests |

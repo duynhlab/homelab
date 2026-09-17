@@ -90,12 +90,6 @@ Skeleton (copy what you need):
 
 ### Feature
 
-#### Observability
-
-- Added the 2026-09-16 logs, traces, metrics, profiling, and ClickHouse telemetry standards audit.
-
-### Feature
-
 #### GitOps
 
 - **KEDA 2.20.2 installed as its own Flux wave, `keda-local`** ([ADR-055](docs/proposals/adr/ADR-055-keda-worker-autoscaling/README.md)).
@@ -126,6 +120,11 @@ Skeleton (copy what you need):
   idle pod per drained version for a day and remove the flap.
 
 #### Observability
+
+- **Telemetry standards audit (2026-09-16).** A static conformance review of logs,
+  traces, metrics, profiling and the ClickHouse consumers across the ten services
+  and both worker modes. No running service, manifest, dashboard or telemetry
+  datum is changed by it.
 
 - **ClickHouse now has a beginner-to-day-2 learning path and dated Kind
   evidence.** Parts, merges, partitions, TTL, cold-tier ownership, secure
@@ -446,6 +445,18 @@ Skeleton (copy what you need):
   stays platform + Grafana + alerts + playground.
 
 #### Proposals
+
+- **RFC-0031 opened at `provisional`, third revision.** A greenfield cross-signal
+  application telemetry standard for logs, traces, metrics and continuous profiles,
+  built on one rule: a service imports the shared package and the OpenTelemetry API
+  and nothing else, enforced by a fleet lint policy. The revision adds a tracing
+  contract, Collector and fleet-scale contracts, a semantic-convention registry, the
+  three template sections that were missing, and ADR-070 through ADR-076 reserved.
+  Its deployed-reality claims were measured live on local-stack and a fresh Kind
+  cluster and corrected where they disagreed. The logging-facade choice is
+  deliberately unsettled: the audit recommends keeping Zap, the RFC proposes
+  `pkg/logger/slogx`, and architecture review decides. Acceptance installs nothing
+  and changes no application contract.
 
 - **RFC-0030 and ADR-066 through ADR-069 are `Accepted / Not started`.** The
   records close the PeerDB transport, explicit source egress, `pg_cron`

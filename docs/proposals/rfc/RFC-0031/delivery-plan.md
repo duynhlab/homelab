@@ -6,15 +6,35 @@ are accepted.
 
 ## Phase 0 — contract approval
 
-### Task 0.1: Approve the logging facade decision
+### Task 0.0: Decide the logging facade
+
+The RFC proposes `pkg/logger/slogx`; the audit recommends keeping `logger/zapx`. The
+decision belongs to architecture review, and this plan has to be executable either
+way, so it branches here.
+
+| Outcome | Phase 1 tasks that run | Tasks that are dropped |
+|---|---|---|
+| **slogx** (RFC proposal) | 1.1 build `slogx`, 1.1b retire unused adapters, 1.1c `obsx` drops its zap-typed API | — |
+| **Keep Zap** (audit recommendation) | 1.1c′ add the central redaction boundary and the stable event helper to `logger/zapx`; 1.1c still runs for the SDK-type leak only | 1.1, 1.1b |
+
+Either outcome leaves Tasks 1.2 through 1.5 and every later phase unchanged. The
+shared-package rule, the tracing, metrics and profiling contracts, and the fleet
+enforcement do not depend on which logger sits behind the facade.
+
+**Verification:** the decision is recorded in ADR-070 with the evidence the audit
+asked for — a benchmark of both facades under fleet log volume and a redaction test
+suite both pass — or with an explicit statement that acceptance proceeds without it.
+
+### Task 0.1: Approve the resulting decisions
 
 **Acceptance criteria:**
 
-- The ADR names pkg/obslog as the sole service-facing facade.
-- The ADR records the pre-1.0 OTel Logs API containment and the clean-cutover cost.
+- ADR-070 names the facade chosen in Task 0.0 and records the pre-1.0 OTel Logs API
+  containment and the cutover cost.
+- ADR-071 through ADR-076 are created at `Proposed` and reviewed together.
 - The target contract is approved with SemConv v1.41.0 as its baseline.
 
-**Verification:** architecture review approves the five resulting ADRs.
+**Verification:** architecture review approves the seven resulting ADRs, ADR-070 through ADR-076.
 
 ### Task 0.2: Freeze the catalog and privacy boundary
 
@@ -28,15 +48,69 @@ are accepted.
 
 ## Phase 1 — shared foundations
 
-### Task 1.1: Build pkg/obslog
+### Task 1.1: Build pkg/logger/slogx
 
 **Acceptance criteria:**
 
-- Native EventName, severity mapping, safe stdout JSON and OTLP record are emitted from one facade.
+- The module lands at `logger/slogx` with its own `go.mod` and its own
+  `logger/slogx/v<semver>` tag, as a sibling of `logger/zapx`. No top-level or
+  `logger/` parent module is created.
+- The module imports the OTel **API** only; a `depguard` run proves it links neither
+  `go.opentelemetry.io/otel/sdk` nor `pkg/obsx`.
+- Stable event naming, severity mapping, safe stdout JSON and OTLP record are emitted from one facade.
 - Redaction runs before both sinks and is tested for nested values and errors.
 - Direct Zap and otelzap application usage has a documented removal path.
 
-**Verification:** package unit tests and disposable Collector-to-ClickHouse integration test.
+**Verification:** package unit tests, `make test-logger:slogx`, and a disposable
+Collector-to-ClickHouse integration test.
+
+### Task 1.1b: Retire the unused logger adapters
+
+`logger/zapx` is the only adapter any service imports; `logger/zerolog` and
+`logger/clog` have no consumers. Shipping `slogx` beside two dead adapters leaves
+four logger modules where one is used.
+
+**Acceptance criteria:**
+
+- `logger/zerolog` and `logger/clog` are removed in the same release that retires
+  `logger/zapx` from the fleet.
+- The shared-package contract records which adapter each historical tag belongs to,
+  so an old service pin still resolves.
+
+**Dependencies:** Task 1.1, and the fleet migration in Phase 3 before `zapx` itself
+is retired.
+
+**Verification:** no service `go.mod` references a removed module; `make modules`
+lists the expected set.
+
+### Task 1.1c: Close the type leaks in the shared package's public API
+
+The fleet rule "a service imports only the shared package and the OTel API" cannot
+be enforced while the shared package itself forces `main()` to import SDK and Zap
+types. Today `obsx.WithTracerProviderFactory` takes
+`func(...sdktrace.TracerProviderOption)`, `obsx.ZapCore` returns `zapcore.Core`, and
+`obsx.TraceContext` returns `zap.Field`; every service `cmd/main.go` imports
+`go.opentelemetry.io/otel/sdk/trace`, `go.uber.org/zap` and `go.uber.org/zap/zapcore`
+solely to call them. `obsx` is also the fleet's `otelzap` consumer
+(`obsx.ZapCore` wraps `otelzap.NewCore`).
+
+**Acceptance criteria:**
+
+- `obsx` exposes no `go.opentelemetry.io/otel/sdk/*`, `go.uber.org/zap` or
+  `go.uber.org/zap/zapcore` type in any exported signature. The tracer-provider seam
+  takes an opaque option or returns the API `trace.TracerProvider`; the log bridge is
+  constructed inside the facade the Task 0.0 decision selects.
+- `obsx` drops its `otelzap` dependency when the slogx outcome is chosen; under the
+  keep-Zap outcome it keeps the bridge but still removes the zap-typed public API.
+- This is a **breaking** `obsx` release with a migration note; every service `cmd/main.go`
+  is updated in Phase 3.
+- The fleet lint policy's `!cmd/**` exemption is removed in the same release train.
+
+**Dependencies:** Task 0.0; Task 1.1 when slogx is chosen.
+
+**Verification:** a `depguard` run over `obsx` and over each migrated service's
+`cmd/` passes with no `cmd/**` exemption; `go doc` of the exported `obsx` API shows
+no SDK or Zap type.
 
 ### Task 1.2: Repair correlation and resource identity
 
@@ -44,6 +118,13 @@ are accepted.
 
 - W3C extraction/injection works with all exporters disabled.
 - API services and workers emit service name, version and environment consistently.
+  The version source for domain services is the existing `image_tag` input, wired
+  into `OTEL_RESOURCE_ATTRIBUTES` as `service.version` in the domain ResourceSets;
+  `mockpay` gets an explicit version input because its image is hand-pinned.
+- Kubernetes identity keeps its current mechanism — Downward API into
+  `K8S_NAMESPACE_NAME` / `K8S_POD_NAME` / `DEPLOYMENT_ENVIRONMENT`, mapped by the
+  shared package — and the contract lists exactly the three attributes that mechanism
+  produces. Adding collector-side `k8sattributes` enrichment is decided in Phase 4.
 - Shutdown flush is bounded and follows readiness/work draining.
 
 **Dependencies:** Task 1.1.
@@ -68,17 +149,53 @@ are accepted.
 
 - All services and both worker modes use one shared profiler lifecycle.
 - Profiles expose only the approved service, namespace, environment and version labels.
+- The profiler derives those labels from the same resource the tracer and meter use.
+  Today it re-parses `OTEL_RESOURCE_ATTRIBUTES` for the deprecated key
+  `deployment.environment`, which no manifest sets, so `deployment_environment` is
+  empty fleet-wide; after this task both `deployment_environment` and
+  `service_version` are populated on every process, verified by a Pyroscope
+  label-values query.
+- The labels the SDK adds outside the contract — `pyroscope_spy` and `span_name` on
+  every application profile, plus `hostname`, `target`, `service_git_ref` and
+  `service_repository` where the SDK's environment supplies them — are each admitted
+  to the contract or stripped in the shared helper; a Pyroscope label-names query
+  scoped to each service after this task returns exactly the admitted set. The
+  profiling agent's self-scrape series are excluded from that check by service name.
 - Profiling failure/disable paths preserve readiness, and runtime sampling changes have benchmark evidence.
 
 **Dependencies:** Task 1.2.
 
 **Verification:** Pyroscope ingestion test, profile-label query, disable/failure test and trace-to-profile manual-pivot check.
 
+### Task 1.5: Enforce the tracing contract
+
+**Acceptance criteria:**
+
+- The sampling table in the RFC matches the edge configuration each environment
+  actually applies; a change to any rate is reviewed as a volume and cost change.
+- Every manual span created through the shared helper carries exactly one kind that
+  matches its layer and a package-path instrumentation scope; a wrapper span around
+  already-instrumented work fails review.
+- Span status follows the recording-errors rule: unset for an expected business
+  rejection, Error plus `error.type` for an unexpected failure; exceptions use the
+  standard exception span event with bounded attributes.
+- No application baggage key is set without a registered review, and no key carries
+  PII, tokens or secrets.
+- The probe and health skip-list is one shared list pinned by a unit test that the
+  trace and metric paths both read.
+
+**Dependencies:** Task 1.2.
+
+**Verification:** sampling assertion against the applied edge config, span-kind and
+scope tests in the shared helper, an error-status contract test with one expected
+rejection and one unexpected failure, a baggage-denylist test, and the shared
+skip-list test.
+
 ## Checkpoint — shared package
 
 - Shared package tests pass.
 - No resource or propagation regression is accepted.
-- Contract tests can assert native EventName in ClickHouse.
+- Contract tests can assert a stable event name in ClickHouse.
 - Metrics are queryable in VictoriaMetrics with bounded series.
 - CPU and heap profiles are queryable in Pyroscope with the expected labels.
 
@@ -145,7 +262,11 @@ are accepted.
 
 - Checkout's idempotency, required token redaction and abandonment workflow remain intact.
 - Expected business rejections remain distinguishable from infrastructure failure.
-- Mockpay follows the same safe provider logging contract.
+- Mockpay is onboarded to the shared package from zero: its manifest gains the same
+  telemetry environment as a domain service (`OTEL_SERVICE_NAME`, collector endpoint,
+  per-signal enable flags, `DEPLOYMENT_ENVIRONMENT`, `K8S_*`, `PROFILING_ENABLED`) and
+  an explicit version input, and it then follows the same safe provider logging
+  contract.
 
 **Dependencies:** Task 3.2.
 
@@ -154,7 +275,7 @@ are accepted.
 ## Checkpoint — full fleet
 
 - No service, worker or mockpay production import uses Zap or otelzap.
-- No legacy event or access key remains in emitted fixtures.
+- No legacy access key remains in emitted fixtures; the `event` attribute is present on every named record.
 - Full service-repository test suites pass at their pinned package version.
 
 ## Phase 4 — analytics and operations
@@ -163,8 +284,9 @@ are accepted.
 
 **Acceptance criteria:**
 
-- Dashboards, SQL examples, panel variables and trace-log pivots use EventName and canonical attributes.
+- Dashboards, SQL examples, panel variables and trace-log pivots use canonical attributes.
 - Removed access fields are absent from current queries and runbooks.
+- The duplicate `dashboards/ClickHouse/` tree is deleted, so no unfixed byte-identical copy survives the migration.
 - Event and trace queries work across the 90-day ClickHouse retention tier.
 
 **Dependencies:** Phase 3.
@@ -187,7 +309,9 @@ are accepted.
 
 **Acceptance criteria:**
 
-- docs/api logging, observability, tracing, metrics, temporal and service references describe only verified deployed behavior.
+- The seven `docs/api/` files this RFC names — `observability.md`, `logs.md`,
+  `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md`, `temporal.md` — and the
+  per-service contracts describe only verified deployed behavior.
 - The event catalog and migration evidence are linked from the proper owners.
 - Platform runbooks and dashboards document investigation paths.
 
@@ -195,20 +319,61 @@ are accepted.
 
 **Verification:** docs ownership review, Mermaid rendering and link checks.
 
+### Task 4.4: Collector enrichment, schema debt and the span-metrics dimension
+
+**Acceptance criteria:**
+
+- A decision is recorded, as an amendment to the span-metrics decision record, on
+  the connector's `http.method` dimension: rename it to the pinned convention's
+  `http.request.method`, or declare both for as long as the edge emits the older name,
+  with the live measurement from research as the evidence.
+- The five materialised `k8s.*` columns that no producer writes are either populated
+  by a collector `k8sattributes` processor with pod association, or removed from the
+  schema; the choice is recorded with the collector topology it implies.
+- The routing documentation states the edge-log exception explicitly.
+
+**Dependencies:** Task 4.1.
+
+**Verification:** a span-metrics series carries a non-empty method dimension for a
+service span; a ClickHouse query shows no materialised column that is empty for every
+record.
+
+### Task 4.5: Platform semantic-convention registry
+
+**Acceptance criteria:**
+
+- A Weaver registry in the shared-package repository declares every platform-owned
+  attribute, metric and event, with a manifest that depends on the upstream semantic
+  conventions at the version `obsx` pins and imports the standard attributes it reuses.
+- The namespace decision from ADR-076 is enforced by a Rego policy in
+  `weaver registry check`, and that check runs in the shared package's CI.
+- The shared package's attribute keys and metric names are **generated** from the
+  registry; the catalog sections of `docs/api/` are generated from the same source.
+- `weaver registry live-check` runs against local-stack OTLP output in the end-to-end
+  gate and exits non-zero on a violation; a new service is "instrumented" when it
+  passes.
+
+**Dependencies:** Phase 3 (the fleet is on one shared-package version), Task 0.1
+(ADR-076 accepted).
+
+**Verification:** `registry check` green in CI; a deliberately mis-named attribute in
+a branch fails it; `live-check` green against the compose gate; `registry diff`
+between two tags reports a planted rename.
+
 ## Final release gate
 
 - Compose E2E audit passes HTTP, gRPC, browser checkout, Temporal workflow and provider failure cases.
 - Kind E2E audit passes the equivalent deployed paths.
 - One trace-to-log and one log-to-trace investigation succeeds in both operational and ClickHouse retention windows.
 - The privacy regression suite shows no forbidden field at stdout, Collector or ClickHouse.
-- VictoriaMetrics receives bounded application series and Pyroscope receives profiles from all service and worker identities.
+- VictoriaMetrics receives bounded application series and Pyroscope receives profiles from all service and worker identities, mockpay included, each carrying all four approved labels with non-empty values.
 - The release has no dual-write or legacy dashboard compatibility path.
 
 ## Risks and mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| OTel Go Logs API changes before v1 | Shared package churn | Contain direct API use in obslog and version-pin integration tests |
+| OTel Go Logs API changes before v1 | Shared package churn | Contain direct API use in slogx and version-pin integration tests |
 | Partial fleet migration | Two incompatible query contracts | Promote only after all service, worker, dashboard and runbook gates pass |
 | Temporal replay duplicates telemetry | Misleading events and metric overcount | Use workflow-aware logger; test replay; emit side-effect telemetry only from activities |
 | Redaction bypass | Sensitive data reaches retained stores | One recursive boundary, deny-list tests and fixtures through both sinks |
@@ -217,4 +382,4 @@ are accepted.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-16_
+_Last updated: 2026-09-17 — third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

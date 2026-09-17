@@ -6,19 +6,19 @@ _Audit date: 2026-09-16. Sources: homelab `26f92780`; service SHAs recorded belo
 
 The proposed direction is sound, but it mixes three different contracts: the OpenTelemetry data model, an application coding convention, and backend/storage policy. The fleet already emits OTLP logs, traces, and metrics through `pkg/obsx`; it is not currently a `slog` fleet. Migrating Zap solely to satisfy OTel would add risk without improving conformance. The highest-value gaps are event identity, redaction, propagation when tracing export is disabled, and a small number of metric histogram definitions.
 
-OpenTelemetry LogRecords have top-level `Timestamp`, `ObservedTimestamp`, trace context, severity, body, resource, scope, attributes, and `EventName`; `EventName` is optional rather than mandatory for every record. The data model is independent of the Go logging API. See the [OTel Logs Data Model](https://opentelemetry.io/docs/specs/otel/logs/data-model/), [event conventions](https://opentelemetry.io/docs/specs/semconv/general/events/), and [Metrics Data Model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/).
+OpenTelemetry LogRecords have top-level `Timestamp`, `ObservedTimestamp`, trace context, severity, body, resource, scope and attributes. The data model is independent of the Go logging API. See the [OTel Logs Data Model](https://opentelemetry.io/docs/specs/otel/logs/data-model/), [event conventions](https://opentelemetry.io/docs/specs/semconv/general/events/), and [Metrics Data Model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/).
 
 ## Inventory and evidence
 
 | Area | Observed state | Assessment |
 |---|---|---|
 | Profiling | All ten services call `obsx.SetupProfiling`; both worker modes use the same binaries and enable profiling. The SDK is configured to push ten Go profile types directly to Pyroscope. | **Implemented with contract gaps.** The four-label allowlist exists, but API services lack `service.version`, runtime sampling has no reviewed overhead budget, and Grafana's VictoriaTraces datasource supports only a manual trace-to-profile pivot. |
-| Logger | All active services pin `github.com/duynhlab/pkg/logger/zapx v0.36.0`; OTLP bridge is `otelzap`. | **Conformant transport, insufficient target interface.** OTel conformance alone does not require migration, but RFC-0031 selects `obslog` to enforce native EventName, redaction and one fleet API if accepted. |
-| Logs | HTTP middleware emits JSON and native OTLP trace IDs; gRPC access logs use `trace_id`, `method`, `code`, `duration`. | **Partial.** No production call sites use `EventName`/`event.name`; HTTP fields are `method`, `path`, `status`, rather than the OTel HTTP names. |
+| Logger | All active services pin `github.com/duynhlab/pkg/logger/zapx v0.36.0`; OTLP bridge is `otelzap`. | **Conformant transport, insufficient target interface.** OTel conformance alone does not require migration, but RFC-0031 selects `slogx` to enforce redaction and one fleet API if accepted. |
+| Logs | HTTP middleware emits JSON and native OTLP trace IDs; gRPC access logs use `trace_id`, `method`, `code`, `duration`. | **Partial.** No production call site emits a stable `event` attribute; HTTP fields are `method`, `path`, `status`, rather than the OTel HTTP names. |
 | Resource | Kubernetes templates set `OTEL_SERVICE_NAME`, namespace, pod, and environment; workers additionally set `service.version` from build ID. | **Partial.** `service.version` is not consistently supplied to API services; `cloud.region` is not established. |
 | Tracing | HTTP middleware, gRPC interceptors, DB instrumentation, and Temporal workers are present. | **Partial.** W3C propagator is installed only inside the enabled tracer-provider branch. Export-disabled processes can therefore lose inbound/outbound propagation. |
 | Metrics | The pipeline routes OTLP application metrics through the Collector to VictoriaMetrics; the Collector span-metrics connector has explicit buckets. The application contract says exemplars are not available on this platform. | **Mostly conformant.** `order.inventory.commit_lag` and `payment.reconciliation.run.duration` rely on SDK default histogram boundaries; do not promise application exemplars. |
-| ClickHouse | Collector exports OTel logs/traces to `otel.otel_logs` and `otel.otel_traces`; schema stores `EventName`, resource attributes, log attributes, severity, and trace fields. | **Good storage shape.** ClickHouse is supplementary OLAP, not a reason to flatten all OTel fields into stdout JSON. |
+| ClickHouse | Collector exports OTel logs/traces to `otel.otel_logs` and `otel.otel_traces`; schema stores resource attributes, log attributes, severity, and trace fields. | **Good storage shape.** ClickHouse is supplementary OLAP, not a reason to flatten all OTel fields into stdout JSON. |
 
 Service dependency snapshot: `zapx v0.36.0` is pinned by all ten active services. `obsx` is `v0.37.1` for user, product, cart, review, shipping, notification, and payment; `v0.37.0` for inventory; `v0.38.0` for order and checkout. SHAs: user `f4801bf`, product `e8db071`, inventory `ca09848`, cart `1647e4d`, order `ff7afe0`, review `4ac3a8b`, shipping `1a098a7`, notification `b62b938`, payment `7672982`, checkout `5ab15c6`.
 
@@ -27,7 +27,7 @@ Service dependency snapshot: `zapx v0.36.0` is pinned by all ten active services
 | Proposal | Decision | Required refinement |
 |---|---|---|
 | TRACE/DEBUG/INFO/WARN/ERROR/FATAL | **Keep as policy; map to OTel severity.** | Zap has no TRACE; represent it as a disabled diagnostic policy or add an internal level. Do not use FATAL for recoverable request failures. Preserve `SeverityText` and `SeverityNumber`. |
-| `domain.object.action` event names | **Keep, with the existing contract's naming decision.** | `docs/api/logs.md` currently standardizes a lower-snake-case `event` attribute (for example `inventory.reservation_committed`), while OTel's LogRecord has the distinct optional `EventName` field. Choose one migration rule and map it deliberately to ClickHouse `EventName`; do not silently introduce both `event` and `event.name`. |
+| `domain.object.action` event names | **Keep, with the existing contract's naming decision.** | `docs/api/logs.md` standardizes a lower-snake-case `event` attribute (for example `inventory.reservation_committed`). Keep that one identifier and make the naming grammar consistent across services; do not introduce a second identifier for the same thing. |
 | Required fields | **Keep conceptually, adjust physical shape.** | Timestamp, severity, body, trace context, resource, and attributes are OTel fields. `service.name`, version, and environment belong in Resource. Kubernetes metadata should be platform-enriched. `trace_id`/`span_id` are conditional when valid context exists. |
 | OTel semantic attributes | **Keep through the selected clean cutover.** | `docs/api/logs.md` explicitly marks the canonical HTTP/gRPC access schema as a target, not yet as-built. Adopt the pinned conventions, version the convention set, and migrate producers and consumers in one promotion unit. |
 | Message vs attributes | **Keep.** | Stable event body/message plus typed attributes. Do not parse prose in ClickHouse. Add an event-name helper to the shared package. |
@@ -41,7 +41,7 @@ Service dependency snapshot: `zapx v0.36.0` is pinned by all ten active services
 
 The initial audit was incomplete because it inferred fleet state from shared packages. This re-audit treats `docs/api` as the intended application contract, then checks each active process and every shipped query consumer.
 
-| Process | Entry transport | Stable EventName | Current logging path | Result |
+| Process | Entry transport | Stable event name | Current logging path | Result |
 |---|---|---:|---|---|
 | user | HTTP | no | `httpmw` + Zap | migrate |
 | product | HTTP + gRPC client | no | `httpmw` + Zap | migrate |
@@ -58,9 +58,9 @@ The initial audit was incomplete because it inferred fleet state from shared pac
 
 ## Findings and priority
 
-### F1 — no application EventName exists (P0)
+### F1 — no stable application event identifier exists (P0)
 
-Search across the ten active service repositories found zero production Go callsites carrying `zap.String("event", ...)`, and the current `otelzap` bridge maps Zap fields only to LogRecord attributes. The database column `otel_logs.EventName` therefore exists but is empty for application records. ClickHouse cannot safely aggregate business outcomes without parsing `Body`.
+Search across the ten active service repositories found zero production Go callsites carrying `zap.String("event", ...)`, even though `docs/api/logs.md` requires that attribute on machine-queryable records. ClickHouse therefore cannot aggregate business outcomes without parsing `Body`, which makes every such query depend on message text that no contract protects.
 
 ### F2 — privacy policy and access logger disagree (P0)
 
@@ -76,7 +76,7 @@ The local logs explorer, traces explorer and service deep-dive dashboard read `L
 
 ### F5 — event terminology is internally inconsistent (P1)
 
-`docs/api/logs.md` requires a legacy `event` attribute in lower snake case. OTel now deprecates the `event.name` attribute in favour of native `LogRecord.EventName`, which uses lowercase dot-namespaced names. RFC-0031 replaces the old contract rather than maps two names indefinitely.
+`docs/api/logs.md` requires an `event` attribute in lower snake case, while service code and dashboards use dot-separated operation classes elsewhere. The two grammars coexist with no rule saying which applies where, so a query author has to know each service's habit.
 
 ### F6 — W3C propagation has an exporter kill-switch failure mode (P1)
 
@@ -98,7 +98,7 @@ The fleet has broad profiling coverage, but the release gate checks neither prof
 
 ### P1 — no shared event-name contract
 
-The ClickHouse schema has `EventName` (`kubernetes/infra/configs/clickhouse-schema/configmap-schema.yaml:90-92`) and the exporter inserts it when present, but production Go call sites do not consistently populate it. Without it, analysts must group on message text or infer event classes from attributes. Add a typed shared helper and migrate business lifecycle/error events first; keep middleware access records explicitly classified.
+Production Go call sites do not consistently populate the contract's `event` attribute, so analysts must group on message text or infer event classes from other attributes. Add a typed shared helper and migrate business lifecycle/error events first; keep middleware access records explicitly classified.
 
 ### P1 — redaction is not demonstrably centralized
 
@@ -106,7 +106,7 @@ The shared `zapx` and `obsx` paths do not expose a central redaction policy for 
 
 ### P1 — HTTP/gRPC attribute vocabulary is inconsistent with OTel
 
-HTTP middleware emits `method`, `path`, `status`, and `duration` (`pkg/httpmw/logging.go:171-177`); gRPC emits `method`, `code`, `duration`, and `peer` (`pkg/grpcx/logging.go:130-138`). Keep protocol-specific fields where their semantics differ, but emit the canonical OTel attributes (`http.request.method`, `url.path`/`http.route`, `http.response.status_code`, `rpc.method`, `rpc.grpc.status_code`) at the instrumentation boundary and move all query consumers in the same clean-cutover release.
+HTTP middleware emits `method`, `path`, `status`, and `duration` (`pkg/httpmw/logging.go:171-177`); gRPC emits `method`, `code`, `duration`, and `peer` (`pkg/grpcx/logging.go:130-138`). Keep protocol-specific fields where their semantics differ, but emit the canonical OTel attributes (`http.request.method`, `http.route`, `http.response.status_code`, `rpc.method`, `rpc.status_code`) at the instrumentation boundary and move all query consumers in the same clean-cutover release.
 
 ### P2 — service version coverage is uneven
 
@@ -118,12 +118,12 @@ Workers set `service.version` from their build ID (`kubernetes/apps/order-worker
 
 ### P2 — ClickHouse schema compatibility is a runtime gate
 
-The Collector `v0.159.0` exporter inserts the OTel fields and optional `EventName` (`exporter source at v0.159.0`); the committed schema states that column mismatch fails only at insert time. Pin the exporter/schema compatibility check in CI with a disposable ClickHouse instance or upstream SQL snapshot. Keep `create_schema: false` in the cluster and the bootstrap Job as the owner.
+The Collector `v0.159.0` exporter inserts the OTel fields; the committed schema states that column mismatch fails only at insert time. Pin the exporter/schema compatibility check in CI with a disposable ClickHouse instance or upstream SQL snapshot. Keep `create_schema: false` in the cluster and the bootstrap Job as the owner.
 
 ## Recommended rollout
 
 1. Fix propagation and add shared redaction tests; these are safety/correlation controls.
-2. Build the selected `obslog` facade and native EventName path, then complete the owner-selected clean cutover across every service, worker and access logger without a legacy dual-write window.
+2. Build the selected `slogx` facade and its stable event-naming path, then complete the owner-selected clean cutover across every service, worker and access logger without a legacy dual-write window.
 3. Make `service.version` uniform, converge `obsx`, approve the two missing histogram boundary sets, and verify bounded series in VictoriaMetrics.
 4. Gate Pyroscope coverage for all services and workers, enforce the four-label allowlist, benchmark sampling changes, and verify the documented manual trace pivot.
 5. Add Collector/schema compatibility CI and migrate ClickHouse queries, dashboards and runbooks in the same promotion unit as the application cutover.
@@ -131,7 +131,7 @@ The Collector `v0.159.0` exporter inserts the OTel fields and optional `EventNam
 ## Acceptance checklist
 
 - A disabled-export test preserves W3C parent context across HTTP, gRPC, DB, and Temporal boundaries.
-- A log test proves `EventName`, severity text/number, typed attributes, trace IDs, and resource fields reach the OTLP record.
+- A log test proves the stable event attribute, severity text/number, typed attributes, trace IDs, and resource fields reach the OTLP record.
 - Redaction tests cover every mandatory key in mixed case and nested structures.
 - Every active service and worker has `service.name`, `service.version`, `deployment.environment.name`, namespace, and pod identity where available.
 - Metrics tests verify units, explicit histogram boundaries, bounded attributes, cumulative/delta handling and Temporal replay semantics. Application exemplars are not a supported platform workflow.
@@ -150,4 +150,4 @@ The API tree is normative for application-side observability. It adds constraint
 
 The service-specific API pages should be the next audit slice for business event and metric names: they define intended operational interpretation, while this report identifies shared implementation and pipeline gaps.
 
-_Last updated: 2026-09-16_
+_Last updated: 2026-09-17 — canonical gRPC status attribute corrected to `rpc.status_code` and the conflicting `url.path` recommendation dropped; facade renamed to `pkg/logger/slogx`; F1 and F5 restated against the deployed `event` attribute, since the log-record representation question is out of scope. Audit date and evidence are unchanged._

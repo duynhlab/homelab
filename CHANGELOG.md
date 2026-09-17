@@ -468,6 +468,18 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### GitOps
+
+- **A fresh `make up` no longer stalls on the RustFS bucket Job.** Both places that
+  run the MinIO client — the `rustfs-setup-buckets-init` Job and the
+  `setup-pg-backup-buckets` CronJob rendered from the `cronjobs` chart — pinned
+  `minio/mc:RELEASE.2025-08-13T08-35-41Z` from Docker Hub, and that repository no
+  longer exists there (the Hub tags API answers 404), so every cold cluster sat in
+  `ImagePullBackOff` on the first storage wave with databases, Keycloak, ClickHouse,
+  tracing and apps waiting behind it. The identical release is on `quay.io/minio/mc`;
+  the registry host changes, the tag does not. Verified on a fresh Kind cluster
+  2026-09-17: the Job pulled from Quay and created all three buckets.
+
 #### Observability
 
 - **`KubeJobFailed` now renders the observed Job namespace.** Its summary and

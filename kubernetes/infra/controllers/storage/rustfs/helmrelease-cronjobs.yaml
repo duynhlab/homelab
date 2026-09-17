@@ -38,7 +38,10 @@ spec:
     jobs:
       setup-pg-backup-buckets:
         image:
-          repository: minio/mc
+          # quay.io, not docker.io: the minio/mc repository was removed from Docker Hub
+          # (the tags API returns 404). Same release, pulled from Quay — keep in step
+          # with job-setup-buckets.yaml.
+          repository: quay.io/minio/mc
           tag: "RELEASE.2025-08-13T08-35-41Z"
           imagePullPolicy: IfNotPresent
         schedule: "*/30 * * * *"

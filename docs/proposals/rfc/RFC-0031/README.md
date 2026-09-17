@@ -1119,13 +1119,18 @@ place; the normative text stays in the subsections it belongs to.
 - **Spans carry more than the log policy allows, and the RFC says so rather than
   hiding it.** Measured on local-stack: the shared HTTP instrumentation puts
   `client.address`, `user_agent.original` and `url.path` on every server span, and the
-  shared database instrumentation puts `db.statement` and `db.connection_string` on
-  every query span. All are semantic-convention attributes emitted by upstream
-  instrumentation, not by service code, so a service cannot remove them and the
-  shared-package rule is the only place they can be governed. The tracing task in the
-  delivery plan decides, per attribute, whether it is permitted on spans (bounded,
-  operationally useful) or dropped by a shared span processor; until then the
-  asymmetry between the log policy and the span payload is a known, recorded gap.
+  shared database and cache instrumentation put `db.statement` and
+  `db.connection_string` on every client span. The connection string is safe — the
+  instrumentation reduces it to scheme, host and port, and none of 4,268 sampled
+  values carried a credential. The statement is not: cache statements embed the lock
+  key, and the lock key embeds the business identifier, so an identifier the log
+  policy would redact reaches the trace store through a span. All of these are
+  semantic-convention attributes emitted by upstream instrumentation, not by service
+  code, so a service cannot remove them and the shared-package rule is the only place
+  they can be governed. The tracing task in the delivery plan decides, per attribute,
+  whether it is permitted on spans (bounded, operationally useful) or dropped by a
+  shared span processor; until then the asymmetry between the log policy and the span
+  payload is a known, recorded gap.
 - **Baggage.** Baggage rides every outbound call, including calls to third-party
   providers. The platform default is no application baggage; an approved key must
   never carry PII, tokens or secrets and must be stripped before an external call.

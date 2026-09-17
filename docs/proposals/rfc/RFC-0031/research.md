@@ -249,6 +249,37 @@ inside one span or needs its own timestamp, severity and attributes.
 - [OTel Go slog bridge](https://pkg.go.dev/go.opentelemetry.io/contrib/bridges/otelslog)
 - [OTel Go zap bridge](https://pkg.go.dev/go.opentelemetry.io/contrib/bridges/otelzap)
 
+## Live verification
+
+The manifests say what is *configured*; these tables say what a running stack
+*did*. Every row is reproducible from the command shown, and where a measurement
+contradicted the RFC, the RFC was changed to match the measurement.
+
+### Local-stack (compose), 2026-09-17
+
+Traffic: 60 GETs to `/product/v1/public/products` and 60 to a non-existent product id
+through the edge, then a 60-second wait for the span-metrics flush and the scrape.
+
+| Claim | How it was measured | Observed | Verdict |
+|---|---|---|---|
+| The span-metrics `http.method` dimension is empty for service spans | `count by (service_name, http_method)(spanmetrics_calls_total)` | `product` 11 series, `keycloak` and `mockpay`: `http_method` absent; edge: 2 series `GET`, 2 absent | **Confirmed** — populated for edge spans only |
+| Why: the edge emits pre-stability attribute names | `SELECT arrayJoin(mapKeys(SpanAttributes)) … GROUP BY` per `ServiceName` | edge: `http.method`, `http.status_code`, `http.url`, `user_agent`, `peer.address`, `upstream_cluster`, `component`, `response_flags`; services: `http.request.method`, `http.response.status_code`, `http.route`, `url.path`, `user_agent.original`, `client.address` | **Confirmed** — two convention generations in one trace store |
+| `http.route` is populated for service spans | `count by (service_name, http_route)(spanmetrics_calls_total)` | `product`: `/product/v1/public/products`, `/product/v1/public/products/:id`; `keycloak`: `/realms/{realm}/protocol/{protocol}/certs` | Confirmed |
+| The edge is the root span and the applied rate is 100 | `countIf(ParentSpanId='')`, `uniqExact(TraceId)` over edge spans | 130 root spans, 130 traces, 237 edge spans | **Confirmed** |
+| Profile labels come only from `OTEL_RESOURCE_ATTRIBUTES` | Pyroscope querier `LabelValues` for the four contract labels | `service_name` 13 values; `service_namespace`, `deployment_environment`, `service_version` empty | **Confirmed** as mechanism; compose sets no resource attributes, so the two-of-four claim is measured on Kind below |
+| The profile label set is the closed four | Pyroscope querier `LabelNames` | `service_name` plus `hostname`, `pyroscope_spy`, `target`, `service_git_ref`, `service_repository`, `span_name` | **Refuted as as-built** — the contract now states the four as a target and the plan admits or strips each extra label |
+| Spans obey the log privacy policy | span attribute keys and sampled values per service | HTTP server spans carry `client.address`, `user_agent.original`, `url.path`; client spans carry `db.statement` and `db.connection_string`. The connection string is scheme, host and port only — 0 of 4,268 values carried a credential. Cache statements (`evalsha … lock:product:<id> …`) embed the business identifier | **Gap recorded** under Security considerations — identifiers, not secrets |
+| The compose ClickHouse schema matches the cluster DDL | `system.columns` for `otel.otel_logs` | 24 columns including the seven materialised `k8s.*` columns and `deployment.environment.name` | Confirmed — the Kind query below uses the same shape |
+
+Two things the traffic itself showed, neither a defect of this RFC: a non-existent
+product id returns `500 INTERNAL_ERROR` rather than `404` (a product-service defect
+already on the owner's list from the earlier telemetry audit), and a burst of sixty
+requests tripped the edge's local rate limit of fifty per window, producing 23 `429`s
+— which is the policy working. Compose also identifies services differently from the
+cluster (`product` and `platform.envoy-gateway-system` here; `product-service` and
+`platform.envoy-gateway` there), so a query written for one environment does not run
+unchanged on the other.
+
 ## Context7 audit log
 
 The first pass recorded Context7 as unavailable and passed the gate on an

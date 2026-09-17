@@ -214,6 +214,8 @@ Clone all repositories: [platform/setup.md](./platform/setup.md).
 
 ### Observability
 
+Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./observability/audits/2026-09-16-telemetry-standards.md)** - logs, traces, metrics, profiling and the ClickHouse consumers.
+
 #### Metrics
 
 1. **[Metrics Guide](./observability/metrics/README.md)** - Complete metrics documentation

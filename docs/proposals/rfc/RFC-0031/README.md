@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-09-16, Context7 rerun 2026-09-17 | 2026-09-16 | 2026-09-17 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-09-16, Context7 rerun 2026-09-17 | 2026-09-16 | 2026-09-17 |
 
 ## Prerequisites
 
@@ -11,14 +11,14 @@
 - [x] Owner approved **ready for RFC**
 - [x] Live verification recorded — local-stack and a fresh, seeded Kind cluster, 2026-09-17, in [research § Live verification](./research.md#live-verification); every claim it contradicted was changed to match
 - [x] Mechanism detail stays in `./research.md`; this document summarises and links it
-- [ ] When Status → **`Accepted`**: create ADR-070 through ADR-076 under [`docs/proposals/adr/`](../../adr/) at `Proposed`. `docs/api/` files to touch: `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md`, `temporal.md` — the same seven the delivery plan names — synced only when Adoption is Complete, never at acceptance
+- [x] ADR-070 through ADR-076 created at `Accepted` / Adoption `Not started` with this RFC under [`docs/proposals/adr/`](../../adr/) — owner decision 2026-09-17, following the RFC-0028/RFC-0030 precedent of accepting the records with the RFC. `docs/api/` files to touch: `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md`, `temporal.md` — the same seven the delivery plan names — synced only when Adoption is Complete, never at acceptance
 
 ## Summary
 
 Adopt one application telemetry contract across logs, metrics, traces and
-continuous profiles. Logging is proposed to move to pkg/logger/slogx behind one
-context-first API with one tested redaction boundary — the one choice architecture
-review still has to settle; tracing keeps its sampling, span and
+continuous profiles. Logging moves to pkg/logger/slogx behind one context-first
+API with one tested redaction boundary — decided at architecture review on
+2026-09-17; tracing keeps its sampling, span and
 baggage rules and gains an explicit contract instead of an inherited pointer;
 metrics retain the OTel Meter API and VictoriaMetrics with stricter instrument,
 bucket, cardinality and replay rules; profiling retains the shared Pyroscope
@@ -37,7 +37,7 @@ and its resulting ADRs are accepted.
 | Which option is being reviewed? | [Decision outcome](#decision-outcome) and [Alternatives](#alternatives) |
 | What exact application contract is proposed? | [Normative target contract](#normative-target-contract) |
 | What does each signal have to do? | [Record model](#record-model) · [Tracing](#tracing-contract) · [Metrics](#metrics-contract) · [Profiling](#continuous-profiling-contract) |
-| Is the logging migration settled? | No — [Open disagreement: keep Zap](#open-disagreement-keep-zap) |
+| Is the logging migration settled? | Yes — `pkg/logger/slogx`, owner decision 2026-09-17; the audit's opposing view stays recorded under [Open disagreement: keep Zap](#open-disagreement-keep-zap) |
 | How will the fleet migrate and roll back? | [Rollout and rollback](#rollout--rollback) and the [delivery plan](./delivery-plan.md) |
 | What evidence must pass before promotion? | [Verification gates](#verification-gates) |
 | Where is the current-state evidence? | [Research](./research.md) and the [audit report](../../../observability/audits/2026-09-16-telemetry-standards.md) |
@@ -77,8 +77,8 @@ explicit verification gate despite being enabled fleet-wide.
 
 ## Proposal
 
-pkg/logger/slogx is proposed as the only application logging facade. Its diagnostic
-methods emit structured slog records. Its context-first event method emits a record whose
+pkg/logger/slogx becomes the only application logging facade (owner decision,
+2026-09-17). Its diagnostic methods emit structured slog records. Its context-first event method emits a record whose
 stable `event` attribute is a lower-case dot-separated identifier. The message is
 short display text; values belong in typed attributes.
 
@@ -133,7 +133,7 @@ bounded shutdown and an honest manual trace-to-profile workflow.
 | Option | Benefit | Cost | Status |
 |--------|---------|------|--------|
 | pkg/logger/slogx facade over slog plus direct OTel Logs API | Standard-library logging with no added dependency; one policy boundary; context-first handler seam; slog already reached through `zapslog` in `temporalx` | Fleet migration of every production logging call site; OTel Logs API remains pre-1.0 | Proposed |
-| Zap facade over the existing `logger/zapx` | Much smaller diff; keeps the adapter every service already pins | Keeps a third-party logging dependency in every service and leaves the redaction boundary split across adapters | Open — the audit recommends it; see § Open disagreement: keep Zap |
+| Zap facade over the existing `logger/zapx` | Much smaller diff; keeps the adapter every service already pins | Keeps a third-party logging dependency in every service and leaves the redaction boundary split across adapters | Rejected — owner decision 2026-09-17; the audit's recommendation is kept on record under § Open disagreement: keep Zap |
 | Raw OTel Logs API in every service | Full record control | Duplicates redaction, correlation and tests | Rejected |
 | Preserve VictoriaMetrics and Pyroscope with stricter shared contracts | No backend migration; fixes measured contract gaps | Requires metric/profile tests and service-version convergence | Proposed |
 | Replace metrics or profiles during this RFC | One large observability redesign | Expands blast radius without solving the audited application gaps | Rejected |
@@ -162,29 +162,45 @@ That position got stronger, not weaker, once the bridges were checked: `otelslog
 and `otelzap` produce equivalent records, so no conformance argument separates
 them. What remains is a dependency and consistency argument.
 
-This RFC still proposes the slog facade, for the reasons in § Proposal. The
-disagreement is recorded here rather than resolved, because § Decision outcome is
-owner-decided at architecture review. The evidence that would settle it is the
-evidence the audit already asked for: a benchmark of the two facades under fleet
-log volume, a redaction test suite that both must pass, and a measured estimate of
-the migration cost across every production logging call site.
+**Resolved 2026-09-17.** The owner chose the slog facade at architecture review,
+for the reasons in § Proposal, and accepted the audit's cost without the benchmark
+it asked for: the work the two options share — closing the shared package's SDK and
+Zap type leaks (Task 1.1c) — is the larger part of either path, and the platform is
+greenfield, so the moment to pay the migration is now rather than after a second
+generation of call sites has accumulated. The audit's recommendation stays on record
+here so that the trade-off is visible to whoever reads this after the cutover, and
+the redaction test suite the audit asked for is still required — as an acceptance
+criterion of Task 1.1, not as a precondition of the decision.
 
 ## Decision outcome
 
-**Chosen option:** undecided — architecture review pending.
+**Chosen option:** **pkg/logger/slogx facade over slog plus direct OTel Logs API**,
+exactly as § Alternatives names it, together with **preserve VictoriaMetrics and
+Pyroscope with stricter shared contracts**. The remaining § Alternatives rows are
+rejected.
 
-**Rationale:** The research recommendation is the pkg/logger/slogx facade over slog,
-on standard-library, dependency and single-redaction-boundary grounds. It is
-explicitly **not** recommended on conformance grounds: the two official bridges
-produce equivalent records. The audit
-recommends keeping Zap; that disagreement is stated in
-[§ Open disagreement: keep Zap](#open-disagreement-keep-zap) and is the main thing
-architecture review has to settle.
+**Rationale:** the facade is chosen on standard-library, dependency and
+single-redaction-boundary grounds — one implementation of redaction, no logging
+dependency added to any service, and a fleet that is greenfield so the migration is
+paid once. It is explicitly **not** chosen on conformance grounds: the two official
+bridges produce equivalent records, and the audit's recommendation to keep Zap stays
+recorded under [§ Open disagreement: keep Zap](#open-disagreement-keep-zap). The two
+backend rows are accepted without a competing option; they fix the scope. Against
+§ Goals: one context-first API with one tested redaction boundary (the first goal) is
+satisfied only by a single facade, and the fleet-wide cutover with no legacy contract
+(the last goal) is what makes the greenfield moment the cheap one.
 
-**Decided:** pending architecture review. The two backend rows in § Alternatives —
-keep VictoriaMetrics and Pyroscope, do not replace them in this RFC — are
-**Proposed with no alternative under review**; they are stated so the scope is
-explicit, not because a competing option is being weighed.
+**Namespace prefix (ADR-076):** the owner chose to **keep the bare platform
+namespaces** (`order.*`, `payment.*`, `checkout.*`, `inventory.*`, …) and register
+each as an explicit exception in the semantic-convention registry, rather than adopt
+a `duynhlab.` prefix. The accepted cost is that an upstream convention claiming one of
+those namespaces forces a rename later; the Rego policy admits exactly the registered
+set and denies any new bare namespace, so the exception list cannot grow silently.
+
+**Decided:** 2026-09-17, owner (`duynhne`), at architecture review; recorded in
+ADR-070 (facade) and ADR-076 (namespace rule). All resulting ADRs are `Accepted` at
+Adoption `Not started` — acceptance installs nothing and changes no application
+contract.
 
 ## Architecture & Diagrams
 
@@ -412,8 +428,11 @@ one question it does not settle: **the namespace prefix.** Two honest options:
 | Prefix every platform attribute and metric with `duynhlab.` (`duynhlab.order.id`) | Every existing dashboard, alert and runbook that names a platform attribute changes once; names get longer | Zero future collision risk; the rule is mechanical and a Rego policy enforces it |
 | Keep bare `order.*`-style namespaces and register each one in the registry as a deliberate exception | Nothing changes today | A future upstream `order.*` or `payment.*` convention forces the rename anyway, at a worse time, and the exception list has to be maintained |
 
-The registry is required either way; the prefix is an owner decision at architecture
-review and is recorded in ADR-076. What this section does not do is call the registry
+The registry is required either way. The prefix question was decided on 2026-09-17:
+the owner **keeps the bare namespaces and registers each one as an explicit
+exception**; ADR-076 records the decision and its Rego policy admits exactly that
+registered set, so a new bare namespace fails review rather than accumulating. What
+this section does not do is call the registry
 a quick win. It touches the shared package, every service, the shared CI and
 `docs/api/`, and it is where the catalog rows the previous telemetry standard left as
 backlog finally get a home — it is program-sized work and is scheduled as such in the
@@ -1225,24 +1244,29 @@ partial rollout is a failed rollout and must not be promoted.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Logging facade and event catalog | ../../adr/ADR-070-logging-facade-and-event-catalog/ | Planned |
-| Canonical event, access and privacy data contract | ../../adr/ADR-071-telemetry-event-data-contract/ | Planned |
-| Fleet cutover and ClickHouse query migration | ../../adr/ADR-072-telemetry-clean-cutover/ | Planned |
-| Metric instrument, cardinality and replay contract | ../../adr/ADR-073-application-metrics-contract/ | Planned |
-| Continuous profiling identity and overhead contract | ../../adr/ADR-074-continuous-profiling-contract/ | Planned |
-| Tracing sampling, span and baggage contract | ../../adr/ADR-075-application-tracing-contract/ | Planned |
-| Platform semantic-convention registry and namespace rule | ../../adr/ADR-076-semantic-convention-registry/ | Planned |
+| Logging facade and event catalog | [ADR-070](../../adr/ADR-070-logging-facade-and-event-catalog/) | Accepted / Not started |
+| Canonical event, access and privacy data contract | [ADR-071](../../adr/ADR-071-telemetry-event-data-contract/) | Accepted / Not started |
+| Fleet cutover with no migration mechanism | [ADR-072](../../adr/ADR-072-telemetry-clean-cutover/) | Accepted / Not started |
+| Metric instrument, cardinality and replay contract | [ADR-073](../../adr/ADR-073-application-metrics-contract/) | Accepted / Not started |
+| Continuous profiling identity and overhead contract | [ADR-074](../../adr/ADR-074-continuous-profiling-contract/) | Accepted / Not started |
+| Tracing sampling, span and baggage contract | [ADR-075](../../adr/ADR-075-application-tracing-contract/) | Accepted / Not started |
+| Platform semantic-convention registry and bare-namespace rule | [ADR-076](../../adr/ADR-076-semantic-convention-registry/) | Accepted / Not started |
 
-ADR-070 through ADR-076 are **reserved numbers**, not existing records — the highest
-record in the repository today is ADR-069. The paths are written as plain text
-because the directories do not exist yet; they become links when each record is
-created at `Proposed` during architecture review.
+All seven were created at `Accepted` with this RFC on 2026-09-17, following the
+RFC-0028 and RFC-0030 precedent; Adoption moves off `Not started` only as the
+delivery plan lands, and `docs/api/` is synced when Adoption is Complete.
 
 ## Implementation History
 
-No implementation has started. This RFC is provisional and must complete
-architecture review and resulting ADR review before code, manifests, dashboards
-or docs/api are changed as target state.
+| Date | Event |
+|---|---|
+| 2026-09-16 | Research gate passed on an official-source fallback; RFC opened at `provisional` with the telemetry audit (#1062) |
+| 2026-09-17 | Second and third revisions: facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope, shared-package rule for all four signals, tracing / Collector / fleet-scale / registry contracts, template sections, live verification on local-stack and a fresh Kind cluster (#1063) |
+| 2026-09-17 | Bring-up exposed that the RustFS bucket Job's MinIO client image had left Docker Hub; fixed separately (#1064) |
+| 2026-09-17 | **Accepted** at architecture review: facade `pkg/logger/slogx`, bare namespaces with registered exceptions; ADR-070 through ADR-076 created at `Accepted` / `Not started` |
+
+No implementation has started. Phase 0 of the delivery plan is now eligible; no code,
+manifest, dashboard or `docs/api/` contract changes until it runs.
 
 ## Related
 
@@ -1274,4 +1298,4 @@ in the metrics guide while the platform does not promise them.
 - [OTel RPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
 
 ---
-_Last updated: 2026-09-17 — third revision. Added the shared-package rule for all four signals with its enforcement mechanism, a tracing contract with gate, task and ADR-075, Collector and fleet-scale contracts, a semantic-convention registry as ADR-076, and the Design Details, Security considerations and Observability & SLO impact sections. Corrected the sampling table, Kubernetes enrichment, profile labels and mockpay scope to deployed reality, and verified the contract live on local-stack and a fresh Kind cluster (research § Live verification). The standard is greenfield: no migration mechanism. Earlier the same day: Context7 rerun, facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope._
+_Last updated: 2026-09-17 — **Accepted** at architecture review (owner, 2026-09-17): facade `pkg/logger/slogx`, bare namespaces with registered exceptions; ADR-070…076 created at `Accepted / Not started`. third revision. Added the shared-package rule for all four signals with its enforcement mechanism, a tracing contract with gate, task and ADR-075, Collector and fleet-scale contracts, a semantic-convention registry as ADR-076, and the Design Details, Security considerations and Observability & SLO impact sections. Corrected the sampling table, Kubernetes enrichment, profile labels and mockpay scope to deployed reality, and verified the contract live on local-stack and a fresh Kind cluster (research § Live verification). The standard is greenfield: no migration mechanism. Earlier the same day: Context7 rerun, facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope._

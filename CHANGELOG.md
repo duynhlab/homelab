@@ -446,6 +446,14 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0031 and ADR-070 through ADR-076 are `Accepted / Not started`.** The
+  owner closed architecture review on 2026-09-17: the logging facade is
+  `pkg/logger/slogx` (the audit's keep-Zap recommendation stays on record), the
+  platform's bare attribute namespaces are kept and registered as explicit exceptions
+  in the Weaver registry, and the cutover is one greenfield release with no migration
+  mechanism. Phase 0 of the delivery plan is eligible; this documentation change
+  installs no component and changes no application contract.
+
 - **RFC-0031 opened at `provisional`, third revision.** A greenfield cross-signal
   application telemetry standard for logs, traces, metrics and continuous profiles,
   built on one rule: a service imports the shared package and the OpenTelemetry API

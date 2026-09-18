@@ -6,35 +6,35 @@ are accepted.
 
 ## Phase 0 — contract approval
 
-### Task 0.0: Decide the logging facade
+### Task 0.0: Decide the logging facade — **done 2026-09-17**
 
-The RFC proposes `pkg/logger/slogx`; the audit recommends keeping `logger/zapx`. The
-decision belongs to architecture review, and this plan has to be executable either
-way, so it branches here.
+The RFC proposed `pkg/logger/slogx`; the audit recommended keeping `logger/zapx`. The
+owner chose **slogx** at architecture review, so the slogx branch runs — Tasks 1.1,
+1.1b and 1.1c — and the keep-Zap branch (1.1c′) is dropped. The decision is recorded
+in ADR-070 with an explicit statement that acceptance proceeded without the
+comparative benchmark the audit asked for; the redaction test suite the audit asked
+for remains an acceptance criterion of Task 1.1.
 
-| Outcome | Phase 1 tasks that run | Tasks that are dropped |
-|---|---|---|
-| **slogx** (RFC proposal) | 1.1 build `slogx`, 1.1b retire unused adapters, 1.1c `obsx` drops its zap-typed API | — |
-| **Keep Zap** (audit recommendation) | 1.1c′ add the central redaction boundary and the stable event helper to `logger/zapx`; 1.1c still runs for the SDK-type leak only | 1.1, 1.1b |
+The shared-package rule, the tracing, metrics and profiling contracts, and the fleet
+enforcement never depended on this choice; Tasks 1.2 through 1.5 and every later
+phase are unchanged.
 
-Either outcome leaves Tasks 1.2 through 1.5 and every later phase unchanged. The
-shared-package rule, the tracing, metrics and profiling contracts, and the fleet
-enforcement do not depend on which logger sits behind the facade.
+**Verification:** ADR-070 is `Accepted` and names the facade; this plan carries no
+Zap branch.
 
-**Verification:** the decision is recorded in ADR-070 with the evidence the audit
-asked for — a benchmark of both facades under fleet log volume and a redaction test
-suite both pass — or with an explicit statement that acceptance proceeds without it.
+### Task 0.1: Approve the resulting decisions — **done 2026-09-17**
 
-### Task 0.1: Approve the resulting decisions
+**Acceptance criteria (met):**
 
-**Acceptance criteria:**
-
-- ADR-070 names the facade chosen in Task 0.0 and records the pre-1.0 OTel Logs API
-  containment and the cutover cost.
-- ADR-071 through ADR-076 are created at `Proposed` and reviewed together.
+- ADR-070 names `pkg/logger/slogx` and records the pre-1.0 OTel Logs API containment
+  and the cutover cost.
+- ADR-071 through ADR-076 exist at `Accepted` / Adoption `Not started`, created with
+  the RFC per the RFC-0028/RFC-0030 precedent; ADR-076 records the bare-namespace
+  decision.
 - The target contract is approved with SemConv v1.41.0 as its baseline.
 
-**Verification:** architecture review approves the seven resulting ADRs, ADR-070 through ADR-076.
+**Verification:** the RFC index row reads `Accepted 2026-09-17` and the ADR index
+lists ADR-070 through ADR-076.
 
 ### Task 0.2: Freeze the catalog and privacy boundary
 
@@ -382,4 +382,4 @@ between two tags reports a planted rename.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-17 — third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._
+_Last updated: 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

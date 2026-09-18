@@ -387,6 +387,18 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **`docs/api/` carries RFC-0031 as a planned-labelled target contract.** Per the
+  hub's own rule (ADR `Accepted` → sync Design records, same PR or immediate
+  follow-up), `observability.md`, `logs.md`, `tracing.md`, `metrics.md`,
+  `profiling.md`, `pkg.md` and `temporal.md` now link ADR-070 through ADR-076, and
+  `observability.md` gains a **Cross-signal telemetry standard (RFC-0031 — normative,
+  planned)** section beside the RFC-0014 policy: the shared-package import rule for
+  all four signals, the not-yet-installed lint enforcement, the version floor, the
+  per-pillar target rules and the privacy boundary. Each pillar file opens with a
+  short **Target contract** callout so a service author sees the accepted rules where
+  they code, while every as-built section stays as deployed. `pkg.md`'s consumer
+  count is ten (`auth-service` archived).
+
 - **`platform-engineer` project skill added at `.agents/skills/`** (#1050) — the
   Senior Platform Engineer operating procedure (repo routing, `docs/api/` trust,
   domains, RFC/ADR gate, commit rules) moved out of `AGENTS.md` into one

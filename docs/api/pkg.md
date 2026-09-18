@@ -11,9 +11,9 @@ release line.
 | **Modules** | **14**, one per package — `github.com/duynhlab/pkg/<module>`. There is **no root `go.mod`**, and one must never be re-created | — |
 | **Newest tags** | `v0.39.0` for `temporalx` (Phase 4: `WithLogger` bridges SDK logs into zap) · `v0.38.0` for `obsx` (ADR-063: the tracer-provider factory seam) · `v0.37.0` for `authmw idempotency proto` (RFC-0024 P3 identity cutover) · `v0.36.1` for `dbx grpcx httpx migratex` · `v0.36.0` for `flagx logger/zapx logger/zerolog logger/clog` · `v0.1.0` for `httpmw`, which starts its own line | — |
 | **Single-module line** | Frozen at `v0.35.0` (2026-08-06). **No plain `v0.36.x` tag exists** | — |
-| **Consumers** | 11 Go services (the frontend SPA does not use it) | — |
+| **Consumers** | 10 Go services (the frontend SPA does not use it; `auth-service` is archived) | — |
 | **Bump mechanics** | Per module: `go get github.com/duynhlab/pkg/<module>@vX.Y.Z` | — |
-| **Design records** | — | [RFC-0014](../proposals/rfc/RFC-0014/) (obsx) · [RFC-0017](../proposals/rfc/RFC-0017/) (dbx, TraceContext) · [RFC-0021](../proposals/rfc/RFC-0021/) (flagx, inventory/product contracts) · [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) (layering, `httpmw`) |
+| **Design records** | — | [RFC-0014](../proposals/rfc/RFC-0014/) (obsx) · [RFC-0017](../proposals/rfc/RFC-0017/) (dbx, TraceContext) · [RFC-0021](../proposals/rfc/RFC-0021/) (flagx, inventory/product contracts) · [ADR-038](../proposals/adr/ADR-038-shared-http-middleware/) (layering, `httpmw`) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor) · [ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry) |
 
 ## Overview
 
@@ -27,6 +27,22 @@ shape it:
 2. **One module per package, one tag per module.** A service pins only what it
    imports, so a change to `temporalx` cannot force a release on the six services
    that never touch Temporal.
+
+> **Target state — RFC-0031, `Accepted` 2026-09-17, not yet as-built.** Four changes
+> to this module set are decided and none has a tag yet: (1) a new Layer-0 module
+> **`logger/slogx`** — the fleet logging facade, own `go.mod`, OTel **API** only, never
+> `obsx` — with `logger/zapx`, `logger/zerolog` and `logger/clog` retired in the same
+> release train ([ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog)); (2) a **breaking `obsx` release** that removes every Zap- and
+> SDK-typed exported signature (`ZapCore`, `TraceContext(...) zap.Field`,
+> `WithTracerProviderFactory(func(...sdktrace.TracerProviderOption))`) and drops
+> `otelzap`, so a service `main()` no longer imports the SDK to call the shared package
+> ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor), RFC-0031 Task 1.1c); (3) a **version floor** — a service may run at most one
+> minor behind the current release, enforced by a fleet lint policy in the shared
+> workflows, which first requires the three `obsx` pins in [§ Adoption](#adoption) to
+> converge ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor)); (4) a **Weaver registry** in this repository from which the
+> attribute keys and metric names in the shared modules, and the catalog sections of
+> `docs/api/`, are generated ([ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry)). The tables below describe the modules as tagged
+> today.
 
 ### Why the split, concretely
 
@@ -240,4 +256,4 @@ sequence jumps `v0.12.0` → `v0.12.2`).
 - [observability.md](./observability.md) — the obsx contract every service follows
 - Per-service contracts: [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-09-17 — the archived `auth` service is removed from the consumer table and the fleet count is ten, matching `docs/api/README.md`. Previously 2026-08-27 — `temporalx v0.39.0` (`WithLogger` → zap via zapslog, Phase-4 conformance) added. Earlier same day: `obsx`/`temporalx` `v0.38.0` (ADR-063 OTel v2) added; the temporalx fleet pin is one version again and the split-pin note retired; the `v0.36.2` ledger row's wrong starting SDK corrected (1.45.0 → 1.44.1). 2026-08-21: `v0.36.2` + `v0.37.0` temporalx rows; ADR-038 middleware wave before that._
+_Last updated: 2026-09-18 — RFC-0031 accepted: Design records link ADR-070/072/076 and a labelled **Target state** callout names the planned `logger/slogx` module, the breaking `obsx` type-leak release, the version floor and the Weaver registry; the consumer count is ten (`auth-service` archived). Previously 2026-09-17 — the archived `auth` service is removed from the consumer table and the fleet count is ten, matching `docs/api/README.md`. Previously 2026-08-27 — `temporalx v0.39.0` (`WithLogger` → zap via zapslog, Phase-4 conformance) added. Earlier same day: `obsx`/`temporalx` `v0.38.0` (ADR-063 OTel v2) added; the temporalx fleet pin is one version again and the split-pin note retired; the `v0.36.2` ledger row's wrong starting SDK corrected (1.45.0 → 1.44.1). 2026-08-21: `v0.36.2` + `v0.37.0` temporalx rows; ADR-038 middleware wave before that._

@@ -218,7 +218,7 @@ not its availability. Record them under the service's **Known gaps** section.
 | Edge routing and policy | [Envoy Gateway](../platform/envoy-gateway.md) |
 | Identity provider deployment and ops | [Keycloak (platform)](../platform/keycloak.md) |
 | NetworkPolicy caller matrix | [Network policies](../security/network-policies.md) |
-| Application observability (normative contract) | [observability.md](./observability.md) · [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md) |
+| Application observability (normative contract) | [observability.md](./observability.md) · [logs](./logs.md) · [metrics](./metrics.md) · [tracing](./tracing.md) · [profiling](./profiling.md) — target rules from [RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17) are labelled **planned** in each file until they land |
 | Metrics platform ops (alerts, dashboards) | [Application metrics (platform)](../observability/metrics/metrics-apps.md) |
 | Valkey cache-aside behavior | [Application caching](./caching.md) · [Caching (platform)](../caching/README.md) |
 | Shared Go library (packages, consumers, bump ledger) | [pkg.md](./pkg.md) |
@@ -249,4 +249,4 @@ GitOps manifests — that evidence is how a claim is verified, not a competing
 source to prefer. Mark designed but undeployed behavior as **planned**, and when
 the two disagree, classify it first: [Resolving a mismatch](#resolving-a-mismatch).
 
-_Last updated: 2026-08-26 — separates capability availability from known-gap lifecycle, adds per-capability evidence, recognizes `admin-service` as the deployed Backoffice application service, and sharpens the `api.md` / `microservices.md` ownership boundary._
+_Last updated: 2026-09-18 — RFC-0031 accepted: the observability rollup row points readers at the planned-labelled target rules in the five pillar files; Design records in `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` and `temporal.md` now link ADR-070 through ADR-076. Previously 2026-08-26 — separates capability availability from known-gap lifecycle, adds per-capability evidence, recognizes `admin-service` as the deployed Backoffice application service, and sharpens the `api.md` / `microservices.md` ownership boundary._

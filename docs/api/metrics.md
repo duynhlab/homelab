@@ -9,7 +9,7 @@ RED, gRPC, runtime, database client, and business metric authoring contract for 
 | **Business catalog** | [metrics-catalog.md](../observability/metrics/metrics-catalog.md) — all 63 shipped instruments | — |
 | **Platform ops** | [Application metrics (platform view)](../observability/metrics/metrics-apps.md) — alerts, dashboards, troubleshooting | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [RFC-0017](../proposals/rfc/RFC-0017/) · [RFC-0013](../proposals/rfc/RFC-0013/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [RFC-0017](../proposals/rfc/RFC-0017/) · [RFC-0013](../proposals/rfc/RFC-0013/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) |
 
 ---
 
@@ -24,6 +24,22 @@ The instrument names and labels are OpenTelemetry semantic conventions
 (`http.server.request.duration`, `http.request.method`, `http.route`,
 `http.response.status_code`), translated to their PromQL form by vmagent's
 `usePrometheusNaming` on ingest.
+
+> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built** ([ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget)).
+> Automatic instrumentation stays the only source for HTTP, gRPC, runtime, DB and
+> cache metrics. Every business metric is recorded with question, owner, dotted OTel
+> name, instrument type, UCUM unit, bounded attribute allowlist, replay semantics and
+> consumer **before** it is emitted. Instrument selection is two questions in order —
+> additive? monotonic? — then sync versus async; an Observable Counter callback
+> reports the **total**, never the increment. **A new seconds histogram must pass the
+> fleet bucket set explicitly** or match an approved View — the SDK default is
+> millisecond-shaped and collapses sub-second quantiles to zero; the two known gaps
+> (`order.inventory.commit_lag`, `payment.reconciliation.run.duration`) are re-bucketed
+> at Task 1.3 and a `forbidigo` fleet rule will reject the pattern. The
+> [§ App-side cardinality control](#app-side-cardinality-control) denylist becomes a
+> test, a per-service series budget is set from the current ~2,800-series baseline, and
+> Temporal replay never increments an application metric. The platform does **not**
+> promise exemplars. Everything below is as-built.
 
 ### Metric families at a glance
 
@@ -588,5 +604,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the collector's `traces` pipeline also feeds the span-metrics connector, which is a metrics source, not a trace store, and the earlier "five" predated the RFC-0027 retirements. Previously 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
+_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-073 and a labelled **Target contract** callout states the instrument-selection, explicit-bucket, cardinality-budget and replay rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the collector's `traces` pipeline also feeds the span-metrics connector, which is a metrics source, not a trace store, and the earlier "five" predated the RFC-0027 retirements. Previously 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
 

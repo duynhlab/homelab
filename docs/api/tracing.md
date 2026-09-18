@@ -287,7 +287,7 @@ Full worker rules: [Application observability § Worker and Temporal instrumenta
 
 | Practice | Why | Implementation |
 |----------|-----|----------------|
-| ~10% sampling | Balance cost vs visibility | `OTEL_SAMPLE_RATE=0.1` |
+| Sample at the edge, honour the parent | The edge starts the root span, so its `samplingRate` governs the whole trace; a service's own rate applies only to traces it starts itself | Base manifest `samplingRate: 50` (inherited by a future production cluster; the Kind overlay applies 100), services `OTEL_SAMPLE_RATE=0.1` |
 | Auto-filter health checks | Reduce noise 30–40% | `httpmw.DefaultSkipRoutes` |
 | Distinguish business vs infra errors | Avoid alert noise | See error semantics above |
 | Graceful shutdown | Zero lost spans on rollout | Bounded `obs.Shutdown()` on exit |
@@ -335,4 +335,4 @@ can be joined to `otel_logs` on `trace_id`. Details:
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-23 — the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`._
+_Last updated: 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse), matching the opening paragraph and `observability.md`; the production-recommendations table no longer shows a `~10%` sampling row that the 2026-08-31 move to a 50 base rate had orphaned — it now states the edge-root model and where each rate is actually applied. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`._

@@ -588,5 +588,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; the log and trace backend sets are corrected against the collector's `service.pipelines`: logs go to **two** stores (VictoriaLogs + ClickHouse), traces to **five**. Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
+_Last updated: 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the collector's `traces` pipeline also feeds the span-metrics connector, which is a metrics source, not a trace store, and the earlier "five" predated the RFC-0027 retirements. Previously 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
 

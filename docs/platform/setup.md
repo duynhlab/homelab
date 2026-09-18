@@ -48,8 +48,9 @@ for service in user product inventory cart order review notification shipping pa
   git clone https://github.com/duynhlab/${service}-service.git
 done
 
-# Frontend Repository
+# Frontend and Backoffice portal (local-stack builds both from ../../<repo>)
 git clone https://github.com/duynhlab/frontend.git
+git clone https://github.com/duynhlab/admin-service.git
 git clone https://github.com/duynhlab/helm-charts.git
 ```
 
@@ -563,4 +564,4 @@ For persistence layer details, refer to [architecture.md](../databases/architect
 
 ---
 
-_Last updated: 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._
+_Last updated: 2026-09-17 — `admin-service` added to the clone list; `local-stack/compose.yaml` builds the Backoffice portal from `../../admin-service`, so a checkout without it fails at `docker compose up --build`. Previously 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

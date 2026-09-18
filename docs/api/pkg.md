@@ -17,7 +17,7 @@ release line.
 
 ## Overview
 
-`pkg` exists so eleven services do not each carry their own copy of JWT
+`pkg` exists so ten services do not each carry their own copy of JWT
 verification, OTel wiring, gRPC hardening, or idempotency semantics. Two rules
 shape it:
 
@@ -103,7 +103,6 @@ import, or imports one it does not require).
 
 | Service | n | authmw | dbx | flagx | grpcx | httpx | idempotency | logger/zapx | migratex | obsx | temporalx | proto |
 |---------|:-:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|-------|
-| auth | 5 | — | ✓ | — | — | ✓ | — | ✓ | ✓ | ✓ | — | — |
 | user | 6 | ✓ | ✓ | — | — | ✓ | — | ✓ | ✓ | ✓ | — | — |
 | inventory | 6 | — | ✓ | — | ✓ | — | — | ✓ | ✓ | ✓ | — | inventory |
 | product | 7 | — | ✓ | — | ✓ | ✓ | — | ✓ | ✓ | ✓ | — | inventory, product, review |
@@ -121,7 +120,7 @@ its adoption is still rolling (see below).
 
 ## Adoption
 
-All eleven services are migrated off the frozen root module. `inventory` was last
+All ten active services are migrated off the frozen root module (`auth` is archived and no longer counted). `inventory` was last
 (2026-08-08), which is also why it is absent from the migration runbook in the pkg
 repo.
 
@@ -141,8 +140,8 @@ records the fleet-wide state, not a per-service guarantee.
 
 - **Bumping:** `go get github.com/duynhlab/pkg/<module>@vX.Y.Z && go mod tidy`,
   build + tests, PR touching `go.mod` + `go.sum` only. Dependabot groups all
-  `github.com/duynhlab/pkg/*` into one PR per service, so a fleet round is eleven
-  PRs, not eleven times fourteen.
+  `github.com/duynhlab/pkg/*` into one PR per service, so a fleet round is ten
+  PRs, not ten times fourteen.
 - **A stale root require must be deleted, never version-edited.** Editing
   `require github.com/duynhlab/pkg v0.35.0` to a `v0.36.x` points at a tag that
   does not exist; mixing the root require with a per-module one fails immediately
@@ -241,4 +240,4 @@ sequence jumps `v0.12.0` → `v0.12.2`).
 - [observability.md](./observability.md) — the obsx contract every service follows
 - Per-service contracts: [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-27 — `temporalx v0.39.0` (`WithLogger` → zap via zapslog, Phase-4 conformance) added. Earlier same day: `obsx`/`temporalx` `v0.38.0` (ADR-063 OTel v2) added; the temporalx fleet pin is one version again and the split-pin note retired; the `v0.36.2` ledger row's wrong starting SDK corrected (1.45.0 → 1.44.1). 2026-08-21: `v0.36.2` + `v0.37.0` temporalx rows; ADR-038 middleware wave before that._
+_Last updated: 2026-09-17 — the archived `auth` service is removed from the consumer table and the fleet count is ten, matching `docs/api/README.md`. Previously 2026-08-27 — `temporalx v0.39.0` (`WithLogger` → zap via zapslog, Phase-4 conformance) added. Earlier same day: `obsx`/`temporalx` `v0.38.0` (ADR-063 OTel v2) added; the temporalx fleet pin is one version again and the split-pin note retired; the `v0.36.2` ledger row's wrong starting SDK corrected (1.45.0 → 1.44.1). 2026-08-21: `v0.36.2` + `v0.37.0` temporalx rows; ADR-038 middleware wave before that._

@@ -48,6 +48,11 @@ lists ADR-070 through ADR-076.
 
 ## Phase 1 — shared foundations
 
+**Prerequisite (ADR-072) — pin convergence done 2026-09-18.** Every `duynhlab/pkg`
+module is at its current tag in all ten services (`obsx v0.38.0` fleet-wide, was three
+versions), shipped as ten patch releases after a full local-stack E2E audit; the
+Dependabot `duynhlab-pkg` group PRs it superseded are closed. The linter converged the same day: `pkg` lints at golangci-lint v2.12.2 (pkg #88), the version the services' shared `go-check.yml` already defaults to — 0 issues across all fourteen modules. ADR-072's first obligation is closed; its Adoption is `Partial`.
+
 ### Task 1.1: Build pkg/logger/slogx
 
 **Acceptance criteria:**
@@ -382,4 +387,4 @@ between two tags reports a planted rename.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._
+_Last updated: 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

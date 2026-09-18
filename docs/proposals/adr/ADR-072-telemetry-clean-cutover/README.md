@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Phases 1–4, checkpoints and final release gate |
-| **Adoption** | Not started |
+| **Adoption** | Partial — pin and linter convergence complete 2026-09-18; lint policy, cutover and CI-enforced floor not started |
 
 ## Context
 
@@ -164,7 +164,7 @@ two-shape state the standard exists to prevent.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Converge the shared package's three `obsx` pins and the two linter versions | Service repositories, `duynhlab/pkg` | RFC-0031 Phase 1 prerequisite | One `obsx` version fleet-wide; one golangci-lint version in pkg and services |
+| Converge the shared package's three `obsx` pins and the two linter versions — **done 2026-09-18** | Service repositories, `duynhlab/pkg` | RFC-0031 Phase 1 prerequisite | One `obsx` version fleet-wide (`v0.38.0`, ten patch releases after a full local-stack audit); one golangci-lint version in pkg and services (v2.12.2, pkg #88) |
 | Add `golangci-policy.yml` and the second lint pass to the shared lint job | `duynhlab/gha-workflows` | RFC-0031 Task 1.1c, Phase 3 | Policy runs non-blocking on every service; blocks after one release; `cmd/**` exemption removed when 1.1c lands |
 | Execute the three domain waves and the consumer release | Service repositories, Observability | RFC-0031 Phase 3, Task 4.1 | Checkpoints pass; no legacy key in any store for new records |
 | Run the final gate on Compose and Kind | Platform | RFC-0031 final release gate | Browser checkout, HTTP, gRPC, Temporal, business rejection, dependency failure and both correlation directions pass |
@@ -208,6 +208,7 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Rollout & rollback and § Fleet scale; owner's greenfield rule recorded |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
+| 2026-09-18 | Accepted / Partial | First obligation closed: every `duynhlab/pkg` module at its current tag in all ten services (`obsx v0.38.0` fleet-wide, was three versions) and pkg lints at the fleet's golangci-lint v2.12.2 |
 
 ---
-_Last updated: 2026-09-17._
+_Last updated: 2026-09-18 — Adoption `Partial`: the pin and linter convergence obligation is complete (ten service releases, pkg #88). Previously 2026-09-17._

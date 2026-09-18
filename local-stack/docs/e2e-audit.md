@@ -1770,12 +1770,16 @@ done
 # C10. Temporal metrics, both halves. SDK first — the worker processes' own
 #      instrumentation, a leg that no other row touches. Absent series here
 #      means obsx wired the SDK without its metrics handler, which is invisible
-#      everywhere else. Note the SDK counters are BARE names (no _total):
-#      verified against live series 2026-08-18; temporal_workflow_failed and
-#      friends are failure-only and legitimately absent on a healthy run.
+#      everywhere else. Note the SDK counters carry a `_total` suffix since
+#      ADR-063 (temporalx v0.39.0, OTel v2 plugin with UseMonotonicCounters —
+#      the OTLP→Prometheus path renders monotonic sums that way; verified live
+#      2026-09-18: `temporal_workflow_completed_total` = 18, bare name = no
+#      series). The 2026-08-18 note that they were bare predates ADR-063.
+#      temporal_workflow_failed_total and friends are failure-only and
+#      legitimately absent on a healthy run.
 for q in 'count(temporal_workflow_endtoend_latency_seconds_bucket)' \
          'sum(temporal_activity_execution_latency_seconds_count)' \
-         'sum(temporal_workflow_completed)' \
+         'sum(temporal_workflow_completed_total)' \
          'sum(temporal_worker_task_slots_available)' \
          'sum(temporal_num_pollers)'; do
   curl -s "$VM" --data-urlencode "query=$q" \
@@ -2128,7 +2132,7 @@ print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing:
 | C7 | spanmetrics / RED leg | `spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"}` > 0 and `spanmetrics_duration_milliseconds_bucket` present — proves the connector plus the remote-write path |
 | C8 | App semconv metrics leg | `http_server_request_duration_seconds_count`, `rpc_server_call_duration_seconds_count{service_name="inventory"}` (the only metrics evidence for gRPC-only inventory), and `go_goroutine_count` all have series |
 | C9 | Business counters | confirmed = saga = authorized for flows driven since the last process restart (after ~45s). A14/A15 reset the saga counter; then the durable evidence settles it — every `OrderFulfillmentWorkflow` `Completed`, every confirmed order `completed`. `auth_*` counters are **not** asserted |
-| C10 | Temporal metrics, both halves | SDK: latency histograms + `temporal_workflow_completed`, worker slots, pollers have series (bare names, no `_total`); server: `up{job="temporal"}` is 1 and `service_requests` / `persistence_requests` rate — the :8000 listener `PROMETHEUS_ENDPOINT` enables |
+| C10 | Temporal metrics, both halves | SDK: latency histograms + `temporal_workflow_completed_total`, worker slots, pollers have series (`_total` on the SDK counters since ADR-063 — the cluster rules and the Temporal dashboard query that name); server: `up{job="temporal"}` is 1 and `service_requests` / `persistence_requests` rate — the :8000 listener `PROMETHEUS_ENDPOINT` enables |
 | C11 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
 | C12 | App logs (OTLP leg) | `_stream:{"service.name"="cart"}` non-empty in VictoriaLogs, and the stream-field enumeration lists every service Phase A drove |
 | C13 | Edge access logs (Vector leg) | `_stream:{service="gateway"}` filtered on `upstream_cluster:*` + `route_name:*` (the discriminator against the control plane's debug logs in the same stream) is non-empty, and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` (`host` never reaches VL — Vector's `del(.host)` cleanup eats it; as-built quirk) — not Envoy's built-in fallback names |
@@ -2220,7 +2224,7 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
+_Last updated: 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
 RFC-0025: the header's "Sign in" is a link to
 `/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
 storage assertion now names the legitimate residents (`theme`, and a

@@ -368,6 +368,21 @@ Skeleton (copy what you need):
   retaining the classic `GrafanaDashboard.spec.oci` resources at v0.3.0, so
   both delivery paths can be compared and rolled back independently.
 
+#### Services
+
+- **Every service pins every `duynhlab/pkg` module at its current tag — one fleet
+  floor.** RFC-0031 Phase 1 opened with the ADR-072 prerequisite: `obsx` sat at
+  three versions across ten services (`v0.36.1`/`v0.37.x`/`v0.38.0`), and no fleet
+  lint policy can be validated against three shapes. Ten `chore/pkg-floor-2026-09`
+  PRs moved `obsx` to `v0.38.0` (additive), every other module one patch (the pkg
+  CVE-fix release), `go` to 1.26.7 and eight builder images to
+  `golang:1.26.7-alpine`; all passed the full local-stack E2E audit (A/B/C,
+  `ELIGIBLE FOR TAG`) and shipped as `user v2.2.2`, `product v1.13.2`,
+  `inventory v0.6.1`, `cart v2.1.2`, `order v2.7.1`, `review v2.1.2`,
+  `shipping v1.6.2`, `notification v2.1.2`, `payment v2.3.2`, `checkout v0.10.1`.
+  The five stale Dependabot `duynhlab-pkg` group PRs were closed as superseded.
+  `docs/api/pkg.md` § Adoption records the floor.
+
 #### Temporal
 
 - **Both versioned workers autoscale from their task-queue backlog** — one
@@ -457,6 +472,12 @@ Skeleton (copy what you need):
   stays platform + Grafana + alerts + playground.
 
 #### Proposals
+
+- **RFC-0031 Phase 1 started — the ADR-072 prerequisite is met.** Pin convergence
+  shipped 2026-09-18 (see Services); the shared package now lints at golangci-lint v2.12.2, the services' CI version (pkg #88, 0 issues across fourteen modules). The delivery plan
+  records the prerequisite and ADR-072 moves to Adoption `Partial` — its first
+  obligation (pin and linter convergence) is closed; the lint policy, the cutover
+  and the version floor in CI remain.
 
 - **RFC-0031 and ADR-070 through ADR-076 are `Accepted / Not started`.** The
   owner closed architecture review on 2026-09-17: the logging facade is

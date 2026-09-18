@@ -140,14 +140,30 @@ All ten active services are migrated off the frozen root module (`auth` is archi
 (2026-08-08), which is also why it is absent from the migration runbook in the pkg
 repo.
 
-| Modules | Pinned at |
-|---------|-----------|
-| `authmw idempotency proto` | `v0.37.0` |
-| `dbx grpcx httpx migratex` | `v0.36.1` |
-| `temporalx` | `v0.39.0` fleet-wide — the ADR-063 rule: both Temporal services pin the SAME version (a future split must record its reason here, and re-buys the dual-metric-name problem #921 measured) |
-| `flagx logger/zapx` | `v0.36.0` |
-| `obsx` | `v0.36.1`, except `inventory` on `v0.37.0` (span-helper wave still rolling) and `order`/`checkout` on `v0.38.0` (the ADR-063 factory seam) |
-| `httpmw` | **Not adopted anywhere yet.** `v0.1.0` is tagged and all nine HTTP services have an open pull request pinning it; none is merged, so every service still carries its own `middleware/` copy. `inventory` is not in that count — it serves gRPC and mounts no Gin middleware |
+**Fleet floor — 2026-09-18 (RFC-0031 Phase 1, ADR-072 prerequisite).** Every module
+a service imports is pinned at its current tag, in every service, since the ten
+`chore/pkg-floor-2026-09` pull requests merged and shipped as patch releases
+(`user v2.2.2`, `product v1.13.2`, `inventory v0.6.1`, `cart v2.1.2`, `order v2.7.1`,
+`review v2.1.2`, `shipping v1.6.2`, `notification v2.1.2`, `payment v2.3.2`,
+`checkout v0.10.1`). The ADR-072 rule from here on: a service may run at most **one
+minor version behind** the current release of any module it imports; until the fleet
+lint policy exists, that rule is enforced in review.
+
+| Modules | Pinned at (fleet-wide) |
+|---------|------------------------|
+| `obsx` | `v0.38.0` — one version everywhere; before this floor it sat at three (`v0.36.1`/`v0.37.x`/`v0.38.0`) |
+| `temporalx` | `v0.39.0` (order, checkout) — the ADR-063 rule: both Temporal services pin the SAME version (a future split must record its reason here, and re-buys the dual-metric-name problem #921 measured) |
+| `httpmw` | `v0.1.1` on all nine HTTP services (`inventory` serves gRPC and mounts no Gin middleware) |
+| `authmw` | `v0.37.2` |
+| `httpx` | `v0.37.1` |
+| `idempotency` | `v0.37.1` (payment, checkout) |
+| `proto` | `v0.37.1` |
+| `dbx grpcx migratex` | `v0.36.2` |
+| `flagx logger/zapx` | `v0.36.1` |
+
+The same floor moved every service to `go 1.26.7` (the version the pkg modules
+declare) and the eight services still building on `golang:1.26.6-alpine` to
+`golang:1.26.7-alpine`, matching order and checkout.
 
 A service's own `go.mod` is the authority for which versions it pins; this table
 records the fleet-wide state, not a per-service guarantee.
@@ -256,4 +272,4 @@ sequence jumps `v0.12.0` → `v0.12.2`).
 - [observability.md](./observability.md) — the obsx contract every service follows
 - Per-service contracts: [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design records link ADR-070/072/076 and a labelled **Target state** callout names the planned `logger/slogx` module, the breaking `obsx` type-leak release, the version floor and the Weaver registry; the consumer count is ten (`auth-service` archived). Previously 2026-09-17 — the archived `auth` service is removed from the consumer table and the fleet count is ten, matching `docs/api/README.md`. Previously 2026-08-27 — `temporalx v0.39.0` (`WithLogger` → zap via zapslog, Phase-4 conformance) added. Earlier same day: `obsx`/`temporalx` `v0.38.0` (ADR-063 OTel v2) added; the temporalx fleet pin is one version again and the split-pin note retired; the `v0.36.2` ledger row's wrong starting SDK corrected (1.45.0 → 1.44.1). 2026-08-21: `v0.36.2` + `v0.37.0` temporalx rows; ADR-038 middleware wave before that._
+_Last updated: 2026-09-18 — § Adoption records the 2026-09-18 fleet floor (every module at its current tag in every service, `obsx v0.38.0` fleet-wide, `httpmw v0.1.1` on all nine HTTP services) and the ADR-072 one-minor rule; the stale 'httpmw not adopted' row is gone. Previously 2026-09-18 — RFC-0031 accepted: Design records link ADR-070/072/076 and a labelled **Target state** callout names the planned `logger/slogx` module, the breaking `obsx` type-leak release, the version floor and the Weaver registry; the consumer count is ten (`auth-service` archived). Previously 2026-09-17 — the archived `auth` service is removed from the consumer table and the fleet count is ten, matching `docs/api/README.md`. Previously 2026-08-27 — `temporalx v0.39.0` (`WithLogger` → zap via zapslog, Phase-4 conformance) added. Earlier same day: `obsx`/`temporalx` `v0.38.0` (ADR-063 OTel v2) added; the temporalx fleet pin is one version again and the split-pin note retired; the `v0.36.2` ledger row's wrong starting SDK corrected (1.45.0 → 1.44.1). 2026-08-21: `v0.36.2` + `v0.37.0` temporalx rows; ADR-038 middleware wave before that._

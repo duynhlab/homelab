@@ -413,7 +413,7 @@ Skeleton (copy what you need):
 - **`homelab-drawio` project skill added at `.agents/skills/homelab-drawio/`** —
   a Draw.io authoring overlay on the generic IDE `drawio-skill` that adds the
   homelab house style (semantic palette shared with the Mermaid diagram
-  convention), a curated PNG icon catalog with provenance in `manifest.json`, and
+  convention), a curated 20-logo PNG icon catalog with provenance in `manifest.json`, and
   deterministic `scripts/` for a preflight doctor, icon-style emission, house-style
   validation, and reproducible SVG/PNG export. Mermaid stays the default for
   diagrams; Draw.io is reached only when asked for by name or when editing an

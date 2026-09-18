@@ -131,6 +131,14 @@
       "source": "https://github.com/cncf/artwork/blob/master/projects/opentelemetry/icon/color/opentelemetry-icon-color.svg",
       "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
     },
+    "pgdog": {
+      "file": "pgdog.png",
+      "bytes": 2181,
+      "sha256": "0b65e6ebd44d028aae114897d3e5014f226977b567160e0131c70c94b6b15d58",
+      "label": "PgDog",
+      "source": "https://github.com/pgdogdev/pgdog/blob/main/.github/logo2_wide.png",
+      "license": "PgDog (pgdogdev) brand mark, logomark cropped from the lockup - identification use only"
+    },
     "postgresql": {
       "file": "postgresql.png",
       "bytes": 4104,
@@ -147,6 +155,14 @@
       "source": "https://cdn.simpleicons.org/temporal",
       "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
     },
+    "valkey": {
+      "file": "valkey.png",
+      "bytes": 2475,
+      "sha256": "7dd7d7f7634b2434bcfabf1c0fb6dd0c75ccb28e9548f55c3e2470fac986e7c7",
+      "label": "Valkey",
+      "source": "https://valkey.io/img/Valkey-logo.svg",
+      "license": "Valkey (Linux Foundation) brand mark - identification use only"
+    },
     "victoriametrics": {
       "file": "victoriametrics.png",
       "bytes": 3071,
@@ -157,9 +173,7 @@
     }
   },
   "none": {
-    "valkey": "no own mark at CNCF/simple-icons/brand; it is a Redis fork and a Redis logo would assert Redis is deployed. Stays plain.",
     "vector": "no mark at any source probed (project repo, site, simple-icons). Stays plain.",
-    "pgdog": "no logo located. Stays plain.",
     "sloth": "no full-colour mark located. Stays plain."
   },
   "follow_up": {

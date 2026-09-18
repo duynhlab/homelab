@@ -29,7 +29,8 @@ that product; pass whatever `--role` the box actually plays.
 Kubernetes, Flux, Helm, OpenTelemetry, cert-manager, Kyverno, KEDA,
 CloudNativePG, External Secrets Operator (CNCF Artwork, colour); Grafana,
 Keycloak, Go, PostgreSQL, ClickHouse, Temporal, Envoy, VictoriaMetrics, OpenBao
-(simple-icons). Run `icon_style.py list` for the exact names and aliases.
+(simple-icons); Valkey (valkey.io brand mark), PgDog (project brand, logomark
+cropped from the lockup). Run `icon_style.py list` for the exact names and aliases.
 
 **Aliases:** `victorialogs` and `victoriatraces` → the VictoriaMetrics mark (one
 company, one logo); `postgres`→`postgresql`, `eso`→`external-secrets`,
@@ -37,10 +38,12 @@ company, one logo); `postgres`→`postgresql`, `eso`→`external-secrets`,
 
 ## Deliberately plain (`none` — do not re-add)
 
-- **Valkey** — a Redis fork with no own mark; a Redis logo would assert Redis is
-  deployed, which it is not. Draw a plain `data` cylinder.
-- **Vector** — no mark at any source probed.
-- **PgDog**, **Sloth** — no logo located.
+- **Vector** — no mark at any source probed (project repo, site, simple-icons).
+- **Sloth** — no full-colour mark located.
+
+(Valkey and PgDog were `none` until their official marks were located —
+`valkey.io/img/Valkey-logo.svg` and the PgDog lockup's paw — and are now in the
+catalog. Never put a Redis logo on Valkey: it would assert Redis is deployed.)
 
 ## Rules that keep the catalog honest
 

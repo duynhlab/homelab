@@ -25,8 +25,11 @@ Shared bootstrap and cross-signal label rules: [Application observability](./obs
 > profiles and the SDK constant `pyroscope_spy`), derived from the **same OTel
 > resource** the tracer and meter use — today the helper re-parses
 > `OTEL_RESOURCE_ATTRIBUTES` for the deprecated key `deployment.environment`, which no
-> manifest sets, so `deployment_environment` is empty fleet-wide and `service_version`
-> is empty on every API service. The SDK's eleventh type `goroutine_leak` is excluded
+> manifest sets, so `deployment_environment` is empty fleet-wide; `service_version`
+> was empty on every API service until 2026-09-18, when the domain ResourceSets put
+> `service.version=<image_tag>` into `OTEL_RESOURCE_ATTRIBUTES` (RFC-0031 Task 1.2) —
+> the helper already reads that key, so the label populates on the next rollout. The
+> SDK's eleventh type `goroutine_leak` is excluded
 > by decision; mutex and block sampling rates stay central with a written overhead
 > budget; `mockpay` is brought under the contract; `PROFILING_ENABLED` is either
 > promoted to a per-service input or documented as domain-scoped. The
@@ -183,4 +186,4 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-09-18 — `service_version` now has a source on API services (`image_tag` → `OTEL_RESOURCE_ATTRIBUTES`, RFC-0031 Task 1.2); `deployment_environment` stays empty until the profiler reads the shared resource (Task 1.4). Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._

@@ -71,6 +71,45 @@ spec:
         value: info
       - name: LOG_FORMAT
         value: json
+      # RFC-0031 Task 1.2 / ADR-074: mockpay is a Go process that already wires
+      # obsx (runMockpay installs the tracer provider + W3C propagator), but it
+      # had no telemetry environment at all, so it exported to nowhere and
+      # profiled nothing. Same contract as the domain ResourceSets. The version
+      # is pinned by hand like the image tag above — bump both together.
+      - name: OTEL_SERVICE_NAME
+        value: mockpay
+      - name: OTEL_COLLECTOR_ENDPOINT
+        value: otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4318
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: OTEL_RESOURCE_ATTRIBUTES
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=2.3.1"
+      - name: K8S_NAMESPACE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: K8S_POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: DEPLOYMENT_ENVIRONMENT
+        value: "production"
+      - name: TRACING_ENABLED
+        value: "true"
+      - name: OTEL_SAMPLE_RATE
+        value: "0.1"
+      - name: OTEL_LOGS_ENABLED
+        value: "true"
+      - name: PYROSCOPE_ENDPOINT
+        value: http://pyroscope.monitoring.svc.cluster.local:4040
+      - name: PROFILING_ENABLED
+        value: "true"
       # Signs every webhook it emits; payment verifies with the same secret
       # (ExternalSecret payment-webhook-hmac, seeded in OpenBAO).
       - name: MOCKPAY_WEBHOOK_SECRET

@@ -121,6 +121,16 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Every process now says which release it is (RFC-0031 Task 1.2).** The five domain
+  ResourceSets append `service.version=<image_tag>` to `OTEL_RESOURCE_ATTRIBUTES`, so
+  spans, metrics, logs and the profiler's `service_version` label carry the deployed
+  release for API services the way the versioned workers already did from their
+  build-id label. `mockpay` — a Go process that wires obsx but had no telemetry
+  environment at all — gains the full contract (collector endpoint, resource
+  attributes with a hand-pinned version, Kubernetes identity, tracing, OTLP logs,
+  Pyroscope). Cluster dashboards that render deployment annotations from
+  `service.version` stop being blank for API services on the next rollout.
+
 - **Telemetry standards audit (2026-09-16).** A static conformance review of logs,
   traces, metrics, profiling and the ClickHouse consumers across the ten services
   and both worker modes. No running service, manifest, dashboard or telemetry

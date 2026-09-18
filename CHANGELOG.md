@@ -121,6 +121,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Profiling has a per-service kill switch (RFC-0031 Task 1.4, ADR-074).** The five
+  domain ResourceSets render `PROFILING_ENABLED` from a `profiling_enabled` input
+  (default `"true"`) instead of a literal, so `profiling_enabled: "false"` on one
+  service's InputProvider opts that service out — before this the only way to turn
+  profiling off was the whole domain. Workers and `mockpay` already had one manifest
+  each. No default changes; nothing is disabled.
+
 - **Telemetry standards audit (2026-09-16).** A static conformance review of logs,
   traces, metrics, profiling and the ClickHouse consumers across the ten services
   and both worker modes. No running service, manifest, dashboard or telemetry

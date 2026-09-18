@@ -28,8 +28,8 @@ Shared bootstrap and cross-signal label rules: [Application observability](./obs
 > manifest sets, so `deployment_environment` is empty fleet-wide and `service_version`
 > is empty on every API service. The SDK's eleventh type `goroutine_leak` is excluded
 > by decision; mutex and block sampling rates stay central with a written overhead
-> budget; `mockpay` is brought under the contract; `PROFILING_ENABLED` is either
-> promoted to a per-service input or documented as domain-scoped. The
+> budget; `mockpay` is brought under the contract; `PROFILING_ENABLED` became a
+> per-service input on 2026-09-18 (the one part of this contract already as-built). The
 > [§ Profile label policy](#profile-label-policy) below is the **as-built** policy and
 > is deliberately wider than the target; it is rewritten at Task 1.4.
 
@@ -157,12 +157,16 @@ On by default. Injected by app ResourceSets and worker manifests:
 
 | Env | Purpose | Default |
 |-----|---------|---------|
-| `PROFILING_ENABLED` | Toggle | `true` |
+| `PROFILING_ENABLED` | Toggle — **per-service** since 2026-09-18: the domain ResourceSets render it from the `profiling_enabled` input (default `"true"`); the two worker manifests and `mockpay` carry their own literal | `true` |
 | `PYROSCOPE_ENDPOINT` | Pyroscope server | `http://pyroscope.monitoring.svc.cluster.local:4040` |
 | `OTEL_SERVICE_NAME` | Identity (`service_name`) | service name |
 | `OTEL_RESOURCE_ATTRIBUTES` | Labels (`service.namespace`, `deployment.environment`, `service.version`) | set by ResourceSet |
 
-Set `PROFILING_ENABLED=false` to opt a service out.
+Opt one service out with `profiling_enabled: "false"` on its `ResourceSetInputProvider`
+(`kubernetes/apps/services/<name>.yaml`) — a GitOps commit, per service. Before
+2026-09-18 the value was a literal in the domain ResourceSet, so turning profiling off
+meant every service in that domain (RFC-0031 Task 1.4). Disabling it changes no other
+signal and never affects readiness.
 
 Full env table: [Application observability § Environment variables](./observability.md#environment-variables).
 
@@ -183,4 +187,4 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-09-18 — `PROFILING_ENABLED` is a per-service ResourceSet input (`profiling_enabled`, default true) — RFC-0031 Task 1.4; the domain-wide literal is gone. Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._

@@ -9,22 +9,42 @@ ERRORS (exit 1):
   * image=data: joined with ';base64,'  -- the semicolon truncates the style
   * image=data:image/svg...             -- headless export renders an empty box
   * a logo on a grouping frame          -- it labels the grouping, not a thing
-  * planned state not marked both ways   -- a planned node must say 'planned'
-                                           AND be dashed (AGENTS.md step 5)
+  * a node styled planned (dashed + the planned stroke) whose label omits the
+                                           word 'planned' (AGENTS.md step 5)
 
 WARNINGS (exit 0, or 1 with --strict):
+  * a label containing 'planned' on a node that is NOT dashed -- the other half
+    of the same rule. A warning rather than an error because legends and prose
+    ("planned migration") legitimately say the word; legend cells and text
+    annotations are skipped outright.
   * a non-Helvetica font                 -- the house font
   * no legend cell                       -- an architecture diagram needs one
+  * no title cell                        -- a reader must see what they opened
+  * an unlabelled DASHED edge            -- AGENTS.md step 5: a dotted arrow
+                                           means optional/indirect/planned/an
+                                           exception, and must say which.
+                                           Solid edges are left to the human
+                                           review checklist: a graph whose every
+                                           arrow means the same thing says so
+                                           once in its legend, and 17 identical
+                                           labels would be noise.
 
 Usage: validate_house.py <file.drawio> [<file.drawio> ...] [--strict]
 """
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import xml.etree.ElementTree as ET
 
-PLANNED_STROKE = "#64748b"
+from _common import is_frame, parent_ids
+
+# The planned role's STROKE. Matched as an attribute, never as a bare substring:
+# #64748B is also the `external` role's FILL, so a substring test flagged every
+# dashed external box as a mislabelled planned one.
+PLANNED_STROKE_RE = re.compile(r"strokeColor=#64748b\b", re.I)
+TITLE_MIN_FONT = 14
 
 
 def _cells(path: str):
@@ -39,6 +59,11 @@ def _cells(path: str):
     return [c for c in root.iter("mxCell")]
 
 
+def _font_size(style: str) -> int:
+    m = re.search(r"fontSize=(\d+)", style)
+    return int(m.group(1)) if m else 0
+
+
 def check_file(path: str) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -47,41 +72,64 @@ def check_file(path: str) -> tuple[list[str], list[str]]:
     except (ET.ParseError, ValueError) as exc:
         return [f"{path}: {exc}"], []
 
-    has_legend = False
+    parents = parent_ids(cells)
+    # Cells that are, or live inside, a legend: the legend names every role it
+    # explains, so it says "planned" without being planned.
+    legend_ids = {
+        c.get("id")
+        for c in cells
+        if "legend" in (c.get("value") or "").lower()
+    }
+
+    has_legend = bool(legend_ids)
+    has_title = False
+
     for c in cells:
         style = c.get("style") or ""
         value = (c.get("value") or "").strip()
         low = value.lower()
-        if "legend" in low:
-            has_legend = True
+        cid = c.get("id")
+        is_edge = c.get("edge") == "1"
+        is_annotation = style.startswith("text;")
+
+        if is_annotation and _font_size(style) >= TITLE_MIN_FONT and value:
+            has_title = True
 
         if "image=data:" in style:
             if ";base64," in style:
-                errors.append(f"{path}#{c.get('id')}: image uses ';base64,' -- use a comma; the semicolon truncates the style")
+                errors.append(f"{path}#{cid}: image uses ';base64,' -- use a comma; the semicolon truncates the style")
             if "image=data:image/svg" in style:
-                errors.append(f"{path}#{c.get('id')}: SVG data URI -- headless export renders an empty box; rasterise to PNG")
+                errors.append(f"{path}#{cid}: SVG data URI -- headless export renders an empty box; rasterise to PNG")
 
         has_png = "image=data:image/png" in style
-        is_frame = "container=1" in style or "swimlane" in style
-        if has_png and is_frame:
-            errors.append(f"{path}#{c.get('id')}: logo on a grouping frame -- it labels the grouping, not a thing")
+        if has_png and is_frame(style, cid, parents):
+            errors.append(f"{path}#{cid}: logo on a grouping frame -- it labels the grouping, not a thing")
 
-        # A node drawn in the planned style (dashed + slate stroke) must say so,
-        # per AGENTS.md step 5. The reverse (any label mentioning "planned" must
-        # be dashed) is deliberately NOT enforced -- it false-positives on
-        # legends and on prose like "planned migration" in an annotation.
-        is_planned_style = "dashed=1" in style and PLANNED_STROKE in style.lower()
+        # Both halves of AGENTS.md step 5. A node drawn in the planned style must
+        # say so (error -- the style is unambiguous). A node whose label says
+        # 'planned' must be dashed (warning -- the word has innocent uses, so
+        # legends and text annotations are exempt).
+        is_planned_style = "dashed=1" in style and PLANNED_STROKE_RE.search(style)
         says_planned = "planned" in low
+        exempt = is_annotation or cid in legend_ids or c.get("parent") in legend_ids
+
         if is_planned_style and value and not says_planned:
-            errors.append(f"{path}#{c.get('id')}: styled planned (dashed + slate) but label omits 'planned'")
+            errors.append(f"{path}#{cid}: styled planned (dashed + slate) but label omits 'planned'")
+        if says_planned and "dashed=1" not in style and not exempt:
+            warnings.append(f"{path}#{cid}: label says 'planned' but the cell is not dashed")
+
+        if is_edge and not value and "dashed=1" in style:
+            warnings.append(f"{path}#{cid}: unlabelled dashed edge -- say which it is (optional, indirect, planned, exception)")
 
         if "fontFamily=" in style:
             fam = style.split("fontFamily=", 1)[1].split(";", 1)[0]
             if fam and fam.lower() != "helvetica":
-                warnings.append(f"{path}#{c.get('id')}: font '{fam}' is not the house font Helvetica")
+                warnings.append(f"{path}#{cid}: font '{fam}' is not the house font Helvetica")
 
     if not has_legend:
         warnings.append(f"{path}: no legend cell found -- an architecture diagram should carry its own legend")
+    if not has_title:
+        warnings.append(f"{path}: no title cell found -- name the diagram and its scope on the canvas")
     return errors, warnings
 
 

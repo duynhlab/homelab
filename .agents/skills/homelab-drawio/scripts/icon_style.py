@@ -23,9 +23,19 @@ import glob
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 
-from _common import ICONS, load_manifest, load_preset, resolve_icon, role_style
+from _common import (
+    ICONS,
+    is_frame,
+    load_manifest,
+    load_preset,
+    parent_ids,
+    resolve_icon,
+    role_dashed,
+    role_style,
+)
 
 
 def cmd_style(args: argparse.Namespace) -> int:
@@ -36,6 +46,7 @@ def cmd_style(args: argparse.Namespace) -> int:
         payload = base64.b64encode(fh.read()).decode()
     style = load_preset()["label_style"].format(
         payload=payload,
+        dashed=role_dashed(args.role),
         fillColor=rs["fillColor"],
         strokeColor=rs["strokeColor"],
         fontColor=rs["fontColor"],
@@ -80,24 +91,58 @@ def _catalog_terms() -> dict[str, str]:
     return terms
 
 
+def _first_line(value: str) -> str:
+    """The box's first label line, lowercased.
+
+    Split on the line breaks Draw.io actually writes (`<br>` and `&#10;`) BEFORE
+    stripping tags -- stripping first collapses every line into one, which is
+    what silently broke the "icon the box's subject, not its prose" rule: a
+    product named on line 2 was matched as if it were the subject.
+    """
+    head = re.split(r"<br\s*/?>|&#10;|\n", value, maxsplit=1)[0]
+    return re.sub(r"<[^>]+>", " ", head).strip().lower()
+
+
 def cmd_audit(args: argparse.Namespace) -> int:
     terms = _catalog_terms()
     none_set = {n.lower() for n in load_manifest().get("none", {})}
     missing: dict[str, list[str]] = defaultdict(list)
     misplaced: list[str] = []
 
-    for path in sorted(glob.glob(os.path.join(args.dir, "*.drawio"))):
-        doc = open(path, encoding="utf-8").read()
+    # Recursive: a non-recursive glob made `audit docs/` report every diagram
+    # clean while the diagrams sat one level down. A false clean is worse than
+    # no check.
+    paths = sorted(glob.glob(os.path.join(args.dir, "**", "*.drawio"), recursive=True))
+    if not paths:
+        print(f"audit: no .drawio files under {args.dir}", file=sys.stderr)
+        return 1
+
+    for path in paths:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
         diagram = os.path.basename(path)[:-7]
-        for m in re.finditer(r'<mxCell\b[^>]*\bvalue="([^"]*)"[^>]*\bstyle="([^"]*)"[^>]*>', doc):
-            value, style = m.group(1), m.group(2)
-            first = re.sub(r"<[^>]+>", " ", value).strip().split("\n")[0].lower()
+        try:
+            cells = list(ET.fromstring(text).iter("mxCell"))
+        except ET.ParseError as exc:
+            print(f"audit: {diagram}: unparseable ({exc})", file=sys.stderr)
+            continue
+        parents = parent_ids(cells)
+        # A title, a caption and a legend row all NAME products without being one.
+        # Auditing them turns the advisory into noise, so they are exempt the same
+        # way validate_house.py exempts them.
+        legend_ids = {
+            c.get("id") for c in cells if "legend" in (c.get("value") or "").lower()
+        }
+        for c in cells:
+            style = c.get("style") or ""
+            first = _first_line(c.get("value") or "")
             has_icon = "image=data:image/png" in style
-            is_container = "container=1" in style or "shape=label" not in style and "swimlane" in style
-            if has_icon and is_container:
+            if has_icon and is_frame(style, c.get("id"), parents):
                 misplaced.append(f"{diagram}: icon on a grouping frame -- {first[:48]!r}")
                 continue
             if has_icon or not first:
+                continue
+            if style.startswith("text;") or c.get("parent") in legend_ids:
                 continue
             for term, tier in terms.items():
                 if term in none_set:
@@ -106,8 +151,9 @@ def cmd_audit(args: argparse.Namespace) -> int:
                     missing[tier].append(f"{diagram}: {first[:48]!r} -> {term}")
                     break
 
+    print(f"audit: {len(paths)} diagram(s) under {args.dir}")
     if not missing and not misplaced:
-        print("audit: every box that names a catalogued product already carries its logo.")
+        print("every box that names a catalogued product already carries its logo.")
         return 0
 
     for tier, how in (

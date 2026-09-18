@@ -41,6 +41,15 @@ company, one logo); `postgres`→`postgresql`, `eso`→`external-secrets`,
 - **Vector** — no mark at any source probed (project repo, site, simple-icons).
 - **Sloth** — no full-colour mark located.
 
+## Known gaps (`follow_up` — a search worth finishing)
+
+`manifest.json` also carries a `follow_up` block: products that *do* have a mark
+nobody has added yet, each recorded with the source to fetch it from. `none` says
+"stop looking"; `follow_up` says "this one is still open" — currently
+**Pyroscope**. `icon_style.py list` prints both blocks, and `audit` reports a
+`follow_up` match under its own heading so it is not confused with a logo that is
+already sitting in `assets/icons/`.
+
 (Valkey and PgDog were `none` until their official marks were located —
 `valkey.io/img/Valkey-logo.svg` and the PgDog lockup's paw — and are now in the
 catalog. Never put a Redis logo on Valkey: it would assert Redis is deployed.)

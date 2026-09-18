@@ -49,6 +49,38 @@ def role_style(role: str) -> dict:
     return roles[role]
 
 
+def role_dashed(role: str) -> str:
+    """'dashed=1;' when the role is drawn dashed (planned), else ''.
+
+    The palette marks `planned` dashed in assets/homelab.json; emitting it here
+    is what keeps "planned = dashed + the word planned" true for every style the
+    scripts hand out, rather than only for the ones an author remembers.
+    """
+    return "dashed=1;" if role_style(role).get("dashed") else ""
+
+
+def parent_ids(cells) -> set:
+    """Ids that some other cell names as its `parent` -- i.e. cells owning children."""
+    return {c.get("parent") for c in cells if c.get("parent")}
+
+
+def is_frame(style: str, cell_id, parents: set) -> bool:
+    """True when a cell is a grouping frame rather than a thing.
+
+    Structural first: a cell that owns children IS a frame, whatever its style.
+    That matters because the house `shapes.container` is a styled rectangle --
+    keying only on `container=1`/`swimlane` made this check unfireable. The
+    declared forms are still honoured for hand-authored cells, and the two
+    unstyled layer cells (`0`, `1`) are excluded: they parent everything but are
+    not drawn.
+    """
+    if not style:
+        return False
+    if "container=1" in style or "swimlane" in style or style.startswith("group;"):
+        return True
+    return bool(cell_id) and cell_id in parents
+
+
 def resolve_icon(name: str) -> tuple[str, str]:
     """Map a catalogue name (following aliases) to (png_path, label)."""
     m = load_manifest()

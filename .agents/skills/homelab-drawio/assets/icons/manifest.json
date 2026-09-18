@@ -177,7 +177,7 @@
     "sloth": "no full-colour mark located. Stays plain."
   },
   "follow_up": {
-    "pyroscope": "only the Grafana umbrella mark resolves on simple-icons; fetch the Pyroscope mark from github.com/grafana/pyroscope brand assets, rasterise, then add.",
-    "keda-note": "present as keda; listed here only so a future editor does not re-add a duplicate."
-  }
+    "pyroscope": "only the Grafana umbrella mark resolves on simple-icons; fetch the Pyroscope mark from github.com/grafana/pyroscope brand assets, rasterise, then add."
+  },
+  "_follow_up_note": "follow_up holds products whose mark exists but is not in the catalog yet; icon_style.py folds its keys into the audit's search terms, so only real product names belong here. KEDA reminder (already catalogued): present as keda; listed here only so a future editor does not re-add a duplicate."
 }

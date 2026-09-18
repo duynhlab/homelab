@@ -36,6 +36,11 @@ docs/
 │   ├── tracing.md                # Span contract, propagation, sampling
 │   ├── profiling.md              # Profiling contract (pkg/obsx, Pyroscope labels)
 │   └── _template-service.md      # v2 template for a new service contract
+├── architecture/                 # Draw.io diagram sources + committed exports
+│   ├── README.md                 # Index: which question each .drawio answers
+│   ├── topology.drawio           # Request path: edge → apps → data
+│   ├── observability-delivery.drawio # Flux waves that deliver observability + their gates
+│   └── img/                      # PNG exports (GitHub strips text from Draw.io SVG)
 ├── frontend/                     # Browser apps at the platform layer (build, expose, watch)
 │   ├── README.md                 # Area hub: storefront + admin portal, the build-arg contract
 │   └── admin-portal/             # The operator portal in depth

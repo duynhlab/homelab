@@ -1,0 +1,211 @@
+<mxfile host="Electron">
+  <diagram name="Observability delivery order" id="obsdelivery">
+    <mxGraphModel grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="w_controllers" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#7C3AED;strokeColor=#5B21B6;strokeWidth=1.5;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;controllers-local&lt;/b&gt;&lt;br&gt;./controllers&lt;br&gt;gate: wait — operators + namespaces" vertex="1">
+          <mxGeometry height="70" width="331" x="440" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="w_secrets" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#7C3AED;strokeColor=#5B21B6;strokeWidth=1.5;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;secrets-local&lt;/b&gt;&lt;br&gt;./configs/secrets&lt;br&gt;gate: wait — OpenBao + ESO" vertex="1">
+          <mxGeometry height="70" width="300" x="455" y="253" as="geometry" />
+        </mxCell>
+        <mxCell id="w_storage" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#7C3AED;strokeColor=#5B21B6;strokeWidth=1.5;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;storage-local&lt;/b&gt;&lt;br&gt;./controllers/storage&lt;br&gt;gate: wait — RustFS" vertex="1">
+          <mxGeometry height="70" width="290" x="606" y="398" as="geometry" />
+        </mxCell>
+        <mxCell id="w_monitoring" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#FFE8CC;strokeColor=#E8590C;strokeWidth=1.5;fontColor=#111111;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;monitoring-local&lt;/b&gt;&lt;br&gt;./configs/observability&lt;br&gt;gate: wait — VM CRs · rules · Grafana" vertex="1">
+          <mxGeometry height="70" width="382" x="1312" y="253" as="geometry" />
+        </mxCell>
+        <mxCell id="w_keeper" parent="1" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAABbklEQVR4nO2bMUoDURRFz58MAbW1sreyUdOIhSuwsNJtqAtRe1cQtbBwBRYiSDS9pZJKsFFsMvPcwP8RAnIhc097eXA4MDAMDBjTaVI8cVJcl7lMG3zlphhxRMta9q7mLm3xmr17Zo+GQfauxyhtc5+9e2GdKfvZu4pJGjDMbn9Qk9JZcf2OG8gHINIxiZ3s1sQ75AMQ1QEp8tEjnUObDUDDZtE1eISYK0A1z9Ei4QBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQU6sF/pt4YIl+4XM6HQhAzSqkq9Lc+UfAAdQCahxALaDGAdQCahxALaBm8d8Ep3zQj8PSvPAB0i4/wHVp7/wj4ABqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQUxNxWlxX+CxuKS5m/Dg5Lt+1t7S8ZbcqRsW7HmOmBdeKSfHOGDOLX0jAQLRkmtzbAAAAAElFTkSuQmCC;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#22C55E;strokeColor=#15803D;strokeWidth=1.5;fontColor=#052E16;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;clickhouse-keeper-local&lt;/b&gt;&lt;br&gt;./configs/clickhouse-keeper&lt;br&gt;gate: &lt;b&gt;healthChecks — 3x StatefulSet&lt;/b&gt;" vertex="1">
+          <mxGeometry height="70" width="439" x="124" y="398" as="geometry" />
+        </mxCell>
+        <mxCell id="w_chi" parent="1" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAABbklEQVR4nO2bMUoDURRFz58MAbW1sreyUdOIhSuwsNJtqAtRe1cQtbBwBRYiSDS9pZJKsFFsMvPcwP8RAnIhc097eXA4MDAMDBjTaVI8cVJcl7lMG3zlphhxRMta9q7mLm3xmr17Zo+GQfauxyhtc5+9e2GdKfvZu4pJGjDMbn9Qk9JZcf2OG8gHINIxiZ3s1sQ75AMQ1QEp8tEjnUObDUDDZtE1eISYK0A1z9Ei4QBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQU6sF/pt4YIl+4XM6HQhAzSqkq9Lc+UfAAdQCahxALaDGAdQCahxALaBm8d8Ep3zQj8PSvPAB0i4/wHVp7/wj4ABqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQUxNxWlxX+CxuKS5m/Dg5Lt+1t7S8ZbcqRsW7HmOmBdeKSfHOGDOLX0jAQLRkmtzbAAAAAElFTkSuQmCC;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#22C55E;strokeColor=#15803D;strokeWidth=1.5;fontColor=#052E16;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;clickhouse-local&lt;/b&gt;&lt;br&gt;./configs/clickhouse&lt;br&gt;gate: &lt;b&gt;healthChecks — 3x StatefulSet&lt;/b&gt;" vertex="1">
+          <mxGeometry height="70" width="365" x="40" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="w_schema" parent="1" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAABbklEQVR4nO2bMUoDURRFz58MAbW1sreyUdOIhSuwsNJtqAtRe1cQtbBwBRYiSDS9pZJKsFFsMvPcwP8RAnIhc097eXA4MDAMDBjTaVI8cVJcl7lMG3zlphhxRMta9q7mLm3xmr17Zo+GQfauxyhtc5+9e2GdKfvZu4pJGjDMbn9Qk9JZcf2OG8gHINIxiZ3s1sQ75AMQ1QEp8tEjnUObDUDDZtE1eISYK0A1z9Ei4QBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQU6sF/pt4YIl+4XM6HQhAzSqkq9Lc+UfAAdQCahxALaDGAdQCahxALaBm8d8Ep3zQj8PSvPAB0i4/wHVp7/wj4ABqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQ4wBqATUOoBZQUxNxWlxX+CxuKS5m/Dg5Lt+1t7S8ZbcqRsW7HmOmBdeKSfHOGDOLX0jAQLRkmtzbAAAAAElFTkSuQmCC;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#F59E0B;strokeColor=#B45309;strokeWidth=1.5;fontColor=#451A03;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;clickhouse-schema-local&lt;/b&gt;&lt;br&gt;./configs/clickhouse-schema&lt;br&gt;gate: wait — DDL bootstrap Job" vertex="1">
+          <mxGeometry height="70" width="425" x="81" y="688" as="geometry" />
+        </mxCell>
+        <mxCell id="w_tracing" parent="1" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;image=data:image/png,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;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#A5D8FF;strokeColor=#1971C2;strokeWidth=1.5;fontColor=#111111;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;tracing-local&lt;/b&gt;&lt;br&gt;./controllers/tracing&lt;br&gt;gate: wait — OTel Collector Deployment" vertex="1">
+          <mxGeometry height="70" width="359" x="174" y="833" as="geometry" />
+        </mxCell>
+        <mxCell id="w_profiling" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F3D9FA;strokeColor=#9C36B5;strokeWidth=1.5;fontColor=#111111;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;profiling-local&lt;/b&gt;&lt;br&gt;./controllers/profiling&lt;br&gt;gate: wait — Pyroscope HelmRelease" vertex="1">
+          <mxGeometry height="70" width="360" x="679" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="w_folders" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#7C3AED;strokeColor=#5B21B6;strokeWidth=1.5;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;obs-as-code-folders-local&lt;/b&gt;&lt;br&gt;./cluster/manifests/folders&lt;br&gt;gate: &lt;b&gt;healthCheckExprs — GrafanaManifest&lt;/b&gt;" vertex="1">
+          <mxGeometry height="70" width="475" x="1265" y="398" as="geometry" />
+        </mxCell>
+        <mxCell id="w_dash" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#7C3AED;strokeColor=#5B21B6;strokeWidth=1.5;fontColor=#FFFFFF;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;obs-as-code-dashboards-local&lt;/b&gt;&lt;br&gt;./cluster/manifests/dashboards&lt;br&gt;gate: &lt;b&gt;healthCheckExprs — 2x GrafanaManifest&lt;/b&gt;" vertex="1">
+          <mxGeometry height="70" width="539" x="1323" y="543" as="geometry" />
+        </mxCell>
+        <mxCell id="w_apps" parent="1" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#06B6D4;strokeColor=#0E7490;strokeWidth=1.5;fontColor=#082F49;fontFamily=Helvetica;fontSize=11;" value="&lt;b&gt;apps-local&lt;/b&gt;&lt;br&gt;./  (apps-oci)&lt;br&gt;gate: wait — the microservices" vertex="1">
+          <mxGeometry height="70" width="290" x="930" y="398" as="geometry" />
+        </mxCell>
+        <mxCell id="d0" edge="1" parent="1" source="w_controllers" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_secrets">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="605" y="216" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d1" edge="1" parent="1" source="w_controllers" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.8333;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_monitoring">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="716" y="194" />
+              <mxPoint x="1503" y="194" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d2" edge="1" parent="1" source="w_controllers" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.6667;exitY=1;entryX=0.6667;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_storage">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="661" y="204" />
+              <mxPoint x="799" y="204" />
+              <mxPoint x="799" y="288" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d3" edge="1" parent="1" source="w_controllers" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.3333;exitY=1;entryX=0.3333;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_keeper">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550" y="204" />
+              <mxPoint x="270" y="204" />
+              <mxPoint x="270" y="288" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d4" edge="1" parent="1" source="w_controllers" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.1667;exitY=1;entryX=0.2;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_chi">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="495" y="194" />
+              <mxPoint x="113" y="194" />
+              <mxPoint x="113" y="433" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d5" edge="1" parent="1" source="w_secrets" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.7143;exitY=1;entryX=0.3333;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_storage">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="670" y="339" />
+              <mxPoint x="703" y="339" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d6" edge="1" parent="1" source="w_secrets" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.1429;exitY=1;entryX=0.6667;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_keeper">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="498" y="339" />
+              <mxPoint x="417" y="339" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d7" edge="1" parent="1" source="w_secrets" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.2857;exitY=1;entryX=0.6;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_chi">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="541" y="339" />
+              <mxPoint x="573" y="339" />
+              <mxPoint x="573" y="494" />
+              <mxPoint x="259" y="494" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d8" edge="1" parent="1" source="w_secrets" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.4286;exitY=1;entryX=0.6667;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_schema">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="584" y="433" />
+              <mxPoint x="584" y="629" />
+              <mxPoint x="364" y="629" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d9" edge="1" parent="1" source="w_secrets" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.5714;exitY=1;entryX=0.6667;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_tracing">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="627" y="339" />
+              <mxPoint x="595" y="339" />
+              <mxPoint x="595" y="774" />
+              <mxPoint x="413" y="774" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d10" edge="1" parent="1" source="w_secrets" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.8571;exitY=1;entryX=0.6667;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_profiling">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="713" y="339" />
+              <mxPoint x="919" y="339" />
+              <mxPoint x="919" y="433" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d11" edge="1" parent="1" source="w_storage" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.3333;exitY=1;entryX=0.8;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_chi">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="703" y="504" />
+              <mxPoint x="332" y="504" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d12" edge="1" parent="1" source="w_storage" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.6667;exitY=1;entryX=0.3333;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_profiling">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="799" y="506" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d13" edge="1" parent="1" source="w_keeper" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.4;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_chi">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="344" y="484" />
+              <mxPoint x="186" y="484" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d14" edge="1" parent="1" source="w_chi" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.3333;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_schema">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="222" y="650" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d15" edge="1" parent="1" source="w_schema" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.3333;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_tracing">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="293" y="796" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d16" edge="1" parent="1" source="w_monitoring" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_folders">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1503" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d17" edge="1" parent="1" source="w_monitoring" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.75;exitY=1;entryX=0.6667;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_dash">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1598" y="339" />
+              <mxPoint x="1750" y="339" />
+              <mxPoint x="1750" y="484" />
+              <mxPoint x="1682" y="484" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d18" edge="1" parent="1" source="w_monitoring" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.25;exitY=1;entryX=0.5;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_apps">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1407" y="339" />
+              <mxPoint x="1075" y="339" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d19" edge="1" parent="1" source="w_folders" style="rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;exitX=0.5;exitY=1;entryX=0.3333;entryY=0;edgeStyle=orthogonalEdgeStyle;" target="w_dash">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1503" y="506" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      <mxCell id="title" value="duynhlab homelab — Observability delivery order" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=18;fontColor=#1E293B;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="26" width="1000" height="28" as="geometry" /></mxCell><mxCell id="subtitle" value="How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux &lt;b&gt;dependsOn&lt;/b&gt;; the third line of each box is that wave's gate. Runtime signal flow is a different question — see the fan-out map at the top of this page." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1"><mxGeometry x="40" y="58" width="1100" height="34" as="geometry" /></mxCell><mxCell id="f_legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="40" y="947" width="520" height="176" as="geometry" /></mxCell><mxCell id="lg_s0" value="" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;fillColor=#7C3AED;strokeColor=#5B21B6;strokeWidth=1.5;" vertex="1" parent="f_legend"><mxGeometry x="20" y="42" width="18" height="14" as="geometry" /></mxCell><mxCell id="lg_t0" value="Control plane / secrets / storage" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="46" y="39" width="210" height="20" as="geometry" /></mxCell><mxCell id="lg_s1" value="" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;fillColor=#FFE8CC;strokeColor=#E8590C;strokeWidth=1.5;" vertex="1" parent="f_legend"><mxGeometry x="20" y="72" width="18" height="14" as="geometry" /></mxCell><mxCell id="lg_t1" value="Metrics + Grafana config" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="46" y="69" width="210" height="20" as="geometry" /></mxCell><mxCell id="lg_s2" value="" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;fillColor=#22C55E;strokeColor=#15803D;strokeWidth=1.5;" vertex="1" parent="f_legend"><mxGeometry x="20" y="102" width="18" height="14" as="geometry" /></mxCell><mxCell id="lg_t2" value="Datastore (ClickHouse)" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="46" y="99" width="210" height="20" as="geometry" /></mxCell><mxCell id="lg_s3" value="" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;fillColor=#F59E0B;strokeColor=#B45309;strokeWidth=1.5;" vertex="1" parent="f_legend"><mxGeometry x="20" y="132" width="18" height="14" as="geometry" /></mxCell><mxCell id="lg_t3" value="One-shot Job" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="46" y="129" width="210" height="20" as="geometry" /></mxCell><mxCell id="lg_s4" value="" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;fillColor=#A5D8FF;strokeColor=#1971C2;strokeWidth=1.5;" vertex="1" parent="f_legend"><mxGeometry x="270" y="42" width="18" height="14" as="geometry" /></mxCell><mxCell id="lg_t4" value="Collector" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="296" y="39" width="210" height="20" as="geometry" /></mxCell><mxCell id="lg_s5" value="" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;fillColor=#F3D9FA;strokeColor=#9C36B5;strokeWidth=1.5;" vertex="1" parent="f_legend"><mxGeometry x="270" y="72" width="18" height="14" as="geometry" /></mxCell><mxCell id="lg_t5" value="Profiles" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="296" y="69" width="210" height="20" as="geometry" /></mxCell><mxCell id="lg_s6" value="" style="rounded=1;absoluteArcSize=1;arcSize=6;html=1;fillColor=#06B6D4;strokeColor=#0E7490;strokeWidth=1.5;" vertex="1" parent="f_legend"><mxGeometry x="270" y="102" width="18" height="14" as="geometry" /></mxCell><mxCell id="lg_t6" value="Application wave" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="296" y="99" width="210" height="20" as="geometry" /></mxCell><mxCell id="lg_arrow" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;" edge="1" parent="f_legend"><mxGeometry relative="1" as="geometry"><mxPoint x="270" y="141" as="sourcePoint" /><mxPoint x="300" y="141" as="targetPoint" /></mxGeometry></mxCell><mxCell id="lg_arrow_t" value="Flux &lt;b&gt;dependsOn&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="f_legend"><mxGeometry x="306" y="131" width="200" height="20" as="geometry" /></mxCell><mxCell id="note_gate" value="&lt;b&gt;Reading the gate line&lt;/b&gt;&lt;br&gt;&lt;b&gt;wait&lt;/b&gt; — the wave is Ready when the objects &lt;i&gt;it applies&lt;/i&gt; are Ready.&lt;br&gt;&lt;b&gt;healthChecks&lt;/b&gt; (bold in the box) — &lt;b&gt;wait is deliberately absent.&lt;/b&gt; The objects worth gating on are StatefulSets and GrafanaManifests an operator creates later, so they are never in the wave's own applied set and &lt;b&gt;wait&lt;/b&gt; would pass instantly. Listing them is the only thing that holds the next wave back (RFC-0028 / ADR-065).&lt;br&gt;The two are mutually exclusive and &lt;b&gt;wait&lt;/b&gt; wins, so a wave setting both gates only on what it applies." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1"><mxGeometry x="590" y="947" width="900" height="124" as="geometry" /></mxCell><mxCell id="note_src" value="&lt;b&gt;Sources&lt;/b&gt; — every wave reads &lt;b&gt;infrastructure-oci&lt;/b&gt; (oci://homelab-registry:5000/flux-infra-sync, ref &lt;i&gt;local&lt;/i&gt;) except the two obs-as-code waves, which read &lt;b&gt;obs-as-code-oci&lt;/b&gt; (ghcr.io/duynhlab/obs-as-code, semver 0.5.1)." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1"><mxGeometry x="590" y="1043" width="900" height="44" as="geometry" /></mxCell></root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

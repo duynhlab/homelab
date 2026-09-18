@@ -1,0 +1,169 @@
+{
+  "_note": "Curated PNG logos for homelab-drawio diagrams. PNG, not SVG: headless Draw.io export does not render SVG data URIs. Embed with image=data:image/png,<base64> (a COMMA, never ';base64,', which truncates the mxCell style). Prefer scripts/icon_style.py style <name> --role <role> over hand-rolling a data URI. Every icon here was fetched from the source URL, rasterised at 64px with rsvg-convert, and eyeballed at 24px before being catalogued.",
+  "_scope": "Deployed platform components only. An icon must not assert something false: a box gets a logo only for the product it IS, not a product its label mentions.",
+  "aliases": {
+    "victorialogs": "victoriametrics",
+    "victoriatraces": "victoriametrics",
+    "postgres": "postgresql",
+    "eso": "external-secrets",
+    "otel": "opentelemetry",
+    "k8s": "kubernetes"
+  },
+  "_aliases_note": "victorialogs and victoriatraces share the VictoriaMetrics mark (one company, one logo) - label the box with the product name and let the shared mark stand.",
+  "icons": {
+    "cert-manager": {
+      "file": "cert-manager.png",
+      "bytes": 5297,
+      "sha256": "3a7d5f3b8008a2aea42bb36b9bfd6c6374f9ac7b98fa7aa2f7c354e73fca7337",
+      "label": "cert-manager",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/cert-manager/icon/color/cert-manager-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "clickhouse": {
+      "file": "clickhouse.png",
+      "bytes": 441,
+      "sha256": "283960e3718506209aee259f364eb219b16a0467532f30717fe2eac78b934c0c",
+      "label": "ClickHouse",
+      "source": "https://cdn.simpleicons.org/clickhouse",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "cloudnativepg": {
+      "file": "cloudnativepg.png",
+      "bytes": 3534,
+      "sha256": "e251fddeacc6120c003a2d997856a92bd8214e9e9a6e38f553770a0e7b3f5cda",
+      "label": "CloudNativePG",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/cloudnativepg/icon/color/cloudnativepg-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "envoy": {
+      "file": "envoy.png",
+      "bytes": 3046,
+      "sha256": "db490e1bf03d623bfa6972de9c60e87e2dfd3489c0e5987fa56367b4f1b5577f",
+      "label": "Envoy",
+      "source": "https://cdn.simpleicons.org/envoyproxy",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "external-secrets": {
+      "file": "external-secrets.png",
+      "bytes": 3033,
+      "sha256": "ee54d977c6b1704ad0f7a14570019c4506fe038b379088d170277f3ce9457d53",
+      "label": "External Secrets Operator",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/external-secrets-operator/icon/color/eso-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "flux": {
+      "file": "flux.png",
+      "bytes": 3441,
+      "sha256": "57b0fae6917e9fd9eede05752ab332b36d659b53775d6268fbd05f034e491141",
+      "label": "Flux",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/flux/icon/color/flux-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "go": {
+      "file": "go.png",
+      "bytes": 1424,
+      "sha256": "b24b02691d36222203751eeb0bdba469f84632c2ab965347a1a5932d96782073",
+      "label": "Go",
+      "source": "https://cdn.simpleicons.org/go",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "grafana": {
+      "file": "grafana.png",
+      "bytes": 2676,
+      "sha256": "f325e06c753d8657fd1f2ae381927783c0d2f40690ed5b299417f107673ad137",
+      "label": "Grafana",
+      "source": "https://cdn.simpleicons.org/grafana",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "helm": {
+      "file": "helm.png",
+      "bytes": 2541,
+      "sha256": "abe12b17efa9176c8ba71eea5797bfec3afd14ef40ccf10a60dc72ecb1581eea",
+      "label": "Helm",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/helm/icon/color/helm-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "keda": {
+      "file": "keda.png",
+      "bytes": 3403,
+      "sha256": "f478e16a2c4b2ef2a99ba98bdd9ed43761f5b783c5f9b1e8b716bd0c7d325659",
+      "label": "KEDA",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/keda/icon/color/keda-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "keycloak": {
+      "file": "keycloak.png",
+      "bytes": 2228,
+      "sha256": "93dc91e5b998996074e3306efd3aba5a2e8477c237c392c219b48c26dc76d95d",
+      "label": "Keycloak",
+      "source": "https://cdn.simpleicons.org/keycloak",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "kubernetes": {
+      "file": "kubernetes.png",
+      "bytes": 4747,
+      "sha256": "034a782c92c84d2868d1e92f4fbe30d3c4f72eb85da5d088f76a6675908c1095",
+      "label": "Kubernetes",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/kubernetes/icon/color/kubernetes-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "kyverno": {
+      "file": "kyverno.png",
+      "bytes": 3269,
+      "sha256": "60a53755c6ec5c603caa4c1787b65f8791c634570e5f41ef08e97743e3b32c50",
+      "label": "Kyverno",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/kyverno/icon/color/kyverno-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "openbao": {
+      "file": "openbao.png",
+      "bytes": 2026,
+      "sha256": "56000753d9fc43b668a76a5884ae9ba03b8cb7cf9907ba242e9bad6f53cffb6d",
+      "label": "OpenBao",
+      "source": "https://cdn.simpleicons.org/openbao",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "opentelemetry": {
+      "file": "opentelemetry.png",
+      "bytes": 1867,
+      "sha256": "d73bf7688912c4c7a6fbd0f705189942fcf945d1b89fb9251cc822db9d585759",
+      "label": "OpenTelemetry",
+      "source": "https://github.com/cncf/artwork/blob/master/projects/opentelemetry/icon/color/opentelemetry-icon-color.svg",
+      "license": "CNCF Artwork (github.com/cncf/artwork), project trademark - identification use only"
+    },
+    "postgresql": {
+      "file": "postgresql.png",
+      "bytes": 4104,
+      "sha256": "6c269388bb7a0493ab0e869df45e31b6dbc54d9233b581f4a184c0089dde55be",
+      "label": "PostgreSQL",
+      "source": "https://cdn.simpleicons.org/postgresql",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "temporal": {
+      "file": "temporal.png",
+      "bytes": 1508,
+      "sha256": "f36b632820f48bafaa69817c9366cf54066ac38341bd3d6ef2af6fe5b3feb57a",
+      "label": "Temporal",
+      "source": "https://cdn.simpleicons.org/temporal",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "victoriametrics": {
+      "file": "victoriametrics.png",
+      "bytes": 3071,
+      "sha256": "7939b2e641cebb78971f7c81c678892a85e9340c70b5c03b386678a034740564",
+      "label": "VictoriaMetrics",
+      "source": "https://cdn.simpleicons.org/victoriametrics",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    }
+  },
+  "none": {
+    "valkey": "no own mark at CNCF/simple-icons/brand; it is a Redis fork and a Redis logo would assert Redis is deployed. Stays plain.",
+    "vector": "no mark at any source probed (project repo, site, simple-icons). Stays plain.",
+    "pgdog": "no logo located. Stays plain.",
+    "sloth": "no full-colour mark located. Stays plain."
+  },
+  "follow_up": {
+    "pyroscope": "only the Grafana umbrella mark resolves on simple-icons; fetch the Pyroscope mark from github.com/grafana/pyroscope brand assets, rasterise, then add.",
+    "keda-note": "present as keda; listed here only so a future editor does not re-add a duplicate."
+  }
+}

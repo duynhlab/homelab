@@ -446,6 +446,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 ### Platform
 
 - [Platform hub](./platform/README.md) - Deployed vs planned, doc map, Flux summary
+- [Architecture diagrams](./architecture/README.md) - Draw.io (`.drawio`) diagram sources and exports (request-path topology), authored with the [`homelab-drawio`](../.agents/skills/homelab-drawio/SKILL.md) skill
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Kind E2E audit](./platform/kind-e2e-audit.md) - The **cluster gate**: K0–K6 runbook proving Flux delivered the pinned images, admission/secrets/isolation, the real edge, and cluster-only telemetry. Twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates

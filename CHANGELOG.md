@@ -402,6 +402,22 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Request-path topology as a Draw.io diagram, embedded in the README** — first
+  `docs/architecture/` sources: [`topology.drawio`](docs/architecture/topology.drawio)
+  with its `topology.svg` and `img/topology.png` exports, authored with the
+  `homelab-drawio` skill (house palette + embedded logos). It sits beside the
+  existing Mermaid topology in [`README.md`](README.md#topology) (both kept —
+  Mermaid stays the text-diffable default; the Draw.io PNG adds logos). New
+  [`docs/architecture/README.md`](docs/architecture/README.md) index, linked from
+  the docs hub.
+- **`homelab-drawio` project skill added at `.agents/skills/homelab-drawio/`** —
+  a Draw.io authoring overlay on the generic IDE `drawio-skill` that adds the
+  homelab house style (semantic palette shared with the Mermaid diagram
+  convention), a curated PNG icon catalog with provenance in `manifest.json`, and
+  deterministic `scripts/` for a preflight doctor, icon-style emission, house-style
+  validation, and reproducible SVG/PNG export. Mermaid stays the default for
+  diagrams; Draw.io is reached only when asked for by name or when editing an
+  existing `.drawio` (`AGENTS.md` Diagrams, `platform-engineer` IDE skills map).
 - **`docs/api/` carries RFC-0031 as a planned-labelled target contract.** Per the
   hub's own rule (ADR `Accepted` → sync Design records, same PR or immediate
   follow-up), `observability.md`, `logs.md`, `tracing.md`, `metrics.md`,

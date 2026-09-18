@@ -1,0 +1,49 @@
+{
+  "skill_name": "homelab-drawio",
+  "evals": [
+    {
+      "id": 0,
+      "name": "platform-overview",
+      "prompt": "In the homelab repo, make me a Draw.io (.drawio) architecture diagram that puts the whole duynhlab platform on one page: the Envoy Gateway edge, the Go microservices, the datastores (PostgreSQL via CloudNativePG, Valkey, ClickHouse), the observability stack (VictoriaMetrics/Logs/Traces, Grafana, Pyroscope), and the control-plane controllers (Flux, KEDA, Kyverno, cert-manager, External Secrets, OpenBao, Temporal). Save it as docs/architecture/platform-overview.drawio. It's a Draw.io file specifically, not Mermaid.",
+      "expected_output": "A native (uncompressed) .drawio with domain-grouped boxes in the homelab semantic palette, embedded PNG logos on the deployed products, a legend, and clean layout. validate_house.py passes.",
+      "files": [],
+      "assertions": [
+        {"id": "native_xml", "text": "Output file exists and contains <mxGraphModel> (native, uncompressed .drawio)"},
+        {"id": "house_valid", "text": "scripts/validate_house.py on the file exits 0 with no ERROR lines"},
+        {"id": "palette", "text": "Uses the homelab palette fills (service #06B6D4, data #22C55E, and at least one platform #7C3AED)"},
+        {"id": "logos_comma", "text": "Embeds at least three logos as image=data:image/png, (comma form, never ;base64,)"},
+        {"id": "legend", "text": "Contains a legend cell"},
+        {"id": "domains", "text": "Groups nodes into domain frames (edge, services, data, observability, control-plane) rather than a flat list"}
+      ]
+    },
+    {
+      "id": 1,
+      "name": "flux-dependency-tree",
+      "prompt": "Draw me the Flux Kustomization dependency chain for the local cluster as a Draw.io .drawio file: the dependsOn edges from flux-system through controllers-local and the infra waves (secrets, monitoring, databases, keda, temporal) down to apps-local. Nodes named exactly as the Kustomizations. Save it as docs/architecture/flux-dependency-tree.drawio.",
+      "expected_output": "A native .drawio directed graph of Kustomizations with dependsOn edges, house palette (platform role for controllers), a legend, planned nodes dashed if any. validate_house.py passes.",
+      "files": [],
+      "assertions": [
+        {"id": "native_xml", "text": "Output file exists and contains <mxGraphModel>"},
+        {"id": "house_valid", "text": "scripts/validate_house.py on the file exits 0 with no ERROR lines"},
+        {"id": "kustomizations", "text": "Nodes are named as real Kustomizations (flux-system, controllers-local, apps-local at minimum)"},
+        {"id": "directed_edges", "text": "Has directed edges expressing dependsOn (edge cells with source and target)"},
+        {"id": "legend", "text": "Contains a legend cell"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "observability-signal-path",
+      "prompt": "I need a Draw.io diagram (save under docs/architecture/) showing how the four observability signals flow through the homelab platform: metrics, logs, traces and profiles leaving the services, through the collectors (Vector, OpenTelemetry), into the VictoriaMetrics / VictoriaLogs / VictoriaTraces / Pyroscope backends, and surfaced in Grafana. Use the signal colours.",
+      "expected_output": "A native .drawio request-path diagram using the four observability signal roles (metric/log/trace/profile) with correct fills, collector and backend boxes with logos, Grafana as the sink, a legend. validate_house.py passes.",
+      "files": [],
+      "assertions": [
+        {"id": "native_xml", "text": "Output file exists and contains <mxGraphModel>"},
+        {"id": "house_valid", "text": "scripts/validate_house.py on the file exits 0 with no ERROR lines"},
+        {"id": "signal_roles", "text": "Uses the four signal fills: metric #FFE8CC, log #D3F9D8, trace #C5F6FA, profile #F3D9FA"},
+        {"id": "backends", "text": "Shows VictoriaMetrics, VictoriaLogs, VictoriaTraces, Pyroscope and Grafana as distinct boxes"},
+        {"id": "flow_edges", "text": "Directed edges express the signal flow from services through collectors to backends to Grafana"},
+        {"id": "legend", "text": "Contains a legend cell"}
+      ]
+    }
+  ]
+}

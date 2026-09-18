@@ -77,7 +77,7 @@ make flux-sync    # force reconciliation
 ## Platform architecture & conventions
 
 - **Observability (platform stack):** VictoriaMetrics, Grafana, VictoriaTraces, VictoriaLogs, ClickHouse, Pyroscope, Vector (Loki, Tempo and Jaeger all removed — RFC-0027 / ADR-058 + ADR-059; the retired manifests sit beside their kustomization as `*.yaml.bak`). SLO via Sloth. Envoy Gateway emits edge spans (OTLP gRPC, W3C, ParentBased). Application instrumentation policy (otel middleware chain, OTLP export, trace/log correlation) lives in service repos via `pkg/obsx` — see the platform-engineer skill when editing ingress, NetworkPolicy, or observability docs.
-- **Diagrams:** **Mermaid only — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.). Palette and workflow in Docs conventions below.
+- **Diagrams:** **Mermaid is the default — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.). Palette and workflow in Docs conventions below. **Draw.io (`.drawio`) is the exception, only when asked for by name or when editing a `.drawio` that already exists** — route that work through the [`homelab-drawio` skill](.agents/skills/homelab-drawio/SKILL.md).
 - **Stack:** Go 1.26 (services, not authored here), PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
 
 ## Kyverno admission rules
@@ -142,7 +142,7 @@ Every manifest applied to the cluster must satisfy admission:
 ## Docs conventions
 
 Docs are a first-class deliverable in this repo. When writing or refactoring them:
-- **English only**; **Mermaid only** for diagrams (never ASCII art — see Platform architecture).
+- **English only**; **Mermaid is the default** for diagrams (never ASCII art — see Platform architecture). Reach for **Draw.io** only when it is asked for by name or an existing `.drawio` is being edited → [`homelab-drawio` skill](.agents/skills/homelab-drawio/SKILL.md).
 - Follow the house shape (model: [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)): one-line hook → status/quick-facts table → overview/concept → architecture (Mermaid) → how-it-works-in-this-platform → operations → references → a `_Last updated: …_` footer.
 - **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
 - **Synthesize external material in-house** — learn from articles/newsletters, then write it in our own words + Mermaid; **don't embed third-party links** (official product docs already in a References section are fine).

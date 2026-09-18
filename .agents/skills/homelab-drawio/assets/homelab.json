@@ -1,0 +1,41 @@
+{
+  "name": "homelab",
+  "version": 1,
+  "_source": "Semantic colours mirror the Mermaid classDef palette in AGENTS.md (Docs conventions -> Diagram workflow, step 4). A Draw.io node and the Mermaid diagram beside it must read as one system, so fill/stroke/font are copied from the classDef verbatim, not re-invented. Change AGENTS.md and this file together.",
+  "font": {
+    "fontFamily": "Helvetica",
+    "fontSize": 11,
+    "titleFontSize": 13,
+    "titleColor": "#334155"
+  },
+  "roles": {
+    "edge":      { "fillColor": "#2563EB", "strokeColor": "#1E3A8A", "fontColor": "#FFFFFF", "note": "gateway / edge" },
+    "service":   { "fillColor": "#06B6D4", "strokeColor": "#0E7490", "fontColor": "#082F49", "note": "platform / app service" },
+    "worker":    { "fillColor": "#F59E0B", "strokeColor": "#B45309", "fontColor": "#451A03", "note": "worker / async processor" },
+    "platform":  { "fillColor": "#7C3AED", "strokeColor": "#5B21B6", "fontColor": "#FFFFFF", "note": "control-plane / platform controller" },
+    "data":      { "fillColor": "#22C55E", "strokeColor": "#15803D", "fontColor": "#052E16", "note": "datastore" },
+    "external":  { "fillColor": "#64748B", "strokeColor": "#334155", "fontColor": "#FFFFFF", "note": "external / third-party" },
+    "metric":    { "fillColor": "#FFE8CC", "strokeColor": "#E8590C", "fontColor": "#111111", "note": "observability: metrics" },
+    "log":       { "fillColor": "#D3F9D8", "strokeColor": "#2F9E44", "fontColor": "#111111", "note": "observability: logs" },
+    "trace":     { "fillColor": "#C5F6FA", "strokeColor": "#0C8599", "fontColor": "#111111", "note": "observability: traces" },
+    "profile":   { "fillColor": "#F3D9FA", "strokeColor": "#9C36B5", "fontColor": "#111111", "note": "observability: profiles" },
+    "collector": { "fillColor": "#A5D8FF", "strokeColor": "#1971C2", "fontColor": "#111111", "note": "observability: collector" },
+    "planned":   { "fillColor": "#FFFFFF", "strokeColor": "#64748B", "fontColor": "#475569", "dashed": true, "note": "planned / not-yet-deployed" }
+  },
+  "_shapes_note": "container=1 is load-bearing, not decoration: a frame must OWN its children so moving it moves them, and so the 'no logo on a grouping frame' check has something to fire on. Children of a container carry mxGeometry RELATIVE to the frame origin. collapsible=0 keeps the fold arrow out of an architecture diagram. For an untitled invisible group, Draw.io's own mechanism is the `group;` style instead.",
+  "shapes": {
+    "card": "rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;",
+    "container": "rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;",
+    "datastore": "shape=cylinder3;whiteSpace=wrap;html=1;shadow=1;"
+  },
+  "label_style": "shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;image=data:image/png,{payload};imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;{dashed}fillColor={fillColor};strokeColor={strokeColor};strokeWidth=1.5;fontColor={fontColor};fontFamily={fontFamily};fontSize={fontSize};",
+  "plain_style": "rounded=1;absoluteArcSize=1;arcSize=10;shadow=1;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor={fillColor};strokeColor={strokeColor};strokeWidth=1.5;fontColor={fontColor};fontFamily={fontFamily};fontSize={fontSize};",
+  "edges": {
+    "request": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;",
+    "storage": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#22C55E;strokeWidth=1.5;endArrow=classic;",
+    "scaling": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#F59E0B;strokeWidth=1.5;endArrow=classic;",
+    "planned": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;",
+    "request_animated": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;"
+  },
+  "_edges_note": "flowAnimation=1 animates the dashes along the connector to show flow direction. It moves only in SVG and in the Draw.io editor -- a PNG export is static, and GitHub may strip the animation from an embedded SVG. Use it sparingly, on the diagram's primary flow only; append ';flowAnimation=1;' to any edge role to animate it."
+}

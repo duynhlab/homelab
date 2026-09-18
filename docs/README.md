@@ -36,6 +36,11 @@ docs/
 │   ├── tracing.md                # Span contract, propagation, sampling
 │   ├── profiling.md              # Profiling contract (pkg/obsx, Pyroscope labels)
 │   └── _template-service.md      # v2 template for a new service contract
+├── architecture/                 # Draw.io diagram sources + committed exports
+│   ├── README.md                 # Index: which question each .drawio answers
+│   ├── topology.drawio           # Request path: edge → apps → data
+│   ├── observability-delivery.drawio # Flux waves that deliver observability + their gates
+│   └── img/                      # PNG exports (GitHub strips text from Draw.io SVG)
 ├── frontend/                     # Browser apps at the platform layer (build, expose, watch)
 │   ├── README.md                 # Area hub: storefront + admin portal, the build-arg contract
 │   └── admin-portal/             # The operator portal in depth
@@ -446,6 +451,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 ### Platform
 
 - [Platform hub](./platform/README.md) - Deployed vs planned, doc map, Flux summary
+- [Architecture diagrams](./architecture/README.md) - Draw.io (`.drawio`) diagram sources and exports (request-path topology), authored with the [`homelab-drawio`](../.agents/skills/homelab-drawio/SKILL.md) skill
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Kind E2E audit](./platform/kind-e2e-audit.md) - The **cluster gate**: K0–K6 runbook proving Flux delivered the pinned images, admission/secrets/isolation, the real edge, and cluster-only telemetry. Twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates

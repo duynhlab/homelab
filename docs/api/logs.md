@@ -9,7 +9,7 @@ Structured logging contract for every Go service and worker in the platform serv
 | **Correlation** | `trace_id` / `span_id` from active span context | — |
 | **Platform pipeline** | [Logging (platform)](../observability/logging/README.md) — dual-path ingest (OTLP + Vector) into **two** stores: VictoriaLogs (7d, LogsQL) and ClickHouse `otel_logs` (90d, SQL) | — |
 | **Cross-cutting** | [Application observability](./observability.md) — middleware order, env, `obsx` | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) |
 
 ---
 
@@ -24,6 +24,19 @@ stores: **VictoriaLogs** (7-day ops retention, LogsQL) and **ClickHouse** `otel_
 still emitted for `kubectl logs`.
 
 Scope and shared bootstrap rules: [Application observability](./observability.md).
+
+> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built.** The fleet
+> logger becomes **`pkg/logger/slogx`** — a context-first facade over the standard
+> library's `slog` that redacts once and renders the same record to stdout and OTLP;
+> `zapx` and the otelzap tee are retired in the same release train, and no service may
+> import `zap`, `zapcore`, `log/slog` directly, `zerolog` or an OTel log bridge
+> ([ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog)). The access record moves to the semconv keys shown in
+> [§ Log output format](#log-output-format) and drops raw path, `client_ip` and
+> `user_agent`; named events form a five-class catalog with a fixed grammar and one
+> deny list applied before every sink ([ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy)). Every section below still describes
+> **`zapx` as deployed**; it is rewritten to as-built when RFC-0031 Phase 3 lands. New
+> logging code is reviewed against the target rules from this date — see
+> [observability.md § Cross-signal telemetry standard](./observability.md#cross-signal-telemetry-standard-rfc-0031--normative-planned).
 
 ---
 
@@ -383,4 +396,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-070/ADR-071 and a labelled **Target contract** callout names `slogx`, the semconv access record and the event catalog as planned; the as-built `zapx` contract below is unchanged. Previously 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

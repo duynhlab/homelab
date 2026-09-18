@@ -9,7 +9,7 @@ Continuous profiling contract for every Go service and worker in the platform se
 | **Correlation** | `pyroscope.profile.id` on spans via `otel-profiling-go` | — |
 | **Platform backend** | [Profiling (platform)](../observability/profiling/README.md) — Pyroscope Helm, RustFS, Grafana | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
-| **Design record** | — | None |
+| **Design record** | — | **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) |
 
 ---
 
@@ -18,6 +18,20 @@ Continuous profiling contract for every Go service and worker in the platform se
 Every Go service pushes pprof data to Pyroscope via the shared **`obsx.SetupProfiling()`** helper — not bespoke profiler code per service. Profiles answer *which line of code* burned CPU or allocated memory during live traffic.
 
 Shared bootstrap and cross-signal label rules: [Application observability](./observability.md).
+
+> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built** ([ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels)).
+> The profile label set closes to exactly **`service_name`, `service_namespace`,
+> `deployment_environment`, `service_version`** (plus `span_name` on span-scoped CPU
+> profiles and the SDK constant `pyroscope_spy`), derived from the **same OTel
+> resource** the tracer and meter use — today the helper re-parses
+> `OTEL_RESOURCE_ATTRIBUTES` for the deprecated key `deployment.environment`, which no
+> manifest sets, so `deployment_environment` is empty fleet-wide and `service_version`
+> is empty on every API service. The SDK's eleventh type `goroutine_leak` is excluded
+> by decision; mutex and block sampling rates stay central with a written overhead
+> budget; `mockpay` is brought under the contract; `PROFILING_ENABLED` is either
+> promoted to a per-service input or documented as domain-scoped. The
+> [§ Profile label policy](#profile-label-policy) below is the **as-built** policy and
+> is deliberately wider than the target; it is rewritten at Task 1.4.
 
 ---
 
@@ -169,4 +183,4 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._

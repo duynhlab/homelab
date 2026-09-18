@@ -9,9 +9,23 @@ Distributed tracing contract for every Go service and worker in the platform ser
 | **Sampling** | `ParentBased(TraceIDRatioBased)` — root decides, downstream honours | — |
 | **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — the collector fans every span to **two** sinks: VictoriaTraces (7d) and ClickHouse `otel_traces` (90d). Tempo and Jaeger retired, [RFC-0027](../proposals/rfc/RFC-0027/README.md) | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) |
 
 ---
+
+> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built** ([ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage)).
+> Sampling stays `ParentBased(TraceIDRatioBased)` with the **edge as root**; the rate
+> each environment actually applies is stated (base manifest 50 inherited, Kind 100,
+> local-stack 100, services `0.1` / `1.0` for self-started traces only) and no applied
+> rate is raised before the trace-store storage arithmetic is written. Span names are
+> two-part operation classes with no identifier; exactly one `SpanKind` per layer
+> (`SERVER` transport, `INTERNAL` manual via `obsx.StartSpan`, `CLIENT` adapters,
+> `PRODUCER`/`CONSUMER` Temporal); scope is the package path; Error status only for
+> unexpected failure with `error.type`, never for an expected business rejection;
+> span events bounded and never in a loop; **application baggage is default-deny** —
+> a key needs review, is immutable, is never stored by a backend and is stripped before
+> any third-party call. Everything below is as-built and already consistent with these
+> rules where it overlaps; the rules become testable at RFC-0031 Task 1.5.
 
 ## Configuration
 
@@ -335,4 +349,4 @@ can be joined to `otel_logs` on `trace_id`. Details:
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse), matching the opening paragraph and `observability.md`; the production-recommendations table no longer shows a `~10%` sampling row that the 2026-08-31 move to a 50 base rate had orphaned — it now states the edge-root model and where each rate is actually applied. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`._
+_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-075 and a labelled **Target contract** callout states the edge-root sampling, span kind/scope/status, span-event and baggage rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse), matching the opening paragraph and `observability.md`; the production-recommendations table no longer shows a `~10%` sampling row that the 2026-08-31 move to a 50 base rate had orphaned — it now states the edge-root model and where each rate is actually applied. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`._

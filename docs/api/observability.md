@@ -9,7 +9,7 @@ Cross-cutting instrumentation contract for every Go service and worker in the pl
 | **Middleware** | **Tracing → logging** (two middleware) from `pkg/httpmw`; RED metrics via `otelgin` inside tracing | — |
 | **Export** | OTLP/HTTP `:4318` → OpenTelemetry Collector | — |
 | **Platform topology** | [OpenTelemetry (platform)](../observability/opentelemetry/README.md) · [Observability hub](../observability/README.md) | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) · [ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor) · [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) · [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) · [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) · [ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry) |
 
 ---
 
@@ -136,6 +136,75 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
 | **SDK** | **Only `pkg/obsx.SetupObservability`** |
 | **Exporters** | `pkg/obsx` only |
 | **Contrib** (`otelgin`, `otelgrpc`, `otelzap`, `runtime`) | `otelgin` in `pkg/httpmw` only; rest via `pkg/obsx`/`pkg/grpcx` |
+
+---
+
+## Cross-signal telemetry standard (RFC-0031 — normative, planned)
+
+> **Status: `Accepted` 2026-09-17, Adoption `Not started`.** [RFC-0031](../proposals/rfc/RFC-0031/) and its seven
+> resulting records are the platform's telemetry standard from this date, so every new
+> service PR is reviewed against the rules below **in addition to** the RFC-0014 policy
+> above. Nothing in this section is deployed yet: the shared modules it names do not
+> exist, the lint policy is not installed, and the as-built shape stays the one the
+> rest of this file and the pillar files describe. When a rule here lands, the
+> owning pillar file is rewritten to as-built and this section shrinks. Rationale
+> and alternatives live in the ADRs, not here.
+
+**The shared-package rule** ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor)). A service does not choose its own telemetry
+libraries. It imports the shared package and the OpenTelemetry **API**; the SDK, every
+exporter, every bridge and every backend client are linked in exactly one place,
+`pkg/obsx`. A change to how the fleet emits telemetry is a shared-package release
+followed by a version bump, never an edit in a service. The table extends the RFC-0014
+[API vs SDK vs contrib](#api-vs-sdk-vs-contrib) boundary to logging and profiling:
+
+| Signal | A service may import | A service must not import | Owned by |
+|---|---|---|---|
+| Logs | `pkg/logger/slogx` (**planned** — [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog)) | `go.uber.org/zap`, `zapcore`, `log/slog` directly, `github.com/rs/zerolog`, `go.opentelemetry.io/contrib/bridges/*`, `go.opentelemetry.io/otel/log` | `slogx` (API), `obsx` (export) |
+| Metrics | `go.opentelemetry.io/otel/metric`, `otel/attribute`; instruments via `obsx` helpers | `go.opentelemetry.io/otel/sdk/metric`, `otel/exporters/*`, `github.com/prometheus/client_golang` | `obsx` |
+| Traces | `go.opentelemetry.io/otel/trace`, `otel/attribute`, `otel/codes`; spans via `obsx.StartSpan` | `go.opentelemetry.io/otel/sdk/trace`, `otel/exporters/*`, `otel/propagation` setup | `obsx`, `httpmw`, `grpcx` |
+| Profiles | nothing — `obsx.SetupProfiling` only | `github.com/grafana/pyroscope-go`, `runtime.SetMutexProfileFraction`, `runtime.SetBlockProfileRate` | `obsx` |
+| Transport | `pkg/httpmw`, `pkg/grpcx` | `contrib/instrumentation/*` directly | `httpmw`, `grpcx` |
+
+Tests are exempt. **Today the fleet is compliant on metrics, traces and profiles and
+non-compliant on logs by design** — every `cmd/main.go` imports `zap`, `zapcore` and
+`sdk/trace` because the canonical bootstrap above requires them; that is a leak in the
+shared package's public API, closed by RFC-0031 Task 1.1c, and the bootstrap snippet in
+§ Platform instrumentation policy is rewritten when it lands. Until then the leak is
+the documented exception, not a licence to import the SDK elsewhere.
+
+**Enforcement (not installed).** A `golangci-policy.yml` in the shared-workflows
+repository, run by the shared lint job as a second additive pass (`depguard` for the
+table above, `forbidigo` for a seconds histogram declared without explicit buckets),
+non-blocking for one release, then blocking. Until it exists the table is enforced by
+review, exactly as the RFC-0014 policy is today.
+
+**Version floor** ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor)). A service runs at most one minor version behind the shared
+package's current release. Today `obsx` is pinned at three versions across the fleet
+([pkg.md § Adoption](./pkg.md#adoption)); converging them is the first implementation
+task, and no new divergence is accepted in review from this date.
+
+**What each pillar changes** — the target rule, its record, and where the as-built
+shape stays documented until it lands:
+
+| Pillar | Target rule (planned) | Record | As-built stays in |
+|---|---|---|---|
+| Logs | One `slogx` facade, one redaction boundary before stdout and OTLP, a five-class event catalog; the access record uses semconv keys and no raw path or peer fields | [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) | [logs.md](./logs.md) |
+| Metrics | Seven-instrument selection rule; every seconds histogram declares the fleet bucket set; identifier denylist becomes a test; per-service series budget; replay never increments | [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) | [metrics.md](./metrics.md) |
+| Traces | Edge-root sampling stated per environment; one span kind per layer, package-path scope; Error only on unexpected failure; application baggage default-deny | [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) | [tracing.md](./tracing.md) |
+| Profiles | Closed four-label identity derived from the shared resource; `goroutine_leak` excluded; central overhead budget; `mockpay` onboarded | [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) | [profiling.md](./profiling.md) |
+| Names | Every platform-owned attribute, metric and event declared in a Weaver registry; bare namespaces (`order.*`, `payment.*`, …) kept as registered exceptions, new ones denied; catalog sections of this directory generated from it | [ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry) | this file, [pkg.md](./pkg.md) |
+
+**Privacy boundary** ([ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy)) applies to all four signals from this date and does not
+wait for code: no authorization, cookie, password, token, secret, API key, private key,
+request/response body, client IP, peer address, full User-Agent, connection string,
+payment secret or PAN-shaped value in any log, span, span event, metric label, profile
+label or baggage key. Workflow, run, order, reservation and session identifiers may be
+span or log attributes when justified and are never labels, resource attributes, event
+names, profile labels or baggage. This restates and tightens
+[§ Cross-signal data and privacy policy](#cross-signal-data-and-privacy-policy); where
+the two differ, the stricter reading wins.
+
+Delivery order and acceptance criteria: [RFC-0031 delivery plan](../proposals/rfc/RFC-0031/delivery-plan.md).
 
 ---
 
@@ -579,4 +648,4 @@ A service or worker PR is observability-compliant only when:
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the span-metrics connector on the `traces` pipeline is a metrics source, not a trace store. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-070 through ADR-076 and a new **Cross-signal telemetry standard (RFC-0031 — normative, planned)** section states the shared-package import rule, the not-yet-installed enforcement, the version floor, the per-pillar target rules and the privacy boundary — all labelled planned; the as-built bootstrap and RFC-0014 policy are unchanged. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the span-metrics connector on the `traces` pipeline is a metrics source, not a trace store. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

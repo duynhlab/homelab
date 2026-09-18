@@ -104,7 +104,7 @@ services:
   # localhost dev origins. --import-realm only imports when a realm does not
   # exist yet — `docker compose down -v` re-converges to this state.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.2@sha256:9d1f1b2b7261ff53c66cb1092dfcdc34a5fb77e81f9e6a6e75b8b6a795de8067
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     command: ["start-dev", "--import-realm"]
     environment:
       KC_DB: postgres

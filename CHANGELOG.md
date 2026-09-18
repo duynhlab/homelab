@@ -370,6 +370,17 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **No service imports the OpenTelemetry SDK any more (RFC-0031 Task 1.1c-A).**
+  `obsx v0.39.2` stops exporting SDK providers (`Enabled() Signals` and API-typed
+  accessors replace the nil-checks) and takes an opaque tracer-provider config whose
+  `SDKOptions()` the Temporal services forward into
+  `temporalx.NewReplaySafeTracerProvider` without naming an SDK type. Ten
+  `chore/obsx-v0.39` PRs, one full local-stack E2E audit, ten patch releases
+  (`user v2.2.3` … `checkout v0.10.2`): `grep otel/sdk cmd/main.go` is zero fleet-wide.
+  `obsx/v0.39.1` is a mis-tag identical to `v0.39.0` and is never pinned. Dependabot in
+  every service now ignores `go.opentelemetry.io/*` — the OTel version moves with the
+  pkg release train (ADR-072).
+
 - **Every service pins every `duynhlab/pkg` module at its current tag — one fleet
   floor.** RFC-0031 Phase 1 opened with the ADR-072 prerequisite: `obsx` sat at
   three versions across ten services (`v0.36.1`/`v0.37.x`/`v0.38.0`), and no fleet
@@ -473,6 +484,11 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0031 Task 1.1c-A closed.** The shared package's exported surface speaks OTel
+  API types only, the fleet followed in one wave, and the lint-policy channel is merged;
+  1.1c-B (retiring `ZapCore`/`TraceContext`/`otelzap`) rides with Task 1.1 `slogx`.
+  ADR-072 gains a History row.
+
 - **RFC-0031 Phase 1 started — the ADR-072 prerequisite is met.** Pin convergence
   shipped 2026-09-18 (see Services); the shared package now lints at golangci-lint v2.12.2, the services' CI version (pkg #88, 0 issues across fourteen modules). The delivery plan
   records the prerequisite and ADR-072 moves to Adoption `Partial` — its first
@@ -523,6 +539,19 @@ Skeleton (copy what you need):
   defines ledger-owned money semantics, cohort funnel rules, completed-batch
   visibility, a read-only analytics boundary, and an Admin Portal-native page;
   Context7 and serving-query benchmark gates remain open before an RFC exists.
+
+#### CI
+
+- **The shared-package rule has an enforcement channel.** `duynhlab/gha-workflows`
+  carries `.github/lint/golangci-policy.yml` — `depguard` for the OTel SDK, exporters,
+  bridges and contrib instrumentation outside `pkg`, no `client_golang`, no
+  `pyroscope-go`; `forbidigo` for the process-global profiler sampling calls — and
+  `go-check.yml` runs it as a second, additive pass when a caller sets
+  `policy-lint: true`, checking the file out at the workflow's own pinned SHA
+  (`policy-lint-blocking` gates failure; the first train is non-blocking). There is no
+  `cmd/**` exemption because obsx v0.39.2 removed the SDK types from its surface first.
+  Known finding at rollout: payment-service imports `otelhttp` directly (no shared
+  HTTP-client helper yet — RFC-0031 Phase 2).
 
 ### Bugfix
 

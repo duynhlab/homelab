@@ -68,7 +68,7 @@ Current behavior and planned behavior must be labelled separately.
 
 These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RFC-0014/README.md).
 
-1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verified signatures (`duynhlab/pkg`, 2026-07-29): `obsx.ConfigFromEnv() Config`, `obsx.SetupObservability(ctx, Config) (*Observability, error)`, `(*Observability).Shutdown(ctx) error`, `(*Observability).ZapCore(scopeName, minLevel) zapcore.Core`.
+1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verified signatures (`duynhlab/pkg` `obsx/v0.39.2`, 2026-09-18): `obsx.ConfigFromEnv() Config`, `obsx.SetupObservability(ctx, Config, ...SetupOption) (*Observability, error)`, `(*Observability).Enabled() Signals` (`{Traces, Metrics, Logs bool}` — the only supported "is it on" check; the SDK provider fields are gone), `(*Observability).TracerProvider() trace.TracerProvider` / `MeterProvider() metric.MeterProvider` / `LoggerProvider() log.LoggerProvider` (API types, true nils when off), `(*Observability).Shutdown(ctx) error`, `(*Observability).ZapCore(scopeName, minLevel) zapcore.Core` (stays until the slogx facade). Temporal services add `obsx.WithTracerProviderFactory(func(c obsx.TracerProviderConfig) obsx.ShutdownTracerProvider { return temporalx.NewReplaySafeTracerProvider(c.SDKOptions()...) })` — no `sdk/trace` import in `main()`.
 
    Canonical bootstrap (the contract shape every service `cmd/main.go`
    converges on). Setup failure is deliberately **non-fatal**: the service
@@ -165,23 +165,33 @@ followed by a version bump, never an edit in a service. The table extends the RF
 | Profiles | nothing — `obsx.SetupProfiling` only | `github.com/grafana/pyroscope-go`, `runtime.SetMutexProfileFraction`, `runtime.SetBlockProfileRate` | `obsx` |
 | Transport | `pkg/httpmw`, `pkg/grpcx` | `contrib/instrumentation/*` directly | `httpmw`, `grpcx` |
 
-Tests are exempt. **Today the fleet is compliant on metrics, traces and profiles and
-non-compliant on logs by design** — every `cmd/main.go` imports `zap`, `zapcore` and
-`sdk/trace` because the canonical bootstrap above requires them; that is a leak in the
-shared package's public API, closed by RFC-0031 Task 1.1c, and the bootstrap snippet in
-§ Platform instrumentation policy is rewritten when it lands. Until then the leak is
-the documented exception, not a licence to import the SDK elsewhere.
+Tests are exempt. **Since obsx v0.39.2 (2026-09-18, RFC-0031 Task 1.1c-A) the fleet is
+compliant on metrics, traces and profiles and non-compliant on logs by design.** No
+service `cmd/main.go` imports `go.opentelemetry.io/otel/sdk/*` any more: `obsx` exports
+no SDK type — `obs.Enabled()` replaces the old nil-checks on SDK provider fields, and the
+Temporal services forward `obsx.TracerProviderConfig.SDKOptions()` into
+`temporalx.NewReplaySafeTracerProvider` without naming an SDK type. `zap`/`zapcore`
+remain in every `main()` because `zapx` is the deployed logger and `obs.ZapCore` the
+deployed OTLP tee; both leave with the slogx facade (Task 1.1c-B) — until then they are
+the documented exception, not a licence to import a logging library elsewhere.
 
-**Enforcement (not installed).** A `golangci-policy.yml` in the shared-workflows
-repository, run by the shared lint job as a second additive pass (`depguard` for the
-table above, `forbidigo` for a seconds histogram declared without explicit buckets),
-non-blocking for one release, then blocking. Until it exists the table is enforced by
-review, exactly as the RFC-0014 policy is today.
+**Enforcement (channel in place, opt-in rolling out).** `.github/lint/golangci-policy.yml`
+in the shared-workflows repository (merged 2026-09-18) carries the table above as
+`depguard` rules — SDK, exporters and bridges only in `obsx`; contrib instrumentation
+only through `httpmw`/`grpcx`; no `client_golang`, no `pyroscope-go` — plus `forbidigo`
+for the process-global profiler sampling calls. `go-check.yml` runs it as a second,
+additive pass when a caller sets `policy-lint: true`, checking the file out at the
+workflow's own pinned SHA; `policy-lint-blocking` (default `false`) decides whether a
+finding fails the job. Each service opts in through its `check.yml`; the first train is
+non-blocking. The seconds-histogram-without-buckets check is **not** in the policy yet —
+a regex cannot tell a bucketed declaration from an unbucketed one; it arrives with
+Task 1.3. Known finding at rollout: `payment-service` wraps its provider client and
+webhook handler with `otelhttp` directly (no shared HTTP-client helper exists yet).
 
 **Version floor** ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor)). A service runs at most one minor version behind the shared
-package's current release. Today `obsx` is pinned at three versions across the fleet
-([pkg.md § Adoption](./pkg.md#adoption)); converging them is the first implementation
-task, and no new divergence is accepted in review from this date.
+package's current release. Since 2026-09-18 the fleet is on one floor — every module at
+its current tag, `obsx v0.39.2` everywhere ([pkg.md § Adoption](./pkg.md#adoption)) —
+and no new divergence is accepted in review.
 
 **What each pillar changes** — the target rule, its record, and where the as-built
 shape stays documented until it lands:
@@ -648,4 +658,4 @@ A service or worker PR is observability-compliant only when:
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-070 through ADR-076 and a new **Cross-signal telemetry standard (RFC-0031 — normative, planned)** section states the shared-package import rule, the not-yet-installed enforcement, the version floor, the per-pillar target rules and the privacy boundary — all labelled planned; the as-built bootstrap and RFC-0014 policy are unchanged. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the span-metrics connector on the `traces` pipeline is a metrics source, not a trace store. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-18 — obsx v0.39.2 (RFC-0031 Task 1.1c-A): the verified bootstrap signatures list `Enabled()` and the API-typed accessors, § Cross-signal telemetry standard records that no service imports `otel/sdk` any more and that the fleet lint policy channel is merged with service opt-in rolling out. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070 through ADR-076 and a new **Cross-signal telemetry standard (RFC-0031 — normative, planned)** section states the shared-package import rule, the not-yet-installed enforcement, the version floor, the per-pillar target rules and the privacy boundary — all labelled planned; the as-built bootstrap and RFC-0014 policy are unchanged. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the span-metrics connector on the `traces` pipeline is a metrics source, not a trace store. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

@@ -15,9 +15,18 @@
 # experiment table: docs/observability/grafana/dashboards-v2.md
 #
 # The spec is INLINE because GrafanaManifest has no content sources at all: no
-# oci, no url, no configMapRef. That is the cost of the new model today, and it
-# is why the payload size is worth watching (10 KiB here, etcd caps objects
-# near 1 MiB).
+# oci, no url, no configMapRef — verified against the 5.25.0 CRD, whose spec has
+# exactly six fields and none of them is a content source. That is the cost of
+# the new model today, and it is why payload size is worth watching (10 KiB
+# here, etcd caps objects near 1 MiB).
+#
+# TEMPORARY. Inlining duplicates JSON that already lives in
+# duynhlab/grafana-dashboards, which is the opposite of what as-code is for. It
+# is here only because that repo publishes nothing consumable yet: its release
+# job is gated on an `as-code` branch that no longer exists. Once it emits
+# GrafanaManifest files and publishes from main, this file is DELETED and
+# replaced by an OCIRepository plus two Flux Kustomizations, the same wiring
+# obs-as-code already uses. Do not add a third board here by copying this one.
 #
 # Named with a -v2 suffix and parked in its own folder so it cannot collide with
 # the vendored Temporal board, which already owns the uid temporal-worker. Deleting this file rolls the canary back and touches nothing else.

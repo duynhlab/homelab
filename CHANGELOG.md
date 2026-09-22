@@ -130,6 +130,12 @@ Skeleton (copy what you need):
   attributes with a hand-pinned version, Kubernetes identity, tracing, OTLP logs,
   Pyroscope). Cluster dashboards that render deployment annotations from
   `service.version` stop being blank for API services on the next rollout.
+- **Profiling has a per-service kill switch (RFC-0031 Task 1.4, ADR-074).** The five
+  domain ResourceSets render `PROFILING_ENABLED` from a `profiling_enabled` input
+  (default `"true"`) instead of a literal, so `profiling_enabled: "false"` on one
+  service's InputProvider opts that service out — before this the only way to turn
+  profiling off was the whole domain. Workers and `mockpay` already had one manifest
+  each. No default changes; nothing is disabled.
 
 - **Telemetry standards audit (2026-09-16).** A static conformance review of logs,
   traces, metrics, profiling and the ClickHouse consumers across the ten services
@@ -482,6 +488,21 @@ Skeleton (copy what you need):
   stays platform + Grafana + alerts + playground.
 
 #### Proposals
+
+- **RFC-0032 opened at `provisional` — the Kind baseline moves to Kubernetes
+  1.36.4.** Kubernetes 1.34 reaches end of life on 2026-10-27 and the cluster it
+  pins is where the E2E release audit runs, so the single version variable in
+  `scripts/kind-up.sh` becomes a digest-pinned node reference and the cluster is
+  recreated rather than upgraded. The move is taken **before** any Kyverno
+  release lists Kubernetes 1.36: that pairing is an explicit, recorded
+  acceptance, evidenced by the full Kind gate instead of a vendor matrix. Two
+  blockers carried by earlier local research were re-verified and found void —
+  Kind v0.33.0 publishes a digest-pinned 1.36.4 image, and the installed kubectl
+  1.37 is within skew of a 1.36 server (against today's 1.34 it is not). Every
+  1.35/1.36 feature is given a verdict and only one is adopted: OCI image
+  volumes, which replace the ClickHouse DDL ConfigMap and remove the manual
+  `kubectl delete job` a schema edit needs today (`ADR-077` at review). This
+  documentation change installs nothing and recreates no cluster.
 
 - **RFC-0031 Phase 1 started — the ADR-072 prerequisite is met.** Pin convergence
   shipped 2026-09-18 (see Services); the shared package now lints at golangci-lint v2.12.2, the services' CI version (pkg #88, 0 issues across fourteen modules). The delivery plan

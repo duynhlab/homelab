@@ -127,8 +127,13 @@ spec:
             value: << index inputs "log_format" | default "json" >>
           - name: TRACING_ENABLED
             value: << index inputs "tracing_enabled" | default "true" | quote >>
+          # RFC-0031 Task 1.4 (ADR-074): per-service kill switch. Until 2026-09-18
+          # this was a literal, so turning profiling off meant every service in
+          # the domain; set `profiling_enabled: "false"` on one service's
+          # ResourceSetInputProvider to opt just that one out. Disabling it
+          # changes no other signal and never affects readiness.
           - name: PROFILING_ENABLED
-            value: "true"
+            value: << index inputs "profiling_enabled" | default "true" | quote >>
           - name: METRICS_ENABLED
             value: "true"
           - name: DB_HOST

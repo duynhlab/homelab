@@ -45,11 +45,11 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-065     # 65 records; status per record in the ADR index
+│   │   └── ADR-001 … ADR-076     # 76 records; status per record in the ADR index
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
-│   │   └── RFC-0001 … RFC-0027   # 26 records; reserve number → research.md → README.md
+│   │   └── RFC-0001 … RFC-0032   # 30 records; reserve number → research.md → README.md
 ├── databases/                    # Database documentation
 │   ├── README.md                 # Learn / understand / operate / reference hub
 │   ├── architecture.md           # Current cluster and connection topology
@@ -402,9 +402,9 @@ The **owning indexes are complete and are the only place a record's status is
 maintained.** This page deliberately does not duplicate them — a partial copy
 here is how an index starts disagreeing with the records it points at.
 
-- [**ADR index**](./proposals/adr/README.md) — all **65** decisions, each with
+- [**ADR index**](./proposals/adr/README.md) — all **76** decisions, each with
   its `Status` and `Adoption`. The *why* behind significant choices.
-- [**RFC index**](./proposals/rfc/README.md) — all **26** proposals, plus the
+- [**RFC index**](./proposals/rfc/README.md) — all **30** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.
 - [Proposals hub](./proposals/) — templates and how to open a new record.
 
@@ -520,4 +520,4 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-09-17 — the metrics guide bullet no longer advertises exemplars, which VictoriaMetrics does not support (RFC-0014 D-14). Previously 2026-08-06 — RFC-0021 closed (P0–P7); inventory is the sole stock authority._
+_Last updated: 2026-09-22 — the RFC and ADR counts on this page were re-derived from the folders (30 RFC records, 76 ADRs) after **RFC-0032** opened; they had been stale at 26 and 65. Previously 2026-09-17 — the metrics guide bullet no longer advertises exemplars, which VictoriaMetrics does not support (RFC-0014 D-14). Previously 2026-08-06 — RFC-0021 closed (P0–P7); inventory is the sole stock authority._

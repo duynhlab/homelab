@@ -121,6 +121,15 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Every process now says which release it is (RFC-0031 Task 1.2).** The five domain
+  ResourceSets append `service.version=<image_tag>` to `OTEL_RESOURCE_ATTRIBUTES`, so
+  spans, metrics, logs and the profiler's `service_version` label carry the deployed
+  release for API services the way the versioned workers already did from their
+  build-id label. `mockpay` — a Go process that wires obsx but had no telemetry
+  environment at all — gains the full contract (collector endpoint, resource
+  attributes with a hand-pinned version, Kubernetes identity, tracing, OTLP logs,
+  Pyroscope). Cluster dashboards that render deployment annotations from
+  `service.version` stop being blank for API services on the next rollout.
 - **Profiling has a per-service kill switch (RFC-0031 Task 1.4, ADR-074).** The five
   domain ResourceSets render `PROFILING_ENABLED` from a `profiling_enabled` input
   (default `"true"`) instead of a literal, so `profiling_enabled: "false"` on one

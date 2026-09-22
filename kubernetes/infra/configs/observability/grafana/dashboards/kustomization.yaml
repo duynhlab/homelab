@@ -54,6 +54,13 @@ resources:
   # no panel read it. This board closes that, and carries the ClickHouse
   # per-edge self-join beside it.
   - grafana-dashboard-service-graph.yaml
+  # Dashboard V2 canary from duynhlab/grafana-dashboards (GrafanaManifest, not
+  # GrafanaDashboard — the classic kind cannot carry a v2 spec; see
+  # docs/observability/grafana/dashboards-v2.md). Folder first: a board naming a
+  # folder that does not exist yet fails outright.
+  - grafana-manifest-as-code-folder.yaml
+  - grafana-manifest-temporal-worker-v2.yaml
+  - grafana-manifest-business-otel-v2.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).

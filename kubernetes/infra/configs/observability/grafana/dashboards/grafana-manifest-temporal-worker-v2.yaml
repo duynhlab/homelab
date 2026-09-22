@@ -1,0 +1,578 @@
+# Temporal — Workflows & Activities — Dashboard V2 canary from duynhlab/grafana-dashboards.
+#
+# This is the NEW Grafana resource model, not the classic one. The board is a
+# `dashboard.grafana.app/v2` Dashboard carried inside a `GrafanaManifest`, which
+# the operator applies through Grafana's own apiserver at /apis. The classic
+# `GrafanaDashboard` kind cannot carry it: measured on Kind against this exact
+# stack (operator 5.25.0, grafana/grafana:13.2.0), Grafana answers
+#
+#   400 dashboard appears to be in v2 format. Please use the
+#       /apis/dashboard.grafana.app/v2 API OR it should include a object
+#       wrapper with an explicit 'apiVersion' ...
+#
+# and wrapping the payload does not rescue it either — the operator stamps an
+# `id` onto the root and Grafana rejects that too. Full write-up and the
+# experiment table: docs/observability/grafana/dashboards-v2.md
+#
+# The spec is INLINE because GrafanaManifest has no content sources at all: no
+# oci, no url, no configMapRef — verified against the 5.25.0 CRD, whose spec has
+# exactly six fields and none of them is a content source. That is the cost of
+# the new model today, and it is why payload size is worth watching (10 KiB
+# here, etcd caps objects near 1 MiB).
+#
+# TEMPORARY. Inlining duplicates JSON that already lives in
+# duynhlab/grafana-dashboards, which is the opposite of what as-code is for. It
+# is here only because that repo publishes nothing consumable yet: its release
+# job is gated on an `as-code` branch that no longer exists. Once it emits
+# GrafanaManifest files and publishes from main, this file is DELETED and
+# replaced by an OCIRepository plus two Flux Kustomizations, the same wiring
+# obs-as-code already uses. Do not add a third board here by copying this one.
+#
+# Named with a -v2 suffix and parked in its own folder so it cannot collide with
+# the vendored Temporal board, which already owns the uid temporal-worker. Deleting this file rolls the canary back and touches nothing else.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaManifest
+metadata:
+  name: temporal-worker-v2
+  labels:
+    app.kubernetes.io/managed-by: grafana-dashboards-as-code
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  resyncPeriod: 10m
+  template:
+    apiVersion: dashboard.grafana.app/v2
+    kind: Dashboard
+    metadata:
+      name: temporal-worker-v2
+      namespace: default
+      annotations:
+        grafana.app/folder: as-code-canary
+    spec:
+      annotations: []
+      cursorSync: 'Off'
+      description: Temporal SDK workflow/activity RED metrics from the order-fulfillment worker (pkg/temporalx).
+        See homelab RFC-0001.
+      editable: true
+      elements:
+        act-failure:
+          kind: Panel
+          spec:
+            id: 0
+            title: Activity failure ratio
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: sum(rate(temporal_activity_execution_failed[$__rate_interval])) / clamp_min(sum(rate(temporal_activity_execution_latency_seconds_count[$__rate_interval])),
+                          1)
+                        legendFormat: failure ratio
+                    refId: A
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: percentunit
+                    custom: {}
+                  overrides: []
+        act-latency:
+          kind: Panel
+          spec:
+            id: 0
+            title: Activity execution latency p95 by type
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.95, sum(rate(temporal_activity_execution_latency_seconds_bucket[$__rate_interval]))
+                          by (le, activity_type))
+                        legendFormat: '{{activity_type}}'
+                    refId: A
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: s
+                    custom: {}
+                  overrides: []
+        act-rate:
+          kind: Panel
+          spec:
+            id: 0
+            title: Activity execution rate by type
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: sum(rate(temporal_activity_execution_latency_seconds_count[$__rate_interval]))
+                          by (activity_type)
+                        legendFormat: '{{activity_type}}'
+                    refId: A
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: ops
+                    custom: {}
+                  overrides: []
+        wf-completion:
+          kind: Panel
+          spec:
+            id: 0
+            title: Workflow completion rate
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: sum(rate(temporal_workflow_completed[$__rate_interval])) by (workflow_type)
+                        legendFormat: '{{workflow_type}}'
+                    refId: A
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: ops
+                    custom: {}
+                  overrides: []
+        wf-failure:
+          kind: Panel
+          spec:
+            id: 0
+            title: Workflow failure ratio
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: sum(rate(temporal_workflow_failed[$__rate_interval])) / clamp_min(sum(rate(temporal_workflow_completed[$__rate_interval]))
+                          + sum(rate(temporal_workflow_failed[$__rate_interval])), 1)
+                        legendFormat: failure ratio
+                    refId: A
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: percentunit
+                    custom: {}
+                  overrides: []
+        wf-latency:
+          kind: Panel
+          spec:
+            id: 0
+            title: Workflow end-to-end latency
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.95, sum(rate(temporal_workflow_endtoend_latency_seconds_bucket[$__rate_interval]))
+                          by (le))
+                        legendFormat: p95
+                    refId: A
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.99, sum(rate(temporal_workflow_endtoend_latency_seconds_bucket[$__rate_interval]))
+                          by (le))
+                        legendFormat: p99
+                        range: true
+                    refId: B
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: s
+                    custom: {}
+                  overrides: []
+        worker-errors:
+          kind: Panel
+          spec:
+            id: 0
+            title: "Worker \u2192 server request error ratio"
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: sum(rate(temporal_request_failure[$__rate_interval])) / clamp_min(sum(rate(temporal_request[$__rate_interval])),
+                          1)
+                        legendFormat: request error ratio
+                    refId: A
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: percentunit
+                    custom: {}
+                  overrides: []
+        worker-slots:
+          kind: Panel
+          spec:
+            id: 0
+            title: Worker task slots
+            description: ''
+            links: []
+            data:
+              kind: QueryGroup
+              spec:
+                queries:
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: sum(temporal_worker_task_slots_available) by (worker_type)
+                        legendFormat: available {{worker_type}}
+                    refId: A
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: sum(temporal_worker_task_slots_used) by (worker_type)
+                        legendFormat: used {{worker_type}}
+                        range: true
+                    refId: B
+                    hidden: false
+                transformations: []
+                queryOptions: {}
+            vizConfig:
+              kind: VizConfig
+              group: timeseries
+              version: ''
+              spec:
+                options:
+                  legend:
+                    displayMode: list
+                    placement: bottom
+                    showLegend: false
+                    calcs: []
+                  tooltip:
+                    mode: ''
+                    sort: ''
+                fieldConfig:
+                  defaults:
+                    unit: short
+                    custom: {}
+                  overrides: []
+      layout:
+        kind: RowsLayout
+        spec:
+          rows:
+          - kind: RowsLayoutRow
+            spec:
+              title: Workflows
+              layout:
+                kind: GridLayout
+                spec:
+                  items:
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 0
+                      y: 0
+                      width: 12
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: wf-completion
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 12
+                      y: 0
+                      width: 12
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: wf-failure
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 0
+                      y: 8
+                      width: 24
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: wf-latency
+          - kind: RowsLayoutRow
+            spec:
+              title: Activities
+              layout:
+                kind: GridLayout
+                spec:
+                  items:
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 0
+                      y: 0
+                      width: 12
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: act-rate
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 12
+                      y: 0
+                      width: 12
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: act-failure
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 0
+                      y: 8
+                      width: 24
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: act-latency
+          - kind: RowsLayoutRow
+            spec:
+              title: Worker / SDK
+              layout:
+                kind: GridLayout
+                spec:
+                  items:
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 0
+                      y: 0
+                      width: 12
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: worker-slots
+                  - kind: GridLayoutItem
+                    spec:
+                      x: 12
+                      y: 0
+                      width: 12
+                      height: 8
+                      element:
+                        kind: ElementReference
+                        name: worker-errors
+      links: []
+      preload: false
+      tags:
+      - temporal
+      - observability
+      - workflow
+      - generated
+      - foundation-sdk
+      timeSettings:
+        timezone: browser
+        from: now-6h
+        to: now
+        autoRefresh: 30s
+        autoRefreshIntervals:
+        - 5s
+        - 10s
+        - 30s
+        - 1m
+        - 5m
+        - 15m
+        - 30m
+        - 1h
+        - 2h
+        - 1d
+        hideTimepicker: false
+        fiscalYearStartMonth: 0
+      title: "Temporal \u2014 Workflows & Activities"
+      variables: []

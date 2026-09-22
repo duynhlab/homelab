@@ -77,15 +77,22 @@ spec:
 
 ## Dashboards
 
-**42 `GrafanaDashboard` CRs across 12 folders** (re-derive with `grep -h -c '^kind: GrafanaDashboard' kubernetes/infra/configs/observability/grafana/dashboards/**/*.yaml`), delivered three ways —
+**42 `GrafanaDashboard` CRs across 12 folders** (re-derive with `grep -h -c '^kind: GrafanaDashboard' kubernetes/infra/configs/observability/grafana/dashboards/**/*.yaml`), delivered four ways —
 `configMapRef` to a JSON vendored in this repo (preferred; auditable and
 pinned), `configMapRef` to a ConfigMap the `grafana-dashboards` HelmRelease
-renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), or `spec.url`
-(grafana.com and legacy external-repo boards):
+renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), `spec.url`
+(grafana.com and legacy external-repo boards), or `spec.oci` (×2, from the
+`obs-as-code` artifact).
+
+Beside those sits a fifth, different in kind rather than in transport:
+**`GrafanaManifest`**, which carries a `dashboard.grafana.app/v2` Dashboard to
+Grafana's own apiserver. `GrafanaDashboard` cannot carry a v2 board at all —
+Grafana answers 400 on both payload shapes. Which resource to reach for, and the
+measurements behind that, are in [dashboards-v2.md](dashboards-v2.md):
 
 | Folder | Boards | Source |
 |--------|--------|--------|
-| Platform / Infrastructure | Kubernetes Cluster Overview, **OTel Collector Health** (ADR-057 consumer), Vector Cluster Monitoring, **Keycloak — Identity** (login/token KPIs) | in-repo JSON ×2 · `spec.url` ×2 |
+| Platform / Infrastructure | Kubernetes Cluster Overview, Kubernetes Workloads, **OTel Collector Health** (ADR-057 consumer), Vector Cluster Monitoring, **Keycloak — Identity** (login/token KPIs) | in-repo JSON ×2 · `spec.url` ×1 · `spec.oci` ×2 (obs-as-code, pinned v0.3.0 — classic v1 payload; see [dashboards-v2.md](dashboards-v2.md#reviewing-the-existing-specoci-boards) before bumping) |
 | Microservices / Golden Signals | Microservices (OTel) (~41 panels), **Microservices — RED Span Metrics** (ADR-057 consumer) | helm-charts ConfigMaps ×1 · in-repo JSON ×1 |
 | Workflows / Async | **Temporal — Workflows & Activities** (SDK + Server rows) · **KEDA — Worker Autoscaling** (scaler value/errors, HPA replicas, the Temporal backlog it drains, KEDA health; ADR-055; no local twin — compose runs no KEDA) | in-repo JSON ×2 |
 | Business & Product | Order Saga & Payment — Cutover Baseline, Microservices — Business KPIs, Inventory Service — Stock Authority (all RFC-0021-era) | helm-charts ConfigMaps ×1 · in-repo JSON ×2 |
@@ -178,4 +185,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

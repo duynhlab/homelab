@@ -418,6 +418,51 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Observability delivery order as a Draw.io diagram** —
+  [`observability-delivery.drawio`](docs/architecture/observability-delivery.drawio),
+  embedded under [§ Deployment](docs/observability/README.md#deployment): the 12
+  Flux waves that deliver the observability stack, every `dependsOn` edge, and
+  the gate that releases each wave. It answers the question the prose summary and
+  the fan-out map both leave open — **why `clickhouse-keeper-local` and
+  `clickhouse-local` omit `wait`**, so their `healthChecks` on the operator's
+  StatefulSets stay live (RFC-0028 / ADR-065). Laid out with the Draw.io CLI's
+  ELK layered layout rather than by hand.
+- **Request-path topology as a Draw.io diagram, embedded in the README** — first
+  `docs/architecture/` sources: [`topology.drawio`](docs/architecture/topology.drawio)
+  with its `topology.svg` and `img/topology.png` exports, authored with the
+  `homelab-drawio` skill (house palette + embedded logos). It sits beside the
+  existing Mermaid topology in [`README.md`](README.md#topology) (both kept —
+  Mermaid stays the text-diffable default; the Draw.io PNG adds logos). New
+  [`docs/architecture/README.md`](docs/architecture/README.md) index, linked from
+  the docs hub. Its 5 domain frames now **own** their boxes (`container=1`), all
+  22 edges carry a label, and the PNG is 34% smaller (539 KB → 358 KB).
+- **`homelab-drawio` project skill added at `.agents/skills/homelab-drawio/`** —
+  the homelab house style (semantic palette shared with the Mermaid diagram
+  convention), a curated 20-logo PNG icon catalog with provenance in
+  `manifest.json`, and deterministic `scripts/` for a preflight doctor,
+  icon-style emission, house-style validation, and reproducible SVG/PNG export.
+  Reachable from Claude Code through the `.claude/skills/homelab-drawio` symlink,
+  as `platform-engineer` already was. Mermaid stays the default for diagrams;
+  Draw.io is reached only when asked for by name or when editing an existing
+  `.drawio` (`AGENTS.md` Diagrams, `platform-engineer` IDE skills map).
+  - **`references/diagram-types.md`** makes "one question per diagram" choosable:
+    the five questions a homelab diagram may answer, each with its scope and its
+    primary/supporting element split, plus a pre-export review checklist. The
+    scoping discipline is the C4 model's, restated for this repo's palette.
+  - **Self-contained workflow** — layout uses the Draw.io CLI's own
+    `--layout elkLayered` (written back into the source with `-x -f xml -u`), so
+    no required step depends on another skill being installed.
+  - **Frames own their children** (`container=1`), which is what makes the "no
+    logo on a grouping frame" guardrail able to fire at all; `validate_house.py`
+    now detects a frame structurally rather than by style string.
+  - **Fixes:** `--role planned` emitted a non-dashed box, contradicting the
+    skill's own hardest rule; the planned check matched `#64748B` anywhere in a
+    style and so flagged every dashed `external` box (that colour is the
+    `planned` stroke *and* the `external` fill); `icon_style.py audit` reported
+    a directory clean when the diagrams were one level down. New checks for a
+    missing title cell and an unlabelled dashed edge, and `flowAnimation`
+    keyframe ids are normalised so an animated diagram's SVG stops changing
+    on every export. 34 unit tests, up from 20.
 - **`docs/api/` carries RFC-0031 as a planned-labelled target contract.** Per the
   hub's own rule (ADR `Accepted` → sync Design records, same PR or immediate
   follow-up), `observability.md`, `logs.md`, `tracing.md`, `metrics.md`,
@@ -429,7 +474,6 @@ Skeleton (copy what you need):
   short **Target contract** callout so a service author sees the accepted rules where
   they code, while every as-built section stays as deployed. `pkg.md`'s consumer
   count is ten (`auth-service` archived).
-
 - **`platform-engineer` project skill added at `.agents/skills/`** (#1050) — the
   Senior Platform Engineer operating procedure (repo routing, `docs/api/` trust,
   domains, RFC/ADR gate, commit rules) moved out of `AGENTS.md` into one

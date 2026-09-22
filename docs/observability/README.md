@@ -441,6 +441,24 @@ Flux reconciliation order:
 3. **Tracing / Profiling** -- the OTel Collector (`tracing-local`) and Pyroscope (`profiling-local`), each split out of the controllers wave to avoid a dependency deadlock. Pyroscope needs the ESO-managed RustFS credentials Secret and RustFS itself; the collector needs **ClickHouse** up first — not to create tables (the `clickhouse-schema` Job owns the DDL since RFC-0028) but because its ClickHouse sink has nowhere to write until the schema exists, and the *Secret*, since `CLICKHOUSE_PASSWORD` comes from a non-optional `secretKeyRef` on the ESO-managed `clickhouse-credentials`. It does **not** need RustFS: that edge went with Tempo
 4. **Apps** -- microservices (push OTLP metrics to the collector; no ServiceMonitor scrape for app services)
 
+The prose above is the summary; the diagram below is the graph as declared, wave
+by wave, with the gate that releases each one:
+
+<p align="center">
+  <a href="../architecture/observability-delivery.svg"><img src="../architecture/img/observability-delivery.png" alt="Observability delivery order: Flux waves and their gates" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/observability-delivery.drawio"><code>docs/architecture/observability-delivery.drawio</code></a>, authored with the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the source, then re-run its <code>scripts/export.py</code> to refresh this image.</sub></p>
+
+The detail worth carrying away: **`clickhouse-keeper-local` and
+`clickhouse-local` omit `wait` on purpose.** The objects worth gating on are
+StatefulSets the Altinity operator creates *later*, so they are never in the
+wave's own applied set and `wait: true` would report Ready with zero
+StatefulSets in existence. Listing them under `healthChecks` is the only thing
+that holds the next wave back — and because `wait` and `healthChecks` are
+mutually exclusive with `wait` winning, adding `wait` back would silently
+disable them (RFC-0028 / ADR-065).
+
 ## Quick Start: Accessing the Stack
 
 ```bash
@@ -479,6 +497,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-09-14 — added the ClickHouse operations, lifecycle, alert
-engineering, and dated Kind-audit learning paths; removed stale hand-maintained
-alert counts from the navigation map._
+_Last updated: 2026-09-18 — added the Draw.io delivery-order diagram under
+Deployment (Flux waves + the gate that releases each one, and why the two
+ClickHouse waves omit `wait`)._

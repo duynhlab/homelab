@@ -3,28 +3,14 @@ kind: Kustomization
 namespace: monitoring
 
 resources:
-  - grafana-dashboard-main.yaml
-  - grafana-dashboard-business.yaml
   - grafana-dashboard-slo-overview.yaml
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml
-  - grafana-dashboard-temporal.yaml
-  # KEDA — Worker Autoscaling (ADR-055): scaler value/errors, HPA replicas, the Temporal
-  # backlog it drains, KEDA health; JSON via configMapGenerator below
-  - grafana-dashboard-keda.yaml
   - grafana-dashboard-cloudnative-pg.yaml
-  - grafana-dashboard-pg-query-performance.yaml
-  - grafana-dashboard-pg-maintenance.yaml
-  - grafana-dashboard-pg-io-waits.yaml
-  - grafana-dashboard-pgdog.yaml
   - grafana-dashboard-redis.yaml
-  - grafana-dashboard-kubernetes-cluster-overview.yaml
-  - grafana-dashboard-kubernetes-workloads.yaml
   # Envoy Gateway first-party dashboards (RFC-0024 P4 edge slice) — JSON vendored
   # from envoyproxy/gateway v1.9.0 via configMapGenerator below
   - grafana-dashboard-envoy-gateway.yaml
-  # Envoy Gateway — Edge Overview (hand-authored; JSON via configMapGenerator below)
-  - grafana-dashboard-eg-edge.yaml
   # ClickHouse OTel logs+traces SQL (RFC-0019 Phase B) — JSON via configMapGenerator below
   - grafana-dashboard-clickhouse.yaml
   - grafana-dashboard-clickhouse-server-engine.yaml
@@ -38,29 +24,10 @@ resources:
   # Flux GitOps dashboards
   - grafana-dashboard-flux-cluster.yaml
   - grafana-dashboard-flux-controlplane.yaml
-  # Order Saga & Payment — Cutover Baseline (RFC-0021 CP-0 gate)
-  - grafana-dashboard-cutover-baseline.yaml
-  # Inventory Service — Stock Authority (RFC-0021 P1-9)
-  - grafana-dashboard-inventory.yaml
-  # cert-manager — visual surface for the CertManager* alerts (JSON via configMapGenerator below)
-  - grafana-dashboard-cert-manager.yaml
-  # Keycloak — Identity (hand-authored; JSON via configMapGenerator below)
-  - grafana-dashboard-keycloak-identity.yaml
-  # ADR-057 consumers: the span-metric series and the collector's own health had
-  # no cluster board until now, which is why that ADR stayed Adoption: Partial
-  - grafana-dashboard-red-spanmetrics.yaml
-  - grafana-dashboard-otel-collector-health.yaml
   # ADR-059 left the Tempo replacement half-built: the dependency data existed,
   # no panel read it. This board closes that, and carries the ClickHouse
   # per-edge self-join beside it.
   - grafana-dashboard-service-graph.yaml
-  # Dashboard V2 canary from duynhlab/grafana-dashboards (GrafanaManifest, not
-  # GrafanaDashboard — the classic kind cannot carry a v2 spec; see
-  # docs/observability/grafana/dashboards-v2.md). Folder first: a board naming a
-  # folder that does not exist yet fails outright.
-  - grafana-manifest-as-code-folder.yaml
-  - grafana-manifest-temporal-worker-v2.yaml
-  - grafana-manifest-business-otel-v2.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).
@@ -95,26 +62,6 @@ configMapGenerator:
   - name: grafana-dashboard-ch-query-analysis
     files:
       - query-analysis.json
-  - name: grafana-dashboard-cutover-baseline
-    files:
-      - cutover-baseline.json
-  - name: grafana-dashboard-inventory
-    files:
-      - inventory.json
-  # Temporal — vendored in-repo (was a runtime URL fetch from the deprecated
-  # duynhlab/grafana-dashboards repo); see grafana-dashboard-temporal.yaml
-  - name: grafana-dashboard-temporal
-    files:
-      - temporal.json
-  # KEDA board, hand-authored (ADR-055); see grafana-dashboard-keda.yaml
-  - name: grafana-dashboard-keda
-    files:
-      - keda.json
-  - name: grafana-dashboard-cert-manager
-    files:
-      - cert-manager.json
-  # Envoy Gateway first-party dashboards (envoyproxy/gateway v1.9.0,
-  # charts/gateway-addons-helm/dashboards/) — see grafana-dashboard-envoy-gateway.yaml
   - name: grafana-dashboard-envoy-proxy-global
     files:
       - envoy-gateway/envoy-proxy-global.json
@@ -124,21 +71,9 @@ configMapGenerator:
   - name: grafana-dashboard-envoy-gateway-global
     files:
       - envoy-gateway/envoy-gateway-global.json
-  - name: grafana-dashboard-eg-edge
-    files:
-      - eg-edge.json
-  - name: grafana-dashboard-keycloak-identity
-    files:
-      - keycloak-identity.json
-  - name: grafana-dashboard-red-spanmetrics
-    files:
-      - red-spanmetrics.json
   - name: grafana-dashboard-service-graph
     files:
       - service-graph.json
-  - name: grafana-dashboard-otel-collector-health
-    files:
-      - otel-collector-health.json
   - name: grafana-dashboard-envoy-resources-monitor
     files:
       - envoy-gateway/resources-monitor.gen.json

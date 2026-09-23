@@ -137,10 +137,16 @@ board reads back from Grafana's own apiserver:
 | `temporal-worker-v2` | Temporal — Workflows & Activities | 8 | 3 | `as-code-canary` |
 | `business-otel-v2` | Microservices — Business KPIs | 38 | 10 | `as-code-canary` |
 
+Those two rows are the original canary measurement, kept as the record of how this was
+established. The canary itself is gone — see §9; the boards now carry their real UIDs in
+their real folders, and `temporal-worker` has since grown from 8 panels to 21.
+
 ### The wire contract
 
 Three layers, each with its own `apiVersion`, and this is where the confusion usually
-bites. The same contract is enforced in CI by `duynhlab/obs-as-code`.
+bites. The same contract is enforced in CI by `duynhlab/grafana-dashboards`, whose
+generator emits exactly this shape and whose Kind e2e reads each board back through
+`/apis` to prove it.
 
 ```yaml
 apiVersion: grafana.integreatly.org/v1beta1   # (1) the OPERATOR's CRD
@@ -276,9 +282,9 @@ immutable per tag, multiplied by the number of boards. At `resyncPeriod: 30s` th
 roughly 2,880 pulls a day per board. Flux pulls the bundle once per interval, applies,
 prunes, and reports a single revision.
 
-The existing wiring for that pattern is already in this repo and is the template to
-copy: `kubernetes/clusters/local/sources/oci/obs-as-code-oci.yaml` plus
-`obs-as-code-folders.yaml` and `obs-as-code-dashboards.yaml`.
+The wiring for that pattern lives in
+`kubernetes/clusters/local/sources/oci/grafana-dashboards-as-code-oci.yaml` plus
+`grafana-dashboards-as-code-folders.yaml` and `grafana-dashboards-as-code-dashboards.yaml`.
 
 ---
 
@@ -306,19 +312,18 @@ they arrive in a single apply; if they ever split into waves, the dashboards wav
 
 One more Flux detail: `GrafanaManifest` reports `ManifestSynchronized`, not the `Ready`
 condition kstatus expects, so any Kustomization gating on it needs the
-`healthCheckExprs` CEL block that `obs-as-code-dashboards.yaml` already carries.
+`healthCheckExprs` CEL block that `grafana-dashboards-as-code-dashboards.yaml` carries.
 
 ---
 
-## 7. Reviewing the existing `spec.oci` boards
+## 7. The `spec.oci` boards, and why they are gone
 
-`grafana-dashboard-kubernetes-cluster-overview.yaml` and
-`grafana-dashboard-kubernetes-workloads.yaml` both fetch from
-`ghcr.io/duynhlab/obs-as-code:v0.3.0`. Pulling that tag shows the payload is **classic
-v1 JSON** — top-level `title`, `uid`, `panels`, `schemaVersion`. **Those two CRs are
-correct as written and need no change.**
+Two `GrafanaDashboard` resources used to fetch `kubernetes-cluster-overview` and
+`kubernetes-workloads` from `ghcr.io/duynhlab/obs-as-code:v0.3.0`. That payload was
+**classic v1 JSON** — top-level `title`, `uid`, `panels`, `schemaVersion` — so the classic
+kind carried it correctly and those two CRs were right as written.
 
-The risk is the pin, and it is sharp:
+The trap was the pin, and it is worth keeping on record because it generalises:
 
 ```console
 $ flux pull artifact oci://ghcr.io/duynhlab/obs-as-code:v0.3.0 --output /tmp/a
@@ -331,17 +336,19 @@ dashboard.grafana.app/v2
 no top-level title
 ```
 
-Same path, same filename, different schema. Bumping `reference` on those two CRs from
-`v0.3.0` to `v0.5.x` without also moving them to `GrafanaManifest` swaps a working board
-for one of the two 400s in §2. The version comment in those files explains why the pin
-exists but not what breaks if it moves; that is the gap this section closes.
+Same path, same filename, different schema. Bumping `reference` on those two CRs without
+also moving them to `GrafanaManifest` would have swapped a working board for one of the
+two 400s in §2.
 
----
+Both boards now come from `duynhlab/grafana-dashboards` as `GrafanaManifest` instead, so
+the CRs and that artifact are deleted. `kubernetes-workloads` was ported there first
+precisely so retiring this delivery would not lose it.
 
-## 8. Boards that are not wired yet, and why
+## 8. The query-variable defects, and what correct looks like
 
-Six of the nine boards in `duynhlab/grafana-dashboards` carry query variables, and
-Grafana's apiserver **rejects them outright** — not "renders empty", rejects:
+**Fixed upstream; kept because it is the reference for the correct shape.** Boards
+carrying query variables used to be **rejected outright** by Grafana's apiserver — not
+"rendered empty", rejected:
 
 ```
 Dashboard.dashboard.grafana.app "exp4-pgdog" is invalid:
@@ -366,11 +373,10 @@ themselves, which is why the v1 boards never showed this. V2's `QueryVariableSpe
 is a `DataQueryKind` with no string variant, so the classic form cannot be expressed and
 reaching for `expr` looks like the natural substitute. It is not.
 
-**Blocked:** `pg-io-waits`, `pg-maintenance`, `pg-query-performance`,
-`pg-exporter-instance`, `pgdog`, `microservices-monitoring-001-otel`.
-**Wired here:** `temporal-worker`, `business-otel`.
-**Not wired:** `kubernetes-cluster-overview` — no variables, but the obs-as-code canary
-already owns that name.
+All three defects are fixed in `duynhlab/grafana-dashboards`, and a registry-wide
+conformance test asserts each of them across every board, so a regression fails the build
+rather than the cluster. All 18 boards now apply and read back through `/apis` on
+Grafana 13.2.0, query variables included.
 
 ### A fourth difference, a choice rather than a defect
 
@@ -384,46 +390,35 @@ what made every obs-as-code board render empty at v0.4.0.
 
 ---
 
-## 9. Current state here, and what replaces it
+## 9. Current state: the cutover is done
 
-The two canary boards beside this file carry their spec **inline**, which duplicates
-JSON that already lives in `duynhlab/grafana-dashboards`. That is deliberate and
-temporary. It exists because that repo does not publish anything consumable yet: the
-release job is gated on a branch called `as-code` that no longer exists, so
-`ghcr.io/duynhlab/grafana-dashboards:latest` still holds two boards from 2026-09-16.
+The two canary boards that used to sit beside this file carried their spec **inline**,
+duplicating JSON that already lived in `duynhlab/grafana-dashboards`. That was always
+described here as deliberate and temporary. It is now finished.
 
 ```mermaid
 flowchart TB
-    subgraph Now["Today — temporary"]
-        N1["spec inline in this repo"] --> N2["GrafanaManifest"] --> N3["operator"] --> N4["Grafana"]
-    end
-    subgraph Target["Target — no duplication"]
-        T1["grafana-dashboards emits<br/>GrafanaManifest files"] --> T2[("OCI artifact<br/>pinned by semver")]
-        T2 --> T3["OCIRepository + 2 Kustomizations"] --> T4["operator"] --> T5["Grafana"]
-    end
-    Now -.->|"replaced by"| Target
+    T1["grafana-dashboards emits<br/>GrafanaManifest + Folder"] --> T2[("OCI artifact<br/>pinned by semver")]
+    T2 --> T3["OCIRepository + 2 Kustomizations<br/>folders, then dashboards"] --> T4["operator"] --> T5["Grafana 13"]
 ```
 
-Three changes upstream, in the order they should happen:
+All three upstream changes that section listed have landed:
 
-1. **Fix the query-variable builder** to the shape in §8, with a conformance check so a
-   regression fails the build rather than the cluster. First, because everything
-   downstream ships this content, and because it takes the deliverable from two boards
-   to nine.
-2. **Emit `GrafanaManifest` resources.** The generator already writes a `*.manifest.json`
-   per board in the right inner shape that nothing consumes; it needs the outer wrapper,
-   the `default` inner namespace, the folder annotation, and a `folder.grafana.app/v1`
-   manifest per folder. Drop the `GrafanaDashboard` + `spec.oci` output at the same
-   time — keeping it means shipping a resource that 400s against its own boards. Raise
-   that repo's Kind e2e from Grafana 12.0.0 to 13.x and assert through `/apis`, or it
-   keeps reproducing the false green from §2.
-3. **Publish from `main`**, preferably on a `v*` tag like `obs-as-code`, so this repo
-   pins a `semver` instead of chasing `latest`.
+1. **The query-variable builder is fixed.** The expression now sits in `query.spec` as
+   `{qryType: 1, query, refId}` with the datasource plugin as `query.group`, `current`
+   defaults to `All`/`$__all` instead of the empty string, and `allowCustomValue` is
+   false. A registry-wide conformance test fails the build if any of the three regress,
+   so the failure mode is a red CI run rather than a silently empty picker.
+2. **`GrafanaManifest` resources are emitted**, with a `folder.grafana.app/v1` manifest
+   per folder, and the `GrafanaDashboard` + `spec.oci` output is gone — keeping it would
+   have meant shipping a resource that 400s against its own boards. That repo's Kind e2e
+   now runs Grafana 13.2.0 and reads every board back through
+   `/apis/dashboard.grafana.app/v2/...`, comparing title and element count, so the false
+   green from §2 cannot reappear.
+3. **It publishes from `main` and from `v*` tags**, so this repo pins a semver.
 
-When those land, the two files beside this one are deleted and replaced by an
-`OCIRepository` plus two `Kustomization`s, and no dashboard JSON lives in this repo.
-
----
+The inline canaries, the `-v2` suffixed UIDs and the `as-code-canary` folder are deleted.
+The boards now carry their real UIDs in their real folders.
 
 ## 10. Reproducing any of this
 
@@ -486,5 +481,8 @@ Failure signatures and where they show up:
 - `kubernetes/clusters/local/obs-as-code-{folders,dashboards}.yaml` — the Flux wiring
   this canary will eventually adopt, including the `healthCheckExprs` block
 
-_Last updated: 2026-09-21 — first version. All measurements from a Kind run against
+_Last updated: 2026-09-23 — the cutover in §9 is done: all 18 boards ship as
+GrafanaManifest from `duynhlab/grafana-dashboards`, the canaries and the `spec.oci` pair
+are deleted, and §7/§8 are rewritten as history rather than open work. Previously
+2026-09-21 — first version. All measurements from a Kind run against
 Grafana Operator 5.25.0 and `grafana/grafana:13.2.0`._

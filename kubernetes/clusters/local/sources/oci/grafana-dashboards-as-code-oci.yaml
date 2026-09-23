@@ -1,0 +1,40 @@
+---
+# Dashboards and Grafana folders as Go code, from duynhlab/grafana-dashboards.
+#
+# This artifact carries deployable resources, not dashboard JSON. Grafana's
+# Dashboard V2 schema cannot travel on the classic GrafanaDashboard kind at all
+# — the operator posts through /api/dashboards/db and Grafana answers 400 on
+# both payload shapes, the wrapped one unfixably because the operator's content
+# resolver injects a root `id`. So the artifact ships GrafanaManifest resources
+# with the App Platform object inlined, and Flux applies them. See
+# docs/observability/grafana/dashboards-v2.md for the measurements.
+#
+# GrafanaManifest has no content sources of its own (no oci, no url, no
+# configMapRef — checked against the 5.25.0 CRD), which is why the pull happens
+# here rather than in the operator. That is also the cheaper side of the trade:
+# the operator's OCI fetcher has no cache read path, so it would re-pull an
+# immutable artifact once per board per resyncPeriod, while Flux pulls the
+# bundle once per interval and reports a single revision.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: grafana-dashboards-as-code-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: dashboards
+spec:
+  interval: 10m
+  url: oci://ghcr.io/duynhlab/grafana-dashboards-as-code
+  ref:
+    # An exact pin, not a range: this artifact carries dashboards straight to a
+    # live Grafana, so a floating constraint would let a board change reach the
+    # cluster without a homelab commit recording it.
+    #
+    # 0.1.0 is the first release that can reach Grafana at all. Before it the
+    # generator emitted GrafanaDashboard with spec.oci, which cannot carry a
+    # Dashboard V2 payload, and every board with a query variable was rejected
+    # outright for a malformed variable spec. Verified on Kind against Grafana
+    # 13.2.0 and Grafana Operator 5.25.0: all 18 boards reach
+    # ManifestSynchronized=True and read back through
+    # /apis/dashboard.grafana.app/v2 with a matching title and element count.
+    semver: "0.1.0"

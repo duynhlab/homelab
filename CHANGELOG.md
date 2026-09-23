@@ -121,6 +121,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The Kind gate ran the obsx v0.44.0 release and the RFC-0031 Phase 1
+  checkpoint with it — 25 k6 rows, 144/144 assertions, evidence in
+  [`kind-e2e-audit.md`](docs/platform/kind-e2e-audit.md#previous-runs).** The
+  two profile labels ADR-074 measured empty now carry values on every process
+  (`deployment_environment=production`, `service_version` equal to the deployed
+  tag), every application span carries the resource identity, and the fleet
+  bucket set reaches `temporal_activity_execution_latency_seconds` and
+  `temporal_workflow_endtoend_latency_seconds` — instruments the Temporal SDK
+  builds inside a library, which a name-matching View never covered and the
+  withdrawn `forbidigo` rule could never have seen. Reading `service.version`
+  off a live span rather than off the manifest is what caught mockpay reporting
+  2.3.1 from a pod running 2.3.4.
+
+
 - **Every process now says which release it is (RFC-0031 Task 1.2).** The five domain
   ResourceSets append `service.version=<image_tag>` to `OTEL_RESOURCE_ATTRIBUTES`, so
   spans, metrics, logs and the profiler's `service_version` label carry the deployed
@@ -385,6 +399,24 @@ Skeleton (copy what you need):
   both delivery paths can be compared and rolled back independently.
 
 #### Services
+
+- **The fleet moves to `obsx v0.44.0` and the cluster is pointed at the new
+  images (RFC-0031 Phase 1).** Ten `go.mod`-only PRs, one local-stack E2E audit
+  covering all ten candidates at once, ten patch releases: `user v2.2.4` ·
+  `product v1.13.4` · `inventory v0.6.3` · `cart v2.1.4` · `order v2.7.3` ·
+  `review v2.1.4` · `shipping v1.6.4` · `notification v2.1.4` ·
+  `payment v2.3.4` · `checkout v0.10.3`. What the pin brings: the W3C
+  propagator installed whether or not tracing is enabled, one resource source
+  feeding traces, metrics, logs and the Pyroscope labels, the fleet bucket set
+  on every histogram declared in seconds, and `error.type` with one bounded
+  exception event on a recorded error. The ten `image_tag` inputs, the two
+  worker images and mockpay move with it — **they are literals, not
+  automation**: the `$imagepolicy` markers describe an image-automation
+  controller this cluster does not run, which is why the pins had drifted three
+  releases behind. mockpay carries its version **twice** — the image tag and a
+  hardcoded `service.version` in `OTEL_RESOURCE_ATTRIBUTES` — and the second had
+  been left behind at 2.3.1; the Kind audit caught it by reading the resource
+  attribute off a live span rather than trusting the manifest.
 
 - **No service imports the OpenTelemetry SDK any more (RFC-0031 Task 1.1c-A).**
   `obsx v0.39.2` stops exporting SDK providers (`Enabled() Signals` and API-typed

@@ -588,8 +588,8 @@ event catalog before use.
 
 | Situation | Required attributes | Forbidden or constrained attributes |
 |---|---|---|
-| HTTP server summary | http.request.method, http.route, http.response.status_code; error.type only for an error outcome | No raw URL path/query, client.address, network.peer.address or user_agent.original |
-| gRPC server summary | rpc.system.name=grpc, rpc.method as the fully-qualified name, rpc.status_code; error.type only for an error outcome | No peer address, no rpc.service, arbitrary metadata or raw protobuf |
+| HTTP server summary | http.request.method, http.route, http.response.status_code; error.type — the status code — only for a 5xx | No raw URL path/query, client.address, network.peer.address or user_agent.original |
+| gRPC server summary | rpc.system.name=grpc, rpc.method as the fully-qualified name, rpc.response.status_code in the spec spelling (`NOT_FOUND`); error.type only for the codes the server span marks Error | No peer address, no rpc.service, arbitrary metadata or raw protobuf |
 | Database decision | db.system.name, db.operation.name where provided by the pinned instrumentation; error.type on failure | No SQL parameters, DSN or credentials |
 | Messaging consumer or producer | messaging.system and messaging.destination.name where a real broker exists | No message body or unrestricted headers |
 | Error | error.type and a safe, documented domain or dependency outcome | No raw error string if it may include credentials, payloads or customer data |
@@ -605,6 +605,13 @@ HTTP route is the matched low-cardinality route template. It is never replaced
 by raw URL path. Query strings, request/response bodies, authorization material,
 cookies, peer addresses and full User-Agent values are forbidden.
 
+The gRPC status key is `rpc.response.status_code`, not the `rpc.status_code` this
+table first named: the pinned instrumentation (otelgrpc v0.71 on semantic conventions
+v1.43) writes `rpc.response.status_code` on the server span, and an access record
+that names the same fact with a different key cannot be joined to its span.
+Corrected at the Task 0.2 freeze, measured against the module rather than the
+research note.
+
 ### Event catalog and ownership
 
 Every named event has an owner, schema and operational purpose. The catalog is
@@ -618,7 +625,9 @@ or a diagnostic log instead. Adding a class is a reviewed change to this table, 
 a decision made at a call site.
 
 The served HTTP or gRPC call is absent from this table by design; see
-[§ Record model](#record-model).
+[§ Record model](#record-model). Its severity mapping, and the frozen list of names
+each class admits, are in
+[`docs/api/logs.md` § Event catalog](../../../api/logs.md#event-catalog).
 
 | Event class | Owner boundary | Required outcome attributes | Metric relationship |
 |---|---|---|---|

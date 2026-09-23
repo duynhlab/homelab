@@ -261,20 +261,116 @@ Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [Victori
 ## Event and field naming
 
 - **Message** is stable and concise — not a dump of dynamic IDs.
-- Custom field keys use **lower snake_case**.
-- Important machine-queryable records carry a stable **`event`** value.
+- A pinned semantic-convention key is used whenever one exists; a platform key is
+  lowercase and dot-separated (`order.id`, `checkout.session.id`), matching the
+  convention's own shape.
+- Only a name from the [§ Event catalog](#event-catalog) may be an **`event`** value,
+  and only `slogx.Event` sets it.
 - Do not put IDs into message templates when fields can carry them.
 - Do not create one-off aliases such as `orderId`, `order_id`, and `oid` for the same concept.
-- Errors use one consistent field shape (`zap.Error(err)` and/or `error.type`).
+- Errors use one shape: `error.type` plus a redacted `error.message`.
+
+Today's services still write snake_case keys through zap; the shape below is what
+they move to in RFC-0031 Phase 3.
 
 ```go
-logger.Info(
-    "inventory reservation committed",
-    zap.String("event", "inventory.reservation_committed"),
-    zap.String("operation", "inventory.commit_reservation"),
-    zap.String("reservation_id", reservationID),
-)
+log.Event(ctx, slog.LevelInfo, "order.confirmed", "order confirmed",
+    slog.String("order.id", orderID))
+
+log.Error(ctx, "compensation failed", slogx.Err(err),
+    slog.String("order.id", orderID))
 ```
+
+## Event catalog
+
+> **Frozen by RFC-0031 Task 0.2 — not yet emitted.** This is the registered list
+> a service may emit through `slogx.Event`. It takes effect when the fleet moves to
+> `logger/slogx` (RFC-0031 Phase 3); until then no record carries these names. Owner
+> sign-off is the merge of the change that introduced this section.
+
+The catalog is deliberately small. A name is admitted only when an operator would
+query it **by name across services**; a detail read while following one request
+belongs in the access record or a diagnostic log instead, and a count already kept by
+a business metric does not need a second copy as an event. Adding a name is a
+reviewed change to this table, never a decision made at a call site.
+
+Names follow the grammar the facade enforces: lowercase segments of
+`[a-z][a-z0-9_]*`, joined by dots, at least two, at most 64 bytes. A name is an
+operation class, so it never contains an id. Where a row lists `outcome`, the event
+carries it as a bounded value from the listed set; that is the same key ADR-075 puts
+on a span for a business rejection.
+
+| Class | Event | Emitted at | Attributes | Owner |
+|---|---|---|---|---|
+| Business state transition | `order.created` | order row committed as `pending` | `order.id` | [order](./order.md) |
+| | `order.confirmed` | saga moves the order to `confirmed` | `order.id` | order |
+| | `order.failed` | saga ends the order `failed` | `order.id`, `reason` (ReasonCode), `outcome`: `failed` \| `compensated` | order |
+| | `order.cancelled` | cancellation workflow reaches `cancelled` | `order.id`, `order.epoch` | order |
+| | `order.manual_review.entered` | order parked for a human decision | `order.id`, `reason` | order |
+| | `payment.authorization.completed` | authorize decision stored | `payment.id`, `order.id`, `outcome`: `authorized` \| `declined` \| `unknown` | [payment](./payment.md) |
+| | `payment.capture.completed` | capture decision stored | `payment.id`, `outcome`: `succeeded` \| `declined` \| `unknown` | payment |
+| | `payment.refund.completed` | refund settled | `payment.id`, `refund.id`, `outcome`: `succeeded` \| `declined` \| `unknown` | payment |
+| | `payment.reconciliation.discrepancy.detected` | reconciliation run finds a mismatch | `reconciliation.run_id`, `discrepancy.class` | payment |
+| | `checkout.session.confirmed` | session handed to order | `checkout.session.id`, `order.id` | [checkout](./checkout.md) |
+| | `checkout.session.requoted` | confirm sent the buyer back to requote | `checkout.session.id`, `reason`: `price_changed` \| `stock_unavailable` \| `availability_unknown` | checkout |
+| | `checkout.session.expired` | session expired | `checkout.session.id`, `reason`: `timer` \| `lazy` | checkout |
+| | `inventory.reservation.rejected` | reserve refused | `inventory.reservation.ref`, `outcome`: `insufficient` \| `unknown_sku` | [inventory](./inventory.md) |
+| Retry exhausted | `order.retry.exhausted` | a bounded retry gives up and the order is escalated | `order.id`, `operation`: `completion` \| `inventory_commit` \| `fulfillment_start` \| `cancellation_start` \| `compensation`, `error.type`, `attempts` | order |
+| Compensation | `order.compensation.completed` | one compensation step finishes | `order.id`, `compensation.step`: `void_payment` \| `refund_payment` \| `release_stock` \| `cancel_shipment` \| `fail_order` \| `mark_manual_review`, `outcome`: `ok` \| `failed`, `error.type` when failed | order |
+| Workflow lifecycle | `temporal.workflow.started` | the client starts a workflow | `temporal.workflow.type`, `temporal.task_queue` | [pkg](./pkg.md) (`temporalx`) |
+| | `temporal.workflow.failed` | a run ends failed, terminated or timed out | `temporal.workflow.type`, `temporal.run_status` | pkg |
+| Startup/shutdown | `process.started` | entry point ready to serve | `component`: `api` \| `worker` \| `mockpay` | pkg (`slogx`) |
+| | `process.stopped` | entry point finished shutting down | `component`, `outcome`: `graceful` \| `error` | pkg |
+
+**Workflow lifecycle events are never written from workflow code.** Workflow code is
+replayed, and only the SDK's replay-aware logger may run there; these two names are
+emitted by the client that starts the run or by the activity or dispatcher that
+observes its end.
+
+**Deliberately not in the catalog.** Cart, review, notification, shipping, user and
+product transitions are single-service facts already counted by their business
+metrics (`cart.cleared.total`, `reviews.duplicate_rejected.total`,
+`shipment.created.total`, …). Payment void is covered from the order side by
+`order.compensation.completed`. Reconciler repair and breach findings stay
+diagnostic until an operator needs them across runs.
+
+### Access-record severity
+
+The access record is a fixed schema owned by the shared middleware and carries no
+event name. Its severity is set by outcome, not by the caller:
+
+| Transport | Error | Warn | Info |
+|---|---|---|---|
+| HTTP | status ≥ 500 | status 400–499 | everything else |
+| gRPC | `UNKNOWN`, `UNIMPLEMENTED`, `INTERNAL`, `DATA_LOSS`, any unknown code | `DEADLINE_EXCEEDED`, `PERMISSION_DENIED`, `RESOURCE_EXHAUSTED`, `FAILED_PRECONDITION`, `ABORTED`, `OUT_OF_RANGE`, `UNAVAILABLE` | `OK`, `NOT_FOUND`, `CANCELLED`, `ALREADY_EXISTS`, `INVALID_ARGUMENT`, `UNAUTHENTICATED` |
+
+Severity answers *who should look*; `error.type` answers *did the server fail*, and
+follows the span: HTTP sets it to the status code for a 5xx, gRPC sets it to the code
+for the six codes the pinned instrumentation marks the server span Error for. The two
+axes differ on purpose — a `DEADLINE_EXCEEDED` is a Warn and still an error.
+
+### Field classification
+
+Every attribute a record may carry falls in one class. The facade enforces `deny`
+before any sink; `review` fields need a named owner, purpose and retention rule, agreed
+in the change that first emits them.
+
+| Class | Fields | Where allowed |
+|---|---|---|
+| Allow | service identity (`service.*`, `deployment.environment.name`); `http.request.method`, `http.route`, `http.response.status_code`; `rpc.system.name`, `rpc.method`, `rpc.response.status_code`; `error.type`; `event`; the bounded enums in the catalog (`outcome`, `reason`, `operation`, `compensation.step`, `discrepancy.class`, `component`); `temporal.workflow.type`, `temporal.task_queue`, `temporal.run_status` | logs, traces, metrics labels where bounded |
+| Allow — correlation only | `order.id`, `payment.id`, `refund.id`, `checkout.session.id`, `inventory.reservation.ref`, `reconciliation.run_id`, `order.epoch`, `attempts`, Temporal workflow and run ids | logs and traces only; never metric labels, resource attributes, event names or profile labels |
+| Review | `user.id`, email, phone, postal address, person names, monetary amounts, provider response text, any free-text a user typed | nowhere until reviewed |
+| Deny | authorization, cookies, passwords, tokens, secrets, API and private keys, card numbers and CVV, connection strings and DSNs, idempotency keys, client address, peer address, User-Agent, headers, request and response bodies, payloads, a raw error string | never — the facade replaces them |
+
+### Schema owners
+
+| Schema | Owner | Contract |
+|---|---|---|
+| HTTP access record | `pkg/httpmw` | [§ Access-log policy](#access-log-policy) |
+| gRPC access record | `pkg/grpcx` | [§ Access-log policy](#access-log-policy) |
+| Temporal SDK and workflow logging | `pkg/temporalx` (on the SDK's replay-aware logger) | [temporal.md](./temporal.md) |
+| Named events | the owning service, per row above | this section |
+| ClickHouse query schema | platform observability | [ClickHouse schema and queries](../observability/clickhouse/schema-and-queries.md) |
 
 ---
 
@@ -419,4 +515,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-23 — `logger/slogx` v0.1.0 is tagged: the Target-contract callout says the facade exists but no service has adopted it, names the one breaking query change (`error` as a string becomes `error.type` + `error.message`) and the two added levels, and § Error logging ownership carries the planned `Err` shape. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070/ADR-071 and a labelled **Target contract** callout names `slogx`, the semconv access record and the event catalog as planned; the as-built `zapx` contract below is unchanged. Previously 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-23 — RFC-0031 Task 0.2 freeze: § Event catalog (nineteen names across five classes), the access-record severity mapping, a per-field classification and one owner per schema; § Event and field naming moves to dotted keys. Previously 2026-09-23 — `logger/slogx` v0.1.0 is tagged: the Target-contract callout says the facade exists but no service has adopted it, names the one breaking query change (`error` as a string becomes `error.type` + `error.message`) and the two added levels, and § Error logging ownership carries the planned `Err` shape. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070/ADR-071 and a labelled **Target contract** callout names `slogx`, the semconv access record and the event catalog as planned; the as-built `zapx` contract below is unchanged. Previously 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

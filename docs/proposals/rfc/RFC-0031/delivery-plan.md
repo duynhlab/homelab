@@ -90,6 +90,19 @@ lists the expected set.
 
 ### Task 1.1c: Close the type leaks in the shared package's public API
 
+**Status — split 2026-09-18 (owner OK): 1.1c-A done, 1.1c-B waits for Task 1.1.**
+Removing `ZapCore` before the slogx facade exists would take OTLP logs away from every
+service, so the non-logging leaks went first. **1.1c-A** shipped as `obsx/v0.39.2`
+(`Enabled() Signals`, API-typed `TracerProvider()/MeterProvider()/LoggerProvider()`,
+`WithTracerProviderFactory(func(TracerProviderConfig) ShutdownTracerProvider)` with
+`SDKOptions()` as the one allowlisted SDK type, `obsx/api_surface_test.go` guarding the
+surface) and a ten-service wave after a full local-stack audit — no `cmd/main.go`
+imports `otel/sdk/*` any more. The fleet lint policy channel (shared-workflows
+`golangci-policy.yml` + `policy-lint` inputs on `go-check.yml`, checked out at the
+workflow's pinned SHA) is merged with **no `cmd/**` exemption**; service opt-in is
+rolling out non-blocking. **1.1c-B** — `ZapCore`, `TraceContext`, `otelzap` and `zap`
+leave `obsx` in the same release train as Task 1.1.
+
 The fleet rule "a service imports only the shared package and the OTel API" cannot
 be enforced while the shared package itself forces `main()` to import SDK and Zap
 types. Today `obsx.WithTracerProviderFactory` takes
@@ -387,4 +400,4 @@ between two tags reports a planted rename.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._
+_Last updated: 2026-09-18 — Task 1.1c split into A (done — obsx v0.39.2, fleet wave, lint policy channel) and B (with slogx). Previously 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

@@ -239,6 +239,7 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Semantic-convention registry, with both prefix options costed |
 | 2026-09-17 | Accepted / Not started | Owner chose bare namespaces as registered exceptions over a `duynhlab.` prefix; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
+| 2026-09-23 | Accepted / Not started | `outcome` is the first platform attribute the registry must carry: `obsx` v0.43.0 emits it on spans for business rejections (ADR-075), so it is named here before the registry exists rather than discovered by the conformance check afterwards |
 
 ---
-_Last updated: 2026-09-17._
+_Last updated: 2026-09-23 — `outcome` named as a registry entry ahead of Task 4.5. Previously 2026-09-17._

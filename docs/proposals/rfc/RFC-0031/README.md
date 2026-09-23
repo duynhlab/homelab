@@ -363,11 +363,13 @@ pinned commit accepts only a config *path*, so a fleet policy has nowhere to liv
 The mechanism this RFC adopts:
 
 1. One policy file, `golangci-policy.yml`, in the shared-workflows repository,
-   containing only `depguard` rules shaped like the shared package's existing
-   `otel-sdk-only-in-obsx` rule (with the same `!$test` exemption) plus a
-   `forbidigo` rule that rejects a seconds-unit histogram declared without explicit
-   boundaries — the silent-failure mode described under
-   [§ Metrics contract](#metrics-contract).
+   containing `depguard` rules shaped like the shared package's existing
+   `otel-sdk-only-in-obsx` rule (with the same `!$test` exemption). The file
+   originally also carried a `forbidigo` rule against a seconds-unit histogram
+   declared without explicit boundaries; that rule is **withdrawn** — the silent
+   failure it guarded is closed at its source instead, by the shared View that
+   gives the fleet boundaries to every histogram whose unit is `s`
+   ([§ Metrics contract](#metrics-contract), ADR-073 amended 2026-09-23).
 2. The shared lint job gains a second, additive pass that checks out that file and
    runs `golangci-lint run --config=<policy>`; a service keeps its own quality config
    untouched. The linter has no config inheritance or remote include, so a checked-out

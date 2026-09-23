@@ -78,8 +78,10 @@ the matching dashboard configuration; a partial rollout is not promoted.
 After the cutover, a service may run at most one minor version behind the shared
 package's current release. A `golangci-policy.yml` in the shared-workflows repository
 carries `depguard` rules for the import boundary in the shared-package rule and a
-`forbidigo` rule for unbounded seconds histograms; the shared lint job runs it as a
-second, additive pass, non-blocking for one release and blocking thereafter. The
+`forbidigo` rule for the process-global profiler sampling calls; the shared lint job
+runs it as a second, additive pass, non-blocking for one release and blocking
+thereafter. (The seconds-histogram rule this ADR originally named was withdrawn on
+2026-09-23 — see ADR-073.) The
 policy exempts `cmd/**` only until the shared package's own type leaks are closed.
 
 ### Decision rules

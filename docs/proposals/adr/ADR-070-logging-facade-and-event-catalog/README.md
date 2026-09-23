@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.1, 1.1b, 1.1c, 2.1, 2.2, Phase 3 |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -224,6 +224,7 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from the RFC's logging proposal |
 | 2026-09-17 | Accepted / Not started | Owner chose the slog facade over the audit's keep-Zap recommendation; created at `Accepted` with the RFC per the RFC-0028/RFC-0030 precedent |
+| 2026-09-23 | Accepted / Partial | `logger/slogx` v0.1.0 is tagged: one context-first facade over `log/slog` rendering a single redacted record to the platform stdout envelope and over OTLP through the OTel slog bridge, six levels on the RFC severity table, `Event` with a validated catalog name, `Err` for the error shape, and an API-surface test that fails if any exported signature names a logging library, the OTel SDK or the bridge. No service has adopted it — the fleet cutover is Phase 3, and `logger/zapx` stays the production default until then |
 
 ---
-_Last updated: 2026-09-17._
+_Last updated: 2026-09-23 — the facade exists: `logger/slogx` v0.1.0 tagged in `duynhlab/pkg`; service adoption is Phase 3. Previously 2026-09-17._

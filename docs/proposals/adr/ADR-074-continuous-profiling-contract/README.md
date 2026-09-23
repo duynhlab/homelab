@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.2, 1.4, 3.3, 4.2 |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -142,8 +142,9 @@ violation.
 
 - Labels the SDK adds by default are stripped in the shared helper, which is code the
   platform must maintain across SDK upgrades.
-- Domain-scoped `PROFILING_ENABLED` may remain; the operational doc then says so
-  plainly rather than implying a per-service switch.
+- ~~Domain-scoped `PROFILING_ENABLED` may remain; the operational doc then says so
+  plainly rather than implying a per-service switch.~~ Resolved 2026-09-22: the flag
+  is a per-service ResourceSet input, so the switch the doc describes exists.
 - Trace-to-profile navigation remains a manual query.
 
 ### Neutral consequences
@@ -199,6 +200,7 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Continuous profiling contract and the live label measurements |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
+| 2026-09-23 | Accepted / Partial | **Amended.** `obsx` v0.44.0 derives the four profile labels from the same resource attributes the tracer, meter and logger read, so `deployment_environment` and `service_version` — measured empty at the decision — now carry values; the hostname fallbacks are gone and the runtime sampling constants carry the overhead budget in their doc. The per-service `profiling_enabled` ResourceSet input shipped in homelab #1073, which closes the accepted trade-off about a domain-scoped switch. Verification on Kind (the Pyroscope label set) remains open |
 
 ---
-_Last updated: 2026-09-17._
+_Last updated: 2026-09-23 — Task 1.4 shipped in obsx v0.44.0 and the per-service profiling input in homelab #1073; the label set is now derived from the shared resource. Previously 2026-09-17._

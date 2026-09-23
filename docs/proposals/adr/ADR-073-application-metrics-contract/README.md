@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.3, 4.2, 4.4 |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -77,8 +77,9 @@ name, instrument type, UCUM unit, bounded attribute allowlist, replay semantics,
 consumer and removal plan. Instrument selection asks two questions in order —
 additive? monotonic? — then sync versus async. The fleet bucket set
 `0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 2, 5, 10` is pinned by the
-shared View for the named HTTP and gRPC instruments and must be passed explicitly by
-any new seconds histogram; non-time histograms choose a scale from an SLO or a
+shared View, which applies it to every histogram whose declared UCUM unit is `s` —
+the named HTTP and gRPC instruments and any new one alike (amended 2026-09-23, see
+History); non-time histograms choose a scale from an SLO or a
 measured distribution and prove it with p50/p95/p99 queries.
 
 Attributes are low-cardinality enums or normalised operation classes. The budget is
@@ -95,7 +96,7 @@ platform does not promise exemplars.
 | **Ownership** | Shared middleware owns HTTP and gRPC RED, the runtime package owns runtime, shared adapters own DB and cache; a service adds no counter or histogram for an operation those already measure |
 | **Selection** | Additive and monotonic → Counter; additive, non-monotonic → UpDownCounter; distribution → Histogram; last value → Gauge; known at decision → sync, sampled → Observable |
 | **Async counters report totals** | An Observable Counter callback reports the cumulative value; reporting increments is a defect reviewed on every async counter |
-| **Boundaries** | HTTP/gRPC use the fleet set via the shared View; every other seconds histogram passes the fleet set at declaration or is covered by an approved View; the `forbidigo` fleet rule rejects a seconds histogram without explicit boundaries |
+| **Boundaries** | Every histogram declared with unit `s` receives the fleet set from the shared View, whatever its name; a histogram in another unit chooses a scale from an SLO or a measured distribution and proves it with p50/p95/p99 queries |
 | **Names** | Application code declares the dotted OTel name and UCUM unit only; `_total`, `_bucket`, `_seconds` are ingest renderings |
 | **Attributes** | No user, request, trace, span, workflow, run, order, cart, session, payment, SKU, promo, IP, raw URL, image SHA, pod UID, email or error text as a label |
 | **Budget** | A new service is admitted with a series number; a dashboard shows fleet total against the ceiling |
@@ -148,7 +149,7 @@ it is exactly what produces zero-valued quantiles on a plausible dashboard.
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
 | Re-bucket the two known seconds histograms and re-baseline their SLOs | Owning services, Observability | RFC-0031 Task 1.3 | p50/p95/p99 queries return non-zero, plausible values |
-| Add the `forbidigo` rule for unbounded seconds histograms to the fleet policy | `duynhlab/gha-workflows` | RFC-0031 Task 1.1c | A planted unbounded histogram fails the fleet lint |
+| ~~Add the `forbidigo` rule for unbounded seconds histograms to the fleet policy~~ — replaced by the unit View (obsx v0.42.0) | `duynhlab/pkg` | RFC-0031 Task 1.3 | A histogram with an unfamiliar name and unit `s` gets the thirteen fleet boundaries in a reader test |
 | Add cardinality allowlist tests to the shared package and services | `duynhlab/pkg`, service repositories | RFC-0031 Task 1.3 | Every forbidden identifier fails the test |
 | Measure the per-service baseline and publish the budget dashboard | Observability | RFC-0031 Task 4.2 | Fleet total and ceiling visible in Grafana |
 | Publish the as-built metrics contract | Platform docs | RFC-0031 Task 4.3 | `docs/api/metrics.md` matches deployment |
@@ -190,6 +191,7 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Metrics contract |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
+| 2026-09-23 | Accepted / Partial | **Amended.** The boundary rule moves from a lint to the type system of the metric itself: `obsx` v0.42.0 dispatches one View that applies the fleet set to every histogram whose unit is `s`, so a new instrument is correct by declaring `WithUnit("s")` rather than by remembering to pass thirteen numbers. The planned `forbidigo` rule is withdrawn — a regex over source cannot see an instrument built in a library, and the View covers the Temporal SDK and gRPC latencies a lint never would. The two known seconds histograms already carried the unit, so no service changed. Cardinality allowlist tests and the budget dashboard remain open |
 
 ---
-_Last updated: 2026-09-17._
+_Last updated: 2026-09-23 — Task 1.3 shipped in obsx v0.42.0: one View applies the fleet boundaries to every histogram declared in seconds, and the planned `forbidigo` rule is withdrawn. Previously 2026-09-17._

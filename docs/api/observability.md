@@ -183,9 +183,11 @@ for the process-global profiler sampling calls. `go-check.yml` runs it as a seco
 additive pass when a caller sets `policy-lint: true`, checking the file out at the
 workflow's own pinned SHA; `policy-lint-blocking` (default `false`) decides whether a
 finding fails the job. Each service opts in through its `check.yml`; the first train is
-non-blocking. The seconds-histogram-without-buckets check is **not** in the policy yet —
-a regex cannot tell a bucketed declaration from an unbucketed one; it arrives with
-Task 1.3. Known finding at rollout: `payment-service` wraps its provider client and
+non-blocking. The seconds-histogram-without-buckets check is **withdrawn**, not
+pending: a regex cannot tell a bucketed declaration from an unbucketed one, and it
+would never see an instrument a library builds. Task 1.3 closed the gap at its source
+instead — `obsx` v0.42.0 gives the fleet boundaries to every histogram whose unit is
+`s` ([metrics.md](./metrics.md), ADR-073 amended 2026-09-23). Known finding at rollout: `payment-service` wraps its provider client and
 webhook handler with `otelhttp` directly (no shared HTTP-client helper exists yet).
 
 **Version floor** ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor)). A service runs at most one minor version behind the shared

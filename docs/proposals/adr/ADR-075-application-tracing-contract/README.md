@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.2, 1.5, 4.4 |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -101,8 +101,8 @@ unit test.
 | **Naming** | Two-part operation class (`checkout.confirm`); no identifiers; never minted from an event name or vice versa |
 | **Kind and scope** | Exactly one kind per span by layer; scope is the package path; `INTERNAL` is the manual default via `obsx.StartSpan` |
 | **Granularity** | Attribute → span event → child span, in that order; no span around already-instrumented work; no span per function |
-| **Status** | Error only for unexpected failure, with `error.type`; business rejections carry a bounded outcome attribute and leave status unset |
-| **Exceptions** | Standard exception span event with bounded `exception.stacktrace`; no secrets or raw payloads |
+| **Status** | Error only for unexpected failure, with `error.type`; business rejections carry the bounded `outcome` attribute and leave status unset |
+| **Exceptions** | One standard exception span event per recorded error, with a bounded `exception.message` and **no `exception.stacktrace` by default**; no secrets or raw payloads |
 | **Span events** | Stable names; bounded count; per-item detail goes to correlated logs, fan-out to span links |
 | **Baggage** | Default no application baggage; approved keys are reviewed, immutable, not stored, copied to attributes where consumed, stripped before third-party calls |
 | **Probes** | Filtered before span start; skip list shared with metrics; pinned by test |
@@ -230,6 +230,7 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Tracing contract and the live sampling measurements |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
+| 2026-09-23 | Accepted / Partial | **Amended.** `obsx` v0.43.0 ships the status rules: `RecordError` sets Error with `error.type` derived from the cause's concrete type and records ONE exception event whose message is bounded to 256 bytes on a rune boundary, and `RecordOutcome` records a business rejection under the `outcome` attribute with the status left unset. The exception event carries **no `exception.stacktrace` by default** — a stack is per-error kilobytes in the 90-day store for a fact the message and the code location already give — so the contract row now says so rather than implying one is attached. `outcome` is the registered key, replacing the ad-hoc `inventory.outcome`. Edge sampling assertions and the baggage denylist remain open |
 
 ---
-_Last updated: 2026-09-17._
+_Last updated: 2026-09-23 — Task 1.5 shipped in obsx v0.43.0: RecordError/RecordOutcome, `error.type` from the cause, a bounded exception message and no stacktrace by default. Previously 2026-09-17._

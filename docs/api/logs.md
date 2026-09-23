@@ -25,7 +25,9 @@ still emitted for `kubectl logs`.
 
 Scope and shared bootstrap rules: [Application observability](./observability.md).
 
-> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built.** The fleet
+> **Target contract — RFC-0031, `Accepted` 2026-09-17. The facade now exists
+> (`logger/slogx` v0.1.0, tagged 2026-09-23); no service has adopted it, so every
+> section below still describes `zapx` as deployed.** The fleet
 > logger becomes **`pkg/logger/slogx`** — a context-first facade over the standard
 > library's `slog` that redacts once and renders the same record to stdout and OTLP;
 > `zapx` and the otelzap tee are retired in the same release train, and no service may
@@ -37,6 +39,20 @@ Scope and shared bootstrap rules: [Application observability](./observability.md
 > **`zapx` as deployed**; it is rewritten to as-built when RFC-0031 Phase 3 lands. New
 > logging code is reviewed against the target rules from this date — see
 > [observability.md § Cross-signal telemetry standard](./observability.md#cross-signal-telemetry-standard-rfc-0031--normative-planned).
+>
+> **What v0.1.0 fixes about the envelope, and the one query that breaks.** The six
+> envelope keys are byte-for-byte what `zapx` emits, so stored queries on
+> `timestamp`, `level`, `message`, `caller`, `trace_id` and `span_id` survive the
+> cutover untouched — and they are now *reserved*, so a service attribute can no
+> longer collide with one. The error field does change: `zap.Error(err)` wrote a
+> single string field `error`; `slogx.Err(err)` writes two flat fields, `error.type`
+> (the Go type, the low-cardinality label ADR-075 also puts on the span) and
+> `error.message` (the text, redacted and bounded). **Any dashboard panel, alert
+> expression or saved LogsQL filter matching `error` as a string must move to
+> `error.message`, or better to `error.type`, before the first service cuts over.**
+> Two levels join the four: `trace` (severity 1) and `fatal` (21); on OTLP the
+> severity *number* is the field to filter, because the bridge writes severity text
+> with the standard library's spelling, which has no name for those two.
 
 ---
 
@@ -323,6 +339,13 @@ the final request/RPC summary.
 
 Full rules: [Application observability § Error ownership](./observability.md#error-ownership).
 
+**Planned shape (RFC-0031, available in `logger/slogx` v0.1.0, not yet deployed).**
+`slogx.Err(err)` is the one error shape: `error.type` carries the concrete Go type of
+the deepest cause that is not a standard-library wrapper, and `error.message` the
+redacted, bounded text. The label is only as useful as the errors behind it — every
+`errors.New` sentinel reports `errors.errorString`, so a domain whose failures should
+be distinguishable on a dashboard declares error types.
+
 ---
 
 ## Data safety
@@ -396,4 +419,4 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-070/ADR-071 and a labelled **Target contract** callout names `slogx`, the semconv access record and the event catalog as planned; the as-built `zapx` contract below is unchanged. Previously 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-23 — `logger/slogx` v0.1.0 is tagged: the Target-contract callout says the facade exists but no service has adopted it, names the one breaking query change (`error` as a string becomes `error.type` + `error.message`) and the two added levels, and § Error logging ownership carries the planned `Err` shape. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070/ADR-071 and a labelled **Target contract** callout names `slogx`, the semconv access record and the event catalog as planned; the as-built `zapx` contract below is unchanged. Previously 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

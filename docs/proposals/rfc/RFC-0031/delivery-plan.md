@@ -48,12 +48,30 @@ lists ADR-070 through ADR-076.
 
 ## Phase 1 — shared foundations
 
+**Execution order (owner OK 2026-09-18): 1.2 → 1.3 → 1.5 → 1.4 → 1.1**, not the
+dependency order written into the tasks below. Tasks 1.2 through 1.5 touch `obsx`,
+`httpmw` and `grpcx` only and need nothing from the facade, so running them first put
+two live defects — the propagator installed only when tracing was enabled, and two
+empty profile labels — right weeks earlier, and kept the largest piece (the facade)
+from blocking the rest. Each task's own `Dependencies` line is left as it was written;
+this paragraph is the deviation, recorded rather than silently taken.
+
 **Prerequisite (ADR-072) — pin convergence done 2026-09-18.** Every `duynhlab/pkg`
 module is at its current tag in all ten services (`obsx v0.38.0` fleet-wide, was three
 versions), shipped as ten patch releases after a full local-stack E2E audit; the
 Dependabot `duynhlab-pkg` group PRs it superseded are closed. The linter converged the same day: `pkg` lints at golangci-lint v2.12.2 (pkg #88), the version the services' shared `go-check.yml` already defaults to — 0 issues across all fourteen modules. ADR-072's first obligation is closed; its Adoption is `Partial`.
 
 ### Task 1.1: Build pkg/logger/slogx
+
+**Status — DONE 2026-09-23: `logger/slogx/v0.1.0` tagged** (pkg #97, #98, #99, #100,
+four PRs: core + stdout envelope, the redaction boundary, the OTLP sink and `Event`,
+then `Err` with the API-surface guard and `docs/MIGRATION-slogx.md`). Every acceptance
+criterion below is met and tested; no service has adopted it, which is Phase 3. Two
+things the plan did not foresee, both recorded in the ADRs: the instrumentation scope
+is the facade's package path, not the service name, and the six envelope keys are
+reserved so a caller attribute cannot make stdout and OTLP disagree about one record.
+One gap carried forward: `obsx` exposes no log force-flush, so the `Config.Flush` seam
+that lets a FATAL record leave the process has nothing to wire to yet.
 
 **Acceptance criteria:**
 
@@ -90,7 +108,7 @@ lists the expected set.
 
 ### Task 1.1c: Close the type leaks in the shared package's public API
 
-**Status — split 2026-09-18 (owner OK): 1.1c-A done, 1.1c-B waits for Task 1.1.**
+**Status — split 2026-09-18 (owner OK): 1.1c-A done; 1.1c-B is now unblocked — Task 1.1 shipped `logger/slogx` v0.1.0 on 2026-09-23, so `ZapCore`, `TraceContext` and the otelzap dependency can go once the fleet has cut over in Phase 3.**
 Removing `ZapCore` before the slogx facade exists would take OTLP logs away from every
 service, so the non-logging leaks went first. **1.1c-A** shipped as `obsx/v0.39.2`
 (`Enabled() Signals`, API-typed `TracerProvider()/MeterProvider()/LoggerProvider()`,
@@ -132,6 +150,13 @@ no SDK or Zap type.
 
 ### Task 1.2: Repair correlation and resource identity
 
+**Status — DONE 2026-09-21: `obsx v0.41.0` + homelab #1072.** The W3C propagator is
+installed unconditionally, so extraction and injection work with every exporter
+disabled; one `resourceAttributes` function is now the single source the tracer,
+meter, logger and (from v0.44.0) the profiler read; `service.version` reaches the five
+domain ResourceSets from `image_tag` and `mockpay` gained the telemetry environment it
+lacked.
+
 **Acceptance criteria:**
 
 - W3C extraction/injection works with all exporters disabled.
@@ -151,6 +176,12 @@ no SDK or Zap type.
 
 ### Task 1.3: Enforce the metrics contract
 
+**Status — DONE 2026-09-21: `obsx v0.42.0`.** One dispatching View applies the fleet
+boundaries to every histogram whose unit is `s`, which covers the Temporal SDK and
+gRPC latencies a per-name View never reached. The planned `forbidigo` rule is
+withdrawn (ADR-073 amended). The two known gaps already declared the unit, so no
+service changed. Cardinality allowlist tests and the budget dashboard remain open.
+
 **Acceptance criteria:**
 
 - Shared HTTP, gRPC, runtime, DB and cache instruments remain the only automatic sources.
@@ -162,6 +193,12 @@ no SDK or Zap type.
 **Verification:** metric-reader tests, cardinality allowlist tests and VictoriaMetrics p50/p95/p99 queries.
 
 ### Task 1.4: Enforce the profiling contract
+
+**Status — DONE 2026-09-21: `obsx v0.44.0` + homelab #1073.** The four profile labels
+come from the same resource attributes every other signal reads, so
+`deployment_environment` and `service_version` — measured empty when the ADR was
+written — carry values; `PROFILING_ENABLED` is a per-service ResourceSet input.
+Verifying the label set on Kind is part of the Phase 1 checkpoint.
 
 **Acceptance criteria:**
 
@@ -186,6 +223,13 @@ no SDK or Zap type.
 **Verification:** Pyroscope ingestion test, profile-label query, disable/failure test and trace-to-profile manual-pivot check.
 
 ### Task 1.5: Enforce the tracing contract
+
+**Status — DONE 2026-09-21: `obsx v0.43.0`.** `RecordError` sets Error with
+`error.type` taken from the cause's concrete type and records one exception event with
+a rune-safe bounded message and **no stacktrace**; `RecordOutcome` records a business
+rejection under `outcome` with the status left unset. Skip lists are pinned by golden
+tests and a middleware test proves no baggage is set. Edge sampling assertions remain
+open.
 
 **Acceptance criteria:**
 
@@ -400,4 +444,4 @@ between two tags reports a planted rename.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-18 — Task 1.1c split into A (done — obsx v0.39.2, fleet wave, lint policy channel) and B (with slogx). Previously 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._
+_Last updated: 2026-09-23 — Phase 1 recorded as built: Tasks 1.2, 1.3, 1.5 and 1.4 shipped in obsx v0.41.0 through v0.44.0, Task 1.1 shipped as `logger/slogx` v0.1.0, and the execution order actually taken (1.2→1.3→1.5→1.4→1.1) is stated at the head of the phase. Previously 2026-09-18 — Task 1.1c split into A (done — obsx v0.39.2, fleet wave, lint policy channel) and B (with slogx). Previously 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

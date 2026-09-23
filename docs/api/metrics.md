@@ -31,11 +31,15 @@ The instrument names and labels are OpenTelemetry semantic conventions
 > name, instrument type, UCUM unit, bounded attribute allowlist, replay semantics and
 > consumer **before** it is emitted. Instrument selection is two questions in order —
 > additive? monotonic? — then sync versus async; an Observable Counter callback
-> reports the **total**, never the increment. **A new seconds histogram must pass the
-> fleet bucket set explicitly** or match an approved View — the SDK default is
-> millisecond-shaped and collapses sub-second quantiles to zero; the two known gaps
-> (`order.inventory.commit_lag`, `payment.reconciliation.run.duration`) are re-bucketed
-> at Task 1.3 and a `forbidigo` fleet rule will reject the pattern. The
+> reports the **total**, never the increment. **A histogram declared with UCUM unit
+> `s` receives the fleet bucket set from the shared View** — the SDK default is
+> millisecond-shaped and collapses sub-second quantiles to zero, so the unit, not a
+> list of thirteen numbers at each call site, is what makes a new instrument correct
+> (shipped in `obsx` v0.42.0; the two known gaps `order.inventory.commit_lag` and
+> `payment.reconciliation.run.duration` already carried the unit and needed no
+> change). The planned `forbidigo` rule is withdrawn: a regex over service source
+> cannot see an instrument a library builds, and the View covers the Temporal SDK
+> and gRPC latencies it never would. The
 > [§ App-side cardinality control](#app-side-cardinality-control) denylist becomes a
 > test, a per-service series budget is set from the current ~2,800-series baseline, and
 > Temporal replay never increments an application metric. The platform does **not**

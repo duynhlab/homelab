@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 0.2, 2.1, 2.2, 4.1 |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -191,6 +191,7 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Record model, § Canonical attributes and § Privacy |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
+| 2026-09-23 | Accepted / Partial | The deny list is code: `logger/slogx` v0.1.0 applies it before every sink, on the message and on attributes bound with `With`, recursing through groups, maps, slices, structs, errors and `LogValuer`s, and scans values for credential shapes (Bearer/Basic, JWT, a `key=value` pair whose key is denied, URL userinfo, Luhn-valid card numbers) as well as keys. The policy can only be tightened by a service. Two security audits drove the implementation; their probes are the regression table. The envelope keys are reserved so a caller attribute cannot make the two sinks disagree about one record |
 
 ---
-_Last updated: 2026-09-17._
+_Last updated: 2026-09-23 — the privacy boundary ships in `logger/slogx` v0.1.0, keys and values, before both sinks. Previously 2026-09-17._

@@ -544,6 +544,24 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0031 Phase 1 is as-built in the shared package — five ADRs move to Adoption
+  `Partial`.** Tasks 1.2 through 1.5 shipped in `obsx` v0.41.0–v0.44.0 and Task 1.1
+  as `logger/slogx` v0.1.0, so the records stop describing a plan: ADR-070 and
+  ADR-071 gain the facade and the privacy boundary that now exist in code; ADR-073 is
+  **amended** — the fleet bucket set is applied by a View to every histogram declared
+  in seconds, and the planned `forbidigo` rule is withdrawn because a regex over
+  service source cannot see an instrument a library builds (the Temporal SDK's
+  latencies are the case in point); ADR-074 records that the four profile labels now
+  come from the same resource every other signal reads and that the per-service
+  profiling switch its trade-off doubted does exist; ADR-075 is **amended** to say
+  the exception event carries no `exception.stacktrace` by default and that `outcome`
+  is the registered attribute for a business rejection, which ADR-076 now names ahead
+  of the registry. The delivery plan records the execution order actually taken
+  (1.2→1.3→1.5→1.4→1.1) and why, rather than leaving the written dependency order
+  looking like what happened. `docs/api/logs.md`, `metrics.md`, `observability.md` and
+  `pkg.md` follow, including the one query that breaks at the fleet cutover: zap's
+  single `error` string becomes `error.type` + `error.message`.
+
 - **RFC-0032 opened at `provisional` — the Kind baseline moves to Kubernetes
   1.36.4.** Kubernetes 1.34 reaches end of life on 2026-10-27 and the cluster it
   pins is where the E2E release audit runs, so the single version variable in

@@ -1357,6 +1357,114 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 Kept so the next audit inherits the findings instead of rediscovering them.
 
+### 2026-09-23 — the obsx v0.44.0 fleet release
+
+Cluster: kind `homelab`, 4 nodes, `kindest/node:v1.34.3`
+Host: Linux + Docker 29.1.3, arch amd64
+Revision: `feat/fleet-images-obsx-v0-44` (#1084) — pins asserted: the ten service
+tags plus both workers and mockpay, listed below
+Preconditions: compose gate passed 2026-09-21 on the same ten candidates · tags
+pinned in this branch · no prior cluster (`make up` created it)
+
+| Group | Rows | Result | Evidence |
+|---|---|---|---|
+| K0 machine | 8 | PASS | kubectl/kind/flux/k6/helm/tofu/yq/jq/docker present; 4/4 nodes Ready; `gateway.duynh.me` and `id.duynh.me` resolve to 127.0.0.1 |
+| K1 bring-up | 8 | PASS | `make up` exit 0 in 8m08s; **30/30 Kustomizations Ready**; `kind-seed.sh` 8/8; both WorkerDeployments report Current = Target on the new build ids |
+| K2 delivery | 7 | PASS | image↔pin **13/13 exact** (table below); `auth` namespace absent; 7/7 ResourceSets Ready |
+| K3 admission/secrets | 6 | PASS | 6 ClusterPolicies Ready, 2/2 PolicyExceptions live, **0 policy failures** across all reports; OpenBAO self-unsealed via floci; 38/38 ExternalSecrets `SecretSynced`; 3 CNPG clusters at 3/3 instances |
+| K4 edge/identity | 10 | PASS | k6 smoke K4.1–K4.8 15/15 rows; 301→200 at the edge; both realms mint tokens; customer token refused at the edge on `/protected/` |
+| K5 signals | 10 | PASS | k6 K5.2–K5.9 all green; traces rooted at the edge across 14 services; Pyroscope and ClickHouse checks below |
+| K6 wrap | 3 | — | teardown pending owner sign-off on #1084 |
+
+**k6 gate, `GATE=kind`: 25 rows, 144/144 assertions.**
+
+    saga      SG.1 SG.2 SG.3 SG.4          4/4 rows    9/9 assertions
+    smoke     K4.* K5.*                   15/15 rows  50/50 assertions
+    staff     A17 A18 A19 A21 A22          5/5 rows   59/59 assertions
+    operator  A20                          1/1 rows   26/26 assertions
+
+**Image ↔ pin comparison (K2.2):**
+
+    user          pinned 2.2.4    running 2.2.4    ✓
+    product       pinned 1.13.4   running 1.13.4   ✓
+    inventory     pinned 0.6.3    running 0.6.3    ✓
+    cart          pinned 2.1.4    running 2.1.4    ✓
+    order         pinned 2.7.3    running 2.7.3    ✓
+    review        pinned 2.1.4    running 2.1.4    ✓
+    shipping      pinned 1.6.4    running 1.6.4    ✓
+    notification  pinned 2.1.4    running 2.1.4    ✓
+    payment       pinned 2.3.4    running 2.3.4    ✓
+    checkout      pinned 0.10.3   running 0.10.3   ✓
+    order-worker  pinned 2.7.3    running 2.7.3    ✓  (Current build 2.7.3-9648)
+    checkout-wkr  pinned 0.10.3   running 0.10.3   ✓  (Current build 0.10.3-669b)
+    mockpay       pinned 2.3.4    running 2.3.4    ✓
+
+**RFC-0031 Phase 1 checkpoint — the four claims, read off the running cluster:**
+
+*Profile identity (ADR-074, Task 1.4).* Pyroscope now answers on all four
+labels; the two the ADR measured **empty** carry values:
+
+    service_name            14 values (10 services + 2 workers + alloy + pyroscope)
+    service_namespace       10 values
+    deployment_environment   1 value  — production      <- was empty
+    service_version         10 values — 2.2.4, 1.13.4, 0.6.3, …  <- was empty
+
+*Resource identity on traces (Task 1.2).* Every application span carries
+`service.version`, `deployment.environment.name` and `service.namespace`, and
+the versions equal the deployed tags — which is also how the mockpay finding
+below was caught.
+
+*Seconds-histogram View (ADR-073 as amended, Task 1.3).* The fleet boundary set
+reaches instruments a name-matching View never did and a `forbidigo` rule could
+never have seen, because the Temporal SDK builds them inside a library:
+
+    http_server_request_duration_seconds          13 boundaries + Inf  ✓
+    rpc_server_call_duration_seconds              13 boundaries + Inf  ✓
+    temporal_activity_execution_latency_seconds   13 boundaries + Inf  ✓
+    temporal_workflow_endtoend_latency_seconds    13 boundaries + Inf  ✓
+    db_client_operation_duration_seconds           9 boundaries + Inf  (its own named View, by design)
+
+*Error semantics (Task 1.5).* Covered by the k6 rows and the pkg unit tests; no
+separate cluster assertion was added.
+
+**Findings:**
+
+- **mockpay carried its version twice and the second copy was stale** — the
+  image tag moved to 2.3.4 while `service.version` inside
+  `OTEL_RESOURCE_ATTRIBUTES` stayed at 2.3.1, so a pod running 2.3.4 reported
+  2.3.1 on every span. Fixed in this PR. Found by reading the resource attribute
+  off a live span rather than trusting the manifest.
+- **The `$imagepolicy` markers describe automation that is not installed.** No
+  `ImageRepository`, `ImagePolicy` or `ImageUpdateAutomation` exists anywhere
+  under `kubernetes/`; the tags are literals. That is why these pins had drifted
+  three releases behind. Recorded in this PR's commit; the choice between
+  removing the markers and installing the controller is the owner's.
+- **A failed confirm leaves a checkout session permanently unconfirmable.** With
+  the catalog unseeded, confirm answered 503 fail-closed — correct — but the
+  in-flight claim it left behind made every later confirm answer 409 "a confirm
+  is already in flight", including after the underlying cause was gone.
+  `POST /sessions` returns the same open session, so a client cannot escape it;
+  only `DELETE` clears it. Not a regression from this release, and not filed as
+  a fix here.
+- **The audit's own failed runs tripped the SLO burn alerts.** Running the gate
+  before seeding produced 503s and 409s that fired
+  `CheckoutHighOverallErrorRate` at `page`. The alerts were right; K5.8 passed
+  once clean traffic brought `slo:sli_error:ratio_rate1h` back to 0.00125
+  against a 0.144 threshold. Worth knowing for the next audit: **seed first**.
+
+**Decision: ELIGIBLE**
+
+Rows not run — outstanding, not passed:
+
+- **K5, propagation with `TRACING_ENABLED=false`** (RFC-0031 Phase 1 checkpoint).
+  Holding that env against Flux needs a Kustomization suspended for the length
+  of the test, which is a bigger intervention than the row is worth on an
+  audited cluster. The behaviour is covered by the obsx unit test that asserts
+  the W3C propagator is installed before any signal branch.
+- **K6.3 teardown.** The cluster is left up until #1084 is merged.
+
+---
+
 ### 2026-08-17 — the first run
 
 The first time the Envoy/Keycloak layer ever reconciled on Kind.
@@ -1600,4 +1708,4 @@ kubectl -n temporal exec deploy/temporal-admintools -- \
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_
+_Last updated: 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

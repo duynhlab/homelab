@@ -121,6 +121,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The Kind gate ran the obsx v0.44.0 release and the RFC-0031 Phase 1
+  checkpoint with it — 25 k6 rows, 144/144 assertions, evidence in
+  [`kind-e2e-audit.md`](docs/platform/kind-e2e-audit.md#previous-runs).** The
+  two profile labels ADR-074 measured empty now carry values on every process
+  (`deployment_environment=production`, `service_version` equal to the deployed
+  tag), every application span carries the resource identity, and the fleet
+  bucket set reaches `temporal_activity_execution_latency_seconds` and
+  `temporal_workflow_endtoend_latency_seconds` — instruments the Temporal SDK
+  builds inside a library, which a name-matching View never covered and the
+  withdrawn `forbidigo` rule could never have seen. Reading `service.version`
+  off a live span rather than off the manifest is what caught mockpay reporting
+  2.3.1 from a pod running 2.3.4.
+
+
 - **Every process now says which release it is (RFC-0031 Task 1.2).** The five domain
   ResourceSets append `service.version=<image_tag>` to `OTEL_RESOURCE_ATTRIBUTES`, so
   spans, metrics, logs and the profiler's `service_version` label carry the deployed

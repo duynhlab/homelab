@@ -399,7 +399,10 @@ Skeleton (copy what you need):
   worker images and mockpay move with it — **they are literals, not
   automation**: the `$imagepolicy` markers describe an image-automation
   controller this cluster does not run, which is why the pins had drifted three
-  releases behind.
+  releases behind. mockpay carries its version **twice** — the image tag and a
+  hardcoded `service.version` in `OTEL_RESOURCE_ATTRIBUTES` — and the second had
+  been left behind at 2.3.1; the Kind audit caught it by reading the resource
+  attribute off a live span rather than trusting the manifest.
 
 - **No service imports the OpenTelemetry SDK any more (RFC-0031 Task 1.1c-A).**
   `obsx v0.39.2` stops exporting SDK providers (`Enabled() Signals` and API-typed

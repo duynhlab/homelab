@@ -291,9 +291,14 @@ candidate eligible for a tag. A failed row is never a partial pass.
 4. Update the explicit pin in homelab. Service API pins live in
    `kubernetes/apps/services/<service>.yaml`. Keep `checkout-worker` aligned
    with checkout and `mockpay` aligned with payment; frontend has its own pin.
-   An order release is different: create a new versioned order-worker manifest,
-   deploy it side by side, and activate it through the ADR-030 procedure—never
-   retag an existing versioned worker.
+   Both Temporal workers are one file each under the Temporal Worker Controller
+   (ADR-054 for `order-worker`, ADR-064 for `checkout-worker`): a release edits
+   the image tag line and nothing else, and the controller derives the Build ID,
+   creates the new Worker Deployment Version, moves Current per `spec.rollout`
+   and deletes the drained one. The ADR-030 procedure this step used to
+   describe — a new versioned manifest per build, deployed side by side and
+   activated by a Job — retired with those ADRs; there is no file per build any
+   more.
 5. Validate and reconcile the local Kind environment:
 
    ```bash

@@ -386,6 +386,21 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **The fleet moves to `obsx v0.44.0` and the cluster is pointed at the new
+  images (RFC-0031 Phase 1).** Ten `go.mod`-only PRs, one local-stack E2E audit
+  covering all ten candidates at once, ten patch releases: `user v2.2.4` ·
+  `product v1.13.4` · `inventory v0.6.3` · `cart v2.1.4` · `order v2.7.3` ·
+  `review v2.1.4` · `shipping v1.6.4` · `notification v2.1.4` ·
+  `payment v2.3.4` · `checkout v0.10.3`. What the pin brings: the W3C
+  propagator installed whether or not tracing is enabled, one resource source
+  feeding traces, metrics, logs and the Pyroscope labels, the fleet bucket set
+  on every histogram declared in seconds, and `error.type` with one bounded
+  exception event on a recorded error. The ten `image_tag` inputs, the two
+  worker images and mockpay move with it — **they are literals, not
+  automation**: the `$imagepolicy` markers describe an image-automation
+  controller this cluster does not run, which is why the pins had drifted three
+  releases behind.
+
 - **No service imports the OpenTelemetry SDK any more (RFC-0031 Task 1.1c-A).**
   `obsx v0.39.2` stops exporting SDK providers (`Enabled() Signals` and API-typed
   accessors replace the nil-checks) and takes an opaque tracer-provider config whose

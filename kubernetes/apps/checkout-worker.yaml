@@ -92,7 +92,7 @@ spec:
           # one shared binary, two subcommands, one CVE surface.
           #
           # THE ONE LINE a release edits.
-          image: ghcr.io/duynhlab/checkout-service/checkout-service:0.10.3
+          image: ghcr.io/duynhlab/checkout-service/checkout-service:0.10.4
           imagePullPolicy: IfNotPresent
           args: ["worker"]
           ports:

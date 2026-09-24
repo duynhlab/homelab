@@ -972,6 +972,16 @@ Skeleton (copy what you need):
   rename is lazy — it happens at each table's first write after the change, so
   the cleanup needs more than one pass.
 
+#### Services
+
+- **A lost Idempotency-Key no longer locks a checkout session until its TTL.**
+  A confirm that failed on a product or inventory outage before the order
+  attempt left the session `confirming` and bound to that key, so any other
+  key got `409 CONFLICT` and the shopper could not start a new checkout
+  either. checkout 0.10.4 returns such a session to `ready` (guarded in the
+  database by the claim's attempt marker), so any key can confirm once the
+  upstream recovers; an order outage keeps the same-key re-drive.
+
 #### Temporal
 
 - **`numHistoryShards: 512` was running against a four-connection pool.** A

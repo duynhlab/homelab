@@ -366,6 +366,16 @@ skip-list test.
 
 ### Task 4.2: Verify VictoriaMetrics and Pyroscope consumers
 
+**Status — DONE 2026-09-24 (verified on Kind).** The four business histograms
+(checkout confirm, notification send, mockpay hop, order value) are on fleet-View
+or minor-unit buckets, and their panels now show p50/p95/p99 on every copy of the
+board. Every expression returns ordered quantiles on Kind. The two RED sources
+have one job each (`docs/api/metrics.md`). Pyroscope has all 13 identities:
+mockpay was missing until payment v2.4.1 started its profiler, and now carries
+the four labels. The manual trace→profile pivot and a per-type investigation
+table are documented. One limit is recorded rather than fixed: the four Temporal
+identities carry no `span_name`, by obsx's replay-safe design.
+
 **Acceptance criteria:**
 
 - Application and span-derived metrics have documented, non-duplicated operational uses.

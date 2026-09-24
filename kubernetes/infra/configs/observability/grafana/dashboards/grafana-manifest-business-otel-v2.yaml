@@ -375,7 +375,7 @@ spec:
           kind: Panel
           spec:
             id: 0
-            title: Confirm latency p95
+            title: Confirm latency p50 / p95 / p99
             description: ''
             links: []
             data:
@@ -391,9 +391,38 @@ spec:
                       datasource:
                         name: prometheus
                       spec:
-                        expr: histogram_quantile(0.95, sum by (le) (rate(checkout_confirm_duration_seconds_bucket[$__rate_interval])))
-                        legendFormat: p95
+                        expr: histogram_quantile(0.5, sum by (le) (rate(checkout_confirm_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: 'p50'
+                        range: true
                     refId: A
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.95, sum by (le) (rate(checkout_confirm_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: 'p95'
+                        range: true
+                    refId: B
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.99, sum by (le) (rate(checkout_confirm_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: 'p99'
+                        range: true
+                    refId: C
                     hidden: false
                 transformations: []
                 queryOptions: {}
@@ -406,7 +435,7 @@ spec:
                   legend:
                     displayMode: list
                     placement: bottom
-                    showLegend: false
+                    showLegend: true
                     calcs: []
                   tooltip:
                     mode: ''
@@ -666,7 +695,7 @@ spec:
           kind: Panel
           spec:
             id: 0
-            title: Send latency p95 by channel
+            title: Send latency p50 / p95 / p99 by channel
             description: ''
             links: []
             data:
@@ -682,9 +711,38 @@ spec:
                       datasource:
                         name: prometheus
                       spec:
-                        expr: histogram_quantile(0.95, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$__rate_interval])))
-                        legendFormat: '{{channel}}'
+                        expr: histogram_quantile(0.5, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: '{{channel}} p50'
+                        range: true
                     refId: A
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.95, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: '{{channel}} p95'
+                        range: true
+                    refId: B
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.99, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: '{{channel}} p99'
+                        range: true
+                    refId: C
                     hidden: false
                 transformations: []
                 queryOptions: {}
@@ -697,7 +755,7 @@ spec:
                   legend:
                     displayMode: list
                     placement: bottom
-                    showLegend: false
+                    showLegend: true
                     calcs: []
                   tooltip:
                     mode: ''
@@ -711,7 +769,7 @@ spec:
           kind: Panel
           spec:
             id: 0
-            title: Average order value
+            title: Order value — average, p50 / p95 / p99
             description: ''
             links: []
             data:
@@ -729,8 +787,51 @@ spec:
                       spec:
                         expr: sum(increase(order_value_minor_sum[$__range])) / sum(increase(order_value_minor_count[$__range]))
                           / 100
-                        legendFormat: Average order value
+                        legendFormat: Average
+                        range: true
                     refId: A
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.5, sum by (le) (increase(order_value_minor_bucket[$__range]))) / 100
+                        legendFormat: p50
+                        range: true
+                    refId: B
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.95, sum by (le) (increase(order_value_minor_bucket[$__range]))) / 100
+                        legendFormat: p95
+                        range: true
+                    refId: C
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.99, sum by (le) (increase(order_value_minor_bucket[$__range]))) / 100
+                        legendFormat: p99
+                        range: true
+                    refId: D
                     hidden: false
                 transformations: []
                 queryOptions: {}
@@ -1146,7 +1247,7 @@ spec:
           kind: Panel
           spec:
             id: 0
-            title: Provider-hop latency p95 (mockpay)
+            title: Provider-hop latency p50 / p95 / p99 (mockpay)
             description: ''
             links: []
             data:
@@ -1162,9 +1263,38 @@ spec:
                       datasource:
                         name: prometheus
                       spec:
-                        expr: histogram_quantile(0.95, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$__rate_interval])))
-                        legendFormat: '{{op}}'
+                        expr: histogram_quantile(0.5, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: '{{op}} p50'
+                        range: true
                     refId: A
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.95, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: '{{op}} p95'
+                        range: true
+                    refId: B
+                    hidden: false
+                - kind: PanelQuery
+                  spec:
+                    query:
+                      kind: DataQuery
+                      group: prometheus
+                      version: v0
+                      datasource:
+                        name: prometheus
+                      spec:
+                        expr: histogram_quantile(0.99, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$__rate_interval])))
+                        legendFormat: '{{op}} p99'
+                        range: true
+                    refId: C
                     hidden: false
                 transformations: []
                 queryOptions: {}
@@ -1177,7 +1307,7 @@ spec:
                   legend:
                     displayMode: list
                     placement: bottom
-                    showLegend: false
+                    showLegend: true
                     calcs: []
                   tooltip:
                     mode: ''

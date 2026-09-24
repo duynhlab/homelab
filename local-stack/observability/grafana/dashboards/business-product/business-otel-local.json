@@ -306,7 +306,7 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Provider-hop latency p95 (mockpay)",
+      "title": "Provider-hop latency p50 / p95 / p99 (mockpay)",
       "description": "RFC-0017 W2 money-hop SLI: mockpay call latency per op.",
       "datasource": {
         "type": "prometheus",
@@ -349,9 +349,27 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.95, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$rate])))",
-          "legendFormat": "{{op}}",
+          "expr": "histogram_quantile(0.5, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$rate])))",
+          "legendFormat": "{{op}} p50",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$rate])))",
+          "legendFormat": "{{op}} p95",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le,op) (rate(payment_provider_request_duration_seconds_bucket[$rate])))",
+          "legendFormat": "{{op}} p99",
+          "refId": "C"
         }
       ]
     },
@@ -540,7 +558,7 @@
     {
       "id": 9,
       "type": "stat",
-      "title": "Average order value",
+      "title": "Order value — average, p50 / p95 / p99",
       "description": "AOV over the selected range = order_value_minor sum/count, minor units ÷100.",
       "datasource": {
         "type": "prometheus",
@@ -589,8 +607,35 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "sum(increase(order_value_minor_sum[$__range])) / sum(increase(order_value_minor_count[$__range])) / 100",
-          "legendFormat": "Average order value",
+          "legendFormat": "Average",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (increase(order_value_minor_bucket[$__range]))) / 100",
+          "legendFormat": "p50",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (increase(order_value_minor_bucket[$__range]))) / 100",
+          "legendFormat": "p95",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (increase(order_value_minor_bucket[$__range]))) / 100",
+          "legendFormat": "p99",
+          "refId": "D"
         }
       ]
     },
@@ -1985,7 +2030,7 @@
         {
           "id": 32,
           "type": "timeseries",
-          "title": "Send latency p95 by channel",
+          "title": "Send latency p50 / p95 / p99 by channel",
           "description": "Delivery latency per channel.",
           "datasource": {
             "type": "prometheus",
@@ -2028,9 +2073,27 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "histogram_quantile(0.95, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$rate])))",
-              "legendFormat": "{{channel}}",
+              "expr": "histogram_quantile(0.5, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$rate])))",
+              "legendFormat": "{{channel}} p50",
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "expr": "histogram_quantile(0.95, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$rate])))",
+              "legendFormat": "{{channel}} p95",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "expr": "histogram_quantile(0.99, sum by (le,channel) (rate(notification_send_duration_seconds_bucket[$rate])))",
+              "legendFormat": "{{channel}} p99",
+              "refId": "C"
             }
           ]
         }
@@ -2297,7 +2360,7 @@
         {
           "id": 37,
           "type": "timeseries",
-          "title": "Confirm latency p95",
+          "title": "Confirm latency p50 / p95 / p99",
           "description": "End-to-end checkout confirm duration (RFC-0015 exemplar).",
           "datasource": {
             "type": "prometheus",
@@ -2340,9 +2403,27 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
+              "expr": "histogram_quantile(0.5, sum by (le) (rate(checkout_confirm_duration_seconds_bucket[$rate])))",
+              "legendFormat": "p50",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
               "expr": "histogram_quantile(0.95, sum by (le) (rate(checkout_confirm_duration_seconds_bucket[$rate])))",
               "legendFormat": "p95",
-              "refId": "A"
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_PROMETHEUS}"
+              },
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(checkout_confirm_duration_seconds_bucket[$rate])))",
+              "legendFormat": "p99",
+              "refId": "C"
             }
           ]
         }

@@ -121,6 +121,21 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Business histograms show p50 / p95 / p99, mockpay is profiled, and the
+  profile pivot is written down as it works (RFC-0031 Task 4.2).** The
+  confirm, notification-send and mockpay-hop latency panels show three
+  quantiles instead of p95, and order value sits beside its quantiles, on
+  the v2 board and the local-stack copy (the v2 inline now matches
+  `duynhlab/grafana-dashboards` #23 exactly; the classic board follows in
+  `duynhlab/helm-charts` #25). Payment `v2.4.1` starts mockpay's profiler,
+  which `PROFILING_ENABLED` never did: Pyroscope now has `mockpay` with all
+  four identity labels. `docs/observability/profiling` gains an
+  investigation table (which profile type answers which symptom) and a
+  manual pivot that uses `span_name`, noting that the four Temporal
+  identities carry no span labels. `docs/api/metrics.md` states the job of
+  each RED source: app metrics feed SLOs and alerts, span metrics the RED
+  Span Metrics board, and nothing alerts on span metrics.
+
 - **The collector fills every `k8s.*` column and gives service spans a method
   (RFC-0031 Task 4.4).** A `k8sattributes` processor (pod association by the SDK's pod name and namespace, then connection
   IP) and a `resource/cluster` insert run on both logs pipelines, so

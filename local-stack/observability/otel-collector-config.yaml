@@ -24,7 +24,8 @@ processors:
   delta_to_cumulative:
     max_stale: 5m
   # ADR-071 deny list for every producer: client and peer addresses and the
-  # User-Agent are never stored; user.id is review-class. Same list as the
+  # User-Agent are never stored; user.id is review-class; db.connection_string
+  # is a DSN, deny class whatever it holds. Same list as the
   # cluster collector (otel-collector.yaml), which explains why it lives here.
   transform/privacy:
     error_mode: ignore
@@ -39,6 +40,7 @@ processors:
           - delete_key(attributes, "user_id")
           - delete_key(attributes, "peer.address")
           - delete_key(attributes, "user_agent")
+          - delete_key(attributes, "db.connection_string")
     log_statements:
       - context: log
         statements:

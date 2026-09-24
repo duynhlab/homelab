@@ -200,6 +200,33 @@ spec:
         # sample stored in VM silently breaks rate().
         delta_to_cumulative:
           max_stale: 5m
+        # ADR-071 deny list, enforced here for every producer: client and peer
+        # addresses and the User-Agent may not be stored, on any signal. otelgin
+        # and otelhttp put them on every HTTP server span, the edge writes its
+        # own spellings, and user.id is review-class (not yet approved anywhere).
+        # The shared package strips them from logs at the source; spans follow
+        # (a later obsx release), and this stays as the backstop for producers
+        # obsx never sees — the edge and Keycloak.
+        transform/privacy:
+          error_mode: ignore
+          trace_statements:
+            - context: span
+              statements:
+                - delete_key(attributes, "client.address")
+                - delete_key(attributes, "network.peer.address")
+                - delete_key(attributes, "network.peer.port")
+                - delete_key(attributes, "user_agent.original")
+                - delete_key(attributes, "user.id")
+                - delete_key(attributes, "user_id")
+                - delete_key(attributes, "peer.address")
+                - delete_key(attributes, "user_agent")
+          log_statements:
+            - context: log
+              statements:
+                - delete_key(attributes, "client.address")
+                - delete_key(attributes, "user_agent.original")
+                - delete_key(attributes, "user_agent")
+                - delete_key(attributes, "client") where resource.attributes["service.name"] == "platform.envoy-gateway"
         # RFC-0031 Task 4.4: fill the k8s.* columns otel_logs materialises. The
         # SDK already sends namespace + pod name (Downward API, obsx); this adds
         # what only the API server knows. Association tries those two SDK
@@ -263,6 +290,7 @@ spec:
             - span_metrics
             processors:
             - memory_limiter
+            - transform/privacy
             - batch
             receivers:
             - otlp
@@ -281,6 +309,7 @@ spec:
             processors:
             - memory_limiter
             - filter/drop_edge_logs
+            - transform/privacy
             - k8sattributes
             - resource/cluster
             - batch
@@ -291,6 +320,7 @@ spec:
             - clickhouse
             processors:
             - memory_limiter
+            - transform/privacy
             - k8sattributes
             - resource/cluster
             - batch

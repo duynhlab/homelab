@@ -121,6 +121,17 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Client addresses, User-Agents and user ids no longer reach the trace
+  store.** A span scan in ClickHouse found `client.address`,
+  `network.peer.address`/`port` and `user_agent.original` on the HTTP server
+  spans of nine services (otelgin/otelhttp defaults), `user.id` on spans in
+  user, order, checkout and cart, and the edge's `peer.address`, `user_agent`
+  and `client` IP — ADR-071 forbids them on every signal, and they were kept
+  90 days. A `transform/privacy` processor on the collector (cluster and
+  local-stack) now deletes them from traces and both logs pipelines; after it
+  the scan finds 0 while spans and edge logs keep arriving. Removing them at
+  the source follows in the shared package and four services.
+
 - **Business histograms show p50 / p95 / p99, mockpay is profiled, and the
   profile pivot is written down as it works (RFC-0031 Task 4.2).** The
   confirm, notification-send and mockpay-hop latency panels show three

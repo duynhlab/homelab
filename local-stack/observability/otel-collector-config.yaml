@@ -23,6 +23,29 @@ processors:
   # delta sample that slips through stores in VM as-is and silently breaks rate().
   delta_to_cumulative:
     max_stale: 5m
+  # ADR-071 deny list for every producer: client and peer addresses and the
+  # User-Agent are never stored; user.id is review-class. Same list as the
+  # cluster collector (otel-collector.yaml), which explains why it lives here.
+  transform/privacy:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(attributes, "client.address")
+          - delete_key(attributes, "network.peer.address")
+          - delete_key(attributes, "network.peer.port")
+          - delete_key(attributes, "user_agent.original")
+          - delete_key(attributes, "user.id")
+          - delete_key(attributes, "user_id")
+          - delete_key(attributes, "peer.address")
+          - delete_key(attributes, "user_agent")
+    log_statements:
+      - context: log
+        statements:
+          - delete_key(attributes, "client.address")
+          - delete_key(attributes, "user_agent.original")
+          - delete_key(attributes, "user_agent")
+          - delete_key(attributes, "client") where resource.attributes["service.name"] == "platform.envoy-gateway"
 
 connectors:
   span_metrics:
@@ -123,7 +146,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [transform/privacy, batch]
       exporters: [otlp_http/victoriatraces, span_metrics, debug, clickhouse]
     # spanmetrics-derived RED metrics keep their remote-write path unchanged.
     metrics/spanmetrics:
@@ -139,5 +162,5 @@ service:
       exporters: [otlp_http/victoriametrics]
     logs:
       receivers: [otlp]
-      processors: [batch]
+      processors: [transform/privacy, batch]
       exporters: [otlp_http/victorialogs, debug, clickhouse]

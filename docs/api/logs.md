@@ -307,7 +307,7 @@ on a span for a business rejection.
 | | `order.failed` | saga ends the order `failed` | `order.id`, `reason` (ReasonCode), `outcome`: `failed` \| `compensated` | order |
 | | `order.cancelled` | cancellation workflow reaches `cancelled` | `order.id`, `order.epoch` | order |
 | | `order.manual_review.entered` | order parked for a human decision | `order.id`, `reason` | order |
-| | `payment.authorization.completed` | authorize decision stored | `payment.id`, `order.id`, `outcome`: `authorized` \| `declined` \| `unknown` | [payment](./payment.md) |
+| | `payment.authorization.completed` | authorize decision stored | `payment.id`, `order.id`, `outcome`: `authorized` \| `declined` \| `unknown` | [payment](./payments.md) |
 | | `payment.capture.completed` | capture decision stored | `payment.id`, `outcome`: `succeeded` \| `declined` \| `unknown` | payment |
 | | `payment.refund.completed` | refund settled | `payment.id`, `refund.id`, `outcome`: `succeeded` \| `declined` \| `unknown` | payment |
 | | `payment.reconciliation.discrepancy.detected` | reconciliation run finds a mismatch | `reconciliation.run_id`, `discrepancy.class` | payment |

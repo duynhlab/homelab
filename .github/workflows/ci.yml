@@ -53,6 +53,9 @@ jobs:
       - name: Validate manifests
         run: ./scripts/flux-validate.sh
 
+      - name: Event catalog matches the registry
+        run: make semconv-catalog-check
+
   # 3. Validate links in Markdown added or changed by a pull request
   markdown-links:
     if: github.event_name == 'pull_request'

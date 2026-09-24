@@ -121,6 +121,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The compose gate checks every telemetry name against the platform
+  registry (RFC-0031 Task 4.5, ADR-076).** `compose.weaver.yaml` adds
+  Weaver's `registry live-check` and copies each signal to it on pipelines
+  of its own; row C22 (`make e2e-conformance`) fails the release on an
+  attribute, metric or event the `duynhlab/pkg` registry does not declare,
+  a unit or instrument that differs, or a deprecated upstream key. Only
+  Weaver's copy drops the library names the platform does not own; the
+  stores are untouched. `make semconv-catalog-check` (CI) holds the event
+  catalog in `docs/api/logs.md` to the table the registry generates,
+  vendored at a pinned `pkg` commit (`docs/api/event-catalog.generated.md`).
+  The error shape in `docs/api/{logs,tracing,temporal,pkg}.md` reads
+  `exception.message` (slogx v0.3.0 / temporalx v0.44.0), and `pkg.md`
+  records obsx v0.46.0/v0.47.0 and the generated constants.
+
 - **`db.connection_string` joins the collector's privacy filter.** redisotel
   (product's cache, built on semconv v1.24) and Keycloak's JDBC spans still
   write it — `redis://cache:6379`, `postgresql://postgres:5432`, no

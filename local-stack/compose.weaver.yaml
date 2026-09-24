@@ -1,0 +1,38 @@
+# Conformance overlay for the end-to-end gate (ADR-076):
+#
+#   docker compose -f compose.yaml -f compose.weaver.yaml up -d
+#   … run the gate traffic …
+#   curl -s -X POST localhost:4320/stop > live-check.json   # the report IS the response
+#   docker compose -f compose.yaml -f compose.weaver.yaml ps -a weaver   # exit 1 = a violation
+#
+# The collector gets a second config that copies every signal to Weaver's
+# live-check; the base pipelines are untouched. WEAVER_REGISTRY points at the
+# registry to check against — the pkg checkout next to this repo by default.
+services:
+  otel-collector:
+    command: ["--config=/etc/otelcol/config.yaml", "--config=/etc/otelcol/weaver.yaml"]
+    volumes:
+      - ./observability/otel-collector-weaver.yaml:/etc/otelcol/weaver.yaml:ro
+    depends_on:
+      weaver: { condition: service_started }
+
+  weaver:
+    image: otel/weaver:v0.26.1
+    environment:
+      HOME: /tmp
+    command:
+      - registry
+      - live-check
+      - --registry=/registry
+      - --input-source=otlp
+      - --otlp-grpc-address=0.0.0.0
+      - --otlp-grpc-port=4317
+      - --admin-port=4320
+      - --inactivity-timeout=7200
+      - --format=json
+      - --output=http # the report is returned as the /stop response: no volume, no file permissions
+      - --fail-on=violation
+    volumes:
+      - ${WEAVER_REGISTRY:-../../pkg/semconv/registry}:/registry:ro
+    ports:
+      - "4320:4320" # admin: POST /stop ends the session and answers with the report

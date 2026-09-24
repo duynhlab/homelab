@@ -121,6 +121,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **`db.connection_string` joins the collector's privacy filter.** redisotel
+  (product's cache, built on semconv v1.24) and Keycloak's JDBC spans still
+  write it — `redis://cache:6379`, `postgresql://postgres:5432`, no
+  credentials today, but ADR-071 classes every DSN as deny whatever it
+  holds.
+
 - **Client addresses, User-Agents and user ids no longer reach the trace
   store.** A span scan in ClickHouse found `client.address`,
   `network.peer.address`/`port` and `user_agent.original` on the HTTP server
@@ -441,6 +447,18 @@ Skeleton (copy what you need):
   both delivery paths can be compared and rolled back independently.
 
 #### Services
+
+- **Services stop sending client addresses, User-Agents and user ids on
+  spans (obsx `v0.46.0`).** The shared exporter drops `client.address`,
+  `network.peer.*` and `user_agent.original` before export, under the stock
+  and the Temporal services' factory provider, and user, cart, order,
+  notification and checkout no longer set `user.id`/`user_id` on spans.
+  Releases: `user v2.3.1` · `product v1.14.1` · `inventory v0.7.1` ·
+  `cart v2.2.1` · `order v2.8.1` · `review v2.2.1` · `shipping v1.7.1` ·
+  `notification v2.2.1` · `payment v2.4.3` · `checkout v0.11.1`. Proven at
+  the source on the compose gate: Weaver's copy of the raw OTLP, which skips
+  the collector's privacy filter, held 0 such keys from the Go services —
+  the 39 left came from Keycloak, which the collector strips.
 
 - **The whole fleet logs through one facade and writes the frozen event
   catalog (RFC-0031 Phase 3).** All ten services, both Temporal workers and

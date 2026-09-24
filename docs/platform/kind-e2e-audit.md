@@ -1355,6 +1355,45 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 ## Previous runs
 
+### 2026-09-24 — the slogx fleet release (RFC-0031 Phase 3)
+
+Cluster: kind `homelab`, 4 nodes, `kindest/node:v1.34.3`
+Host: Linux + Docker, arch amd64
+Revision: `feat/rfc-0031-fleet-train` (#1088) — pins asserted: `user 2.3.0` ·
+`product 1.14.0` · `inventory 0.7.0` · `cart 2.2.0` · `order 2.8.0` (API +
+worker) · `review 2.2.0` · `shipping 1.7.0` · `notification 2.2.0` ·
+`payment 2.4.0` (API + mockpay) · `checkout 0.11.0` (API + abandonment worker)
+Preconditions: compose train gate (A/B/C + privacy + events) passed 2026-09-24
+on the same candidates · tags pinned in this branch · no prior cluster
+
+| Group | Result | Evidence |
+|---|---|---|
+| K0 machine | PASS | 4/4 nodes Ready; the new `homelab-ca` replaced the old one in NSS and in the CLI bundle — Grafana, the gateway and Keycloak answer 200 **without `-k`** |
+| K1 bring-up | PASS | **30/30 Kustomizations Ready**; `kind-seed.sh` 8/8; both WorkerDeployments at Current = Target (`2.8.0-54b4`, `0.11.0-d98b`) |
+| K2 delivery | PASS | image↔pin **13/13 exact** |
+| K3 admission/secrets | PASS | 6/6 ClusterPolicies, **0 policy failures**; 38/38 ExternalSecrets synced; OpenBAO unsealed (awskms); 3 CNPG clusters at 3/3 |
+| K4 edge/identity + K5 signals | PASS | k6 `GATE=kind`: saga 4/4 (9/9), smoke 15/15 (50/50), staff 5/5 (59/59), operator 1/1 (26/26) |
+| No zap in any binary | PASS | `go version -m` on the binary in all ten release images: zero `go.uber.org/zap`, `otelzap`, `logger/zapx`, `zerolog`, `clog` lines. Control: `order-service:2.7.3` shows 4, so the scan does detect zap |
+| Events in ClickHouse | PASS | `otel.otel_logs` grouped by `LogAttributes['event']`: `process.started` from all 13 identities (untraced, as designed — no request span at boot); `order.created`, `temporal.workflow.started`, `order.confirmed`, `order.manual_review.entered`, `order.compensation.completed`, `payment.authorization/capture/refund.completed`, `checkout.session.confirmed` — every request-scoped record carries a `TraceId` |
+| Privacy on the cluster | PASS | 310 application records: none of `client_ip`, `user_agent`, `path`, `peer`, `user_id`, `email`, `phone`, `amount`, `duration`, `idempotency_key`; no email, demo username, Bearer or JWT in a body or value. (`user_agent`/`duration` do appear on `platform.envoy-gateway` — the edge access log, outside the application contract) |
+| Propagation with tracing off | PASS | product's ResourceSet frozen, HelmRelease suspended, `TRACING_ENABLED=false`; a sampled `traceparent` to `/products/3/details` → the trace holds the edge spans, inventory's and review's server spans **parented on the edge egress span**, and no product span; product's two log records carry the same trace id and the egress span id. Reverted and resumed afterwards |
+
+**Findings:**
+
+- **The product list cache outlived the seed again** (K4.2 failed on the first
+  smoke run, passed on the next). Same cause as the checkout 0.10.4 audit;
+  still not a regression.
+- **K5.8 failed once for the known ordering reason:** the staff gate ran
+  before the re-run, so A21's `CheckoutAvailabilityUnknownSKU` (critical,
+  count-once over 15m) was still firing. After it cleared at 06:31 UTC only
+  ticket-severity alerts from the gate's deliberate errors remained, and
+  smoke passed 50/50.
+- **`make up` with a dedicated kubeconfig needs `TF_VAR_kubeconfig_path` too:**
+  OpenTofu reads `var.kubeconfig_path`, not `KUBECONFIG`, so `flux-up` failed
+  with `context "kind-homelab" does not exist` until it was set.
+
+**Decision: ELIGIBLE**
+
 ### 2026-09-24 — checkout 0.10.4 (confirm lock)
 
 Cluster: kind `homelab`, 4 nodes, `kindest/node:v1.34.3`

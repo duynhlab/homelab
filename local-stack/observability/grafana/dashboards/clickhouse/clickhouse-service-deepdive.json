@@ -1638,7 +1638,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp, SeverityText, Body, TraceId, LogAttributes['path'] AS path, LogAttributes['status'] AS status, LogAttributes['code'] AS grpc_code, LogAttributes['duration'] AS duration FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND $__conditionalAll(SeverityText IN (${severity:singlequote}), $severity) ORDER BY Timestamp DESC LIMIT 100",
+          "rawSql": "SELECT Timestamp, SeverityText, Body, TraceId, LogAttributes['event'] AS event, if(LogAttributes['http.route'] != '', LogAttributes['http.route'], LogAttributes['rpc.method']) AS route, if(LogAttributes['http.response.status_code'] != '', LogAttributes['http.response.status_code'], LogAttributes['rpc.response.status_code']) AS status FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND $__conditionalAll(SeverityText IN (${severity:singlequote}), $severity) ORDER BY Timestamp DESC LIMIT 100",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"

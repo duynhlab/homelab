@@ -327,6 +327,11 @@ replayed, and only the SDK's replay-aware logger may run there; these two names 
 emitted by the client that starts the run or by the activity or dispatcher that
 observes its end.
 
+Domain events that are *decided* in workflow code — `order.failed`,
+`order.compensation.completed`, the saga's `order.retry.exhausted` — go through
+`temporalx.WorkflowEvent`, which writes via that replay-aware logger, so a replayed
+history writes nothing. Everywhere else a service uses the facade's `Event`.
+
 **Deliberately not in the catalog.** Cart, review, notification, shipping, user and
 product transitions are single-service facts already counted by their business
 metrics (`cart.cleared.total`, `reviews.duplicate_rejected.total`,
@@ -358,7 +363,7 @@ in the change that first emits them.
 | Class | Fields | Where allowed |
 |---|---|---|
 | Allow | service identity (`service.*`, `deployment.environment.name`); `http.request.method`, `http.route`, `http.response.status_code`; `rpc.system.name`, `rpc.method`, `rpc.response.status_code`; `error.type`; `event`; the bounded enums in the catalog (`outcome`, `reason`, `operation`, `compensation.step`, `discrepancy.class`, `component`); `temporal.workflow.type`, `temporal.task_queue`, `temporal.run_status` | logs, traces, metrics labels where bounded |
-| Allow — correlation only | `order.id`, `payment.id`, `refund.id`, `checkout.session.id`, `inventory.reservation.ref`, `reconciliation.run_id`, `order.epoch`, `attempts`, Temporal workflow and run ids | logs and traces only; never metric labels, resource attributes, event names or profile labels |
+| Allow — correlation only | `order.id`, `payment.id`, `refund.id`, `checkout.session.id`, `inventory.reservation.ref`, `reconciliation.run_id`, `order.epoch`, `attempts`, Temporal workflow and run ids; `product.id`, `review.id`, `shipment.id`, `notification.id`, `payment.provider_id`, `webhook.event_id` (catalog, provider and delivery ids the Phase 3 cutover writes on diagnostic records — none identifies a person) | logs and traces only; never metric labels, resource attributes, event names or profile labels |
 | Review | `user.id`, email, phone, postal address, person names, monetary amounts, provider response text, any free-text a user typed | nowhere until reviewed |
 | Deny | authorization, cookies, passwords, tokens, secrets, API and private keys, card numbers and CVV, connection strings and DSNs, idempotency keys, client address, peer address, User-Agent, headers, request and response bodies, payloads, a raw error string | never — the facade replaces them |
 

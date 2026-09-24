@@ -1223,7 +1223,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, lower(SeverityText) AS level, ServiceName, SpanId, LogAttributes['path'] AS path, LogAttributes['status'] AS status, LogAttributes['code'] AS grpc_code FROM otel.otel_logs WHERE TraceId = '$traceid' ORDER BY Timestamp ASC LIMIT 200",
+          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, lower(SeverityText) AS level, ServiceName, SpanId, LogAttributes['event'] AS event, if(LogAttributes['http.route'] != '', LogAttributes['http.route'], LogAttributes['rpc.method']) AS route, if(LogAttributes['http.response.status_code'] != '', LogAttributes['http.response.status_code'], LogAttributes['rpc.response.status_code']) AS status FROM otel.otel_logs WHERE TraceId = '$traceid' ORDER BY Timestamp ASC LIMIT 200",
           "format": 2,
           "queryType": "logs",
           "pluginVersion": "4.20.0"

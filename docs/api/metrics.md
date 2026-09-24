@@ -576,6 +576,21 @@ Automatic HTTP/gRPC/runtime/DB instruments are installed through the shared
 [application observability contract](./observability.md). Service authors do
 not reproduce RED/USE instruments or construct OTel providers/exporters.
 
+## Two RED sources, two jobs
+
+The platform has two request-rate/error/duration sources. They measure the same
+traffic from different places, so each has one job and they are never added
+together:
+
+| Source | Produced by | Read by | Why this one |
+|---|---|---|---|
+| **App metrics** — `http_server_request_duration_seconds_*`, `rpc_server_call_duration_seconds_*` | the SDK in each process (`httpmw.Tracing`, `grpcx`), exported over OTLP | Sloth SLOs for the Go services, the alert rules (`alerts.yaml`, `recording-rules.yaml`, `rfc0021-baseline.yaml`, `inventory.yaml`), the per-service boards | measured on 100% of requests, independent of trace sampling |
+| **Span metrics** — `spanmetrics_calls_total`, `spanmetrics_duration_milliseconds_*` | the Collector's `span_metrics` connector, from sampled spans ([ADR-057](../proposals/adr/ADR-057-span-metrics-in-collector/)) | the **RED Span Metrics** board (gate rows K5.5 and C19 only prove the leg exists) | covers identities outside the Go SDK (the edge, Keycloak) on one board, and keeps both methods (`http_method` for the edge, `http_request_method` for services) |
+
+**Nothing alerts on span metrics.** They follow the sampling rate, and a second
+alert source on the same traffic would double-page. Use the app metrics for "is
+it broken" and span metrics for the edge-to-service view across every identity.
+
 ## Correlation: metrics ↔ traces ↔ logs
 
 > **Exemplars are not available on this platform (RFC-0014 D-14).**
@@ -608,5 +623,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-073 and a labelled **Target contract** callout states the instrument-selection, explicit-bucket, cardinality-budget and replay rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the collector's `traces` pipeline also feeds the span-metrics connector, which is a metrics source, not a trace store, and the earlier "five" predated the RFC-0027 retirements. Previously 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
+_Last updated: 2026-09-24 — new § Two RED sources, two jobs: app metrics feed SLOs and alerts, span metrics the RED Span Metrics board; nothing alerts on span metrics (RFC-0031 Task 4.2). Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-073 and a labelled **Target contract** callout states the instrument-selection, explicit-bucket, cardinality-budget and replay rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the collector's `traces` pipeline also feeds the span-metrics connector, which is a metrics source, not a trace store, and the earlier "five" predated the RFC-0027 retirements. Previously 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
 

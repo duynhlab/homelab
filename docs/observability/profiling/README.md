@@ -109,15 +109,30 @@ datasource type only — the Jaeger type that VictoriaTraces is queried through
 supports `tracesToLogsV2`, `tracesToMetrics`, `nodeGraph` and `traceIdTimeParams`,
 and nothing else. Verified against Grafana's datasource provisioning reference.
 
-What still works, and is the current procedure:
+The current procedure, verified on Kind 2026-09-24:
 
-1. In the span, read `service.name` and the span's time range — the
-   `pyroscope.profile.id` attribute is still attached by `otel-profiling-go`.
-2. Explore → **Pyroscope** → filter `service_name="<that service>"` and set the
-   time range to the span's window.
+1. In the trace, find the service's **root server span** (the one the request
+   entered by) and read `service.name`, the span name and its time range.
+2. Explore → **Pyroscope** → profile type **process_cpu** → filter
+   `service_name="<service>", span_name="<span name>"` and set the time range to
+   **at least one upload interval around the span** (profiles are pushed in 15s
+   chunks, so use ±30s — a window as short as the span usually matches nothing).
+   The result is the CPU of **every request to that endpoint** in that window,
+   not the one request.
+3. For memory, goroutine, mutex or block, drop `span_name` — on Kind only
+   `process_cpu` carries it; the others are per service and time window only.
 
-The labels line up by construction (`service.name` → `service_name`), so the
-answer is the same; it costs two steps instead of one. Closing this properly needs
+The labels line up by construction (`service.name` → `service_name`, root span
+name → `span_name`), so it costs two steps instead of one. Two limits:
+
+- **The four Temporal identities** (`order`, `order-worker`, `checkout`,
+  `checkout-worker`) have no `span_name`: obsx cannot wrap their replay-safe
+  tracer provider ([`docs/api/profiling.md` § Trace correlation](../../api/profiling.md#trace-correlation-app-side)).
+  Pivot on `service_name` and the time window only.
+- **`pyroscope.profile.id` on a span is evidence, not proof.** The tracer wrapper
+  stamps it whenever the profiling flag is on, even if the profiler never started —
+  mockpay's spans carried it while Pyroscope had no `mockpay` series at all,
+  until payment v2.4.1 started its profiler. Check the series exists. Closing this properly needs
 either a Tempo-compatible datasource pointed at VictoriaTraces' experimental
 `/select/tempo` API, or upstream support for `tracesToProfiles` on more datasource
 types — neither is done here.
@@ -197,6 +212,23 @@ Per-service env vars and the `PROFILING_ENABLED` toggle:
 - **local-stack** — http://localhost:4040 (Pyroscope) and Grafana's Explore → Pyroscope;
   a checkout generates profiles for all services.
 
+### Investigations — which profile answers what
+
+| Symptom that brings you here | Profile type (Pyroscope) | What to read | Usual next step |
+|---|---|---|---|
+| p95/p99 latency up, CPU up | `process_cpu` (+ `span_name` for one endpoint) | the widest self-time frames; compare with a quiet window (diff view) | the hot function, then the trace of a slow request through it |
+| memory climbs until OOMKilled or restart | `memory:inuse_space` / `inuse_objects` | who *holds* live bytes now — a frame that only grows is the leak | diff two windows an hour apart |
+| GC CPU high, latency jittery, memory flat | `memory:alloc_space` / `alloc_objects` | who *allocates* most, even if freed — churn, not leak | cut the allocation in the hottest frame |
+| goroutine count keeps rising, requests hang | `goroutine` | stacks piling up at one point: a channel nobody reads, a lock, a call with no deadline | fix the missing timeout/cancel on that stack |
+| throughput flat while CPU stays low | `mutex:delay` (then `contentions`) | which lock goroutines wait on and for how long | shrink the critical section or shard the lock |
+| same, but no lock shows up | `block:delay` (then `contentions`) | time parked on channels, `select`, `sync.Cond`, I/O | the producer/consumer on the other side |
+
+Mutex and block are sampled (fraction and rate set centrally by `obsx`), so they
+show *where* contention is and its share, not an exact count. Every type is
+labelled with the same four identity labels, so a question can start from the
+**Business** or **RED** board, move to the trace, and land here without renaming
+anything.
+
 ### Runbook — profiles not appearing
 
 1. **Flag on?** Check the service env `PROFILING_ENABLED` and its startup log
@@ -224,7 +256,10 @@ Per-service env vars and the `PROFILING_ENABLED` toggle:
 - [Traces to profiles](https://grafana.com/docs/grafana/latest/datasources/pyroscope/configure-traces-to-profiles/)
 
 ---
-_Last updated: 2026-08-24 — RFC-0027 retired Tempo, which is where `tracesToProfiles`
+_Last updated: 2026-09-24 — RFC-0031 Task 4.2: the manual pivot uses `span_name`
+and states its two limits (no span labels on the four Temporal identities; the
+profile id is not proof a profile exists), and an investigation table maps each
+profile type to the symptom that leads to it. Previously 2026-08-24 — RFC-0027 retired Tempo, which is where `tracesToProfiles`
 lived. The span→profile one-click pivot is a **known gap**: Grafana implements that option on
 the Tempo datasource type only, so it cannot be moved onto the jaeger-type VictoriaTraces
 datasource. The manual procedure that replaces it is documented above._

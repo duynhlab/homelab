@@ -148,9 +148,19 @@ as higher-cost signals than CPU-only profiling.
 ## Trace correlation (app side)
 
 1. **`obsx.TracerProviderWithProfiles`** wraps the OTel `TracerProvider` with `otel-profiling-go` so spans carry **`pyroscope.profile.id`** — applied automatically inside `SetupObservability` (to the global provider) when both tracing and profiling are enabled.
-2. **CPU profiles are span-scoped** — the profile ID links a span to the CPU flame graph for its duration.
+2. **CPU profiles are span-scoped** — the wrapper labels CPU samples with the
+   request's **local root span** (the first span started in this process) (`span_name`, e.g. `GET /product/v1/public/products/:id/details`);
+   only that span carries `pyroscope.profile.id`, child spans do not.
 3. **Heap, goroutine, mutex, and block profiles are service/time scoped** — they have no per-span correlation.
-4. Grafana **Profiles for this span** uses the datasource link configured in platform manifests — see [Profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform).
+4. **Not on the four Temporal identities** (`order`, `order-worker`, `checkout`,
+   `checkout-worker`). They install the replay-safe tracer provider through
+   `WithTracerProviderFactory`, and obsx skips the wrapper there because it would
+   change the global's concrete type that Temporal's interceptors assert on.
+   Their profiles are collected normally but carry no `span_name`, and their spans
+   no `pyroscope.profile.id` (measured on Kind 2026-09-24: 0 of their server spans;
+   the other eight services 100%).
+5. There is no one-click span→profile link — the pivot is manual:
+   [Profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform).
 
 ---
 
@@ -190,4 +200,4 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-09-18 — `PROFILING_ENABLED` is a per-service ResourceSet input (`profiling_enabled`, default true) — RFC-0031 Task 1.4; the domain-wide literal is gone. Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-09-24 — trace correlation as measured on Kind: only the root span is labelled, the four Temporal identities carry no span labels, and the one-click link is gone (manual pivot). mockpay profiles from payment v2.4.1. Previously 2026-09-18 — `PROFILING_ENABLED` is a per-service ResourceSet input (`profiling_enabled`, default true) — RFC-0031 Task 1.4; the domain-wide literal is gone. Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._

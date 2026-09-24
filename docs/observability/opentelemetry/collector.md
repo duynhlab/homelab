@@ -166,9 +166,16 @@ deliberate sequence, not a set:
    edge sends no pod name). A value the sender set is never
    overwritten. A pod with one container gets its name for free; service pods
    also carry the `migrate` init container, so they declare
-   `k8s.container.name` in `OTEL_RESOURCE_ATTRIBUTES`. It is kept off `traces`
-   and `metrics` because the span-metrics exporter turns every resource
-   attribute into a label. RBAC: get/list/watch on pods and namespaces only.
+   `k8s.container.name` in `OTEL_RESOURCE_ATTRIBUTES` — SDK-side, so it also
+   rides their spans and RED series, as one label constant per service. The
+   processor is kept off `traces` and `metrics` because the span-metrics
+   exporter turns every resource attribute into a label. RBAC: get/list/watch on
+   **pods** only — with this extraction set it never lists namespaces,
+   ReplicaSets or nodes. Two things to expect: a Temporal worker's
+   `k8s.deployment.name` is the controller's versioned Deployment
+   (`order-fulfillment-2-8-0-54b4`), not the WorkerDeployment name; and the
+   edge's records get no `k8s.container.name`, because its pod has two
+   containers and sends no name.
 4. **`resource/cluster`** (logs pipelines only) — inserts `k8s.cluster.name:
    homelab`, which the API server cannot supply. `insert`, so a sender's own
    value wins; an overlay that runs this collector on another cluster patches

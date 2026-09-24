@@ -193,8 +193,10 @@ identities (the ten services, both workers, mockpay, Keycloak) without a method,
 the edge alone with one. A rename would move the
 blind spot to the edge.
 
-**Cost:** none in series count. A span carries exactly one of the two names, so
-the other label is absent rather than doubling a series — after the change,
+**Cost:** none in series count. HTTP server span names already carry the method
+(`POST /checkout/v1/…`), so the new label never splits a series, and a span
+carries exactly one of the two names, so the other label is absent rather than
+doubling one — after the change,
 `count(spanmetrics_calls_total{http_method!="", http_request_method!=""})` is
 **0**, services carry `http_request_method` and the edge `http_method`
 (Kind, 2026-09-24). A query that wants "the method" for any span reads either
@@ -260,10 +262,10 @@ a new ADR that supersedes this one.
   the implementation, not the other way around.
 - **2026-08-24** — created at `Proposed` during RFC-0027 architecture review.
 - **2026-08-24** — **Accepted** with [RFC-0027](../../rfc/RFC-0027/), on the evidence of the P1 TraceQL experiment and the span-metrics measurement recorded in the research.
+- **2026-08-25** — restated for the record because this History is a bullet list and carries no `Status / adoption` column: the decision stands at **Accepted / Adoption Complete**, on the evidence above — the span-metric series exist on the cluster and the RED Span Metrics board reads them. No new change; the header and this list now say the same thing.
 - **2026-09-24** — **amended** (RFC-0031 Task 4.4): the connector declares
   `http.request.method` beside `http.method`; see the amendment section. The
   decision itself and its adoption status are unchanged.
-- **2026-08-25** — restated for the record because this History is a bullet list and carries no `Status / adoption` column: the decision stands at **Accepted / Adoption Complete**, on the evidence above — the span-metric series exist on the cluster and the RED Span Metrics board reads them. No new change; the header and this list now say the same thing.
 
 ---
 _Last updated: 2026-09-24 — amendment: both HTTP method dimensions. Previously 2026-08-25_

@@ -203,19 +203,21 @@ spec:
         # RFC-0031 Task 4.4: fill the k8s.* columns otel_logs materialises. The
         # SDK already sends namespace + pod name (Downward API, obsx); this adds
         # what only the API server knows. Association tries those two SDK
-        # attributes first, then the connection IP — pods reach the Service
-        # directly, so the source IP is the pod's (the edge sends no
-        # pod name). Existing values are never overwritten.
+        # attributes first, then the connection IP for the edge, which sends no
+        # pod name (pod-to-Service traffic is not SNATed, so the source IP is the
+        # pod's). Existing values are never overwritten.
         #
         # k8s.container.name: a pod with exactly one container gets it for free
         # (workers, mockpay). Service pods also carry the `migrate` init
         # container, which the processor counts, so they declare the name in
-        # OTEL_RESOURCE_ATTRIBUTES instead (domains/*-rs.yaml).
+        # OTEL_RESOURCE_ATTRIBUTES instead (domains/*-rs.yaml) — which, being
+        # SDK-side, also lands on their spans and RED series: one label,
+        # constant per service.
         #
         # Logs pipelines only: the columns live on otel_logs, and the span_metrics
         # connector turns every resource attribute into a label
-        # (resource_to_telemetry_conversion), so enriching traces would add five
-        # labels to every RED series.
+        # (resource_to_telemetry_conversion), so enriching traces here would add
+        # four more labels to every RED series.
         k8sattributes:
           auth_type: serviceAccount
           extract:
@@ -384,16 +386,17 @@ spec:
             key: password
     service:
       type: ClusterIP
-    # k8sattributes watches pods and namespaces cluster-wide. Nothing more:
-    # the deployment name comes from the ReplicaSet name and the node name from
-    # the pod spec, so no replicasets or nodes watch. Not the chart's
-    # kubernetesAttributes preset — it only wires pipelines named exactly
-    # logs/metrics/traces and would skip logs/clickhouse.
+    # k8sattributes watches pods cluster-wide, and nothing else with this
+    # extraction set: the deployment name is cut from the ReplicaSet name, the
+    # node name read from the pod spec, and namespaces are watched only for
+    # namespace labels or k8s.cluster.uid. Not the chart's kubernetesAttributes
+    # preset: it would also put the processor on metrics and traces (the label
+    # problem above), add replicasets RBAC, and still skip logs/clickhouse.
     clusterRole:
       create: true
       rules:
         - apiGroups: [""]
-          resources: ["pods", "namespaces"]
+          resources: ["pods"]
           verbs: ["get", "list", "watch"]
     serviceAccount:
       create: true

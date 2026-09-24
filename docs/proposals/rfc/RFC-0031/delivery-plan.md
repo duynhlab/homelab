@@ -397,8 +397,10 @@ declares both `http.method` and `http.request.method`; service spans now carry t
 method and no series carries both. A `k8sattributes` processor (pod association by
 the SDK's pod name + namespace, then connection IP) plus `resource/cluster` on both
 logs pipelines fill all seven materialised `k8s.*` columns on every application
-record — kept off `traces`/`metrics` because span-metrics labels every resource
-attribute. The edge-log exception was already explicit in
+record (the edge lacks only the container name) — kept off `traces`/`metrics`
+because span-metrics labels every resource attribute. The one SDK-side addition,
+`k8s.container.name` on service pods, does reach spans and RED series as a constant
+label; the RFC's resource-contract and admission sections carry dated amendments. The edge-log exception was already explicit in
 `docs/observability/logging/README.md` (ADR-061).
 
 **Acceptance criteria:**

@@ -576,6 +576,20 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0031 Task 0.2: the event catalog is frozen — owner sign-off is the merge.**
+  [`docs/api/logs.md` § Event catalog](docs/api/logs.md#event-catalog) registers
+  nineteen names across the five classes (business transition, retry exhausted,
+  compensation, workflow lifecycle, startup/shutdown). The admission test is the
+  RFC's own: an operator would query the name across services. So the order saga,
+  payment decisions, checkout confirm/requote/expiry and stock rejection are in, and
+  single-service facts that a business metric already counts — cart, review,
+  shipping, notification, user, product — are out. The same section writes down the
+  access-record severity mapping Task 2.1 needed and the RFC never stated, classifies
+  every field allow, correlation-only, review or deny, and names one owner per
+  schema. It also corrects the RFC's gRPC status key to `rpc.response.status_code`:
+  that is what the pinned otelgrpc writes on the server span, and a log that names
+  the same fact differently cannot join its span.
+
 - **RFC-0031 Phase 1 is as-built in the shared package — five ADRs move to Adoption
   `Partial`.** Tasks 1.2 through 1.5 shipped in `obsx` v0.41.0–v0.44.0 and Task 1.1
   as `logger/slogx` v0.1.0, so the records stop describing a plan: ADR-070 and

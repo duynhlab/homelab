@@ -38,6 +38,15 @@ lists ADR-070 through ADR-076.
 
 ### Task 0.2: Freeze the catalog and privacy boundary
 
+**Status — frozen 2026-09-23, owner sign-off by merge.** The catalog, the
+access-record severity mapping, the per-field allow / correlation-only / review / deny
+classification and the schema owners are in
+[`docs/api/logs.md` § Event catalog](../../../api/logs.md#event-catalog). Nineteen names
+across the five classes, chosen by the RFC's own admission test — an operator would
+query it by name across services — which is why single-service transitions already
+counted by a metric are out. The freeze also corrects the gRPC status key to
+`rpc.response.status_code`, the one the pinned instrumentation writes.
+
 **Acceptance criteria:**
 
 - Initial event catalog covers access, lifecycle, business decision, retry and compensation classes.

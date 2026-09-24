@@ -400,6 +400,29 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **The whole fleet logs through one facade and writes the frozen event
+  catalog (RFC-0031 Phase 3).** All ten services, both Temporal workers and
+  mockpay move from `zapx` + the `obsx.ZapCore` tee to `logger/slogx`: one
+  redacted record reaches stdout and OTLP, a Fatal is flushed before exit
+  (`Flush: obs.ForceFlush`), and no binary links zap any more. Access records
+  carry only the canonical keys (`http.request.method`, `http.route`,
+  `http.response.status_code`; `rpc.system.name`, `rpc.method`,
+  `rpc.response.status_code`, `error.type`) — the raw path, client address,
+  User-Agent, peer and duration are gone. The catalog's events are emitted
+  where each decision is stored and only by the caller that stored it:
+  `order.*` (workflow-decided ones through `temporalx.WorkflowEvent`, replay
+  safe), `payment.*`, `checkout.session.*`, `inventory.reservation.rejected`,
+  `temporal.workflow.*` and `process.started`/`stopped`. Review- and
+  deny-class data came out of records and error text (user ids, emails,
+  phones, amounts, typed text, idempotency keys, payloads). `gin.Default` is
+  gone; `httpmw.Recovery` answers a panic with one structured record. The
+  local-stack ClickHouse boards read the new keys. Pins: slogx v0.2.0, obsx
+  v0.45.0, httpmw v0.2.0, grpcx v0.37.0, temporalx v0.43.0. Releases:
+  `user v2.3.0` · `product v1.14.0` · `inventory v0.7.0` · `cart v2.2.0` ·
+  `order v2.8.0` (API + worker) · `review v2.2.0` · `shipping v1.7.0` ·
+  `notification v2.2.0` · `payment v2.4.0` (API + mockpay) ·
+  `checkout v0.11.0` (API + abandonment worker).
+
 - **The fleet moves to `obsx v0.44.0` and the cluster is pointed at the new
   images (RFC-0031 Phase 1).** Ten `go.mod`-only PRs, one local-stack E2E audit
   covering all ten candidates at once, ten patch releases: `user v2.2.4` ·

@@ -121,6 +121,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The collector fills every `k8s.*` column and gives service spans a method
+  (RFC-0031 Task 4.4).** A `k8sattributes` processor (pods + namespaces
+  RBAC, pod association by the SDK's pod name and namespace, then connection
+  IP) and a `resource/cluster` insert run on both logs pipelines, so
+  `k8s.pod.uid`, `k8s.deployment.name`, `k8s.node.name`,
+  `k8s.container.name` and `k8s.cluster.name` join the namespace and pod name
+  on every application record — measured 7/7 columns on Kind. Service pods
+  declare `k8s.container.name` because their `migrate` init container
+  leaves the processor two to choose from. Traces and metrics are left
+  alone: span-metrics labels every resource attribute. The span-metrics
+  connector declares `http.request.method` beside `http.method` (ADR-057
+  amended): services write the stable name, the edge the old one, and no
+  series carries both.
+
 - **The Kind gate ran the obsx v0.44.0 release and the RFC-0031 Phase 1
   checkpoint with it — 25 k6 rows, 144/144 assertions, evidence in
   [`kind-e2e-audit.md`](docs/platform/kind-e2e-audit.md#previous-runs).** The

@@ -392,6 +392,15 @@ skip-list test.
 
 ### Task 4.4: Collector enrichment, schema debt and the span-metrics dimension
 
+**Status — DONE 2026-09-24 (verified on Kind).** ADR-057 amended: the connector
+declares both `http.method` and `http.request.method`; service spans now carry the
+method and no series carries both. A `k8sattributes` processor (pod association by
+the SDK's pod name + namespace, then connection IP) plus `resource/cluster` on both
+logs pipelines fill all seven materialised `k8s.*` columns on every application
+record — kept off `traces`/`metrics` because span-metrics labels every resource
+attribute. The edge-log exception was already explicit in
+`docs/observability/logging/README.md` (ADR-061).
+
 **Acceptance criteria:**
 
 - A decision is recorded, as an amendment to the span-metrics decision record, on

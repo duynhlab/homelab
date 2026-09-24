@@ -12,7 +12,7 @@
 | **Distribution** | `otel/opentelemetry-collector-contrib:0.159.0` |
 | **Mode** | Gateway — `deployment`, 1 replica (SPOF — single replica accepted for the homelab) |
 | **Receivers** | OTLP only — gRPC `:4317`, HTTP `:4318` |
-| **Pipelines** | `traces`, `logs`, `metrics` — see [table below](#the-deployed-pipelines) |
+| **Pipelines** | `traces`, `logs`, `logs/clickhouse`, `metrics`, `metrics/spanmetrics` — see [table below](#the-deployed-pipelines) |
 | **Self-telemetry** | `:8888` (scraped) · health `:13133` · zpages `:55679` |
 | **Resources** | requests 50m/256Mi · limits 200m/**1Gi** (`memory_limiter` at 800MiB) |
 
@@ -117,8 +117,10 @@ same Service; only tail-based sampling (not used — head sampling per
 | Pipeline | Receivers | Processors (ordered) | Exporters |
 |----------|-----------|----------------------|-----------|
 | `traces` | `otlp` | `memory_limiter` → `batch` | `otlp_http/victoriatraces` · `clickhouse` · **`span_metrics`** (a *connector*, not a store — it feeds the pipeline below) |
-| `logs` | `otlp` | `memory_limiter` → `batch` | `otlp_http/victorialogs` · `clickhouse` |
+| `logs` | `otlp` | `memory_limiter` → `filter/drop_edge_logs` → `k8sattributes` → `resource/cluster` → `batch` | `otlp_http/victorialogs` (the edge's access log is filtered out here — ClickHouse-only, [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) |
+| `logs/clickhouse` | `otlp` | `memory_limiter` → `k8sattributes` → `resource/cluster` → `batch` | `clickhouse` (everything, edge included) |
 | `metrics` | `otlp` | `memory_limiter` → `deltatocumulative` → `batch` | `otlp_http/victoriametrics` |
+| `metrics/spanmetrics` | `span_metrics` | `memory_limiter` → `batch` | `prometheus_remote_write` |
 
 A `debug` exporter is **defined but wired into no pipeline** — attach it
 temporarily when debugging ingest, never leave it on.
@@ -130,7 +132,11 @@ connector**. Connectors are the only component type that changes a signal's
 `spanmetrics_calls_total` and `spanmetrics_duration_milliseconds_*` series in
 VictoriaMetrics ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)).
 Its `aggregation_temporality` defaults to cumulative, so this pipeline needs no
-`deltatocumulative` — unlike the app-metrics one.
+`deltatocumulative` — unlike the app-metrics one. Beyond the built-in
+dimensions it declares `http.route` and **both** method names: the services
+write the stable `http.request.method`, the edge still writes the older
+`http.method`, and a span carries only one of them, so no series doubles
+(ADR-057 amendment, 2026-09-24).
 
 Service-graph metrics are **not** produced here. `servicegraph` is a separate
 connector and this collector does not run it; the service map comes from
@@ -152,9 +158,28 @@ deliberate sequence, not a set:
    temporality normalization. The Go SDK exports cumulative by default
    (RFC-0017 D-7), but a delta sample that ever slipped into VictoriaMetrics
    would silently corrupt `rate()`; this processor makes that impossible.
-3. **`batch`** (`send_batch_size: 512`, `send_batch_max_size: 1024`,
+3. **`k8sattributes`** (logs pipelines only) — adds what only the API server
+   knows: `k8s.pod.uid`, `k8s.deployment.name`, `k8s.node.name` and
+   `k8s.container.name`, filling the `k8s.*` columns `otel_logs`
+   materialises. A record is matched to its pod by the `k8s.pod.name` +
+   `k8s.namespace.name` the SDK already sends, else by the connection IP (the
+   edge sends no pod name). A value the sender set is never
+   overwritten. A pod with one container gets its name for free; service pods
+   also carry the `migrate` init container, so they declare
+   `k8s.container.name` in `OTEL_RESOURCE_ATTRIBUTES`. It is kept off `traces`
+   and `metrics` because the span-metrics exporter turns every resource
+   attribute into a label. RBAC: get/list/watch on pods and namespaces only.
+4. **`resource/cluster`** (logs pipelines only) — inserts `k8s.cluster.name:
+   homelab`, which the API server cannot supply. `insert`, so a sender's own
+   value wins; an overlay that runs this collector on another cluster patches
+   the value.
+5. **`batch`** (`send_batch_size: 512`, `send_batch_max_size: 1024`,
    `timeout: 5s`) — always **last**, groups exports for compression
    efficiency.
+
+On local-stack there is no API server, so `k8s.cluster.name`,
+`k8s.container.name`, `k8s.deployment.name`, `k8s.node.name` and
+`k8s.pod.uid` stay empty there — expected, not a fault.
 
 ### Exporters and durability
 
@@ -218,7 +243,10 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 
 ---
 
-_Last updated: 2026-08-24 — exporters are **6 defined / 5 wired** after RFC-0027 removed
+_Last updated: 2026-09-24 — RFC-0031 Task 4.4: `k8sattributes` + `resource/cluster` on
+both logs pipelines (all seven `k8s.*` columns filled on Kind), both HTTP method
+dimensions on the span-metrics connector, and the pipeline table brought up to the five
+pipelines actually deployed. Previously 2026-08-24 — exporters are **6 defined / 5 wired** after RFC-0027 removed
 `otlp/tempo`, `otlp/tempo-chart` and `otlp/jaeger` and added `prometheus_remote_write`. There
 are now **four** pipelines: the new `metrics/spanmetrics` is fed by the `span_metrics`
 connector, which appears twice in `service.pipelines` — as an exporter on `traces` and as the

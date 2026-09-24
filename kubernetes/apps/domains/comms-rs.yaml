@@ -104,7 +104,10 @@ spec:
             # metrics, logs and the profiler's service_version label — carries
             # the deployed release. The versioned workers set it from their
             # build-id label instead (order-worker.yaml, checkout-worker.yaml).
-            value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=<< inputs.image_tag >>"
+            # k8s.container.name is stated here because the `migrate` init
+            # container leaves the collector's k8sattributes two containers to
+            # choose from (RFC-0031 Task 4.4, otel-collector.yaml).
+            value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=<< inputs.image_tag >>,k8s.container.name=<< inputs.name >>"
           # RFC-0014 D-2: obsx reads these exact names for the Kubernetes
           # resource attributes on the OTLP path (k8s.namespace.name and
           # k8s.pod.name are on vmagent's promote allowlist).

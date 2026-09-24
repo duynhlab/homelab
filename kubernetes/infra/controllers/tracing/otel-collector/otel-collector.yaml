@@ -48,8 +48,16 @@ spec:
               buckets: [1ms, 2ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s]
           # service.name, span.name, span.kind and status.code are BUILT-IN
           # dimensions -- listing them again duplicates labels.
+          #
+          # Both method names, on purpose (ADR-057 amendment 2026-09-24): the
+          # services write the stable http.request.method, the edge still writes
+          # the pre-stability http.method. Declaring only one left the method
+          # empty on every service span. A span carries one of the two, so the
+          # other label is simply absent -- no series doubles. Drop http.method
+          # once the edge emits the stable name.
           dimensions:
             - name: http.method
+            - name: http.request.method
             - name: http.route
           # Preserves the metric -> one-sample-trace jump that Tempo gave us through
           # send_exemplars: true. Without it a bucket is a dead end.
@@ -71,7 +79,7 @@ spec:
             insecure: true
           compression: gzip
         otlp_http/victorialogs:
-          # OTLP logs sink (RFC-0014 P4): the 10 Go services' + 2 workers' otelzap tee posts
+          # OTLP logs sink (RFC-0014 P4): every service, worker and mockpay posts its slogx records
           # OTLP logs here; re-export to VictoriaLogs. VL-Stream-Fields makes
           # service.name the log-stream identity; trace_id stays a queryable
           # regular field. The edge's access logs do NOT land here anymore:
@@ -192,6 +200,50 @@ spec:
         # sample stored in VM silently breaks rate().
         delta_to_cumulative:
           max_stale: 5m
+        # RFC-0031 Task 4.4: fill the k8s.* columns otel_logs materialises. The
+        # SDK already sends namespace + pod name (Downward API, obsx); this adds
+        # what only the API server knows. Association tries those two SDK
+        # attributes first, then the connection IP for the edge, which sends no
+        # pod name (pod-to-Service traffic is not SNATed, so the source IP is the
+        # pod's). Existing values are never overwritten.
+        #
+        # k8s.container.name: a pod with exactly one container gets it for free
+        # (workers, mockpay). Service pods also carry the `migrate` init
+        # container, which the processor counts, so they declare the name in
+        # OTEL_RESOURCE_ATTRIBUTES instead (domains/*-rs.yaml) — which, being
+        # SDK-side, also lands on their spans and RED series: one label,
+        # constant per service.
+        #
+        # Logs pipelines only: the columns live on otel_logs, and the span_metrics
+        # connector turns every resource attribute into a label
+        # (resource_to_telemetry_conversion), so enriching traces here would add
+        # four more labels to every RED series.
+        k8sattributes:
+          auth_type: serviceAccount
+          extract:
+            metadata:
+              - k8s.namespace.name
+              - k8s.pod.name
+              - k8s.pod.uid
+              - k8s.deployment.name # derived from the ReplicaSet name, no RS watch
+              - k8s.node.name
+              - k8s.container.name
+          pod_association:
+            - sources:
+                - from: resource_attribute
+                  name: k8s.pod.name
+                - from: resource_attribute
+                  name: k8s.namespace.name
+            - sources:
+                - from: connection
+        # The API server has no notion of a cluster name. This collector runs on
+        # the local cluster only; an overlay that adopts it elsewhere patches the
+        # value. insert = a sender's own value wins.
+        resource/cluster:
+          attributes:
+            - key: k8s.cluster.name
+              value: homelab
+              action: insert
       receivers:
         otlp:
           protocols:
@@ -229,6 +281,8 @@ spec:
             processors:
             - memory_limiter
             - filter/drop_edge_logs
+            - k8sattributes
+            - resource/cluster
             - batch
             receivers:
             - otlp
@@ -237,6 +291,8 @@ spec:
             - clickhouse
             processors:
             - memory_limiter
+            - k8sattributes
+            - resource/cluster
             - batch
             receivers:
             - otlp
@@ -330,6 +386,18 @@ spec:
             key: password
     service:
       type: ClusterIP
+    # k8sattributes watches pods cluster-wide, and nothing else with this
+    # extraction set: the deployment name is cut from the ReplicaSet name, the
+    # node name read from the pod spec, and namespaces are watched only for
+    # namespace labels or k8s.cluster.uid. Not the chart's kubernetesAttributes
+    # preset: it would also put the processor on metrics and traces (the label
+    # problem above), add replicasets RBAC, and still skip logs/clickhouse.
+    clusterRole:
+      create: true
+      rules:
+        - apiGroups: [""]
+          resources: ["pods"]
+          verbs: ["get", "list", "watch"]
     serviceAccount:
       create: true
       name: otel-collector

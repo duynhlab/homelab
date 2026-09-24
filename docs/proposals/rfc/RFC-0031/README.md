@@ -1018,6 +1018,14 @@ cluster, pod UID or region.
 That gap is visible in storage: the ClickHouse logs schema materialises eight
 `k8s.*` columns and five of them (`cluster.name`, `container.name`, `deployment.name`,
 `node.name`, `pod.uid`) are empty for every record, because no producer writes them.
+
+> **Amended 2026-09-24 (Task 4.4).** The gateway Collector now runs `k8sattributes`
+> and a `resource/cluster` insert on its two logs pipelines, and all seven `k8s.*`
+> columns are filled for application records. The Downward API attributes stay the
+> SDK's contract; the Collector adds only what the API server knows. One addition
+> reaches every signal: service pods declare `k8s.container.name` in
+> `OTEL_RESOURCE_ATTRIBUTES`, because the `migrate` init container leaves the
+> processor two containers to choose from.
 No dashboard reads them today, so it is schema debt rather than a broken consumer.
 The contract states the honest set and leaves two choices to the delivery plan:
 populate the missing keys with a collector `k8sattributes` processor — the
@@ -1081,6 +1089,11 @@ property of its configuration, not a capacity number.
   Downward API mechanism stated under
   [§ Resource and propagation contract](#resource-and-propagation-contract) is the
   contract, and the empty materialised columns are debt the delivery plan clears.
+  *Amended 2026-09-24:* Task 4.4 did not wait for the agent tier. The gateway
+  Collector enriches its logs pipelines, associating by the SDK's pod name and
+  namespace first and then by connection IP. Traces and metrics are left
+  unenriched there, because span-metrics turns every resource attribute into a
+  label.
 - The edge-log exception is part of the routing table, not folklore: edge access
   logs go to the 90-day store only, by decision, and the two log pipelines are the
   mechanism.
@@ -1184,7 +1197,9 @@ place; the normative text stays in the subsections it belongs to.
   introduced; the Collector's `Deployment` is unchanged by this RFC. The lint policy
   runs in CI, not in the cluster. When the agent tier is introduced later, the
   `k8sattributes` processor needs a read-only cluster role for pods and namespaces,
-  which is recorded in that ADR.
+  which is recorded in that ADR. *Amended 2026-09-24:* Task 4.4 added the processor
+  to the gateway Collector with a read-only ClusterRole on **pods only**. With
+  this extraction set the processor never lists namespaces, ReplicaSets or nodes.
 
 ## Observability & SLO impact
 

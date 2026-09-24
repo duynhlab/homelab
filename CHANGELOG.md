@@ -515,6 +515,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The observability contracts describe what runs (RFC-0031 Task 4.3).**
+  `docs/api/{observability,logs,tracing,metrics,profiling,pkg,temporal}.md`
+  and `graceful-shutdown.md` drop the zap era: the `logger/slogx` wiring
+  and envelope, the canonical access records, the emitted event catalog,
+  collector enrichment, the four-label profile identity, and a 12-module
+  `pkg.md` that records which logger each historical tag belongs to. Every
+  "not yet as-built" marker is gone; what is not built (Weaver registry,
+  lint-policy enforcement, metrics budget tests) stays planned. The
+  delivery plan records Phases 2–3 and Tasks 1.1b, 1.1c-B and 4.1–4.4 done.
+
 - **Observability delivery order as a Draw.io diagram** —
   [`observability-delivery.drawio`](docs/architecture/observability-delivery.drawio),
   embedded under [§ Deployment](docs/observability/README.md#deployment): the 12

@@ -6,10 +6,11 @@ Cross-cutting instrumentation contract for every Go service and worker in the pl
 |-----------|-------|-----------|
 | **Wiring** | One call: `obsx.SetupObservability(ctx, obsx.ConfigFromEnv())` in `main()` | — |
 | **Semconv** | **v1.41.0**, pinned in `pkg/obsx` — bumps only via a deliberate `obsx` release | — |
-| **Middleware** | **Tracing → logging** (two middleware) from `pkg/httpmw`; RED metrics via `otelgin` inside tracing | — |
+| **Middleware** | **Tracing → logging → recovery** from `pkg/httpmw` on `gin.New()`; RED metrics via `otelgin` inside tracing | — |
+| **Logging** | `pkg/logger/slogx` facade (`logger/slogx` v0.2.0 fleet-wide) — one redacted record to stdout JSON and OTLP | — |
 | **Export** | OTLP/HTTP `:4318` → OpenTelemetry Collector | — |
 | **Platform topology** | [OpenTelemetry (platform)](../observability/opentelemetry/README.md) · [Observability hub](../observability/README.md) | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) · [ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor) · [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) · [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) · [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) · [ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17; as-built 2026-09-24)** → [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) · [ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor) · [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) · [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) · [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) · [ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry) |
 
 ---
 
@@ -68,52 +69,65 @@ Current behavior and planned behavior must be labelled separately.
 
 These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RFC-0014/README.md).
 
-1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verified signatures (`duynhlab/pkg` `obsx/v0.39.2`, 2026-09-18): `obsx.ConfigFromEnv() Config`, `obsx.SetupObservability(ctx, Config, ...SetupOption) (*Observability, error)`, `(*Observability).Enabled() Signals` (`{Traces, Metrics, Logs bool}` — the only supported "is it on" check; the SDK provider fields are gone), `(*Observability).TracerProvider() trace.TracerProvider` / `MeterProvider() metric.MeterProvider` / `LoggerProvider() log.LoggerProvider` (API types, true nils when off), `(*Observability).Shutdown(ctx) error`, `(*Observability).ZapCore(scopeName, minLevel) zapcore.Core` (stays until the slogx facade). Temporal services add `obsx.WithTracerProviderFactory(func(c obsx.TracerProviderConfig) obsx.ShutdownTracerProvider { return temporalx.NewReplaySafeTracerProvider(c.SDKOptions()...) })` — no `sdk/trace` import in `main()`.
+1. **One wiring point.** Services call `obsx.SetupObservability(ctx, cfg)` once in `main()`. No hand-built OTel providers. Verified signatures (`duynhlab/pkg` `obsx/v0.45.0`, 2026-09-24): `obsx.ConfigFromEnv() Config`, `obsx.SetupObservability(ctx, Config, ...SetupOption) (*Observability, error)`, `(*Observability).Enabled() Signals` (`{Traces, Metrics, Logs bool}` — the only supported "is it on" check), `(*Observability).TracerProvider() trace.TracerProvider` / `MeterProvider() metric.MeterProvider` / `LoggerProvider() log.LoggerProvider` (API types, true nils when off), `(*Observability).ForceFlush(ctx) error` (exports what every provider has buffered without stopping it — logs first), `(*Observability).Shutdown(ctx) error`. `ZapCore` and `TraceContext` were removed in `obsx` v0.45.0 together with the `otelzap` dependency: the logger reaches OTLP through the global `LoggerProvider` that `SetupObservability` installs, which the `slogx` facade reads. Temporal services (order, checkout) add `obsx.WithTracerProviderFactory(func(c obsx.TracerProviderConfig) obsx.ShutdownTracerProvider { return temporalx.NewReplaySafeTracerProvider(c.SDKOptions()...) })` — no `sdk/trace` import in `main()`.
 
-   Canonical bootstrap (the contract shape every service `cmd/main.go`
-   converges on). Setup failure is deliberately **non-fatal**: the service
-   serves traffic without telemetry rather than crash-loop on a collector
-   outage.
+   Canonical bootstrap — the shape every service `cmd/main.go` runs since the
+   2026-09-24 release train (cart-service shown; the level comes from validated
+   config or `LOG_LEVEL`). Setup failure is deliberately **non-fatal**: the
+   service serves traffic without telemetry rather than crash-loop on a
+   collector outage.
 
    ```go
-   logger, err := zapx.New(cfg.Logging.Level) // validated config, not a raw env read
-   if err != nil {
-       panic("Failed to initialize logger: " + err.Error())
-   }
-   defer func() { _ = logger.Sync() }()
+   logger := slogx.New(slogx.Config{Level: cfg.Logging.Level})
+   slogx.SetDefault(logger) // what slogx.FromContext falls back to
 
    otelCfg := obsx.ConfigFromEnv()
 
    var tp interface{ Shutdown(context.Context) error }
    obs, err := obsx.SetupObservability(context.Background(), otelCfg)
    if err != nil {
-       logger.Warn("Failed to initialize OpenTelemetry", zap.Error(err))
+       logger.Warn(ctx, "Failed to initialize OpenTelemetry", slogx.Err(err))
    } else {
        tp = obs
-       minLevel, lvlErr := zapcore.ParseLevel(cfg.Logging.Level)
-       if lvlErr != nil {
-           minLevel = zapcore.InfoLevel
-       }
-       logger = logger.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
-           return zapcore.NewTee(c, obs.ZapCore(otelCfg.ServiceName, minLevel))
-       }))
+       // The facade already reaches OTLP through the global logger provider
+       // obsx installed; rebuilding it only wires Flush, so a Fatal record is
+       // exported before the process exits.
+       logger = slogx.New(slogx.Config{Level: cfg.Logging.Level, Flush: obs.ForceFlush})
+       slogx.SetDefault(logger)
    }
    ```
+
+   The transport layer takes the facade's `*slog.Logger` view:
+   `gin.New()` (never `gin.Default()`, whose own logger and recovery print the
+   raw path and client address past the facade) with
+   `httpmw.Tracing(serviceName)`, `httpmw.Logging(logger.Slog())` and
+   `httpmw.Recovery(logger.Slog())`; `grpcx.NewServer(logger.Slog())`; and,
+   in the Temporal services, `temporalx.Dial(..., temporalx.WithLogger(logger.Slog()))`.
+   Business code logs through `slogx.FromContext(ctx)` (or an injected
+   `*slogx.Logger`) and always passes the context — correlation comes from the
+   span on the context, not from bound fields.
 
    Shutdown is the **last step of the ordered
    [graceful-shutdown sequence](./graceful-shutdown.md)**
    (after the HTTP/gRPC servers stop), bounded by the shutdown context —
    `cfg.ShutdownTimeout` is an `int` of seconds behind
-   `cfg.GetShutdownTimeoutDuration()`. Workers follow the same rule: every
-   process flushes through a bounded `Shutdown` before exit.
+   `cfg.GetShutdownTimeoutDuration()`. Workers flush through `Shutdown` before
+   exit too — bounded at 5s on order-worker; checkout-worker passes an unbounded
+   `context.Background()`. The lifecycle
+   records bracket the process: `logger.ProcessStarted(ctx, component)` before
+   the signal wait, and `logger.ProcessStopped(ctx, component, outcome)`
+   **before** the OTel shutdown, because a record emitted after it is dropped.
+   Records written after the signal use a context that is not the cancelled
+   signal context.
 
    ```go
    shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GetShutdownTimeoutDuration())
    defer cancel()
    // ...stop servers first...
+   logger.ProcessStopped(ctx, slogx.ComponentAPI, outcome)
    if tp != nil {
        if err := tp.Shutdown(shutdownCtx); err != nil {
-           logger.Warn("OpenTelemetry shutdown error", zap.Error(err))
+           logger.Error(ctx, "OpenTelemetry shutdown error", slogx.Err(err))
        }
    }
    ```
@@ -132,23 +146,22 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
 
 | Layer | Who imports it here |
 |---|---|
-| **API** (`go.opentelemetry.io/otel`, …) | `pkg/obsx`, `pkg/grpcx`, `pkg/httpmw` |
+| **API** (`go.opentelemetry.io/otel`, …) | `pkg/obsx`, `pkg/grpcx`, `pkg/httpmw`, `pkg/logger/slogx` (`otel/log`) |
 | **SDK** | **Only `pkg/obsx.SetupObservability`** |
 | **Exporters** | `pkg/obsx` only |
-| **Contrib** (`otelgin`, `otelgrpc`, `otelzap`, `runtime`) | `otelgin` in `pkg/httpmw` only; rest via `pkg/obsx`/`pkg/grpcx` |
+| **Contrib** (`otelgin`, `otelgrpc`, `runtime`, `bridges/otelslog`) | `otelgin` in `pkg/httpmw` only; the slog bridge in `pkg/logger/slogx` only; rest via `pkg/obsx`/`pkg/grpcx` |
 
 ---
 
-## Cross-signal telemetry standard (RFC-0031 — normative, planned)
+## Cross-signal telemetry standard (RFC-0031 — normative)
 
-> **Status: `Accepted` 2026-09-17, Adoption `Not started`.** [RFC-0031](../proposals/rfc/RFC-0031/) and its seven
-> resulting records are the platform's telemetry standard from this date, so every new
-> service PR is reviewed against the rules below **in addition to** the RFC-0014 policy
-> above. Nothing in this section is deployed yet: the shared modules it names do not
-> exist, the lint policy is not installed, and the as-built shape stays the one the
-> rest of this file and the pillar files describe. When a rule here lands, the
-> owning pillar file is rewritten to as-built and this section shrinks. Rationale
-> and alternatives live in the ADRs, not here.
+> **Status: `Accepted` 2026-09-17; as-built 2026-09-24.** [RFC-0031](../proposals/rfc/RFC-0031/) and its seven
+> resulting records are the platform's telemetry standard, and every service PR is
+> reviewed against the rules below **in addition to** the RFC-0014 policy above. The
+> fleet cut over in one release train on 2026-09-24 (all ten services on
+> `logger/slogx` v0.2.0 and `obsx` v0.45.0). Two parts are still **planned**: the
+> Weaver semantic-convention registry (RFC-0031 Task 4.5) and a *blocking* fleet lint
+> policy — see Enforcement below. Rationale and alternatives live in the ADRs, not here.
 
 **The shared-package rule** ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor)). A service does not choose its own telemetry
 libraries. It imports the shared package and the OpenTelemetry **API**; the SDK, every
@@ -159,31 +172,32 @@ followed by a version bump, never an edit in a service. The table extends the RF
 
 | Signal | A service may import | A service must not import | Owned by |
 |---|---|---|---|
-| Logs | `pkg/logger/slogx` (**planned** — [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog)) | `go.uber.org/zap`, `zapcore`, `log/slog` directly, `github.com/rs/zerolog`, `go.opentelemetry.io/contrib/bridges/*`, `go.opentelemetry.io/otel/log` | `slogx` (API), `obsx` (export) |
+| Logs | `pkg/logger/slogx` ([ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog)); `log/slog` only for the `slog.Attr` constructors the facade takes and the `*slog.Logger` it hands to `httpmw`/`grpcx`/`temporalx` through `logger.Slog()` | `go.uber.org/zap`, `zapcore`, `slog` handlers or `slog.New` of its own, `github.com/rs/zerolog`, `go.opentelemetry.io/contrib/bridges/*`, `go.opentelemetry.io/otel/log` | `slogx` (API + bridge), `obsx` (export) |
 | Metrics | `go.opentelemetry.io/otel/metric`, `otel/attribute`; instruments via `obsx` helpers | `go.opentelemetry.io/otel/sdk/metric`, `otel/exporters/*`, `github.com/prometheus/client_golang` | `obsx` |
 | Traces | `go.opentelemetry.io/otel/trace`, `otel/attribute`, `otel/codes`; spans via `obsx.StartSpan` | `go.opentelemetry.io/otel/sdk/trace`, `otel/exporters/*`, `otel/propagation` setup | `obsx`, `httpmw`, `grpcx` |
 | Profiles | nothing — `obsx.SetupProfiling` only | `github.com/grafana/pyroscope-go`, `runtime.SetMutexProfileFraction`, `runtime.SetBlockProfileRate` | `obsx` |
 | Transport | `pkg/httpmw`, `pkg/grpcx` | `contrib/instrumentation/*` directly | `httpmw`, `grpcx` |
 
-Tests are exempt. **Since obsx v0.39.2 (2026-09-18, RFC-0031 Task 1.1c-A) the fleet is
-compliant on metrics, traces and profiles and non-compliant on logs by design.** No
-service `cmd/main.go` imports `go.opentelemetry.io/otel/sdk/*` any more: `obsx` exports
-no SDK type — `obs.Enabled()` replaces the old nil-checks on SDK provider fields, and the
-Temporal services forward `obsx.TracerProviderConfig.SDKOptions()` into
-`temporalx.NewReplaySafeTracerProvider` without naming an SDK type. `zap`/`zapcore`
-remain in every `main()` because `zapx` is the deployed logger and `obs.ZapCore` the
-deployed OTLP tee; both leave with the slogx facade (Task 1.1c-B) — until then they are
-the documented exception, not a licence to import a logging library elsewhere.
+Tests are exempt. **Since the 2026-09-24 release train the fleet is compliant on all four
+signals.** No service `cmd/main.go` imports `go.opentelemetry.io/otel/sdk/*`: `obsx`
+exports no SDK type — `obs.Enabled()` replaces the old nil-checks on SDK provider fields,
+and the Temporal services forward `obsx.TracerProviderConfig.SDKOptions()` into
+`temporalx.NewReplaySafeTracerProvider` without naming an SDK type. No service requires
+`logger/zapx` any more, and no release binary links `go.uber.org/zap`, `otelzap`,
+`zerolog` or `clog` (checked with `go version -m` on all ten release images). The
+`logger/zapx`, `logger/zerolog` and `logger/clog` modules were removed from `pkg` the
+same day; their last tags still resolve for history only ([pkg.md](./pkg.md)).
 
-**Enforcement (channel in place, opt-in rolling out).** `.github/lint/golangci-policy.yml`
+**Enforcement (channel in place; no service opted in — planned).** `.github/lint/golangci-policy.yml`
 in the shared-workflows repository (merged 2026-09-18) carries the table above as
 `depguard` rules — SDK, exporters and bridges only in `obsx`; contrib instrumentation
 only through `httpmw`/`grpcx`; no `client_golang`, no `pyroscope-go` — plus `forbidigo`
 for the process-global profiler sampling calls. `go-check.yml` runs it as a second,
 additive pass when a caller sets `policy-lint: true`, checking the file out at the
 workflow's own pinned SHA; `policy-lint-blocking` (default `false`) decides whether a
-finding fails the job. Each service opts in through its `check.yml`; the first train is
-non-blocking. The seconds-histogram-without-buckets check is **withdrawn**, not
+finding fails the job. Each service opts in through its `check.yml`; as of 2026-09-24 no
+service's `check.yml` sets `policy-lint`, so the import rule is held by review and by the
+release-image check above, not by CI. The seconds-histogram-without-buckets check is **withdrawn**, not
 pending: a regex cannot tell a bucketed declaration from an unbucketed one, and it
 would never see an instrument a library builds. Task 1.3 closed the gap at its source
 instead — `obsx` v0.42.0 gives the fleet boundaries to every histogram whose unit is
@@ -191,30 +205,37 @@ instead — `obsx` v0.42.0 gives the fleet boundaries to every histogram whose u
 webhook handler with `otelhttp` directly (no shared HTTP-client helper exists yet).
 
 **Version floor** ([ADR-072](../proposals/adr/ADR-072-telemetry-clean-cutover/) (one-release cutover, version floor)). A service runs at most one minor version behind the shared
-package's current release. Since 2026-09-18 the fleet is on one floor — every module at
-its current tag, `obsx v0.39.2` everywhere ([pkg.md § Adoption](./pkg.md#adoption)) —
-and no new divergence is accepted in review.
+package's current release. Since 2026-09-24 the fleet is on one floor — every service pins
+`obsx` v0.45.0, `logger/slogx` v0.2.0, `httpmw` v0.2.0 and the current tag of each other
+module it uses ([pkg.md § Adoption](./pkg.md#adoption)) — and no new divergence is
+accepted in review.
 
-**What each pillar changes** — the target rule, its record, and where the as-built
-shape stays documented until it lands:
+**What each pillar changes** — the rule, its record, its state on 2026-09-24 and the
+file that owns the detail:
 
-| Pillar | Target rule (planned) | Record | As-built stays in |
-|---|---|---|---|
-| Logs | One `slogx` facade, one redaction boundary before stdout and OTLP, a five-class event catalog; the access record uses semconv keys and no raw path or peer fields | [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) | [logs.md](./logs.md) |
-| Metrics | Seven-instrument selection rule; every seconds histogram declares the fleet bucket set; identifier denylist becomes a test; per-service series budget; replay never increments | [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) | [metrics.md](./metrics.md) |
-| Traces | Edge-root sampling stated per environment; one span kind per layer, package-path scope; Error only on unexpected failure; application baggage default-deny | [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) | [tracing.md](./tracing.md) |
-| Profiles | Closed four-label identity derived from the shared resource; `goroutine_leak` excluded; central overhead budget; `mockpay` onboarded | [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) | [profiling.md](./profiling.md) |
-| Names | Every platform-owned attribute, metric and event declared in a Weaver registry; bare namespaces (`order.*`, `payment.*`, …) kept as registered exceptions, new ones denied; catalog sections of this directory generated from it | [ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry) | this file, [pkg.md](./pkg.md) |
+| Pillar | Rule | Record | State 2026-09-24 | Owner |
+|---|---|---|---|---|
+| Logs | One `slogx` facade, one redaction boundary before stdout and OTLP, a five-class event catalog; the access record uses semconv keys and no raw path or peer fields | [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) | As-built fleet-wide; catalog events observed live on Kind | [logs.md](./logs.md) |
+| Metrics | Seven-instrument selection rule; every seconds histogram declares the fleet bucket set; identifier denylist becomes a test; per-service series budget; replay never increments | [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) | Seconds-bucket View in `obsx` (v0.42.0) and the business histograms are deployed; see the owner file for the rest | [metrics.md](./metrics.md) |
+| Traces | Edge-root sampling stated per environment; one span kind per layer, package-path scope; Error only on unexpected failure; application baggage default-deny | [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) | As-built in `obsx` (`RecordError` / `RecordOutcome`, propagator always installed); no service sets application baggage | [tracing.md](./tracing.md) |
+| Profiles | Closed four-label identity derived from the shared resource; `goroutine_leak` excluded; central overhead budget; `mockpay` onboarded | [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) | As-built: all 13 identities (10 services, two workers, `mockpay`) carry the four labels on Kind | [profiling.md](./profiling.md) |
+| Names | Every platform-owned attribute, metric and event declared in a Weaver registry; bare namespaces (`order.*`, `payment.*`, …) kept as registered exceptions, new ones denied; catalog sections of this directory generated from it | [ADR-076](../proposals/adr/ADR-076-semantic-convention-registry/) (Weaver registry) | **Planned** — RFC-0031 Task 4.5, not built | this file, [pkg.md](./pkg.md) |
 
-**Privacy boundary** ([ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy)) applies to all four signals from this date and does not
-wait for code: no authorization, cookie, password, token, secret, API key, private key,
+**Privacy boundary** ([ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy)) applies to all four signals: no authorization, cookie, password, token, secret, API key, private key,
 request/response body, client IP, peer address, full User-Agent, connection string,
 payment secret or PAN-shaped value in any log, span, span event, metric label, profile
 label or baggage key. Workflow, run, order, reservation and session identifiers may be
 span or log attributes when justified and are never labels, resource attributes, event
 names, profile labels or baggage. This restates and tightens
 [§ Cross-signal data and privacy policy](#cross-signal-data-and-privacy-policy); where
-the two differ, the stricter reading wins.
+the two differ, the stricter reading wins. On the application side it is enforced in
+code: `slogx` applies one redaction policy before both sinks, and the HTTP/gRPC access
+records carry no raw path, query, client address, User-Agent or peer. Verified
+2026-09-24 on the Kind cluster (310 application records in ClickHouse `otel_logs`, none
+carrying `client_ip`, `user_agent`, `path`, `peer`, `user_id`, `email`, `phone`, `amount`,
+`duration` or `idempotency_key`) and on the compose release gate. The edge access log
+(Envoy Gateway) still records User-Agent and duration; it is outside the application
+contract and stored in ClickHouse only (ADR-061).
 
 Delivery order and acceptance criteria: [RFC-0031 delivery plan](../proposals/rfc/RFC-0031/delivery-plan.md).
 
@@ -222,47 +243,57 @@ Delivery order and acceptance criteria: [RFC-0031 delivery plan](../proposals/rf
 
 ## Middleware and interceptors
 
-The HTTP middleware chain is **tracing → logging** (two middleware only).
+The HTTP middleware chain is **tracing → logging → recovery**, mounted on
+`gin.New()`.
 
 | Order | Middleware | Emits |
 |-------|------------|-------|
 | 1 | **Tracing** (`otelgin` via `httpmw.Tracing`) | Root span + **`http.server.*` metrics** via global MeterProvider |
-| 2 | **Logging** (`httpmw.Logging`) | Structured JSON + `trace_id` on stdout; otelzap tee when enabled |
+| 2 | **Logging** (`httpmw.Logging(logger.Slog())`) | One access record per request (`"HTTP request"`), written with the request context so the facade stamps `trace_id`/`span_id` on stdout and OTLP |
+| 3 | **Recovery** (`httpmw.Recovery(logger.Slog())`) | A panic becomes a 500 plus one structured `"HTTP handler panicked"` record; the access record then carries `error.type=panic` |
 
-There is **no separate metrics middleware**. RED HTTP metrics come from the same `otelgin` instrumentation that creates spans. gRPC RED + tracing come from `pkg/grpcx` `otelgrpc` handlers.
+There is **no separate metrics middleware**. RED HTTP metrics come from the same `otelgin` instrumentation that creates spans. gRPC RED + tracing come from `pkg/grpcx` `otelgrpc` handlers, and its access interceptor writes the `"gRPC request"` record.
 
-Sharing status (as-built): providers (`pkg/obsx`), gRPC (`pkg/grpcx`), and DB
-(`pkg/dbx` + otelpgx) are shared libraries, and the HTTP pair is shared too —
-`httpmw.Tracing(serviceName)` and `httpmw.Logging(logger)` in **`pkg/httpmw`**
-(`httpmw/v0.1.0`), with the `logic/v1` span helpers in **`pkg/obsx`**
-(`obsx/v0.37.1`). `httpmw` is a module of its own because `gin` and `otelgin` are
-imported there and nowhere else in `pkg`: a gRPC-only service such as
-inventory-service takes the span helpers without pulling in a web framework,
-which is what the `logic/v1` rule below ("must not depend on Gin/gRPC types")
-requires. The service name is a **parameter** of `httpmw.Tracing`, not package
-state written by a startup setter as the per-service copies had it.
+The access record carries only `http.request.method` (the nine standard methods,
+anything else `_OTHER`), `http.route` (omitted when no route matched — never the
+raw path), `http.response.status_code` and, for a server failure, `error.type`
+(the status code as a string, or `panic`); its level follows the status class.
+The gRPC record carries `rpc.system.name`, `rpc.method`,
+`rpc.response.status_code` and `error.type`. Neither carries a raw path, query,
+client address, User-Agent, peer or duration — the span and the RED histogram
+already measure duration. Field-level detail: [logs.md § Access-log policy](./logs.md#access-log-policy).
 
-Fleet migration off the per-service `<svc>-service/middleware/` copies is **in
-progress**. Merged so far: `pkg` itself and inventory-service, which takes only
-the `obsx` span helpers because it serves gRPC and mounts no Gin middleware. All
-nine HTTP services have an open pull request and none is merged, so each still
-carries its own copy and pins an `obsx` release that predates the span helpers.
-The shared packages are the contract for new and migrated code.
+Sharing status (as-built): providers (`pkg/obsx`), gRPC (`pkg/grpcx`), DB
+(`pkg/dbx` + otelpgx), the logging facade (`pkg/logger/slogx`) and the HTTP
+middleware (`pkg/httpmw` v0.2.0) are shared libraries, with the `logic/v1` span
+helpers in **`pkg/obsx`**. `httpmw` is a module of its own because `gin` and
+`otelgin` are imported there and nowhere else in `pkg`: a gRPC-only caller takes
+the span helpers without pulling in a web framework, which is what the
+`logic/v1` rule below ("must not depend on Gin/gRPC types") requires. The
+service name is a **parameter** of `httpmw.Tracing`, not package state written by
+a startup setter as the old per-service copies had it.
+
+The per-service `middleware/` copies are gone. The nine services with an HTTP
+API mount all three `httpmw` middleware. inventory-service, whose only HTTP
+surface is the probe routes and the protected Backoffice group, mounts
+`httpmw.Logging` and `httpmw.Recovery` but not `httpmw.Tracing`, so its
+Backoffice HTTP requests produce an access record but no HTTP server span.
 
 ```mermaid
 graph TD
-    A["HTTP request"] --> B["Gin router"]
+    A["HTTP request"] --> B["Gin router (gin.New)"]
     B --> C["Middleware chain"]
     C --> D["httpmw.Tracing (otelgin)<br/>root span + http.server.* metrics"]
-    D --> E["httpmw.Logging<br/>request log + trace_id"]
-    E --> H["Web layer web/v1"]
+    D --> E["httpmw.Logging<br/>access record, ids from context"]
+    E --> R["httpmw.Recovery<br/>panic → 500 + one record"]
+    R --> H["Web layer web/v1"]
     H --> L["Logic layer logic/v1"]
     L --> O["Core layer"]
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
     class A edge;
-    class B,C,D,E,H,L service;
+    class B,C,D,E,R,H,L service;
     class O data;
 ```
 
@@ -385,15 +416,10 @@ generic request span:
 ```go
 func (h *Handler) CreateOrder(c *gin.Context) {
     ctx := c.Request.Context()
-    logger := httpmw.LoggerFrom(c)
 
     var req CreateOrderRequest
     if err := c.ShouldBindJSON(&req); err != nil {
-        logger.Warn(
-            "request validation failed",
-            zap.String("operation", "order.create"),
-            zap.Error(err),
-        )
+        slogx.FromContext(ctx).Warn(ctx, "request validation failed", slogx.Err(err))
         httpx.RespondError(c, http.StatusBadRequest, httpx.CodeValidation, err.Error())
         return
     }
@@ -408,16 +434,17 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 }
 ```
 
-Logger retrieval is the fleet-majority pattern: `httpmw.Logging` stores the
-request logger with `c.Set("logger", …)` and handlers read it back with
-`httpmw.LoggerFrom(c)`, which falls back to a no-op logger when the middleware
-was not mounted rather than building a second, uncorrelated one.
-`httpmw.TraceID(c)` returns the request correlation id and
-`httpmw.LoggerWithTraceID(c, base)` binds it to another logger. auth-service
-instead injects the logger into the request context
-(`zapx.WithContext`/`zapx.FromContext`) — same contract, different carrier.
-Error responses go through `httpx.RespondError` (`pkg/httpx`); there is no
-`httpx.ValidationError` helper.
+Logger retrieval is the fleet pattern: handlers and logic call
+`slogx.FromContext(ctx)`, which returns a logger attached with
+`slogx.WithContext` or, failing that, the process default `main()` installed with
+`slogx.SetDefault` — so a lost logger keeps the configured level. Every call
+passes `ctx`, and the facade reads `trace_id`/`span_id` from the span on it, so
+no logger is ever bound to a trace id by hand. `httpmw.LoggerFrom(c)` still
+exists (a `*slog.Logger` bound to the request span, silent when `Logging` was
+not mounted) but no service uses it; `httpmw.TraceID(c)` returns the correlation
+id `Logging` echoes in the `X-Trace-ID` response header. Errors go on a record
+through `slogx.Err(err)`. Error responses go through `httpx.RespondError`
+(`pkg/httpx`); there is no `httpx.ValidationError` helper.
 
 Logic methods do not automatically receive one manual span each. Create a
 manual span only for a meaningful operation, failure boundary, or multi-step
@@ -463,13 +490,14 @@ shared instrumentation.
 ```mermaid
 graph LR
     A["HTTP request traceparent"] --> B["httpmw.Tracing"]
-    B --> C["httpmw.Logging trace_id on logger"]
-    C --> D["Web handler"]
-    D --> E["Logic service"]
-    E --> F["Structured logs with trace_id"]
     B --> G["OTel context via context.Context"]
+    G --> D["Web handler"]
+    D --> E["Logic service"]
     G --> H["Web span"]
     H --> I["Logic span"]
+    D --> C["slogx.FromContext(ctx)<br/>ids read from the span on ctx"]
+    E --> C
+    C --> F["Structured logs with trace_id + span_id"]
     classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
     classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
@@ -488,6 +516,16 @@ inbound decision. Configured in the `EnvoyProxy` resource
 (`telemetry.tracing`); the platform's only propagation format is W3C. gRPC
 metadata carries the same context via `pkg/grpcx`.
 
+**Propagation does not depend on `TRACING_ENABLED`.** `obsx.SetupObservability`
+installs the W3C `TraceContext` + `Baggage` propagator unconditionally (since
+`obsx` v0.41.0), so a service with tracing switched off still extracts
+`traceparent` and forwards it on every instrumented outbound call; it simply
+exports no spans of its own. Verified on the Kind cluster on 2026-09-24 with
+product-service at `TRACING_ENABLED=false`: a sampled request to
+`/products/3/details` produced a trace holding the edge spans plus the inventory
+and review server spans, parented on the edge egress span, with no product span —
+and product's own log records carried the same trace id and the egress span id.
+
 ## Worker and Temporal instrumentation
 
 Workers are process entry points that call `logic/v1` directly. They are not an
@@ -504,7 +542,12 @@ additional business layer and do not call HTTP or gRPC handlers.
   through their activity context.
 - Temporal workflow code must remain deterministic. It must not perform direct
   network I/O, arbitrary OTel export, or non-replay-safe logging side effects.
-- Use Temporal-aware, replay-safe workflow logging.
+- Use Temporal-aware, replay-safe workflow logging. As built, workers pass
+  the facade to the SDK with `temporalx.Dial(..., temporalx.WithLogger(logger.Slog()))`,
+  which also installs the interceptor that emits `temporal.workflow.started`;
+  a catalog event decided inside workflow code goes through
+  `temporalx.WorkflowEvent`, which is replay-safe. Event rules:
+  [logs.md § Event catalog](./logs.md#event-catalog).
 - Workflow IDs, run IDs, order IDs, session IDs, and reservation IDs may be
   selected trace/log attributes when operationally justified; they must never
   be metric labels or profile labels.
@@ -541,6 +584,12 @@ Rules:
 5. Redaction happens before a value reaches the logger or telemetry API.
 6. A new sensitive field requires an explicit owner, purpose, retention rule,
    and review.
+
+As built (2026-09-24), the application log path no longer records an IP,
+User-Agent or raw request path at all: the shared access records dropped them,
+and `slogx` applies the ADR-071 redaction policy to every record before stdout
+and OTLP. The privacy check behind that statement is in
+[§ Cross-signal telemetry standard](#cross-signal-telemetry-standard-rfc-0031--normative).
 
 ## Error ownership
 
@@ -585,15 +634,33 @@ Read by `obsx.ConfigFromEnv` (injected by app ResourceSets, `kubernetes/apps/dom
 | `TRACING_ENABLED` | `true` | Traces kill switch |
 | `OTEL_SAMPLE_RATE` | `0.1`; local `1.0` | Head-sampling ratio (`ParentBased(TraceIDRatioBased)`) |
 | `OTEL_METRICS_ENABLED` | `true` | OTLP metrics + runtime instrumentation |
-| `OTEL_LOGS_ENABLED` | `false` in pkg; manifests `true` | otelzap → OTLP logs |
+| `OTEL_LOGS_ENABLED` | `false` in pkg; manifests `true` | Builds the OTLP `LoggerProvider` the `slogx` facade exports through |
 | `OTEL_METRIC_EXPORT_INTERVAL_SECONDS` | `15` | PeriodicReader interval (pkg default) |
-| `LOG_LEVEL` | `info` | zapx + otelzap level gate — see [logs.md](./logs.md) |
+| `LOG_LEVEL` | `info` | `slogx` level gate — one gate for both the stdout and the OTLP sink; see [logs.md](./logs.md) |
 | `PROFILING_ENABLED` | `true` | Pyroscope push — see [profiling.md](./profiling.md) |
 | `PYROSCOPE_ENDPOINT` | `http://pyroscope.monitoring.svc.cluster.local:4040` | Profiler target |
 
 Note: `OTEL_COLLECTOR_ENDPOINT` and `OTEL_SAMPLE_RATE` are platform names read by `obsx`, not standard SDK vars (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_TRACES_SAMPLER_ARG`).
 
 Sampling details: [Application tracing](./tracing.md#sampling).
+
+### Collector-side enrichment
+
+The SDK resource carries only what the environment above states (service
+identity, `k8s.namespace.name`, `k8s.pod.name`, `deployment.environment.name`,
+plus `service.namespace`, `service.instance.id`, `service.version` and
+`k8s.container.name` from `OTEL_RESOURCE_ATTRIBUTES`; the container name is
+declared because every service pod also runs a `migrate` init container). Since
+RFC-0031 Task 4.4 the collector adds the rest **on the two log pipelines only**
+(`logs` → VictoriaLogs and `logs/clickhouse`): the `k8sattributes` processor fills
+`k8s.pod.uid`, `k8s.deployment.name` and `k8s.node.name` (pods matched by the
+SDK's `k8s.pod.name` + `k8s.namespace.name`, then by connection IP; its
+ClusterRole is `get`/`list`/`watch` on pods only), and `resource/cluster` inserts
+`k8s.cluster.name=homelab` without overriding a sender's value. Traces and
+metrics are not enriched by the collector, so the `span_metrics` connector gains
+no labels from it. The collector runs five pipelines: `traces`, `logs`,
+`logs/clickhouse`, `metrics` and `metrics/spanmetrics`. Operations detail:
+[OpenTelemetry (platform)](../observability/opentelemetry/README.md).
 
 ---
 
@@ -603,7 +670,7 @@ Sampling details: [Application tracing](./tracing.md#sampling).
 |-------|--------|------|
 | `trace_id` | Logs, traces | VictoriaTraces links back to logs (`tracesToLogsV2` → `victorialogs`); the reverse direction is not wired. ClickHouse joins `otel_logs` ↔ `otel_traces` on this field in one query |
 | `span_id` | Logs | Span-scoped log lines |
-| `pyroscope.profile.id` | Traces, profiles | Span → CPU flame graph, **manual pivot** since RFC-0027 — see [profiling.md](./profiling.md) |
+| `pyroscope.profile.id` | Traces, profiles | Set on the root server span for span-scoped CPU in 8 services — not order, order-worker, checkout or checkout-worker, where the replay-safe tracer provider is left unwrapped. No one-click span → profile link: **manual pivot**, see [profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform) |
 | `service.name` / `app` | Metrics, traces, logs, profiles | Fleet identity via `OTEL_SERVICE_NAME` |
 
 Exemplars are **not** available on this platform (VictoriaMetrics D-14). Correlation loop:
@@ -623,7 +690,7 @@ A service or worker PR is observability-compliant only when:
 - [ ] The logger OTLP branch is gated on the same `LOG_LEVEL` as the stdout branch.
 - [ ] Access logs follow the semconv field schema in [logs.md](./logs.md#access-log-policy).
 - [ ] Exported log records carry the full [LogRecord mapping](./logs.md#otel-log-data-model) (trace context, resource, scope).
-- [ ] HTTP middleware order is tracing, then logging; new and migrated services mount `pkg/httpmw` rather than a per-service copy.
+- [ ] HTTP middleware order is tracing, logging, recovery from `pkg/httpmw` on `gin.New()` — never `gin.Default()` or a per-service copy.
 - [ ] Manual span helpers come from `pkg/obsx`, with a package-path instrumentation scope.
 - [ ] gRPC servers and clients use `pkg/grpcx`.
 - [ ] Transport handlers propagate the incoming context into `logic/v1`.
@@ -660,4 +727,4 @@ A service or worker PR is observability-compliant only when:
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 - [OpenTelemetry (platform)](../observability/opentelemetry/README.md)
 
-_Last updated: 2026-09-23 — obsx v0.39.2 (RFC-0031 Task 1.1c-A): the verified bootstrap signatures list `Enabled()` and the API-typed accessors, § Cross-signal telemetry standard records that no service imports `otel/sdk` any more and that the fleet lint policy channel is merged with service opt-in rolling out. Previously 2026-09-18 — RFC-0031 Task 1.2 manifests: `service.version` now set on every domain service (from `image_tag`) and on `mockpay`, which also gains the full telemetry environment it lacked. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070 through ADR-076 and a new **Cross-signal telemetry standard (RFC-0031 — normative, planned)** section states the shared-package import rule, the not-yet-installed enforcement, the version floor, the per-pillar target rules and the privacy boundary — all labelled planned; the as-built bootstrap and RFC-0014 policy are unchanged. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the span-metrics connector on the `traces` pipeline is a metrics source, not a trace store. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-24 — RFC-0031 as-built (Task 4.3): the bootstrap sample and verified signatures move to `slogx` + `obsx` v0.45.0 (`ForceFlush`; `ZapCore`/`TraceContext` gone), the middleware chain gains `httpmw.Recovery` on `gin.New()` with the semconv-only access record, § Cross-signal telemetry standard becomes as-built (Weaver registry and a blocking lint policy stay planned), propagation with tracing off, the privacy verification and the collector's log-pipeline enrichment are recorded, and the profile-id correlation row names the eight services with span-scoped CPU. Previously 2026-09-23 — obsx v0.39.2 (RFC-0031 Task 1.1c-A): the verified bootstrap signatures list `Enabled()` and the API-typed accessors, § Cross-signal telemetry standard records that no service imports `otel/sdk` any more and that the fleet lint policy channel is merged with service opt-in rolling out. Previously 2026-09-18 — RFC-0031 Task 1.2 manifests: `service.version` now set on every domain service (from `image_tag`) and on `mockpay`, which also gains the full telemetry environment it lacked. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070 through ADR-076 and a new **Cross-signal telemetry standard (RFC-0031 — normative, planned)** section states the shared-package import rule, the not-yet-installed enforcement, the version floor, the per-pillar target rules and the privacy boundary — all labelled planned; the as-built bootstrap and RFC-0014 policy are unchanged. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the span-metrics connector on the `traces` pipeline is a metrics source, not a trace store. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

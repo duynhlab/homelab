@@ -128,7 +128,7 @@ different quick-facts shape when per-attribute provenance is useful.
 | Shared URL, auth, error, pagination, idempotency, and gRPC rules | [api.md](./api.md) |
 | Realms, token claims, `user_id`, and the `OIDC_*` verification contract | [identity.md](./identity.md) |
 | Cross-cutting observability policy, env, middleware, layer responsibilities | [observability.md](./observability.md) |
-| Application logging JSON contract, levels, otelzap tee | [logs.md](./logs.md) |
+| Application logging JSON contract, levels, the `logger/slogx` facade (one redacted record → stdout + OTLP), event catalog | [logs.md](./logs.md) |
 | Metric instruments, cardinality, business metric authoring | [metrics.md](./metrics.md) |
 | Tracing spans, sampling, span helpers | [tracing.md](./tracing.md) |
 | Profiling client (`obsx.SetupProfiling`, env) | [profiling.md](./profiling.md) |
@@ -249,4 +249,4 @@ GitOps manifests — that evidence is how a claim is verified, not a competing
 source to prefer. Mark designed but undeployed behavior as **planned**, and when
 the two disagree, classify it first: [Resolving a mismatch](#resolving-a-mismatch).
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: the observability rollup row points readers at the planned-labelled target rules in the five pillar files; Design records in `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` and `temporal.md` now link ADR-070 through ADR-076. Previously 2026-08-26 — separates capability availability from known-gap lifecycle, adds per-capability evidence, recognizes `admin-service` as the deployed Backoffice application service, and sharpens the `api.md` / `microservices.md` ownership boundary._
+_Last updated: 2026-09-24 — the logging row describes the as-built `logger/slogx` facade (RFC-0031 Task 4.3). Previously 2026-09-18 — RFC-0031 accepted: the observability rollup row points readers at the planned-labelled target rules in the five pillar files; Design records in `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` and `temporal.md` now link ADR-070 through ADR-076. Previously 2026-08-26 — separates capability availability from known-gap lifecycle, adds per-capability evidence, recognizes `admin-service` as the deployed Backoffice application service, and sharpens the `api.md` / `microservices.md` ownership boundary._

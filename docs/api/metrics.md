@@ -9,7 +9,7 @@ RED, gRPC, runtime, database client, and business metric authoring contract for 
 | **Business catalog** | [metrics-catalog.md](../observability/metrics/metrics-catalog.md) — all 63 shipped instruments | — |
 | **Platform ops** | [Application metrics (platform view)](../observability/metrics/metrics-apps.md) — alerts, dashboards, troubleshooting | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [RFC-0017](../proposals/rfc/RFC-0017/) · [RFC-0013](../proposals/rfc/RFC-0013/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · [RFC-0017](../proposals/rfc/RFC-0017/) · [RFC-0013](../proposals/rfc/RFC-0013/) · [ADR-016](../proposals/adr/ADR-016-otel-metrics-cutover/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17; as-built 2026-09-24)** → [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) |
 
 ---
 
@@ -25,25 +25,32 @@ The instrument names and labels are OpenTelemetry semantic conventions
 `http.response.status_code`), translated to their PromQL form by vmagent's
 `usePrometheusNaming` on ingest.
 
-> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built** ([ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget)).
-> Automatic instrumentation stays the only source for HTTP, gRPC, runtime, DB and
+> **As-built — RFC-0031** (`Accepted` 2026-09-17, deployed fleet-wide 2026-09-24;
+> [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget)).
+> Automatic instrumentation is the only source for HTTP, gRPC, runtime, DB and
 > cache metrics. Every business metric is recorded with question, owner, dotted OTel
 > name, instrument type, UCUM unit, bounded attribute allowlist, replay semantics and
 > consumer **before** it is emitted. Instrument selection is two questions in order —
 > additive? monotonic? — then sync versus async; an Observable Counter callback
 > reports the **total**, never the increment. **A histogram declared with UCUM unit
-> `s` receives the fleet bucket set from the shared View** — the SDK default is
-> millisecond-shaped and collapses sub-second quantiles to zero, so the unit, not a
-> list of thirteen numbers at each call site, is what makes a new instrument correct
-> (shipped in `obsx` v0.42.0; the two known gaps `order.inventory.commit_lag` and
-> `payment.reconciliation.run.duration` already carried the unit and needed no
-> change). The planned `forbidigo` rule is withdrawn: a regex over service source
-> cannot see an instrument a library builds, and the View covers the Temporal SDK
-> and gRPC latencies it never would. The
-> [§ App-side cardinality control](#app-side-cardinality-control) denylist becomes a
-> test, a per-service series budget is set from the current ~2,800-series baseline, and
-> Temporal replay never increments an application metric. The platform does **not**
-> promise exemplars. Everything below is as-built.
+> `s` receives the fleet bucket set from the shared View** (`obsx` v0.42.0 onward;
+> all ten services pin `obsx` v0.45.0) — the SDK default is millisecond-shaped and
+> collapses sub-second quantiles to zero, so the unit, not a list of thirteen numbers
+> at each call site, is what makes a new instrument correct. The `forbidigo` rule
+> once planned is withdrawn: a regex over service source cannot see an instrument a
+> library builds, and the View covers the Temporal SDK and gRPC latencies it never
+> would. Every application series carries the same identity labels
+> ([§ Labels & provenance](#labels--provenance)) — measured on Kind 2026-09-24 on all
+> 13 identities (10 services, order-worker, checkout-worker, mockpay) with
+> `app`, `namespace`, `service_version` and `deployment_environment_name` non-empty —
+> and no application series carries an identifier label (`user_id`, order/cart/payment
+> ids, `request_id`, `trace_id`). The order saga records its metrics behind
+> `!workflow.IsReplaying`, so Temporal replay never increments an application metric.
+> The platform does **not** promise exemplars (VictoriaMetrics stores none).
+> **Still planned:** the [§ App-side cardinality control](#app-side-cardinality-control)
+> denylist as a test, and a per-service series budget enforced as a test from the
+> ~2,800-series baseline — neither exists in `pkg` yet; today both are review rules.
+> Everything below is as-built.
 
 ### Metric families at a glance
 
@@ -73,8 +80,10 @@ These are **not custom** — three HTTP metrics are emitted by `otelgin` itself
 (the same instrumentation the tracing middleware wraps), feeding the global
 MeterProvider that `pkg/obsx` installs. `obsx` sets the providers; it does not
 install the `otelgin` middleware — `httpmw.Tracing` (shared `pkg/httpmw`) does.
-Fleet migration off the per-service `<svc>-service/middleware/` copies is **in
-progress**; the shared package is the contract for new and migrated code. All
+The per-service `<svc>-service/middleware/` copies are gone: every service
+with a public HTTP API mounts `httpmw.Tracing` (inventory's operator-only backoffice router
+mounts `httpmw.Logging` and `httpmw.Recovery` but not `Tracing`, so it emits no
+`http.server.*` metrics; its RED comes from gRPC). All
 three also carry the OTLP resource-attribute labels (`app`, `namespace`,
 `k8s_pod_name`, …); only the per-request semconv labels are listed below.
 
@@ -196,6 +205,8 @@ labels on ingest and relabels the two the whole platform groups by.
 | `app` | `service.name` resource attr | `auth` | **vmagent relabel** |
 | `namespace` | `k8s.namespace.name` resource attr | `auth` | **vmagent relabel** |
 | `k8s_pod_name` | `k8s.pod.name` resource attr | `auth-7d4c…` | **vmagent** (promoted) |
+| `service_version` | `service.version` resource attr | `2.8.0` | **vmagent** (promoted) |
+| `deployment_environment_name` | `deployment.environment.name` resource attr | `production` | **vmagent** (promoted) |
 
 vmagent's OTLP ingest runs with a **deliberately narrow** resource-attribute
 allowlist (`promoteAllResourceAttributes: false`) so the SDK-default
@@ -448,21 +459,24 @@ Buckets are how a histogram turns many observations into a distribution: each
 `_bucket{le=X}` counts observations ≤ X, and `histogram_quantile(0.95, …)`
 interpolates the p95 from those cumulative counts.
 
-**Why a seconds histogram needs explicit buckets.** `pkg/obsx` installs an SDK
-**View** (the canonical 13-bucket set above) *only* for the named HTTP/gRPC
-instruments. A brand-new business histogram — say `payment.provider.request.duration`
-— matches no View, so it falls back to the SDK's **default** boundaries, which
-are **millisecond-shaped** (`0, 5, 10, … 10000`). A sub-second call then lands
-entirely in the first bucket and every quantile collapses to ~0. The fix is to
-pass the platform bucket set explicitly when declaring the instrument:
+**Why the unit decides the buckets.** The SDK's **default** histogram
+boundaries are **millisecond-shaped** (`0, 5, 10, … 10000`), so a sub-second
+observation lands entirely in the first bucket and every quantile collapses to
+~0. `pkg/obsx` therefore installs one dispatcher **View**: the named HTTP/gRPC/DB
+instruments get their reviewed sets, and **every other histogram declared with
+unit `s`** falls back to the canonical 13-bucket set above (`obsx` v0.42.0
+onward). Declaring the unit is the whole job:
 
 ```go
 meter.Float64Histogram("payment.provider.request.duration",
-    metric.WithUnit("s"),
-    metric.WithExplicitBucketBoundaries(obsx.DurationBuckets...)) // else quantiles are useless
+    metric.WithUnit("s")) // the obsx View supplies obsx.DurationBuckets
 ```
 
-Money- and rating-scale histograms pick their own boundaries the same way
+Some instruments declared before the View still pass
+`metric.WithExplicitBucketBoundaries(obsx.DurationBuckets...)` — the same set,
+so the hint is redundant, not wrong.
+
+Money- and rating-scale histograms keep their own unit and pass explicit boundaries
 (`order.value.minor` uses cent-scale buckets; `reviews.rating` uses `1,2,3,4,5`).
 
 **Names on the wire.** OTel instrument names are dotted
@@ -623,5 +637,5 @@ metric → exemplar → trace.
 - [Metrics hub (platform)](../observability/metrics/README.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-24 — new § Two RED sources, two jobs: app metrics feed SLOs and alerts, span metrics the RED Span Metrics board; nothing alerts on span metrics (RFC-0031 Task 4.2). Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-073 and a labelled **Target contract** callout states the instrument-selection, explicit-bucket, cardinality-budget and replay rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the collector's `traces` pipeline also feeds the span-metrics connector, which is a metrics source, not a trace store, and the earlier "five" predated the RFC-0027 retirements. Previously 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
+_Last updated: 2026-09-24 — RFC-0031 as-built (Task 4.3): the Target-contract callout becomes an as-built one — the fleet seconds View (obsx v0.42.0+), identity labels measured on all 13 identities, no identifier labels, replay-guarded saga metrics; the denylist and per-service series budget tests stay planned. The seconds-histogram paragraph now describes the unit-based View fallback; `service_version` and `deployment_environment_name` join the label table; the middleware-migration note is replaced (every public HTTP API mounts `httpmw.Tracing`). Previously 2026-09-24 — new § Two RED sources, two jobs: app metrics feed SLOs and alerts, span metrics the RED Span Metrics board; nothing alerts on span metrics (RFC-0031 Task 4.2). Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-073 and a labelled **Target contract** callout states the instrument-selection, explicit-bucket, cardinality-budget and replay rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse); the collector's `traces` pipeline also feeds the span-metrics connector, which is a metrics source, not a trace store, and the earlier "five" predated the RFC-0027 retirements. Previously 2026-08-23 — the correlation loop no longer names Tempo as the only trace destination; logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-17 — HTTP RED instrumentation is mounted by the shared `httpmw.Tracing`._
 

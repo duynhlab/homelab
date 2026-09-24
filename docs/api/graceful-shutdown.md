@@ -10,7 +10,7 @@ lives in the service repos; this page owns the shared behavior.
 | **Applies to** | The 10 Go HTTP services (workers follow a Temporal-specific lifecycle — a recorded gap below) |
 | **Contract env vars** | `READINESS_DRAIN_DELAY` (default 5s) · `SHUTDOWN_TIMEOUT` (default 10s) |
 | **Pod budget** | `terminationGracePeriodSeconds` — defaults come from the `mop` chart (`duynhlab/helm-charts`); homelab pins none per-service |
-| **Ordering** | fail `/ready` → drain delay → HTTP server → DB → tracer flush |
+| **Ordering** | fail `/ready` → drain delay → HTTP server → gRPC server → DB → `process.stopped` → OTel SDK flush |
 
 ---
 
@@ -295,20 +295,26 @@ r.GET("/ready", func(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"status": "ok"})
 })
 
-// Context-based signal handling (modern Go pattern)
-ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-defer stop()
+ctx := context.Background() // records after the signal must not use the cancelled sigCtx
 
-// Start server in goroutine
+// Start server in goroutine — a serve failure is logged, not Fatal:
+// Fatal is for bootstrap failures only
 go func() {
-    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-        logger.Fatal("Server failed", zap.Error(err))
+    if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+        logger.Error(ctx, "Failed to start server", slogx.Err(err))
     }
 }()
 
+logger.ProcessStarted(ctx, slogx.ComponentAPI) // event: process.started
+
+// Context-based signal handling — a separate sigCtx, so the logging ctx
+// above is never the one that gets cancelled
+sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+defer stop()
+
 // Wait for shutdown signal
-<-ctx.Done()
-logger.Info("Shutdown signal received")
+<-sigCtx.Done()
+logger.Info(ctx, "Shutdown signal received")
 
 // Fail readiness first and wait for propagation (VictoriaMetrics pattern)
 isShuttingDown.Store(true)
@@ -321,29 +327,38 @@ defer cancel()
 
 // Explicit cleanup sequence (order matters!)
 // 1. HTTP Server - stop accepting new connections first
+outcome := slogx.OutcomeGraceful
 if err := srv.Shutdown(shutdownCtx); err != nil {
-    logger.Error("Server shutdown error", zap.Error(err))
+    outcome = slogx.OutcomeError
+    logger.Error(ctx, "HTTP server shutdown error", slogx.Err(err))
 } else {
-    logger.Info("HTTP server shutdown complete")
+    logger.Info(ctx, "HTTP server shutdown complete")
 }
 
-// 2. Database - close after server stops
-if err := db.Close(); err != nil {
-    logger.Error("Database close error", zap.Error(err))
-} else {
-    logger.Info("Database closed")
+// 2. gRPC server (services that serve one)
+if grpcSrv != nil {
+    grpcSrv.GracefulStop()
+    logger.Info(ctx, "gRPC server shutdown complete")
 }
 
-// 3. Tracer - flush spans last
+// 3. Database - close after the servers stop
+pool.Close()
+logger.Info(ctx, "Database pool closed")
+
+// 4. process.stopped BEFORE the OTel SDK shuts down — a record emitted
+//    after it is dropped rather than exported
+logger.ProcessStopped(ctx, slogx.ComponentAPI, outcome)
+
+// 5. OTel SDK - flush spans, metrics and logs last
 if tp != nil {
     if err := tp.Shutdown(shutdownCtx); err != nil {
-        logger.Error("Tracer shutdown error", zap.Error(err))
+        logger.Error(ctx, "OpenTelemetry shutdown error", slogx.Err(err))
     } else {
-        logger.Info("Tracer shutdown complete")
+        logger.Info(ctx, "OpenTelemetry shutdown complete")
     }
 }
 
-logger.Info("Graceful shutdown complete")
+logger.Info(ctx, "Graceful shutdown complete") // stdout only: the OTLP provider is already shut down
 ```
 
 ### Cleanup Order
@@ -351,8 +366,10 @@ logger.Info("Graceful shutdown complete")
 The cleanup sequence is **critical**:
 
 1. **HTTP Server** - Stop accepting new connections first (prevents new work)
-2. **Database** - Close connections after server stops (no new queries)
-3. **Tracer** - Flush spans last (captures shutdown events)
+2. **gRPC Server** - `GracefulStop()` on services that serve internal gRPC
+3. **Database** - Close connections after the servers stop (no new queries)
+4. **`process.stopped`** - The lifecycle event (`outcome`: `graceful` | `error`) is written while the OTLP log provider can still export it — see [logs.md § Event catalog](logs.md#event-catalog)
+5. **OTel SDK** - Flush spans, metrics and logs last (captures shutdown events); any record written after this reaches stdout only
 
 ---
 
@@ -362,7 +379,7 @@ The cleanup sequence is **critical**:
 |---------|-------|----------|
 | **SIGKILL during shutdown** | `terminationGracePeriodSeconds` too small | Increase to `shutdown_timeout + 20s` |
 | **Long-running requests timeout** | `SHUTDOWN_TIMEOUT` too short | Increase timeout or optimize request handling |
-| **Leaked database connections** | DB not closed in shutdown sequence | Ensure explicit `db.Close()` in shutdown |
+| **Leaked database connections** | DB not closed in shutdown sequence | Ensure explicit `pool.Close()` in shutdown |
 | **Missing trace spans** | Tracer not flushed | Call `tp.Shutdown()` before exit |
 | **Requests during shutdown** | EndpointSlice update delay | Add `preStop` hook with small sleep |
 
@@ -421,4 +438,4 @@ kubectl describe pod <pod-name> -n user | grep -i kill
 - [Tracing Architecture](../observability/tracing/architecture.md) - OpenTelemetry integration
 
 ---
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — moved from docs/platform/ to docs/api/ as the cross-service shutdown contract; the per-service config table (unbacked by any homelab manifest, incl. a retired-auth row) replaced by the uniform-defaults contract; EndpointSlice wording fixed (removal is not instantaneous — the drain delay exists because of the propagation window); machine-local paths and dead-namespace commands removed._
+_Last updated: 2026-09-24 — RFC-0031 as-built: the code pattern moves from zap to the `logger/slogx` facade (context-first calls, `slogx.Err`, `process.started` before the signal wait, a separate `sigCtx`, `process.stopped` before the OTel SDK shutdown), and the cleanup order gains the gRPC server and the lifecycle event. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — moved from docs/platform/ to docs/api/ as the cross-service shutdown contract; the per-service config table (unbacked by any homelab manifest, incl. a retired-auth row) replaced by the uniform-defaults contract; EndpointSlice wording fixed (removal is not instantaneous — the drain delay exists because of the propagation window); machine-local paths and dead-namespace commands removed._

@@ -179,7 +179,7 @@ services:
   # `docker compose down` still wipes this: `postgres` has no data volume, by
   # design. Use `restart` to exercise durability.
   temporal-schema:
-    image: temporalio/admin-tools:1.31.2
+    image: temporalio/admin-tools:1.32.0
     # A healthy postgres can still refuse the first connection during bring-up;
     # retry rather than failing every Temporal-dependent service behind it.
     restart: on-failure:5
@@ -275,7 +275,7 @@ services:
   # Registers `mop` with the cluster's retention (168h). Gate Temporal-dependent
   # services on this completing, not on the server being healthy.
   temporal-bootstrap:
-    image: temporalio/admin-tools:1.31.2
+    image: temporalio/admin-tools:1.32.0
     restart: on-failure:5 # the frontend can accept a TCP probe just before it serves the API
     environment:
       TEMPORAL_ADDRESS: temporal:7233
@@ -310,7 +310,7 @@ services:
   # tag tracks the cluster's admin-tools pin so the client is never older than the
   # server it talks to.
   temporal-admintools:
-    image: temporalio/admin-tools:1.31.2 # default entrypoint sleeps; nothing to run
+    image: temporalio/admin-tools:1.32.0 # default entrypoint sleeps; nothing to run
     environment:
       TEMPORAL_ADDRESS: temporal:7233
       # `mop` is the only namespace here, so default to it. Without this the CLI

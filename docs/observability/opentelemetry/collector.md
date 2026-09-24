@@ -116,9 +116,9 @@ same Service; only tail-based sampling (not used — head sampling per
 
 | Pipeline | Receivers | Processors (ordered) | Exporters |
 |----------|-----------|----------------------|-----------|
-| `traces` | `otlp` | `memory_limiter` → `batch` | `otlp_http/victoriatraces` · `clickhouse` · **`span_metrics`** (a *connector*, not a store — it feeds the pipeline below) |
-| `logs` | `otlp` | `memory_limiter` → `filter/drop_edge_logs` → `k8sattributes` → `resource/cluster` → `batch` | `otlp_http/victorialogs` (the edge's access log is filtered out here — ClickHouse-only, [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) |
-| `logs/clickhouse` | `otlp` | `memory_limiter` → `k8sattributes` → `resource/cluster` → `batch` | `clickhouse` (everything, edge included) |
+| `traces` | `otlp` | `memory_limiter` → `transform/privacy` → `batch` | `otlp_http/victoriatraces` · `clickhouse` · **`span_metrics`** (a *connector*, not a store — it feeds the pipeline below) |
+| `logs` | `otlp` | `memory_limiter` → `filter/drop_edge_logs` → `transform/privacy` → `k8sattributes` → `resource/cluster` → `batch` | `otlp_http/victorialogs` (the edge's access log is filtered out here — ClickHouse-only, [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) |
+| `logs/clickhouse` | `otlp` | `memory_limiter` → `transform/privacy` → `k8sattributes` → `resource/cluster` → `batch` | `clickhouse` (everything, edge included) |
 | `metrics` | `otlp` | `memory_limiter` → `deltatocumulative` → `batch` | `otlp_http/victoriametrics` |
 | `metrics/spanmetrics` | `span_metrics` | `memory_limiter` → `batch` | `prometheus_remote_write` |
 
@@ -158,7 +158,15 @@ deliberate sequence, not a set:
    temporality normalization. The Go SDK exports cumulative by default
    (RFC-0017 D-7), but a delta sample that ever slipped into VictoriaMetrics
    would silently corrupt `rate()`; this processor makes that impossible.
-3. **`k8sattributes`** (logs pipelines only) — adds what only the API server
+3. **`transform/privacy`** (traces and both logs pipelines) — the ADR-071 deny
+   list for every producer: deletes `client.address`, `network.peer.address`,
+   `network.peer.port`, `user_agent.original` and `user.id` from spans (otelgin
+   and otelhttp put the first four on every HTTP server span), the edge's own
+   `peer.address` and `user_agent`, and the edge access log's `client` IP and
+   `user_agent`. It runs before anything is stored or turned into span metrics.
+   The shared package strips logs at the source; this is the backstop for spans
+   and for the edge and Keycloak, which obsx never sees.
+4. **`k8sattributes`** (logs pipelines only) — adds what only the API server
    knows: `k8s.pod.uid`, `k8s.deployment.name`, `k8s.node.name` and
    `k8s.container.name`, filling the `k8s.*` columns `otel_logs`
    materialises. A record is matched to its pod by the `k8s.pod.name` +
@@ -176,11 +184,11 @@ deliberate sequence, not a set:
    (`order-fulfillment-2-8-0-54b4`), not the WorkerDeployment name; and the
    edge's records get no `k8s.container.name`, because its pod has two
    containers and sends no name.
-4. **`resource/cluster`** (logs pipelines only) — inserts `k8s.cluster.name:
+5. **`resource/cluster`** (logs pipelines only) — inserts `k8s.cluster.name:
    homelab`, which the API server cannot supply. `insert`, so a sender's own
    value wins; an overlay that runs this collector on another cluster patches
    the value.
-5. **`batch`** (`send_batch_size: 512`, `send_batch_max_size: 1024`,
+6. **`batch`** (`send_batch_size: 512`, `send_batch_max_size: 1024`,
    `timeout: 5s`) — always **last**, groups exports for compression
    efficiency.
 
@@ -250,7 +258,7 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 
 ---
 
-_Last updated: 2026-09-24 — RFC-0031 Task 4.4: `k8sattributes` + `resource/cluster` on
+_Last updated: 2026-09-24 — `transform/privacy` on traces and both logs pipelines strips the ADR-071 deny list from every producer. Earlier the same day — RFC-0031 Task 4.4: `k8sattributes` + `resource/cluster` on
 both logs pipelines (all seven `k8s.*` columns filled on Kind), both HTTP method
 dimensions on the span-metrics connector, and the pipeline table brought up to the five
 pipelines actually deployed. Previously 2026-08-24 — exporters are **6 defined / 5 wired** after RFC-0027 removed

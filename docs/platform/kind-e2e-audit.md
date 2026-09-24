@@ -1355,6 +1355,44 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 ## Previous runs
 
+### 2026-09-24 — checkout 0.10.4 (confirm lock)
+
+Cluster: kind `homelab`, 4 nodes, `kindest/node:v1.34.3`
+Host: Linux + Docker, arch amd64
+Revision: `fix/checkout-0.10.4` (#1087) — pins asserted: checkout API and the
+abandonment worker at 0.10.4; every other pin unchanged from 2026-09-23
+Preconditions: compose full audit (A/B/C) passed 2026-09-24 on the same
+candidates · tags pinned in this branch · no prior cluster (`make up` created it)
+
+| Group | Result | Evidence |
+|---|---|---|
+| K0 machine | PASS | 4/4 nodes Ready; `homelab-ca` trusted per user (NSS `certutil`, no sudo) and a CA bundle for CLI tools — `https://grafana.duynh.me` and the gateway answer 200 **without `-k`** |
+| K1 bring-up | PASS | `make up` exit 0; **30/30 Kustomizations Ready**; `kind-seed.sh` 8/8 |
+| K2 delivery | PASS | checkout `0.10.4` on both `checkout` and `checkout-abandon-0-10-4-7d97`; the other 13 images equal their pins |
+| K3 admission/secrets | PASS | 6/6 ClusterPolicies, **0 policy failures**; 38/38 ExternalSecrets synced; OpenBAO unsealed (awskms via floci); 3 CNPG clusters at 3/3 |
+| K4 edge/identity + K5 signals | PASS | k6 `GATE=kind`: saga 4/4 (9/9), smoke 15/15 (50/50), staff 5/5 (59/59), operator 1/1 (26/26) |
+| Confirm lock (the change) | PASS | product scaled to 0 → confirm with key K1 = **503** → session reads `ready` → product back → confirm with a **different** key = **201**, order completed. On 0.10.3 this path answered 409 forever (finding of 2026-09-23) |
+
+**Findings:**
+
+- **The product list cache outlives the seed.** Right after `kind-seed.sh` the
+  catalog list answered an empty array twice (03:07:33 and 03:08:42 UTC) and
+  15 items from 03:09:47: the empty page cached before the seed stayed within
+  its TTL, because the seed writes the database and nothing invalidates the
+  list. It failed K4.2's non-empty assertion once. Not a regression; wait one
+  cache TTL after seeding, or seed before anything reads the catalog.
+- **The gate's own traffic trips alerts, in two ways.** A21 deliberately sends
+  checkout an untracked SKU, which fires `CheckoutAvailabilityUnknownSKU`
+  (critical, count-once over 15m) — so K5.8 must run before the staff gate, as
+  `make e2e` orders it, or after the window. And the confirm-lock repro's 503s
+  tripped checkout's page-severity burn alerts in a quiet hour; 1500 paced
+  successful reads diluted the ratio and K5.8 passed at 50/50.
+- **A fresh confirm right after product returns can still answer 503** while
+  checkout's gRPC client reconnects; the next attempt succeeded. The session
+  stayed `ready` throughout, which is the property this release fixes.
+
+**Decision: ELIGIBLE**
+
 Kept so the next audit inherits the findings instead of rediscovering them.
 
 ### 2026-09-23 — the obsx v0.44.0 fleet release

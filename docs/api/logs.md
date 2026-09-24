@@ -32,8 +32,9 @@ Stdout is still emitted for `kubectl logs`.
 Scope and shared bootstrap rules: [Application observability](./observability.md).
 
 > **What changed for stored queries at the cutover.** The six envelope keys —
-> `timestamp`, `level`, `message`, `caller`, `trace_id`, `span_id` — are byte-for-byte
-> what `zapx` emitted, so queries on them survived untouched; they are now reserved.
+> `timestamp`, `level`, `message`, `caller`, `trace_id`, `span_id` — are reserved. The
+> first five are what `zapx` emitted, so queries on them survived untouched; `span_id`
+> on stdout is new (the zap era wrote only `trace_id` there).
 > The error field changed: `zap.Error(err)` wrote one string field `error`;
 > `slogx.Err(err)` writes two flat fields, `error.type` (the Go type, the
 > low-cardinality label the span also carries) and `error.message` (the text, redacted
@@ -93,7 +94,9 @@ All services build the logger from the shared facade (`github.com/duynhlab/pkg/l
 - `Logger.Fatal` is for bootstrap failures only: it writes the record, calls the
   configured `Flush`, and exits with status 1.
 
-**Service wiring** (as built in every service `cmd/main.go`):
+**Service wiring** (as built in the service `cmd/main.go` files; inventory mounts
+`Logging` and `Recovery` but not `Tracing`, and only services that serve gRPC call
+`grpcx.NewServer` — not user or checkout):
 
 ```go
 logger := slogx.New(slogx.Config{Level: cfg.Logging.Level})
@@ -166,7 +169,7 @@ without parsing language-specific label strings:
 | `TraceId`, `SpanId`, `TraceFlags` | the span in the `ctx` passed to the call, read by the bridge (stdout gets `trace_id` / `span_id` from the same span) |
 | `SeverityText`, `SeverityNumber` | slog level via the OTel slog bridge — filter on the number; the text reads `DEBUG-4` / `ERROR+4` for trace and fatal |
 | `Body` | record `message` |
-| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod — from `OTEL_SERVICE_NAME` + Downward API; `service.version` only on the versioned order worker today — the controller-derived build id, read from the `temporal.io/build-id` pod label, ADR-054) |
+| `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod — from `OTEL_SERVICE_NAME` + Downward API; `service.version` from `OTEL_RESOURCE_ATTRIBUTES` — the image tag on every API service and mockpay, the controller-derived build id on the two versioned workers, read from the `temporal.io/build-id` pod label, ADR-054) |
 | `InstrumentationScope` | always `github.com/duynhlab/pkg/logger/slogx` — the facade's package path, never the service name |
 | `Attributes` | every redacted `slog.Attr` on the record; the source location rides as `code.*` attributes (stdout shortens it to `caller`) |
 
@@ -435,7 +438,8 @@ the **status-code class** (pkg ≥ v0.31.0, verbatim from go-grpc-middleware's
 `PermissionDenied`, `ResourceExhausted`, `FailedPrecondition`, `Aborted`,
 `OutOfRange`, `Unavailable`), faults at `error` (`Unknown`, `Unimplemented`,
 `Internal`, `DataLoss`; unknown codes default to `error`). This is as-built:
-every gRPC-serving service (all but user) pins `pkg/grpcx v0.37.0`. HTTP
+every service except user pins `pkg/grpcx v0.37.0`; eight of them serve gRPC
+(not user, not checkout, which uses grpcx only as a client). HTTP
 messages are `HTTP request`, gRPC messages are `gRPC request`.
 
 **Probe filtering (contract):** no routine successful health/readiness probe

@@ -111,8 +111,9 @@ These rules apply to every service PR. Rationale: [RFC-0014](../proposals/rfc/RF
    [graceful-shutdown sequence](./graceful-shutdown.md)**
    (after the HTTP/gRPC servers stop), bounded by the shutdown context —
    `cfg.ShutdownTimeout` is an `int` of seconds behind
-   `cfg.GetShutdownTimeoutDuration()`. Workers follow the same rule: every
-   process flushes through a bounded `Shutdown` before exit. The lifecycle
+   `cfg.GetShutdownTimeoutDuration()`. Workers flush through `Shutdown` before
+   exit too — bounded at 5s on order-worker; checkout-worker passes an unbounded
+   `context.Background()`. The lifecycle
    records bracket the process: `logger.ProcessStarted(ctx, component)` before
    the signal wait, and `logger.ProcessStopped(ctx, component, outcome)`
    **before** the OTel shutdown, because a record emitted after it is dropped.

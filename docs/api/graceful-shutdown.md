@@ -379,7 +379,7 @@ The cleanup sequence is **critical**:
 |---------|-------|----------|
 | **SIGKILL during shutdown** | `terminationGracePeriodSeconds` too small | Increase to `shutdown_timeout + 20s` |
 | **Long-running requests timeout** | `SHUTDOWN_TIMEOUT` too short | Increase timeout or optimize request handling |
-| **Leaked database connections** | DB not closed in shutdown sequence | Ensure explicit `db.Close()` in shutdown |
+| **Leaked database connections** | DB not closed in shutdown sequence | Ensure explicit `pool.Close()` in shutdown |
 | **Missing trace spans** | Tracer not flushed | Call `tp.Shutdown()` before exit |
 | **Requests during shutdown** | EndpointSlice update delay | Add `preStop` hook with small sleep |
 

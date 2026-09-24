@@ -1,116 +1,125 @@
 # Application Logging
 
-Structured logging contract for every Go service and worker in the platform service catalog — libraries, JSON shape, levels, and OTLP export via the otelzap tee.
+Structured logging contract for every Go service and worker in the platform service catalog — the `logger/slogx` facade, JSON shape, levels, and OTLP export of the same redacted record.
 
 | Attribute | Value | RFC / ADR |
 |-----------|-------|-----------|
-| **Logger** | `github.com/duynhlab/pkg/logger/zapx` (fleet-wide since RFC-0014 P4) | — |
-| **Format** | JSON on stdout + OTLP logs when `OTEL_LOGS_ENABLED=true` | — |
-| **Correlation** | `trace_id` / `span_id` from active span context | — |
+| **Logger** | `github.com/duynhlab/pkg/logger/slogx` v0.2.0 (fleet-wide since 2026-09-24, RFC-0031 Phase 3) | [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) |
+| **Format** | One redacted record → JSON envelope on stdout + OTLP logs when `OTEL_LOGS_ENABLED=true` | [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) |
+| **Correlation** | `trace_id` / `span_id` from the span in the `ctx` passed to each call | — |
 | **Platform pipeline** | [Logging (platform)](../observability/logging/README.md) — dual-path ingest (OTLP + Vector) into **two** stores: VictoriaLogs (7d, LogsQL) and ClickHouse `otel_logs` (90d, SQL) | — |
 | **Cross-cutting** | [Application observability](./observability.md) — middleware order, env, `obsx` | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17; as-built 2026-09-24)** → [ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog) · [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) |
 
 ---
 
 ## Overview
 
-Every service outputs **structured JSON** using the shared **`zapx`** logger. Its zap core is **tee'd** into the OpenTelemetry log pipeline (see [OpenTelemetry integration](#opentelemetry-integration)).
+Every service and worker logs through the shared **`logger/slogx`** facade — a
+context-first API over the standard library's `slog`. Each call builds **one**
+record, redacts it **once**, and renders it to two sinks: the JSON envelope on
+stdout and an OTLP log record (see [OpenTelemetry integration](#opentelemetry-integration)).
 
-**Current status (RFC-0014 P4):** the fleet has converged on **`zapx`** — one logger, one
-JSON contract, one otelzap tee → OTLP → OpenTelemetry Collector, which exports to **two**
-stores: **VictoriaLogs** (7-day ops retention, LogsQL) and **ClickHouse** `otel_logs`
-(90-day SQL, [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/)). Stdout is
-still emitted for `kubectl logs`.
+**Current status (RFC-0031 Phase 3, 2026-09-24):** all ten services, `order-worker`,
+`checkout-worker` and `mockpay` pin `logger/slogx` v0.2.0, and no release image links
+`go.uber.org/zap`, otelzap, `zerolog` or `clog`. `zapx`, `zerolog` and `clog` are
+retired from `duynhlab/pkg` (their tags still resolve). The OTLP branch goes through the
+global logger provider `obsx` installs to the OpenTelemetry Collector, which exports to
+**two** stores: **VictoriaLogs** (7-day ops retention, LogsQL) and **ClickHouse**
+`otel_logs` (90-day SQL, [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/)).
+Stdout is still emitted for `kubectl logs`.
 
 Scope and shared bootstrap rules: [Application observability](./observability.md).
 
-> **Target contract — RFC-0031, `Accepted` 2026-09-17. The facade now exists
-> (`logger/slogx` v0.1.0, tagged 2026-09-23); no service has adopted it, so every
-> section below still describes `zapx` as deployed.** The fleet
-> logger becomes **`pkg/logger/slogx`** — a context-first facade over the standard
-> library's `slog` that redacts once and renders the same record to stdout and OTLP;
-> `zapx` and the otelzap tee are retired in the same release train, and no service may
-> import `zap`, `zapcore`, `log/slog` directly, `zerolog` or an OTel log bridge
-> ([ADR-070](../proposals/adr/ADR-070-logging-facade-and-event-catalog/) (slog facade, event catalog)). The access record moves to the semconv keys shown in
-> [§ Log output format](#log-output-format) and drops raw path, `client_ip` and
-> `user_agent`; named events form a five-class catalog with a fixed grammar and one
-> deny list applied before every sink ([ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy)). Every section below still describes
-> **`zapx` as deployed**; it is rewritten to as-built when RFC-0031 Phase 3 lands. New
-> logging code is reviewed against the target rules from this date — see
-> [observability.md § Cross-signal telemetry standard](./observability.md#cross-signal-telemetry-standard-rfc-0031--normative-planned).
->
-> **What v0.1.0 fixes about the envelope, and the one query that breaks.** The six
-> envelope keys are byte-for-byte what `zapx` emits, so stored queries on
-> `timestamp`, `level`, `message`, `caller`, `trace_id` and `span_id` survive the
-> cutover untouched — and they are now *reserved*, so a service attribute can no
-> longer collide with one. The error field does change: `zap.Error(err)` wrote a
-> single string field `error`; `slogx.Err(err)` writes two flat fields, `error.type`
-> (the Go type, the low-cardinality label ADR-075 also puts on the span) and
-> `error.message` (the text, redacted and bounded). **Any dashboard panel, alert
-> expression or saved LogsQL filter matching `error` as a string must move to
-> `error.message`, or better to `error.type`, before the first service cuts over.**
-> Two levels join the four: `trace` (severity 1) and `fatal` (21); on OTLP the
-> severity *number* is the field to filter, because the bridge writes severity text
-> with the standard library's spelling, which has no name for those two.
+> **What changed for stored queries at the cutover.** The six envelope keys —
+> `timestamp`, `level`, `message`, `caller`, `trace_id`, `span_id` — are byte-for-byte
+> what `zapx` emitted, so queries on them survived untouched; they are now reserved.
+> The error field changed: `zap.Error(err)` wrote one string field `error`;
+> `slogx.Err(err)` writes two flat fields, `error.type` (the Go type, the
+> low-cardinality label the span also carries) and `error.message` (the text, redacted
+> and bounded). A panel, alert or saved LogsQL filter matching `error` as a string must
+> use `error.message`, or better `error.type`. The access record moved from
+> `method`/`path`/`status`/`duration`/`client_ip`/`user_agent` to the semconv keys in
+> [§ Access-log policy](#access-log-policy). Two levels joined the four: `trace`
+> (severity 1) and `fatal` (21); on OTLP the severity *number* is the field to filter,
+> because the bridge writes severity text with the standard library's spelling, which
+> has no name for those two.
 
 ---
 
 ## Pod log verification
 
 ```bash
-# Uniform zapx JSON, with trace_id when a span is active
-kubectl logs -n auth deployment/auth --tail=50
+# Uniform slogx JSON envelope, with trace_id/span_id when a span is active
+kubectl logs -n order deployment/order --tail=50
 kubectl logs -n cart deployment/cart --tail=50
 ```
 
 ### Log output format
 
-Canonical access-log line (middleware-owned summary) — **the contract target, not
-yet what the fleet emits**; see [Access-log policy](#access-log-policy) for the
-as-built keys:
+Canonical access-log line (middleware-owned summary, as emitted by `httpmw.Logging`):
 
 ```json
-{"level":"info","timestamp":"2026-07-09T02:12:04.455Z","caller":"httpmw/logging.go:192","message":"HTTP request","trace_id":"94c290a2e22a985f6f9fa2337e476443","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"duration_seconds":0.042}
+{"timestamp":"2026-09-24T02:12:04.455Z","level":"info","caller":"httpmw@v0.2.0/logging.go:144","message":"HTTP request","http.request.method":"GET","http.route":"/order/v1/private/orders","http.response.status_code":200,"trace_id":"94c290a2e22a985f6f9fa2337e476443","span_id":"5b8efff798038103"}
 ```
 
-What `kubectl logs` shows **today** carries the legacy keys the same middleware
-still emits — `method`, `path`, `status`, `duration`, plus `client_ip` and
-`user_agent` — so a query written against the target keys above returns nothing on
-the current fleet. The envelope (`level`, `timestamp`, `caller`, `message`,
-`trace_id`) is identical in both shapes.
+The record carries no raw path, query, client address, User-Agent or duration — the
+span and the RED histogram measure latency. See [Access-log policy](#access-log-policy)
+for the full key set.
 
-The stdout line is also exported over OTLP by
-the otelzap tee, and the collector's `logs` pipeline writes it to **both** VictoriaLogs and
-ClickHouse. The two are retention tiers, not a mistake: 7 days of LogsQL for ops, 90 days of
-SQL for questions that cross days.
+The same redacted record is exported over OTLP by the facade's second sink, and the
+collector's `logs` pipeline writes it to **both** VictoriaLogs and ClickHouse. The two
+are retention tiers, not a mistake: 7 days of LogsQL for ops, 90 days of SQL for
+questions that cross days.
 
 ---
 
-## The `zapx` logger
+## The `slogx` logger
 
-All services build the logger from the shared adapter (`github.com/duynhlab/pkg/logger/zapx`):
+All services build the logger from the shared facade (`github.com/duynhlab/pkg/logger/slogx`):
 
-- **JSON encoder** with `TimeKey: "timestamp"` (ISO8601), `MessageKey: "message"`, `LevelKey: "level"`, `CallerKey: "caller"`.
-- Level parsed from `LOG_LEVEL` (`debug|info|warn|error`, defaults to `info`).
-- `WithContext` / `FromContext` helpers carry a request-scoped logger.
+- **JSON envelope** on stdout: `timestamp` (ISO8601, UTC, millisecond), `level`
+  (lowercase: `trace|debug|info|warn|error|fatal`), `caller` (`<dir>/<file>.go:<line>`),
+  `message`, then the record's attributes, then `trace_id` / `span_id` when the `ctx`
+  carries a valid span.
+- Level parsed from `LOG_LEVEL` (`debug|info|warn|error`; `trace` is accepted for local
+  investigation); anything else means `info`.
+- Every emission takes a `context.Context` (`Info(ctx, msg, attrs…)`); correlation
+  comes from that `ctx`, never from bound fields.
+- `slogx.FromContext` / `slogx.WithContext` carry a logger through code that receives
+  only a context; `slogx.SetDefault` installs the configured logger as the fallback.
+- `Logger.Slog()` hands the same handler chain (redaction, level gate, both sinks) to
+  shared middleware and SDK bridges that need a `*slog.Logger`.
+- `Logger.Fatal` is for bootstrap failures only: it writes the record, calls the
+  configured `Flush`, and exits with status 1.
 
-**Setup** (`pkg/logger/zapx/logger.go` in the `duynhlab/pkg` repository):
+**Service wiring** (as built in every service `cmd/main.go`):
 
 ```go
-func New(level string) (*zap.Logger, error) {
-    cfg := zap.NewProductionConfig()
-    cfg.Level = zap.NewAtomicLevelAt(parseLevel(level))
-    cfg.EncoderConfig.TimeKey = "timestamp"
-    cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-    cfg.EncoderConfig.MessageKey = "message"
-    cfg.EncoderConfig.LevelKey = "level"
-    cfg.EncoderConfig.CallerKey = "caller"
-    return cfg.Build()
+logger := slogx.New(slogx.Config{Level: cfg.Logging.Level})
+slogx.SetDefault(logger)
+
+obs, err := obsx.SetupObservability(ctx, obsx.ConfigFromEnv())
+if err != nil {
+    logger.Warn(ctx, "Failed to initialize OpenTelemetry", slogx.Err(err))
+} else {
+    // The OTLP sink reads the global logger provider obsx installed; the
+    // rebuild only wires Flush, so a Fatal record is exported before exit.
+    logger = slogx.New(slogx.Config{Level: cfg.Logging.Level, Flush: obs.ForceFlush})
+    slogx.SetDefault(logger)
 }
+
+r := gin.New() // not gin.Default: its logger and recovery bypass the facade
+r.Use(httpmw.Tracing(serviceName))
+r.Use(httpmw.Logging(logger.Slog()))
+r.Use(httpmw.Recovery(logger.Slog()))
+
+grpcSrv, _ := grpcx.NewServer(logger.Slog())
+// order and checkout: temporalx.Dial(..., temporalx.WithLogger(logger.Slog()))
 ```
 
-`trace_id`/`span_id` are injected from the OpenTelemetry span context in `httpmw.Logging`, so a log line and its trace join on one id.
+Business code logs through `slogx.FromContext(ctx)` or an injected `*slogx.Logger`,
+always passing the request `ctx`.
 
 ---
 
@@ -139,37 +148,37 @@ and the OTLP export carries it natively.
 OTel normalizes severity into numeric ranges so backends can filter and alert
 without parsing language-specific label strings:
 
-| Range | Meaning | zap level mapped by the otelzap bridge |
-|-------|---------|----------------------------------------|
-| 1–4 | TRACE | — (zap has no trace level) |
-| 5–8 | DEBUG | `DebugLevel` |
-| 9–12 | INFO | `InfoLevel` |
-| 13–16 | WARN | `WarnLevel` |
-| 17–20 | ERROR | `ErrorLevel` |
-| 21–24 | FATAL | `FatalLevel` / `PanicLevel` |
+| Range | Meaning | `slogx` level mapped by the OTel slog bridge |
+|-------|---------|----------------------------------------------|
+| 1–4 | TRACE | `slogx.LevelTrace` → 1 |
+| 5–8 | DEBUG | `slog.LevelDebug` → 5 |
+| 9–12 | INFO | `slog.LevelInfo` → 9 |
+| 13–16 | WARN | `slog.LevelWarn` → 13 |
+| 17–20 | ERROR | `slog.LevelError` → 17 |
+| 21–24 | FATAL | `slogx.LevelFatal` → 21 (`Logger.Fatal` only) |
 
 ### How the platform stack fills the LogRecord
 
 | LogRecord field | Filled by |
 |-----------------|-----------|
-| `Timestamp` | zap entry time (`zapx` `timestamp`) |
-| `ObservedTimestamp` | otelzap bridge / OpenTelemetry Collector at receive time |
-| `TraceId`, `SpanId`, `TraceFlags` | `obsx.TraceContext(ctx)` bound to the request logger |
-| `SeverityText`, `SeverityNumber` | zap `level` via the otelzap bridge |
-| `Body` | zap `message` |
+| `Timestamp` | record time (stdout `timestamp`) |
+| `ObservedTimestamp` | OTel log SDK when the record is emitted |
+| `TraceId`, `SpanId`, `TraceFlags` | the span in the `ctx` passed to the call, read by the bridge (stdout gets `trace_id` / `span_id` from the same span) |
+| `SeverityText`, `SeverityNumber` | slog level via the OTel slog bridge — filter on the number; the text reads `DEBUG-4` / `ERROR+4` for trace and fatal |
+| `Body` | record `message` |
 | `Resource` | `pkg/obsx` resource (`service.name`, namespace, pod — from `OTEL_SERVICE_NAME` + Downward API; `service.version` only on the versioned order worker today — the controller-derived build id, read from the `temporal.io/build-id` pod label, ADR-054) |
-| `InstrumentationScope` | the scope name passed to `obs.ZapCore(scopeName, minLevel)` |
-| `Attributes` | every `zap.Field` on the entry (`caller` included) |
+| `InstrumentationScope` | always `github.com/duynhlab/pkg/logger/slogx` — the facade's package path, never the service name |
+| `Attributes` | every redacted `slog.Attr` on the record; the source location rides as `code.*` attributes (stdout shortens it to `caller`) |
 
-Every field in this mapping is wired by shared code (`pkg/obsx`, `zapx`,
-middleware) — a service author only writes `logger.Info(message, fields…)` and
+Every field in this mapping is wired by shared code (`pkg/obsx`, `slogx`,
+middleware) — a service author only writes `logger.Info(ctx, message, attrs…)` and
 the full LogRecord shape falls out.
 
 ---
 
 ## Log level standards
 
-Platform severity taxonomy — use when choosing which zap method to call or
+Platform severity taxonomy — use when choosing which `slogx` method to call or
 interpreting exported JSON `level` values:
 
 | Level Name | Value | Description |
@@ -182,26 +191,25 @@ interpreting exported JSON `level` values:
 | **debug** | 0 | Detailed debug info |
 | **trace** | -1 | Low-level tracing |
 
-### Library level mapping (zap)
+### Library level mapping (`slogx`)
 
-The fleet converged on **`zapx`** (RFC-0014 P4) — see
-[Migration history](#migration-history). Legacy `pkg/logger/zerolog` and
-`pkg/logger/clog` adapters remain in `duynhlab/pkg` but no service imports
-them anymore; every API service and worker in the catalog uses `zapx`.
+The fleet runs **`slogx`** (RFC-0031 Phase 3, 2026-09-24) — see
+[Migration history](#migration-history). The earlier `zapx`, `zerolog` and `clog`
+adapters were removed from `duynhlab/pkg` the same day.
 
-| User Standard | Zap (`zapcore.Level`) |
-|----------------|-----------------------|
-| panic (5) | PanicLevel (4) |
-| fatal (4) | FatalLevel (5) |
-| error (3) | ErrorLevel (2) |
-| warn (2) | WarnLevel (1) |
-| info (1) | InfoLevel (0) |
-| debug (0) | DebugLevel (-1) |
-| trace (-1) | N/A (zap has no trace level) |
+| User Standard | `slogx` (`slog.Level`) |
+|----------------|------------------------|
+| panic (5) | N/A (the facade has no panic method) |
+| fatal (4) | `slogx.LevelFatal` (12), written only by `Logger.Fatal` |
+| error (3) | `slog.LevelError` (8) |
+| warn (2) | `slog.LevelWarn` (4) |
+| info (1) | `slog.LevelInfo` (0) |
+| debug (0) | `slog.LevelDebug` (-4) |
+| trace (-1) | `slogx.LevelTrace` (-8) |
 
-`panic` and `fatal` are **logger methods** (`logger.Panic`, `logger.Fatal`) or
-process bootstrap failures — they are **not** valid `LOG_LEVEL` values. The
-platform defines no trace log level.
+`fatal` is a **logger method** (`logger.Fatal`) for process bootstrap failures —
+not a valid `LOG_LEVEL` value. `trace` is accepted by the facade for local
+investigation; service config validation admits only the four runtime values below.
 
 ### Runtime configuration (`LOG_LEVEL`)
 
@@ -221,8 +229,8 @@ What operators and config validation actually accept:
 
 **Wiring contract:**
 
-- stdout logger: `zapx.New(cfg.Logging.Level)` — the validated config value, not a raw env read. `zapx.parseLevel` recognises the four runtime values; anything else defaults to `info`.
-- OTLP tee gate: the **same level** gates the export branch — `zapcore.ParseLevel` (fallback `info`) passed to `obs.ZapCore(serviceName, minLevel)` — so debug records suppressed on stdout are not exported over OTLP either.
+- Logger: `slogx.New(slogx.Config{Level: …})` with the service's `LOG_LEVEL` (the validated config value, or the env var directly in services that read it there). The facade recognises the runtime values; anything else defaults to `info`.
+- One level gate: it sits above both sinks, so debug records suppressed on stdout are not exported over OTLP either.
 
 Legacy adapters (`zerolog`, `clog`) accepted the same four `LOG_LEVEL` strings before P4; only the JSON field shapes differed (`msg` vs `message`, Unix vs ISO8601 time).
 
@@ -246,12 +254,12 @@ Legacy adapters (`zerolog`, `clog`) accepted the same four `LOG_LEVEL` strings b
 | `trace_id`, `span_id` | a valid active span context exists |
 | `event` | the record represents a stable machine-queryable event |
 | `operation` | the record belongs to a command/use case |
-| `error` / `error.type` | the operation has an error |
+| `error.type`, `error.message` | the operation has an error (`slogx.Err(err)`) |
 | domain/workflow identifiers | operationally justified and permitted by the [common data policy](./observability.md#cross-signal-data-and-privacy-policy) |
 
 ### OTLP export (app path)
 
-- otelzap maps the zap `message` to the OTLP log body and attaches fields as attributes.
+- The OTel slog bridge maps the record `message` to the OTLP log body and attaches the redacted attributes as attributes.
 - The Collector's VictoriaLogs exporter sets `VL-Stream-Fields: service.name` (one stream per service) and keeps `trace_id` as a queryable field.
 
 Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [VictoriaLogs (platform)](../observability/logging/victorialogs.md#per-sender-ingest-contract).
@@ -270,8 +278,7 @@ Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [Victori
 - Do not create one-off aliases such as `orderId`, `order_id`, and `oid` for the same concept.
 - Errors use one shape: `error.type` plus a redacted `error.message`.
 
-Today's services still write snake_case keys through zap; the shape below is what
-they move to in RFC-0031 Phase 3.
+The facade call shape:
 
 ```go
 log.Event(ctx, slog.LevelInfo, "order.confirmed", "order confirmed",
@@ -283,10 +290,21 @@ log.Error(ctx, "compensation failed", slogx.Err(err),
 
 ## Event catalog
 
-> **Frozen by RFC-0031 Task 0.2 — not yet emitted.** This is the registered list
-> a service may emit through `slogx.Event`. It takes effect when the fleet moves to
-> `logger/slogx` (RFC-0031 Phase 3); until then no record carries these names. Owner
-> sign-off is the merge of the change that introduced this section.
+> **Frozen by RFC-0031 Task 0.2; emitted since 2026-09-24.** This is the registered
+> list a service may emit through `slogx.Event`. Owner sign-off is the merge of the
+> change that introduced this section. Observed live on Kind in ClickHouse
+> `otel_logs` (`LogAttributes['event']`) during the 2026-09-24 audit:
+> `process.started` (all 13 identities — 10 services, `order-worker`,
+> `checkout-worker`, `mockpay`; untraced by design), `order.created`,
+> `temporal.workflow.started`, `order.confirmed`, `order.manual_review.entered`,
+> `order.compensation.completed`, `payment.authorization.completed`,
+> `payment.capture.completed`, `payment.refund.completed` and
+> `checkout.session.confirmed` — every request-scoped one carrying a trace id. The
+> compose release gate observed 15 names. Catalog names outside the Kind list above
+> were not observed in that audit.
+
+An event is emitted only after the decision it names is stored, and only by the caller
+that stored it.
 
 The catalog is deliberately small. A name is admitted only when an operator would
 query it **by name across services**; a detail read while following one request
@@ -325,12 +343,14 @@ on a span for a business rejection.
 **Workflow lifecycle events are never written from workflow code.** Workflow code is
 replayed, and only the SDK's replay-aware logger may run there; these two names are
 emitted by the client that starts the run or by the activity or dispatcher that
-observes its end.
+observes its end. `temporalx.WithLogger` installs the client interceptor that writes
+`temporal.workflow.started`.
 
 Domain events that are *decided* in workflow code — `order.failed`,
 `order.compensation.completed`, the saga's `order.retry.exhausted` — go through
 `temporalx.WorkflowEvent`, which writes via that replay-aware logger, so a replayed
-history writes nothing. Everywhere else a service uses the facade's `Event`.
+history writes nothing. An activity's `error.type` comes from the Temporal
+`ApplicationError.Type()`. Everywhere else a service uses the facade's `Event`.
 
 **Deliberately not in the catalog.** Cart, review, notification, shipping, user and
 product transitions are single-service facts already counted by their business
@@ -385,27 +405,26 @@ HTTP and gRPC middleware own **one request/RPC summary record** per call.
 Handlers must not also write generic `logger.Info("HTTP request", …)` unless
 they are logging a separate domain event.
 
-**Access-log field schema (contract):**
+**Access-log field schema (as built — `pkg/httpmw` v0.2.0, `pkg/grpcx` v0.37.0):**
 
 | Field | Notes |
 |-------|-------|
-| `http.request.method` | HTTP verb |
-| `http.route` | Route template, never the raw path with IDs |
+| `message` | `HTTP request` / `gRPC request` |
+| `http.request.method` | HTTP verb — the nine standard methods, anything else `_OTHER` |
+| `http.route` | Matched route template, never the raw path; omitted when no route matched |
 | `http.response.status_code` | Final status |
-| `duration_seconds` | Request latency, explicit unit |
-| `rpc.system`, `rpc.service`, `rpc.method` | gRPC access logs |
-| `grpc.code` | gRPC status |
-| `trace_id` | When span context exists |
+| `rpc.system.name`, `rpc.method` | gRPC access logs (`rpc.method` is `package.Service/Method`) |
+| `rpc.response.status_code` | gRPC status by its spec name (`NOT_FOUND`, `CANCELLED`) — the value the span carries |
+| `error.type` | HTTP: the status code as a string for a 5xx, `panic` when `httpmw.Recovery` caught one; gRPC: the code for the six codes the server span marks Error |
+| `trace_id`, `span_id` | When span context exists (from the request `ctx`) |
 
-> **Contract target, not yet as-built.** Today every service emits
-> `method`/`path`/`status`/`duration`/`client_ip`/`user_agent` on HTTP and
-> `method`/`code`/`duration`/`peer` on gRPC (see
-> [tracing.md](./tracing.md) for the fields recorded today, and
-> [api.md § Deadlines, retries, and health](./api.md#deadlines-retries-and-health)
-> for probe filtering). The rename to this schema —
-> and dropping `client_ip`/`user_agent` per the
-> [data policy](./observability.md#cross-signal-data-and-privacy-policy) — is
-> the LOG-1 refactor.
+The record carries **no** raw path or query, client address, User-Agent, peer
+address or duration — they leak identifiers or personal data per the
+[data policy](./observability.md#cross-signal-data-and-privacy-policy), and the span
+and the RED histogram already measure duration. See [tracing.md](./tracing.md) for
+the span attributes and
+[api.md § Deadlines, retries, and health](./api.md#deadlines-retries-and-health)
+for probe filtering.
 
 Level policy: HTTP logs `error` for status ≥ 500, `warn` for 400–499, else
 `info` — a rejected request is not a broken service. gRPC follows
@@ -416,8 +435,8 @@ the **status-code class** (pkg ≥ v0.31.0, verbatim from go-grpc-middleware's
 `PermissionDenied`, `ResourceExhausted`, `FailedPrecondition`, `Aborted`,
 `OutOfRange`, `Unavailable`), faults at `error` (`Unknown`, `Unimplemented`,
 `Internal`, `DataLoss`; unknown codes default to `error`). This is as-built:
-every service pins `pkg/grpcx v0.36.1`. HTTP messages are `HTTP request`, gRPC
-messages are `gRPC request`.
+every gRPC-serving service (all but user) pins `pkg/grpcx v0.37.0`. HTTP
+messages are `HTTP request`, gRPC messages are `gRPC request`.
 
 **Probe filtering (contract):** no routine successful health/readiness probe
 access logs on either transport; keep failed probes and readiness state
@@ -440,7 +459,7 @@ the final request/RPC summary.
 
 Full rules: [Application observability § Error ownership](./observability.md#error-ownership).
 
-**Planned shape (RFC-0031, available in `logger/slogx` v0.1.0, not yet deployed).**
+**Error shape (as built, `logger/slogx` v0.2.0).**
 `slogx.Err(err)` is the one error shape: `error.type` carries the concrete Go type of
 the deepest cause that is not a standard-library wrapper, and `error.message` the
 redacted, bounded text. The label is only as useful as the errors behind it — every
@@ -464,9 +483,9 @@ high-cardinality and may be pseudonymous data. See the
 
 ## OpenTelemetry integration
 
-- **Tee wiring:** `zapcore.NewTee(stdoutCore, obs.ZapCore(serviceName, minLevel))` — one branch to stdout, one through **otelzap** → OTLP log exporter (`otlploghttp`) → OpenTelemetry Collector.
-- **`OTEL_LOGS_ENABLED`** gates the exporter (enabled fleet-wide since RFC-0014 P4). See [Application observability](./observability.md#environment-variables).
-- The bridge is **level-gated** to the service's configured level.
+- **One record, two sinks:** the facade's handler chain is redaction → one level gate → {JSON stdout, OTel slog bridge}. The bridge reads the global logger provider `pkg/obsx` installs, whose batching processor ships records over OTLP (`otlploghttp`) to the OpenTelemetry Collector. No service constructs a provider or exporter.
+- **`OTEL_LOGS_ENABLED`** gates the exporter (enabled fleet-wide since RFC-0014 P4). With it off the global provider is a no-op and the OTLP sink is skipped. See [Application observability](./observability.md#environment-variables).
+- **Flush:** services pass `obs.ForceFlush` as `slogx.Config.Flush`, so a `Fatal` record is exported before exit, and write `process.stopped` before the OTel SDK shutdown — see [Graceful shutdown](./graceful-shutdown.md).
 - App pods carry `platform.duynhlab.dev/otlp-logs=true` and are **excluded** from Vector — the double-ingest guard. Full pipeline: [Logging (platform)](../observability/logging/README.md).
 
 ---
@@ -474,19 +493,17 @@ high-cardinality and may be pseudonymous data. See the
 ## Examples
 
 ```go
-logger.Info(
-    "service started",
-    zap.String("event", "service.started"),
-    zap.String("listen_address", cfg.ListenAddress),
+logger.Info(ctx, "Database connection pool established")
+
+logger.Warn(ctx, "dependency call degraded",
+    slog.String("operation", "product.get_details"),
+    slogx.Err(err),
 )
 
-logger.Warn(
-    "dependency call degraded",
-    zap.String("event", "dependency.degraded"),
-    zap.String("dependency", "review"),
-    zap.String("operation", "product.get_details"),
-    zap.Error(err),
-)
+slogx.FromContext(ctx).Event(ctx, slog.LevelInfo, "order.created", "order created",
+    slog.String("order.id", orderID))
+
+logger.ProcessStarted(ctx, slogx.ComponentAPI) // process.started
 ```
 
 Do not log collector or Pyroscope endpoints when they could contain embedded credentials.
@@ -495,7 +512,12 @@ Do not log collector or Pyroscope endpoints when they could contain embedded cre
 
 ## Migration history
 
-Pre-P4 library migrations (RFC-0014 P4 converged the fleet on `zapx`):
+RFC-0031 Phase 3 (2026-09-24) moved every service and worker from `zapx` to
+`logger/slogx` in one release train and removed `zapx`, `zerolog` and `clog` from
+`duynhlab/pkg`; stdout envelope keys were kept, the error and access-record fields
+changed (see [Overview](#overview)).
+
+Pre-P4 library migrations (RFC-0014 P4 converged the fleet on `zapx`, historical):
 
 | Service | Logger | Was |
 |---------|--------|-----|
@@ -510,7 +532,7 @@ Pre-P4 library migrations (RFC-0014 P4 converged the fleet on `zapx`):
 | **payment** | zapx | zap |
 | **checkout** | zapx | zap |
 
-Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap tee needs one uniform zap core. Converging removes field-shape divergence (`msg` vs `message`, Unix vs ISO8601 time).
+Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap tee needed one uniform zap core. Converging removes field-shape divergence (`msg` vs `message`, Unix vs ISO8601 time).
 
 ---
 
@@ -519,5 +541,6 @@ Before RFC-0014 P4, three loggers coexisted (zap, clog, zerolog). The otelzap te
 - [Application observability](./observability.md)
 - [Logging (platform)](../observability/logging/README.md)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
+- [RFC-0031: logging and telemetry overhaul](../proposals/rfc/RFC-0031/)
 
-_Last updated: 2026-09-23 — RFC-0031 Task 0.2 freeze: § Event catalog (nineteen names across five classes), the access-record severity mapping, a per-field classification and one owner per schema; § Event and field naming moves to dotted keys. Previously 2026-09-23 — `logger/slogx` v0.1.0 is tagged: the Target-contract callout says the facade exists but no service has adopted it, names the one breaking query change (`error` as a string becomes `error.type` + `error.message`) and the two added levels, and § Error logging ownership carries the planned `Err` shape. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070/ADR-071 and a labelled **Target contract** callout names `slogx`, the semconv access record and the event catalog as planned; the as-built `zapx` contract below is unchanged. Previously 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._
+_Last updated: 2026-09-24 — RFC-0031 as-built (Task 4.3): the fleet logs through `logger/slogx` v0.2.0 — one redacted record to the stdout envelope and OTLP via the global provider `obsx` installs, `obs.ForceFlush` wired as `Flush`; the access-record schema is the as-built semconv set (no path, client address, User-Agent or duration); the event catalog is emitted, with the names observed live; level mapping, LogRecord mapping, wiring and examples rewritten from `zapx`/otelzap to `slogx`. Previously 2026-09-23 — RFC-0031 Task 0.2 freeze: § Event catalog (nineteen names across five classes), the access-record severity mapping, a per-field classification and one owner per schema; § Event and field naming moves to dotted keys. Previously 2026-09-23 — `logger/slogx` v0.1.0 is tagged: the Target-contract callout says the facade exists but no service has adopted it, names the one breaking query change (`error` as a string becomes `error.type` + `error.message`) and the two added levels, and § Error logging ownership carries the planned `Err` shape. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-070/ADR-071 and a labelled **Target contract** callout names `slogx`, the semconv access record and the event catalog as planned; the as-built `zapx` contract below is unchanged. Previously 2026-09-17 — the opening access-log sample is labelled as the contract target and the as-built keys (`method`/`path`/`status`/`duration`/`client_ip`/`user_agent`) are stated beside it, so the first example no longer contradicts § Access-log policy; the trace sink count is corrected to **two**. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle._

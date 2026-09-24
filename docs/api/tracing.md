@@ -9,23 +9,25 @@ Distributed tracing contract for every Go service and worker in the platform ser
 | **Sampling** | `ParentBased(TraceIDRatioBased)` — root decides, downstream honours | — |
 | **Platform backends** | [Tracing (platform)](../observability/tracing/README.md) — the collector fans every span to **two** sinks: VictoriaTraces (7d) and ClickHouse `otel_traces` (90d). Tempo and Jaeger retired, [RFC-0027](../proposals/rfc/RFC-0027/README.md) | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
-| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) |
+| **Design record** | — | [RFC-0014](../proposals/rfc/RFC-0014/) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17; as-built 2026-09-24)** → [ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage) |
 
 ---
 
-> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built** ([ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage)).
-> Sampling stays `ParentBased(TraceIDRatioBased)` with the **edge as root**; the rate
-> each environment actually applies is stated (base manifest 50 inherited, Kind 100,
-> local-stack 100, services `0.1` / `1.0` for self-started traces only) and no applied
-> rate is raised before the trace-store storage arithmetic is written. Span names are
-> two-part operation classes with no identifier; exactly one `SpanKind` per layer
-> (`SERVER` transport, `INTERNAL` manual via `obsx.StartSpan`, `CLIENT` adapters,
-> `PRODUCER`/`CONSUMER` Temporal); scope is the package path; Error status only for
-> unexpected failure with `error.type`, never for an expected business rejection;
-> span events bounded and never in a loop; **application baggage is default-deny** —
-> a key needs review, is immutable, is never stored by a backend and is stripped before
-> any third-party call. Everything below is as-built and already consistent with these
-> rules where it overlaps; the rules become testable at RFC-0031 Task 1.5.
+> **RFC-0031 tracing contract — `Accepted` 2026-09-17, as-built 2026-09-24** ([ADR-075](../proposals/adr/ADR-075-application-tracing-contract/) (sampling, spans, baggage)).
+> Sampling is `ParentBased(TraceIDRatioBased)` with the **edge as root**; the applied
+> rates are the base `EnvoyProxy` manifest `samplingRate: 50` (inherited by a future
+> production cluster), the Kind overlay 100, local-stack 100, and the services'
+> `OTEL_SAMPLE_RATE` `0.1` (cluster) / `1.0` (local-stack), which only governs traces a
+> service starts itself. In `pkg/obsx` (v0.45.0): `obsx.StartSpan` opens `INTERNAL`
+> spans by default (`SERVER` belongs to `httpmw`/`grpcx`, `CLIENT` to the instrumented
+> adapters, `PRODUCER`/`CONSUMER` to the Temporal integration); `obsx.RecordError` sets
+> Error status, the semconv `error.type` and an `exception` event whose message is
+> bounded to 256 bytes; `obsx.RecordOutcome` stamps a bounded business outcome and
+> leaves the status unset; and the W3C propagator is installed whether or not tracing
+> is enabled. **Application baggage is default-deny**: no service sets any today, and a
+> new key needs review. Span naming (two-part operation classes, no identifier),
+> package-path scope and "no span events in a loop" are review rules — the fleet lint
+> policy does not check them.
 
 ## Configuration
 
@@ -97,11 +99,11 @@ service never registered should be visible. The prefix match this replaced also
 swallowed anything merely *starting* with a listed value (a route named
 `/healthy-users` was untraceable); that is gone.
 
-Adoption is in flight: `pkg/httpmw` is tagged `v0.1.0`, and all nine HTTP
-services have an open pull request pinning it, none merged. Until those land,
-every one of them still runs its own `middleware/tracing.go` copy with the old
-prefix match, so the exact-match behaviour described above is the contract this
-page states, not yet what the running fleet does.
+This is the running behaviour: the nine services with an HTTP API mount
+`httpmw.Tracing` (`httpmw` v0.2.0) and the per-service copies are gone.
+inventory-service mounts `httpmw.Logging` and `httpmw.Recovery` on its HTTP
+listener but not `httpmw.Tracing`, so its Backoffice HTTP requests produce no
+HTTP server span; its gRPC surface is traced through `pkg/grpcx`.
 
 gRPC health and reflection RPCs are filtered by `pkg/grpcx`.
 
@@ -111,7 +113,12 @@ gRPC health and reflection RPCs are filtered by `pkg/grpcx`.
 
 ### Propagation
 
-Services accept and propagate W3C Trace Context (`traceparent`). The edge speaks
+Services accept and propagate W3C Trace Context (`traceparent`). `pkg/obsx`
+installs the propagator even when `TRACING_ENABLED=false`, so a service with
+tracing off still forwards the trace it received — verified on Kind with
+product-service switched off: the trace kept the edge, inventory and review
+spans, and product's log records carried the trace id (details in
+[Application observability § Trace-ID propagation](./observability.md#trace-id-propagation)). The edge speaks
 W3C natively: Envoy starts a span for every request it accepts and sends
 `traceparent` upstream, so a browser request that carries no trace header still
 arrives at the service already joined to the edge trace. The edge is therefore
@@ -159,12 +166,15 @@ Automatic spans — do not duplicate these with manual spans:
 - supported external-client spans.
 
 Automatic capture includes service identity, route template or RPC method,
-HTTP/gRPC status, duration, and W3C propagation fields per semconv. Note the
-split: **spans** carry only what `otelgin`/`otelgrpc` emit per semconv, while
-the HTTP **access log** additionally records `client_ip` and `user_agent`
-today (see [logs.md § Access-log policy](./logs.md#access-log-policy)); adding
-IP/User-Agent to spans is not part of the contract and requires
-privacy/retention review.
+HTTP/gRPC status, duration, and W3C propagation fields per semconv. **Spans**
+carry only what `otelgin`/`otelgrpc` emit per semconv. The access record written
+beside them is narrower still: `http.request.method`, `http.route`,
+`http.response.status_code` and `error.type` for HTTP, `rpc.system.name`,
+`rpc.method`, `rpc.response.status_code` and `error.type` for gRPC — no raw path,
+query, client address, User-Agent, peer or duration (see
+[logs.md § Access-log policy](./logs.md#access-log-policy)). Adding IP or
+User-Agent to spans is not part of the contract and requires privacy/retention
+review.
 
 ---
 
@@ -201,17 +211,20 @@ high-cardinality attributes and are added only when operationally justified.
 
 ### Helper functions
 
-The helpers are `pkg/obsx` (`obsx/v0.37.1`) — they touch only the OTel API, so a
+The helpers are `pkg/obsx` (`obsx/v0.45.0`) — they touch only the OTel API, so a
 gRPC-only service uses them without a web framework; signatures verified
-2026-08-16:
+2026-09-24:
 
 ```go
 // The instrumentation scope is the PACKAGE PATH of the code creating the span,
 // never the service name — deployment identity already rides as service.name.
 const tracerScope = "github.com/duynhlab/<svc>-service/internal/logic/v1"
 
-// Record unexpected failures (records the error and sets Error status)
+// Record unexpected failures: Error status + error.type + a bounded exception event
 obsx.RecordError(ctx, err)
+
+// Record an expected business rejection: outcome attribute, status left unset
+obsx.RecordOutcome(ctx, "stock_unavailable")
 
 // Add business context (high-cardinality IDs — use sparingly)
 obsx.AddSpanAttributes(ctx,
@@ -230,8 +243,11 @@ span.SetAttributes(
 )
 ```
 
-`obsx.Tracer(scope)` returns the tracer directly when a caller needs it, and
-`obsx.SetSpanStatus(ctx, code, description)` sets status without an error. Every
+`obsx.Tracer(scope)` returns the tracer directly when a caller needs it,
+`obsx.SetSpanStatus(ctx, code, description)` sets status without an error, and
+`obsx.ErrorType(err)` is the `error.type` value `RecordError` uses — the Go type
+of the first cause past `fmt.Errorf`/`errors.Join` wrappers, short package path,
+no `*`. Every
 helper is a no-op when the span is not recording, so an unsampled request costs
 nothing and callers do not guard at each site.
 
@@ -250,8 +266,8 @@ Layer responsibilities: [Application observability § Observability responsibili
 ### Errors
 
 - Record unexpected failures on the span where they become meaningful.
-- Set Error status for failed operations, not automatically for every expected
-  business rejection.
+- Set Error status for failed operations (`obsx.RecordError`), not for an
+  expected business rejection — that gets `obsx.RecordOutcome` and a green span.
 - Add retry and compensation milestones as stable span events.
 - Do not record secrets, raw payloads, or sensitive provider responses.
 
@@ -323,14 +339,18 @@ Full worker rules: [Application observability § Worker and Temporal instrumenta
 
 ### Correlation with logs
 
-Structured logs carry `trace_id` when a span is active (logging middleware runs after tracing):
+Structured logs carry `trace_id` and `span_id` whenever the context passed to
+the `slogx` facade holds a valid span — the facade reads them from the context,
+so business code never binds them (logging middleware runs after tracing):
 
 ```json
 {
   "level": "error",
   "message": "Payment failed",
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-  "error": "timeout"
+  "span_id": "00f067aa0ba902b7",
+  "error.type": "provider.TimeoutError",
+  "error.message": "timeout"
 }
 ```
 
@@ -338,6 +358,13 @@ Grafana Explore → **VictoriaTraces** → search by Trace ID. There are two que
 paths: VictoriaTraces for the first 7 days, and ClickHouse for 90, where the span
 can be joined to `otel_logs` on `trace_id`. Details:
 [Application logging](./logs.md), [Tracing (platform)](../observability/tracing/README.md).
+
+Two correlation paths this platform does **not** offer: VictoriaMetrics stores no
+exemplars, so there is no metric → trace jump; and there is no one-click span →
+profile link. Eight services put `pyroscope.profile.id` on the root server span
+(not order, order-worker, checkout or checkout-worker); the pivot to the flame
+graph is manual — see
+[profiling (platform) § Trace correlation](../observability/profiling/README.md#trace-correlation-platform).
 
 ---
 
@@ -349,4 +376,4 @@ can be joined to `otel_logs` on `trace_id`. Details:
 - [Tracing architecture (platform)](../observability/tracing/architecture.md)
 - [RFC-0014](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-075 and a labelled **Target contract** callout states the edge-root sampling, span kind/scope/status, span-event and baggage rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse), matching the opening paragraph and `observability.md`; the production-recommendations table no longer shows a `~10%` sampling row that the 2026-08-31 move to a 50 base rate had orphaned — it now states the edge-root model and where each rate is actually applied. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`._
+_Last updated: 2026-09-24 — RFC-0031 as-built (Task 4.3): the Target-contract callout becomes an as-built statement of the applied sampling rates and the `obsx` v0.45.0 span helpers (`RecordError` with `error.type` and a bounded exception event, `RecordOutcome`), propagation with tracing off is recorded, request filtering is the running behaviour (inventory's HTTP listener carries no `httpmw.Tracing`), the access-record fields no longer list client IP or User-Agent, the log example shows the `slogx` envelope, and the missing exemplar and span → profile links are stated. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-075 and a labelled **Target contract** callout states the edge-root sampling, span kind/scope/status, span-event and baggage rules as planned. Previously 2026-09-17 — the trace sink count is corrected to **two** (VictoriaTraces + ClickHouse), matching the opening paragraph and `observability.md`; the production-recommendations table no longer shows a `~10%` sampling row that the 2026-08-31 move to a 50 base rate had orphaned — it now states the edge-root model and where each rate is actually applied. Previously 2026-08-23 — logs go to **two** stores (VictoriaLogs + ClickHouse). Previously 2026-08-16 — request filtering moves to `pkg/httpmw` (exact route match) and the span helpers to `pkg/obsx`._

@@ -6,10 +6,10 @@ Continuous profiling contract for every Go service and worker in the platform se
 |-----------|-------|-----------|
 | **Client** | `obsx.SetupProfiling()` (`duynhlab/pkg`), `pyroscope-go` SDK — push every 15s | — |
 | **Default** | On in cluster and local-stack (`PROFILING_ENABLED=true`) | — |
-| **Correlation** | `pyroscope.profile.id` on spans via `otel-profiling-go` | — |
+| **Correlation** | `pyroscope.profile.id` on the root server span via `otel-profiling-go` — not on the four Temporal identities ([§ Trace correlation](#trace-correlation-app-side)) | — |
 | **Platform backend** | [Profiling (platform)](../observability/profiling/README.md) — Pyroscope Helm, RustFS, Grafana | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
-| **Design record** | — | **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) |
+| **Design record** | — | **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17; as-built 2026-09-24)** → [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) |
 
 ---
 
@@ -19,22 +19,18 @@ Every Go service pushes pprof data to Pyroscope via the shared **`obsx.SetupProf
 
 Shared bootstrap and cross-signal label rules: [Application observability](./observability.md).
 
-> **Target contract — RFC-0031, `Accepted` 2026-09-17, not yet as-built** ([ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels)).
-> The profile label set closes to exactly **`service_name`, `service_namespace`,
+> **As-built — RFC-0031** (`Accepted` 2026-09-17, deployed fleet-wide 2026-09-24;
+> [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels)).
+> The profile label set is closed to exactly **`service_name`, `service_namespace`,
 > `deployment_environment`, `service_version`** (plus `span_name` on span-scoped CPU
 > profiles and the SDK constant `pyroscope_spy`), derived from the **same OTel
-> resource** the tracer and meter use — today the helper re-parses
-> `OTEL_RESOURCE_ATTRIBUTES` for the deprecated key `deployment.environment`, which no
-> manifest sets, so `deployment_environment` is empty fleet-wide; `service_version`
-> was empty on every API service until 2026-09-18, when the domain ResourceSets put
-> `service.version=<image_tag>` into `OTEL_RESOURCE_ATTRIBUTES` (RFC-0031 Task 1.2) —
-> the helper already reads that key, so the label populates on the next rollout. The
-> SDK's eleventh type `goroutine_leak` is excluded
-> by decision; mutex and block sampling rates stay central with a written overhead
-> budget; `mockpay` is brought under the contract; `PROFILING_ENABLED` became a
-> per-service input on 2026-09-18 (the one part of this contract already as-built). The
-> [§ Profile label policy](#profile-label-policy) below is the **as-built** policy and
-> is deliberately wider than the target; it is rewritten at Task 1.4.
+> resource** the tracer, meter and logger provider use (`obsx` v0.45.0 on all ten
+> services). Measured on Kind 2026-09-24: all four labels are non-empty on all 13
+> identities — the 10 services, `order-worker`, `checkout-worker` and `mockpay`
+> (profiling since payment v2.4.1). The SDK's eleventh type `goroutine_leak` is
+> excluded by decision; the mutex and block sampling rates are set centrally in
+> `pkg/obsx`, never per service ([§ Runtime overhead](#runtime-overhead));
+> `PROFILING_ENABLED` is a per-service input.
 
 ---
 
@@ -59,8 +55,7 @@ CPU, alloc, and inuse are on by default in the SDK; goroutine, mutex, and block 
 
 ## Setup (`pkg/obsx/profiling.go`)
 
-- **Identity** = `OTEL_SERVICE_NAME` → Pyroscope `service_name` (same as traces and metrics).
-- **Labels** from `OTEL_RESOURCE_ATTRIBUTES`, dotted keys underscored: `service.namespace` → `service_namespace`, etc.
+- **Identity** = the OTel resource `obsx` builds for every signal (`resourceAttributes(ConfigFromEnv())`): `service.name` → the Pyroscope application name (`service_name`), and exactly three labels — `service.namespace` → `service_namespace`, `deployment.environment.name` → `deployment_environment`, `service.version` → `service_version`. Empty values are omitted; no other resource attribute (pod, instance id, Kubernetes identity) becomes a profile label.
 - **Runtime sampling** after successful start — `runtime.SetMutexProfileFraction(100)` and `runtime.SetBlockProfileRate(100_000_000)` (blocking events ≥ 100 ms). Only on success avoids overhead when misconfigured.
 - **Strict helper validation** — empty `PYROSCOPE_ENDPOINT` returns an error; `sync.Once` guards startup and **caches the error permanently** (a second call after a failed first call returns the same error without retrying).
 - Verified signature (`duynhlab/pkg`, 2026-07-29): `obsx.SetupProfiling() (func(context.Context) error, error)` — no arguments; the returned stop function flushes and stops the profiler (its context is currently ignored).
@@ -81,27 +76,21 @@ gated on `cfg.Profiling.Enabled` from `PROFILING_ENABLED`, bounded stop, stop
 error always logged):
 
 ```go
-func initProfiling(cfg *config.Config, logger *zap.Logger) func() {
+func initProfiling(cfg *config.Config, logger *slogx.Logger) func(context.Context) error {
+    ctx := context.Background()
     if !cfg.Profiling.Enabled {
-        logger.Info("Profiling disabled (PROFILING_ENABLED=false)")
-        return func() {}
+        logger.Info(ctx, "Profiling disabled (PROFILING_ENABLED=false)")
+        return nil
     }
 
     stop, err := obsx.SetupProfiling()
     if err != nil {
-        logger.Warn("Failed to initialize profiling", zap.Error(err))
-        return func() {}
+        logger.Warn(ctx, "Failed to initialize profiling", slogx.Err(err))
+        return nil
     }
 
-    logger.Info("Profiling initialized", zap.String("endpoint", cfg.Profiling.Endpoint))
-
-    return func() {
-        shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GetShutdownTimeoutDuration())
-        defer cancel()
-        if err := stop(shutdownCtx); err != nil {
-            logger.Error("Profiling shutdown error", zap.Error(err))
-        }
-    }
+    logger.Info(ctx, "Profiling initialized", slog.String("endpoint", cfg.Profiling.Endpoint))
+    return stop // the caller runs it at shutdown and logs any error
 }
 ```
 
@@ -112,10 +101,11 @@ Do not log a profiler URL containing credentials or query secrets at startup
 
 ## Profile label policy
 
-Allowed profile labels:
+Allowed profile labels — a **closed** set, enforced by `profilingTags` in
+`pkg/obsx/profiling.go`:
 
-- `service_name`, service namespace, environment, service version;
-- low-cardinality deployment identity from resource attributes.
+- `service_name`, `service_namespace`, `deployment_environment`, `service_version`;
+- `span_name` (span-scoped CPU profiles) and `pyroscope_spy`, both added by the SDK.
 
 Forbidden profile labels:
 
@@ -173,7 +163,8 @@ On by default. Injected by app ResourceSets and worker manifests:
 | `PROFILING_ENABLED` | Toggle — **per-service** since 2026-09-18: the domain ResourceSets render it from the `profiling_enabled` input (default `"true"`); the two worker manifests and `mockpay` carry their own literal | `true` |
 | `PYROSCOPE_ENDPOINT` | Pyroscope server | `http://pyroscope.monitoring.svc.cluster.local:4040` |
 | `OTEL_SERVICE_NAME` | Identity (`service_name`) | service name |
-| `OTEL_RESOURCE_ATTRIBUTES` | Labels (`service.namespace`, `deployment.environment`, `service.version`) | set by ResourceSet |
+| `OTEL_RESOURCE_ATTRIBUTES` | Labels (`service.namespace`, `service.version`) | set by ResourceSet |
+| `DEPLOYMENT_ENVIRONMENT` | `deployment.environment.name` → `deployment_environment` label | `production` |
 
 Opt one service out with `profiling_enabled: "false"` on its `ResourceSetInputProvider`
 (`kubernetes/apps/services/<name>.yaml`) — a GitOps commit, per service. Before
@@ -200,4 +191,4 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-09-24 — trace correlation as measured on Kind: only the root span is labelled, the four Temporal identities carry no span labels, and the one-click link is gone (manual pivot). mockpay profiles from payment v2.4.1. Previously 2026-09-18 — `PROFILING_ENABLED` is a per-service ResourceSet input (`profiling_enabled`, default true) — RFC-0031 Task 1.4; the domain-wide literal is gone. Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-09-24 — RFC-0031 as-built (Task 4.3): the Target-contract callout becomes an as-built one (closed four-label identity from the shared OTel resource, non-empty on all 13 identities incl. mockpay; central mutex/block rates); Setup, wiring snippet (slogx), label policy and env table follow the code. Previously 2026-09-24 — trace correlation as measured on Kind: only the root span is labelled, the four Temporal identities carry no span labels, and the one-click link is gone (manual pivot). mockpay profiles from payment v2.4.1. Previously 2026-09-18 — `PROFILING_ENABLED` is a per-service ResourceSet input (`profiling_enabled`, default true) — RFC-0031 Task 1.4; the domain-wide literal is gone. Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._

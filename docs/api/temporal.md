@@ -12,7 +12,7 @@ when a shopper stopped.
 | **Task queues** | `order-fulfillment` (both order workflows) · `checkout` | — |
 | **Namespace** | `mop` | — |
 | **Registry** | [workflows.md](./workflows.md) — the one-line index of every workflow | — |
-| **Design record** | — | [RFC-0021](../proposals/rfc/RFC-0021/) (stock participant, worker versioning, start outbox) · [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-039](../proposals/adr/ADR-039-local-stack-temporal-server-postgres/) (local topology on Postgres) · [RFC-0026](../proposals/rfc/RFC-0026/) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) (worker lifecycle) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17, not yet as-built)** → [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) (activity records: retry exhausted, compensation, lifecycle; identifiers never labels) · [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) (replay never increments; attempts vs outcomes named) |
+| **Design record** | — | [RFC-0021](../proposals/rfc/RFC-0021/) (stock participant, worker versioning, start outbox) · [ADR-001](../proposals/adr/ADR-001-adopt-temporal-for-order-fulfillment/) · [ADR-002](../proposals/adr/ADR-002-deploy-temporal-via-operator/) · [ADR-009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) · [ADR-030](../proposals/adr/ADR-030-temporal-workflow-versioning/) · [ADR-031](../proposals/adr/ADR-031-fulfillment-start-outbox/) · [ADR-039](../proposals/adr/ADR-039-local-stack-temporal-server-postgres/) (local topology on Postgres) · [RFC-0026](../proposals/rfc/RFC-0026/) · [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/) (worker lifecycle) · **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17; as-built 2026-09-24)** → [ADR-071](../proposals/adr/ADR-071-telemetry-event-data-contract/) (access/event schema, privacy) (activity records: retry exhausted, compensation, lifecycle; identifiers never labels) · [ADR-073](../proposals/adr/ADR-073-application-metrics-contract/) (instruments, buckets, budget) (replay never increments; attempts vs outcomes named) |
 
 ## Overview
 
@@ -979,6 +979,19 @@ introduced in `v0.7.0`), all **idempotent** so activity retries are safe:
   sums (`_total` names), and workflow code may create replay-safe spans via `temporalx.Tracer`.
   Precondition wired in each service main: the global tracer provider is
   `temporalx.NewReplaySafeTracerProvider`, installed through `obsx.WithTracerProviderFactory`.
+  **Logs** (`temporalx` v0.43.0, pinned by order and checkout): every `temporalx.Dial` passes
+  `temporalx.WithLogger(logger.Slog())`, so the SDK's own lines and everything
+  `workflow.GetLogger` / `activity.GetLogger` write flow through the service's `slog` logger —
+  redacted, to stdout and OTLP like any other record. The wrapper lifts the SDK tracing
+  interceptor's `TraceID`/`SpanID` attributes into the record's span context (so the record
+  carries the platform `trace_id`/`span_id`, not a second pair of fields) and reshapes the SDK's
+  raw `Error` attribute into `error.type` + `error.message`. The same option installs a client
+  interceptor that writes `temporal.workflow.started` for every unambiguous start. Events
+  decided in workflow code go through `temporalx.WorkflowEvent` — the SDK's replay-aware logger,
+  so a replayed history writes nothing twice (order's saga: `order.compensation.completed`,
+  `order.failed`, `order.retry.exhausted`); `temporalx.WorkflowFailed` writes
+  `temporal.workflow.failed` from a caller that observed the run end (order's reconciler), never
+  from workflow code. Catalog and field rules: [logs.md § Event catalog](./logs.md#event-catalog).
 
 **Checkout is async.** After [checkout confirm](./checkout.md), checkout calls
 `order.v1/CreateOrder` over gRPC; order-service persists the row as **`pending`**
@@ -1304,6 +1317,12 @@ ADR-063/064; SDK ≥ 1.47):
   unreadable / breach / truncated), participant skew
   (`OrderParticipantDisagreement`, `OrderStartParticipantUnrecognised`), outbox
   age and terminal rows, commit lag, and compensation failures.
+- **Logs** — SDK, workflow and activity records go through the service's `slog` logger via
+  `temporalx.WithLogger`; workflow-decided events are replay-safe (see the `pkg/temporalx`
+  bullet in [§ Shared mechanics](#shared-mechanics)).
+- **Profiles** — all four Temporal identities (`order`, `order-worker`, `checkout`,
+  `checkout-worker`) push profiles, but none has span-scoped CPU profiles:
+  [profiling.md § Trace correlation (app side)](./profiling.md#trace-correlation-app-side).
 - **Failure handling** — insufficient stock fails fast (non-retryable) and compensates; transient
   downstream errors retry per policy; a stuck workflow is visible (and terminable) in the UI.
 
@@ -1321,4 +1340,4 @@ ADR-063/064; SDK ≥ 1.47):
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-09-18 — RFC-0031 accepted: Design record links ADR-071 and ADR-073 for the planned telemetry rules that bind workflow and activity code (replay-safe logger only, named activity records, no identifier labels, replay never increments a metric). Previously 2026-08-27 — Phase-4 conformance wave: § Finding and Reading Executions added (Search Attributes OrderId/SessionId + StaticSummary + SetCurrentDetails), CommitInventory heartbeat, SDK logs through zap. Previous: 2026-08-27 — ADR-063: `pkg/temporalx` bullet rewritten for the OTel v2 plugin (monotonic `_total` counters, replay-safe workflow spans); ADR-064 puts checkout-worker under the controller (see workflows.md). 2026-08-21: ADR-054 lifecycle move._
+_Last updated: 2026-09-24 — RFC-0031 as-built (Task 4.3): Design record marked as-built; the `pkg/temporalx` bullet documents SDK logs through the service's slog logger (`WithLogger`: lifted TraceID/SpanID, `Error` → `error.type`/`error.message`, `temporal.workflow.started`), `WorkflowEvent` and `WorkflowFailed`; Operations gains Logs and Profiles bullets. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-071 and ADR-073 for the planned telemetry rules that bind workflow and activity code (replay-safe logger only, named activity records, no identifier labels, replay never increments a metric). Previously 2026-08-27 — Phase-4 conformance wave: § Finding and Reading Executions added (Search Attributes OrderId/SessionId + StaticSummary + SetCurrentDetails), CommitInventory heartbeat, SDK logs through zap. Previous: 2026-08-27 — ADR-063: `pkg/temporalx` bullet rewritten for the OTel v2 plugin (monotonic `_total` counters, replay-safe workflow spans); ADR-064 puts checkout-worker under the controller (see workflows.md). 2026-08-21: ADR-054 lifecycle move._

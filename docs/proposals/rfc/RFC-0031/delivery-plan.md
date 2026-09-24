@@ -80,7 +80,9 @@ things the plan did not foresee, both recorded in the ADRs: the instrumentation 
 is the facade's package path, not the service name, and the six envelope keys are
 reserved so a caller attribute cannot make stdout and OTLP disagree about one record.
 One gap carried forward: `obsx` exposes no log force-flush, so the `Config.Flush` seam
-that lets a FATAL record leave the process has nothing to wire to yet.
+that lets a FATAL record leave the process has nothing to wire to yet. *Both closed since:
+`obsx v0.45.0` added `ForceFlush` (Task 1.1c-B) and Phase 3 adopted the facade fleet-wide;
+`logger/slogx v0.2.0` added `ProcessStarted`/`ProcessStopped`.*
 
 **Acceptance criteria:**
 
@@ -97,6 +99,11 @@ that lets a FATAL record leave the process has nothing to wire to yet.
 Collector-to-ClickHouse integration test.
 
 ### Task 1.1b: Retire the unused logger adapters
+
+**Status — DONE 2026-09-24: pkg #108.** `logger/zapx`, `logger/zerolog` and
+`logger/clog` left the tree once no service `go.mod` required `zapx`; pkg lists 12
+modules. Their last tags (`zapx v0.36.1`, `zerolog v0.36.2`, `clog v0.36.2`) still
+resolve, and `docs/api/pkg.md` records them.
 
 `logger/zapx` is the only adapter any service imports; `logger/zerolog` and
 `logger/clog` have no consumers. Shipping `slogx` beside two dead adapters leaves
@@ -117,7 +124,11 @@ lists the expected set.
 
 ### Task 1.1c: Close the type leaks in the shared package's public API
 
-**Status — split 2026-09-18 (owner OK): 1.1c-A done; 1.1c-B is now unblocked — Task 1.1 shipped `logger/slogx` v0.1.0 on 2026-09-23, so `ZapCore`, `TraceContext` and the otelzap dependency can go once the fleet has cut over in Phase 3.**
+**Status — DONE 2026-09-23: 1.1c-B shipped as `obsx/v0.45.0`** (pkg #103): `ZapCore`,
+`TraceContext` and the otelzap dependency are gone and `ForceFlush` backs the facade's
+FATAL path. The fleet moved onto it with Phase 3.
+
+**Earlier — split 2026-09-18 (owner OK): 1.1c-A done; 1.1c-B is now unblocked — Task 1.1 shipped `logger/slogx` v0.1.0 on 2026-09-23, so `ZapCore`, `TraceContext` and the otelzap dependency can go once the fleet has cut over in Phase 3.**
 Removing `ZapCore` before the slogx facade exists would take OTLP logs away from every
 service, so the non-logging leaks went first. **1.1c-A** shipped as `obsx/v0.39.2`
 (`Enabled() Signals`, API-typed `TracerProvider()/MeterProvider()/LoggerProvider()`,
@@ -272,6 +283,12 @@ skip-list test.
 
 ## Phase 2 — transport and worker adapters
 
+**Status — DONE 2026-09-23: pkg #102** — `httpmw/v0.2.0` (access record with the
+canonical keys, `Recovery`), `grpcx/v0.37.0` (the gRPC access record), `temporalx/v0.40.0`
+(SDK logs on the service slog logger); `temporalx` then grew the start-event interceptor,
+`WorkflowFailed` and `WorkflowEvent` (v0.41.0–v0.42.0) and the SDK error shape
+(v0.43.0).
+
 ### Task 2.1: Replace HTTP and gRPC access logging
 
 **Acceptance criteria:**
@@ -302,6 +319,17 @@ skip-list test.
 - Existing idempotency, deadline and compensation behavior remains unchanged.
 
 ## Phase 3 — service migration slices
+
+**Status — DONE 2026-09-24: one release train, not three.** All ten services, both
+workers and mockpay were cut over on branches reviewed in the three batches below, then
+gated together by one full compose audit (Phase A 90/90, browser checkout, Phase C, six k6
+suites, privacy on stdout and in ClickHouse, 15 event names observed) and released as
+`user v2.3.0` · `product v1.14.0` · `inventory v0.7.0` · `cart v2.2.0` · `order v2.8.0` ·
+`review v2.2.0` · `shipping v1.7.0` · `notification v2.2.0` · `payment v2.4.0` ·
+`checkout v0.11.0` (homelab #1088). The Kind checkpoint passed the same day
+(`docs/platform/kind-e2e-audit.md`): no binary links zap, the catalog events land in
+ClickHouse with trace ids, and propagation holds through a service with tracing off.
+mockpay started its profiler only in `payment v2.4.1` (Task 4.2).
 
 ### Task 3.1: Migrate user, product, inventory and cart
 
@@ -353,6 +381,11 @@ skip-list test.
 
 ### Task 4.1: Migrate ClickHouse and Grafana consumers
 
+**Status — DONE 2026-09-24 (homelab #1088).** The three local-stack ClickHouse boards
+read the canonical keys (`http.route`, `http.response.status_code`, `rpc.method`,
+`event`), the duplicate `dashboards/ClickHouse/` tree is gone, and the board SQL returns
+data on the train gate.
+
 **Acceptance criteria:**
 
 - Dashboards, SQL examples, panel variables and trace-log pivots use canonical attributes.
@@ -388,6 +421,19 @@ identities carry no `span_name`, by obsx's replay-safe design.
 **Verification:** PromQL regression checks, profile queries, alert-rule validation and rendered runbook review.
 
 ### Task 4.3: Publish as-built contracts
+
+**Status — DONE 2026-09-24.** The seven files — `observability.md`, `logs.md`,
+`tracing.md`, `metrics.md`, `profiling.md`, `pkg.md`, `temporal.md` — plus
+`graceful-shutdown.md` describe the deployed facade, access records, event catalog,
+collector enrichment and profile identity, each claim checked against the pkg and
+service code or measured on Kind. What is not built stays **planned**: the Weaver
+registry (Task 4.5), the fleet lint policy's enforcement (no service opts into
+`policy-lint`), and the metrics denylist and series-budget tests. `pkg.md` records which
+logger each historical tag belongs to (Task 1.1b). Per-service contracts needed no change:
+their only snake_case keys are API payload fields, not log keys. Two code facts found
+on the way are recorded rather than fixed: inventory mounts `httpmw.Logging`/`Recovery`
+but not `Tracing`, and payment's `[GIN-debug]` route lines reach stdout because
+`GIN_MODE` is unset.
 
 **Acceptance criteria:**
 
@@ -475,4 +521,4 @@ between two tags reports a planted rename.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-23 — Phase 1 recorded as built: Tasks 1.2, 1.3, 1.5 and 1.4 shipped in obsx v0.41.0 through v0.44.0, Task 1.1 shipped as `logger/slogx` v0.1.0, and the execution order actually taken (1.2→1.3→1.5→1.4→1.1) is stated at the head of the phase. Previously 2026-09-18 — Task 1.1c split into A (done — obsx v0.39.2, fleet wave, lint policy channel) and B (with slogx). Previously 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._
+_Last updated: 2026-09-24 — Phases 2–3 and Tasks 1.1b, 1.1c-B, 4.1–4.4 recorded as built; only Task 4.5 (Weaver registry) and the Final release gate remain. Previously 2026-09-23 — Phase 1 recorded as built: Tasks 1.2, 1.3, 1.5 and 1.4 shipped in obsx v0.41.0 through v0.44.0, Task 1.1 shipped as `logger/slogx` v0.1.0, and the execution order actually taken (1.2→1.3→1.5→1.4→1.1) is stated at the head of the phase. Previously 2026-09-18 — Task 1.1c split into A (done — obsx v0.39.2, fleet wave, lint policy channel) and B (with slogx). Previously 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

@@ -125,8 +125,8 @@ Skeleton (copy what you need):
   profile pivot is written down as it works (RFC-0031 Task 4.2).** The
   confirm, notification-send and mockpay-hop latency panels show three
   quantiles instead of p95, and order value sits beside its quantiles, on
-  the v2 board and the local-stack copy (the v2 inline now matches
-  `duynhlab/grafana-dashboards` #23 exactly; the classic board follows in
+  the v2 board and the local-stack copy (the v2 inline's panels match
+  `duynhlab/grafana-dashboards` #23's generated output; the classic board follows in
   `duynhlab/helm-charts` #25). Payment `v2.4.1` starts mockpay's profiler,
   which `PROFILING_ENABLED` never did: Pyroscope now has `mockpay` with all
   four identity labels. `docs/observability/profiling` gains an

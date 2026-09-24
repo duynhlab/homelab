@@ -115,9 +115,12 @@ The current procedure, verified on Kind 2026-09-24:
    entered by) and read `service.name`, the span name and its time range.
 2. Explore → **Pyroscope** → profile type **process_cpu** → filter
    `service_name="<service>", span_name="<span name>"` and set the time range to
-   the span's window. That is the CPU spent inside that endpoint.
-3. For memory, goroutine, mutex or block, drop `span_name` — those profiles are
-   per service and time window only.
+   **at least one upload interval around the span** (profiles are pushed in 15s
+   chunks, so use ±30s — a window as short as the span usually matches nothing).
+   The result is the CPU of **every request to that endpoint** in that window,
+   not the one request.
+3. For memory, goroutine, mutex or block, drop `span_name` — on Kind only
+   `process_cpu` carries it; the others are per service and time window only.
 
 The labels line up by construction (`service.name` → `service_name`, root span
 name → `span_name`), so it costs two steps instead of one. Two limits:

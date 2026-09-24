@@ -584,8 +584,8 @@ together:
 
 | Source | Produced by | Read by | Why this one |
 |---|---|---|---|
-| **App metrics** — `http_server_request_duration_seconds_*`, `rpc_server_call_duration_seconds_*` | the SDK in each process (`httpmw.Tracing`, `grpcx`), exported over OTLP | Sloth SLOs, the alert rules (`alerts.yaml`, `recording-rules.yaml`, `rfc0021-baseline.yaml`, `inventory.yaml`), the per-service boards | measured on 100% of requests, independent of trace sampling |
-| **Span metrics** — `spanmetrics_calls_total`, `spanmetrics_duration_milliseconds_*` | the Collector's `span_metrics` connector, from sampled spans ([ADR-057](../proposals/adr/ADR-057-span-metrics-in-collector/)) | the **RED Span Metrics** board, gate rows K5.5 (Kind) and C19 (compose) in `scripts/k6/` | covers identities outside the Go SDK (the edge, Keycloak) on one board, and keeps both methods (`http_method` for the edge, `http_request_method` for services) |
+| **App metrics** — `http_server_request_duration_seconds_*`, `rpc_server_call_duration_seconds_*` | the SDK in each process (`httpmw.Tracing`, `grpcx`), exported over OTLP | Sloth SLOs for the Go services, the alert rules (`alerts.yaml`, `recording-rules.yaml`, `rfc0021-baseline.yaml`, `inventory.yaml`), the per-service boards | measured on 100% of requests, independent of trace sampling |
+| **Span metrics** — `spanmetrics_calls_total`, `spanmetrics_duration_milliseconds_*` | the Collector's `span_metrics` connector, from sampled spans ([ADR-057](../proposals/adr/ADR-057-span-metrics-in-collector/)) | the **RED Span Metrics** board (gate rows K5.5 and C19 only prove the leg exists) | covers identities outside the Go SDK (the edge, Keycloak) on one board, and keeps both methods (`http_method` for the edge, `http_request_method` for services) |
 
 **Nothing alerts on span metrics.** They follow the sampling rate, and a second
 alert source on the same traffic would double-page. Use the app metrics for "is

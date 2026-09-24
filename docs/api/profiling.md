@@ -149,7 +149,7 @@ as higher-cost signals than CPU-only profiling.
 
 1. **`obsx.TracerProviderWithProfiles`** wraps the OTel `TracerProvider` with `otel-profiling-go` so spans carry **`pyroscope.profile.id`** — applied automatically inside `SetupObservability` (to the global provider) when both tracing and profiling are enabled.
 2. **CPU profiles are span-scoped** — the wrapper labels CPU samples with the
-   process's **root** span (`span_name`, e.g. `GET /product/v1/public/products/:id/details`);
+   request's **local root span** (the first span started in this process) (`span_name`, e.g. `GET /product/v1/public/products/:id/details`);
    only that span carries `pyroscope.profile.id`, child spans do not.
 3. **Heap, goroutine, mutex, and block profiles are service/time scoped** — they have no per-span correlation.
 4. **Not on the four Temporal identities** (`order`, `order-worker`, `checkout`,

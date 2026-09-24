@@ -368,8 +368,9 @@ skip-list test.
 
 **Status — DONE 2026-09-24 (verified on Kind).** The four business histograms
 (checkout confirm, notification send, mockpay hop, order value) are on fleet-View
-or minor-unit buckets, and their panels now show p50/p95/p99 on every copy of the
-board. Every expression returns ordered quantiles on Kind. The two RED sources
+or minor-unit buckets, and their panels show p50/p95/p99 on the v2 and local-stack
+boards; the classic chart board follows with `duynhlab/helm-charts` #25 (the cluster
+picks it up on release, `semver >=0.2.0`). Every expression returns ordered quantiles on Kind. The two RED sources
 have one job each (`docs/api/metrics.md`). Pyroscope has all 13 identities:
 mockpay was missing until payment v2.4.1 started its profiler, and now carries
 the four labels. The manual trace→profile pivot and a per-type investigation

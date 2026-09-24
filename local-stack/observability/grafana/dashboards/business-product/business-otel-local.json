@@ -559,7 +559,7 @@
       "id": 9,
       "type": "stat",
       "title": "Order value — average, p50 / p95 / p99",
-      "description": "AOV over the selected range = order_value_minor sum/count, minor units ÷100.",
+      "description": "AOV over the selected range = order_value_minor sum/count, minor units ÷100; p50/p95/p99 from the same histogram place it (a mean pulled up by a few large baskets reads differently from one the median agrees with).",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"

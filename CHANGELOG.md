@@ -1038,6 +1038,16 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **mockpay no longer reissues ids after a restart (payment `v2.4.2`).**
+  Charges, refunds and webhook events were numbered by in-memory counters,
+  so the 2.4.1 rollout on Kind handed out `mp_3` a second time — two
+  payments with one `provider_payment_id` — and a reused `evt_N` would have
+  been dropped by payment's `event_id` dedup. Ids are now random behind the
+  same prefixes. A restart still empties the mock's ledger, so the
+  `missing_provider` burst for the last hour's payments (and the
+  `PaymentReconciliationDiscrepancy` alert with it) remains and clears as
+  they age out; the runbook says so.
+
 - **A lost Idempotency-Key no longer locks a checkout session until its TTL.**
   A confirm that failed on a product or inventory outage before the order
   attempt left the session `confirming` and bound to that key, so any other

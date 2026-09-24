@@ -104,14 +104,18 @@ dirty on every pass forever.
 - Auto-heal (`RECON_HEAL_ENABLED`) converges the one safe class. It is enabled
   only alongside these alerts, because a heal nobody can see is worse than a
   discrepancy nobody heals.
-- Reconciliation v1 scans the full payment set per pass; windowing is a later
-  slice.
+- Each pass compares a window: from the watermark minus a one-hour lookback to
+  five minutes before now. A discrepancy older than that stops being re-detected,
+  which is why a standing one clears the `[1h]` alert on its own.
 - Keep the provider's build in step with payment's. `mockpay` runs the payment
   image under a different subcommand, so its tag carries payment's
   `$imagepolicy` marker — a skew there is indistinguishable from money drift.
-- Restarting `mockpay` empties its in-memory ledger and resets its `mp_N`
-  counter. Expect a burst of `missing_provider` for every internal payment still
-  inside the window (self-clearing as they age out), and note that
-  `provider_payment_id` stops being unique across restarts.
+- Restarting `mockpay` empties its in-memory ledger. Expect a burst of
+  `missing_provider` for every internal payment still inside the window; it
+  clears on its own about an hour later, as they age out of the lookback, so do
+  not correct them by hand. Since payment `v2.4.2` its ids are random
+  (`mp_<hex>`, also `re_` and `evt_`), so a restart no longer reissues an id —
+  before that, a new charge could reuse an old `provider_payment_id` and a reused
+  webhook `event_id` was dropped as a redelivery.
 
-_Last updated: 2026-08-02_
+_Last updated: 2026-09-24 — mockpay ids are random since payment v2.4.2; the reconciliation window replaces the stale full-scan note. Previously 2026-08-02_

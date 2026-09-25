@@ -112,7 +112,11 @@ The useful pattern is a control system, not a collection of chat personas:
 
 This definition deliberately avoids calling every role a manager. Current Claude Code
 agent teams do not support nested teams, and non-interactive or Agent SDK sessions do
-not spawn teammates. A Claude implementation therefore needs a flat runtime topology:
+not spawn teammates. Subagents are different: since Claude Code v2.1.219 a subagent may
+spawn its own subagents up to **three layers deep by default**. Flatness is therefore a
+setting to enforce, not a property the product guarantees. Set
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` and leave `Agent` out of every worker's `tools`.
+A Claude implementation needs a flat runtime topology:
 one coordinator directly launches or resumes workers. "Contract", "documentation",
 "delivery", and "assurance" below are ownership lanes and reusable agent definitions,
 not nested team leads that create their own organizations.
@@ -372,8 +376,8 @@ flowchart TD
 
 | Need | Candidate Claude capability | Constraint that shapes the design |
 |------|-----------------------------|------------------------------------|
-| Persistent trigger surface | Claude Code routines triggered by schedule, API, or supported GitHub events | A routine is not a durable queue. Each run starts from a fresh cloud session and repository clone. Scheduled runs have a one-hour minimum interval; preview GitHub events beyond hourly limits may be dropped, runs may be rejected at usage/account caps, and a green infrastructure status does not prove semantic task success. Reconciliation, idempotency, and explicit success checks are required. |
-| Focused implementation | Custom subagents under `.claude/agents/` | Definitions can constrain tools, skills, model, hooks, turns, and permissions. A worker can use `isolation: worktree`. |
+| Persistent trigger surface | Claude Code routines triggered by schedule, API, or supported GitHub events | A routine is not a durable queue. Each run starts from a fresh cloud session and repository clone. Scheduled runs have a one-hour minimum interval; preview GitHub events beyond hourly limits may be dropped, runs may be rejected at usage/account caps, and a green infrastructure status does not prove semantic task success. A routine belongs to one individual claude.ai account and is not shared with teammates. It pushes to `claude/`-prefixed branches by default. If its GitHub connection is missing, it skips runs for up to 72 hours and then turns itself off. Reconciliation, idempotency, and explicit success checks are required. |
+| Focused implementation | Custom subagents under `.claude/agents/` | Definitions can constrain tools, skills, model, hooks, turns, and permissions. A worker can use `isolation: worktree`. Subagents nest three layers deep by default. Pin `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`, and bound fan-out with `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (default 20) and, for SDK runs, a `max_budget_usd` spend cap. |
 | High-bandwidth parallel review | Experimental agent teams | Disabled by default, higher token cost, interactive-only teammate spawning, one team per session, no nested teams, and known resume/task/shutdown limitations. Use only for bounded collaborative work, not as the durable scheduler. |
 | Repository isolation | Claude Code worktrees or subagent worktree isolation | Isolation prevents file collisions, not logical API conflicts. A task still needs an explicit base SHA and ownership boundary. |
 | Deterministic enforcement | Hooks plus existing CI | Hooks can reject completion or unsafe actions, but must not replace server-side branch protection and CI. |
@@ -439,9 +443,11 @@ editing every repository simultaneously. A typical sequence is:
 1. Land or version the shared contract in Homelab or `duynhlab/pkg`.
 2. Open producer changes behind backward-compatible behavior.
 3. Open consumer changes pinned to the new contract/library version.
-4. Update local-stack and Kubernetes delivery only after compatible artifacts exist.
-5. Run the mandatory compose/Kind/browser/telemetry gates where repository policy
-   requires them.
+4. Run the mandatory compose E2E release audit (API, browser, telemetry) on the PR
+   code **before** any service PR merges or is tagged, as `AGENTS.md` requires for
+   service, `pkg`, gateway, compose, and SPA changes.
+5. Merge, tag, and pin the compatible artifacts. Update Kubernetes delivery, then run
+   the Kind gate once as the final pass.
 6. Remove compatibility paths in a later, separately approved train.
 
 Only tasks without a file or contract dependency may run in parallel.
@@ -622,7 +628,7 @@ and have documented resume and task-state limitations.
 | Prompt injection in issues, PR comments, websites, or logs | Worker treats untrusted content as instruction | Mark trust boundaries in the task; allowlisted tools/domains; instructions outrank retrieved content; human gate for permission changes |
 | Credential bleed between roles | A low-trust task gains unrelated access | Claude subagents share parent-session credentials and routine actions use the linked user's identities. Treat independent context as a quality boundary only; minimize connectors, rely on server-side permissions/branch protection, and require a separately qualified automation identity, GitHub Action, or SDK controller where identity separation is mandatory |
 | Two workers edit the same file or contract | Lost work or incompatible changes | One-owner task graph, worktree isolation, path ownership, base SHA, and optimistic conflict check before handoff |
-| Coordinator delegates recursively | Runaway work and unclear accountability | Flat topology, concurrency ceiling, spawn budget, and no nested teams |
+| Coordinator delegates recursively | Runaway work and unclear accountability | Flat topology enforced by `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` (the default allows three nested layers), `Agent` absent from worker tools, `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` ceiling, spend budget, and no nested teams |
 | Stale memory or documentation | Plausible but incorrect implementation | Re-read current files and immutable SHAs on every run; memory only locates sources |
 | Worker verifies its own output | Confirmation bias hides defects | Separate verifier context; use separate identity only where the execution path genuinely supports it; CI and branch protection remain server-side |
 | Infinite polling or retries | Token/cost exhaustion and noisy follow-ups | Event-driven status where possible; bounded backoff, retry, turn, time, and cost budgets |
@@ -718,9 +724,10 @@ qualifies the routine trigger and recovery semantics.
 
 Start with one coordinator and at most three simultaneously active workers, expanding to
 five only after collision, quality, cost, and owner-attention metrics stay within agreed
-bounds. Three is a conservative Homelab starting point informed by Claude's 3–5 guidance
-for interactive Agent Teams; that guidance is not evidence for routine-launched workers,
-so this runtime must establish its own safe envelope. Concurrency is elastic capacity,
+bounds. Three is a conservative Homelab starting point. Claude's agent-team guidance says
+only to keep teams small, because token use grows roughly in proportion to team size. It
+gives no numeric range and says nothing about routine-launched workers, so this runtime
+must establish its own safe envelope. Concurrency is elastic capacity,
 not a headcount target.
 
 ### Stop conditions
@@ -739,26 +746,91 @@ Pause automated triggers when any of these occur:
 
 ## Open questions
 
-- [ ] What exact low-risk repository and task class should be the Phase 1 canary?
-- [ ] Should the durable task schema live in GitHub issue forms, a checked-in schema, or
-      both?
-- [ ] Which GitHub identity and token model provides one-repo least privilege while
-      preserving attributable audit history?
-- [ ] Which checks are universal, and how does a worker discover repository-specific
-      release gates without duplicating them in the coordinator?
-- [ ] What numeric thresholds define acceptable intervention, rework, escaped defects,
-      and cost for each trust-ladder promotion?
-- [ ] What run telemetry may be retained without storing prompts, source code, secrets,
-      or sensitive issue content?
-- [ ] Who owns the 24/7 coordinator/routine failure path and response expectation?
-- [ ] Which existing area should pilot the junior-to-master capability map without a
-      disruptive tree-wide documentation reorganization?
-- [ ] Which documentation examples are safe to execute in CI, which require an ephemeral
-      environment, and which must remain review-only because they are destructive?
-- [ ] Should the stable page contracts be encoded as Markdown templates, a project skill,
-      lintable metadata, or a deliberately small combination of all three?
-- [ ] Is Option B sufficient after Phase 3, or is there measured evidence for an Agent
-      SDK controller?
+Each question below has a proposed direction instead of being left open. A direction is
+not a decision. It is the owner's to confirm or override before this research becomes an
+RFC, and a confirmed answer is marked *owner-confirmed*.
+
+- [ ] **What exact low-risk repository and task class should be the Phase 1 canary?**
+      *Proposed:* Homelab `docs/` corrections, meaning broken links, stale counts, and
+      deployed/planned label drift. The limits are one area per task and no manifests.
+      The gates are already deterministic: the CI `markdown-links` and `validate` jobs,
+      plus Mermaid rendering. The change has no deploy path. Service dependency bumps
+      come second, because Renovate and Dependabot already cover that lane without agents.
+- [ ] **Should the durable task schema live in GitHub issue forms, a checked-in schema,
+      or both?** *Proposed:* both, with one owner. A versioned JSON Schema in Homelab
+      is the contract. A GitHub issue form (`.github/ISSUE_TEMPLATE/`, which does not
+      exist today) is only its human entry point. A CI check validates each task against
+      the schema, so the form cannot drift into a second definition.
+- [ ] **Which GitHub identity and token model provides one-repo least privilege while
+      preserving attributable audit history?** *Proposed:* a dedicated GitHub App
+      installed per repository. It uses short-lived installation tokens and only the
+      contents, pull-requests, and issues permissions, with no admin or workflow scope.
+      Routines cannot provide this, because they act as the owner's own GitHub user.
+      Phases 0–2 therefore either accept owner attribution, labelled on every PR, or run
+      as bounded GitHub Actions jobs under the App. The unattended write path waits
+      until the App path is qualified.
+- [ ] **Which checks are universal, and how does a worker discover repository-specific
+      release gates without duplicating them in the coordinator?** *Proposed:* four
+      universal checks: task-schema validity, base-SHA freshness, a clean worktree, and
+      evidence completeness. Everything else is discovered from the target repository's
+      `AGENTS.md`, which all 10 service repos, `pkg`, and `frontend` already carry. The
+      worker cites the gate section it ran. The coordinator stores only the *reference*,
+      and a missing or ambiguous gate blocks the task.
+- [ ] **What numeric thresholds define acceptable intervention, rework, escaped defects,
+      and cost for each trust-ladder promotion?** *Proposed starting bars*, measured
+      against Phase 0 human baselines and revised with evidence:
+
+      | Promotion | Bar |
+      |---|---|
+      | 0 → 1 | All ten evals pass twice in a row; seeded false-positive rate ≤ 10% |
+      | 1 → 2 | ≥ 10 consecutive draft PRs: first-pass gate ≥ 80%, rework ≤ 20%, zero escaped defects, human minutes per accepted change ≤ 50% of baseline |
+      | 2 → 3 | ≥ 3 cross-repo trains with zero ordering errors; cost per accepted change within the owner-set ceiling |
+      | 3 → 4 | 30 days of routines with no silent drop left unreconciled for more than one cycle |
+
+      Any escaped defect resets the current phase's count.
+- [ ] **What run telemetry may be retained without storing prompts, source code,
+      secrets, or sensitive issue content?** *Proposed:* metrics and ledger metadata
+      only. That covers the task ID, repo, phase, outcome, retry count, duration, tokens,
+      cost, and human-intervention minutes. Claude Code's OpenTelemetry export redacts
+      prompts, responses, tool arguments, and tool content by default.
+      `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_ASSISTANT_RESPONSES`, `OTEL_LOG_TOOL_DETAILS`,
+      `OTEL_LOG_TOOL_CONTENT`, and `OTEL_LOG_RAW_API_BODIES` all stay unset. The OAuth
+      `user.email` attribute is dropped at the collector, and retention follows the
+      platform's existing VictoriaMetrics and VictoriaLogs defaults.
+- [ ] **Who owns the 24/7 coordinator/routine failure path and response expectation?**
+      *Proposed:* the platform owner, on a best-effort basis with no response SLA. The
+      default behavior on failure is *pause and record*, never *retry until green*.
+      Routines are tied to one individual account, and one with a lost GitHub connection
+      turns itself off after 72 hours, so a heartbeat alert is the minimum control. The
+      scheduled reconciliation run then backfills. Asking for anything stronger means
+      asking for Path 2 and its on-call burden.
+- [ ] **Which existing area should pilot the junior-to-master capability map without a
+      disruptive tree-wide documentation reorganization?** *Proposed:*
+      `docs/observability/`. It already has the house-shape model page
+      (`profiling/README.md`), a hub, and a recent stack migration (RFC-0027/0031) whose
+      deployed/planned drift makes a realistic Steward eval. No other area is touched
+      until the pilot's reader-task metrics are recorded.
+- [ ] **Which documentation examples are safe to execute in CI, which require an
+      ephemeral environment, and which must remain review-only because they are
+      destructive?** *Proposed:* three tags on the fenced block, defaulting to
+      review-only. **`ci-safe`** covers read-only or offline commands such as
+      `make validate`, `kustomize build`, `mmdc`, and `kyverno test`.
+      **`ephemeral`** needs local-stack or Kind, for example `make e2e GATE=compose|kind`
+      and `curl` against the gateway. **`review-only`** covers anything that deletes,
+      rotates secrets, reconciles Flux, or touches real data. Untagged blocks are never
+      executed.
+- [ ] **Should the stable page contracts be encoded as Markdown templates, a project
+      skill, lintable metadata, or a deliberately small combination of all three?**
+      *Proposed:* Markdown templates as the source, one Documentation Steward section
+      inside the existing `platform-engineer` skill that points to them (no new skill),
+      and front-matter metadata linted in CI only after the observability pilot shows
+      which fields reviewers actually use.
+- [ ] **Is Option B sufficient after Phase 3, or is there measured evidence for an Agent
+      SDK controller?** *Proposed:* this stays undecided by design, and Phase 4 exists to
+      answer it. The trigger for Path 2 is a named gap that Option B cannot close with
+      configuration: identity separation, queue durability, or concurrency control
+      beyond the routine caps. The SDK's `max_budget_usd`, depth, and concurrency limits
+      are the controls such a controller would need to prove.
 - [x] Must initial merges remain human-gated? **Yes — owner direction for this research.**
 - [x] Is the target always-on rather than manually invoked only? **Yes — as a target;
       the rollout must earn unattended operation phase by phase.**
@@ -776,8 +848,9 @@ with concurrency determined by measured value and risk.
 **Why not make three Claude managers that each spawn workers?**
 
 Current Claude Code agent teams do not support nested teams, and teammate spawning is
-interactive rather than available in non-interactive/Agent SDK sessions. The runtime
-must stay flat. “Three lanes” describe ownership and context specialization.
+interactive rather than available in non-interactive/Agent SDK sessions. Subagents *can*
+nest, three layers by default, so the runtime stays flat only because the depth limit is
+pinned to `1`. “Three lanes” describe ownership and context specialization.
 
 **Why is GitHub the ledger instead of Claude's shared task list or memory?**
 
@@ -887,10 +960,16 @@ out of the reference list; the official xAI version above is the cited authority
 
 ## Context7 audit log
 
-The requested Context7 connector was not available in this session. The fallback agreed
-with the owner was a direct audit against current official product documentation and the
-repository's checked-in sources. This limitation is explicit so a later review can repeat
-the queries through Context7 before RFC promotion.
+The first pass (2026-09-24) had no Context7 connector, so it was audited against the
+official product documentation directly. **Context7 was rerun on 2026-09-25** against
+`/websites/code_claude`, the official `code.claude.com` index. Rows marked *Context7
+rerun* record that result.
+
+Context7 has no index for xAI, Diátaxis, Google style or Kubernetes contributor docs, so
+those rows stay on the official-document check. Two Claude claims did not surface in
+Context7 within the three-query budget: the one-hour scheduled-routine minimum and
+interactive-only teammate spawning. Both keep their official-document confirmation and
+must be re-checked in Phase 3 qualification.
 
 | Claim / section | Source checked | Result |
 |-----------------|----------------|--------|
@@ -907,6 +986,13 @@ the queries through Context7 before RFC promotion.
 | Claude worktree behavior | Official Claude Code worktree docs | Confirmed; isolation does not imply contract-level conflict prevention |
 | Claude scheduled/event automation | Official Claude Code routines docs | **Constrained:** candidate trigger surface, not a durable queue; supported event classes and limits require implementation qualification |
 | Claude routine permissions and lifecycle | Official Claude Code routines docs | Confirmed: fresh session/clone per run, one-hour scheduled minimum, preview events may be dropped and runs rejected at caps, green does not prove semantic success, no interactive permission-mode prompt, actions use linked identities, and connected tools require explicit minimization |
+| Subagent nesting (*Context7 rerun*) | `code.claude.com/docs/en/sub-agents`, `agent-sdk/subagents` | **Corrected:** since v2.1.219 subagents nest **three layers** by default (v2.1.172–216 allowed five). The "flat topology" is now an enforced setting (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), not a platform limit. Concurrency defaults to 20 (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`). SDK `max_budget_usd` refuses new spawns and ends the query at the cap |
+| Agent-team limits (*Context7 rerun*) | `code.claude.com/docs/en/agent-teams` | Confirmed: experimental, off by default, one team per session, no nested teams, no resume of in-process teammates, lagging task status, slow shutdown, fixed lead. Also: in-process teammates cannot run background subagents |
+| Routine lifecycle (*Context7 rerun*) | `code.claude.com/docs/en/routines` | Confirmed: research preview; schedule/API/GitHub triggers; fresh session per event; GitHub events above the per-routine and per-account hourly caps are dropped; there is a daily per-account run cap, and runs beyond it are rejected unless usage credits are on; no permission-mode picker; included connectors can write without asking; actions appear as the owner's GitHub user and linked accounts. **Added:** routines are per individual account and not shared; pushes go to `claude/`-prefixed branches by default, and a push elsewhere is refused if the branch is protected or carries commits by other authors; a missing GitHub connection skips runs for 72 hours, after which the routine turns off |
+| Subagent definition fields (*Context7 rerun*) | `code.claude.com/docs/en/claude-directory` | Confirmed: `tools`, `disallowedTools`, `permissionMode`, `maxTurns`, `skills`, `mcpServers`, `hooks`, `memory`, `background`, `isolation`, and the `Agent(worker, …)` spawn allowlist. Plugin-shipped agents ignore `hooks` and `permissionMode`, so guardrail agents must be project files, not plugins |
+| Unattended CLI runs (*Context7 rerun*) | `code.claude.com/docs/en/headless` | **Added:** `claude -p … --permission-mode auto --permission-prompts none` (v2.1.259+) runs a bounded CI job without stalling on prompts. This is the Phase 0–2 bounded-job path |
+| Agent-team sizing (*Context7 rerun*) | `code.claude.com/docs/en/costs`, `agent-teams` | **Corrected:** the docs say "keep teams small" (token use scales with team size) and give no 3–5 range; the worker envelope no longer cites one |
+| Run telemetry privacy (*Context7 rerun*) | `code.claude.com/docs/en/monitoring-usage`, `env-vars` | Confirmed: OTel export is opt-in; prompts, responses, tool arguments, tool content, and raw API bodies are redacted unless their `OTEL_LOG_*` flag is set; OAuth sessions attach `user.email` |
 | Deterministic completion gates | Official Claude Code hooks docs plus existing CI | Confirmed; hooks supplement rather than replace server-side controls |
 | Homelab topology and gates | `AGENTS.md`, docs index, API index, application-delivery docs, E2E runbook | Confirmed against repository state on 2026-09-25 |
 | Documentation content architecture | Diátaxis and Kubernetes page-content guidance | Confirmed: separate tutorial, how-to/task, reference, and explanation/concept by reader need; cross-link rather than mix contracts |
@@ -930,13 +1016,14 @@ the queries through Context7 before RFC promotion.
 - [x] `docs/` is modeled as an executable learning and knowledge plane with a planned
       Documentation Steward, four reader-need contracts, progressive capability routes,
       independent proof, and domain-owner approval
-- [ ] **Context7 audit** complete — official-document fallback is complete, but Context7
-      itself must be rerun when the connector is available
+- [x] **Context7 audit** complete — rerun 2026-09-25 against `/websites/code_claude`;
+      two corrections (subagent nesting, team sizing) and four additions recorded; two claims re-checked
+      only against official docs (see audit log)
 - [x] Mermaid diagrams label every candidate component and flow as **planned**
 - [x] No Kubernetes manifest, runtime configuration, hook, routine, or agent definition
       is changed by this research
 - [ ] Owner sign-off: **ready for RFC**
 
-_Last verified: 2026-09-25 (official xAI, Claude, Diátaxis, Google, and Kubernetes
-documentation + repository cross-check; Context7 connector unavailable and still
-required before RFC promotion)._
+_Last verified: 2026-09-25 (Context7 rerun for Claude Code docs; official xAI,
+Diátaxis, Google, and Kubernetes documentation; repository cross-check. Open questions
+carry proposed directions awaiting owner confirmation)._

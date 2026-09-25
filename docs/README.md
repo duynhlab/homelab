@@ -54,7 +54,7 @@ docs/
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
-│   │   └── RFC-0001 … RFC-0032   # 30 records; reserve number → research.md → README.md
+│   │   └── RFC-0001 … RFC-0033   # 31 records; reserve number → research.md → README.md
 ├── databases/                    # Database documentation
 │   ├── README.md                 # Learn / understand / operate / reference hub
 │   ├── architecture.md           # Current cluster and connection topology
@@ -526,4 +526,11 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-09-22 — the RFC and ADR counts on this page were re-derived from the folders (30 RFC records, 76 ADRs) after **RFC-0032** opened; they had been stale at 26 and 65. Previously 2026-09-17 — the metrics guide bullet no longer advertises exemplars, which VictoriaMetrics does not support (RFC-0014 D-14). Previously 2026-08-06 — RFC-0021 closed (P0–P7); inventory is the sole stock authority._
+_Last updated: 2026-09-25 — **RFC-0033** research now includes a planned Documentation
+Steward and treats `docs/` as the platform's executable learning and knowledge plane;
+the index contains 31 RFC records and 76 ADRs.
+Previously 2026-09-22 — the RFC and ADR counts on this page were re-derived from the
+folders (30 RFC records, 76 ADRs) after **RFC-0032** opened; they had been stale at 26
+and 65. Previously 2026-09-17 — the metrics guide bullet no longer advertises exemplars,
+which VictoriaMetrics does not support (RFC-0014 D-14). Previously 2026-08-06 — RFC-0021
+closed (P0–P7); inventory is the sole stock authority._

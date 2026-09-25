@@ -705,6 +705,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0033 opened at `researching` for a Claude-native autonomous engineering
+  organization.** The research separates verified Grok Bot engineering patterns from
+  unsupported viral claims, maps an always-on coordinator to Claude routines, isolated
+  workers, a GitHub ledger, independent verification, and human-gated merges. A planned
+  Documentation Steward treats `docs/` as an executable learning and knowledge plane,
+  using Diátaxis content contracts and Google/Kubernetes writing and review practices
+  to serve junior-to-master paths. Every runtime component remains uninstalled until the
+  research gate and owner review pass.
+
 - **RFC-0031 is `Implemented`; ADR-070 through ADR-076 are `Complete`.** Every
   delivery-plan task is done (Task 4.5 and the Final release gate recorded on
   2026-09-25) and both final gates passed on the final pins — the compose audit

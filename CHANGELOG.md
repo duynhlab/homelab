@@ -705,6 +705,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0033 research audited: Context7 rerun and all open questions carry proposed
+  directions.** The Context7 rerun against the Claude Code docs corrects two claims.
+  Subagents now nest three layers by default, so the flat topology must be enforced with
+  `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`. The docs give no 3–5 team-size range. It
+  also records routine facts that shape failure ownership: routines are per account,
+  push to `claude/` branches, and turn off after 72 hours without GitHub. The change
+  train now runs the compose gate before merge and tag. Each of the 11 open questions
+  has a proposed direction for owner review, and the status stays `researching`.
+
 - **RFC-0033 opened at `researching` for a Claude-native autonomous engineering
   organization.** The research separates verified Grok Bot engineering patterns from
   unsupported viral claims, maps an always-on coordinator to Claude routines, isolated

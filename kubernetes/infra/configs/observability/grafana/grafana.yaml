@@ -49,6 +49,16 @@ spec:
       mode: console
     plugins:
       allow_loading_unsigned_plugins: victoriametrics-metrics-datasource,victoriametrics-logs-datasource
+      # Grafana 13 ships Prometheus and Pyroscope as preinstalled plugins and, by
+      # default, "updates" them at startup when a newer release exists: it
+      # unregisters the bundled copy, then fails to replace it because the
+      # container's root filesystem is read-only ("unlinkat
+      # /usr/share/grafana/data/plugins-bundled/prometheus: read-only file
+      # system"). The plugin is then simply gone — every prometheus-type
+      # datasource reads "Datasource ... was not found" (2026-09-25: 28 of 43
+      # boards, v1 and as-code alike). Keep the version the image ships; a
+      # plugin upgrade is an image bump.
+      preinstall_auto_update: "false"
     server:
       # OAuth redirect_uri is derived from root_url — localhost here is what
       # blocked any SSO before ADR-062. Must match the realm client's

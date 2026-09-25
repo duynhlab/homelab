@@ -866,10 +866,18 @@ Skeleton (copy what you need):
   hard-coded `service.version=2.4.3`, so spans and profiles from the `2.5.0`
   pod carried the old version (seen on the 2026-09-25 Kind gate's Pyroscope
   label check). The order worker pin that #1097 missed landed in #1098.
-- **Known: `quay.io/minio/mc` refuses anonymous pulls (`401`).** A cold
-  `make up` stalls at `storage-local` until the RustFS bucket Job's image is
-  present on the nodes; the 2026-09-25 gate loaded it from the host. The
-  image needs a durable home before the next cold bring-up.
+- **The RustFS bucket Job and CronJob run the AWS CLI, not the MinIO client.**
+  `quay.io/minio/mc` started answering anonymous pulls with `401` (Docker Hub
+  had already dropped the repository), so a cold `make up` stalled at
+  `storage-local` and the twelve waves behind it. Both now use
+  `public.ecr.aws/aws-cli/aws-cli:2.37.3` (no auth, amd64 + arm64) with the
+  same gate: an authenticated ListBuckets must answer before anything is
+  created, CreateBucket only when HeadBucket misses, and a HeadBucket per
+  bucket must pass or the run fails. Memory goes to 64Mi/128Mi (one run
+  peaks at ~80 MiB). Tested on Kind: Job and CronJob Complete, a new bucket
+  created then reported `exists` on the second run, wrong endpoint and wrong
+  secret both exit 1, and with RustFS scaled to 0 the Job waited and
+  completed on the attempt after it came back.
 
 - **A fresh `make up` no longer stalls on the RustFS bucket Job.** Both places that
   run the MinIO client — the `rustfs-setup-buckets-init` Job and the

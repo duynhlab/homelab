@@ -38,11 +38,13 @@ spec:
     jobs:
       setup-pg-backup-buckets:
         image:
-          # quay.io, not docker.io: the minio/mc repository was removed from Docker Hub
-          # (the tags API returns 404). Same release, pulled from Quay — keep in step
-          # with job-setup-buckets.yaml.
-          repository: quay.io/minio/mc
-          tag: "RELEASE.2025-08-13T08-35-41Z"
+          # public.ecr.aws, not docker.io or quay.io: the minio/mc repository was removed
+          # from Docker Hub, and quay.io/minio/mc started answering anonymous pulls with 401
+          # (2026-09-25 Kind bring-up: storage-local and twelve waves behind it stalled).
+          # The AWS CLI speaks the same S3 API to RustFS and ECR Public needs no auth.
+          # Keep in step with job-setup-buckets.yaml.
+          repository: public.ecr.aws/aws-cli/aws-cli
+          tag: "2.37.3"
           imagePullPolicy: IfNotPresent
         schedule: "*/30 * * * *"
         failedJobsHistoryLimit: 1
@@ -57,21 +59,21 @@ spec:
             set -e
             ENDPOINT="http://rustfs-svc.rustfs.svc.cluster.local:9000"
             BUCKETS="pg-backups-cnpg pyroscope-profiles clickhouse-otel"
+            ATTEMPTS=60
+            s3() { aws --endpoint-url "$ENDPOINT" s3api "$@"; }
 
-            # Gate on the server actually SERVING, not on the alias being writable.
-            # `mc alias set` can return 0 against an endpoint that is not yet backed by a
-            # formatted disk; `mc ls rustfs/` cannot. This distinction is the whole bug:
-            # on 2026-08-07 the old loop logged "not ready" ten times, fell through anyway,
-            # reported three buckets created, and the Job went Complete — while RustFS only
-            # opened /data 70s later and found it empty. Flux read that Complete as its gate
-            # and released Tempo onto a bucket that did not exist.
+            # Gate on the server actually SERVING, not on it being reachable. On
+            # 2026-08-07 the old loop fell through after ten failed attempts, reported
+            # three buckets created, and the Job went Complete while RustFS only opened
+            # /data 70s later and found it empty; Flux read that Complete as its gate and
+            # released a consumer onto a bucket that did not exist. ListBuckets needs an
+            # authenticated answer from a server with its disk formatted, so it is the gate.
             echo "=== Waiting for RustFS to serve ==="
             ready=""
             i=0
-            while [ "$i" -lt 60 ]; do
+            while [ "$i" -lt "$ATTEMPTS" ]; do
               i=$((i + 1))
-              if mc alias set rustfs "$ENDPOINT" "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" >/dev/null 2>&1 \
-                 && mc ls rustfs/ >/dev/null 2>&1; then
+              if s3 list-buckets >/dev/null 2>&1; then
                 echo "RustFS is serving (attempt $i)."
                 ready=yes
                 break
@@ -84,22 +86,26 @@ spec:
             # backoffLimit / next CronJob run) happen, and what stops Flux from treating an
             # ungated run as a satisfied dependency.
             if [ -z "$ready" ]; then
-              echo "FATAL: RustFS did not serve within 300s — refusing to report success." >&2
+              echo "FATAL: RustFS did not serve within $((ATTEMPTS * 5))s — refusing to report success." >&2
               exit 1
             fi
 
             echo "=== Creating buckets ==="
             for b in $BUCKETS; do
-              mc mb --ignore-existing "rustfs/$b"
+              if s3 head-bucket --bucket "$b" >/dev/null 2>&1; then
+                echo "  exists  $b"
+              else
+                s3 create-bucket --bucket "$b" >/dev/null
+                echo "  created $b"
+              fi
             done
 
-            # Verify each bucket individually and fail on any miss. `mc ls rustfs/` alone
-            # printed the buckets in the broken run too, so a listing is not proof; a
-            # per-bucket stat that must succeed is.
+            # Verify each bucket individually and fail on any miss: a create call that
+            # answered is not proof, a per-bucket HeadBucket that must succeed is.
             echo "=== Verifying ==="
             missing=""
             for b in $BUCKETS; do
-              if mc ls "rustfs/$b" >/dev/null 2>&1; then
+              if s3 head-bucket --bucket "$b" >/dev/null 2>&1; then
                 echo "  ok      $b"
               else
                 echo "  MISSING $b"
@@ -112,6 +118,10 @@ spec:
             fi
             echo "=== Done ==="
         env:
+          - name: AWS_DEFAULT_REGION
+            value: us-east-1
+          - name: AWS_EC2_METADATA_DISABLED
+            value: "true"
           - name: AWS_ACCESS_KEY_ID
             valueFrom:
               secretKeyRef:
@@ -122,10 +132,12 @@ spec:
               secretKeyRef:
                 name: rustfs-credentials
                 key: RUSTFS_SECRET_KEY
+        # The AWS CLI is Python: one run peaks at ~80 MiB (measured), where mc
+        # fitted in 64.
         resources:
           requests:
             cpu: 10m
-            memory: 32Mi
-          limits:
-            cpu: 50m
             memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi

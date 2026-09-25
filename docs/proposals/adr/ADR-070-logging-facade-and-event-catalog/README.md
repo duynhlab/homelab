@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.1, 1.1b, 1.1c, 2.1, 2.2, Phase 3 |
-| **Adoption** | Partial |
+| **Adoption** | Complete — `logger/slogx` v0.3.0 on all ten services, both workers and mockpay (trains of 2026-09-24/25); the 19-name catalog frozen, generated from the registry and held to `docs/api/logs.md` in CI |
 
 ## Context
 
@@ -225,6 +225,7 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from the RFC's logging proposal |
 | 2026-09-17 | Accepted / Not started | Owner chose the slog facade over the audit's keep-Zap recommendation; created at `Accepted` with the RFC per the RFC-0028/RFC-0030 precedent |
 | 2026-09-23 | Accepted / Partial | `logger/slogx` v0.1.0 is tagged: one context-first facade over `log/slog` rendering a single redacted record to the platform stdout envelope and over OTLP through the OTel slog bridge, six levels on the RFC severity table, `Event` with a validated catalog name, `Err` for the error shape, and an API-surface test that fails if any exported signature names a logging library, the OTel SDK or the bridge. No service has adopted it — the fleet cutover is Phase 3, and `logger/zapx` stays the production default until then |
+| 2026-09-25 | Accepted / Complete | **Complete.** The facade is the fleet's only logger (v0.3.0: `error.type` + `exception.message`, registry-generated key and event constants); `process.started` observed from all 13 identities and 12 catalog names observed in the 2026-09-25 gate; the catalog table is generated from the registry and checked in homelab CI. |
 
 ---
-_Last updated: 2026-09-23 — the facade exists: `logger/slogx` v0.1.0 tagged in `duynhlab/pkg`; service adoption is Phase 3. Previously 2026-09-17._
+_Last updated: 2026-09-25 — Adoption `Complete` at the close of RFC-0031 (both final gates passed). Previously the facade exists: `logger/slogx` v0.1.0 tagged in `duynhlab/pkg`; service adoption is Phase 3. Previously 2026-09-17._

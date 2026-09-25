@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.3, 4.2, 4.4 |
-| **Adoption** | Partial |
+| **Adoption** | Complete — the fleet seconds View (obsx v0.42.0+), a UCUM unit on every business instrument (train #2, names unchanged 77 = 77), no identifier labels; registry declares 66 business instruments with unit and attributes |
 
 ## Context
 
@@ -192,6 +192,7 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Metrics contract |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
 | 2026-09-23 | Accepted / Partial | **Amended.** The boundary rule moves from a lint to the type system of the metric itself: `obsx` v0.42.0 dispatches one View that applies the fleet set to every histogram whose unit is `s`, so a new instrument is correct by declaring `WithUnit("s")` rather than by remembering to pass thirteen numbers. The planned `forbidigo` rule is withdrawn — a regex over source cannot see an instrument built in a library, and the View covers the Temporal SDK and gRPC latencies a lint never would. The two known seconds histograms already carried the unit, so no service changed. Cardinality allowlist tests and the budget dashboard remain open |
+| 2026-09-25 | Accepted / Complete | **Complete.** Train #2 put a unit on all 57 instruments that lacked one (annotation units, Prometheus names unchanged); the registry declares every instrument and the live-check rejects a unit or instrument that differs. |
 
 ---
-_Last updated: 2026-09-23 — Task 1.3 shipped in obsx v0.42.0: one View applies the fleet boundaries to every histogram declared in seconds, and the planned `forbidigo` rule is withdrawn. Previously 2026-09-17._
+_Last updated: 2026-09-25 — Adoption `Complete` at the close of RFC-0031 (both final gates passed). Previously Task 1.3 shipped in obsx v0.42.0: one View applies the fleet boundaries to every histogram declared in seconds, and the planned `forbidigo` rule is withdrawn. Previously 2026-09-17._

@@ -705,6 +705,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0031 is `Implemented`; ADR-070 through ADR-076 are `Complete`.** Every
+  delivery-plan task is done (Task 4.5 and the Final release gate recorded on
+  2026-09-25) and both final gates passed on the final pins — the compose audit
+  with row C22 (#1095) and the Kind audit (`docs/platform/kind-e2e-audit.md`
+  § Previous runs). The RFC's Implementation History is filled in from the
+  2026-09-18 floor to the close; `docs/api/` Design records and status callouts
+  read `Implemented`, and `pkg.md` records `httpmw v0.3.0` and the blocking
+  fleet lint policy.
+
 - **RFC-0031 Task 0.2: the event catalog is frozen — owner sign-off is the merge.**
   [`docs/api/logs.md` § Event catalog](docs/api/logs.md#event-catalog) registers
   nineteen names across the five classes (business transition, retry exhausted,
@@ -810,6 +819,16 @@ Skeleton (copy what you need):
 
 #### CI
 
+- **The fleet lint policy runs blocking in every service, with the version
+  floor encoded** (ADR-072). `gha-workflows` #126 adds a `gomodguard_v2` rule
+  that fails a telemetry module pinned more than one minor behind its current
+  release (obsx `< 0.46.0`, logger/slogx `< 0.2.0`, httpmw `< 0.2.0`, grpcx
+  `< 0.36.0`, temporalx `< 0.43.0`); all ten services flipped `policy-lint` +
+  `policy-lint-blocking` at 0 findings, payment first taking its otelhttp hop
+  from `httpmw v0.3.0` (`Transport`/`Handler`) so no service links contrib
+  instrumentation itself. pkg's release procedure now moves the floor with
+  each new minor.
+
 - **The shared-package rule has an enforcement channel.** `duynhlab/gha-workflows`
   carries `.github/lint/golangci-policy.yml` — `depguard` for the OTel SDK, exporters,
   bridges and contrib instrumentation outside `pkg`, no `client_golang`, no
@@ -824,6 +843,15 @@ Skeleton (copy what you need):
 ### Bugfix
 
 #### GitOps
+
+- **mockpay reports the version it runs.** Its `OTEL_RESOURCE_ATTRIBUTES`
+  hard-coded `service.version=2.4.3`, so spans and profiles from the `2.5.0`
+  pod carried the old version (seen on the 2026-09-25 Kind gate's Pyroscope
+  label check). The order worker pin that #1097 missed landed in #1098.
+- **Known: `quay.io/minio/mc` refuses anonymous pulls (`401`).** A cold
+  `make up` stalls at `storage-local` until the RustFS bucket Job's image is
+  present on the nodes; the 2026-09-25 gate loaded it from the host. The
+  image needs a durable home before the next cold bring-up.
 
 - **A fresh `make up` no longer stalls on the RustFS bucket Job.** Both places that
   run the MinIO client — the `rustfs-setup-buckets-init` Job and the

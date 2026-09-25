@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.2, 1.4, 3.3, 4.2 |
-| **Adoption** | Partial |
+| **Adoption** | Complete — four profile labels derived from the resource (obsx v0.44.0+), verified on Kind 2026-09-24 for all 13 identities incl. mockpay; profiles from all 10 services and both workers in the 2026-09-25 gates |
 
 ## Context
 
@@ -201,6 +201,7 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Continuous profiling contract and the live label measurements |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
 | 2026-09-23 | Accepted / Partial | **Amended.** `obsx` v0.44.0 derives the four profile labels from the same resource attributes the tracer, meter and logger read, so `deployment_environment` and `service_version` — measured empty at the decision — now carry values; the hostname fallbacks are gone and the runtime sampling constants carry the overhead budget in their doc. The per-service `profiling_enabled` ResourceSet input shipped in homelab #1073, which closes the accepted trade-off about a domain-scoped switch. Verification on Kind (the Pyroscope label set) remains open |
+| 2026-09-25 | Accepted / Complete | **Complete.** The label set is closed and derived from the same resource the traces carry; every identity, mockpay included, profiles with all four labels non-empty (Kind 2026-09-24, compose 2026-09-25). |
 
 ---
-_Last updated: 2026-09-23 — Task 1.4 shipped in obsx v0.44.0 and the per-service profiling input in homelab #1073; the label set is now derived from the shared resource. Previously 2026-09-17._
+_Last updated: 2026-09-25 — Adoption `Complete` at the close of RFC-0031 (both final gates passed). Previously Task 1.4 shipped in obsx v0.44.0 and the per-service profiling input in homelab #1073; the label set is now derived from the shared resource. Previously 2026-09-17._

@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-09-16, Context7 rerun 2026-09-17 | 2026-09-16 | 2026-09-17 |
+| Implemented | platform-wide | [./research.md](./research.md) — gate passed 2026-09-16, Context7 rerun 2026-09-17 | 2026-09-16 | 2026-09-25 |
 
 ## Prerequisites
 
@@ -305,16 +305,17 @@ accepting the RFC.
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed target; not an as-built application contract |
+| **Status** | Implemented 2026-09-25 — the deployed contract is the as-built text in `docs/api/` (Task 4.3); this section is the target it was measured against, kept as the review record |
 | **Owner** | Platform engineering with each service owner |
 | **Applies after** | RFC acceptance and the resulting ADRs |
 | **Signals** | Logs, metrics, traces and continuous profiles |
 | **Source baseline** | docs/api observability, logs, metrics, tracing, profiling, Temporal, workflows, graceful shutdown and service contracts |
 | **SemConv baseline** | OpenTelemetry semantic conventions v1.41.0, pinned by pkg/obsx |
 
-This section makes the target reviewable without replacing the deployed
-contracts in docs/api. The as-built rules remain authoritative until the clean
-cutover has passed every verification gate.
+This section made the target reviewable without replacing the deployed
+contracts in docs/api. Every verification gate has passed (§ Verification gates);
+the as-built rules in `docs/api/` are authoritative and this text is the record
+of what was proposed.
 
 ### Shared-package rule
 
@@ -1270,17 +1271,18 @@ partial rollout is a failed rollout and must not be promoted.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Logging facade and event catalog | [ADR-070](../../adr/ADR-070-logging-facade-and-event-catalog/) | Accepted / Not started |
-| Canonical event, access and privacy data contract | [ADR-071](../../adr/ADR-071-telemetry-event-data-contract/) | Accepted / Not started |
-| Fleet cutover with no migration mechanism | [ADR-072](../../adr/ADR-072-telemetry-clean-cutover/) | Accepted / Not started |
-| Metric instrument, cardinality and replay contract | [ADR-073](../../adr/ADR-073-application-metrics-contract/) | Accepted / Not started |
-| Continuous profiling identity and overhead contract | [ADR-074](../../adr/ADR-074-continuous-profiling-contract/) | Accepted / Not started |
-| Tracing sampling, span and baggage contract | [ADR-075](../../adr/ADR-075-application-tracing-contract/) | Accepted / Not started |
-| Platform semantic-convention registry and bare-namespace rule | [ADR-076](../../adr/ADR-076-semantic-convention-registry/) | Accepted / Not started |
+| Logging facade and event catalog | [ADR-070](../../adr/ADR-070-logging-facade-and-event-catalog/) | Accepted / Complete (2026-09-25) |
+| Canonical event, access and privacy data contract | [ADR-071](../../adr/ADR-071-telemetry-event-data-contract/) | Accepted / Complete (2026-09-25) |
+| Fleet cutover with no migration mechanism | [ADR-072](../../adr/ADR-072-telemetry-clean-cutover/) | Accepted / Complete (2026-09-25) |
+| Metric instrument, cardinality and replay contract | [ADR-073](../../adr/ADR-073-application-metrics-contract/) | Accepted / Complete (2026-09-25) |
+| Continuous profiling identity and overhead contract | [ADR-074](../../adr/ADR-074-continuous-profiling-contract/) | Accepted / Complete (2026-09-25) |
+| Tracing sampling, span and baggage contract | [ADR-075](../../adr/ADR-075-application-tracing-contract/) | Accepted / Complete (2026-09-25) |
+| Platform semantic-convention registry and bare-namespace rule | [ADR-076](../../adr/ADR-076-semantic-convention-registry/) | Accepted / Complete (2026-09-25) |
 
 All seven were created at `Accepted` with this RFC on 2026-09-17, following the
-RFC-0028 and RFC-0030 precedent; Adoption moves off `Not started` only as the
-delivery plan lands, and `docs/api/` is synced when Adoption is Complete.
+RFC-0028 and RFC-0030 precedent. Adoption moved with the delivery plan and reached
+`Complete` on 2026-09-25; `docs/api/` carries the as-built contracts (Task 4.3,
+synced again at closure).
 
 ## Implementation History
 
@@ -1290,9 +1292,15 @@ delivery plan lands, and `docs/api/` is synced when Adoption is Complete.
 | 2026-09-17 | Second and third revisions: facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope, shared-package rule for all four signals, tracing / Collector / fleet-scale / registry contracts, template sections, live verification on local-stack and a fresh Kind cluster (#1063) |
 | 2026-09-17 | Bring-up exposed that the RustFS bucket Job's MinIO client image had left Docker Hub; fixed separately (#1064) |
 | 2026-09-17 | **Accepted** at architecture review: facade `pkg/logger/slogx`, bare namespaces with registered exceptions; ADR-070 through ADR-076 created at `Accepted` / `Not started` |
+| 2026-09-18 | Phase 1 floor: every `duynhlab/pkg` module at one tag in all ten services (`obsx v0.38.0`), pkg lints v2.12.2; the fleet lint-policy channel merged in `gha-workflows` (Task 1.1c-A) |
+| 2026-09-21 | Tasks 1.2–1.5 shipped as `obsx v0.41.0`–`v0.44.0` (propagator always on, one resource identity, the fleet seconds View, `RecordError`/`RecordOutcome`, four profile labels from the resource) + homelab #1072/#1073 |
+| 2026-09-23 | `logger/slogx v0.1.0` (Task 1.1), `obsx v0.45.0` without the zap bridge (Task 1.1c-B), Phase 2 adapters (`httpmw v0.2.0`, `grpcx v0.37.0`, `temporalx v0.40.0`), Task 0.2 catalog freeze (homelab #1086) |
+| 2026-09-24 | Phase 3 as **one release train** (ten services + both workers + mockpay on `slogx v0.2.0`, `obsx v0.45.0`, homelab #1088), Task 1.1b (three logger modules retired, pkg #108), Tasks 4.1–4.4 (homelab #1088–#1091), span privacy at the source (`obsx v0.46.0`, homelab #1093/#1094), mockpay random ids (payment v2.4.2) |
+| 2026-09-25 | Task 4.5: the Weaver registry (pkg #111/#112), row C22 in the compose gate (homelab #1095), train #2 (`exception.message`, UCUM units, typed fields off spans; homelab #1097), ADR-072 enforcement (fleet lint policy blocking on all ten services with the version floor, `gha-workflows` #126, `httpmw v0.3.0`), Kind gate on the final pins — **Implemented** |
 
-No implementation has started. Phase 0 of the delivery plan is now eligible; no code,
-manifest, dashboard or `docs/api/` contract changes until it runs.
+Every task of the [delivery plan](./delivery-plan.md) is done and the final release gate
+passed on both environments — compose gate 2026-09-25 (homelab #1095, evidence comment: A/B/C + C22 exit 0), Kind gate 2026-09-25 ([`docs/platform/kind-e2e-audit.md`](../../../platform/kind-e2e-audit.md) § Previous runs). What the RFC left open by design is recorded in
+the ADRs' revisit triggers, not here.
 
 ## Related
 
@@ -1324,4 +1332,4 @@ in the metrics guide while the platform does not promise them.
 - [OTel RPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
 
 ---
-_Last updated: 2026-09-17 — **Accepted** at architecture review (owner, 2026-09-17): facade `pkg/logger/slogx`, bare namespaces with registered exceptions; ADR-070…076 created at `Accepted / Not started`. third revision. Added the shared-package rule for all four signals with its enforcement mechanism, a tracing contract with gate, task and ADR-075, Collector and fleet-scale contracts, a semantic-convention registry as ADR-076, and the Design Details, Security considerations and Observability & SLO impact sections. Corrected the sampling table, Kubernetes enrichment, profile labels and mockpay scope to deployed reality, and verified the contract live on local-stack and a fresh Kind cluster (research § Live verification). The standard is greenfield: no migration mechanism. Earlier the same day: Context7 rerun, facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope._
+_Last updated: 2026-09-25 — **Implemented**: every delivery-plan task done, both final gates passed (compose #1095, Kind § Previous runs 2026-09-25), ADR-070…076 at `Complete`, Implementation History filled in from the 2026-09-18 floor to the 2026-09-25 close. Previously 2026-09-17 — **Accepted** at architecture review (owner, 2026-09-17): facade `pkg/logger/slogx`, bare namespaces with registered exceptions; ADR-070…076 created at `Accepted / Not started`. third revision. Added the shared-package rule for all four signals with its enforcement mechanism, a tracing contract with gate, task and ADR-075, Collector and fleet-scale contracts, a semantic-convention registry as ADR-076, and the Design Details, Security considerations and Observability & SLO impact sections. Corrected the sampling table, Kubernetes enrichment, profile labels and mockpay scope to deployed reality, and verified the contract live on local-stack and a fresh Kind cluster (research § Live verification). The standard is greenfield: no migration mechanism. Earlier the same day: Context7 rerun, facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope._

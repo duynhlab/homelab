@@ -321,7 +321,7 @@ services:
       temporal: { condition: service_healthy }
 
   temporal-ui:
-    image: temporalio/ui:2.53.3
+    image: temporalio/ui:2.54.1
     environment:
       TEMPORAL_ADDRESS: temporal:7233
     ports:

@@ -1,0 +1,83 @@
+# Gate-only addition, loaded by compose.weaver.yaml as a second --config.
+# It adds pipelines — it never edits the base ones — that copy every signal the
+# services send to Weaver's live-check listener, which compares each attribute,
+# metric and event name against the platform registry (duynhlab/pkg semconv,
+# ADR-076). The otlp receiver fans out to these and the base pipelines alike.
+exporters:
+  otlp/weaver:
+    endpoint: weaver:4317
+    tls:
+      insecure: true
+    # Weaver's listener rejects gzip ("Unimplemented: Content is compressed with
+    # gzip"), and the otlp exporter compresses by default — every batch dropped.
+    compression: none
+
+processors:
+  # Vendor residue, removed only on the copy Weaver sees. The stores keep the
+  # data; the check judges the platform's names, not its libraries':
+  #   - the Temporal Go SDK stamps records with Namespace/WorkflowID/… and
+  #     spans with temporalWorkflowID/…, CamelCase the naming rule rejects;
+  #   - redisotel (semconv v1.24) writes db.system and pool.name/state under
+  #     names the pinned conventions renamed or dropped;
+  #   - db.connection_string is a DSN, also stripped for good by
+  #     transform/privacy in the base config.
+  transform/weaver-vendor:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["db.system.name"], attributes["db.system"]) where attributes["db.system"] != nil
+          - delete_key(attributes, "db.system")
+          - delete_key(attributes, "db.connection_string")
+          - delete_key(attributes, "temporalWorkflowID")
+          - delete_key(attributes, "temporalRunID")
+          - delete_key(attributes, "temporalActivityID")
+    log_statements:
+      - context: log
+        statements:
+          # Every Temporal SDK key starts with a capital (Namespace, TaskQueue,
+          # WorkflowID, WorkerType, …) and no registry name may, so one pattern
+          # covers the set instead of a list that misses the next key — WorkerType
+          # was the one the 2026-09-25 gate found.
+          - delete_matching_keys(attributes, "^[A-Z]")
+    metric_statements:
+      - context: datapoint
+        statements:
+          - delete_key(attributes, "pool.name")
+          - delete_key(attributes, "state")
+  # redisotel's pool metrics carry the pre-rename db.client.connections.* names.
+  filter/weaver-vendor-metrics:
+    error_mode: ignore
+    metrics:
+      metric:
+        - 'IsMatch(name, "^db\\.client\\.connections\\.")'
+  # Live-check judges the platform's OWN instrumentation: a service is
+  # "instrumented" when it passes (ADR-076). The edge and Keycloak emit their
+  # vendors' names, which the platform registry does not own, so they never
+  # reach Weaver.
+  filter/fleet-only:
+    error_mode: ignore
+    traces:
+      span:
+        - 'resource.attributes["service.name"] == "keycloak" or IsMatch(resource.attributes["service.name"], "^platform\\.")'
+    metrics:
+      metric:
+        - 'resource.attributes["service.name"] == "keycloak" or IsMatch(resource.attributes["service.name"], "^platform\\.")'
+    logs:
+      log_record:
+        - 'resource.attributes["service.name"] == "keycloak" or IsMatch(resource.attributes["service.name"], "^platform\\.")'
+
+service:
+  pipelines:
+    traces/weaver:
+      receivers: [otlp]
+      processors: [filter/fleet-only, transform/weaver-vendor, batch]
+      exporters: [otlp/weaver]
+    metrics/weaver:
+      receivers: [otlp]
+      processors: [filter/fleet-only, filter/weaver-vendor-metrics, transform/weaver-vendor, batch]
+      exporters: [otlp/weaver]
+    logs/weaver:
+      receivers: [otlp]
+      processors: [filter/fleet-only, transform/weaver-vendor, batch]
+      exporters: [otlp/weaver]

@@ -37,9 +37,10 @@ Scope and shared bootstrap rules: [Application observability](./observability.md
 > on stdout is new (the zap era wrote only `trace_id` there).
 > The error field changed: `zap.Error(err)` wrote one string field `error`;
 > `slogx.Err(err)` writes two flat fields, `error.type` (the Go type, the
-> low-cardinality label the span also carries) and `error.message` (the text, redacted
-> and bounded). A panel, alert or saved LogsQL filter matching `error` as a string must
-> use `error.message`, or better `error.type`. The access record moved from
+> low-cardinality label the span also carries) and `exception.message` (the text, redacted
+> and bounded; `error.message` until slogx v0.3.0, when the deprecated upstream key was
+> retired). A panel, alert or saved LogsQL filter matching `error` as a string must
+> use `exception.message`, or better `error.type`. The access record moved from
 > `method`/`path`/`status`/`duration`/`client_ip`/`user_agent` to the semconv keys in
 > [§ Access-log policy](#access-log-policy). Two levels joined the four: `trace`
 > (severity 1) and `fatal` (21); on OTLP the severity *number* is the field to filter,
@@ -257,7 +258,7 @@ Legacy adapters (`zerolog`, `clog`) accepted the same four `LOG_LEVEL` strings b
 | `trace_id`, `span_id` | a valid active span context exists |
 | `event` | the record represents a stable machine-queryable event |
 | `operation` | the record belongs to a command/use case |
-| `error.type`, `error.message` | the operation has an error (`slogx.Err(err)`) |
+| `error.type`, `exception.message` | the operation has an error (`slogx.Err(err)`) |
 | domain/workflow identifiers | operationally justified and permitted by the [common data policy](./observability.md#cross-signal-data-and-privacy-policy) |
 
 ### OTLP export (app path)
@@ -279,7 +280,7 @@ Infra ingest headers (`VL-Msg-Field`, Vector streams) are documented in [Victori
   and only `slogx.Event` sets it.
 - Do not put IDs into message templates when fields can carry them.
 - Do not create one-off aliases such as `orderId`, `order_id`, and `oid` for the same concept.
-- Errors use one shape: `error.type` plus a redacted `error.message`.
+- Errors use one shape: `error.type` plus a redacted `exception.message`.
 
 The facade call shape:
 
@@ -320,6 +321,10 @@ Names follow the grammar the facade enforces: lowercase segments of
 operation class, so it never contains an id. Where a row lists `outcome`, the event
 carries it as a bounded value from the listed set; that is the same key ADR-075 puts
 on a span for a business rejection.
+
+The registry in `duynhlab/pkg` (`semconv/`, ADR-076) declares the same 19 names;
+`make semconv-catalog-check` (CI) fails when this table and the registry's generated
+catalog disagree on a name, class, attribute set or owner.
 
 | Class | Event | Emitted at | Attributes | Owner |
 |---|---|---|---|---|
@@ -463,10 +468,11 @@ the final request/RPC summary.
 
 Full rules: [Application observability § Error ownership](./observability.md#error-ownership).
 
-**Error shape (as built, `logger/slogx` v0.2.0).**
+**Error shape (as built, `logger/slogx` v0.3.0).**
 `slogx.Err(err)` is the one error shape: `error.type` carries the concrete Go type of
-the deepest cause that is not a standard-library wrapper, and `error.message` the
-redacted, bounded text. The label is only as useful as the errors behind it — every
+the deepest cause that is not a standard-library wrapper, and `exception.message` the
+redacted, bounded text (the upstream conventions deprecated `error.message`, so the
+registry live-check would have flagged every error record). The label is only as useful as the errors behind it — every
 `errors.New` sentinel reports `errors.errorString`, so a domain whose failures should
 be distinguishable on a dashboard declares error types.
 

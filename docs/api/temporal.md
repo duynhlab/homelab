@@ -985,7 +985,7 @@ introduced in `v0.7.0`), all **idempotent** so activity retries are safe:
   redacted, to stdout and OTLP like any other record. The wrapper lifts the SDK tracing
   interceptor's `TraceID`/`SpanID` attributes into the record's span context (so the record
   carries the platform `trace_id`/`span_id`, not a second pair of fields) and reshapes the SDK's
-  raw `Error` attribute into `error.type` + `error.message`. The same option installs a client
+  raw `Error` attribute into `error.type` + `exception.message`. The same option installs a client
   interceptor that writes `temporal.workflow.started` for every unambiguous start. Events
   decided in workflow code go through `temporalx.WorkflowEvent` — the SDK's replay-aware logger,
   so a replayed history writes nothing twice (order's saga: `order.compensation.completed`,

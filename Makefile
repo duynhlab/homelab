@@ -108,6 +108,28 @@ e2e-staff: ## The /protected/ Backoffice surface (compose A17-A19, A21)
 e2e-operator: ## Operator resolve of a parked order (compose A20)
 	GATE=$(or $(GATE),compose) k6 run scripts/k6/operator.js
 
+.PHONY: e2e-conformance
+e2e-conformance: ## Row C22: stop Weaver's live-check, save its report, fail on a violation (needs compose.weaver.yaml)
+	@cd local-stack && curl -sf -X POST localhost:4320/stop -o .weaver-live-check.json \
+	  && { docker compose -f compose.yaml -f compose.weaver.yaml wait weaver >/dev/null 2>&1 || true; }; \
+	  code=$$(docker inspect -f '{{.State.ExitCode}}' local-stack-weaver-1); \
+	  python3 -c "import json;s=json.load(open('.weaver-live-check.json'))['statistics'];print('C22 advice:',s.get('advice_level_counts'))"; \
+	  if [ "$$code" = 0 ]; then echo 'C22 OK: every emitted name is in the registry'; else echo "C22 FAIL: weaver exit $$code — see local-stack/.weaver-live-check.json"; exit 1; fi
+
+# The registry lives in duynhlab/pkg; pin the commit whose catalog logs.md is
+# held to, and bump it in the same change that updates the table.
+SEMCONV_PKG_REF ?= 7032b6b
+
+.PHONY: semconv-catalog-refresh
+semconv-catalog-refresh: ## Vendor the registry's generated event catalog from pkg at SEMCONV_PKG_REF
+	gh api "repos/duynhlab/pkg/contents/semconv/docs/event-catalog.md?ref=$(SEMCONV_PKG_REF)" \
+	  -H 'Accept: application/vnd.github.raw' > docs/api/event-catalog.generated.md
+	sed -i '1s|$$| pkg @ $(SEMCONV_PKG_REF) — refresh with make semconv-catalog-refresh -->|;1s|-- do not edit; run make semconv-generate -->||' docs/api/event-catalog.generated.md
+
+.PHONY: semconv-catalog-check
+semconv-catalog-check: ## docs/api/logs.md event catalog == the registry's (names, classes, attributes, owners)
+	python3 scripts/semconv-catalog-check.py
+
 .PHONY: e2e-observability
 e2e-observability: ## Datasources, dashboards, panel path, scrape targets (compose C17-C20)
 	GATE=compose k6 run scripts/k6/observability.js

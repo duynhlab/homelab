@@ -350,7 +350,7 @@ so business code never binds them (logging middleware runs after tracing):
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
   "span_id": "00f067aa0ba902b7",
   "error.type": "provider.TimeoutError",
-  "error.message": "timeout"
+  "exception.message": "timeout"
 }
 ```
 

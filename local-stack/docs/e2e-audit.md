@@ -20,8 +20,14 @@ for release; every Phase A, B, and C row must pass before a tag is created.
 
    ```bash
    docker compose down -v          # drops volumes: databases, telemetry stores, edge state
-   docker compose up -d --build
+   docker compose -f compose.yaml -f compose.weaver.yaml up -d --build
    ```
+
+   The second file is the conformance overlay for row C22: it adds Weaver's
+   `registry live-check` and gives the collector extra pipelines that copy every
+   signal to it. The base stack is unchanged by it. Build sequentially
+   (`COMPOSE_PARALLEL_LIMIT=1`) when a Kind cluster shares the machine — the
+   parallel Go builds have pushed the host out of memory.
 
    Cumulative telemetry is what makes this mandatory rather than advisory. Half
    of Phase C reads counters, span tables, and log streams that never reset on
@@ -2078,6 +2084,25 @@ print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing:
 #   && curl -s http://localhost:8880/api/v1/alerts | python3 -c "import json,sys; \
 #      print([a['labels']['alertname'] for a in json.load(sys.stdin)['data']['alerts']])" \
 #   && docker compose start clickhouse
+
+# C22. EVERY NAME THE FLEET EMITTED IS IN THE REGISTRY (ADR-076). Weaver has been
+#      listening to a copy of the gate's OTLP since Preconditions step 2 (the
+#      compose.weaver.yaml overlay). Stopping it returns the report and sets the
+#      container's exit code: 0 = no violation, 1 = an attribute, metric or event
+#      the registry does not know, a unit or instrument that differs from the
+#      declaration, or a deprecated upstream key. Run it LAST — it judges
+#      everything the rows above produced. The base stores are not touched by
+#      the overlay; only Weaver's copy has the vendor residue removed (Temporal
+#      SDK CamelCase keys, redisotel's v1.24 names), which its comments explain.
+#      DO NOT RECREATE otel-collector OR weaver MID-SESSION. Docker hands a freed
+#      IP to the next container, and the edge caches its Backend DNS: on
+#      2026-09-25 a recreated collector's old address went to weaver, both listen
+#      on 4317, and Envoy pushed its spans and access logs straight into the
+#      live-check, bypassing filter/fleet-only — 4,381 "violations", every one
+#      an Envoy key. If a recreate cannot be avoided, `docker compose restart
+#      gateway` afterwards and start a fresh Weaver session before the traffic
+#      the report should judge.
+make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the report, prints the verdict
 ```
 
 > A brand-new counter has **no series until its first increment** — "NO SERIES"
@@ -2144,6 +2169,7 @@ print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing:
 | C19 | Panels return data | `/api/ds/query` returns a non-empty frame for one representative query per datasource (VictoriaMetrics PromQL, ClickHouse SQL) — a healthy datasource that cannot shape a frame still renders "No data" |
 | C20 | Engine-health scrape | vmagent (`:8429/api/v1/targets`) shows all six jobs — `clickhouse`, `otel-collector`, `envoy-gateway` (edge control plane :19001), `envoy` (proxy native stats :19005), `temporal` (server :8000) and `keycloak` (management :9000) — with `health: up`; a missing target means the C21 rules evaluate against nothing |
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **18 alerting** rules (8 ClickHouse engine + 2 collector + 3 inventory + 4 keycloak + Watchdog) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |
+| C22 | Names conform to the registry | `make e2e-conformance` (Weaver `registry live-check` on the gate's OTLP, `--fail-on violation`) exits 0: every attribute, metric and event the fleet emitted is declared in `duynhlab/pkg` `semconv/registry`, with the declared unit and instrument, and no deprecated upstream key — `improvement`/`information` advice is allowed |
 
 Any failed row blocks the release tag. Two rows share one root cause and must be
 reported as such: **C13 + C14** both empty while C12 is healthy means the Vector

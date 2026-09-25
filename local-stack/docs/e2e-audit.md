@@ -2094,6 +2094,14 @@ print('C21 rules loaded: %d alerting (want 18) + %d recording (want 15); firing:
 #      everything the rows above produced. The base stores are not touched by
 #      the overlay; only Weaver's copy has the vendor residue removed (Temporal
 #      SDK CamelCase keys, redisotel's v1.24 names), which its comments explain.
+#      DO NOT RECREATE otel-collector OR weaver MID-SESSION. Docker hands a freed
+#      IP to the next container, and the edge caches its Backend DNS: on
+#      2026-09-25 a recreated collector's old address went to weaver, both listen
+#      on 4317, and Envoy pushed its spans and access logs straight into the
+#      live-check, bypassing filter/fleet-only — 4,381 "violations", every one
+#      an Envoy key. If a recreate cannot be avoided, `docker compose restart
+#      gateway` afterwards and start a fresh Weaver session before the traffic
+#      the report should judge.
 make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the report, prints the verdict
 ```
 

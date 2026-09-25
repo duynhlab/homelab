@@ -44,7 +44,7 @@ spec:
     # 0.4.3: RFC-0024 wave (2026-08-13): pkg/proto v0.37.0 pin alignment
     # (string user_id in the notification/payment protos); no behaviour
     # change in this service beyond the shared-contract bump.
-    image_tag: "0.7.1" # {"$imagepolicy": "flux-system:inventory:tag"}
+    image_tag: "0.8.0" # {"$imagepolicy": "flux-system:inventory:tag"}
     namespace: inventory
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm
     # pairs belong in the manifest rather than in compiled defaults.

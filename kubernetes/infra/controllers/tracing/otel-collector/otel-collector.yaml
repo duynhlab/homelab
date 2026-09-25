@@ -223,6 +223,14 @@ spec:
                 - delete_key(attributes, "peer.address")
                 - delete_key(attributes, "user_agent")
                 - delete_key(attributes, "db.connection_string")
+                # Typed recipient and addresses (ADR-071 deny): gone at the source since
+                # notification v2.3.0 / shipping v1.8.0; kept here so a regression cannot
+                # reach a store.
+                - delete_key(attributes, "to")
+                - delete_key(attributes, "origin")
+                - delete_key(attributes, "destination")
+                - delete_key(attributes, "estimate.origin")
+                - delete_key(attributes, "estimate.destination")
           log_statements:
             - context: log
               statements:

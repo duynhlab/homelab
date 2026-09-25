@@ -1382,8 +1382,8 @@ candidates (#1095) · tags pinned on `main` · no prior cluster
 1. **`quay.io/minio/mc` answers `401` to anonymous pulls.** The RustFS bucket
    Job and its CronJob sat in `ImagePullBackOff`, holding `storage-local` and
    everything behind it (12 waves). Unblocked here by loading the same
-   `RELEASE.2025-08-13T08-35-41Z` build from the host into the nodes; the
-   image needs a durable home before the next cold bring-up.
+   `RELEASE.2025-08-13T08-35-41Z` build from the host into the nodes. Fixed
+   afterwards by moving both to the AWS CLI on `public.ecr.aws`.
 2. **#1097 missed the order worker pin** (`kubernetes/apps/order-worker.yaml`
    still named `2.8.1`); fixed in #1098.
 3. **mockpay's `service.version` was hard-coded to `2.4.3`** in its

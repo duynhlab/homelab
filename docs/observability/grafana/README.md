@@ -122,6 +122,18 @@ The boards that remain as in-repo JSON are the ones nothing has ported: the Clic
 suite, the vendored Envoy Gateway set, `service-graph`, `cloudnative-pg`, `redis`, and the
 grafana.com / flux2-monitoring-example boards fetched by `spec.url`.
 
+**Folders belong to the artifact.** The six folders (`api-gateway`, `databases`,
+`kubernetes`, `microservices`, `observability`, `platform`) have fixed uids, so a
+remaining in-repo board that belongs with them names the folder by **`folderUID`**, never
+by title: the Envoy Gateway set → `api-gateway`, `cloudnative-pg` → `databases`,
+`service-graph` → `microservices`, `vector` → `observability`. A `folder:` title made the
+operator create a second folder of the same name next to the artifact's. The as-code
+folders arrive one wave after `monitoring-local`; a board applied first answers
+"folder not found" and the operator retries on its own (about a minute, measured on
+Kind) — the `GrafanaDashboard` carries no `Ready` condition, so `monitoring-local`'s
+`wait` does not block on it. Boards with no artifact folder (ClickHouse, Flux, SLO,
+VictoriaMetrics, Cache) keep a title.
+
 Dashboard documentation:
 - [Dashboard Reference](dashboard-reference.md) -- per-panel queries and what they measure
 - [Variables](variables.md) -- `$app`, `$namespace`, `$rate` and regex patterns
@@ -168,4 +180,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

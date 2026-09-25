@@ -21,7 +21,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Tasks 1.2, 1.5, 4.4 |
-| **Adoption** | Partial |
+| **Adoption** | Complete — `RecordError`/`RecordOutcome` (obsx v0.43.0+), one exception event without stacktrace, edge-governed ParentBased sampling, the deny list stripped from spans at the source (v0.46.0+); ids typed as strings per the registry |
 
 ## Context
 
@@ -231,6 +231,7 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-17 | Proposed / Not started | Drafted during RFC-0031 architecture review from § Tracing contract and the live sampling measurements |
 | 2026-09-17 | Accepted / Not started | Owner accepted with the RFC; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
 | 2026-09-23 | Accepted / Partial | **Amended.** `obsx` v0.43.0 ships the status rules: `RecordError` sets Error with `error.type` derived from the cause's concrete type and records ONE exception event whose message is bounded to 256 bytes on a rune boundary, and `RecordOutcome` records a business rejection under the `outcome` attribute with the status left unset. The exception event carries **no `exception.stacktrace` by default** — a stack is per-error kilobytes in the 90-day store for a fact the message and the code location already give — so the contract row now says so rather than implying one is attached. `outcome` is the registered key, replacing the ad-hoc `inventory.outcome`. Edge sampling assertions and the baggage denylist remain open |
+| 2026-09-25 | Accepted / Complete | **Complete.** Span privacy moved to the source, payment ids became strings, and the tracing rows of both gates pass (edge root, continuity across the edge and 10 services, correlation both ways). |
 
 ---
-_Last updated: 2026-09-23 — Task 1.5 shipped in obsx v0.43.0: RecordError/RecordOutcome, `error.type` from the cause, a bounded exception message and no stacktrace by default. Previously 2026-09-17._
+_Last updated: 2026-09-25 — Adoption `Complete` at the close of RFC-0031 (both final gates passed). Previously Task 1.5 shipped in obsx v0.43.0: RecordError/RecordOutcome, `error.type` from the cause, a bounded exception message and no stacktrace by default. Previously 2026-09-17._

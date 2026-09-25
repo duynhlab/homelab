@@ -89,7 +89,7 @@ spec:
           fieldRef:
             fieldPath: metadata.namespace
       - name: OTEL_RESOURCE_ATTRIBUTES
-        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=2.4.3"
+        value: "service.namespace=$(POD_NAMESPACE),service.instance.id=$(POD_NAME),service.version=2.5.0"
       - name: K8S_NAMESPACE_NAME
         valueFrom:
           fieldRef:

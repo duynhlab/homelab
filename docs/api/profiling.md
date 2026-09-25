@@ -9,7 +9,7 @@ Continuous profiling contract for every Go service and worker in the platform se
 | **Correlation** | `pyroscope.profile.id` on the root server span via `otel-profiling-go` — not on the four Temporal identities ([§ Trace correlation](#trace-correlation-app-side)) | — |
 | **Platform backend** | [Profiling (platform)](../observability/profiling/README.md) — Pyroscope Helm, RustFS, Grafana | — |
 | **Cross-cutting** | [Application observability](./observability.md) | — |
-| **Design record** | — | **[RFC-0031](../proposals/rfc/RFC-0031/) (Accepted 2026-09-17; as-built 2026-09-24)** → [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) |
+| **Design record** | — | **[RFC-0031](../proposals/rfc/RFC-0031/) (Implemented 2026-09-25)** → [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels) |
 
 ---
 
@@ -19,7 +19,7 @@ Every Go service pushes pprof data to Pyroscope via the shared **`obsx.SetupProf
 
 Shared bootstrap and cross-signal label rules: [Application observability](./observability.md).
 
-> **As-built — RFC-0031** (`Accepted` 2026-09-17, deployed fleet-wide 2026-09-24;
+> **As-built — RFC-0031** (`Implemented` 2026-09-25, deployed fleet-wide 2026-09-24;
 > [ADR-074](../proposals/adr/ADR-074-continuous-profiling-contract/) (profile identity, labels)).
 > The profile label set is closed to exactly **`service_name`, `service_namespace`,
 > `deployment_environment`, `service_version`** (plus `span_name` on span-scoped CPU
@@ -191,4 +191,4 @@ Backend troubleshooting (Pyroscope pods, RustFS, Grafana datasource): [Profiling
 - [pyroscope-go SDK](https://github.com/grafana/pyroscope-go)
 - [otel-profiling-go](https://github.com/grafana/otel-profiling-go)
 
-_Last updated: 2026-09-24 — RFC-0031 as-built (Task 4.3): the Target-contract callout becomes an as-built one (closed four-label identity from the shared OTel resource, non-empty on all 13 identities incl. mockpay; central mutex/block rates); Setup, wiring snippet (slogx), label policy and env table follow the code. Previously 2026-09-24 — trace correlation as measured on Kind: only the root span is labelled, the four Temporal identities carry no span labels, and the one-click link is gone (manual pivot). mockpay profiles from payment v2.4.1. Previously 2026-09-18 — `PROFILING_ENABLED` is a per-service ResourceSet input (`profiling_enabled`, default true) — RFC-0031 Task 1.4; the domain-wide literal is gone. Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._
+_Last updated: 2026-09-25 — RFC-0031 `Implemented` in the Design record and callout. Previously 2026-09-24 — RFC-0031 as-built (Task 4.3): the Target-contract callout becomes an as-built one (closed four-label identity from the shared OTel resource, non-empty on all 13 identities incl. mockpay; central mutex/block rates); Setup, wiring snippet (slogx), label policy and env table follow the code. Previously 2026-09-24 — trace correlation as measured on Kind: only the root span is labelled, the four Temporal identities carry no span labels, and the one-click link is gone (manual pivot). mockpay profiles from payment v2.4.1. Previously 2026-09-18 — `PROFILING_ENABLED` is a per-service ResourceSet input (`profiling_enabled`, default true) — RFC-0031 Task 1.4; the domain-wide literal is gone. Previously 2026-09-18 — RFC-0031 accepted: Design record moves from `None` to ADR-074 and a labelled **Target contract** callout states the closed four-label identity, the two labels that are empty today, and the overhead and `mockpay` rules as planned; the as-built label policy is unchanged. Previously 2026-07-29 — canonical app profiling contract; as-built claims verified against `duynhlab/pkg` and the service repos._

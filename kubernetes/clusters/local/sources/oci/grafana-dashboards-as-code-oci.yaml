@@ -30,11 +30,21 @@ spec:
     # live Grafana, so a floating constraint would let a board change reach the
     # cluster without a homelab commit recording it.
     #
-    # 0.1.0 is the first release that can reach Grafana at all. Before it the
+    # 0.1.0 was the first release that could reach Grafana at all. Before it the
     # generator emitted GrafanaDashboard with spec.oci, which cannot carry a
     # Dashboard V2 payload, and every board with a query variable was rejected
-    # outright for a malformed variable spec. Verified on Kind against Grafana
-    # 13.2.0 and Grafana Operator 5.25.0: all 18 boards reach
-    # ManifestSynchronized=True and read back through
-    # /apis/dashboard.grafana.app/v2 with a matching title and element count.
-    semver: "0.1.0"
+    # outright for a malformed variable spec.
+    #
+    # 0.2.0 carries the business histogram quantiles from RFC-0031 Task 4.2:
+    # confirm latency, notification send latency and the mockpay provider hop
+    # show p50/p95/p99, and the order-value stat shows the average beside those
+    # quantiles. Pinning 0.1.0 here after #1090 landed would have dropped p50
+    # and p99 from all four panels — the artifact is the only copy of this board
+    # the cluster reads, so an out-of-date pin is a silent content revert, not a
+    # stale-looking version string.
+    #
+    # Verified on Kind against Grafana 13.2.0 and Grafana Operator 5.25.0: all
+    # 18 boards reach ManifestSynchronized=True and read back through
+    # /apis/dashboard.grafana.app/v2 with a title and element count matching the
+    # generated spec.
+    semver: "0.2.0"

@@ -304,14 +304,45 @@ full audit runs before the change merges.
   Add routing the day a Slack/webhook rehearsal is worth its weight locally.
 - **No scraping of application services** — their metrics arrive over OTLP;
   a scrape would double-ingest (RFC-0014 P3).
-- **No second dashboard fork** — the dual-target JSON is the parity mechanism;
-  do not hand-edit one copy.
+- **No second dashboard fork** — where a board exists on both sides as JSON, the
+  dual-target JSON is the parity mechanism; do not hand-edit one copy. This no
+  longer applies to the 18 boards the cluster takes from the as-code artifact
+  (see §8) — those have no cluster-side JSON to diff against, and their
+  local-stack copies are deliberate forks.
 
 ## 8. Cluster ↔ local-stack parity — quick lookup
 
+The folder slugs are the six in
+`local-stack/observability/grafana/provisioning/dashboards/dashboards.yaml`:
+`api-gateway`, `business-product`, `clickhouse`, `microservices-golden-signals`,
+`platform-infrastructure`, `workflows-async`.
+
+**Eighteen boards no longer have a cluster-side JSON to diff against.** They are Go in
+`duynhlab/grafana-dashboards` and reach the cluster as a pinned OCI artifact, so the old
+"open both files side by side" check does not work for them. Nine of those have a
+local-stack counterpart — `eg-edge`, `rfc0021-baseline`, `inventory-overview`,
+`red-spanmetrics` and `keycloak-identity` share the uid outright, while `business-otel`,
+`microservices-monitoring-001-otel`, `otel-collector-health` and `temporal-worker` carry a
+`-local` suffixed one. All nine are independent forks already, differing in legends and
+datasource uids; they are not generated from the cluster copy and never were.
+
+To check one of those against the cluster now, read the rendered board out of the artifact
+rather than looking for a file:
+
+```bash
+flux pull artifact oci://ghcr.io/duynhlab/grafana-dashboards-as-code:<pinned tag> \
+  --output /tmp/as-code
+yq '.spec.template.spec.elements[].spec.title' \
+  /tmp/as-code/dashboards/grafanamanifest-business-otel.yaml
+```
+
+The pinned tag is in
+`kubernetes/clusters/local/sources/oci/grafana-dashboards-as-code-oci.yaml`.
+
 | Layer | Cluster path | local-stack path |
 |---|---|---|
-| Grafana dashboards | `kubernetes/infra/configs/observability/grafana/dashboards/*.json` | `local-stack/observability/grafana/dashboards/{ClickHouse,Gateway,Observability}/*.json` |
+| Grafana dashboards (vendored here) | `kubernetes/infra/configs/observability/grafana/dashboards/*.json` | `local-stack/observability/grafana/dashboards/<folder-slug>/*.json` |
+| Grafana dashboards (as-code) | none — Go in `duynhlab/grafana-dashboards`, pulled as an OCI artifact | `local-stack/observability/grafana/dashboards/<folder-slug>/*.json`, an independent fork |
 | Datasources | `kubernetes/infra/configs/observability/grafana/datasource-*.yaml` | `local-stack/observability/grafana/provisioning/datasources/*.yaml` |
 | Alert rules | `…/metrics/prometheusrules/**/*.yaml` (PrometheusRule CRs) | `local-stack/observability/vmalert/rules/*.yaml` |
 | Scrape config | `…/metrics/{servicemonitors,podmonitors}/*.yaml` | `local-stack/observability/vmagent/prometheus.yml` |

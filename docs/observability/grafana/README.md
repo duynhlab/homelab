@@ -101,12 +101,18 @@ Which boards: `kubernetes-cluster-overview`, `kubernetes-workloads`, `keda`, `pg
 `business-otel`, `red-spanmetrics`, `rfc0021-baseline`, `inventory-overview`,
 `cert-manager`, `keycloak-identity`, `eg-edge`.
 
-Two things follow from that and are easy to get wrong:
+Three things follow from that and are easy to get wrong:
 
 1. **Edit those boards in the Go repo, not here.** There is no JSON to edit. A change
    lands by merging there, letting CI publish, and bumping the pin in
    `kubernetes/clusters/local/sources/oci/grafana-dashboards-as-code-oci.yaml`.
-2. **`GrafanaDashboard` cannot carry these boards.** It posts through the legacy
+2. **The `grafana-dashboards` Helm chart no longer reaches this cluster.**
+   `microservices-monitoring-001-otel` and `business-otel` used to arrive as ConfigMaps
+   rendered by the `duynhlab/helm-charts` `grafana-dashboards` chart. That `HelmRelease`
+   and its `OCIRepository` are gone. The chart still exists and is still released — as of
+   `0.3.2` it still carries its own copy of those boards — but nothing here consumes it, so
+   **a change published to the chart does not appear on this cluster.** Edit the Go repo.
+3. **`GrafanaDashboard` cannot carry these boards.** It posts through the legacy
    `/api/dashboards/db` envelope and Grafana answers 400 on a Dashboard V2 payload in
    either shape. That is why they arrive as `GrafanaManifest`, and why the folders are a
    separate Flux wave the dashboards `dependsOn` — see

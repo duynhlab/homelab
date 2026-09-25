@@ -479,6 +479,19 @@ record.
 
 ### Task 4.5: Platform semantic-convention registry
 
+**Status — DONE 2026-09-25 (pkg #111, #112; homelab #1095).** `semconv/registry/` in
+`duynhlab/pkg` declares 185 platform attributes (31 upstream by reference), 66 business
+and 46 vendor instruments and the 19 catalog events, depending on upstream v1.41.0;
+`registry.rego` enforces the namespace list (attributes, metric and event names), no
+upstream redefinition, a unit on every metric and stability everywhere;
+`make semconv-check`, `semconv-generated-check` and `semconv-lockstep` run in pkg CI
+(a planted mis-named metric and event fail the check). The `slogx`/`temporalx` key and
+event constants and the event-catalog table are generated; homelab holds
+`docs/api/logs.md` to that table in CI. `weaver registry live-check` is row C22 of
+the compose gate (`make e2e-conformance`): its first run found four real violations,
+all fixed at the source or declared, and the clean session on the train #2 candidates
+exited 0 (46,560 entities, 13 identities).
+
 **Acceptance criteria:**
 
 - A Weaver registry in the shared-package repository declares every platform-owned
@@ -501,6 +514,14 @@ between two tags reports a planted rename.
 
 ## Final release gate
 
+**Status — PASSED 2026-09-25.** Compose: homelab #1095 evidence comment (A1–A22 incl.
+the fired abandonment timer, B1–B10 in a real browser, C1–C22, the train-#2 privacy and
+rename rows). Kind: `docs/platform/kind-e2e-audit.md` § Previous runs, 2026-09-25, on
+the final pins. Correlation both ways and the bounded-series / profile-identity checks
+were recorded on Kind on 2026-09-24 and hold on the final pins; no dual-write or legacy
+compatibility path exists (the three logger modules are gone from pkg, the ClickHouse
+boards read only canonical keys).
+
 - Compose E2E audit passes HTTP, gRPC, browser checkout, Temporal workflow and provider failure cases.
 - Kind E2E audit passes the equivalent deployed paths.
 - One trace-to-log and one log-to-trace investigation succeeds in both operational and ClickHouse retention windows.
@@ -521,4 +542,4 @@ between two tags reports a planted rename.
 | Profiling overhead | CPU, allocation or lock sampling changes service behavior | Keep one centrally owned configuration and require representative benchmarks for sampling changes |
 
 ---
-_Last updated: 2026-09-24 — Phases 2–3 and Tasks 1.1b, 1.1c-B, 4.1–4.4 recorded as built; only Task 4.5 (Weaver registry) and the Final release gate remain. Previously 2026-09-23 — Phase 1 recorded as built: Tasks 1.2, 1.3, 1.5 and 1.4 shipped in obsx v0.41.0 through v0.44.0, Task 1.1 shipped as `logger/slogx` v0.1.0, and the execution order actually taken (1.2→1.3→1.5→1.4→1.1) is stated at the head of the phase. Previously 2026-09-18 — Task 1.1c split into A (done — obsx v0.39.2, fleet wave, lint policy channel) and B (with slogx). Previously 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._
+_Last updated: 2026-09-25 — Task 4.5 and the Final release gate recorded as done; the plan is complete and the RFC is `Implemented`. Previously 2026-09-24 — Phases 2–3 and Tasks 1.1b, 1.1c-B, 4.1–4.4 recorded as built; only Task 4.5 (Weaver registry) and the Final release gate remain. Previously 2026-09-23 — Phase 1 recorded as built: Tasks 1.2, 1.3, 1.5 and 1.4 shipped in obsx v0.41.0 through v0.44.0, Task 1.1 shipped as `logger/slogx` v0.1.0, and the execution order actually taken (1.2→1.3→1.5→1.4→1.1) is stated at the head of the phase. Previously 2026-09-18 — Task 1.1c split into A (done — obsx v0.39.2, fleet wave, lint policy channel) and B (with slogx). Previously 2026-09-18 — Phase 1 prerequisite (ADR-072 pin convergence) recorded as done 2026-09-18 with the ten service releases. Previously 2026-09-17 — Tasks 0.0 and 0.1 closed by acceptance on 2026-09-17; Phase 1 eligible. third revision. Task 0.0 branches the plan on the facade decision; Task 1.1c closes the shared package's SDK and Zap type leaks; Task 1.5 enforces the tracing contract; Tasks 4.4 and 4.5 add Collector enrichment, the span-metrics dimension amendment and the Weaver registry; mockpay onboarding and the `image_tag` version source are explicit; the plan is greenfield with no migration mechanism. Earlier the same day: facade renamed to `pkg/logger/slogx`, Task 1.1b retires the unused adapters._

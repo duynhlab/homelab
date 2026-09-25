@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0031 delivery plan Task 4.5 |
-| **Adoption** | Partial — registry, policies, generation and diff shipped in `duynhlab/pkg` (2026-09-24); live-check wired into the compose gate as row C22; first green run pending |
+| **Adoption** | Complete — registry, Rego policies (attribute, metric and event namespaces), generation, diff and lockstep in pkg CI (2026-09-24/25); live-check is row C22 of the compose gate and its clean run on the train #2 candidates exited 0 (2026-09-25) |
 
 ## Context
 
@@ -241,6 +241,7 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-17 | Accepted / Not started | Owner chose bare namespaces as registered exceptions over a `duynhlab.` prefix; created at `Accepted` per the RFC-0028/RFC-0030 precedent |
 | 2026-09-24 | Accepted / Partial | **Registry built** (`duynhlab/pkg` `semconv/`, Task 4.5). From a live inventory of the compose gate: 182 platform attributes, 66 business instruments, 46 library instruments (`origin: vendor`), the 19 catalog events, 31 upstream attributes by `ref` and 21 upstream metrics by `imports`, against semantic conventions v1.41.0. **Two readings recorded as owner decisions (2026-09-24):** the namespace exception list grew from the twelve named here to every namespace the fleet already used (each with an owner in `registry.rego`; adding one stays a registry change), and single-segment keys are admitted without a namespace — they only have to be declared. Weaver rates a deprecated upstream key or a unit/instrument mismatch as a violation even when referenced, so `error.message` became `exception.message` (slogx v0.3.0), every business instrument gained a UCUM unit, and redisotel's caller/statement attributes were turned off; the library names Weaver's copy still saw (Temporal SDK CamelCase keys, redisotel's v1.24 names) are removed on that copy only, documented in `compose.weaver.yaml`. The check is row C22 of the local-stack gate |
 | 2026-09-23 | Accepted / Not started | `outcome` is the first platform attribute the registry must carry: `obsx` v0.43.0 emits it on spans for business rejections (ADR-075), so it is named here before the registry exists rather than discovered by the conformance check afterwards |
+| 2026-09-25 | Accepted / Complete | **Complete.** First live gate 2026-09-25: four real violations (`WorkerType`, `pgx.sql_state`/`pgx.prepare_stmt.name`, `result.count`) fixed or declared; the clean session exited 0 with 13 identities. Metric and event names are namespace-checked like attributes; homelab holds the event catalog to the generated table. |
 
 ---
-_Last updated: 2026-09-24 — registry shipped (Adoption Partial); the two owner readings on namespaces and bare keys; live-check as gate row C22. Previously 2026-09-23 — `outcome` named as a registry entry ahead of Task 4.5. Previously 2026-09-17._
+_Last updated: 2026-09-25 — Adoption `Complete` at the close of RFC-0031 (both final gates passed). Previously registry shipped (Adoption Partial); the two owner readings on namespaces and bare keys; live-check as gate row C22. Previously 2026-09-23 — `outcome` named as a registry entry ahead of Task 4.5. Previously 2026-09-17._

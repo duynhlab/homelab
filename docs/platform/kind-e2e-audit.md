@@ -1355,6 +1355,43 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 ## Previous runs
 
+### 2026-09-25 — train #2 and the RFC-0031 final gate
+
+Cluster: kind `homelab`, 4 nodes, `kindest/node:v1.34.3`, recreated for this run
+(the previous cluster was deleted to fit the compose gate's build)
+Host: Linux + Docker, arch amd64
+Revision: `main` at #1097 + #1098 — pins asserted: `user 2.4.0` · `product 1.15.0`
+· `inventory 0.8.0` · `cart 2.3.0` · `order 2.9.0` (API + worker) · `review 2.3.0`
+· `shipping 1.8.0` · `notification 2.3.0` · `payment 2.5.0` (API + mockpay) ·
+`checkout 0.12.0` (API + abandonment worker)
+Preconditions: compose gate (A/B/C + C22) passed 2026-09-25 on the same
+candidates (#1095) · tags pinned on `main` · no prior cluster
+
+| Group | Result | Evidence |
+|---|---|---|
+| K0 machine | PASS | 4/4 nodes Ready; the new `homelab-ca` (valid to 2036-09-22) replaced the old one in NSS and in the CLI bundle; Grafana 200 and Keycloak 302 **without `-k`** |
+| K1 bring-up | PASS | `make up` exit 0; **30/30 Kustomizations Ready** after the RustFS bucket Job was unblocked (finding 1); `kind-seed.sh` 8/8; WorkerDeployments Current = Target (`2.9.0-7869`, `0.12.0-7d47`), the `2.8.1` version draining its pinned runs |
+| K2 delivery | PASS (after #1098) | image↔pin 13/13 once the order worker pin landed — the first table showed it on `2.8.1` (finding 2) |
+| K3 admission/secrets | PASS | 6/6 ClusterPolicies, **0 policy failures**; 38/38 ExternalSecrets `SecretSynced`; OpenBAO unsealed (awskms via floci); 3 CNPG clusters at 3/3 |
+| K4 edge/identity + K5 signals | PASS | k6 `GATE=kind`: smoke 15/15 (50/50), saga 4/4 (9/9), staff 5/5 (59/59), operator 1/1 (26/26). Smoke needed two re-runs, both for known reasons: K5.2/K5.5 before the first traffic had produced every service's span and the SDK series, K5.8 while A21's count-once `CheckoutAvailabilityUnknownSKU` was still inside its 15 m window |
+| Train #2 in ClickHouse | PASS | `exception.message` on the fleet's error records; the only `error.message` rows came from the `2.8.1` worker before #1098; `process.started` from all 13 identities; 10 catalog names observed; deny keys (`client.address`, `user_agent.original`, `user.id`, `to`, `origin`) on app spans **0** (control `http.route` 71); `k8s.pod.name` on 87/87 app log records |
+| Profiles | PASS | Pyroscope `service_name` 13 identities + the two platform agents; `service_namespace`, `deployment_environment`, `service_version` non-empty on all — which is how finding 3 surfaced |
+
+**Findings:**
+
+1. **`quay.io/minio/mc` answers `401` to anonymous pulls.** The RustFS bucket
+   Job and its CronJob sat in `ImagePullBackOff`, holding `storage-local` and
+   everything behind it (12 waves). Unblocked here by loading the same
+   `RELEASE.2025-08-13T08-35-41Z` build from the host into the nodes; the
+   image needs a durable home before the next cold bring-up.
+2. **#1097 missed the order worker pin** (`kubernetes/apps/order-worker.yaml`
+   still named `2.8.1`); fixed in #1098.
+3. **mockpay's `service.version` was hard-coded to `2.4.3`** in its
+   `OTEL_RESOURCE_ATTRIBUTES`, so its profiles and spans carried a version the
+   pod was not running; corrected to `2.5.0` with the RFC-0031 closing PR.
+
+**Decision: ELIGIBLE**
+
 ### 2026-09-24 — the slogx fleet release (RFC-0031 Phase 3)
 
 Cluster: kind `homelab`, 4 nodes, `kindest/node:v1.34.3`
@@ -1785,4 +1822,4 @@ kubectl -n temporal exec deploy/temporal-admintools -- \
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_
+_Last updated: 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

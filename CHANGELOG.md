@@ -121,6 +121,22 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The cluster runs train #2: error text under `exception.message`, a UCUM
+  unit on every instrument, typed recipients and addresses gone from spans.**
+  Releases `user v2.4.0` · `product v1.15.0` · `inventory v0.8.0` · `cart v2.3.0`
+  · `order v2.9.0` · `review v2.3.0` · `shipping v1.8.0` · `notification v2.3.0`
+  · `payment v2.5.0` · `checkout v0.12.0` (mockpay follows payment, the
+  checkout worker follows checkout) on `logger/slogx v0.3.0`, `obsx v0.47.0`
+  and `temporalx v0.44.0`: `slogx.Err` writes `error.type` + `exception.message`
+  (`error.message` is deprecated upstream — dashboards and saved queries must
+  follow), 57 instruments carry annotation units without a Prometheus name
+  change (77 series names before = 77 after), product's redisotel no longer
+  records the caller or the statement, notification's spans drop the recipient
+  and shipping's the typed origin/destination, and payment ids are strings.
+  The collector's privacy filter now also deletes `to`, `origin`,
+  `destination` and `estimate.*` on spans as a backstop. Gate: the full
+  local-stack audit with row C22 green (#1095).
+
 - **The compose gate checks every telemetry name against the platform
   registry (RFC-0031 Task 4.5, ADR-076).** `compose.weaver.yaml` adds
   Weaver's `registry live-check` and copies each signal to it on pipelines

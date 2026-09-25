@@ -30,7 +30,13 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "API Gateway"
+  # folderUID, not a folder title: the as-code artifact (grafana-dashboards)
+  # owns this folder with a fixed uid. A title made the operator create a
+  # second folder of the same name. The as-code folders arrive one wave later;
+  # a dashboard applied first fails with "folder not found" and the operator
+  # retries on its own (~1 min, measured) — kstatus reads it as Current, so
+  # monitoring-local's wait does not block on it.
+  folderUID: api-gateway
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:
@@ -45,7 +51,8 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "API Gateway"
+  # folderUID: see the first dashboard in this file.
+  folderUID: api-gateway
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:
@@ -60,7 +67,8 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "API Gateway"
+  # folderUID: see the first dashboard in this file.
+  folderUID: api-gateway
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:
@@ -75,7 +83,8 @@ spec:
   instanceSelector:
     matchLabels:
       dashboards: grafana
-  folder: "API Gateway"
+  # folderUID: see the first dashboard in this file.
+  folderUID: api-gateway
   allowCrossNamespaceImport: true
   resyncPeriod: 30s
   configMapRef:

@@ -121,6 +121,24 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Eighteen dashboards now come only from the as-code artifact; the
+  hand-drawn copies are gone.** `OCIRepository grafana-dashboards-as-code`
+  (`v0.2.0`) and two waves (`grafana-dashboards-as-code-folders-local`,
+  `-dashboards-local`, gated by `healthCheckExprs`) replace the nine vendored
+  JSON boards, the eight CRs that pulled boards from the `helm-charts` chart,
+  obs-as-code and `spec.url`, the three V2 canaries and the chart
+  `HelmRelease`. Audited board by board against what the cluster served: all
+  18 keep their uid and title; 13 are identical query for query, the rest
+  differ by `$__rate_interval`, variables instead of hard-coded values, the
+  three retired baseline panels, and the Microservices board's documented
+  40 → 28 consolidation (it also drops Success RPS (2xx), Total Request and
+  Total Requests by Endpoint). The remaining in-repo boards join the
+  artifact's folders by `folderUID` (Envoy Gateway → `api-gateway`,
+  `cloudnative-pg` → `databases`, `service-graph` → `microservices`,
+  `vector` → `observability`), which ends the duplicate "API Gateway" and
+  "Databases" folders. Verified on Kind: both waves Ready, 43 boards in 12
+  folders with no duplicate or empty folder, K5.7 green.
+
 - **The cluster runs train #2: error text under `exception.message`, a UCUM
   unit on every instrument, typed recipients and addresses gone from spans.**
   Releases `user v2.4.0` · `product v1.15.0` · `inventory v0.8.0` · `cart v2.3.0`

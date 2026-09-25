@@ -1,0 +1,130 @@
+---
+# Dashboard V2 boards and alert rule groups from the as-code artifact.
+#
+# These replace the JSON that used to live in this repository under
+# observability/grafana/dashboards/ and the GrafanaDashboard CRs that wrapped
+# it. The boards are now Go in duynhlab/grafana-dashboards; this repo pins a
+# release of the rendered output and applies it.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: grafana-dashboards-as-code-dashboards-local
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: observability
+spec:
+  interval: 10m
+  timeout: 5m
+  retryInterval: 2m
+
+  sourceRef:
+    kind: OCIRepository
+    name: grafana-dashboards-as-code-oci
+
+  path: ./dashboards
+  targetNamespace: monitoring
+
+  prune: true
+
+  dependsOn:
+    - name: monitoring-local
+    # The folders must exist before these are applied. The operator applies
+    # manifests in no guaranteed order, so a dashboard naming a missing folder
+    # fails outright and the wave sits red until the next 10m resync — longer
+    # than this wave's own timeout. See the folders manifest for the detail.
+    - name: grafana-dashboards-as-code-folders-local
+
+  healthChecks:
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: kubernetes-cluster-overview
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: kubernetes-workloads
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: keda
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: pg-io-waits
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: pg-maintenance
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: pg-query-performance
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: pg-exporter-instance
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: pgdog
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: temporal-worker
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: otel-collector-health
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: microservices-monitoring-001-otel
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: business-otel
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: red-spanmetrics
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: rfc0021-baseline
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: inventory-overview
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: cert-manager
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: keycloak-identity
+      namespace: monitoring
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: eg-edge
+      namespace: monitoring
+
+  # GrafanaManifest reports ManifestSynchronized rather than the conventional
+  # Ready condition, so kstatus cannot infer readiness without this contract.
+  healthCheckExprs:
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      inProgress: >-
+        !has(status.conditions) ||
+        status.conditions.filter(e,
+          e.type == 'ManifestSynchronized' &&
+          e.observedGeneration == metadata.generation).size() == 0
+      failed: >-
+        status.conditions.exists(e,
+          e.type == 'ManifestSynchronized' &&
+          e.status == 'False' &&
+          e.observedGeneration == metadata.generation)
+      current: >-
+        status.conditions.exists(e,
+          e.type == 'ManifestSynchronized' &&
+          e.status == 'True' &&
+          e.observedGeneration == metadata.generation)

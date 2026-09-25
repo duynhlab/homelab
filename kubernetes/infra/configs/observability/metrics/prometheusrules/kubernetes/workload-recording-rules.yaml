@@ -3,7 +3,7 @@
 # Record names and label shape match the mixin's
 # namespace_workload_pod:kube_pod_owner:relabel exactly, so any upstream mixin
 # dashboard dropped into this cluster finds the series it expects. Consumers:
-# the kubernetes-workloads board in duynhlab/obs-as-code — both its panel
+# the kubernetes-workloads board in duynhlab/grafana-dashboards — both its panel
 # queries (join cAdvisor `on (namespace, pod) group_left (workload,
 # workload_type)`) and its $workload/$workload_type variables, which are
 # label_values() over these series.

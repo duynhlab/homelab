@@ -77,60 +77,62 @@ spec:
 
 ## Dashboards
 
-**42 `GrafanaDashboard` CRs across 12 folders** (re-derive with `grep -h -c '^kind: GrafanaDashboard' kubernetes/infra/configs/observability/grafana/dashboards/**/*.yaml`), delivered four ways —
-`configMapRef` to a JSON vendored in this repo (preferred; auditable and
-pinned), `configMapRef` to a ConfigMap the `grafana-dashboards` HelmRelease
-renders (the RFC-0017 boards, owned in `duynhlab/helm-charts`), `spec.url`
-(grafana.com and legacy external-repo boards), or `spec.oci` (×2, from the
-`obs-as-code` artifact).
+**24 `GrafanaDashboard` CRs** still vendored here, plus **18 dashboards and 6 folders
+delivered as `GrafanaManifest` from an OCI artifact** (re-derive the first with
+`grep -h -c '^kind: GrafanaDashboard' kubernetes/infra/configs/observability/grafana/dashboards/*.yaml`).
 
-Beside those sits a fifth, different in kind rather than in transport:
-**`GrafanaManifest`**, which carries a `dashboard.grafana.app/v2` Dashboard to
-Grafana's own apiserver. `GrafanaDashboard` cannot carry a v2 board at all —
-Grafana answers 400 on both payload shapes. Which resource to reach for, and the
-measurements behind that, are in [dashboards-v2.md](dashboards-v2.md):
+## Dashboards as code
 
-| Folder | Boards | Source |
-|--------|--------|--------|
-| Platform / Infrastructure | Kubernetes Cluster Overview, Kubernetes Workloads, **OTel Collector Health** (ADR-057 consumer), Vector Cluster Monitoring, **Keycloak — Identity** (login/token KPIs) | in-repo JSON ×2 · `spec.url` ×1 · `spec.oci` ×2 (obs-as-code, pinned v0.3.0 — classic v1 payload; see [dashboards-v2.md](dashboards-v2.md#reviewing-the-existing-specoci-boards) before bumping) |
-| Microservices / Golden Signals | Microservices (OTel) (~41 panels), **Microservices — RED Span Metrics** (ADR-057 consumer) | helm-charts ConfigMaps ×1 · in-repo JSON ×1 |
-| Workflows / Async | **Temporal — Workflows & Activities** (SDK + Server rows) · **KEDA — Worker Autoscaling** (scaler value/errors, HPA replicas, the Temporal backlog it drains, KEDA health; ADR-055; no local twin — compose runs no KEDA) | in-repo JSON ×2 |
-| Business & Product | Order Saga & Payment — Cutover Baseline, Microservices — Business KPIs, Inventory Service — Stock Authority (all RFC-0021-era) | helm-charts ConfigMaps ×1 · in-repo JSON ×2 |
-| ClickHouse | Server/Engine, OTel logs+traces SQL, Service deep dive, OTel Overview / Logs Explorer / Trace Explorer | in-repo JSON ×6 (RFC-0019 / ADR-023) |
-| API Gateway | Envoy Global, Envoy Clusters, Envoy Gateway Global, Resources Monitor, **Envoy Gateway — Edge Overview** | in-repo JSON ×4 vendored from `envoyproxy/gateway` v1.9.0 + ×1 hand-authored (golden signals / control plane / infra) |
-| Databases | CloudNativePG, PG query performance, PG maintenance, PgDog | vendored/hand-rolled, external repo (`spec.url`) |
-| GitOps | **cert-manager** (expiry/renewal, controller, ACME, workqueue — the visual surface for the CertManager* alerts) | in-repo JSON |
-| VictoriaMetrics | VMSingle, VMAgent, VMAlert | grafana.com (`spec.url`) |
-| Flux | Flux cluster, Flux control plane | fluxcd/flux2-monitoring-example (`spec.url`) |
-| SLO | Sloth overview, Sloth detail | grafana.com (`spec.url`) |
-| Cache | Redis/Valkey | external repo (`spec.url`) |
+Eighteen boards are no longer JSON in this repository. They are Go in
+[`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards), rendered
+with the Grafana Foundation SDK and published as one OCI artifact that Flux pins and
+applies:
 
-The **in-repo JSON** pattern (ClickHouse suite, Envoy Gateway, Temporal,
-cert-manager, RFC-0021): the JSON lives next to the CRs under `dashboards/`,
-a `configMapGenerator` entry in that directory's `kustomization.yaml` turns it
-into a stable-named ConfigMap (`disableNameSuffixHash`), and the CR consumes it
-via `configMapRef`. Boards whose datasource variable is `query: prometheus`
-resolve against the prometheus-TYPE alias datasource, not the default VM plugin
-DS. The local stack provisions file-based twins for the Observability, Gateway
-and ClickHouse folders — see
-[`local-stack/docs/observability.md`](../../../local-stack/docs/observability.md)
-for the parity matrix and the recorded local divergences.
+```text
+Go builders -> dashboard.grafana.app/v2 spec -> GrafanaManifest -> OCI artifact
+  -> OCIRepository grafana-dashboards-as-code-oci
+  -> Kustomization ...-folders-local   (6 folders)
+  -> Kustomization ...-dashboards-local (18 boards + 2 alert rule groups, dependsOn the folders)
+```
 
-**Microservices Observability + Business KPIs** (RFC-0017): the JSONs live in
-the [`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts) repo
-(`charts/grafana-dashboards/dashboards/microservices/`). A `HelmRelease`
-(`grafana-dashboards`, ns `monitoring`, chart via its own `OCIRepository`)
-renders them as ConfigMaps and the `GrafanaDashboard` CRs consume them via
-`configMapRef`, mapping `DS_PROMETHEUS` → `VictoriaMetrics`. **Edit the boards
-in that repo and bump the chart** — the old
-[`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards)
-repo is deprecated (its remaining legacy boards — K8s overview, the PG
-trio, Redis — are still fetched via `spec.url` at their nested
-`dashboard/<area>/<name>.json` paths until they migrate; **Temporal migrated
-in-repo on 2026-08-18** after living unpinned on that repo's `main`).
+Which boards: `kubernetes-cluster-overview`, `kubernetes-workloads`, `keda`, `pg-io-waits`,
+`pg-maintenance`, `pg-query-performance`, `pg-exporter-instance`, `pgdog`,
+`temporal-worker`, `otel-collector-health`, `microservices-monitoring-001-otel`,
+`business-otel`, `red-spanmetrics`, `rfc0021-baseline`, `inventory-overview`,
+`cert-manager`, `keycloak-identity`, `eg-edge`.
 
-**CloudNativePG**: JSON is vendored from [cloudnative-pg/grafana-dashboards](https://github.com/cloudnative-pg/grafana-dashboards) (`charts/cluster/grafana-dashboard.json`), adapted for the VictoriaMetrics plugin (same pattern as other JSON dashboards). `GrafanaDashboard` maps `DS_PROMETHEUS` → `VictoriaMetrics`. Cluster DB metrics use `PodMonitor` resources under [`kubernetes/infra/configs/databases/clusters/`](../../../kubernetes/infra/configs/databases/clusters/) (e.g. `product-db/monitoring/`); the CNPG **operator** `PodMonitor` is created when `monitoring.podMonitorEnabled` is true on the [`cloudnative-pg` HelmRelease](../../../kubernetes/infra/controllers/databases/cloudnativepg-operator.yaml).
+Three things follow from that and are easy to get wrong:
 
+1. **Edit those boards in the Go repo, not here.** There is no JSON to edit. A change
+   lands by merging there, letting CI publish, and bumping the pin in
+   `kubernetes/clusters/local/sources/oci/grafana-dashboards-as-code-oci.yaml`.
+2. **The `grafana-dashboards` Helm chart no longer reaches this cluster.**
+   `microservices-monitoring-001-otel` and `business-otel` used to arrive as ConfigMaps
+   rendered by the `duynhlab/helm-charts` `grafana-dashboards` chart. That `HelmRelease`
+   and its `OCIRepository` are gone. The chart still exists and is still released — as of
+   `0.3.2` it still carries its own copy of those boards — but nothing here consumes it, so
+   **a change published to the chart does not appear on this cluster.** Edit the Go repo.
+3. **`GrafanaDashboard` cannot carry these boards.** It posts through the legacy
+   `/api/dashboards/db` envelope and Grafana answers 400 on a Dashboard V2 payload in
+   either shape. That is why they arrive as `GrafanaManifest`, and why the folders are a
+   separate Flux wave the dashboards `dependsOn` — see
+   [dashboards-v2.md](dashboards-v2.md).
+
+The boards that remain as in-repo JSON are the ones nothing has ported: the ClickHouse
+suite, the vendored Envoy Gateway set, `service-graph`, `cloudnative-pg`, `redis`, and the
+grafana.com / flux2-monitoring-example boards fetched by `spec.url`.
+
+**Folders belong to the artifact.** The six folders (`api-gateway`, `databases`,
+`kubernetes`, `microservices`, `observability`, `platform`) have fixed uids, so a
+remaining in-repo board that belongs with them names the folder by **`folderUID`**, never
+by title: the Envoy Gateway set → `api-gateway`, `cloudnative-pg` → `databases`,
+`service-graph` → `microservices`, `vector` → `observability`. A `folder:` title made the
+operator create a second folder of the same name next to the artifact's. The as-code
+folders arrive one wave after `monitoring-local`; a board applied first answers
+"folder not found" and the operator retries on its own (about a minute, measured on
+Kind) — the `GrafanaDashboard` carries no `Ready` condition, so `monitoring-local`'s
+`wait` does not block on it. Boards with no artifact folder (ClickHouse, Flux, SLO,
+VictoriaMetrics, Cache) keep a title.
 
 Dashboard documentation:
 - [Dashboard Reference](dashboard-reference.md) -- per-panel queries and what they measure
@@ -158,19 +160,12 @@ kubernetes/infra/configs/observability/grafana/
 ├── datasource-clickhouse.yaml         # grafana-clickhouse-datasource
 ├── datasource-pyroscope.yaml
 ├── grafana-service-account-mcp.yaml   # Viewer SA + token Secret for the Grafana MCP server
-├── dashboards-chart.yaml              # HelmRelease → helm-charts grafana-dashboards chart (RFC-0017 boards as ConfigMaps)
 └── dashboards/
     ├── kustomization.yaml               # CR list + configMapGenerator entries (stable names, no hash)
-    ├── grafana-dashboard-main.yaml      # Microservices Observability (configMapRef → chart ConfigMap)
-    ├── grafana-dashboard-business.yaml  # Business KPIs (configMapRef → chart ConfigMap)
-    ├── grafana-dashboard-temporal.yaml  # Temporal (configMapRef → temporal.json, vendored in-repo)
-    ├── grafana-dashboard-keda.yaml      # KEDA — Worker Autoscaling (configMapRef → keda.json, ADR-055)
-    ├── grafana-dashboard-cert-manager.yaml  # cert-manager (configMapRef → cert-manager.json)
     ├── grafana-dashboard-clickhouse*.yaml   # ClickHouse suite (configMapRef → clickhouse-*.json)
     ├── grafana-dashboard-envoy-gateway.yaml # 4 CRs (configMapRef → envoy-gateway/*.json, vendored v1.9.0)
-    ├── grafana-dashboard-cutover-baseline.yaml · grafana-dashboard-inventory.yaml
     ├── grafana-dashboard-*.yaml         # remaining boards (spec.url → grafana.com or legacy repo)
-    ├── temporal.json · keda.json · cert-manager.json · clickhouse-*.json · cutover-baseline.json · inventory.json
+    ├── clickhouse-*.json · service-graph.json
     └── envoy-gateway/*.json             # vendored envoyproxy/gateway v1.9.0 dashboards
 ```
 
@@ -185,4 +180,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

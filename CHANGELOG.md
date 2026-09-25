@@ -909,6 +909,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Five as-code panels query again** (`grafana-dashboards` `v0.2.1`).
+  `pg-io-waits` (shared buffers, IO time, throughput) and
+  `kubernetes-cluster-overview` (network I/O, PVC utilization) sent duplicate
+  refId `A`, which Grafana rejects ("Multiple queries using the same RefId is
+  not allowed"); the builder now gives every target its own refId.
+
 - **Prometheus-type panels work again: Grafana keeps the plugins its image
   ships.** Grafana 13 "updates" its preinstalled Prometheus and Pyroscope
   plugins at startup; on the cluster it unregistered the bundled copy, then

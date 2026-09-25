@@ -47,4 +47,4 @@ spec:
     # 18 boards reach ManifestSynchronized=True and read back through
     # /apis/dashboard.grafana.app/v2 with a title and element count matching the
     # generated spec.
-    semver: "0.2.0"
+    semver: "0.2.1"

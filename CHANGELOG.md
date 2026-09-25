@@ -909,6 +909,17 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Prometheus-type panels work again: Grafana keeps the plugins its image
+  ships.** Grafana 13 "updates" its preinstalled Prometheus and Pyroscope
+  plugins at startup; on the cluster it unregistered the bundled copy, then
+  failed to replace it (`unlinkat …/plugins-bundled/prometheus: read-only
+  file system`), so every prometheus-type datasource read "Datasource … was
+  not found" — 107 panels on 28 of 43 boards, vendored v1 JSON and as-code
+  v2 alike (not a Dashboard v2 regression). `preinstall_auto_update = false`
+  in the Grafana CR (and `GF_PLUGINS_PREINSTALL_AUTO_UPDATE` in local-stack,
+  where the update succeeded and silently ran a newer plugin). A render audit
+  of all 43 boards afterwards: 0 datasource errors.
+
 - **`KubeJobFailed` now renders the observed Job namespace.** Its summary and
   remediation command use kube-state-metrics' `exported_namespace`; the plain
   `namespace` label identifies the `kube-system` scrape target on this platform.

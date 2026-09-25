@@ -502,6 +502,11 @@ services:
       # Plugin install happens at container start and needs outbound internet
       # once (cached in the grafana volume afterwards).
       GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.20.0,victoriametrics-logs-datasource 0.29.0
+      # Same as the cluster (grafana.yaml): keep the Prometheus/Pyroscope plugins
+      # the image ships instead of self-updating them at start. Here the update
+      # succeeds (writable filesystem), so the stack would silently run a newer
+      # plugin than the cluster, whose read-only root makes the same update fail.
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro

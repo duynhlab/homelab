@@ -35,14 +35,11 @@ processors:
     log_statements:
       - context: log
         statements:
-          - delete_key(attributes, "Namespace")
-          - delete_key(attributes, "TaskQueue")
-          - delete_key(attributes, "WorkflowID")
-          - delete_key(attributes, "RunID")
-          - delete_key(attributes, "WorkflowType")
-          - delete_key(attributes, "WorkerID")
-          - delete_key(attributes, "Attempt")
-          - delete_key(attributes, "ActivityType")
+          # Every Temporal SDK key starts with a capital (Namespace, TaskQueue,
+          # WorkflowID, WorkerType, …) and no registry name may, so one pattern
+          # covers the set instead of a list that misses the next key — WorkerType
+          # was the one the 2026-09-25 gate found.
+          - delete_matching_keys(attributes, "^[A-Z]")
     metric_statements:
       - context: datapoint
         statements:

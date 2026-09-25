@@ -681,6 +681,7 @@ services:
       postgres: { condition: service_healthy }
       shipping-migrate: { condition: service_completed_successfully }
       shipping-seed: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
 
   review:
     build: { context: ../../review-service }

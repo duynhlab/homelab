@@ -111,7 +111,7 @@ e2e-operator: ## Operator resolve of a parked order (compose A20)
 .PHONY: e2e-conformance
 e2e-conformance: ## Row C22: stop Weaver's live-check, save its report, fail on a violation (needs compose.weaver.yaml)
 	@cd local-stack && curl -sf -X POST localhost:4320/stop -o .weaver-live-check.json \
-	  && docker compose -f compose.yaml -f compose.weaver.yaml wait weaver >/dev/null 2>&1; \
+	  && { docker compose -f compose.yaml -f compose.weaver.yaml wait weaver >/dev/null 2>&1 || true; }; \
 	  code=$$(docker inspect -f '{{.State.ExitCode}}' local-stack-weaver-1); \
 	  python3 -c "import json;s=json.load(open('.weaver-live-check.json'))['statistics'];print('C22 advice:',s.get('advice_level_counts'))"; \
 	  if [ "$$code" = 0 ]; then echo 'C22 OK: every emitted name is in the registry'; else echo "C22 FAIL: weaver exit $$code — see local-stack/.weaver-live-check.json"; exit 1; fi

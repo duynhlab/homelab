@@ -131,6 +131,12 @@ Skeleton (copy what you need):
   stores are untouched. `make semconv-catalog-check` (CI) holds the event
   catalog in `docs/api/logs.md` to the table the registry generates,
   vendored at a pinned `pkg` commit (`docs/api/event-catalog.generated.md`).
+  First run on the train #2 gate (2026-09-25): 304,922 entities, four
+  violations, each real — `WorkerType` (a Temporal SDK key the overlay's
+  list missed; the copy Weaver sees now drops every capitalised key),
+  `pgx.sql_state` and `pgx.prepare_stmt.name` (otelpgx, declared in pkg
+  #112) and notification's `result.count`, a namespace collision with the
+  bare `result` label (renamed `notifications.affected`).
   The error shape in `docs/api/{logs,tracing,temporal,pkg}.md` reads
   `exception.message` (slogx v0.3.0 / temporalx v0.44.0), and `pkg.md`
   records obsx v0.46.0/v0.47.0 and the generated constants.
@@ -1123,6 +1129,16 @@ Skeleton (copy what you need):
 
 #### Local-stack
 
+- **`shipping` waits for Keycloak like every other staff-facing service.** It
+  was the one service with an `OIDC_STAFF_JWKS_URL` and no `keycloak`
+  dependency, so it started ~50 s before its siblings and before the
+  collector: its JWK refresh logged a raw `connection refused` and its first
+  OTLP log batch (`process.started` included) never reached ClickHouse —
+  12 of 13 identities in the 2026-09-25 gate.
+- **`make e2e-conformance` reports a violation instead of aborting.** The
+  Makefile runs recipes with `-e`, and `docker compose wait weaver` returns
+  the container's exit code — 1 on a violation — so the recipe died before
+  printing the report summary.
 - **The compose ClickHouse alert slice matches the cluster catalog again.**
   `ClickHouseDiskAlmostFull` said "30-day TTL" while the collector sets
   `ttl: 2160h` (90 d); `ClickHouseMergesFailing` read

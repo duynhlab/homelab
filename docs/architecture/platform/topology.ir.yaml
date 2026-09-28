@@ -13,7 +13,7 @@ diagram:
     - "The ten Go services are one box: per-service routes live in docs/api/, not here."
     - "Pooling split follows each service's db_host: PgDog for product-db, the CNPG PgBouncer Pooler for platform-db."
 
-layers: [client, edge, apps, workflow, pooling, data]
+layers: [client, edge, apps, workflow, pooling, data, view]
 
 boundaries:
   - {id: f_cluster, label: "Kind cluster · homelab"}
@@ -24,32 +24,35 @@ boundaries:
   - {id: f_obs, label: "Observability", parent: f_cluster}
 
 nodes:
-  # Listed in the left-to-right order dot starts from (the fewest crossings
-  # of 54 orderings measured with validate.py on 2026-09-28).
+  # Listed in the order dot starts from: the fewest crossings of ~1000
+  # orderings measured with validate.py on 2026-09-28.
   - {id: browser, label: "Browser", role: external, layer: client}
 
   - {id: keycloak, label: "Keycloak\nid.duynh.me · OIDC", role: platform, layer: edge, parent: f_cluster, icon: keycloak}
   - {id: envoy, label: "Envoy Gateway\ngateway.duynh.me · TLS · JWT · CORS", role: edge, layer: edge, parent: f_cluster, icon: envoy}
   - {id: openbao, label: "OpenBao\nHA Raft", role: platform, layer: edge, parent: f_sec, icon: openbao}
 
-  - {id: svc, label: "10 Go services\nidentity · catalog · checkout\nfulfillment · comms", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: spa, label: "Storefront SPA\nlocal.duynh.me", role: service, layer: apps, parent: f_apps}
+  - {id: svc, label: "10 Go services\nidentity · catalog · checkout\nfulfillment · comms", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: bo, label: "Back-office portal\nbackoffice.duynh.me", role: service, layer: apps, parent: f_apps}
   - {id: eso, label: "External Secrets Operator", role: platform, layer: apps, parent: f_sec, icon: external-secrets}
 
-  - {id: tmp, label: "Temporal server", role: platform, layer: workflow, parent: f_flow, icon: temporal}
   - {id: wk, label: "Temporal workers\ncheckout-worker · order-worker", role: worker, layer: workflow, parent: f_flow, icon: go}
+  - {id: tmp, label: "Temporal server", role: platform, layer: workflow, parent: f_flow, icon: temporal}
 
-  - {id: otel, label: "OTel Collector\n+ vmagent · Vector", role: collector, layer: pooling, parent: f_obs, icon: opentelemetry}
-  - {id: pgdog, label: "PgDog pooler\nproduct-db", role: data, layer: pooling, parent: f_data, icon: pgdog}
+  - {id: otel, label: "OTel Collector\nOTLP · traces · logs · metrics", role: collector, layer: pooling, parent: f_obs, icon: opentelemetry}
   - {id: valkey, label: "Valkey cache", role: data, layer: pooling, parent: f_data, icon: valkey}
   - {id: cnpg, label: "CloudNativePG operator", role: platform, layer: pooling, parent: f_data, icon: cloudnativepg}
   - {id: cnpgpool, label: "CNPG Pooler (PgBouncer)\nplatform-db", role: data, layer: pooling, parent: f_data}
+  - {id: pgdog, label: "PgDog pooler\nproduct-db", role: data, layer: pooling, parent: f_data, icon: pgdog}
 
-  - {id: backends, label: "VictoriaMetrics · Logs · Traces\nPyroscope · ClickHouse", role: metric, layer: data, parent: f_obs, icon: victoriametrics}
-  - {id: grafana, label: "Grafana\n+ Sloth SLOs", role: platform, layer: data, parent: f_obs, icon: grafana}
+  - {id: pyro, label: "Pyroscope\nprofiles · 7 d", role: profile, layer: data, parent: f_obs, icon: pyroscope}
+  - {id: vm, label: "VictoriaMetrics · VictoriaLogs · VictoriaTraces\nvmagent ingest · 7 d", role: metric, layer: data, parent: f_obs, icon: victoriametrics}
+  - {id: ch, label: "ClickHouse\notel_logs · otel_traces · 90 d", role: data, layer: data, parent: f_obs, icon: clickhouse}
   - {id: productdb, label: "product-db\nHA + DR replica", role: data, layer: data, parent: f_data, shape: datastore}
   - {id: platformdb, label: "platform-db\nHA", role: data, layer: data, parent: f_data, shape: datastore}
+
+  - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, parent: f_obs, icon: grafana}
 
 edges:
   - {id: e_br, source: browser, target: envoy, type: traffic, protocol: HTTPS}
@@ -76,8 +79,13 @@ edges:
   - {id: e_otlp_edge, source: envoy, target: otel, type: telemetry, label: "OTLP spans"}
   - {id: e_otlp_svc, source: svc, target: otel, type: telemetry, protocol: OTLP, label_pos: -0.4}
   - {id: e_otlp_wk, source: wk, target: otel, type: telemetry, protocol: OTLP}
-  - {id: e_store, source: otel, target: backends, type: telemetry, label: "metrics · logs · traces"}
-  - {id: e_gf, source: backends, target: grafana, type: data, label: queried}
+  - {id: e_vm, source: otel, target: vm, type: telemetry, label: "metrics · logs · traces"}
+  - {id: e_ch, source: otel, target: ch, type: telemetry, label: "logs · traces"}
+  - {id: e_pyro_svc, source: svc, target: pyro, type: telemetry, label: "profiles (SDK push)"}
+  - {id: e_pyro_wk, source: wk, target: pyro, type: telemetry, label: "profiles"}
+  - {id: e_gf_vm, source: vm, target: grafana, type: data, label: queried}
+  - {id: e_gf_ch, source: ch, target: grafana, type: data, label: queried}
+  - {id: e_gf_pyro, source: pyro, target: grafana, type: data, label: queried}
 
 tests:
   - {rule: no-public-datastore}

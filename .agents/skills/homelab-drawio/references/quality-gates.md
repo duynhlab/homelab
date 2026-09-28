@@ -30,7 +30,7 @@ Every finding has the same shape, so a fix loop can act on it:
 
 | # | Gate | ERROR | WARN |
 |---|---|---|---|
-| 0 | **house** (`validate_house.py`) | `;base64,` / SVG data URI, logo on a frame, planned style without the word | planned word without the dash, v1 fills / white text / shadows, no legend, no title, unlabelled dashed edge, non-Helvetica |
+| 0 | **house** (`validate_house.py`, plus `house.one_box_many_products`: a logo box listing another catalogued product, see icons.md) | `;base64,` / SVG data URI, logo on a frame, planned style without the word | planned word without the dash, v1 fills / white text / shadows, no legend, no title, unlabelled dashed edge, non-Helvetica |
 | 1 | **structural** | duplicate id, broken parent / source / target, parent cycle; with `--ir`: IR schema errors, and `stale_projection` when the file is not exactly what its IR generates | with `--ir`: `layout.unframed_node`, a platform node outside every frame (only `external` nodes belong on the bare canvas) |
 | 2 | **connectivity** | edge with no source or target (outside the legend) | orphan box, duplicate edge, unlabelled pair of opposite edges |
 | 3 | **geometry** | overlapping boxes, child outside its frame, box on a frame it does not belong to, off-canvas or zero-size cell, edge through an unrelated box | edge crossings, gap under 10px, peers of one layer off their row (`--ir`), edge longer than the canvas |

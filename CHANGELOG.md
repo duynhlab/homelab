@@ -598,6 +598,24 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **One box, one product.**
+  - In the root README topology, ClickHouse and Pyroscope had been folded into
+    a "VictoriaMetrics · Logs · Traces · Pyroscope · ClickHouse" box under the
+    VictoriaMetrics logo. They are now three boxes, each with its own inputs and
+    its own Grafana query:
+    - the VictoriaMetrics / VictoriaLogs / VictoriaTraces family, 7 d;
+    - ClickHouse `otel_logs` / `otel_traces`, 90 d;
+    - Pyroscope, 7 d.
+  - The collector box drops "+ vmagent · Vector", and Grafana drops
+    "+ Sloth SLOs": none of those are those products.
+  - The data-tier NetworkPolicy view drops the logos on `monitoring`, `product`
+    and `platform`, which each run more than one product.
+  - homelab-drawio makes the rule checkable:
+    - `icons.md` states it;
+    - `validate.py` adds `house.one_box_many_products`;
+    - `icon_style.py audit` stops asking for logos on frames, on compound names
+      like `logs/clickhouse`, and on multi-product boxes.
+
 - **What flows moves, what governs stays still.**
   - The topology now animates application → database and the telemetry path,
     alongside requests.

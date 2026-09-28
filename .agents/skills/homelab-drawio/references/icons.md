@@ -88,6 +88,25 @@ catalog. Never put a Redis logo on Valkey: it would assert Redis is deployed.)
 - **Never invent or counterfeit a vendor logo.** No redrawn "close enough"
   mark and no generic icon passed off as a brand. When steps 1–4 miss, the box
   stays plain (step 5).
+- **One box, one product.** A box with a logo holds only that product. A family
+  that shares one catalogued logo may share a box: VictoriaMetrics, VictoriaLogs
+  and VictoriaTraces all resolve to `victoriametrics` through the manifest
+  aliases. A different product gets its own box, or the products go in a frame
+  that carries no logo. The failure this prevents: a "VictoriaMetrics · … ·
+  ClickHouse" box under the VictoriaMetrics logo told readers ClickHouse was part
+  of VictoriaMetrics.
+  - `validate.py` warns (`house.one_box_many_products`) when a logo box lists
+    another catalogued product as one of its parts, meaning an item of a label
+    line split on `·`, `+` or `,`.
+  - A mention is not a part: "Pyroscope SDK" in a Go-process box, "Temporal
+    workers", and table or bucket names like `otel_traces` are fine.
+- **A namespace box takes a logo only when the namespace runs one product.**
+  `identity` (Keycloak) and `envoy-gateway` do; `monitoring` (VMAgent and Grafana)
+  and `product` (product-db and PgDog) do not. `icon_style.py audit` follows the
+  same rules:
+  - it never asks for a logo on a frame;
+  - it ignores a box naming several products;
+  - it ignores a product name inside a compound such as `logs/clickhouse`.
 - **Icon the box's subject, not its prose.** A box titled *Leaf certificates*
   whose second line says "cert-manager-issued" gets no cert-manager logo.
 - **Never on a grouping frame.** A logo on a frame labels the grouping, not a

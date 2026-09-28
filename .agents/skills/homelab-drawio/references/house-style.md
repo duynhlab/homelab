@@ -187,6 +187,8 @@ control edges (a delivery graph): there they are the flow.
 
 - Logo box: `python3 ../scripts/icon_style.py style <name> --role <role>` →
   paste as the cell `style`.
+  One box holds one product, or one logo family
+  ([`icons.md`](icons.md#rules-that-keep-the-catalog-honest)).
 - Plain box (no catalogued logo): use `plain_style` / `shapes.card` from the
   preset with the role's fill/stroke/font.
 - **`planned` boxes must carry `dashed=1;` in the style as well as the word

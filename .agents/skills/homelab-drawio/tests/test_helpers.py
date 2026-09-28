@@ -220,6 +220,29 @@ class TestAuditRecursion(unittest.TestCase):
         self.assertIn("1 diagram(s)", out)
         self.assertIn("grafana", out)
 
+    def test_frames_compounds_and_multi_product_boxes_are_exempt(self):
+        """Consistent with the other rules: a frame never takes a logo, a compound
+        name (`logs/clickhouse`, `grafana-dashboards-x`) is not the product, and a
+        box naming two products must not get either's logo (one box, one product)."""
+        doc = CLEAN.replace(
+            "</root>",
+            '<mxCell id="fr" value="temporal namespace" style="rounded=1;container=1;" vertex="1" '
+            'parent="1"><mxGeometry x="0" y="300" width="300" height="200" as="geometry"/></mxCell>'
+            '<mxCell id="kid" value="worker" style="rounded=1;" vertex="1" parent="fr">'
+            '<mxGeometry x="10" y="40" width="100" height="40" as="geometry"/></mxCell>'
+            '<mxCell id="pipe" value="logs/clickhouse" style="rounded=1;" vertex="1" parent="1">'
+            '<mxGeometry x="0" y="600" width="120" height="40" as="geometry"/></mxCell>'
+            '<mxCell id="ns" value="VictoriaMetrics · Grafana" style="rounded=1;" vertex="1" parent="1">'
+            '<mxGeometry x="0" y="700" width="220" height="40" as="geometry"/></mxCell>'
+            "</root>",
+        )
+        with tempfile.TemporaryDirectory() as td:
+            with open(os.path.join(td, "d.drawio"), "w", encoding="utf-8") as fh:
+                fh.write(doc)
+            rc, out = self._audit(td)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("already carries its logo", out)
+
     def test_annotations_and_legend_rows_are_exempt(self):
         """A caption or legend row names a product without being one.
 

@@ -39,7 +39,7 @@ nodes:
   - {id: openbao, label: "openbao server + Jobs\n(not fenced)", role: platform, layer: open, parent: f_openbao, icon: openbao}
   - {id: cnpg, label: "cloudnative-pg\nCNPG operator", role: platform, layer: open, parent: f_open, icon: cloudnativepg}
   - {id: temporal, label: "temporal\nTemporal server", role: platform, layer: open, parent: f_open, icon: temporal}
-  - {id: monitoring, label: "monitoring\nVMAgent · Grafana", role: collector, layer: open, parent: f_open, icon: victoriametrics}
+  - {id: monitoring, label: "monitoring\nVMAgent · Grafana", role: collector, layer: open, parent: f_open}
   - {id: envoy, label: "envoy-gateway\nEnvoy Gateway proxies", role: edge, layer: open, parent: f_open, icon: envoy}
 
   - {id: floci, label: "floci KMS pod\npod-scoped allow", role: platform, layer: apps, parent: f_openbao}
@@ -47,8 +47,8 @@ nodes:
   - {id: apps_platform, label: "user · notification\nshipping · review", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: identity, label: "identity\nKeycloak", role: platform, layer: apps, parent: f_fenced, icon: keycloak}
 
-  - {id: product, label: "product\nproduct-db · pgdog-product", role: data, layer: tier, parent: f_fenced, icon: postgresql}
-  - {id: platform, label: "platform\nplatform-db · PgBouncer pooler", role: data, layer: tier, parent: f_fenced, icon: postgresql}
+  - {id: product, label: "product\nproduct-db · pgdog-product", role: data, layer: tier, parent: f_fenced}
+  - {id: platform, label: "platform\nplatform-db · PgBouncer pooler", role: data, layer: tier, parent: f_fenced}
 
 edges:
   - {id: a_product, source: apps_product, target: product, type: data, label: ":6432 · :5432"}

@@ -144,12 +144,18 @@ def cmd_audit(args: argparse.Namespace) -> int:
                 continue
             if style.startswith("text;") or c.get("parent") in legend_ids:
                 continue
-            for term, tier in terms.items():
-                if term in none_set:
-                    continue
-                if re.search(rf"\b{re.escape(term)}\b", first):
-                    missing[tier].append(f"{diagram}: {first[:48]!r} -> {term}")
-                    break
+            if is_frame(style, c.get("id"), parents):
+                continue  # a frame never takes a logo, so it is never "missing" one
+            # A standalone word only: `logs/clickhouse` is a collector pipeline and
+            # `grafana-dashboards-...` a Flux wave, not those products.
+            found = [(t, tier) for t, tier in terms.items() if t not in none_set
+                     and re.search(rf"(?<![\w/-]){re.escape(t)}(?![\w/-])", first)]
+            products = {load_manifest().get("aliases", {}).get(t, t) for t, _ in found}
+            if len(products) > 1:
+                continue  # several products in one box: it takes no logo (icons.md)
+            if found:
+                term, tier = found[0]
+                missing[tier].append(f"{diagram}: {first[:48]!r} -> {term}")
 
     print(f"audit: {len(paths)} diagram(s) under {args.dir}")
     if not missing and not misplaced:

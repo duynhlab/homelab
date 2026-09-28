@@ -10,6 +10,7 @@ diagram:
   scope: "How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see signal-flow.drawio."
   question: delivery
   level: L2
+  animate: [control]
   pin_order: true
   legend:
     roles:

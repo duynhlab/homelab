@@ -100,10 +100,10 @@ flowchart TD
 Same palette as the Platform map above.
 
 <p align="center">
-  <a href="docs/architecture/platform/topology.drawio"><img src="docs/architecture/platform/img/topology.png" alt="Request-path topology (Draw.io edition)" width="920"></a>
+  <a href="docs/architecture/platform/topology.drawio"><img src="docs/architecture/platform/topology.svg" alt="Request-path topology (Draw.io edition)" width="920"></a>
 </p>
 
-<p align="center"><sub>Source <a href="docs/architecture/platform/topology.drawio"><code>platform/topology.drawio</code></a> · <a href="docs/architecture/platform/topology.svg">SVG</a></sub></p>
+<p align="center"><sub>Source <a href="docs/architecture/platform/topology.drawio"><code>platform/topology.drawio</code></a> · <a href="docs/architecture/platform/img/topology.png">PNG</a></sub></p>
 
 ---
 

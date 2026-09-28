@@ -147,15 +147,32 @@ The generator implements these; `validate.py` checks them
 
 ### Flow animation (`flowAnimation=1`)
 
-Append `;flowAnimation=1;` to an edge (or use the `request_animated` role in the
-preset) to animate the dashes travelling along the connector — a strong cue for
-the diagram's **primary** flow direction. Caveats:
+Moving dashes along a connector mark the diagram's **primary** flow and its
+direction. In an IR, name the edge types that move in `diagram.animate`
+(`animate: true|false` overrides one edge); the generator appends
+`flowAnimation=1;` and animates the matching legend sample too. By hand, append
+`;flowAnimation=1;` or use the `request_animated` preset role.
 
-- It moves **only in SVG and in the Draw.io editor**. A PNG export is static,
-  and GitHub may strip the animation from an embedded SVG. Never let the meaning
-  depend on motion.
-- Use it **sparingly** — one flow, not every edge. Animating everything is
-  noise and defeats the cue.
+| Diagram | Moves (`diagram.animate`) | Stays still |
+|---|---|---|
+| request path (platform/topology) | `traffic` | trust, data, control, telemetry |
+| signal flow (observability/signal-flow) | `telemetry` | Grafana queries, cold tier |
+| delivery (observability/delivery) | `control` (every wave) | — |
+| database paths (databases/topology) | `data`, `replication` | manage, rotate, migrations |
+| NetworkPolicy (security/network-policies) | `data` | operator, scrape, HTTP |
+| work layer (workflows/temporal-keda) | `traffic`, `event` | rollout, scaling, backlog reads |
+
+- **It moves in the SVG, on GitHub too.** Checked 2026-09-28 by rendering a
+  pushed branch with a real browser: GitHub shows a Draw.io SVG in an `<img>`
+  with its HTML labels and running animation, and it follows the reader's dark or
+  light theme. So pages embed the SVG and link the PNG. The PNG is static and
+  draws the moving dashes as a plain dash pattern.
+- **Never let the meaning depend on motion.** Edge type is still carried by
+  colour, head and label; the motion only says "this is the flow to follow".
+- **Something must stay still.** A planned or optional edge never animates,
+  because moving dashes would read as flow. `validate.py` warns
+  (`house.animation_overuse`) when every kind of edge moves; a graph with one
+  kind of edge, like a delivery graph, may move entirely.
 
 ## Applying it
 

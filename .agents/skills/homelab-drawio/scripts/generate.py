@@ -576,12 +576,22 @@ def node_style(n: dict, P: dict) -> str:
     return _style(P["plain_style"].replace("rounded=1;", "rounded=1;{dashed}", 1), n["role"], dashed, None, font)
 
 
-def edge_style(e: dict, P: dict) -> str:
+def animated(e: dict, ir: dict) -> bool:
+    """Primary-flow edges move in the SVG. A dashed (planned/optional) edge
+    never does: moving dashes would read as flow, and it is not one."""
+    if e.get("status") in ("planned", "optional"):
+        return False
+    return e.get("animate", e["type"] in ir["diagram"].get("animate", []))
+
+
+def edge_style(e: dict, P: dict, ir: dict | None = None) -> str:
     edges = P["edges"]
     if e.get("status") == "planned":
         st = edges["planned"]
     else:
         st = edges[e["type"]] + ("dashed=1;" if e.get("status") == "optional" else "")
+    if ir is not None and animated(e, ir):
+        st += "flowAnimation=1;"
     if e.get("signal"):
         stroke = role_style(e["signal"])["strokeColor"]
         st = _replace_attr(st, "strokeColor", stroke)
@@ -727,7 +737,7 @@ def build(ir: dict) -> str:
 
     for e in ir["edges"]:
         r = routes[e["id"]]
-        st = edge_style(e, P)
+        st = edge_style(e, P, ir)
         if r["ports"]:
             ex, ey, nx, ny = r["ports"]
             st += (f"exitX={_num(round(ex, 4))};exitY={_num(round(ey, 4))};exitDx=0;exitDy=0;"
@@ -827,6 +837,8 @@ def _legend(root: ET.Element, ir: dict, P: dict, x: int, y: int, width: int, fra
                 st = P["edges"][t]
                 if sig:
                     st = _replace_attr(st, "strokeColor", role_style(sig)["strokeColor"])
+                if t in ir["diagram"].get("animate", []):
+                    st += "flowAnimation=1;"
             c = _cell(root, f"legend-{kind}-{key}", "", st, "legend", None, vertex=False)
             g = ET.SubElement(c, "mxGeometry", {"relative": "1", "as": "geometry"})
             ET.SubElement(g, "mxPoint", {"x": _num(ix), "y": _num(iy + 11), "as": "sourcePoint"})

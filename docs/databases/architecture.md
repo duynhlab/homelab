@@ -63,10 +63,10 @@ leaves out:
 - the WAL and base backups in RustFS that the DR replica recovers from.
 
 <p align="center">
-  <a href="../architecture/databases/topology.svg"><img src="../architecture/databases/img/topology.png" alt="Database connection and recovery paths: clients, poolers, CNPG clusters, RustFS backups and the DR replica" width="960"></a>
+  <a href="../architecture/databases/topology.svg"><img src="../architecture/databases/topology.svg" alt="Database connection and recovery paths: clients, poolers, CNPG clusters, RustFS backups and the DR replica" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/databases/topology.drawio"><code>databases/topology.drawio</code></a> · <a href="../architecture/databases/topology.svg">SVG</a></sub></p>
+<p align="center"><sub>Source <a href="../architecture/databases/topology.drawio"><code>databases/topology.drawio</code></a> · <a href="../architecture/databases/img/topology.png">PNG</a></sub></p>
 
 ## Cluster behavior
 

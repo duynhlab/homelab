@@ -137,10 +137,10 @@ floci KMS pod added. It answers one question: **who may reach the data and ident
 tier, and on which port.** The app-to-app mesh is § 3.
 
 <p align="center">
-  <a href="../architecture/security/network-policies.svg"><img src="../architecture/security/img/network-policies.png" alt="NetworkPolicy allows into the product, platform and identity namespaces and the floci pod, by source namespace and port" width="960"></a>
+  <a href="../architecture/security/network-policies.svg"><img src="../architecture/security/network-policies.svg" alt="NetworkPolicy allows into the product, platform and identity namespaces and the floci pod, by source namespace and port" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/security/network-policies.drawio"><code>security/network-policies.drawio</code></a> · <a href="../architecture/security/network-policies.svg">SVG</a></sub></p>
+<p align="center"><sub>Source <a href="../architecture/security/network-policies.drawio"><code>security/network-policies.drawio</code></a> · <a href="../architecture/security/img/network-policies.png">PNG</a></sub></p>
 
 ---
 

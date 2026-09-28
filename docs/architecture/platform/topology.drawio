@@ -85,7 +85,7 @@
         <mxCell id="platformdb" value="&lt;b&gt;platform-db&lt;/b&gt;&lt;br&gt;HA" style="shape=cylinder3;whiteSpace=wrap;html=1;shadow=0;size=8;fillColor=#DCFCE7;strokeColor=#16A34A;strokeWidth=1.5;fontColor=#14532D;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_data">
           <mxGeometry x="460" y="185" width="120" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="e_br" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="envoy">
+        <mxCell id="e_br" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="envoy">
           <mxGeometry relative="1" as="geometry" x="-0.14">
             <Array as="points">
               <mxPoint x="560" y="165" />
@@ -96,7 +96,7 @@
         <mxCell id="e_jwks" value="JWKS · id route" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1.5;endArrow=open;startArrow=oval;startFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="keycloak">
           <mxGeometry relative="1" as="geometry" x="-0.4" />
         </mxCell>
-        <mxCell id="e_spa" value="HTTPRoute" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="spa">
+        <mxCell id="e_spa" value="HTTPRoute" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.9;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="spa">
           <mxGeometry relative="1" as="geometry" x="0.79">
             <Array as="points">
               <mxPoint x="535" y="355" />
@@ -104,7 +104,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_bo" value="HTTPRoute" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="bo">
+        <mxCell id="e_bo" value="HTTPRoute" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="bo">
           <mxGeometry relative="1" as="geometry" x="0.05">
             <Array as="points">
               <mxPoint x="585" y="340" />
@@ -112,7 +112,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_svc" value="HTTPRoute /api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.81;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="svc">
+        <mxCell id="e_svc" value="HTTPRoute /api" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.81;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="svc">
           <mxGeometry relative="1" as="geometry" x="0.5">
             <Array as="points">
               <mxPoint x="640" y="340" />
@@ -120,7 +120,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_tmp" value="starts workflows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.33;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="tmp">
+        <mxCell id="e_tmp" value="starts workflows" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.33;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="tmp">
           <mxGeometry relative="1" as="geometry" x="0.46">
             <Array as="points">
               <mxPoint x="725" y="520" />
@@ -128,7 +128,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_wk" value="polls task queue" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="wk" target="tmp">
+        <mxCell id="e_wk" value="polls task queue" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="wk" target="tmp">
           <mxGeometry relative="1" as="geometry" x="0" />
         </mxCell>
         <mxCell id="e_cache" value="cache-aside" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="valkey">
@@ -320,7 +320,7 @@
         <mxCell id="legend-role-metric-text" value="Metrics store" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="942" y="34" width="80" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-traffic" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;" edge="1" parent="legend">
+        <mxCell id="legend-edge-traffic" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1040" y="45" as="sourcePoint" />
             <mxPoint x="1066" y="45" as="targetPoint" />

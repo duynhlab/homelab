@@ -10,6 +10,7 @@ diagram:
   scope: "Allowed ingress into the fenced product, platform and identity namespaces and the floci KMS pod, by source namespace and port. The app-to-app mesh (:8080 / :9090) is the Mermaid map in § 3; egress is not fenced anywhere."
   question: domain-topology
   level: L4
+  animate: [data]
   pin_order: true
   legend:
     roles:

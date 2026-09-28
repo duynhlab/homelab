@@ -66,6 +66,7 @@ tests:                            # architecture rules to enforce
 | edge `type` | One of eight relationship types ([house-style.md](house-style.md#relationship-types)). |
 | edge `status` | `planned` or `optional` draws it dashed, and it must then carry a label. |
 | edge `signal` | Telemetry only: colour by metric / log / trace / profile. |
+| `diagram.animate`, edge `animate` | Edge types whose dashes move in the SVG: the primary flow. `animate: true/false` overrides one edge; planned and optional edges never move ([house-style.md](house-style.md#flow-animation-flowanimation1)). |
 | edge `via`, `label_pos` | Escape hatches: absolute waypoints, or a label position from -1 (source) to 1 (target). |
 
 `generate.py` refuses an IR with any of these wrong, before it draws anything:

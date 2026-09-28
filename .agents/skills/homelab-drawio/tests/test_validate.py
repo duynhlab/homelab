@@ -125,6 +125,19 @@ class TestGates(unittest.TestCase):
                 edge("e2", "b", "d", value="second label", points=[(260, 260), (80, 260), (80, 300), (260, 300)]))
         self.assertIn("typography.label_collision", rules(f, "WARN"))
 
+    def test_animation_overuse(self):
+        blue = "strokeColor=#2563EB;flowAnimation=1;"
+        green = "strokeColor=#16A34A;"
+        def e(cid, s, t, extra):
+            return edge(cid, s, t, ports="exitX=0.5;exitY=1;entryX=0.5;entryY=0;" + extra)
+        base = (box("a", 0, 100), box("b", 0, 300), box("c", 300, 300))
+        all_move = run(*base, e("e1", "a", "b", blue), e("e2", "a", "c", green + "flowAnimation=1;"))
+        primary = run(*base, e("e1", "a", "b", blue), e("e2", "a", "c", green))
+        one_kind = run(*base, e("e1", "a", "b", blue), e("e2", "a", "c", blue))
+        self.assertIn("house.animation_overuse", rules(all_move, "WARN"))
+        self.assertNotIn("house.animation_overuse", rules(primary))
+        self.assertNotIn("house.animation_overuse", rules(one_kind))  # a delivery graph may move entirely
+
     def test_legend_is_exempt(self):
         # an arrow sample inside the legend frame is not a dangling edge
         cell = ('<mxCell id="lg" value="" style="endArrow=classic;" edge="1" parent="legend">'

@@ -598,6 +598,24 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Diagrams show their primary flow moving, on GitHub too.**
+  - Each IR names the edge types that animate (`diagram.animate`). The generator
+    adds draw.io's `flowAnimation` to them and to their legend sample; planned and
+    optional edges never move.
+  - What moves:
+    - topology: requests;
+    - signal-flow: telemetry;
+    - delivery: the waves;
+    - databases: SQL and WAL;
+    - NetworkPolicy: SQL allows;
+    - Temporal: starts and task queues.
+  - Pages now embed the SVG and link the PNG. A pushed test branch opened in a
+    real browser showed GitHub renders a draw.io SVG in an `<img>` with its HTML
+    labels and running animation, following the reader's dark or light theme.
+    The skill's old "GitHub strips the labels" rule is corrected.
+  - `validate.py` warns when every kind of edge moves
+    (`house.animation_overuse`).
+
 - **Architecture diagrams are split by domain, and three new ones cover
   databases, NetworkPolicy and the Temporal work layer.**
   - `docs/architecture/` now holds `platform/`, `observability/`, `databases/`,

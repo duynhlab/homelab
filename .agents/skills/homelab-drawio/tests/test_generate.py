@@ -175,6 +175,19 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("layout.unframed_node", {x["rule_id"] for x in f})
         self.assertEqual([x for x in f if x["severity"] == "ERROR"], [])
 
+    def test_animate_marks_primary_flow_only(self):
+        ir = _ir()
+        ir["diagram"]["animate"] = ["traffic"]
+        ir["edges"].append({"id": "e6", "source": "gw", "target": "b", "type": "traffic",
+                            "status": "optional", "label": "fallback"})
+        ir["edges"][3]["animate"] = True  # e4 is data: per-edge override
+        cells = _cells(generate.build(ir))
+        self.assertIn("flowAnimation=1", cells["e1"].get("style"))
+        self.assertIn("flowAnimation=1", cells["e4"].get("style"))
+        self.assertNotIn("flowAnimation=1", cells["e5"].get("style"))   # dependency
+        self.assertNotIn("flowAnimation=1", cells["e6"].get("style"))   # optional never moves
+        self.assertIn("flowAnimation=1", cells["legend-edge-traffic"].get("style"))
+
     def test_spline_parser_handles_multi_piece_splines(self):
         pts = generate._spline_points("e,10,20 1,2 3,4 5,6;s,7,8 9,10 11,12 13,14")
         self.assertEqual(pts[0], (1.0, 2.0))

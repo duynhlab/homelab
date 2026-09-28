@@ -141,10 +141,10 @@ logs), the span-metrics connector, and the edge access logs that only
 ClickHouse keeps:
 
 <p align="center">
-  <a href="../architecture/observability/signal-flow.svg"><img src="../architecture/observability/img/signal-flow.png" alt="Observability signal flow: producers, OTel Collector pipelines, backends and their retention, Grafana" width="960"></a>
+  <a href="../architecture/observability/signal-flow.svg"><img src="../architecture/observability/signal-flow.svg" alt="Observability signal flow: producers, OTel Collector pipelines, backends and their retention, Grafana" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/observability/signal-flow.drawio"><code>observability/signal-flow.drawio</code></a> · <a href="../architecture/observability/signal-flow.svg">SVG</a></sub></p>
+<p align="center"><sub>Source <a href="../architecture/observability/signal-flow.drawio"><code>observability/signal-flow.drawio</code></a> · <a href="../architecture/observability/img/signal-flow.png">PNG</a></sub></p>
 
 
 ## 3-Layer Service Architecture & APM Integration
@@ -462,10 +462,10 @@ The prose above is the summary; the diagram below is the graph as declared, wave
 by wave, with the gate that releases each one:
 
 <p align="center">
-  <a href="../architecture/observability/delivery.svg"><img src="../architecture/observability/img/delivery.png" alt="Observability delivery order: Flux waves and their gates" width="960"></a>
+  <a href="../architecture/observability/delivery.svg"><img src="../architecture/observability/delivery.svg" alt="Observability delivery order: Flux waves and their gates" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/observability/delivery.drawio"><code>observability/delivery.drawio</code></a> · <a href="../architecture/observability/delivery.svg">SVG</a></sub></p>
+<p align="center"><sub>Source <a href="../architecture/observability/delivery.drawio"><code>observability/delivery.drawio</code></a> · <a href="../architecture/observability/img/delivery.png">PNG</a></sub></p>
 
 The detail worth carrying away: **`clickhouse-keeper-local` and
 `clickhouse-local` omit `wait` on purpose.** The objects worth gating on are

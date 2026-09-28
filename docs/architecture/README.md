@@ -11,7 +11,7 @@ IR is what you edit and the `.drawio` is its output.
 | Fact | Value |
 |------|-------|
 | Layout | one directory per domain: `<domain>/<name>.ir.yaml` (the model you edit) → `<domain>/<name>.drawio` (generated, still editable in Draw.io) + `<domain>/<name>.svg`, PNG under `<domain>/img/` |
-| Exports | GitHub strips text from Draw.io SVG, so a Markdown page embeds the PNG and links the SVG for zooming |
+| Exports | pages embed the **SVG**: GitHub renders it with its labels, and the diagram's primary flow moves (`diagram.animate`). The PNG under `img/` is the static fallback the caption links |
 | Style | homelab house style — palette mirrors the Mermaid `classDef` in [AGENTS.md](../../AGENTS.md); the outermost frame is the cluster |
 | Regenerate | `S=.agents/skills/homelab-drawio/scripts; python3 $S/generate.py docs/architecture/<domain>/<name>.ir.yaml && python3 $S/export.py docs/architecture/<domain>/<name>.drawio --png --png-dir docs/architecture/<domain>/img` |
 | Validate | `python3 .agents/skills/homelab-drawio/scripts/validate.py docs/architecture/<domain>/<name>.drawio --ir docs/architecture/<domain>/<name>.ir.yaml` — 0 errors to ship |
@@ -48,4 +48,4 @@ IR is what you edit and the `.drawio` is its output.
 - Validate before exporting (the table above), then **open the render and
   look**, which is where a crowded corner or an ambiguous crossing is caught.
 
-_Last updated: 2026-09-28 — split by domain (`platform/`, `observability/`, `databases/`, `security/`, `workflows/`) with three new sources: database paths, NetworkPolicy allows into the data tier, and the Temporal + KEDA work layer. Earlier the same day: every source now sits in a `Kind cluster · homelab` frame (only the browser stays outside); all three sources redrawn top-down from YAML IRs (`*.ir.yaml`) by the skill's generator, with routed edges and placed labels; PNGs quantized to 256 colours. Earlier the same day: `observability-signal-flow.drawio` added and the v2 soft-tint palette applied._
+_Last updated: 2026-09-28 — pages embed the SVG, whose primary flow moves (`diagram.animate`); the PNG is the linked fallback. Earlier the same day: split by domain (`platform/`, `observability/`, `databases/`, `security/`, `workflows/`) with three new sources: database paths, NetworkPolicy allows into the data tier, and the Temporal + KEDA work layer. Earlier the same day: every source now sits in a `Kind cluster · homelab` frame (only the browser stays outside); all three sources redrawn top-down from YAML IRs (`*.ir.yaml`) by the skill's generator, with routed edges and placed labels; PNGs quantized to 256 colours. Earlier the same day: `observability-signal-flow.drawio` added and the v2 soft-tint palette applied._

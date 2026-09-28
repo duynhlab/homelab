@@ -187,7 +187,9 @@ reference style.
    A `Proposed` ADR is committed in *direction* and not in *decision*, so its
    nodes may be drawn — naming the record is what keeps that honest, and it gives
    a reader one place to check whether the answer has changed.
-3. **Use semantic structure.** Prefer domain/layer subgraphs, stable node IDs,
+3. **Use semantic structure.** The outermost subgraph/frame is the system
+   boundary (the cluster); only off-platform nodes (browser, Git, registry,
+   third parties) sit outside it. Prefer domain/layer subgraphs nested in it, stable node IDs,
    quoted labels, `<br/>` for intentional line breaks, and database shapes for
    persistent stores. Label edges with protocols or ports only when that detail
    helps answer the diagram's question.

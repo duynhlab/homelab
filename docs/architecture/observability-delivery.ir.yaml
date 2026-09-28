@@ -10,6 +10,7 @@ diagram:
   scope: "How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see observability-signal-flow.drawio."
   question: delivery
   level: L2
+  pin_order: true
   legend:
     roles:
       platform: "Platform wave (operators, secrets, storage, Grafana)"
@@ -24,24 +25,27 @@ diagram:
 
 layers: [w0, w1, w2, w3, w4, w5]
 
+boundaries:
+  - {id: f_cluster, label: "Kind cluster · homelab — Flux waves"}
+
 nodes:
-  - {id: w_controllers, label: "controllers-local\n./controllers\ngate: wait — operators + namespaces", role: platform, layer: w0}
+  - {id: w_controllers, label: "controllers-local\n./controllers\ngate: wait — operators + namespaces", role: platform, layer: w0, parent: f_cluster}
 
-  - {id: w_secrets, label: "secrets-local\n./configs/secrets\ngate: wait — OpenBao + ESO", role: platform, layer: w1}
-  - {id: w_monitoring, label: "monitoring-local\n./configs/observability\ngate: wait — VM CRs · rules · Grafana", role: metric, layer: w1}
+  - {id: w_secrets, label: "secrets-local\n./configs/secrets\ngate: wait — OpenBao + ESO", role: platform, layer: w1, parent: f_cluster}
+  - {id: w_monitoring, label: "monitoring-local\n./configs/observability\ngate: wait — VM CRs · rules · Grafana", role: metric, layer: w1, parent: f_cluster}
 
-  - {id: w_keeper, label: "clickhouse-keeper-local\n./configs/clickhouse-keeper\ngate: healthChecks — 3× StatefulSet", role: data, layer: w2, icon: clickhouse}
-  - {id: w_storage, label: "storage-local\n./controllers/storage\ngate: wait — RustFS", role: platform, layer: w2}
-  - {id: w_folders, label: "grafana-dashboards-as-code-folders-local\n./folders\ngate: healthCheckExprs — 6× GrafanaManifest", role: platform, layer: w2}
-  - {id: w_apps, label: "apps-local\n./ (apps-oci)\ngate: wait — the microservices", role: service, layer: w2}
+  - {id: w_keeper, label: "clickhouse-keeper-local\n./configs/clickhouse-keeper\ngate: healthChecks — 3× StatefulSet", role: data, layer: w2, parent: f_cluster, icon: clickhouse}
+  - {id: w_storage, label: "storage-local\n./controllers/storage\ngate: wait — RustFS", role: platform, layer: w2, parent: f_cluster}
+  - {id: w_folders, label: "grafana-dashboards-as-code-folders-local\n./folders\ngate: healthCheckExprs — 6× GrafanaManifest", role: platform, layer: w2, parent: f_cluster}
+  - {id: w_apps, label: "apps-local\n./ (apps-oci)\ngate: wait — the microservices", role: service, layer: w2, parent: f_cluster}
 
-  - {id: w_chi, label: "clickhouse-local\n./configs/clickhouse\ngate: healthChecks — 3× StatefulSet", role: data, layer: w3, icon: clickhouse}
-  - {id: w_profiling, label: "profiling-local\n./controllers/profiling\ngate: wait — Pyroscope HelmRelease", role: profile, layer: w3}
-  - {id: w_dash, label: "grafana-dashboards-as-code-dashboards-local\n./dashboards\ngate: healthCheckExprs — 18× GrafanaManifest", role: platform, layer: w3}
+  - {id: w_chi, label: "clickhouse-local\n./configs/clickhouse\ngate: healthChecks — 3× StatefulSet", role: data, layer: w3, parent: f_cluster, icon: clickhouse}
+  - {id: w_profiling, label: "profiling-local\n./controllers/profiling\ngate: wait — Pyroscope HelmRelease", role: profile, layer: w3, parent: f_cluster}
+  - {id: w_dash, label: "grafana-dashboards-as-code-dashboards-local\n./dashboards\ngate: healthCheckExprs — 18× GrafanaManifest", role: platform, layer: w3, parent: f_cluster}
 
-  - {id: w_schema, label: "clickhouse-schema-local\n./configs/clickhouse-schema\ngate: wait — DDL bootstrap Job", role: worker, layer: w4, icon: clickhouse}
+  - {id: w_schema, label: "clickhouse-schema-local\n./configs/clickhouse-schema\ngate: wait — DDL bootstrap Job", role: worker, layer: w4, parent: f_cluster, icon: clickhouse}
 
-  - {id: w_tracing, label: "tracing-local\n./controllers/tracing\ngate: wait — OTel Collector Deployment", role: collector, layer: w5, icon: opentelemetry}
+  - {id: w_tracing, label: "tracing-local\n./controllers/tracing\ngate: wait — OTel Collector Deployment", role: collector, layer: w5, parent: f_cluster, icon: opentelemetry}
 
 edges:
   - {id: d0, source: w_controllers, target: w_secrets, type: control}

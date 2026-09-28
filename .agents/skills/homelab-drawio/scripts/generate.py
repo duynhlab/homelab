@@ -77,9 +77,29 @@ class IRError(Exception):
 
 # --------------------------------------------------------------------------- IR
 
+class _StrictLoader(yaml.SafeLoader):
+    """SafeLoader that refuses a repeated mapping key. PyYAML keeps the last
+    one silently, so a pasted-twice `nodes:` block would quietly win over the
+    one you edited."""
+
+
+def _no_duplicates(loader: yaml.SafeLoader, node: yaml.MappingNode, deep: bool = False) -> dict:
+    seen = set()
+    for key_node, _ in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            raise yaml.constructor.ConstructorError(
+                None, None, f"duplicate key '{key}'", key_node.start_mark)
+        seen.add(key)
+    return loader.construct_mapping(node, deep)
+
+
+_StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_duplicates)
+
+
 def load_ir(path: str) -> dict:
     with open(path, encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+        return yaml.load(fh, Loader=_StrictLoader)  # noqa: S506 - SafeLoader subclass
 
 
 def ir_problems(ir: dict) -> list[tuple[str, list[str], str]]:
@@ -340,6 +360,29 @@ class Layout:
             y1 = max(f[1] + f[3], max(k[1] + k[3] for k in kids) + 10)
             self.frame[bid] = [x0, y0, x1 - x0, y1 - y0]
 
+    def _titles_opening(self, layer: int) -> list[tuple[float, float]]:
+        """Title x-spans of frames whose top border lies just above `layer`:
+        a vertical run through that layer crosses those borders."""
+        if not self.rows[layer]:
+            return []
+        top = self.rows[layer][0]
+        above = self.rows[layer - 1][1] if layer > 0 and self.rows[layer - 1] else top - 200
+        labels = {b["id"]: b["label"] for b in self.ir.get("boundaries", [])}
+        return [(f[0], f[0] + text_width(labels.get(fid, ""), 13, bold=True) + 30)
+                for fid, f in self.frame.items() if above <= f[1] <= top]
+
+    def ancestor_titles(self, nid: str) -> list[tuple[float, float]]:
+        """x-spans of the title text of every frame around node `nid`."""
+        bounds = {b["id"]: b for b in self.ir.get("boundaries", [])}
+        parent = {n["id"]: n.get("parent") for n in self.ir["nodes"]}.get(nid)
+        spans = []
+        while parent:
+            f = self.frame.get(parent)
+            if f:
+                spans.append((f[0], f[0] + text_width(bounds[parent]["label"], 13, bold=True) + 30))
+            parent = bounds[parent].get("parent")
+        return spans
+
     def channel(self, upper: int) -> tuple[float, float]:
         """Free vertical band between layer `upper` and `upper + 1`."""
         lo, hi = self.rows[upper][1], self.rows[upper + 1][0]
@@ -353,8 +396,8 @@ class Layout:
 
     def free_x(self, layer: int, x: float, exclude: set[str]) -> float:
         """Nearest x in `layer` whose vertical line hits no node."""
-        spans = sorted((b[0], b[0] + b[2]) for n, b in self.box.items()
-                       if self.li[n] == layer and n not in exclude)
+        spans = sorted([(b[0], b[0] + b[2]) for n, b in self.box.items()
+                        if self.li[n] == layer and n not in exclude] + self._titles_opening(layer))
         if all(not (a - 10 < x < b + 10) for a, b in spans):
             return x
         gaps, prev = [], -1e9
@@ -417,12 +460,19 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
         side_edges.setdefault((e["source"], s_side), []).append((toward_t, e["id"], "exit"))
         side_edges.setdefault((e["target"], t_side), []).append((toward_s, e["id"], "entry"))
     port_x: dict[tuple[str, str], float] = {}
-    for (nid, _side), items in side_edges.items():
+    for (nid, side), items in side_edges.items():
         b = lay.box[nid]
         items.sort(key=lambda it: (it[0], it[1]))
+        lo, hi = b[0], b[0] + b[2]
+        if side == "top":
+            # An edge entering from above crosses the top border of every frame
+            # around the box; keep it clear of those frames' title text.
+            for f in lay.ancestor_titles(nid):
+                if f[0] <= lo < f[1] and f[1] + 10 < hi - 10:
+                    lo = f[1] + 10
         k = len(items)
         for i, (_, eid, which) in enumerate(items):
-            x = b[0] + _snap(b[2] * (i + 1) / (k + 1), 5)
+            x = lo + _snap((hi - lo) * (i + 1) / (k + 1), 5)
             port_x[(eid, which)] = x
 
     # Horizontal runs per channel, then one lane per overlapping run.

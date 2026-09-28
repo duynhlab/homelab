@@ -45,4 +45,4 @@ IR is what you edit and the `.drawio` is its output.
 - Validate before exporting (the table above), then **open the render and
   look**, which is where a crowded corner or an ambiguous crossing is caught.
 
-_Last updated: 2026-09-28 — all three sources redrawn top-down from YAML IRs (`*.ir.yaml`) by the skill's generator, with routed edges and placed labels; PNGs quantized to 256 colours. Earlier the same day: `observability-signal-flow.drawio` added and the v2 soft-tint palette applied._
+_Last updated: 2026-09-28 — every source now sits in a `Kind cluster · homelab` frame (only the browser stays outside); all three sources redrawn top-down from YAML IRs (`*.ir.yaml`) by the skill's generator, with routed edges and placed labels; PNGs quantized to 256 colours. Earlier the same day: `observability-signal-flow.drawio` added and the v2 soft-tint palette applied._

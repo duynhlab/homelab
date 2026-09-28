@@ -598,6 +598,24 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Every architecture diagram draws the cluster as its outer frame.**
+  - The three Draw.io sources nest their domain frames inside a
+    `Kind cluster · homelab` frame, and only the browser stays outside.
+  - The same holds for the Mermaid diagrams answering the same questions: the
+    README Topology and GitOps delivery maps (where Git and the registry
+    container stay outside), and the observability architecture.
+  - The rule is in the `homelab-drawio` house style and in AGENTS.md step 3.
+  - `validate.py --ir` warns on a platform node left outside
+    (`layout.unframed_node`), and on an edge drawn through a frame's title
+    (`typography.edge_over_frame_title`).
+  - The generator keeps edge ports and skip-layer runs clear of frame titles.
+  - `load_ir` refuses a duplicate YAML key, which PyYAML otherwise lets win
+    silently.
+  - The signal-flow IR's `metrics` pipeline is back in the pipelines tier, after
+    an earlier edit moved it to the derived one.
+  - Crossings after re-measuring: topology 8 → 5, signal-flow 12 → 10,
+    delivery 6 → 5.
+
 - **Draw.io diagrams are generated top-down from a YAML model, and checked
   by five quality gates.**
   - The `homelab-drawio` skill takes over the method of the owner's

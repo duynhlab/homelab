@@ -7,7 +7,7 @@
         <mxCell id="title" value="duynhlab homelab — Observability signal flow and retention" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=18;fontColor=#1E293B;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="40" y="24" width="1270" height="28" as="geometry" />
         </mxCell>
-        <mxCell id="scope" value="Where every signal goes on the cluster: which OTel Collector pipeline carries it, which backend stores it, and for how long. Delivery order is a different question — see observability-delivery.drawio." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1">
+        <mxCell id="scope" value="Where every signal goes on the cluster: which OTel Collector pipeline carries it, which backend stores it, and for how long. Delivery order is a different question — see delivery.drawio." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1">
           <mxGeometry x="40" y="54" width="1270" height="36" as="geometry" />
         </mxCell>
         <mxCell id="f_cluster" value="Kind cluster · homelab" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
@@ -87,10 +87,10 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_svc" value="OTLP/HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.33;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="otel">
-          <mxGeometry relative="1" as="geometry" x="0.71">
+        <mxCell id="e_svc" value="OTLP/HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.93;exitY=1;exitDx=0;exitDy=0;entryX=0.33;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="otel">
+          <mxGeometry relative="1" as="geometry" x="0.53">
             <Array as="points">
-              <mxPoint x="220" y="265" />
+              <mxPoint x="335.42" y="265" />
               <mxPoint x="425" y="265" />
             </Array>
           </mxGeometry>
@@ -111,11 +111,11 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="r_logsch" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;endArrow=classic;strokeColor=#2F9E44;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.84;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel" target="p_logsch">
+        <mxCell id="r_logsch" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeWidth=1.5;endArrow=classic;strokeColor=#2F9E44;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel" target="p_logsch">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="400" y="405" />
-              <mxPoint x="245.04" y="405" />
+              <mxPoint x="180" y="405" />
             </Array>
           </mxGeometry>
         </mxCell>

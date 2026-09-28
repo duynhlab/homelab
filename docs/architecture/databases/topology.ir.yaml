@@ -1,0 +1,87 @@
+# Source of docs/architecture/databases/topology.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/databases/topology.ir.yaml
+# Verified on 2026-09-28 against kubernetes/apps/services/*.yaml (db_host,
+# db_migration_host, db_sslmode), configs/databases/clusters/*/{instance,objectstore}.yaml,
+# the PgDog HelmRelease and PgBouncer Pooler, controllers/keycloak/deployment.yaml,
+# controllers/temporal/helmrelease.yaml and platform-db/openbao-db-config.yaml.
+diagram:
+  id: databases
+  title: "duynhlab homelab — Database connection and recovery paths"
+  scope: "Every path into Postgres: which pooler or direct host each client uses, who manages the clusters, and where WAL and backups go, including the DR replica that recovers from them. Engine internals are out of scope."
+  question: domain-topology
+  level: L2
+  legend:
+    roles:
+      service: "Service clients"
+      platform: "Platform client / controller"
+      worker: "Migration Jobs"
+      data: "Pooler / database / bucket"
+    edges:
+      data: "SQL connection"
+      control: "manages / rotates"
+      replication: "WAL + backups / recovery"
+      dependency: "migration (direct -rw)"
+
+layers: [clients, poolers, clusters, storage, dr]
+
+boundaries:
+  - {id: f_cluster, label: "Kind cluster · homelab"}
+  - {id: f_clients, label: "Clients", parent: f_cluster}
+  - {id: f_cnpg, label: "cloudnative-pg namespace", parent: f_cluster}
+  - {id: f_platform, label: "platform namespace", parent: f_cluster}
+  - {id: f_product, label: "product namespace", parent: f_cluster}
+  - {id: f_rustfs, label: "rustfs namespace", parent: f_cluster}
+
+nodes:
+  # Listed in the order dot starts from: the fewest crossings of ~600
+  # orderings measured with validate.py on 2026-09-28.
+  - {id: c_temporal, label: "Temporal server (temporal)\ntemporal · temporal_visibility", role: platform, layer: clients, parent: f_clients, icon: temporal}
+  - {id: c_migrate, label: "Migration Jobs\nevery service, before rollout", role: worker, layer: clients, parent: f_clients}
+  - {id: c_platform, label: "user · notification\nshipping · review", role: service, layer: clients, parent: f_clients, icon: go}
+  - {id: c_keycloak, label: "Keycloak (identity)\nJDBC, long-lived pool", role: platform, layer: clients, parent: f_clients, icon: keycloak}
+  - {id: c_product, label: "product · cart · order\ncheckout · inventory", role: service, layer: clients, parent: f_clients, icon: go}
+  - {id: c_payment, label: "payment\nsslmode=require", role: service, layer: clients, parent: f_clients, icon: go}
+
+  - {id: openbao, label: "OpenBao database engine\nvault_rotator · static role", role: platform, layer: poolers, parent: f_cluster, icon: openbao}
+  - {id: pgbouncer, label: "platform-db-pooler-rw\nPgBouncer ×2 · transaction", role: data, layer: poolers, parent: f_platform}
+  - {id: cnpg, label: "CloudNativePG operator\n+ barman-cloud plugin", role: platform, layer: poolers, parent: f_cnpg, icon: cloudnativepg}
+  - {id: pgdog, label: "pgdog-product ×3 :6432\nwrites -rw · reads -r", role: data, layer: poolers, parent: f_product, icon: pgdog}
+
+  - {id: productdb, label: "product-db ×3 · sync any 1\nproduct · cart · order · payment\ncheckout · inventory", role: data, layer: clusters, parent: f_product, shape: datastore}
+  - {id: platformdb, label: "platform-db ×3 · sync any 1\nuser · notification · shipping · review\nkeycloak · temporal · temporal_visibility", role: data, layer: clusters, parent: f_platform, shape: datastore}
+
+  - {id: rustfs, label: "RustFS bucket pg-backups-cnpg\nplatform-db/ · product-db/ (30 d)\nproduct-db-replica/ (7 d)", role: data, layer: storage, parent: f_rustfs, shape: datastore}
+
+  - {id: replica, label: "product-db-replica ×3\nDR: designated primary\n+ 2 cascading standbys", role: data, layer: dr, parent: f_product, shape: datastore}
+
+edges:
+  - {id: e_platform, source: c_platform, target: pgbouncer, type: data, label: ":5432"}
+  - {id: e_product, source: c_product, target: pgdog, type: data, label: ":6432"}
+  - {id: e_payment, source: c_payment, target: productdb, type: data, label: "direct TLS"}
+  - {id: e_keycloak, source: c_keycloak, target: platformdb, type: data, label: "direct"}
+  - {id: e_temporal, source: c_temporal, target: platformdb, type: data, label: "direct"}
+  - {id: e_mig_platform, source: c_migrate, target: platformdb, type: dependency, label: "platform-db-rw"}
+  - {id: e_mig_product, source: c_migrate, target: productdb, type: dependency, label: "product-db-rw"}
+
+  - {id: e_pgbouncer, source: pgbouncer, target: platformdb, type: data, label: "primary"}
+  - {id: e_pgdog, source: pgdog, target: productdb, type: data, label: "-rw / -r"}
+
+  - {id: e_rotate, source: openbao, target: platformdb, type: control, label: "rotates notification (720 h)"}
+  - {id: e_cnpg_platform, source: cnpg, target: platformdb, type: control, label: manages}
+  - {id: e_cnpg_product, source: cnpg, target: productdb, type: control, label: manages}
+  - {id: e_cnpg_replica, source: cnpg, target: replica, type: control, label: manages}
+
+  - {id: e_wal_platform, source: platformdb, target: rustfs, type: replication, label: "WAL + base backups"}
+  - {id: e_wal_product, source: productdb, target: rustfs, type: replication, label: "WAL + base backups"}
+  - {id: e_recover, source: rustfs, target: replica, type: replication, label: "continuous WAL recovery"}
+
+notes:
+  - id: note_creds
+    title: "Credentials"
+    text: "Each role's password is a Kubernetes Secret rendered by External Secrets from OpenBao KV (secret/local/databases/<cluster>/<service>) and reloaded by CNPG. notification is the exception: its password is owned by the OpenBao database engine, which rotates it every 720 h, and External Secrets reads database/static-creds/notification every minute. PgDog takes the product-db role secrets through its HelmRelease valuesFrom; backups authenticate to RustFS with pg-backup-rustfs-credentials."
+  - id: note_dr
+    title: "Why the DR replica reads from RustFS"
+    text: "product-db-replica never connects to the primary: it bootstraps from product-db's base backup and then replays its WAL archive from the bucket, so it survives the loss of the product-db pods. Its designated primary keeps its own archive and a daily backup in product-db-replica/ (7 d). Migrations always target the -rw service directly, never a pooler."
+
+tests:
+  - {rule: no-public-datastore}

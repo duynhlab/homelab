@@ -55,7 +55,9 @@ stop.
    - Anything not deployed is `status: planned`: the generator dashes it and
      refuses a label without the word.
    - Record what you checked in the IR's header comment.
-3. **Plan it as an IR.** Write `docs/<area>/<name>.ir.yaml` beside where the
+3. **Plan it as an IR.** Write `docs/architecture/<domain>/<name>.ir.yaml` (one
+   directory per domain: `platform`, `observability`, `databases`, `security`,
+   `workflows`, …) beside where the
    `.drawio` will live. It holds:
    - the question and level;
    - ordered `layers` (top of the canvas first);
@@ -73,18 +75,18 @@ stop.
    [`references/icons.md`](references/icons.md).
 4. **Generate.** Run `python3 scripts/doctor.py` once, then:
    ```bash
-   python3 scripts/generate.py docs/<area>/<name>.ir.yaml     # writes <name>.drawio
+   python3 scripts/generate.py docs/architecture/<domain>/<name>.ir.yaml     # writes <name>.drawio
    ```
 5. **Validate.**
    ```bash
-   python3 scripts/validate.py docs/<area>/<name>.drawio --ir docs/<area>/<name>.ir.yaml
+   python3 scripts/validate.py docs/architecture/<domain>/<name>.drawio --ir docs/architecture/<domain>/<name>.ir.yaml
    ```
    Fix every ERROR. Read each WARN and either fix it or be able to say why it
    stays. Crossings are the WARN most worth reducing. The gates and the finding
    format are in [`references/quality-gates.md`](references/quality-gates.md).
 6. **Export and look.**
    ```bash
-   python3 scripts/export.py docs/<area>/<name>.drawio --png --png-dir docs/<area>/img
+   python3 scripts/export.py docs/architecture/<domain>/<name>.drawio --png --png-dir docs/architecture/<domain>/img
    ```
    Then **open the PNG** and walk the review checklist in
    [`diagram-types.md`](references/diagram-types.md#review-it-before-you-export)
@@ -97,8 +99,15 @@ stop.
      longer matches its IR.
    - At most five rounds. After two geometry rounds that do not converge, ask the
      owner: the model is unclear.
-8. **Report and commit** the `.ir.yaml`, the `.drawio`, the SVG and the PNG
-   together.
+8. **Embed, report and commit.** The page shows the PNG and links the SVG, under a
+   one-line lead-in saying which question this copy answers (and, beside a Mermaid
+   map of the same question, what it adds). The caption is only the source link:
+   ```html
+   <p align="center"><a href="../architecture/<domain>/<name>.svg"><img src="../architecture/<domain>/img/<name>.png" alt="…" width="960"></a></p>
+   <p align="center"><sub>Source <a href="../architecture/<domain>/<name>.drawio"><code><domain>/<name>.drawio</code></a> · <a href="../architecture/<domain>/<name>.svg">SVG</a></sub></p>
+   ```
+   Commit the `.ir.yaml`, the `.drawio`, the SVG and the PNG together, and add the
+   row to `docs/architecture/README.md`.
 
 **A `.drawio` without an IR** is hand-drawn, or needs geometry the IR cannot
 express. Edit it in place (house style: [`references/house-style.md`](references/house-style.md);

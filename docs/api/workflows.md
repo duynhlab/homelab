@@ -61,7 +61,7 @@ flowchart TD
     CDB[("checkout DB<br/>its own rows only")]
   end
 
-  KEDA["KEDA + one ScaledObject per version<br/>scales on task-queue backlog<br/>ADR-055 — installed 2026-09-05, Kind audit pending"]
+  KEDA["KEDA + one ScaledObject per version<br/>scales on task-queue backlog<br/>ADR-055 — installed 2026-09-05<br/>Kind audit: 11 of 12 rows verified"]
 
   OAPI --> OFW
   OAPI --> CW
@@ -82,7 +82,7 @@ flowchart TD
   OWd --> DS
   CKW --> CDB
 
-  KEDA -->|"DescribeTaskQueue backlog<br/>per build id"| TS
+  KEDA -->|"backlog per build id<br/>(gRPC :7233)"| TS
   KEDA -->|"replicas 1–3"| OWc
   KEDA -->|"replicas 1–3"| CKW
   KEDA -.->|"floor 1 while draining"| OWd
@@ -106,6 +106,19 @@ worker's lifecycle · green = Temporal and the stores activities write to · gre
 Temporal subgraph because the server owns them. Dotted edges are task dispatch
 (the server chooses the worker; nothing pushes) and the one-replica floor KEDA keeps under a draining build.
 
+The Draw.io view below answers the same question one level down, for the build and
+scaling detail the Mermaid map summarises:
+- the Worker Controller's Progressive rollout per build;
+- the ScaledObject KEDA runs per version, and the backlog it reads from the frontend;
+- the server's persistence in `platform-db`;
+- the services the activities call.
+
+<p align="center">
+  <a href="../architecture/workflows/temporal-keda.svg"><img src="../architecture/workflows/img/temporal-keda.png" alt="Temporal work layer and KEDA autoscaling: starters, the Temporal server, the two WorkerDeployments, the Worker Controller and KEDA" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/workflows/temporal-keda.drawio"><code>workflows/temporal-keda.drawio</code></a> · <a href="../architecture/workflows/temporal-keda.svg">SVG</a></sub></p>
+
 > **In plain terms:** three workflows, two queues, two workers — and since
 > [ADR-064](../proposals/adr/ADR-064-all-workers-under-controller/) ONE lifecycle:
 > the Temporal Worker Controller owns both. (Until 2026-08-27 checkout-worker was a
@@ -126,8 +139,9 @@ Temporal subgraph because the server owns them. Dotted edges are task dispatch
 > the controller renders one `ScaledObject` per running build id from a
 > `WorkerResourceTemplate`, and KEDA's `temporal` scaler polls the frontend for that
 > version's backlog every 15 s — replicas 1 → 3 at five queued tasks per replica, never
-> below 1 while a build may still hold pinned workflows. The Kind audit that proves the
-> loop end to end is pending; until it lands, treat the numbers as configured, not measured.
+> below 1 while a build may still hold pinned workflows. The Kind audit has verified 11 of
+> its 12 rows; the one left is the delete of a drained build, which needs a
+> `drainedSince + 1h` wait to be observed.
 
 ### What each one is for
 
@@ -165,9 +179,11 @@ authorization, because every build **since order 1.13.0 refuses** a
 product-participant history rather than re-routing it — which is why retirement
 waits on `drainedSince` rather than on a human's judgement.
 
-Checkout is deliberately **not** versioned ([RFC-0026](../proposals/rfc/RFC-0026/)
-left it out), so a tag move there is safe and its manifest is an ordinary
-`HelmRelease`. See [order-worker.yaml](../../kubernetes/apps/order-worker.yaml) and
+Checkout follows the same mechanism since
+[ADR-064](../proposals/adr/ADR-064-all-workers-under-controller/): its worker is a
+`WorkerDeployment` (`checkout-abandon`, Pinned) with the same Progressive rollout.
+[RFC-0026](../proposals/rfc/RFC-0026/) originally left it unversioned. See
+[order-worker.yaml](../../kubernetes/apps/order-worker.yaml) and
 [checkout-worker.yaml](../../kubernetes/apps/checkout-worker.yaml).
 
 ## Standard roles
@@ -225,4 +241,4 @@ resolves it.
 - [temporal.md](./temporal.md) — the three workflows as built, plus saga theory and operations
 - [Service contracts](README.md#service-contracts) — platform deployment rollup
 
-_Last updated: 2026-08-27 — ADR-064: checkout-worker joins the controller (Pinned); the versioned-vs-unversioned asymmetry this file existed to teach is retired and recorded as history above. 2026-08-21: ADR-054 gave order the controller._
+_Last updated: 2026-09-28 — Draw.io view of the work layer with the Worker Controller and KEDA; the checkout and Kind-audit lines brought up to date. 2026-08-27 — ADR-064: checkout-worker joins the controller (Pinned); the versioned-vs-unversioned asymmetry this file existed to teach is retired and recorded as history above. 2026-08-21: ADR-054 gave order the controller._

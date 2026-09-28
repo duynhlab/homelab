@@ -175,6 +175,11 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("layout.unframed_node", {x["rule_id"] for x in f})
         self.assertEqual([x for x in f if x["severity"] == "ERROR"], [])
 
+    def test_spline_parser_handles_multi_piece_splines(self):
+        pts = generate._spline_points("e,10,20 1,2 3,4 5,6;s,7,8 9,10 11,12 13,14")
+        self.assertEqual(pts[0], (1.0, 2.0))
+        self.assertIn((13.0, 14.0), pts)
+
     def test_duplicate_yaml_key_is_refused(self):
         import tempfile
         fd, path = tempfile.mkstemp(suffix=".ir.yaml")

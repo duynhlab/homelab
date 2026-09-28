@@ -7,10 +7,10 @@ Paths are resolved from wherever you run it, so give them relative to the repo
 root and run from the repo root:
 
 ```bash
-python3 .agents/skills/homelab-drawio/scripts/export.py docs/architecture/topology.drawio
+python3 .agents/skills/homelab-drawio/scripts/export.py docs/architecture/platform/topology.drawio
 # SVG beside the source; add the PNG under img/ in the same run:
-python3 .agents/skills/homelab-drawio/scripts/export.py docs/architecture/topology.drawio \
-        --png --png-dir docs/architecture/img
+python3 .agents/skills/homelab-drawio/scripts/export.py docs/architecture/platform/topology.drawio \
+        --png --png-dir docs/architecture/platform/img
 ```
 
 `--png-dir` exists because the repo keeps the SVG beside its source and the PNG
@@ -42,7 +42,7 @@ puts a second copy of the SVG in `img/` too.
   fewer than 256 colours outside the anti-aliased edges, so nothing visible is
   lost and the file shrinks ~3×. That is what keeps a tall top-down diagram —
   1536 px wide, often 1600 px high — inside the 400 KB budget:
-  `observability-signal-flow.png` went from 492 KB to 158 KB on 2026-09-28. The
+  `observability/img/signal-flow.png` went from 492 KB to 158 KB on 2026-09-28. The
   quantizer is deterministic, so two exports in a row still match.
 - **`--page-index` is 1-based** in this CLI. A multi-page `.drawio` is looped
   `1..N` and written `<name>-<i>.svg`; a single-page file is `<name>.svg`.

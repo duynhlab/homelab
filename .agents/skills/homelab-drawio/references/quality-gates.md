@@ -6,8 +6,8 @@ either fixed, or you can say why it stays. The render is then reviewed by eye,
 because no validator sees what a reader sees.
 
 ```bash
-python3 scripts/validate.py docs/architecture/topology.drawio \
-        --ir docs/architecture/topology.ir.yaml          # --json, --strict
+python3 scripts/validate.py docs/architecture/platform/topology.drawio \
+        --ir docs/architecture/platform/topology.ir.yaml          # --json, --strict
 ```
 
 ## Severity

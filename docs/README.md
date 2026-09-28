@@ -37,11 +37,12 @@ docs/
 │   ├── profiling.md              # Profiling contract (pkg/obsx, Pyroscope labels)
 │   └── _template-service.md      # v2 template for a new service contract
 ├── architecture/                 # Draw.io diagram sources + committed exports
-│   ├── README.md                 # Index: which question each .drawio answers
-│   ├── topology.ir.yaml          # Request path: edge → apps → data (IR; .drawio + .svg generated beside it)
-│   ├── observability-delivery.ir.yaml # Flux waves that deliver observability + their gates (IR)
-│   ├── observability-signal-flow.ir.yaml # Collector pipelines → backends → retention (IR)
-│   └── img/                      # PNG exports (GitHub strips text from Draw.io SVG)
+│   ├── README.md                 # Index: which question each diagram answers, by domain
+│   ├── platform/topology.ir.yaml # Request path: edge → apps → data (IR; .drawio + .svg beside it, PNG in img/)
+│   ├── observability/            # signal-flow (collector pipelines → stores) · delivery (Flux waves)
+│   ├── databases/topology.ir.yaml # Every Postgres connection + WAL/backup → DR recovery path
+│   ├── security/network-policies.ir.yaml # NetworkPolicy allows into the data and identity tier
+│   └── workflows/temporal-keda.ir.yaml # Temporal work layer, Worker Controller rollout, KEDA scaling
 ├── frontend/                     # Browser apps at the platform layer (build, expose, watch)
 │   ├── README.md                 # Area hub: storefront + admin portal, the build-arg contract
 │   └── admin-portal/             # The operator portal in depth
@@ -452,7 +453,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 ### Platform
 
 - [Platform hub](./platform/README.md) - Deployed vs planned, doc map, Flux summary
-- [Architecture diagrams](./architecture/README.md) - Draw.io (`.drawio`) diagram sources and exports (request-path topology), authored with the [`homelab-drawio`](../.agents/skills/homelab-drawio/SKILL.md) skill
+- [Architecture diagrams](./architecture/README.md) - Draw.io (`.drawio`) diagram sources and exports by domain (platform, observability, databases, security, workflows), generated with the [`homelab-drawio`](../.agents/skills/homelab-drawio/SKILL.md) skill
 - [Setup Guide](./platform/setup.md) - Complete deployment and configuration guide
 - [Kind E2E audit](./platform/kind-e2e-audit.md) - The **cluster gate**: K0–K6 runbook proving Flux delivered the pinned images, admission/secrets/isolation, the real edge, and cluster-only telemetry. Twin of the [Compose E2E audit](../local-stack/docs/e2e-audit.md)
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates

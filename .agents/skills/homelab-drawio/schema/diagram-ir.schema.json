@@ -72,7 +72,7 @@
         "legend": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Override legend lines: roles keyed by role, edges keyed by edge type",
+          "description": "Override legend lines: roles keyed by role, edges keyed by edge type (a telemetry edge with a signal: telemetry:<signal>)",
           "properties": {
             "roles": {
               "type": "object",

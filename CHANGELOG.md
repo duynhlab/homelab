@@ -598,6 +598,33 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Architecture diagrams are split by domain, and three new ones cover
+  databases, NetworkPolicy and the Temporal work layer.**
+  - `docs/architecture/` now holds `platform/`, `observability/`, `databases/`,
+    `security/` and `workflows/`, each with its IR, `.drawio`, SVG and `img/` PNG.
+  - New views, each verified against the manifests:
+    - `databases/topology`: every Postgres path, meaning each client group's
+      pooler or direct host, migrations to `-rw`, OpenBao rotating
+      `notification`, and WAL and backups in RustFS feeding the DR replica.
+      Embedded in `docs/databases/architecture.md`.
+    - `security/network-policies`: the allows into product, platform, identity
+      and the floci pod, by source namespace and port. Embedded after the DB-tier
+      table in `docs/security/network-policies.md`.
+    - `workflows/temporal-keda`: starters → Temporal (`mop`) → task queues →
+      the two WorkerDeployments, with the Worker Controller's Progressive rollout
+      and KEDA's per-version backlog scaling. Embedded in `docs/api/workflows.md`.
+  - Existing Mermaid maps stay as the summary.
+  - Captions shrink to the source link.
+  - `workflows.md` corrections:
+    - checkout is a `WorkerDeployment` since ADR-064;
+    - the Kind audit is 11 of 12 rows verified;
+    - the KEDA edge reads backlog per build.
+  - Generator fixes found on the way:
+    - dot's multi-piece splines are parsed;
+    - lanes never run in a frame's title band when frames touch;
+    - ports and a detour keep edges out of frame titles.
+  - The Mermaid cluster frame is darker (`#64748b`, 2px) so it shows on GitHub.
+
 - **Every architecture diagram draws the cluster as its outer frame.**
   - The three Draw.io sources nest their domain frames inside a
     `Kind cluster · homelab` frame, and only the browser stays outside.
@@ -658,7 +685,7 @@ Skeleton (copy what you need):
   shadows. It lands in the AGENTS.md classDef, the skill preset, 739 Mermaid
   `classDef` lines across 151 docs (all 218 changed blocks re-rendered with
   `mmdc`, none failing) and the two existing Draw.io sources. New:
-  `docs/architecture/observability-signal-flow.drawio` — which collector
+  `docs/architecture/observability/signal-flow.drawio` — which collector
   pipeline carries each signal, the store and retention behind it, and the
   paths that bypass the collector — embedded in `docs/observability/README.md`
   § Architecture. Skill: Linux install paths and apt hints, `xvfb-run` / root
@@ -678,7 +705,7 @@ Skeleton (copy what you need):
   delivery plan records Phases 2–3 and Tasks 1.1b, 1.1c-B and 4.1–4.4 done.
 
 - **Observability delivery order as a Draw.io diagram** —
-  [`observability-delivery.drawio`](docs/architecture/observability-delivery.drawio),
+  [`observability-delivery.drawio`](docs/architecture/observability/delivery.drawio),
   embedded under [§ Deployment](docs/observability/README.md#deployment): the 12
   Flux waves that deliver the observability stack, every `dependsOn` edge, and
   the gate that releases each wave. It answers the question the prose summary and
@@ -687,7 +714,7 @@ Skeleton (copy what you need):
   StatefulSets stay live (RFC-0028 / ADR-065). Laid out with the Draw.io CLI's
   ELK layered layout rather than by hand.
 - **Request-path topology as a Draw.io diagram, embedded in the README** — first
-  `docs/architecture/` sources: [`topology.drawio`](docs/architecture/topology.drawio)
+  `docs/architecture/` sources: [`topology.drawio`](docs/architecture/platform/topology.drawio)
   with its `topology.svg` and `img/topology.png` exports, authored with the
   `homelab-drawio` skill (house palette + embedded logos). It sits beside the
   existing Mermaid topology in [`README.md`](README.md#topology) (both kept —

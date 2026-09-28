@@ -7,7 +7,7 @@
         <mxCell id="title" value="duynhlab homelab — Observability delivery order" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=18;fontColor=#1E293B;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="40" y="24" width="1230" height="28" as="geometry" />
         </mxCell>
-        <mxCell id="scope" value="How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see observability-signal-flow.drawio." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1">
+        <mxCell id="scope" value="How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see signal-flow.drawio." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1">
           <mxGeometry x="40" y="54" width="1230" height="36" as="geometry" />
         </mxCell>
         <mxCell id="f_cluster" value="Kind cluster · homelab — Flux waves" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">

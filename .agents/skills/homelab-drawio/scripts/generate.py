@@ -272,8 +272,10 @@ def run_dot(src: str) -> dict:
 
 
 def _spline_points(pos: str) -> list[tuple[float, float]]:
+    # dot writes one spline per piece, separated by ';' (an edge split around
+    # a flat label or a cluster), each with optional e,/s, arrow endpoints.
     pts = []
-    for tok in pos.split():
+    for tok in pos.replace(";", " ").split():
         if tok.startswith(("e,", "s,")):
             continue
         x, y = tok.split(",")
@@ -371,15 +373,15 @@ class Layout:
         return [(f[0], f[0] + text_width(labels.get(fid, ""), 13, bold=True) + 30)
                 for fid, f in self.frame.items() if above <= f[1] <= top]
 
-    def ancestor_titles(self, nid: str) -> list[tuple[float, float]]:
-        """x-spans of the title text of every frame around node `nid`."""
+    def ancestor_titles(self, nid: str) -> list[tuple[float, float, float]]:
+        """(x0, x1, frame top) of the title text of every frame around `nid`."""
         bounds = {b["id"]: b for b in self.ir.get("boundaries", [])}
         parent = {n["id"]: n.get("parent") for n in self.ir["nodes"]}.get(nid)
         spans = []
         while parent:
             f = self.frame.get(parent)
             if f:
-                spans.append((f[0], f[0] + text_width(bounds[parent]["label"], 13, bold=True) + 30))
+                spans.append((f[0], f[0] + text_width(bounds[parent]["label"], 13, bold=True) + 30, f[1]))
             parent = bounds[parent].get("parent")
         return spans
 
@@ -392,7 +394,19 @@ class Layout:
                 lo = max(lo, y + h)
             if lo <= y < hi:
                 hi = min(hi, y)
-        return (lo, hi) if hi - lo >= 2 * LANE_MIN else raw
+        if hi - lo >= 2 * LANE_MIN:
+            return (lo, hi)
+        # Frames touch, so there is no gap between them. Run the lanes inside
+        # the lower frame instead, but never in a frame's title band.
+        free, cur = [], raw[0]
+        for y0, y1 in sorted((f[1], f[1] + FRAME_TITLE_H + 2) for f in self.frame.values()
+                             if raw[0] <= f[1] < raw[1]):
+            if y0 > cur:
+                free.append((cur, y0))
+            cur = max(cur, y1)
+        if raw[1] > cur:
+            free.append((cur, raw[1]))
+        return max(free, key=lambda r: (r[1] - r[0], -r[0])) if free else raw
 
     def free_x(self, layer: int, x: float, exclude: set[str]) -> float:
         """Nearest x in `layer` whose vertical line hits no node."""
@@ -412,6 +426,20 @@ class Layout:
 
 
 # ---------------------------------------------------------------------- routing
+
+def _widest_free(lo: float, hi: float, spans: list[tuple[float, float]]) -> tuple[float, float]:
+    """The widest part of [lo, hi] outside every span (10px clear of each);
+    [lo, hi] itself when nothing usable (20px) is left."""
+    free, cur = [], lo
+    for a, b in sorted((a - 10, b + 10) for a, b in spans if a < hi and b > lo):
+        if a > cur:
+            free.append((cur, a))
+        cur = max(cur, b)
+    if hi > cur:
+        free.append((cur, hi))
+    best = max(free, key=lambda r: r[1] - r[0], default=None)
+    return best if best and best[1] - best[0] >= 20 else (lo, hi)
+
 
 def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
     """Per edge: ports (exit/entry fractions) and absolute waypoints."""
@@ -463,13 +491,12 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
     for (nid, side), items in side_edges.items():
         b = lay.box[nid]
         items.sort(key=lambda it: (it[0], it[1]))
-        lo, hi = b[0], b[0] + b[2]
-        if side == "top":
-            # An edge entering from above crosses the top border of every frame
-            # around the box; keep it clear of those frames' title text.
-            for f in lay.ancestor_titles(nid):
-                if f[0] <= lo < f[1] and f[1] + 10 < hi - 10:
-                    lo = f[1] + 10
+        # Keep ports clear of the title text of every frame the vertical run
+        # crosses: the frames around the box for a top port, the frames that
+        # open just below the box's layer for a bottom port.
+        spans = ([(a, b) for a, b, _ in lay.ancestor_titles(nid)] if side == "top"
+                 else lay._titles_opening(lay.li[nid] + 1) if lay.li[nid] + 1 < len(lay.layers) else [])
+        lo, hi = _widest_free(b[0], b[0] + b[2], spans)
         k = len(items)
         for i, (_, eid, which) in enumerate(items):
             x = lo + _snap((hi - lo) * (i + 1) / (k + 1), 5)
@@ -507,6 +534,15 @@ def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
         for j in range(len(chans)):
             y = lane_y[(eid, j)]
             pts += [(xs[j], y), (xs[j + 1], y)]
+        if t_side == "top" and pts:
+            # The box sits under a frame title no port can avoid: come down
+            # beside the title and run in under it, inside the frame.
+            px, lane = xs[-1], pts[-1][1]
+            for x0, x1, fy in lay.ancestor_titles(e["target"]):
+                if x0 - 10 < px < x1 + 10 and lane < fy:
+                    y_in = fy + FRAME_TITLE_H + 6
+                    pts[-1:] = [(x1 + 10, lane), (x1 + 10, y_in), (px, y_in)]
+                    break
         sb, tb = lay.box[e["source"]], lay.box[e["target"]]
         ports = ((xs[0] - sb[0]) / sb[2], 1 if s_side == "bottom" else 0,
                  (xs[-1] - tb[0]) / tb[2], 1 if t_side == "bottom" else 0)
@@ -756,7 +792,8 @@ def _legend(root: ET.Element, ir: dict, P: dict, x: int, y: int, width: int, fra
             types.append(k)
     for t, sig in types:
         text = "planned path (dashed)" if t == "planned" else (
-            f"telemetry: {SIGNAL_LABEL[sig]}" if sig else legend.get("edges", {}).get(t, LEGEND_EDGE[t]))
+            legend.get("edges", {}).get(f"telemetry:{sig}", f"telemetry: {SIGNAL_LABEL[sig]}") if sig
+            else legend.get("edges", {}).get(t, LEGEND_EDGE[t]))
         items.append(("edge", f"{t}{'-' + sig if sig else ''}", text))
     if any(e.get("status") == "optional" for e in ir["edges"]):
         items.append(("edge", "optional", "dashed = optional / indirect (labelled)"))

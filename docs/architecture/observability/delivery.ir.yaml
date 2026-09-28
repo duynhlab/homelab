@@ -1,5 +1,5 @@
-# Source of docs/architecture/observability-delivery.drawio -- edit this, then regenerate:
-#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/observability-delivery.ir.yaml
+# Source of docs/architecture/observability/delivery.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/observability/delivery.ir.yaml
 # Verified on 2026-09-28 against kubernetes/clusters/local/*.yaml: every edge is
 # one spec.dependsOn entry between two of these waves (20 of 20), each layer is
 # the wave's longest dependsOn chain from controllers-local, and each gate line
@@ -7,7 +7,7 @@
 diagram:
   id: delivery
   title: "duynhlab homelab — Observability delivery order"
-  scope: "How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see observability-signal-flow.drawio."
+  scope: "How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see signal-flow.drawio."
   question: delivery
   level: L2
   pin_order: true

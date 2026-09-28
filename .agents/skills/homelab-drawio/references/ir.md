@@ -33,12 +33,14 @@ diagram:
 layers: [client, edge, apps, workflow, pooling, data]   # top of canvas first
 
 boundaries:                       # frames; may nest via parent
-  - {id: f_apps, label: "Applications"}
+  - {id: f_cluster, label: "Kind cluster · homelab"}      # the system boundary
+  - {id: f_apps, label: "Applications", parent: f_cluster}
 
 nodes:
-  - {id: envoy, label: "Envoy Gateway\ngateway.duynh.me", role: edge, layer: edge, icon: envoy}
+  - {id: browser, label: "Browser", role: external, layer: client}   # outside: no parent
+  - {id: envoy, label: "Envoy Gateway\ngateway.duynh.me", role: edge, layer: edge, parent: f_cluster, icon: envoy}
   - {id: svc, label: "10 Go services", role: service, layer: apps, parent: f_apps, icon: go}
-  - {id: db, label: "product-db\nHA + DR replica", role: data, layer: data, shape: datastore}
+  - {id: db, label: "product-db\nHA + DR replica", role: data, layer: data, parent: f_cluster, shape: datastore}
   - {id: search, label: "search (planned)", role: service, layer: apps, parent: f_apps, status: planned}
 
 edges:
@@ -58,7 +60,7 @@ tests:                            # architecture rules to enforce
 | `label` | `\n` breaks the line; the first line is the name and is drawn bold. Keep a line under 48 characters. |
 | `role` | One of the twelve palette roles ([house-style.md](house-style.md#semantic-palette)). |
 | `layer` | Every node sits in one tier. Peers in a tier share a row. |
-| `parent` | A boundary id. The frame owns the box (`container=1`), so moving it moves them. |
+| `parent` | A boundary id. The frame owns the box (`container=1`), so moving it moves them. Every platform node has one: the canvas root is only for `external` nodes, and the outermost boundary is the cluster. |
 | `icon` | A catalogue name ([icons.md](icons.md)). A logo needs a card; a `datastore` cylinder takes none. |
 | `status: planned` | Drawn dashed; the label must contain the word `planned` (AGENTS.md step 5). |
 | edge `type` | One of eight relationship types ([house-style.md](house-style.md#relationship-types)). |
@@ -104,9 +106,14 @@ switches off dot's reordering.
 A flat edge between two peers still decides their order: its source goes left.
 List the nodes of one boundary together, or the frame cannot be contiguous.
 
-Neither option is always right. `validate.py` counts crossings, so try both:
-- on 2026-09-28 the topology read best pinned (8 crossings against 12);
-- the signal-flow and delivery diagrams read best with dot's own order (12 and 6).
+Neither option is always right, and even unpinned the IR's order is dot's
+starting point. `validate.py` counts crossings, so measure a few orderings and
+both settings. On 2026-09-28, after the cluster frame was added:
+- the topology read best unpinned (5 crossings);
+- the signal-flow and delivery diagrams read best pinned (10 and 5).
+
+Re-measure after a structural change such as a new frame: the best setting
+moved for all three.
 
 ## When the picture is wrong
 

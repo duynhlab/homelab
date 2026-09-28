@@ -22,42 +22,45 @@ Postgres query plans, the frontend). Profiles push straight to Pyroscope.
 
 ```mermaid
 flowchart TB
-    subgraph workloads["Instrumented workloads"]
-        Services["10 Go services<br/>HTTP + gRPC"]
-        Workers["order-worker<br/>checkout-worker"]
+    subgraph Cluster["Kind cluster · homelab"]
+        subgraph workloads["Instrumented workloads"]
+            Services["10 Go services<br/>HTTP + gRPC"]
+            Workers["order-worker<br/>checkout-worker"]
+        end
+
+        subgraph nonSdk["Workloads without an OTel SDK"]
+            Infra["Databases · frontend<br/>PG plans · edge runtime lines"]
+            Edge["Envoy Gateway edge<br/>telemetry: tracing + accessLog"]
+        end
+
+        subgraph collectorNode["OpenTelemetry Collector"]
+            Receiver[/"OTLP receiver<br/>HTTP :4318 · gRPC :4317"/]
+            Processors[/"memory_limiter<br/>deltatocumulative · batch"/]
+            Receiver --> Processors
+        end
+
+        Vector["Vector DaemonSet"]
+
+        subgraph backends["Signal backends"]
+            VMAgent[/"VMAgent :8429<br/>OTLP ingest + infra scrape"/]
+            VMSingle[("VictoriaMetrics :8428")]
+            VLogs[("VictoriaLogs :9428")]
+            VT[("VictoriaTraces :10428<br/>7d fast path")]
+            CH[("ClickHouse :9000<br/>otel_logs · otel_traces")]
+            Pyro[("Pyroscope :4040")]
+        end
+
+        subgraph alerting["Alert evaluation and routing"]
+            Sloth["Sloth"]
+            VMAlert["VMAlert"]
+            VMAM["VMAlertmanager"]
+            Sloth -->|"generated burn-rate rules"| VMAlert
+            VMAlert --> VMAM
+        end
+
+        Grafana{{"Grafana"}}
     end
-
-    subgraph nonSdk["Workloads without an OTel SDK"]
-        Infra["Databases · frontend<br/>PG plans · edge runtime lines"]
-        Edge["Envoy Gateway edge<br/>telemetry: tracing + accessLog"]
-    end
-
-    subgraph collectorNode["OpenTelemetry Collector"]
-        Receiver[/"OTLP receiver<br/>HTTP :4318 · gRPC :4317"/]
-        Processors[/"memory_limiter<br/>deltatocumulative · batch"/]
-        Receiver --> Processors
-    end
-
-    Vector["Vector DaemonSet"]
-
-    subgraph backends["Signal backends"]
-        VMAgent[/"VMAgent :8429<br/>OTLP ingest + infra scrape"/]
-        VMSingle[("VictoriaMetrics :8428")]
-        VLogs[("VictoriaLogs :9428")]
-        VT[("VictoriaTraces :10428<br/>7d fast path")]
-        CH[("ClickHouse :9000<br/>otel_logs · otel_traces")]
-        Pyro[("Pyroscope :4040")]
-    end
-
-    subgraph alerting["Alert evaluation and routing"]
-        Sloth["Sloth"]
-        VMAlert["VMAlert"]
-        VMAM["VMAlertmanager"]
-        Sloth -->|"generated burn-rate rules"| VMAlert
-        VMAlert --> VMAM
-    end
-
-    Grafana{{"Grafana"}}
+    style Cluster fill:#f8fafc,stroke:#cbd5e1,color:#334155
 
     Services & Workers -->|"OTLP metrics · logs · traces"| Receiver
     Services & Workers -->|"pprof push"| Pyro

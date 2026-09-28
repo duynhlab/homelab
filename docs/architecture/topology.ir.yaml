@@ -8,7 +8,6 @@ diagram:
   scope: "How a request travels once the platform is up, and what each hop depends on. Delivery order and the observability pipeline have their own diagrams."
   question: request-path
   level: L2
-  pin_order: true
   assumptions:
     - "The ten Go services are one box: per-service routes live in docs/api/, not here."
     - "Pooling split follows each service's db_host: PgDog for product-db, the CNPG PgBouncer Pooler for platform-db."
@@ -16,23 +15,25 @@ diagram:
 layers: [client, edge, apps, workflow, pooling, data]
 
 boundaries:
-  - {id: f_apps, label: "Applications"}
-  - {id: f_flow, label: "Workflows"}
-  - {id: f_sec, label: "Secrets"}
-  - {id: f_data, label: "Data"}
-  - {id: f_obs, label: "Observability"}
+  - {id: f_cluster, label: "Kind cluster · homelab"}
+  - {id: f_apps, label: "Applications", parent: f_cluster}
+  - {id: f_flow, label: "Workflows", parent: f_cluster}
+  - {id: f_sec, label: "Secrets", parent: f_cluster}
+  - {id: f_data, label: "Data", parent: f_cluster}
+  - {id: f_obs, label: "Observability", parent: f_cluster}
 
 nodes:
-  # pin_order: each layer reads left to right in this order.
+  # Listed in the left-to-right order dot starts from (the fewest crossings
+  # of 54 orderings measured with validate.py on 2026-09-28).
   - {id: browser, label: "Browser", role: external, layer: client}
 
-  - {id: envoy, label: "Envoy Gateway\ngateway.duynh.me · TLS · JWT · CORS", role: edge, layer: edge, icon: envoy}
-  - {id: keycloak, label: "Keycloak\nid.duynh.me · OIDC", role: platform, layer: edge, icon: keycloak}
+  - {id: keycloak, label: "Keycloak\nid.duynh.me · OIDC", role: platform, layer: edge, parent: f_cluster, icon: keycloak}
+  - {id: envoy, label: "Envoy Gateway\ngateway.duynh.me · TLS · JWT · CORS", role: edge, layer: edge, parent: f_cluster, icon: envoy}
   - {id: openbao, label: "OpenBao\nHA Raft", role: platform, layer: edge, parent: f_sec, icon: openbao}
 
+  - {id: svc, label: "10 Go services\nidentity · catalog · checkout\nfulfillment · comms", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: spa, label: "Storefront SPA\nlocal.duynh.me", role: service, layer: apps, parent: f_apps}
   - {id: bo, label: "Back-office portal\nbackoffice.duynh.me", role: service, layer: apps, parent: f_apps}
-  - {id: svc, label: "10 Go services\nidentity · catalog · checkout\nfulfillment · comms", role: service, layer: apps, parent: f_apps, icon: go}
   - {id: eso, label: "External Secrets Operator", role: platform, layer: apps, parent: f_sec, icon: external-secrets}
 
   - {id: tmp, label: "Temporal server", role: platform, layer: workflow, parent: f_flow, icon: temporal}
@@ -72,7 +73,7 @@ edges:
   - {id: e_bao, source: openbao, target: eso, type: data, label: "KV, read by ESO"}
 
   - {id: e_otlp_edge, source: envoy, target: otel, type: telemetry, label: "OTLP spans"}
-  - {id: e_otlp_svc, source: svc, target: otel, type: telemetry, protocol: OTLP}
+  - {id: e_otlp_svc, source: svc, target: otel, type: telemetry, protocol: OTLP, label_pos: -0.4}
   - {id: e_otlp_wk, source: wk, target: otel, type: telemetry, protocol: OTLP}
   - {id: e_store, source: otel, target: backends, type: telemetry, label: "metrics · logs · traces"}
   - {id: e_gf, source: backends, target: grafana, type: data, label: queried}

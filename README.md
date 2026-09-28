@@ -49,38 +49,41 @@ flowchart TD
     classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
 
     Browser["Browser"]:::external
-    EG["Envoy Gateway<br/>gateway.duynh.me<br/>(TLS, JWT, CORS, rate-limit)"]:::edge
-    KC["Keycloak<br/>id.duynh.me (OIDC)"]:::platform
+    subgraph Cluster ["Kind cluster · homelab"]
+        EG["Envoy Gateway<br/>gateway.duynh.me<br/>(TLS, JWT, CORS, rate-limit)"]:::edge
+        KC["Keycloak<br/>id.duynh.me (OIDC)"]:::platform
 
-    subgraph Apps ["Applications"]
-        SPA["Storefront SPA<br/>local.duynh.me"]:::service
-        BO["Back-office portal<br/>backoffice.duynh.me"]:::service
-        SVC["10 Go services<br/>identity · catalog · checkout<br/>· fulfillment · comms"]:::service
-        TMP["Temporal server"]:::platform
-        WK["Temporal workers<br/>checkout-worker · order-worker"]:::worker
-    end
+        subgraph Apps ["Applications"]
+            SPA["Storefront SPA<br/>local.duynh.me"]:::service
+            BO["Back-office portal<br/>backoffice.duynh.me"]:::service
+            SVC["10 Go services<br/>identity · catalog · checkout<br/>· fulfillment · comms"]:::service
+            TMP["Temporal server"]:::platform
+            WK["Temporal workers<br/>checkout-worker · order-worker"]:::worker
+        end
 
-    subgraph Data ["Data"]
-        valkey[("Valkey cache")]:::data
-        pgdog["PgDog pooler"]:::data
-        pgb["CNPG pooler<br/>(PgBouncer)"]:::data
-        productdb[("product-db<br/>CNPG HA + DR replica")]:::data
-        platformdb[("platform-db<br/>CNPG HA")]:::data
-    end
+        subgraph Data ["Data"]
+            valkey[("Valkey cache")]:::data
+            pgdog["PgDog pooler"]:::data
+            pgb["CNPG pooler<br/>(PgBouncer)"]:::data
+            productdb[("product-db<br/>CNPG HA + DR replica")]:::data
+            platformdb[("platform-db<br/>CNPG HA")]:::data
+        end
 
-    subgraph Obs ["Observability"]
-        direction LR
-        otel["OTel Collector<br/>+ vmagent · Vector"]:::platform
-        backends["VictoriaMetrics · VictoriaLogs<br/>VictoriaTraces · Pyroscope · ClickHouse"]:::platform
-        grafana["Grafana<br/>+ Sloth SLOs"]:::platform
-        otel --> backends --> grafana
-    end
+        subgraph Obs ["Observability"]
+            direction LR
+            otel["OTel Collector<br/>+ vmagent · Vector"]:::platform
+            backends["VictoriaMetrics · VictoriaLogs<br/>VictoriaTraces · Pyroscope · ClickHouse"]:::platform
+            grafana["Grafana<br/>+ Sloth SLOs"]:::platform
+            otel --> backends --> grafana
+        end
 
-    subgraph Sec ["Secrets"]
-        openbao["OpenBAO (HA Raft)"]:::platform
-        eso["External Secrets Operator"]:::platform
-        openbao --> eso
+        subgraph Sec ["Secrets"]
+            openbao["OpenBAO (HA Raft)"]:::platform
+            eso["External Secrets Operator"]:::platform
+            openbao --> eso
+        end
     end
+    style Cluster fill:#f8fafc,stroke:#cbd5e1,color:#334155
 
     Browser -->|HTTPS| EG
     EG --> SPA & BO & SVC
@@ -130,9 +133,15 @@ flowchart LR
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
 
     Git["Git (homelab)"] --> Push["make flux-push<br/>OCI registry"]
-    Push --> Flux["Flux Operator"]:::platform
-    Flux --> Infra["kubernetes/infra"]:::platform
-    Infra --> Apps["kubernetes/apps"]:::service
+    subgraph Cluster ["Kind cluster · homelab"]
+        Flux["Flux Operator"]:::platform
+        Infra["kubernetes/infra"]:::platform
+        Apps["kubernetes/apps"]:::service
+    end
+    style Cluster fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    Push --> Flux
+    Flux --> Infra
+    Infra --> Apps
 ```
 
 ---

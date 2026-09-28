@@ -9,6 +9,7 @@ diagram:
   scope: "Where every signal goes on the cluster: which OTel Collector pipeline carries it, which backend stores it, and for how long. Delivery order is a different question — see observability-delivery.drawio."
   question: domain-topology
   level: L3
+  pin_order: true
   legend:
     roles:
       trace: "Traces pipeline / store"
@@ -23,11 +24,14 @@ diagram:
 layers: [producers, receiver, pipelines, derived, ingest, stores, cold, view]
 
 boundaries:
-  - {id: f_src, label: "Producers"}
-  - {id: f_col, label: "OTel Collector (tracing namespace)"}
-  - {id: f_store, label: "Storage (monitoring namespace)"}
+  - {id: f_cluster, label: "Kind cluster · homelab"}
+  - {id: f_src, label: "Producers", parent: f_cluster}
+  - {id: f_col, label: "OTel Collector (tracing namespace)", parent: f_cluster}
+  - {id: f_store, label: "Storage (monitoring namespace)", parent: f_cluster}
 
 nodes:
+  # pin_order: each layer reads left to right in this order (the fewest
+  # crossings of 72 orderings measured with validate.py on 2026-09-28).
   - {id: edge, label: "Envoy Gateway\nedge spans · access logs", role: edge, layer: producers, parent: f_src, icon: envoy}
   - {id: svc, label: "Go services ×10 · 2 workers · mockpay\ntraces · metrics · logs", role: service, layer: producers, parent: f_src, icon: go}
   - {id: pyrosdk, label: "Same Go processes\nPyroscope SDK", role: service, layer: producers, parent: f_src, icon: go}
@@ -36,24 +40,24 @@ nodes:
 
   - {id: otel, label: "OTLP receiver\ngRPC :4317 · HTTP :4318", role: collector, layer: receiver, parent: f_col, icon: opentelemetry}
 
-  - {id: p_traces, label: "traces\nmemory_limiter · transform/privacy · batch", role: trace, layer: pipelines, parent: f_col}
+  - {id: p_metrics, label: "metrics\nmemory_limiter · delta_to_cumulative", role: metric, layer: pipelines, parent: f_col}
   - {id: p_logs, label: "logs\ndrop edge access logs · privacy · k8sattributes", role: log, layer: pipelines, parent: f_col}
   - {id: p_logsch, label: "logs/clickhouse\nprivacy · k8sattributes (all logs)", role: log, layer: pipelines, parent: f_col}
-  - {id: p_metrics, label: "metrics\nmemory_limiter · delta_to_cumulative", role: metric, layer: derived, parent: f_col}
+  - {id: p_traces, label: "traces\nmemory_limiter · transform/privacy · batch", role: trace, layer: pipelines, parent: f_col}
 
   - {id: p_span, label: "metrics/spanmetrics\nspan_metrics connector · RED per span", role: metric, layer: derived, parent: f_col}
 
   - {id: vmagent, label: "vmagent\nscrape · OTLP ingest · remote write", role: metric, layer: ingest, parent: f_store, icon: victoriametrics}
 
-  - {id: vt, label: "VictoriaTraces\n7 d", role: trace, layer: stores, parent: f_store, icon: victoriametrics}
   - {id: ch, label: "ClickHouse otel_traces · otel_logs\n7 d hot, cold volume, deleted at 90 d", role: data, layer: stores, parent: f_store, icon: clickhouse}
   - {id: vl, label: "VictoriaLogs\n7 d", role: log, layer: stores, parent: f_store, icon: victoriametrics}
+  - {id: vt, label: "VictoriaTraces\n7 d", role: trace, layer: stores, parent: f_store, icon: victoriametrics}
   - {id: vm, label: "VictoriaMetrics (VMSingle)\n7 d", role: metric, layer: stores, parent: f_store, icon: victoriametrics}
   - {id: pyro, label: "Pyroscope\n7 d (168 h)", role: profile, layer: stores, parent: f_store, icon: pyroscope}
 
   - {id: rustfs, label: "RustFS buckets\nclickhouse-otel · pyroscope-profiles", role: data, layer: cold, parent: f_store, shape: datastore}
 
-  - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, icon: grafana}
+  - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, parent: f_cluster, icon: grafana}
 
 edges:
   - {id: e_edge, source: edge, target: otel, type: telemetry, protocol: "OTLP/gRPC"}

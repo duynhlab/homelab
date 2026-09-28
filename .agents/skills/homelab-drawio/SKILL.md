@@ -61,6 +61,9 @@ stop.
    - ordered `layers` (top of the canvas first);
    - `boundaries`, `nodes` (role, layer, icon) and `edges` (one of eight
      relationship types, with a label saying what flows);
+   - an outermost `boundaries` frame for the cluster (`Kind cluster · homelab`)
+     that every platform node and frame sits in; only `external` nodes stay
+     outside;
    - `notes` for what the boxes cannot say;
    - the architecture `tests` that must hold;
    - `assumptions` for anything you could not verify.

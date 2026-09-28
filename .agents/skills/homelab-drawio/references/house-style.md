@@ -119,6 +119,14 @@ shape to aim for when hand-editing one:
   flow reads down the page.
 - **Peers sit side by side**, one row per tier: replicas, workers, pipelines,
   stores.
+- **The outermost frame is the system boundary.** Everything the platform runs
+  sits inside one frame named for the cluster (`Kind cluster · homelab`), and
+  the domain frames nest inside it. Only off-platform parties stand outside:
+  the browser, Git, the local registry container, a third-party API (role
+  `external`). A reader then sees at once what is ours and what is not.
+  The same holds for Mermaid: one `subgraph` for the cluster, the others
+  nested in it. `validate.py --ir` warns on a platform node left outside
+  (`layout.unframed_node`).
 - **Boundaries nest** (cluster → domain → group). A frame owns its boxes, and a
   frame is never used for decoration.
 - **Orthogonal edges only.** A horizontal run belongs in the channel between two

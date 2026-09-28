@@ -6,8 +6,9 @@ Gates, in order; every finding is machine-readable
 
   0 house         validate_house.py's rules (palette, planned, embeds, legend, title)
   1 structural    parse, duplicate ids, broken parent/source/target, parent
-                  cycles; with --ir also the IR schema and whether the file is
-                  still exactly what its IR generates
+                  cycles; with --ir also the IR schema, whether the file is
+                  still exactly what its IR generates, and (WARN) a platform
+                  node standing outside the cluster frame
   2 connectivity  dangling edges, orphan nodes, duplicate edges, an unlabelled
                   pair of opposite edges
   3 geometry      overlapping boxes, a child outside its frame, a box straddling
@@ -244,6 +245,14 @@ def gate_structural(d: Diagram, ir: dict | None, ir_path: str | None) -> list[di
         probs = generate.ir_problems(ir)
         for rule, objs, msg in probs:
             out.append(finding("ERROR", rule, objs, msg, f"fix {ir_path}"))
+        if not probs and ir.get("boundaries"):
+            # The outermost frame is the system boundary (house-style.md): only
+            # off-platform parties stand outside it.
+            for n in ir["nodes"]:
+                if not n.get("parent") and n["role"] != "external":
+                    out.append(finding("WARN", "layout.unframed_node", [n["id"]],
+                                       f"'{n['id']}' sits outside every frame but is not external",
+                                       "put it inside the cluster frame (parent: f_cluster)"))
         if not probs:
             if generate.build(ir) != d.text:
                 out.append(finding("ERROR", "structural.stale_projection", [ir_path or "ir"],
@@ -413,6 +422,16 @@ def gate_typography(d: Diagram, routes: dict) -> list[dict]:
               and (c.get("value") or "").strip() and not d.is_edge_label(c)]
     label_boxes: list[tuple[str, str, list[float]]] = []
     frames = [c for c in d.cells if d.is_frame(c) and (c.get("value") or "").strip()]
+    for f in frames:  # an edge drawn through a frame's name hides it
+        fr = d.abs_rect(f.get("id"))
+        if not fr or d.in_legend(f.get("id")):
+            continue
+        band = [fr[0], fr[1], min(fr[2], text_width(_plain(f.get("value"))[0], 13, bold=True) + 30), 22]
+        for eid, poly in routes.items():
+            if any(_seg_hits_rect(p, q, band, shrink=0) for p, q in zip(poly, poly[1:])):
+                out.append(finding("WARN", "typography.edge_over_frame_title", [eid, f.get("id")],
+                                   f"edge runs through the title of frame '{_plain(f.get('value'))[0]}'",
+                                   "regenerate (ports avoid titles), or move the edge with IR `via`"))
     for eid, poly in routes.items():
         e = d.by_id[eid]
         text = " ".join(_plain(e.get("value") or ""))

@@ -148,6 +148,44 @@ class TestGenerate(unittest.TestCase):
             generate.build(ir)
         self.assertIn("structural.duplicate_id", [p[0] for p in cm.exception.problems])
 
+    def _validate(self, ir):
+        import tempfile
+        import validate
+        d = tempfile.mkdtemp()
+        irp, drp = os.path.join(d, "t.ir.yaml"), os.path.join(d, "t.drawio")
+        with open(irp, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(ir, fh)
+        with open(drp, "w", encoding="utf-8") as fh:
+            fh.write(generate.build(ir))
+        return validate.validate(drp, irp)
+
+    def test_unframed_platform_node_warns(self):
+        f = self._validate(_ir())  # gw and db sit on the bare canvas
+        flagged = {o for x in f if x["rule_id"] == "layout.unframed_node" for o in x["objects"]}
+        self.assertEqual(flagged, {"gw", "db"})  # browser is external: allowed outside
+
+    def test_cluster_frame_clears_unframed(self):
+        ir = _ir()
+        ir["boundaries"] = [{"id": "f_cluster", "label": "Kind cluster · homelab"},
+                            {"id": "f_apps", "label": "Applications", "parent": "f_cluster"}]
+        for n in ir["nodes"]:
+            if n["id"] in ("gw", "db"):
+                n["parent"] = "f_cluster"
+        f = self._validate(ir)
+        self.assertNotIn("layout.unframed_node", {x["rule_id"] for x in f})
+        self.assertEqual([x for x in f if x["severity"] == "ERROR"], [])
+
+    def test_duplicate_yaml_key_is_refused(self):
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix=".ir.yaml")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("layers: [a]\nnodes: []\nnodes: []\n")
+        try:
+            with self.assertRaises(yaml.YAMLError):
+                generate.load_ir(path)
+        finally:
+            os.unlink(path)
+
     def test_repo_diagrams_match_their_ir(self):
         """Every committed .drawio with an IR beside it is exactly that IR's output."""
         irs = sorted(glob.glob(os.path.join(REPO, "docs", "**", "*.ir.yaml"), recursive=True))

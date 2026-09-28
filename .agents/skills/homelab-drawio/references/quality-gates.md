@@ -31,10 +31,10 @@ Every finding has the same shape, so a fix loop can act on it:
 | # | Gate | ERROR | WARN |
 |---|---|---|---|
 | 0 | **house** (`validate_house.py`) | `;base64,` / SVG data URI, logo on a frame, planned style without the word | planned word without the dash, v1 fills / white text / shadows, no legend, no title, unlabelled dashed edge, non-Helvetica |
-| 1 | **structural** | duplicate id, broken parent / source / target, parent cycle; with `--ir`: IR schema errors, and `stale_projection` when the file is not exactly what its IR generates | — |
+| 1 | **structural** | duplicate id, broken parent / source / target, parent cycle; with `--ir`: IR schema errors, and `stale_projection` when the file is not exactly what its IR generates | with `--ir`: `layout.unframed_node`, a platform node outside every frame (only `external` nodes belong on the bare canvas) |
 | 2 | **connectivity** | edge with no source or target (outside the legend) | orphan box, duplicate edge, unlabelled pair of opposite edges |
 | 3 | **geometry** | overlapping boxes, child outside its frame, box on a frame it does not belong to, off-canvas or zero-size cell, edge through an unrelated box | edge crossings, gap under 10px, peers of one layer off their row (`--ir`), edge longer than the canvas |
-| 4 | **typography** | — | text wider or taller than its box, font under 10px, box label line over 48 chars, duplicate box names, edge label on a box or a frame title, two edge labels overlapping |
+| 4 | **typography** | — | text wider or taller than its box, font under 10px, box label line over 48 chars, duplicate box names, edge label on a box or a frame title, two edge labels overlapping, an edge drawn through a frame title |
 | 5 | **architecture** (`--ir`) | the rules the IR declares in `tests` | — |
 
 Geometry and typography only judge a path that is in the file. A generated

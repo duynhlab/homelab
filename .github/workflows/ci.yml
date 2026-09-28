@@ -36,12 +36,12 @@ jobs:
       - name: Setup kustomize
         uses: fluxcd/pkg/actions/kustomize@fc29ca0375323410da6588eb84a304444943f898 # main 2026-08-19
 
-      # Pinned to the engine the cluster runs: chart 3.8.2 ships Kyverno
-      # v1.18.2. A CLI ahead of the engine can agree with itself and disagree
+      # Pinned to the engine the cluster runs: chart 3.9.1 ships Kyverno
+      # v1.19.1. A CLI ahead of the engine can agree with itself and disagree
       # with admission, which is worse than having no gate.
       - name: Setup Kyverno CLI
         env:
-          KYVERNO_VERSION: v1.18.2
+          KYVERNO_VERSION: v1.19.1
         run: |
           set -euo pipefail
           curl -fsSL -o kyverno.tar.gz \

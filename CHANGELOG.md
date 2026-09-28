@@ -895,6 +895,16 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0032 → `Accepted`; ADR-077 created at `Proposed`.** The Kind
+  baseline moves to `kindest/node:v1.36.4` by digest before 1.34's EOL
+  (2026-10-27). [ADR-077](docs/proposals/adr/ADR-077-image-volume-schema-delivery/README.md)
+  records Phase 2: the ClickHouse DDL shipped as a digest-pinned
+  `FROM scratch` image volume. It names two things the RFC left implicit:
+  apko cannot package five local files without a melange package per
+  revision, and a Job's pod template is immutable, so the Job carries a
+  scoped `kustomize.toolkit.fluxcd.io/force: enabled` to re-run on a digest
+  bump. The Kyverno 1.19.1 prerequisite ships in the same PR.
+
 - **RFC-0033 research audited: Context7 rerun and all open questions carry proposed
   directions.** The Context7 rerun against the Claude Code docs corrects two claims.
   Subagents now nest three layers by default, so the flat topology must be enforced with
@@ -5556,6 +5566,18 @@ Skeleton (copy what you need):
   panic fix).
 
 #### Security
+
+- **Kyverno chart 3.8.2 → 3.9.1 (engine v1.18.2 → v1.19.1)**, with the
+  Kyverno CLI pin in `ci.yml` / `flux-validate.sh` moved in the same change
+  so the `kyverno test` gate keeps matching the engine. Supersedes Renovate
+  #884. The prerequisite [RFC-0032](docs/proposals/rfc/RFC-0032/README.md)
+  gates on: Kyverno moves on the current 1.34 baseline, as its own
+  revertible step, before the node image does. Rendered diff is additive
+  only (new CEL policy RBAC, `--maxGlobalContextEntries=0`,
+  `--excludeBootstrapResources=false`, `*_policy_results_total` label
+  trimming). 1.19 now prints a deprecation warning for every legacy
+  `kyverno.io` `ClusterPolicy` / `PolicyException`; they still enforce
+  unchanged, and migrating to the CEL types is not part of this bump.
 
 - **Keycloak 26.5.7 → 26.7.2** (#806) — two minors on the platform IdP,
   taken as a greenfield redeploy (fresh DB, Liquibase on empty schema — the

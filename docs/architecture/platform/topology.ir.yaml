@@ -8,7 +8,7 @@ diagram:
   scope: "How a request travels once the platform is up, and what each hop depends on. Delivery order and the observability pipeline have their own diagrams."
   question: request-path
   level: L2
-  animate: [traffic]
+  animate: [traffic, data, telemetry]
   assumptions:
     - "The ten Go services are one box: per-service routes live in docs/api/, not here."
     - "Pooling split follows each service's db_host: PgDog for product-db, the CNPG PgBouncer Pooler for platform-db."

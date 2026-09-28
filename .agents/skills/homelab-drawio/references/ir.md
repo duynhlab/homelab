@@ -66,7 +66,7 @@ tests:                            # architecture rules to enforce
 | edge `type` | One of eight relationship types ([house-style.md](house-style.md#relationship-types)). |
 | edge `status` | `planned` or `optional` draws it dashed, and it must then carry a label. |
 | edge `signal` | Telemetry only: colour by metric / log / trace / profile. |
-| `diagram.animate`, edge `animate` | Edge types whose dashes move in the SVG: the primary flow. `animate: true/false` overrides one edge; planned and optional edges never move ([house-style.md](house-style.md#flow-animation-flowanimation1)). |
+| `diagram.animate`, edge `animate` | Edge types whose dashes move in the SVG: the primary flow, meaning what travels (`traffic`, `data`, `replication`, `event`, `telemetry`), never what governs. `animate: true/false` overrides one edge; planned and optional edges never move ([house-style.md](house-style.md#flow-animation-flowanimation1)). |
 | edge `target` = a boundary | One arrow that means "every box in this frame" (e.g. the gateway's :8080 allow into every fenced namespace). It ends on the frame's top border, clear of its title, and counts as reaching every box inside. Use it instead of fanning the same edge out to each box. |
 | edge `via`, `label_pos` | Escape hatches: absolute waypoints, or a label position from -1 (source) to 1 (target). |
 

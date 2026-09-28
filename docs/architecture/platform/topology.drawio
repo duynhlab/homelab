@@ -131,7 +131,7 @@
         <mxCell id="e_wk" value="polls task queue" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="wk" target="tmp">
           <mxGeometry relative="1" as="geometry" x="0" />
         </mxCell>
-        <mxCell id="e_cache" value="cache-aside" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="valkey">
+        <mxCell id="e_cache" value="cache-aside" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="valkey">
           <mxGeometry relative="1" as="geometry" x="-0.52">
             <Array as="points">
               <mxPoint x="760" y="520" />
@@ -141,7 +141,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_pgdog" value="catalog · checkout SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.68;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="pgdog">
+        <mxCell id="e_pgdog" value="catalog · checkout SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.68;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="pgdog">
           <mxGeometry relative="1" as="geometry" x="-0.2">
             <Array as="points">
               <mxPoint x="795" y="520" />
@@ -151,7 +151,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_cnpg" value="identity · comms SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.82;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="cnpgpool">
+        <mxCell id="e_cnpg" value="identity · comms SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.82;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="cnpgpool">
           <mxGeometry relative="1" as="geometry" x="-0.53">
             <Array as="points">
               <mxPoint x="825" y="520" />
@@ -161,7 +161,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_prod" value="pooled SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.33;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgdog" target="productdb">
+        <mxCell id="e_prod" value="pooled SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.33;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgdog" target="productdb">
           <mxGeometry relative="1" as="geometry" x="-0.74">
             <Array as="points">
               <mxPoint x="820" y="835" />
@@ -169,7 +169,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_plat" value="pooled SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.58;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cnpgpool" target="platformdb">
+        <mxCell id="e_plat" value="pooled SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.58;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="cnpgpool" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="0.64">
             <Array as="points">
               <mxPoint x="1230" y="805" />
@@ -177,7 +177,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_kcdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.79;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="keycloak" target="platformdb">
+        <mxCell id="e_kcdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.79;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="keycloak" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="-0.66">
             <Array as="points">
               <mxPoint x="940" y="340" />
@@ -191,7 +191,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_tmpdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.69;exitY=1;exitDx=0;exitDy=0;entryX=0.21;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tmp" target="platformdb">
+        <mxCell id="e_tmpdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.69;exitY=1;exitDx=0;exitDy=0;entryX=0.21;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tmp" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="-0.45">
             <Array as="points">
               <mxPoint x="678.83" y="660" />
@@ -220,7 +220,7 @@
         <mxCell id="e_sec" value="syncs Secrets" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="eso" target="svc">
           <mxGeometry relative="1" as="geometry" x="-0.4" />
         </mxCell>
-        <mxCell id="e_bao" value="KV, read by ESO" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="openbao" target="eso">
+        <mxCell id="e_bao" value="KV, read by ESO" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="openbao" target="eso">
           <mxGeometry relative="1" as="geometry" x="0.11">
             <Array as="points">
               <mxPoint x="1240" y="340" />
@@ -228,7 +228,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_otlp_edge" value="OTLP spans" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.19;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="otel">
+        <mxCell id="e_otlp_edge" value="OTLP spans" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.19;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="envoy" target="otel">
           <mxGeometry relative="1" as="geometry" x="-0.14">
             <Array as="points">
               <mxPoint x="480" y="340" />
@@ -240,7 +240,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_otlp_svc" value="OTLP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.17;exitY=1;exitDx=0;exitDy=0;entryX=0.78;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="otel">
+        <mxCell id="e_otlp_svc" value="OTLP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.17;exitY=1;exitDx=0;exitDy=0;entryX=0.78;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="otel">
           <mxGeometry relative="1" as="geometry" x="-0.4">
             <Array as="points">
               <mxPoint x="695" y="530" />
@@ -250,7 +250,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_otlp_wk" value="OTLP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.91;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wk" target="otel">
+        <mxCell id="e_otlp_wk" value="OTLP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.91;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wk" target="otel">
           <mxGeometry relative="1" as="geometry" x="0.48">
             <Array as="points">
               <mxPoint x="350" y="660" />
@@ -258,7 +258,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_store" value="metrics · logs · traces" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel" target="backends">
+        <mxCell id="e_store" value="metrics · logs · traces" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel" target="backends">
           <mxGeometry relative="1" as="geometry" x="0.37">
             <Array as="points">
               <mxPoint x="200" y="805" />
@@ -266,7 +266,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_gf" value="queried" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="backends" target="grafana">
+        <mxCell id="e_gf" value="queried" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="backends" target="grafana">
           <mxGeometry relative="1" as="geometry" x="-0.4" />
         </mxCell>
         <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
@@ -338,7 +338,7 @@
         <mxCell id="legend-edge-trust-text" value="trust / authentication" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="48" y="56" width="110" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-data" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;" edge="1" parent="legend">
+        <mxCell id="legend-edge-data" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="176" y="67" as="sourcePoint" />
             <mxPoint x="202" y="67" as="targetPoint" />
@@ -356,7 +356,7 @@
         <mxCell id="legend-edge-control-text" value="manages / reconciles" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="342" y="56" width="120" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-telemetry" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;" edge="1" parent="legend">
+        <mxCell id="legend-edge-telemetry" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;flowAnimation=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="480" y="67" as="sourcePoint" />
             <mxPoint x="506" y="67" as="targetPoint" />

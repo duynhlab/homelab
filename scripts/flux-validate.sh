@@ -259,7 +259,7 @@ validate_worker_versioning() {
 # first run of these fixtures found one: require-probes returned `error`, not a
 # verdict, for any Pod with no ownerReferences.
 #
-# Pin the CLI to the engine the cluster runs (chart 3.8.2 -> v1.18.2). A CLI
+# Pin the CLI to the engine the cluster runs (chart 3.9.1 -> v1.19.1). A CLI
 # ahead of the engine can agree with itself and disagree with admission.
 # The schema bootstrap Job asserts a replica count, and that number is stated in
 # two files: the CHI's layout and the Job's EXPECTED_REPLICAS. Discovering it at

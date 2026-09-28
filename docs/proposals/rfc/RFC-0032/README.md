@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | infra | [./research.md](./research.md) — gate passed 2026-09-22 | 2026-09-22 | 2026-09-22 |
+| Accepted | infra | [./research.md](./research.md) — gate passed 2026-09-22 | 2026-09-22 | 2026-09-28 |
 
 > **Don't forget: every decision is a tradeoff.** The cost of this one is named
 > in the Summary rather than buried: the platform will run a Kyverno/Kubernetes
@@ -417,7 +417,7 @@ digest once the policy is extended.
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Deliver bootstrap SQL/DDL payloads as digest-pinned OCI image volumes, starting with the ClickHouse schema Job | `ADR-077` — created at architecture review | Proposed |
+| Deliver bootstrap SQL/DDL payloads as digest-pinned OCI image volumes, starting with the ClickHouse schema Job | [ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) | Proposed — Accepted when the Phase 2 gate passes |
 
 The Kubernetes version itself is deliberately **not** an ADR: it is a
 maintenance position with a support-window expiry, not a durable architectural
@@ -443,4 +443,4 @@ choice.
 - [`docs/platform/setup.md`](../../../platform/setup.md) — the Flux dependency chain the rebuild walks
 
 ---
-_Last updated: 2026-09-22 — opened at `provisional`: baseline to `kindest/node:v1.36.4` by digest, the Kyverno 1.36 gap accepted explicitly rather than waited out, every 1.35/1.36 feature given a verdict, and OCI image volumes adopted for the ClickHouse DDL as the single Phase 2 deliverable (`ADR-077` at review)._
+_Last updated: 2026-09-28 — **Accepted** by the owner; [ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) created at `Proposed`, stating two things this RFC left implicit: the image is built `FROM scratch` (apko assembles from packages, not local files), and the Job carries `kustomize.toolkit.fluxcd.io/force: enabled` because a Job's pod template is immutable. The Kyverno 1.19 prerequisite ships in the same PR as this status change. Previously 2026-09-22 — opened at `provisional`: baseline to `kindest/node:v1.36.4` by digest, the Kyverno 1.36 gap accepted explicitly rather than waited out, every 1.35/1.36 feature given a verdict, and OCI image volumes adopted for the ClickHouse DDL as the single Phase 2 deliverable (`ADR-077` at review)._

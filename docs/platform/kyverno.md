@@ -7,7 +7,7 @@ mode, so a violation is reported rather than blocked.
 
 | | |
 |---|---|
-| **Chart** | `kyverno/kyverno` 3.8.2, four controllers (admission, background, cleanup, reports) |
+| **Chart** | `kyverno/kyverno` 3.9.1 (engine v1.19.1), four controllers (admission, background, cleanup, reports) |
 | **Policies** | 7 deployed — 6 `ClusterPolicy` + 1 `ClusterCleanupPolicy` — plus 1 disabled. See [Policy inventory](#policy-inventory) |
 | **Enforcing** | Exactly one: `disallow-default-namespace` (`failurePolicy: Fail`). The other five validating policies are Audit |
 | **Exceptions** | 2 registered, both expiring 2026-12-31, accepted only from ns `kyverno` |
@@ -47,7 +47,7 @@ so the highest-value Kyverno features are:
 | 13 | JMESPath / context | ✅ when needed | — | Use sparingly (latency) |
 | 14 | Foreach | ✅ | 1 | Required for resources/probes rules |
 | 15 | `kyverno-policies` Helm chart | ❌ | — | Forked rules into repo, no chart |
-| 16 | Kyverno CLI `test` | ✅ | 3 | Gate in this repo — `make validate` + the `validate` CI job; CLI pinned to the engine (v1.18.2) |
+| 16 | Kyverno CLI `test` | ✅ | 3 | Gate in this repo — `make validate` + the `validate` CI job; CLI pinned to the engine (v1.19.1) |
 | 17 | Reports server | ❌ | — | KinD scale doesn't need it |
 | 18 | Namespaced `Policy` | ✅ when needed | — | Most rules are ClusterPolicy |
 | 19 | Tracing (OTLP) | ❌ not adopted — blocked upstream of Kyverno | 3 | Metrics already answer "which policy is slow"; spans would arrive as orphan roots until **API server tracing** is enabled. [Full reasoning](#why-tracing-is-not-adopted) |
@@ -55,6 +55,13 @@ so the highest-value Kyverno features are:
 **Skipped on purpose**: full `kyverno-policies` chart (avoid implicit policies),
 ConfigMap/Secret generation (handled by Flux), reports server (KinD scale).
 VAP is no longer version-blocked (row 7) — unadopted by choice, not constraint.
+
+**Legacy policy types warn from 1.19.** Engine v1.19 marks `kyverno.io/v1`
+`ClusterPolicy` and `kyverno.io/v2` `PolicyException` as deprecated in favour of
+the CEL types in `policies.kyverno.io` (`ValidatingPolicy`, `GeneratingPolicy`,
+…). Every policy and exception here is a legacy type, so `kyverno test` and
+admission print a deprecation warning per file. They still load and enforce
+unchanged; migrating to the CEL types is future work, not part of the 1.19 bump.
 Only row 4 (Cosign) remains **⏳ planned**: it describes intent, and nothing for
 it is deployed.
 
@@ -91,7 +98,7 @@ flowchart LR
 ```
 kubernetes/
   infra/
-    controllers/kyverno/          # HelmRelease (Kyverno chart 3.8.2)
+    controllers/kyverno/          # HelmRelease (Kyverno chart 3.9.1)
     controllers/policy-reporter/  # HelmRelease (policy-reporter 3.9.1) — the reports UI
     configs/kyverno/
       cluster-policies/           # 8 active + 1 disabled — see Policy inventory
@@ -358,7 +365,7 @@ make validate      # includes the Kyverno CLI test fixtures
 **Expected**: the three fixtures under `configs/kyverno/tests/`
 (`disallow-default-namespace`, `require-probes`, `require-resources`) all pass.
 This is the same gate the `validate` CI job runs, with the CLI pinned to engine
-v1.18.2.
+v1.19.1.
 
 ### Step 8: Metrics are actually arriving
 
@@ -515,8 +522,9 @@ aggregate histogram is the better instrument, not the worse one.
 admission is part of a real trace, Kyverno tracing adds a surface to audit and
 returns spans nobody can follow.
 
-**And when it is enabled, mind the nesting.** Chart 3.8.2 defines `tracing:`
-**four times — once per controller** (`admissionController`,
+**And when it is enabled, mind the nesting.** The chart (3.8.2, still true in
+3.9.1) defines `tracing:` **four
+times — once per controller** (`admissionController`,
 `backgroundController`, `cleanupController`, `reportsController`), exactly like
 `serviceMonitor`. Setting it at the top level of `values` is accepted by Helm and
 silently ignored — the failure that left this cluster with zero ServiceMonitors
@@ -534,7 +542,9 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-08-24 — refactored to the house shape: adds a quick-facts table, a **Policy inventory** (the doc previously named no policy file at all), a decision-path diagram, an exceptions table, an 8-step verification runbook, and troubleshooting by symptom with a failure-modes table. Corrects a self-contradiction: the adoption matrix called Policy Reporter “planned — not deployed” while three other sections, the HelmRelease, the HTTPRoute and `setup-hosts.sh` all say it is live — the architecture diagram's `planned` node is gone with it. The PolicyException YAML block now delegates to `policy-exceptions.md` instead of duplicating it._
+_Last updated: 2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
+
+_2026-08-24 — refactored to the house shape: adds a quick-facts table, a **Policy inventory** (the doc previously named no policy file at all), a decision-path diagram, an exceptions table, an 8-step verification runbook, and troubleshooting by symptom with a failure-modes table. Corrects a self-contradiction: the adoption matrix called Policy Reporter “planned — not deployed” while three other sections, the HelmRelease, the HTTPRoute and `setup-hosts.sh` all say it is live — the architecture diagram's `planned` node is gone with it. The PolicyException YAML block now delegates to `policy-exceptions.md` instead of duplicating it._
 
 _2026-08-21 — added row 19 (Tracing, not adopted) and a **Why tracing is not adopted** section: the blocker is upstream of Kyverno (no API server `TracingConfiguration`, so spans would be orphan roots), and the per-policy latency question tracing was going to answer is already answered by `kyverno_policy_execution_duration_seconds`, which carries `policy_name` + `rule_name`. Also records that the chart defines `tracing:` per controller, the same nesting trap that left the cluster with zero ServiceMonitors. Previously — CLI `test` row flipped to adopted: policy fixtures live at `configs/kyverno/tests/` and run in `make validate` + the `validate` CI job, with the CLI pinned to the engine (v1.18.2). Their first run found `require-probes` reporting `error` rather than a verdict for Pods with no ownerReferences._
 

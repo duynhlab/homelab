@@ -36,8 +36,11 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+import base64
+import hashlib
+
 import validate_house
-from _common import text_width
+from _common import load_manifest, text_width
 
 SEV_ORDER = {"ERROR": 0, "WARN": 1, "INFO": 2}
 DATA_ROLES = {"data", "metric", "log", "trace", "profile"}
@@ -524,6 +527,48 @@ def gate_architecture(ir: dict) -> list[dict]:
     return out
 
 
+def _catalogue() -> tuple[dict[str, str], dict[str, str]]:
+    """(product name -> icon key, png sha256 -> icon key) from the icon manifest.
+    A name is the key, its label and every alias, so a product family that
+    shares one logo (VictoriaMetrics / VictoriaLogs / VictoriaTraces) resolves
+    to one key."""
+    m = load_manifest()
+    names, by_sha = {}, {}
+    for key, entry in m.get("icons", {}).items():
+        names[key.lower()] = key
+        names[entry.get("label", key).lower()] = key
+        by_sha[entry.get("sha256", "")] = key
+    for alias, key in m.get("aliases", {}).items():
+        names[alias.lower()] = key
+    return names, by_sha
+
+
+def gate_products(d: "Diagram") -> list[dict]:
+    """One box, one product (icons.md): a box that carries a logo must not list
+    another catalogued product as one of its parts. A part is an item of a label
+    line split on '·', '+' or ','; only an item that IS a product name counts,
+    so a mention ('Pyroscope SDK', 'Temporal workers', otel_traces) does not."""
+    names, by_sha = _catalogue()
+    out = []
+    for c in d.cells:
+        st = c.get("style") or ""
+        m = re.search(r"image=data:image/png,([A-Za-z0-9+/=]+)", st)
+        if not m or d.in_legend(c.get("id")):
+            continue
+        own = by_sha.get(hashlib.sha256(base64.b64decode(m.group(1))).hexdigest())
+        others = set()
+        for line in _plain(c.get("value") or ""):
+            for item in re.split(r"[·+,]", line):
+                key = names.get(item.strip().lower())
+                if key and key != own:
+                    others.add(item.strip())
+        if others:
+            out.append(finding("WARN", "house.one_box_many_products", [c.get("id")],
+                               f"a box with the {own or 'catalogued'} logo also lists {', '.join(sorted(others))}",
+                               "give each product its own box (or group them in a frame without a logo)"))
+    return out
+
+
 def gate_house(path: str) -> list[dict]:
     errors, warnings = validate_house.check_file(path)
     out = []
@@ -543,7 +588,7 @@ def validate(path: str, ir_path: str | None = None) -> list[dict]:
     if ir_path:
         import generate
         ir = generate.load_ir(ir_path)
-    out = gate_house(path) + gate_structural(d, ir, ir_path)
+    out = gate_house(path) + gate_products(d) + gate_structural(d, ir, ir_path)
     if any(f["severity"] == "ERROR" and f["rule_id"].startswith("structural.broken") for f in out):
         return out
     out += gate_connectivity(d)

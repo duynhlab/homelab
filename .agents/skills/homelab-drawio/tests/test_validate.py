@@ -138,6 +138,18 @@ class TestGates(unittest.TestCase):
         self.assertNotIn("house.animation_overuse", rules(primary))
         self.assertNotIn("house.animation_overuse", rules(one_kind))  # a delivery graph may move entirely
 
+    def test_one_box_many_products(self):
+        import base64
+        with open(os.path.join(SKILL, "assets", "icons", "victoriametrics.png"), "rb") as fh:
+            logo = base64.b64encode(fh.read()).decode()
+        st = CARD + f"shape=label;image=data:image/png,{logo};"
+        mixed = run(box("vm", 0, 100, w=300, value="VictoriaMetrics · Logs&lt;br&gt;Pyroscope · ClickHouse", style=st),
+                    box("g", 0, 300), edge("e", "vm", "g"))
+        family = run(box("vm", 0, 100, w=300, value="VictoriaMetrics · VictoriaLogs&lt;br&gt;Pyroscope SDK", style=st),
+                     box("g", 0, 300), edge("e", "vm", "g"))
+        self.assertIn("house.one_box_many_products", rules(mixed, "WARN"))
+        self.assertNotIn("house.one_box_many_products", rules(family))  # same family; a mention is not a part
+
     def test_legend_is_exempt(self):
         # an arrow sample inside the legend frame is not a dangling edge
         cell = ('<mxCell id="lg" value="" style="endArrow=classic;" edge="1" parent="legend">'

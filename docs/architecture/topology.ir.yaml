@@ -1,0 +1,83 @@
+# Source of docs/architecture/topology.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/topology.ir.yaml
+# Verified against kubernetes/ (HTTPRoute hostnames, apps/services db_host,
+# configs/databases/clusters, controllers/keycloak + temporal) on 2026-09-28.
+diagram:
+  id: topology
+  title: "duynhlab homelab — Request-path topology"
+  scope: "How a request travels once the platform is up, and what each hop depends on. Delivery order and the observability pipeline have their own diagrams."
+  question: request-path
+  level: L2
+  pin_order: true
+  assumptions:
+    - "The ten Go services are one box: per-service routes live in docs/api/, not here."
+    - "Pooling split follows each service's db_host: PgDog for product-db, the CNPG PgBouncer Pooler for platform-db."
+
+layers: [client, edge, apps, workflow, pooling, data]
+
+boundaries:
+  - {id: f_apps, label: "Applications"}
+  - {id: f_flow, label: "Workflows"}
+  - {id: f_sec, label: "Secrets"}
+  - {id: f_data, label: "Data"}
+  - {id: f_obs, label: "Observability"}
+
+nodes:
+  # pin_order: each layer reads left to right in this order.
+  - {id: browser, label: "Browser", role: external, layer: client}
+
+  - {id: envoy, label: "Envoy Gateway\ngateway.duynh.me · TLS · JWT · CORS", role: edge, layer: edge, icon: envoy}
+  - {id: keycloak, label: "Keycloak\nid.duynh.me · OIDC", role: platform, layer: edge, icon: keycloak}
+  - {id: openbao, label: "OpenBao\nHA Raft", role: platform, layer: edge, parent: f_sec, icon: openbao}
+
+  - {id: spa, label: "Storefront SPA\nlocal.duynh.me", role: service, layer: apps, parent: f_apps}
+  - {id: bo, label: "Back-office portal\nbackoffice.duynh.me", role: service, layer: apps, parent: f_apps}
+  - {id: svc, label: "10 Go services\nidentity · catalog · checkout\nfulfillment · comms", role: service, layer: apps, parent: f_apps, icon: go}
+  - {id: eso, label: "External Secrets Operator", role: platform, layer: apps, parent: f_sec, icon: external-secrets}
+
+  - {id: tmp, label: "Temporal server", role: platform, layer: workflow, parent: f_flow, icon: temporal}
+  - {id: wk, label: "Temporal workers\ncheckout-worker · order-worker", role: worker, layer: workflow, parent: f_flow, icon: go}
+
+  - {id: otel, label: "OTel Collector\n+ vmagent · Vector", role: collector, layer: pooling, parent: f_obs, icon: opentelemetry}
+  - {id: pgdog, label: "PgDog pooler\nproduct-db", role: data, layer: pooling, parent: f_data, icon: pgdog}
+  - {id: valkey, label: "Valkey cache", role: data, layer: pooling, parent: f_data, icon: valkey}
+  - {id: cnpg, label: "CloudNativePG operator", role: platform, layer: pooling, parent: f_data, icon: cloudnativepg}
+  - {id: cnpgpool, label: "CNPG Pooler (PgBouncer)\nplatform-db", role: data, layer: pooling, parent: f_data}
+
+  - {id: backends, label: "VictoriaMetrics · Logs · Traces\nPyroscope · ClickHouse", role: metric, layer: data, parent: f_obs, icon: victoriametrics}
+  - {id: grafana, label: "Grafana\n+ Sloth SLOs", role: platform, layer: data, parent: f_obs, icon: grafana}
+  - {id: productdb, label: "product-db\nHA + DR replica", role: data, layer: data, parent: f_data, shape: datastore}
+  - {id: platformdb, label: "platform-db\nHA", role: data, layer: data, parent: f_data, shape: datastore}
+
+edges:
+  - {id: e_br, source: browser, target: envoy, type: traffic, protocol: HTTPS}
+  - {id: e_jwks, source: envoy, target: keycloak, type: trust, label: "JWKS · id route"}
+  - {id: e_spa, source: envoy, target: spa, type: traffic, label: HTTPRoute}
+  - {id: e_bo, source: envoy, target: bo, type: traffic, label: HTTPRoute}
+  - {id: e_svc, source: envoy, target: svc, type: traffic, label: "HTTPRoute /api"}
+
+  - {id: e_tmp, source: svc, target: tmp, type: traffic, label: "starts workflows"}
+  - {id: e_wk, source: wk, target: tmp, type: traffic, label: "polls task queue"}
+  - {id: e_cache, source: svc, target: valkey, type: data, label: "cache-aside"}
+  - {id: e_pgdog, source: svc, target: pgdog, type: data, label: "catalog · checkout SQL"}
+  - {id: e_cnpg, source: svc, target: cnpgpool, type: data, label: "identity · comms SQL"}
+  - {id: e_prod, source: pgdog, target: productdb, type: data, label: "pooled SQL"}
+  - {id: e_plat, source: cnpgpool, target: platformdb, type: data, label: "pooled SQL"}
+  - {id: e_kcdb, source: keycloak, target: platformdb, type: data, label: "direct SQL"}
+  - {id: e_tmpdb, source: tmp, target: platformdb, type: data, label: "direct SQL"}
+  - {id: e_cnpg1, source: cnpg, target: productdb, type: control, label: manages}
+  - {id: e_cnpg2, source: cnpg, target: platformdb, type: control, label: manages}
+
+  - {id: e_sec, source: eso, target: svc, type: control, label: "syncs Secrets"}
+  - {id: e_bao, source: openbao, target: eso, type: data, label: "KV, read by ESO"}
+
+  - {id: e_otlp_edge, source: envoy, target: otel, type: telemetry, label: "OTLP spans"}
+  - {id: e_otlp_svc, source: svc, target: otel, type: telemetry, protocol: OTLP}
+  - {id: e_otlp_wk, source: wk, target: otel, type: telemetry, protocol: OTLP}
+  - {id: e_store, source: otel, target: backends, type: telemetry, label: "metrics · logs · traces"}
+  - {id: e_gf, source: backends, target: grafana, type: data, label: queried}
+
+tests:
+  - {rule: no-public-datastore}
+  - {rule: entry-via-edge}
+  - {rule: telemetry-has-destination}

@@ -37,6 +37,13 @@ puts a second copy of the SVG in `img/` too.
   is a budget you can reason about: 1536 px is ~1.7× the 920 px the README
   displays — sharp on a retina screen, and the widest that keeps a
   full-platform diagram inside 400 KB.
+- **The PNG is quantized to a 256-colour palette, undithered** (Pillow, else
+  ImageMagick; `--no-quantize` keeps 24-bit). A flat-colour diagram has far
+  fewer than 256 colours outside the anti-aliased edges, so nothing visible is
+  lost and the file shrinks ~3×. That is what keeps a tall top-down diagram —
+  1536 px wide, often 1600 px high — inside the 400 KB budget:
+  `observability-signal-flow.png` went from 492 KB to 158 KB on 2026-09-28. The
+  quantizer is deterministic, so two exports in a row still match.
 - **`--page-index` is 1-based** in this CLI. A multi-page `.drawio` is looped
   `1..N` and written `<name>-<i>.svg`; a single-page file is `<name>.svg`.
   Exporting page `0` silently repeats page 1 — the loop starts at 1 for this
@@ -55,6 +62,7 @@ puts a second copy of the SVG in `img/` too.
 
 ## After any diagram change
 
-Re-export, because the exports are committed alongside the source — a source
-edit without a re-run ships a stale picture. Commit the `.drawio` and its
-export(s) in the same change.
+Regenerate from the IR when there is one (`generate.py <name>.ir.yaml`), then
+re-export: the exports are committed alongside the source, and a source edit
+without a re-run ships a stale picture. Commit the `.ir.yaml`, the `.drawio`
+and its export(s) in the same change.

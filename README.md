@@ -100,7 +100,7 @@ Same palette as the Platform map above.
   <a href="docs/architecture/topology.drawio"><img src="docs/architecture/img/topology.png" alt="Request-path topology (Draw.io edition)" width="920"></a>
 </p>
 
-<p align="center"><sub>Draw.io edition, with logos — source <a href="docs/architecture/topology.drawio"><code>docs/architecture/topology.drawio</code></a>, authored with the <a href=".agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill. Edit the source, then re-run its <code>scripts/export.py</code> to refresh this image.</sub></p>
+<p align="center"><sub>Draw.io edition, with logos — source <a href="docs/architecture/topology.drawio"><code>docs/architecture/topology.drawio</code></a>, generated from <a href="docs/architecture/topology.ir.yaml"><code>topology.ir.yaml</code></a> by the <a href=".agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill. Edit the IR, then re-run its <code>scripts/generate.py</code> and <code>scripts/export.py</code> to refresh this image.</sub></p>
 
 ---
 

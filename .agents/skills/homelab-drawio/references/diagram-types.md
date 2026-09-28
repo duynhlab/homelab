@@ -38,6 +38,24 @@ are reading, and the diagram answers no question cleanly.
 | **Delivery / lifecycle** — how it gets there, and what gates on what | One delivery graph (Flux waves, a rollout, a migration's steps) | Each wave or step, its ordering edges, and the condition that releases it | The artefacts a wave applies, when the gate is the point | Runtime request flow — that is a different question, and a different file |
 | **Migration** — what changed and why | One before/after pair | The end state, plus what it replaced | The record (ADR/RFC) that decided it | Anything still true in both states and therefore not the story |
 
+## Level of abstraction
+
+Pick one level and stay on it: every box on the canvas is the same kind of
+thing. The IR records it (`diagram.level`), so a reviewer knows what scale to
+read.
+
+| Level | Boxes are | Typical question |
+|---|---|---|
+| **L0** | whole systems (the platform, GitHub, the browser) | platform landscape, from outside |
+| **L1** | infrastructure (the Kind cluster, registries, OCI sources) | platform landscape |
+| **L2** | platform components (gateway, operators, databases, the services as groups) | request path, delivery |
+| **L3** | the components of one area (collector pipelines, CNPG poolers) | domain topology |
+| **L4** | runtime communication (ports, protocols, NetworkPolicies) | request path in depth |
+| **L5** | a protocol or control-plane deep dive (TLS handshake, a reconcile loop) | one mechanism |
+
+Mixing levels is the mistake flagged above: a subsystem beside a single
+process. When a question needs two levels, draw two diagrams and link them.
+
 A **historical** diagram says so in the surrounding text. A diagram of something
 not yet deployed follows the design record's status — the label table in
 [AGENTS.md § Diagram workflow](../../../../AGENTS.md#diagram-workflow) step 2 —

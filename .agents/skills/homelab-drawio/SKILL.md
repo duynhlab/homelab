@@ -2,124 +2,163 @@
 name: homelab-drawio
 description: >-
   Author, edit, and export Draw.io (`.drawio`) architecture diagrams in the
-  homelab repo with the house style and curated logos. Use whenever the request
-  names Draw.io / diagrams.net / a `.drawio` file, asks to edit an existing
-  `.drawio`, or asks to export/re-render one to SVG/PNG. Mermaid stays the
-  default for diagrams in this repo (AGENTS.md); reach for this skill only when
-  Draw.io is asked for by name or a `.drawio` already exists. For a plain
-  Mermaid diagram, do NOT use this skill.
+  homelab repo: plan the diagram as a YAML IR, generate a top-down `.drawio`
+  in the house style with curated logos, run the quality gates, and export
+  SVG/PNG. Use whenever the request names Draw.io / diagrams.net / a `.drawio`
+  file, asks to edit an existing `.drawio`, or asks to export/re-render one.
+  Mermaid stays the default for diagrams in this repo (AGENTS.md); reach for
+  this skill only when Draw.io is asked for by name or a `.drawio` already
+  exists. For a plain Mermaid diagram, do NOT use this skill.
 ---
 
 # homelab-drawio
 
-Draw.io authoring for the homelab platform: a semantic palette shared with the
-Mermaid convention, a curated logo catalog, house-style validation, and
-reproducible export.
+Draw.io authoring for the homelab platform. The diagram is **planned as a
+model**, a small YAML IR ([`references/ir.md`](references/ir.md)).
+`scripts/generate.py` projects the model into a top-down `.drawio`:
+- tiers run down the page and peers sit side by side;
+- frames nest;
+- edges are orthogonal, in routing channels;
+- colours come from the semantic palette shared with the Mermaid convention;
+- boxes carry curated logos.
 
-Everything a step here *requires* is in this directory or in the `drawio` CLI —
-nothing in the workflow depends on another skill being installed. A generic
-Draw.io skill in the agent IDE is a useful **complement** for shape search and
-structural scoring, and step 5 names it, but as an optional extra.
+`scripts/validate.py` then runs the quality gates.
 
-**Mermaid is the repo default** ([AGENTS.md](../../../AGENTS.md) Diagrams). Draw.io
-earns its extra weight only for a large multi-domain overview or an editable
-source someone will hand-tune — and only when asked for by name, or when a
-`.drawio` already exists. If the request is a normal flowchart/sequence/state
-diagram, write Mermaid instead and stop.
+Everything a step here *requires* is in this directory, plus the `drawio` CLI
+and Graphviz `dot`. Nothing in the workflow depends on another skill being
+installed.
+
+**Mermaid is the repo default** ([AGENTS.md](../../../AGENTS.md) Diagrams).
+Draw.io earns its extra weight only in two cases:
+- a large multi-domain overview;
+- an editable source someone will hand-tune.
+
+Even then, only when asked for by name, or when a `.drawio` already exists. A
+normal flowchart, sequence or state diagram is Mermaid: write that instead and
+stop.
 
 ## Workflow
 
-1. **One question.** Pick a row from
-   [`references/diagram-types.md`](references/diagram-types.md) — platform
-   landscape, domain topology, request path, delivery/lifecycle, or migration —
-   and use its primary/supporting split to decide what goes in. That file is what
-   makes [AGENTS.md § Diagram workflow](../../../AGENTS.md#diagram-workflow)
-   step 1 actionable. Split a diagram that tries to answer more than one
-   question.
+1. **One question, one level.** Pick the question from
+   [`references/diagram-types.md`](references/diagram-types.md): platform
+   landscape, domain topology, request path, delivery/lifecycle, or migration.
+   Pick one level of abstraction, L0–L5. The same file's primary/supporting
+   split decides what goes in. A diagram that answers two questions is two
+   diagrams.
 2. **Verify deployed reality.** A diagram is an executable summary of the repo,
-   not decoration. Cross-check every box against the manifests and
-   [`docs/api/`](../../../docs/api/README.md) (the API source of truth — see the
-   [platform-engineer skill](../platform-engineer/SKILL.md)). Anything not
-   deployed is labelled **planned** and drawn dashed — both, or the check in
-   step 6 fails.
-3. **Preflight.** `python3 scripts/doctor.py` — confirms `drawio` is present
-   before you invest in authoring (add `--adding-icon` when you will also
-   rasterise a new logo, which needs `rsvg-convert`).
-4. **Author native XML** (`.drawio` under `docs/**`), applying the house style
-   and logos:
-   - Colours/shapes/edges → [`references/house-style.md`](references/house-style.md).
-   - A box that IS a deployed product gets its logo →
-     [`references/icons.md`](references/icons.md); paste a ready style with
-     `python3 scripts/icon_style.py style <name> --role <role>`.
-   - Domain frames use `shapes.container` and **own** their children: set each
-     child's `parent` to the frame id and write its geometry relative to the
-     frame origin ([`references/house-style.md`](references/house-style.md)).
-   - Large graph (~15+ nodes)? Do not hand-place it — let ELK lay it out and
-     write the result back into the source:
-     ```bash
-     drawio --layout '[{"layout":"elkLayered","config":{"elk.direction":"RIGHT"}}]' \
-            -x -f xml -u -o <file>.drawio <file>.drawio
-     ```
-     (`--layout` also takes the presets `verticalFlow`, `horizontalFlow`,
-     `verticalTree`, `horizontalTree`, `radialTree`, `organic`. Without
-     `-f xml -u` the layout applies to the export only and the source keeps its
-     old coordinates.)
-   - Every diagram carries its own **legend**.
-5. **Validate.** `python3 scripts/validate_house.py <file.drawio>` — required.
-   Fix every ERROR before exporting; read the WARNings and either fix them or be
-   able to say why not. If the agent IDE's generic Draw.io skill is installed, its
-   `validate.py --score` adds a structural score on top; skip it when it is not.
-6. **Export + look.** `python3 scripts/export.py <file.drawio>` writes the SVG;
-   add `--png --png-dir <dir>` for the one raster GitHub needs
-   ([`references/export.md`](references/export.md)). Then **open the render** and
-   walk the review checklist in
-   [`references/diagram-types.md`](references/diagram-types.md#review-it-before-you-export):
-   clipping, edge-through-node crossings, labels overlapping their boxes, icons
-   that vanish at render size. This step finds what no validator can.
-   `python3 scripts/icon_style.py audit docs` flags product boxes still missing a
-   logo (advisory, recursive).
-7. **Report** the editable `.drawio` and the exported path(s).
+   not decoration.
+   - Cross-check every box and edge against the manifests and
+     [`docs/api/`](../../../docs/api/README.md), the API source of truth (see the
+     [platform-engineer skill](../platform-engineer/SKILL.md)).
+   - [`references/domains.md`](references/domains.md) says, per area, where to
+     look and what is easy to get wrong.
+   - Anything not deployed is `status: planned`: the generator dashes it and
+     refuses a label without the word.
+   - Record what you checked in the IR's header comment.
+3. **Plan it as an IR.** Write `docs/<area>/<name>.ir.yaml` beside where the
+   `.drawio` will live. It holds:
+   - the question and level;
+   - ordered `layers` (top of the canvas first);
+   - `boundaries`, `nodes` (role, layer, icon) and `edges` (one of eight
+     relationship types, with a label saying what flows);
+   - `notes` for what the boxes cannot say;
+   - the architecture `tests` that must hold;
+   - `assumptions` for anything you could not verify.
+
+   Field rules: [`references/ir.md`](references/ir.md); colours and relationship
+   types: [`references/house-style.md`](references/house-style.md); logos:
+   [`references/icons.md`](references/icons.md).
+4. **Generate.** Run `python3 scripts/doctor.py` once, then:
+   ```bash
+   python3 scripts/generate.py docs/<area>/<name>.ir.yaml     # writes <name>.drawio
+   ```
+5. **Validate.**
+   ```bash
+   python3 scripts/validate.py docs/<area>/<name>.drawio --ir docs/<area>/<name>.ir.yaml
+   ```
+   Fix every ERROR. Read each WARN and either fix it or be able to say why it
+   stays. Crossings are the WARN most worth reducing. The gates and the finding
+   format are in [`references/quality-gates.md`](references/quality-gates.md).
+6. **Export and look.**
+   ```bash
+   python3 scripts/export.py docs/<area>/<name>.drawio --png --png-dir docs/<area>/img
+   ```
+   Then **open the PNG** and walk the review checklist in
+   [`diagram-types.md`](references/diagram-types.md#review-it-before-you-export)
+   and the self-check in [`quality-gates.md`](references/quality-gates.md#self-check-after-rendering).
+   This step finds what no validator can.
+7. **Fix in the IR, then return to step 4.**
+   - Order of preference: split the view, re-tier a node, reorder peers or
+     toggle `pin_order`, and only then use `via` / `label_pos`.
+   - Never hand-edit the generated XML. `validate.py --ir` fails a file that no
+     longer matches its IR.
+   - At most five rounds. After two geometry rounds that do not converge, ask the
+     owner: the model is unclear.
+8. **Report and commit** the `.ir.yaml`, the `.drawio`, the SVG and the PNG
+   together.
+
+**A `.drawio` without an IR** is hand-drawn, or needs geometry the IR cannot
+express. Edit it in place (house style: [`references/house-style.md`](references/house-style.md);
+domain frames own their children through `container=1`), then run steps 5–6.
+For a large hand-drawn graph, let ELK lay it out and write the result back into
+the source:
+
+```bash
+drawio --layout '[{"layout":"elkLayered","config":{"elk.direction":"DOWN"}}]' \
+       -x -f xml -u -o <file>.drawio <file>.drawio
+```
+
+Prefer converting a diagram you touch often into an IR.
 
 ## Scripts
 
-Run from this skill directory (`.agents/skills/homelab-drawio/`).
+Run from this skill directory (`.agents/skills/homelab-drawio/`), or give
+repo-root paths from the repo root.
 
 | Command | Does |
 |---|---|
-| `scripts/doctor.py [--adding-icon]` | Preflight: `drawio` (required; wrapped in `xvfb-run -a` on a Linux box with no display, `--no-sandbox` as root), ImageMagick + `rsvg-convert` (for adding icons), and which font renders Helvetica. Install hints follow the OS (apt on Linux, brew on macOS) |
-| `scripts/icon_style.py style <name> --role <role>` | Emit a paste-ready label style with the logo embedded + palette applied (adds `dashed=1` for `planned`) |
-| `scripts/icon_style.py list` | Show the icon catalogue, aliases, and `none` decisions |
-| `scripts/icon_style.py audit <dir>` | Advisory, recursive: product boxes rendering without a logo; logos on frames |
-| `scripts/validate_house.py <file> [--strict]` | House-style checks (embed traps, planned state, frame icons, font, legend, title, unlabelled dashed edges, v1 saturated fills / white text / drop shadows) |
-| `scripts/export.py <file> [--png --png-dir <dir>]` | Reproducible SVG/PNG export with version + per-format size budget |
+| `scripts/doctor.py [--adding-icon]` | Preflight. Required: `drawio` (wrapped in `xvfb-run -a` without a display, `--no-sandbox` as root), Graphviz `dot`, PyYAML and jsonschema. Optional: Pillow for PNG quantizing, ImageMagick + `rsvg-convert` when adding icons. Also reports which font renders Helvetica. Install hints follow the OS |
+| `scripts/generate.py <ir> [-o <drawio>] [--check]` | IR → top-down `.drawio`, deterministic. `--check` exits 1 when the file on disk is stale |
+| `scripts/validate.py <drawio> [--ir <ir>] [--json] [--strict]` | The quality gates: house, structural, connectivity, geometry, typography, architecture. Findings as `{severity, rule_id, objects, message, fix}` |
+| `scripts/validate_house.py <file> [--strict]` | House rules alone. `validate.py` runs them as its first gate |
+| `scripts/icon_style.py style <name> --role <role>` | A paste-ready logo style for hand-drawn boxes (`dashed=1` added for `planned`) |
+| `scripts/icon_style.py list` / `audit <dir>` | The icon catalogue; product boxes still missing a logo (advisory) |
+| `scripts/export.py <file> [--png --png-dir <dir>]` | Reproducible SVG/PNG export. The PNG is quantized to 256 colours, and each format has a size budget |
 
-`python3 -m unittest discover -s tests` covers the helpers (catalog checksums,
-style emission, every validator rule) with no network and no `drawio` binary —
-run it after touching `scripts/` or `assets/`. `evals/evals.json` holds three
-end-to-end authoring evals in skill-creator format; they need that plugin and a
-live repo, so they are a judgement aid, not a gate.
+`python3 -m unittest discover -s tests` covers:
+- the helpers;
+- every validator rule, with a passing and a failing fixture;
+- the generator (determinism, top-down order, frames, legend, IR rejection).
+
+It also checks that **every committed `.ir.yaml` still generates its committed
+`.drawio` byte for byte**. It needs no network and no `drawio` binary. The
+generator tests skip without `dot`. Run the suite after touching `scripts/`,
+`assets/` or `schema/`. `evals/evals.json` holds end-to-end authoring evals in
+skill-creator format; they are a judgement aid, not a gate.
 
 ## Guardrails
 
-- **Palette is not invented here.** Node colours mirror the Mermaid `classDef`
-  in AGENTS.md so a Draw.io diagram and the Mermaid beside it read as one
-  system. The single source is [`assets/homelab.json`](assets/homelab.json);
+- **The palette is not invented here.** Node colours mirror the Mermaid
+  `classDef` in AGENTS.md, so a Draw.io diagram and the Mermaid beside it read as
+  one system. The single source is [`assets/homelab.json`](assets/homelab.json);
   change it and AGENTS.md together.
-- **PNG logos, comma-joined.** `image=data:image/png,<base64>` — never
-  `;base64,` (truncates the style) and never an SVG data URI (exports blank).
-  `icon_style.py` gets this right; hand-rolling does not.
-- **A logo must not assert something false.** Icon the box's *subject*, never a
-  product its label merely mentions; grouping frames and concept boxes stay
-  plain. Catalogue is deployed-platform-only. Both checks key on a frame that
-  actually owns children, so a frame drawn as a bare rectangle is a frame nothing
-  can police — see `container=1` in
-  [`references/house-style.md`](references/house-style.md).
-- **Planned = dashed + the word "planned".** `validate_house.py` **errors** on a
-  planned-styled box (dashed + the planned stroke) whose label omits the word,
-  and **warns** on a label that says "planned" without the dash — a warning
-  because legends and prose like "planned migration" say it innocently, so
-  annotations and legend cells are exempt.
+- **PNG logos, comma-joined.** Write `image=data:image/png,<base64>`. Never
+  `;base64,`, which truncates the style, and never an SVG data URI, which exports
+  blank. The generator and `icon_style.py` get this right; hand-rolling does not.
+- **A logo must not assert something false.**
+  - Icon the box's *subject*, never a product its label merely mentions.
+  - Grouping frames and concept boxes stay plain.
+  - Never invent or counterfeit a vendor mark.
+  - The catalogue is deployed-platform-only.
+- **Planned = dashed + the word "planned".** The generator refuses a planned
+  node or edge without the word. `validate_house.py` errors on a planned-styled
+  box that omits it, and warns on the word without the dash.
+- **Architecture rules are declared, never assumed.** Only the rules an IR lists
+  under `tests` run. A common best practice becomes a rule here when an ADR says
+  so.
+- **Never assert a path without evidence.** A packet path, a pooler or a
+  hostname comes from the manifests, not from how such platforms usually look.
 - **Commit** per [platform-engineer](../platform-engineer/SKILL.md): branch, no
   attribution trailers, `make validate` when repo manifests change. Commit the
-  `.drawio` source and its exports together (a source edit without a re-export
-  ships a stale picture).
+  IR, the `.drawio` and its exports together. A source edit without a re-export
+  ships a stale picture.

@@ -598,6 +598,39 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Draw.io diagrams are generated top-down from a YAML model, and checked
+  by five quality gates.**
+  - The `homelab-drawio` skill takes over the method of the owner's
+    SRE/DevOps diagram draft:
+    - plan the diagram as a provider-neutral model first;
+    - project it top-down;
+    - run structural → connectivity → geometry → typography → architecture
+      gates, with machine-readable findings;
+    - render, then self-check.
+  - That draft shipped its scripts as stubs; here they run.
+  - `schema/diagram-ir.schema.json` defines the IR: question, level L0–L5,
+    ordered tiers, frames, twelve palette roles, eight relationship types,
+    notes and declared architecture rules.
+  - `scripts/generate.py` projects it deterministically:
+    - Graphviz places the tiers and nested frames;
+    - edges are routed in channels between tiers, with a lane per run and
+      spread ports, and the path is written into the file;
+    - labels are placed off boxes, frame titles and each other;
+    - the title, scope, notes and a used-roles-only legend are generated.
+  - `scripts/validate.py` runs the gates, including edge-through-box, crossing
+    and label-collision checks the house validator could not make. It also
+    fails a `.drawio` that no longer matches its IR.
+  - `export.py` now quantizes the PNG to 256 colours, so a tall top-down diagram
+    stays inside the 400 KB budget.
+  - The three `docs/architecture/` sources are now `*.ir.yaml` models, each
+    re-verified against the manifests:
+    - the delivery diagram has all 20 `dependsOn` edges;
+    - its sources note no longer claims `apps-local` reads `infrastructure-oci`.
+  - All three are redrawn top-down with 0 errors, and their PNGs shrink from
+    275–403 KB to 112–158 KB.
+  - Tests go from 39 to 71, one of which regenerates every committed IR and
+    compares it byte for byte.
+
 - **Diagrams move to a soft-tint palette; a signal-flow diagram joins the
   observability hub; the Draw.io skill runs cleanly on Linux.** The v1 palette
   filled boxes with the saturated role colour and white text, and every

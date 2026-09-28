@@ -1,0 +1,74 @@
+# Source of docs/architecture/observability-delivery.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/observability-delivery.ir.yaml
+# Verified on 2026-09-28 against kubernetes/clusters/local/*.yaml: every edge is
+# one spec.dependsOn entry between two of these waves (20 of 20), each layer is
+# the wave's longest dependsOn chain from controllers-local, and each gate line
+# is the wave's wait / healthChecks / healthCheckExprs.
+diagram:
+  id: delivery
+  title: "duynhlab homelab — Observability delivery order"
+  scope: "How Flux delivers the observability stack, and what releases each wave. Every arrow is a Flux dependsOn; the last line of each box is that wave's gate. Runtime signal flow is a different question — see observability-signal-flow.drawio."
+  question: delivery
+  level: L2
+  legend:
+    roles:
+      platform: "Platform wave (operators, secrets, storage, Grafana)"
+      metric: "Metrics wave"
+      data: "ClickHouse wave"
+      worker: "Bootstrap Job wave"
+      collector: "Collector wave"
+      profile: "Profiling wave"
+      service: "Application wave"
+    edges:
+      control: "releases (the target's dependsOn)"
+
+layers: [w0, w1, w2, w3, w4, w5]
+
+nodes:
+  - {id: w_controllers, label: "controllers-local\n./controllers\ngate: wait — operators + namespaces", role: platform, layer: w0}
+
+  - {id: w_secrets, label: "secrets-local\n./configs/secrets\ngate: wait — OpenBao + ESO", role: platform, layer: w1}
+  - {id: w_monitoring, label: "monitoring-local\n./configs/observability\ngate: wait — VM CRs · rules · Grafana", role: metric, layer: w1}
+
+  - {id: w_keeper, label: "clickhouse-keeper-local\n./configs/clickhouse-keeper\ngate: healthChecks — 3× StatefulSet", role: data, layer: w2, icon: clickhouse}
+  - {id: w_storage, label: "storage-local\n./controllers/storage\ngate: wait — RustFS", role: platform, layer: w2}
+  - {id: w_folders, label: "grafana-dashboards-as-code-folders-local\n./folders\ngate: healthCheckExprs — 6× GrafanaManifest", role: platform, layer: w2}
+  - {id: w_apps, label: "apps-local\n./ (apps-oci)\ngate: wait — the microservices", role: service, layer: w2}
+
+  - {id: w_chi, label: "clickhouse-local\n./configs/clickhouse\ngate: healthChecks — 3× StatefulSet", role: data, layer: w3, icon: clickhouse}
+  - {id: w_profiling, label: "profiling-local\n./controllers/profiling\ngate: wait — Pyroscope HelmRelease", role: profile, layer: w3}
+  - {id: w_dash, label: "grafana-dashboards-as-code-dashboards-local\n./dashboards\ngate: healthCheckExprs — 18× GrafanaManifest", role: platform, layer: w3}
+
+  - {id: w_schema, label: "clickhouse-schema-local\n./configs/clickhouse-schema\ngate: wait — DDL bootstrap Job", role: worker, layer: w4, icon: clickhouse}
+
+  - {id: w_tracing, label: "tracing-local\n./controllers/tracing\ngate: wait — OTel Collector Deployment", role: collector, layer: w5, icon: opentelemetry}
+
+edges:
+  - {id: d0, source: w_controllers, target: w_secrets, type: control}
+  - {id: d1, source: w_controllers, target: w_monitoring, type: control}
+  - {id: d2, source: w_controllers, target: w_storage, type: control}
+  - {id: d3, source: w_controllers, target: w_keeper, type: control}
+  - {id: d4, source: w_controllers, target: w_chi, type: control}
+  - {id: d5, source: w_secrets, target: w_storage, type: control}
+  - {id: d6, source: w_secrets, target: w_keeper, type: control}
+  - {id: d7, source: w_secrets, target: w_chi, type: control}
+  - {id: d8, source: w_secrets, target: w_schema, type: control}
+  - {id: d9, source: w_secrets, target: w_tracing, type: control}
+  - {id: d10, source: w_secrets, target: w_profiling, type: control}
+  - {id: d11, source: w_storage, target: w_chi, type: control}
+  - {id: d12, source: w_storage, target: w_profiling, type: control}
+  - {id: d13, source: w_keeper, target: w_chi, type: control}
+  - {id: d14, source: w_chi, target: w_schema, type: control}
+  - {id: d15, source: w_schema, target: w_tracing, type: control}
+  - {id: d16, source: w_monitoring, target: w_folders, type: control}
+  - {id: d17, source: w_monitoring, target: w_dash, type: control}
+  - {id: d18, source: w_monitoring, target: w_apps, type: control}
+  - {id: d19, source: w_folders, target: w_dash, type: control}
+
+notes:
+  - id: note_gate
+    title: "Reading the gate line"
+    text: "wait — the wave is Ready when the objects it applies are Ready. healthChecks / healthCheckExprs — wait is deliberately absent: the objects worth gating on are StatefulSets and GrafanaManifests an operator creates later, so they are never in the wave's own applied set and wait would pass instantly. Listing them is the only thing that holds the next wave back (RFC-0028 / ADR-065). The two are mutually exclusive and wait wins, so a wave setting both gates only on what it applies."
+  - id: note_src
+    title: "Sources and scope"
+    text: "Every wave reads infrastructure-oci (oci://homelab-registry:5000/flux-infra-sync, ref local) except apps-local, which reads apps-oci (flux-apps-sync), and the two dashboards-as-code waves, which read grafana-dashboards-as-code-oci (ghcr.io/duynhlab/grafana-dashboards-as-code, semver 0.2.1). apps-local also waits for databases-local, temporal-config-local and keda-local, which sit outside this diagram."

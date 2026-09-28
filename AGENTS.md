@@ -77,7 +77,7 @@ make flux-sync    # force reconciliation
 ## Platform architecture & conventions
 
 - **Observability (platform stack):** VictoriaMetrics, Grafana, VictoriaTraces, VictoriaLogs, ClickHouse, Pyroscope, Vector (Loki, Tempo and Jaeger all removed — RFC-0027 / ADR-058 + ADR-059; the retired manifests sit beside their kustomization as `*.yaml.bak`). SLO via Sloth. Envoy Gateway emits edge spans (OTLP gRPC, W3C, ParentBased). Application instrumentation policy (otel middleware chain, OTLP export, trace/log correlation) lives in service repos via `pkg/obsx` — see the platform-engineer skill when editing ingress, NetworkPolicy, or observability docs.
-- **Diagrams:** **Mermaid is the default — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.). Palette and workflow in Docs conventions below. **Draw.io (`.drawio`) is the exception, only when asked for by name or when editing a `.drawio` that already exists** — route that work through the [`homelab-drawio` skill](.agents/skills/homelab-drawio/SKILL.md).
+- **Diagrams:** **Mermaid is the default — never ASCII art** (`flowchart`, `sequenceDiagram`, etc.). Palette and workflow in Docs conventions below. **Draw.io (`.drawio`) is the exception, only when asked for by name or when editing a `.drawio` that already exists** — route that work through the [`homelab-drawio` skill](.agents/skills/homelab-drawio/SKILL.md). The skill plans each diagram as a YAML model (`<name>.ir.yaml`) and generates the `.drawio` from it top-down; edit the IR, never the generated XML.
 - **Stack:** Go 1.26 (services, not authored here), PostgreSQL (CloudNativePG operator, PgDog pooler, Barman backups), OpenTelemetry, Flux Operator + Kustomize + OCI, Kind + Helm 3, OpenBAO + External Secrets Operator.
 
 ## Kyverno admission rules

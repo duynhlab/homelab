@@ -141,7 +141,7 @@ ClickHouse keeps:
   <a href="../architecture/observability-signal-flow.svg"><img src="../architecture/img/observability-signal-flow.png" alt="Observability signal flow: producers, OTel Collector pipelines, backends and their retention, Grafana" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/observability-signal-flow.drawio"><code>docs/architecture/observability-signal-flow.drawio</code></a>, authored with the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the source, then re-run its <code>scripts/export.py</code> to refresh this image.</sub></p>
+<p align="center"><sub>Source <a href="../architecture/observability-signal-flow.drawio"><code>docs/architecture/observability-signal-flow.drawio</code></a>, generated from <a href="../architecture/observability-signal-flow.ir.yaml"><code>observability-signal-flow.ir.yaml</code></a> by the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the IR, then re-run its <code>scripts/generate.py</code> and <code>scripts/export.py</code> to refresh this image.</sub></p>
 
 
 ## 3-Layer Service Architecture & APM Integration
@@ -462,7 +462,7 @@ by wave, with the gate that releases each one:
   <a href="../architecture/observability-delivery.svg"><img src="../architecture/img/observability-delivery.png" alt="Observability delivery order: Flux waves and their gates" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/observability-delivery.drawio"><code>docs/architecture/observability-delivery.drawio</code></a>, authored with the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the source, then re-run its <code>scripts/export.py</code> to refresh this image.</sub></p>
+<p align="center"><sub>Source <a href="../architecture/observability-delivery.drawio"><code>docs/architecture/observability-delivery.drawio</code></a>, generated from <a href="../architecture/observability-delivery.ir.yaml"><code>observability-delivery.ir.yaml</code></a> by the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the IR, then re-run its <code>scripts/generate.py</code> and <code>scripts/export.py</code> to refresh this image.</sub></p>
 
 The detail worth carrying away: **`clickhouse-keeper-local` and
 `clickhouse-local` omit `wait` on purpose.** The objects worth gating on are

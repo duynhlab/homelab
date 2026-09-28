@@ -9,9 +9,13 @@ load-bearing tool is missing:
   rsvg-convert  required only when ADDING an icon (SVG -> PNG raster step), so
                 it is a warning by default and a failure under --adding-icon
   magick        ImageMagick, to eyeball a new icon at 24px -- same treatment
+  dot           Graphviz, required by generate.py to lay an IR out top-down
+  yaml, jsonschema  Python modules generate.py/validate.py read and check the IR with
+  Pillow        optional: export.py quantizes the PNG with it (else ImageMagick)
 
-Authoring a diagram from the existing catalog needs `drawio` and nothing else;
-failing that run on a missing librsvg would block work it cannot affect.
+Hand-editing an existing .drawio needs `drawio` alone; generating one from an
+IR also needs dot + PyYAML + jsonschema. Failing a run on a missing librsvg
+would block work it cannot affect, so the icon tools stay warnings.
 """
 from __future__ import annotations
 
@@ -67,6 +71,26 @@ def main() -> int:
             ok = False
         else:
             print(f"  warn  {tool:15} only needed to {why}: {hint}")
+
+    dot = shutil.which("dot")
+    if dot:
+        print(f"  OK    dot             {dot}  [{_version([dot, '-V'])}]")
+    else:
+        print(f"  MISS  dot             generate.py lays the IR out with Graphviz: {INSTALL_HINTS['graphviz']}")
+        ok = False
+    for mod, hint in (("yaml", "python3-yaml"), ("jsonschema", "python3-jsonschema")):
+        try:
+            __import__(mod)
+            print(f"  OK    {mod:15} python module")
+        except ImportError:
+            print(f"  MISS  {mod:15} generate.py/validate.py need it: "
+                  f"{'pip install ' + mod if IS_MAC else 'sudo apt install ' + hint}")
+            ok = False
+    try:
+        __import__("PIL")
+        print("  OK    pillow          export.py quantizes the PNG with it")
+    except ImportError:
+        print("  warn  pillow          optional -- export.py falls back to ImageMagick to quantize the PNG")
 
     print(f"  OK    python          {sys.version.split()[0]}")
 

@@ -153,14 +153,23 @@ direction. In an IR, name the edge types that move in `diagram.animate`
 `flowAnimation=1;` and animates the matching legend sample too. By hand, append
 `;flowAnimation=1;` or use the `request_animated` preset role.
 
+**The rule: what flows moves, what governs stays still.** Requests (`traffic`),
+reads and writes (`data`), WAL and backups (`replication`), task queues
+(`event`) and logs / metrics / traces (`telemetry`) are things travelling, so
+they animate. `control`, `trust` and `dependency` edges say who manages,
+authenticates or needs whom; they stay still, and that stillness is what makes
+the moving flow readable. The exception is a graph whose question *is* the
+control edges (a delivery graph): there they are the flow.
+
 | Diagram | Moves (`diagram.animate`) | Stays still |
 |---|---|---|
-| request path (platform/topology) | `traffic` | trust, data, control, telemetry |
-| signal flow (observability/signal-flow) | `telemetry` | Grafana queries, cold tier |
+| request path (platform/topology) | `traffic`, `data`, `telemetry` | JWKS (trust), manages / syncs Secrets (control) |
+| signal flow (observability/signal-flow) | `telemetry` | Grafana queries, cold tier (data) |
 | delivery (observability/delivery) | `control` (every wave) | — |
-| database paths (databases/topology) | `data`, `replication` | manage, rotate, migrations |
-| NetworkPolicy (security/network-policies) | `data` | operator, scrape, HTTP |
-| work layer (workflows/temporal-keda) | `traffic`, `event` | rollout, scaling, backlog reads |
+| database paths (databases/topology) | `data`, `replication` | manage, rotate (control), migrations (dependency) |
+| NetworkPolicy data tier (security/network-policies) | `data`, `telemetry`, `traffic` | operator, rotation, floci (control) |
+| NetworkPolicy app mesh (security/app-mesh) | `traffic` (every allow) | — |
+| work layer (workflows/temporal-keda) | `traffic`, `event`, `data` | rollout, scaling (control), backlog reads (dependency) |
 
 - **It moves in the SVG, on GitHub too.** Checked 2026-09-28 by rendering a
   pushed branch with a real browser: GitHub shows a Draw.io SVG in an `<img>`

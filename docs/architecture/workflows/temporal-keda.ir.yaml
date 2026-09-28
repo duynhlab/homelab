@@ -13,7 +13,7 @@ diagram:
   scope: "Who starts each workflow, which task queue carries it, which worker serves it, what rolls each worker out by build and what scales it on backlog. Workflow step behaviour and build routing live in docs/api/temporal.md."
   question: domain-topology
   level: L2
-  animate: [traffic, event]
+  animate: [traffic, event, data]
   pin_order: true
   legend:
     roles:

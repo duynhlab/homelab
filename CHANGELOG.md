@@ -598,6 +598,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **What flows moves, what governs stays still.**
+  - The topology now animates application → database and the telemetry path,
+    alongside requests.
+  - The NetworkPolicy data-tier view adds the scrape and gateway allows.
+  - The Temporal view adds its persistence.
+  - `control`, `trust` and `dependency` edges stay still. The rule and a
+    per-diagram table are in the homelab-drawio house style.
+
 - **The NetworkPolicy app mesh gets its Draw.io view; the root README keeps
   only the Draw.io topology.**
   - New: `security/app-mesh`, verified against every ingress rule in

@@ -290,9 +290,9 @@ graph TD
     R --> H["Web layer web/v1"]
     H --> L["Logic layer logic/v1"]
     L --> O["Core layer"]
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class A edge;
     class B,C,D,E,R,H,L service;
     class O data;
@@ -362,11 +362,11 @@ flowchart TB
     LOGIC --> ADAPTER["core adapters<br/>DB · cache · external clients"]
     ADAPTER --> DB[("owned storage")]
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
 
     class HTTP,RPC edge;
     class HM,LM,GI,WEB,GRPC,LOGIC,DOMAIN,ADAPTER service;
@@ -499,8 +499,8 @@ graph LR
     D --> C["slogx.FromContext(ctx)<br/>ids read from the span on ctx"]
     E --> C
     C --> F["Structured logs with trace_id + span_id"]
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     class A edge;

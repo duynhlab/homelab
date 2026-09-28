@@ -246,8 +246,8 @@ flowchart TD
     Q4 -->|no| F6["Single vmagent streamAggr<br/>(this homelab's pilot shape)"]
 
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Q0,Q1,Q2,Q3,Q4 metric;
     class F4,F5,F6 data;
     class N0,F1,F2,F3 platform;

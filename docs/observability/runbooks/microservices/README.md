@@ -148,8 +148,8 @@ flowchart TD
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class Start,CheckDashboard metric;
     class CheckExemplar,CheckLogs log;
     class ReadTrace trace;
@@ -188,8 +188,8 @@ flowchart TD
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class Start,CheckP95 metric;
     class CheckExemplar log;
     class ReadTrace trace;
@@ -219,8 +219,8 @@ flowchart TD
     IsUpstreamDown -->|No| CheckIngress["Check Ingress / routing\nconfiguration"]
 
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class Start metric;
     class IsUp,CheckEndpoints,HasEndpoints,CheckUpstream,IsUpstreamDown,CheckIngress platform;
     class FollowDown,CheckService,FixSelector,FixUpstream service;
@@ -248,8 +248,8 @@ flowchart TD
 
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     class Start,CheckGrafana metric;
     class CheckGoroutineProfile,CheckHeapProfile,CheckAllocProfile profile;
     class IsGoroutine,IsHeap,IsGCHigh,StableState platform;

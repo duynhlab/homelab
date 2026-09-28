@@ -103,10 +103,10 @@ flowchart LR
     COL --> CH[("ClickHouse")]
     SO -.->|"Vector stops tailing:<br/>otlp-logs=true"| VL
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
 
     class EG edge;
     class COL platform;

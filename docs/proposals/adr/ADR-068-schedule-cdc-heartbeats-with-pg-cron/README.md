@@ -104,9 +104,9 @@ flowchart LR
     CH -->|"oldest emitted_at"| F["data_through"]
     CRON -.->|"job status is diagnostic only"| OPS["Alerts and runbook"]
 
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class CRON worker;
     class O,C,P,CH data;
     class F,OPS platform;

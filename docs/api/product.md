@@ -71,9 +71,9 @@ flowchart LR
     Product -->|"gRPC BatchGetAvailability<br/>soft-fail to unknown"| Inventory[inventory]
     Checkout[checkout] -->|"gRPC BatchGetCurrentPrices<br/>cache-bypass"| Product
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class SPA,Edge edge;
     class Product,Review,Checkout,Inventory service;
     class DB,Cache data;

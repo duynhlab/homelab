@@ -67,8 +67,8 @@ flowchart LR
   end
   Q["SELECT ServiceName, count()"] --> C1
 
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   class Page,C1,C2,C3 data;
   class Q platform;
 ```
@@ -180,8 +180,8 @@ flowchart TB
   M -->|"1"| Late["Part survives until the<br/>WHOLE month expires<br/>retention overshoots"]
   M -->|"0"| Heavy["Month-sized parts rewritten<br/>repeatable every 4h"]
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   class Q,A,D,M platform;
   class Drop,Small,Late,Heavy data;
 ```
@@ -257,8 +257,8 @@ flowchart LR
   Plan --> Exec["Executor<br/>read granules as column blocks"]
   Exec --> Parts[("MergeTree parts")]
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   class Parser,Plan,Exec platform;
   class Parts data;
 ```
@@ -298,8 +298,8 @@ flowchart TB
     P["2 shards × 2 replicas"]
   end
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
   class G,K platform;
   class S0,S1,S2 data;

@@ -31,7 +31,7 @@ def _write(text: str) -> str:
 CLEAN = """<mxGraphModel><root>
 <mxCell id="0"/><mxCell id="1" parent="0"/>
 <mxCell id="ttl" value="Title — scope" style="text;html=1;fontFamily=Helvetica;fontSize=18;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="300" height="26" as="geometry"/></mxCell>
-<mxCell id="a" value="user-service" style="rounded=1;fillColor=#06B6D4;strokeColor=#0E7490;fontColor=#082F49;fontFamily=Helvetica;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="120" height="40" as="geometry"/></mxCell>
+<mxCell id="a" value="user-service" style="rounded=1;fillColor=#CFFAFE;strokeColor=#0891B2;fontColor=#164E63;fontFamily=Helvetica;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="120" height="40" as="geometry"/></mxCell>
 <mxCell id="lg" value="Legend" style="fillColor=none;fontFamily=Helvetica;" vertex="1" parent="1"><mxGeometry x="0" y="80" width="120" height="40" as="geometry"/></mxCell>
 </root></mxGraphModel>"""
 
@@ -52,8 +52,26 @@ class TestCommon(unittest.TestCase):
 
     def test_role_style_known(self):
         rs = _common.role_style("service")
-        self.assertEqual(rs["fillColor"], "#06B6D4")
-        self.assertEqual(rs["fontColor"], "#082F49")
+        self.assertEqual(rs["fillColor"], "#CFFAFE")
+        self.assertEqual(rs["fontColor"], "#164E63")
+
+    def test_drawio_command_linux_headless_and_root(self):
+        from unittest import mock
+        with mock.patch.object(_common, "IS_MAC", False), \
+             mock.patch.dict(os.environ, {"DISPLAY": "", "WAYLAND_DISPLAY": ""}), \
+             mock.patch.object(_common.shutil, "which", return_value="/usr/bin/xvfb-run"), \
+             mock.patch.object(_common.os, "geteuid", return_value=0):
+            self.assertEqual(_common.drawio_command("/usr/bin/drawio"),
+                             ["/usr/bin/xvfb-run", "-a", "/usr/bin/drawio", "--no-sandbox"])
+
+    def test_drawio_command_desktop_unchanged(self):
+        from unittest import mock
+        with mock.patch.object(_common, "IS_MAC", False), \
+             mock.patch.dict(os.environ, {"DISPLAY": ":0"}), \
+             mock.patch.object(_common.os, "geteuid", return_value=1000):
+            self.assertEqual(_common.drawio_command("/usr/bin/drawio"), ["/usr/bin/drawio"])
+        with mock.patch.object(_common, "IS_MAC", True):
+            self.assertEqual(_common.drawio_command("/x/draw.io"), ["/x/draw.io"])
 
     def test_role_style_unknown(self):
         with self.assertRaises(KeyError):
@@ -124,7 +142,8 @@ class TestIconStyle(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("image=data:image/png,", out)
         self.assertNotIn(";base64,", out)
-        self.assertIn("fillColor=#7C3AED", out)  # platform fill
+        self.assertIn("fillColor=#EDE9FE", out)  # platform fill (v2 soft tint)
+        self.assertIn("shadow=0", out)  # v2: no drop shadows
         self.assertIn("fontFamily=Helvetica", out)
         self.assertNotIn("dashed=1", out)  # platform is a solid role
 
@@ -242,18 +261,37 @@ class TestValidateHouse(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(warnings, [])  # has a legend, Helvetica
 
+    def test_v1_saturated_fill_warns(self):
+        text = CLEAN.replace("fillColor=#CFFAFE;strokeColor=#0891B2;fontColor=#164E63",
+                             "fillColor=#7C3AED;strokeColor=#5B21B6;fontColor=#FFFFFF")
+        _, warnings = self._errs(text)
+        self.assertTrue(any("v1 saturated fill #7C3AED" in w for w in warnings))
+        self.assertTrue(any("white text" in w for w in warnings))
+
+    def test_shadow_warns(self):
+        text = CLEAN.replace('style="rounded=1;fillColor=#CFFAFE', 'style="rounded=1;shadow=1;fillColor=#CFFAFE')
+        _, warnings = self._errs(text)
+        self.assertTrue(any("drop shadow" in w for w in warnings))
+
+    def test_legend_swatch_may_keep_any_fill(self):
+        # legend cells explain the roles; they are exempt from the palette check
+        text = CLEAN.replace('<mxCell id="lg" value="Legend" style="fillColor=none;',
+                             '<mxCell id="lg" value="Legend" style="fillColor=#7C3AED;')
+        _, warnings = self._errs(text)
+        self.assertFalse(any("v1 saturated" in w for w in warnings))
+
     def test_base64_trap(self):
-        text = CLEAN.replace('style="rounded=1;fillColor=#06B6D4', 'style="rounded=1;image=data:image/png;base64,AAAA;fillColor=#06B6D4')
+        text = CLEAN.replace('style="rounded=1;fillColor=#CFFAFE', 'style="rounded=1;image=data:image/png;base64,AAAA;fillColor=#CFFAFE')
         errors, _ = self._errs(text)
         self.assertTrue(any("';base64,'" in e for e in errors))
 
     def test_svg_data_uri(self):
-        text = CLEAN.replace('style="rounded=1;fillColor=#06B6D4', 'style="rounded=1;image=data:image/svg+xml,PHN2Zz48L3N2Zz4=;fillColor=#06B6D4')
+        text = CLEAN.replace('style="rounded=1;fillColor=#CFFAFE', 'style="rounded=1;image=data:image/svg+xml,PHN2Zz48L3N2Zz4=;fillColor=#CFFAFE')
         errors, _ = self._errs(text)
         self.assertTrue(any("SVG data URI" in e for e in errors))
 
     def test_icon_on_frame(self):
-        text = CLEAN.replace('style="rounded=1;fillColor=#06B6D4', 'style="rounded=1;container=1;image=data:image/png,AAAA;fillColor=#06B6D4')
+        text = CLEAN.replace('style="rounded=1;fillColor=#CFFAFE', 'style="rounded=1;container=1;image=data:image/png,AAAA;fillColor=#CFFAFE')
         errors, _ = self._errs(text)
         self.assertTrue(any("grouping frame" in e for e in errors))
 
@@ -278,7 +316,7 @@ class TestValidateHouse(unittest.TestCase):
         box as a mislabelled planned one.
         """
         text = CLEAN.replace(
-            'style="rounded=1;fillColor=#06B6D4;strokeColor=#0E7490',
+            'style="rounded=1;fillColor=#CFFAFE;strokeColor=#0891B2',
             'style="rounded=1;dashed=1;fillColor=#64748B;strokeColor=#334155',
         )
         errors, _ = self._errs(text)

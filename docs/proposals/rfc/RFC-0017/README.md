@@ -102,8 +102,8 @@ flowchart TB
     WEB --> LOGIC --> CORE --> DB[(PostgreSQL)]
     CORE -.cache-aside.-> VK[(Valkey · product only)]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class RED,BIZ,DBSPAN service;
     class DB,VK data;
 ```
@@ -341,9 +341,9 @@ flowchart TD
     Q2 -->|yes| LOG
     Q2 -->|no| OK["OK as a metric label / span attribute"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class V,Q1,Q2 service;
     class OK data;
     class LOG external;

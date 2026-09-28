@@ -39,7 +39,7 @@ Official reference: [Roles and permissions](https://grafana.com/docs/grafana/lat
 - **Backend** / **Frontend** teams can own service-specific folders.
 - **Viewer** org role + **Editor** on a folder allows targeted edit rights without org-wide Editor.
 
-Official: [Team sync](https://grafana.com/docs/grafana/latest/administration/team-sync/), [Folder permissions](https://grafana.com/docs/grafana/latest/administration/user-management/manage-dashboard-permissions/).
+Official: [Team sync](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-team-sync/), [Folder permissions](https://grafana.com/docs/grafana/latest/administration/user-management/manage-dashboard-permissions/).
 
 ---
 
@@ -123,8 +123,8 @@ flowchart TD
   OrgRole -->|"Default ceiling"| UserCap[User capability]
   FolderPerm -->|"Override for folder"| UserCap
 
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   class OrgRole,FolderPerm data;
   class UserCap platform;
 ```
@@ -145,8 +145,8 @@ flowchart LR
     U3[Team folder Editor]
   end
 
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   class A1,U1,U2,U3 external;
   class A2 platform;
 ```
@@ -159,8 +159,8 @@ flowchart TD
   Folders[Folders platform services apps]
   Teams --> Folders
 
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   class Teams platform;
   class Folders data;
 ```

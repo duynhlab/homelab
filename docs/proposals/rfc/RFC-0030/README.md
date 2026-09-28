@@ -198,9 +198,9 @@ flowchart LR
   PAGE -.->|"planned staff Bearer request"| EDGE
   EDGE -.->|"planned protected route"| ANA
 
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
   class STAFF external;
   class EDGE edge;
@@ -232,9 +232,9 @@ flowchart TD
   AGE -->|">2m and ≤5m"| STALE
   AGE -->|">5m"| DOWN
 
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   class READ,KNOWN,AGE worker;
   class FRESH service;
   class STALE,DOWN external;

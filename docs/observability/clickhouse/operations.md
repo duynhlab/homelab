@@ -37,10 +37,10 @@ flowchart LR
   R3 --> RustFS
   Grafana["Grafana"] --> CHSvc
 
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   class Producer service;
   class Collector collector;
   class CHSvc,Keeper,Grafana platform;

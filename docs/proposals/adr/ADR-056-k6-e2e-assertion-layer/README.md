@@ -120,9 +120,9 @@ flowchart LR
   verdict -->|"all rows pass"| zero["exit 0"]
   verdict -->|"any row fails"| nonzero["exit non-zero<br/>+ evidence table"]
 
-  classDef edgeC fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef edgeC fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 
   class edge edgeC;
   class suite service;

@@ -32,9 +32,9 @@ flowchart TD
     Shared --> Checkpointer["Checkpointer"]
     Shared --> Autovacuum["Autovacuum workers"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class Client,Postmaster,Backend service;
     class WALWriter,BgWriter,Checkpointer,Autovacuum worker;
     class Private,Shared platform;

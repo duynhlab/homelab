@@ -193,8 +193,8 @@ flowchart LR
     VMSingle["VMSingle :8428"] -->|"vmalert.proxyURL"| Grafana
 
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
     class VMSingle metric;
     class VMAM,Karma,Grafana platform;

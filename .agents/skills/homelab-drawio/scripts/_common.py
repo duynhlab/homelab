@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
+import sys
 from functools import lru_cache
 
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,14 +20,31 @@ ICONS = os.path.join(ASSETS, "icons")
 PRESET = os.path.join(ASSETS, "homelab.json")
 MANIFEST = os.path.join(ICONS, "manifest.json")
 
-# Candidate locations for the Draw.io desktop CLI, in priority order.
+# Candidate locations for the Draw.io desktop CLI, in priority order: PATH
+# first (the .deb, Homebrew and snap all put a `drawio` there), then the usual
+# install directories on Linux and macOS for a shell whose PATH lacks them.
 DRAWIO_CANDIDATES = (
     "drawio",
     "draw.io",
-    "/Applications/draw.io.app/Contents/MacOS/draw.io",
-    "/opt/homebrew/bin/drawio",
-    "/usr/local/bin/drawio",
+    "/opt/drawio/drawio",                                  # Linux .deb / .rpm
+    "/snap/bin/drawio",                                    # Linux snap
+    "/Applications/draw.io.app/Contents/MacOS/draw.io",    # macOS app bundle
+    "/opt/homebrew/bin/drawio",                            # macOS Homebrew (arm64)
+    "/usr/local/bin/drawio",                               # macOS Homebrew (x86_64) / manual
 )
+
+IS_MAC = sys.platform == "darwin"
+
+# Install hints per platform, so a MISS line tells the reader something they
+# can actually run on the machine in front of them.
+INSTALL_HINTS = {
+    "drawio": ("brew install --cask drawio" if IS_MAC else
+               "download the .deb from github.com/jgraph/drawio-desktop/releases and "
+               "`sudo apt install ./drawio-amd64-*.deb` (or `sudo snap install drawio`)"),
+    "rsvg-convert": "brew install librsvg" if IS_MAC else "sudo apt install librsvg2-bin",
+    "imagemagick": "brew install imagemagick" if IS_MAC else "sudo apt install imagemagick",
+    "xvfb-run": "" if IS_MAC else "sudo apt install xvfb",
+}
 
 
 @lru_cache(maxsize=1)
@@ -103,3 +122,40 @@ def find_drawio() -> str | None:
             if found:
                 return found
     return None
+
+
+def drawio_command(drawio: str) -> list[str]:
+    """The argv prefix that runs the Draw.io CLI on this machine.
+
+    Draw.io Desktop is Electron. On macOS and on a Linux desktop session it runs
+    as-is. Two Linux cases need help, and both fail with an opaque Electron error
+    rather than a useful one:
+      - no display server (CI, ssh, a container): Electron cannot start at all,
+        so wrap it in `xvfb-run -a` when that is installed;
+      - running as root: Chromium refuses to start without `--no-sandbox`.
+    """
+    cmd = [drawio]
+    if IS_MAC:
+        return cmd
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        xvfb = shutil.which("xvfb-run")
+        if xvfb:
+            cmd = [xvfb, "-a", drawio]
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        cmd.append("--no-sandbox")
+    return cmd
+
+
+def font_fallback(family: str = "Helvetica") -> str | None:
+    """What fontconfig actually renders `family` with, or None without fc-match.
+
+    The house font is Helvetica. macOS ships it; Linux does not and substitutes a
+    metric-compatible clone (Nimbus Sans, from the urw-base35 fonts), so labels
+    keep their width and nothing in a diagram needs a per-OS font. Anything else
+    (DejaVu Sans is the usual culprit) is wider and can overflow a box.
+    """
+    fc = shutil.which("fc-match")
+    if not fc:
+        return None
+    out = subprocess.run([fc, "-f", "%{family}", family], capture_output=True, text=True)
+    return out.stdout.strip() or None

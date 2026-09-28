@@ -65,8 +65,8 @@ flowchart LR
     PAE -. "dropped (parse errors)" .-> FAILS["victorialogs_pg_parse_failures"]
     ALL & PLANS & FAILS --> VL[("VictoriaLogs :9428<br/>/insert/jsonline")]
     IM[/"internal_metrics source"/] --> PE["prometheus_exporter :9090"] -->|"PodMonitor scrape"| VM[("VictoriaMetrics")]
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     class K8S,EGP external;

@@ -19,6 +19,7 @@ that earn an editable vector source. They are authored with the
 | Source | Answers | Published |
 |--------|---------|-----------|
 | [`topology.drawio`](topology.drawio) | **Request path** — how a request travels once the platform is up: edge → apps → data, with the observability and secrets planes. | [`README.md` § Topology](../../README.md#topology) (as [`img/topology.png`](img/topology.png), [`topology.svg`](topology.svg) to zoom) |
+| [`observability-signal-flow.drawio`](observability-signal-flow.drawio) | **Signal flow + retention** — which OTel Collector pipeline carries each signal, which backend stores it and for how long, and the paths that bypass the collector (Pyroscope SDK, vmagent scrape, Vector). | [`observability/README.md` § Architecture](../observability/README.md#architecture) (as [`img/observability-signal-flow.png`](img/observability-signal-flow.png), [`observability-signal-flow.svg`](observability-signal-flow.svg) to zoom) |
 | [`observability-delivery.drawio`](observability-delivery.drawio) | **Delivery order** — how Flux delivers the observability stack and what releases each wave, including the two ClickHouse waves that omit `wait` so their `healthChecks` stay live. | [`observability/README.md` § Deployment](../observability/README.md#deployment) (as [`img/observability-delivery.png`](img/observability-delivery.png), [`observability-delivery.svg`](observability-delivery.svg) to zoom) |
 
 ## Conventions
@@ -41,4 +42,4 @@ that earn an editable vector source. They are authored with the
   **open the render and look**, which is where clipping and overlapping labels
   are caught.
 
-_Last updated: 2026-09-18._
+_Last updated: 2026-09-28 — `observability-signal-flow.drawio` added; all sources recoloured to the v2 soft-tint palette (light fill, role-hue stroke, dark text, no shadows). Previously 2026-09-18._

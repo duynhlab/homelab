@@ -159,10 +159,10 @@ flowchart LR
   CH --> P2[("PVC · otel_traces · 90d")]
 
   classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
 
   class APP service;
   class EDGE edge;
@@ -427,11 +427,11 @@ flowchart LR
   VEC --> VL
   COL -->|"span_metrics connector → vmagent"| VM[("VictoriaMetrics")]
 
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
   class APP service;

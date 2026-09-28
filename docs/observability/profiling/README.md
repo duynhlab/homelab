@@ -78,12 +78,12 @@ flowchart LR
     PYRO --> GRAF["Grafana<br/>Explore Profiles"]
     TEMPO["VictoriaTraces"] -. "manual pivot: service_name + time window<br/>(no tracesToProfiles on a jaeger-type datasource)" .-> PYRO
     PYRO -->|"ServiceMonitor /metrics"| VM["VictoriaMetrics<br/>(PyroscopeDown alert)"]
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class SDK service;
     class PYRO profile;
     class S3,PVC data;

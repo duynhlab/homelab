@@ -5,6 +5,12 @@
     },
     {
       "pattern": "^https?://[^/]+\\.duynh\\.me(?:/|$)"
+    },
+    {
+      "pattern": "^https://karma-dashboard\\.io/"
+    },
+    {
+      "pattern": "(RFC-NNNN|ADR-NNN|%7B[a-z]+%7D|\\{[a-z]+\\})"
     }
   ],
   "httpHeaders": [

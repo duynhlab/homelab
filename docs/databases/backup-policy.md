@@ -26,8 +26,8 @@ flowchart LR
     WAL -->|"replay to target"| Restore
     Restore --> Validate["Database and application validation"]
 
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Cluster,Base,WAL,Validate data;
     class Restore platform;
 ```

@@ -48,9 +48,9 @@ flowchart LR
     Worker --> Notification
     Worker -.->|"internal REST clear (by design)"| Cart
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class Checkout,Order,Product,Shipping,Payment,Notification,Cart service;
     class Worker worker;
     class Temporal platform;
@@ -326,7 +326,7 @@ flowchart TD
     Q2 -->|"yes + need strict<br/>immediate consistency"| TPC["Two-phase commit<br/>(accept the blocking cost)"]
     Q2 -->|"no — separate services<br/>or an external API"| SAGA["Saga<br/>local txns + compensations"]
 
-    classDef pick fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef pick fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class SAGA pick;
 ```
 
@@ -375,9 +375,9 @@ flowchart LR
     Shopper -->|"asks to cancel an order"| ORD
     ORD -->|"one run per cancel episode"| CW["CancellationWorkflow<br/>queue: order-fulfillment"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class CO,ORD service;
     class ACW,OFW,CW worker;
     class Shopper external;
@@ -618,11 +618,11 @@ flowchart TB
     OW -->|"gRPC :9090 (saga money ops)"| PGRPC
     EDGE["Envoy Gateway<br/>edge"] -->|"/payment/v1/public/payments/webhooks/mockpay"| PHTTP
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class EDGE edge;
     class PGRPC,PHTTP,PLOGIC service;
     class OW,RELAY,RECON worker;
@@ -771,8 +771,8 @@ flowchart TD
     Sel -->|"signal: finalize"| Done(["drain and return<br/>session confirmed or cancelled"])
     Act -->|"expired · gone"| Done
 
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Arm,Sel,Reset,CAN,ReArm worker;
     class Act data;
 ```
@@ -847,10 +847,10 @@ flowchart TD
     W -->|"started, or an existing run is live"| D
     W -->|"attempt cap, cleared token,<br/>or past the dedup window"| F["FAILED<br/>needs a human"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class O,R data
     class T platform
     class W worker
@@ -1054,10 +1054,10 @@ flowchart LR
     TC -- /metrics --> VM[VictoriaMetrics]
     OW -- OTLP --> OTC[OTel Collector]
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Edge edge;
     class OW worker;
     class HR,TC,UI,VM,OTC,WC,KEDA platform;
@@ -1183,9 +1183,9 @@ flowchart TD
   drn --> sd["scaledownDelay 1h<br/>controller writes replicas -> 0"]
   sd --> del["deleteDelay 0s (ADR-055)<br/>next reconcile deletes the Deployment<br/>and its ScaledObject"]
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   class tag,bid,dep,so platform
   class ramp,cur,dpr worker
   class reg,drn,sd,del data

@@ -85,15 +85,15 @@ flowchart LR
 
   GR --> VM & VL & VT & CH & PY
 
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
   classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
   classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
   classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
-  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+  classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
 ```
 
 Every signal has a home, and the collector fan-out matches the cluster

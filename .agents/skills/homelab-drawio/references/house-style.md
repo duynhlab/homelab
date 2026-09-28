@@ -13,19 +13,27 @@ apply it. When they disagree, the JSON wins — and the JSON must track the Merm
 Each role carries a fill, a stroke, and the font colour that stays legible on
 that fill — all three copied from the AGENTS.md `classDef` verbatim.
 
+**v2 soft tints (2026-09-28).** A light fill, the role hue on the stroke, dark
+text. v1 filled boxes with the saturated role colour and white text; on a
+30-box canvas that read as a wall of colour. Every role now clears **7:1** text
+contrast and **3:1** stroke contrast against white (WCAG formula), so the
+diagram stays legible printed, projected or in a dark-mode viewer that keeps
+the image as-is. `validate_house.py` warns on a v1 fill, white text on a content
+box, or a drop shadow.
+
 | Role | Fill | Stroke | Font | Use for |
 |---|---|---|---|---|
-| `edge` | `#2563EB` | `#1E3A8A` | `#FFFFFF` | Envoy Gateway, ingress, the edge |
-| `service` | `#06B6D4` | `#0E7490` | `#082F49` | platform / app services |
-| `worker` | `#F59E0B` | `#B45309` | `#451A03` | Temporal workers, async processors |
-| `platform` | `#7C3AED` | `#5B21B6` | `#FFFFFF` | control-plane controllers (Flux, KEDA, operators) |
-| `data` | `#22C55E` | `#15803D` | `#052E16` | datastores (Postgres, Valkey, ClickHouse, buckets) |
-| `external` | `#64748B` | `#334155` | `#FFFFFF` | third-party / off-platform |
+| `edge` | `#DBEAFE` | `#2563EB` | `#1E3A8A` | Envoy Gateway, ingress, the edge |
+| `service` | `#CFFAFE` | `#0891B2` | `#164E63` | platform / app services |
+| `worker` | `#FEF3C7` | `#D97706` | `#78350F` | Temporal workers, async processors |
+| `platform` | `#EDE9FE` | `#7C3AED` | `#4C1D95` | control-plane controllers (Flux, KEDA, operators) |
+| `data` | `#DCFCE7` | `#16A34A` | `#14532D` | datastores (Postgres, Valkey, ClickHouse, buckets) |
+| `external` | `#F1F5F9` | `#64748B` | `#334155` | third-party / off-platform |
 | `metric` | `#FFE8CC` | `#E8590C` | `#111111` | observability: metrics (VictoriaMetrics) |
 | `log` | `#D3F9D8` | `#2F9E44` | `#111111` | observability: logs (VictoriaLogs) |
 | `trace` | `#C5F6FA` | `#0C8599` | `#111111` | observability: traces (VictoriaTraces) |
 | `profile` | `#F3D9FA` | `#9C36B5` | `#111111` | observability: profiles (Pyroscope) |
-| `collector` | `#A5D8FF` | `#1971C2` | `#111111` | observability: collectors (Vector, OTel) |
+| `collector` | `#E0F2FE` | `#1971C2` | `#0C4A6E` | observability: collectors (Vector, OTel) |
 | `planned` | `#FFFFFF` | `#64748B` | `#475569` | not-yet-deployed — **always dashed** |
 
 Do not invent decorative per-node colours, and never rely on colour alone to
@@ -33,8 +41,8 @@ carry meaning (label the state too).
 
 ## Shapes
 
-- **Card** (a component): the `shapes.card` prefix — rounded, subtle shadow,
-  wrap. With a logo it becomes a `shape=label` (logo left, text right); the
+- **Card** (a component): the `shapes.card` prefix — rounded, no shadow,
+  `strokeWidth=1.5`, wrap. With a logo it becomes a `shape=label` (logo left, text right); the
   `icon_style.py` output already encodes this.
 - **Container / domain frame**: the `shapes.container` prefix — rounded, top-
   aligned title, no shadow, and `container=1`. A frame groups; it never carries a
@@ -55,7 +63,16 @@ carry meaning (label the state too).
 - **Datastore**: `shape=cylinder3` (`shapes.datastore`), always the `data` role.
 
 Fonts: **Helvetica** everywhere (web-safe, resolves locally, so SVG export needs
-no embedded font). Titles use `fontSize=13; fontStyle=1`.
+no embedded font). Titles use `fontSize=13; fontStyle=1`. macOS ships Helvetica;
+Linux has none and fontconfig substitutes a metric-compatible clone (Nimbus Sans
+from `fonts-urw-base35`, or Liberation Sans), so a label measures the same on
+both and the style never needs a per-OS font. `doctor.py` reports the
+substitute; a non-metric fallback such as DejaVu Sans is wider and can overflow
+a box.
+
+Frames (domain groups and the legend) are neutral: `fillColor=#F8FAFC;
+strokeColor=#CBD5E1;fontColor=#334155;fontSize=13;fontStyle=1` (`frame` in the
+preset). A frame never takes a role colour.
 
 ## Edges
 

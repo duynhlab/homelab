@@ -112,8 +112,8 @@ flowchart LR
     VMA --> VM[("VictoriaMetrics<br/>_bucket / _sum / _count")]
     VM --> Q["histogram_quantile()<br/>dashboards · SLO burn rates"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     class SDK service;
     class COL,VMA collector;

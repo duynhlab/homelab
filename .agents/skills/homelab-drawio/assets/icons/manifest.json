@@ -147,6 +147,14 @@
       "source": "https://cdn.simpleicons.org/postgresql",
       "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
     },
+    "pyroscope": {
+      "file": "pyroscope.png",
+      "bytes": 3045,
+      "sha256": "7e6b1cfb0d28e25f2b967b7ae3d7ef899b2895a90bd8f1fa3f6bb46359e6375e",
+      "label": "Pyroscope",
+      "source": "https://github.com/grafana/pyroscope/blob/main/ui/public/icons/logo.svg (rasterised to 64px, aspect kept, with headless Chrome)",
+      "license": "Grafana Labs Pyroscope mark; brand trademark - identification use only"
+    },
     "temporal": {
       "file": "temporal.png",
       "bytes": 1508,
@@ -176,8 +184,6 @@
     "vector": "no mark at any source probed (project repo, site, simple-icons). Stays plain.",
     "sloth": "no full-colour mark located. Stays plain."
   },
-  "follow_up": {
-    "pyroscope": "only the Grafana umbrella mark resolves on simple-icons; fetch the Pyroscope mark from github.com/grafana/pyroscope brand assets, rasterise, then add."
-  },
+  "follow_up": {},
   "_follow_up_note": "follow_up holds products whose mark exists but is not in the catalog yet; icon_style.py folds its keys into the audit's search terms, so only real product names belong here. KEDA reminder (already catalogued): present as keda; listed here only so a future editor does not re-add a duplicate."
 }

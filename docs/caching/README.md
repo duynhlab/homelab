@@ -47,9 +47,9 @@ flowchart LR
     PROD["product-service<br/>db 0 cache-aside"] --> VALKEY["Valkey :6379<br/>cache-system"]
     VALKEY --> SM["ServiceMonitor<br/>redis_exporter"]
     SM --> VM["VictoriaMetrics<br/>via VMAgent scrape"]
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     class PROD service;
     class VALKEY data;

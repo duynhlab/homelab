@@ -47,8 +47,8 @@ flowchart LR
     SLO -->|relax + add penalty| SLA
 
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class SLI metric;
     class SLO data;
     class SLA external;
@@ -218,7 +218,7 @@ flowchart LR
     L2["Layer 2 — SLO burn-rate alerts<br/>page (14.4x) + ticket (6x)"] --> R2["Catch slow degradation<br/>that eats the budget"]
 
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class L1,L2 metric;
     class R1,R2 platform;
 ```

@@ -59,7 +59,7 @@ flowchart LR
     USE --> G
     G --> SLO["SLOs / error budgets<br/>(Sloth → VMAlert)"]
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class R,E1,D,U,S2,E3 metric;
     class G,SLO platform;
 ```
@@ -117,12 +117,12 @@ flowchart LR
     VMS --> GRAF["Grafana"]
     VMS --> VMAL["VMAlert"] --> AM["VMAlertmanager"]
     SVC -. "trace_id in spans + logs" .-> CORR["VictoriaTraces / VictoriaLogs<br/>(no exemplars — D-14)"]
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class SVC service;
     class KSM,PGE external;
     class OTEL collector;

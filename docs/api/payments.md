@@ -65,11 +65,11 @@ flowchart LR
     Payment -->|"charge / capture / void / refund"| Provider
     Payment --> DB[("payment DB<br/>payments · ledger · outbox")]
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class Browser edge;
     class Payment,OrderAPI service;
     class Worker worker;
@@ -293,9 +293,9 @@ flowchart LR
     end
     R -->|"GET /transactions?from&to (paged)"| MP["mockpay<br/>provider ledger"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class TICK,R,API,API2 service; class DB,RDB,WM,LEASE data; class MP external;
 ```
 

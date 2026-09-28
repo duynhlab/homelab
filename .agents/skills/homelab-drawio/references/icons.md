@@ -17,6 +17,21 @@ Stop at the first hit:
 | 4 | project brand repo | fetch the official mark, rasterise, add |
 | 5 | none | a clean plain box — the honest fallback, only after 1–4 miss |
 
+**Rasterising without librsvg.** `rsvg-convert` is the default. A box without it
+(Ubuntu before `sudo apt install librsvg2-bin`) can use the headless Chrome that
+`agent-browser`/`mmdc` already need — keep the aspect with `object-fit: contain`
+and a transparent background:
+
+```bash
+T=$(mktemp -d); cp mark.svg "$T/"
+printf '<img src="mark.svg" style="width:64px;height:64px;object-fit:contain;display:block">' > "$T/i.html"
+google-chrome --headless=new --no-sandbox --hide-scrollbars --default-background-color=00000000 \
+  --window-size=64,64 --screenshot="$T/mark.png" "file://$T/i.html"
+```
+
+Context7 serves library *documentation*, not logo files — use it to confirm a
+product's current name or version, and take the mark itself from sources 2–4.
+
 Reaching step 5 is fine; skipping to it without trying 1–4 is the failure to
 avoid. `icon_style.py audit <dir>` lists product boxes rendering without a logo,
 grouped by which source would supply it — advisory, not a gate.
@@ -59,9 +74,13 @@ catalog. Never put a Redis logo on Valkey: it would assert Redis is deployed.)
 - **Look at every icon at 24px before naming it.** Marks that differ on a
   contact sheet can collapse to the same glyph at render size. Compare:
   ```bash
-  magick icons/<a>.png -resize 24x24 -background white -flatten -resize 400% /tmp/a.png
-  magick icons/<b>.png -resize 24x24 -background white -flatten -resize 400% /tmp/b.png
-  magick montage /tmp/a.png /tmp/b.png -tile 2x -geometry +8+8 /tmp/cmp.png
+  T=$(mktemp -d)
+  # ImageMagick 7 (Homebrew): prefix each command with `magick`.
+  # ImageMagick 6 (Ubuntu apt): `convert` and `montage` are standalone commands.
+  if command -v magick >/dev/null; then IM="magick"; MONTAGE="magick montage"; else IM="convert"; MONTAGE="montage"; fi
+  $IM icons/<a>.png -resize 24x24 -background white -flatten -resize 400% "$T/a.png"
+  $IM icons/<b>.png -resize 24x24 -background white -flatten -resize 400% "$T/b.png"
+  $MONTAGE "$T/a.png" "$T/b.png" -tile 2x -geometry +8+8 "$T/cmp.png"
   ```
 - **PNG, comma-joined.** `image=data:image/png,<base64>` — a comma, never
   `;base64,` (truncates the mxCell style and drops every property after it). An

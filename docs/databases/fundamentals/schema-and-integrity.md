@@ -30,9 +30,9 @@ flowchart TD
   Unique --> FK["Foreign keys"]
   FK --> Commit["Committed valid state"]
 
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   class Input external;
   class App service;
   class Tx,Type,Check,Unique,FK,Commit data;

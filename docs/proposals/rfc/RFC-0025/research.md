@@ -274,8 +274,8 @@ flowchart LR
   AD2 --> KC
   AD2 --> EDGE
 
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
   class EDGE,KC edge;

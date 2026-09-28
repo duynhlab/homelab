@@ -116,9 +116,9 @@ flowchart TD
   issuer -->|"server+client · planned"| grpc["gRPC mTLS<br/>pkg/grpcx + Temporal link"]
   issuer -->|"server auth · planned"| bao["OpenBAO listener<br/>tls_disable=0"]
 
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
   class root,issuer platform; class edge edge;
   class dbsrv,pool,appcli planned; class grpc,bao planned;

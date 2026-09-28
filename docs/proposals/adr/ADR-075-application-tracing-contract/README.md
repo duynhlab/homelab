@@ -120,10 +120,10 @@ flowchart LR
     X --> VT[("VictoriaTraces")]
     X --> CH[("ClickHouse")]
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     class B,E edge;
     class S1,S2 service;

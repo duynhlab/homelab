@@ -152,11 +152,11 @@ flowchart TD
   R1 <-->|replicate| R2
   R0 <-->|replicate| R2
   CH -.->|"coordination<br/>zookeeper.keeper.name"| KEEP
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
   class OC collector; class JOB worker; class GF service;
   class R0,R1,R2 data; class K0,K1,K2 platform;
 ```

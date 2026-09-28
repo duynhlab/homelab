@@ -54,9 +54,9 @@ flowchart LR
   OP -->|"Bearer"| EG
   EG --> PROD & INV & PAY & ORD & USER & SHIP
 
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   class OP external
   class EG edge
   class PROD,INV,PAY,ORD,USER,SHIP service

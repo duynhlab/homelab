@@ -46,11 +46,11 @@ flowchart LR
     OBSERVE --> RESTORE["Restore"]
     RESTORE --> CONVERGE["Prove convergence<br/>in the data"]
 
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class CLAIM platform;
     class INJECT external;
     class OBSERVE metric;

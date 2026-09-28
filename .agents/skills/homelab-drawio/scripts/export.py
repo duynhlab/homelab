@@ -30,7 +30,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
-from _common import find_drawio
+from _common import INSTALL_HINTS, drawio_command, find_drawio
 
 SVG_OPTS = ["-x", "-f", "svg", "-b", "10", "--embed-svg-fonts", "false"]
 
@@ -78,7 +78,7 @@ def _append_newline(path: str) -> None:
 
 
 def _run(drawio: str, args: list[str]) -> None:
-    proc = subprocess.run([drawio, *args], capture_output=True, text=True)
+    proc = subprocess.run([*drawio_command(drawio), *args], capture_output=True, text=True)
     if proc.returncode != 0:
         sys.stderr.write(proc.stdout + proc.stderr)
         raise SystemExit(f"drawio export failed ({' '.join(args)})")
@@ -103,7 +103,7 @@ def main() -> int:
 
     drawio = find_drawio()
     if not drawio:
-        raise SystemExit("drawio not found -- run doctor.py; brew install --cask drawio")
+        raise SystemExit(f"drawio not found -- run doctor.py; {INSTALL_HINTS['drawio']}")
 
     src = os.path.abspath(args.src)
     if not os.path.isfile(src):
@@ -112,7 +112,7 @@ def main() -> int:
     os.makedirs(out_dir, exist_ok=True)
     name = os.path.basename(src)[:-7] if src.endswith(".drawio") else os.path.basename(src)
 
-    ver = subprocess.run([drawio, "--version"], capture_output=True, text=True)
+    ver = subprocess.run([*drawio_command(drawio), "--version"], capture_output=True, text=True)
     print(f"drawio {ver.stdout.strip() or ver.stderr.strip() or '(unknown version)'}")
 
     pages = page_count(src)

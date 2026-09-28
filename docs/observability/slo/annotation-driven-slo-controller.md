@@ -34,8 +34,8 @@ flowchart LR
     vmAlert -->|query| vmSingle
 
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     class deployment,controller planned;
     class psl,promRule,vmRule data;

@@ -38,9 +38,11 @@ docs/
 │   └── _template-service.md      # v2 template for a new service contract
 ├── architecture/                 # Draw.io diagram sources + committed exports
 │   ├── README.md                 # Index: which question each diagram answers, by domain
+│   ├── api/platform-api.ir.yaml  # Who calls whom: gateway routes, gRPC methods, worker activities
 │   ├── platform/topology.ir.yaml # Request path: edge → apps → data (IR; .drawio + .svg beside it, PNG in img/)
 │   ├── observability/            # signal-flow (collector pipelines → stores) · delivery (Flux waves)
 │   ├── databases/topology.ir.yaml # Every Postgres connection + WAL/backup → DR recovery path
+│   ├── secrets/pipeline.ir.yaml  # OpenBao → ESO → Secrets → pods; unseal, rotation, edge TLS, CA bundle
 │   ├── security/network-policies.ir.yaml # NetworkPolicy allows into the data and identity tier
 │   └── workflows/temporal-keda.ir.yaml # Temporal work layer, Worker Controller rollout, KEDA scaling
 ├── frontend/                     # Browser apps at the platform layer (build, expose, watch)

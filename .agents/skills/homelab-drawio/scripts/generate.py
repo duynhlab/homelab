@@ -204,7 +204,7 @@ def _dot_id(s: str) -> str:
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def build_dot(ir: dict, sizes: dict[str, tuple[int, int]]) -> str:
+def build_dot(ir: dict, sizes: dict[str, tuple[int, int]], flat_labels: bool = True) -> str:
     layers = ir["layers"]
     li = {n["id"]: layers.index(n["layer"]) for n in ir["nodes"]}
     bounds = ir.get("boundaries", [])
@@ -252,7 +252,7 @@ def build_dot(ir: dict, sizes: dict[str, tuple[int, int]]) -> str:
         attrs = [f"id={_dot_id(e['id'])}"]
         if li[e["target"]] < li[e["source"]]:
             attrs.append("constraint=false")  # an upward edge must not re-rank the layers
-        elif li[e["target"]] == li[e["source"]] and (e.get("label") or e.get("protocol")):
+        elif flat_labels and li[e["target"]] == li[e["source"]] and (e.get("label") or e.get("protocol")):
             # A flat edge's label sits between the two boxes: let dot keep room for it.
             attrs.append(f'label={_dot_id(_edge_label(e))}, fontname="Helvetica", fontsize={EDGE_FONT}')
         out.append(f"{_dot_id(e['source'])} -> {_dot_id(e['target'])} [{', '.join(attrs)}];")
@@ -265,6 +265,15 @@ def _edge_label(e: dict) -> str:
     if e.get("protocol"):
         label = f"{label} ({e['protocol']})" if label else e["protocol"]
     return label
+
+
+def layout_dot(ir: dict, sizes: dict[str, tuple[int, int]]) -> dict:
+    """dot with room reserved for flat-edge labels; without it if dot's spline
+    router rejects the labelled flat edges (a known `routesplines` failure)."""
+    try:
+        return run_dot(build_dot(ir, sizes))
+    except SystemExit:
+        return run_dot(build_dot(ir, sizes, flat_labels=False))
 
 
 def run_dot(src: str) -> dict:
@@ -718,7 +727,7 @@ def build(ir: dict) -> str:
     font = P["font"]
     FR = P["frame"]
     sizes = {n["id"]: node_size(n, font["fontSize"]) for n in ir["nodes"]}
-    lay = Layout(ir, sizes, run_dot(build_dot(ir, sizes)))
+    lay = Layout(ir, sizes, layout_dot(ir, sizes))
     routes = route_edges(ir, lay)
     label_at = place_labels(ir, lay, routes)
 

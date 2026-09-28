@@ -598,6 +598,27 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Two more Draw.io views: the platform API and the secrets pipeline.**
+  - `api/platform-api`, from the `docs/api` contracts and the service manifests:
+    - the SPAs through the gateway;
+    - every documented gRPC method between services;
+    - the order worker's activities;
+    - the in-cluster payment ↔ mockpay loop.
+
+    Domains are a label line rather than frames: calls cross domains, and
+    domain frames cost about 15 crossings.
+  - `secrets/pipeline`, from the manifests:
+    - floci auto-unseal and the bootstrap Job → OpenBao → External Secrets
+      (two stores) → 30 + 4 ExternalSecrets;
+    - services, platform components, CNPG and cert-manager as consumers;
+    - notification rotation;
+    - the edge certificate and CA bundle.
+
+    It records deployed reality: HTTP listener, TLS planned, and a CA bundle
+    with no consumer yet.
+  - homelab-drawio: when dot's spline router rejects labelled flat edges, the
+    generator retries without reserving their label room instead of failing.
+
 - **One box, one product.**
   - In the root README topology, ClickHouse and Pyroscope had been folded into
     a "VictoriaMetrics · Logs · Traces · Pyroscope · ClickHouse" box under the

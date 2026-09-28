@@ -77,8 +77,12 @@ OCI image read-only, pinned by digest.
 
 We will build the five `.sql` files into a **standard OCI image**
 (`FROM scratch`, the files copied under `/sql`) and publish it to
-`ghcr.io/duynhlab/homelab/clickhouse-ddl`. The build runs in homelab CI and is
-signed and attested the same way `duynhlab/wolfi-images` signs its images. The
+`ghcr.io/duynhlab/homelab/clickhouse-ddl`. Source and build live in homelab
+under `images/clickhouse-ddl/` (`Dockerfile` + `sql/`), outside `kubernetes/`,
+so the payload leaves the artifact `make flux-push` publishes. A homelab CI
+workflow publishes it, signed and attested the same way `duynhlab/wolfi-images`
+signs its images; a manual build into `homelab-registry` is for development
+only and never the published image. The
 Job mounts the image as a volume, referenced by tag **and** digest with
 `pullPolicy: IfNotPresent`.
 
@@ -98,7 +102,8 @@ to require a `@sha256:` digest there.
 | **Ownership** | The `.sql` files in git stay the source of truth. The image is a build output of those files and never edited by hand |
 | **Image shape** | A standard OCI image with ordinary layer media types. An `oras`-style artifact with a custom media type is forbidden: containerd mounts it **empty**, with no error |
 | **Pinning** | Every image-volume reference carries a digest, enforced at admission. A tag alone is rejected |
-| **Re-run** | A DDL change reaches the cluster only as a new digest in the Job's pod template. `force` is scoped to this Job, and to no other object in the wave |
+| **Re-run** | A DDL change reaches the cluster only as a new digest in the Job's pod template. `force` is scoped to this Job, and to no other object in the wave. It acts only when an apply fails on an immutable field: an unchanged digest is a no-op (measured 2026-09-28, three `--with-source` reconciles kept `rustfs-setup-buckets-init`'s UID) |
+| **Not `flux push`** | `flux push artifact` writes Flux's own media type, which only source-controller reads; containerd mounts it empty. Build with `docker buildx` (or `crane`) |
 | **Isolation** | Never combine an image volume with `hostUsers: false`: containerd cannot idmap the overlay mount, and the pod fails to start |
 | **Failure behavior** | The Job asserts that `/sql` holds the expected files before running any statement. An empty mount fails the Job; it never runs "no DDL" as success |
 | **Build tool** | `FROM scratch`, not apko. apko assembles images from APK packages, so shipping five local files through it would need a melange package for every schema revision. The signing and attestation path is still the one `wolfi-images` uses |
@@ -182,7 +187,8 @@ as the fallback because it keeps the one property that matters most.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Image build + sign + attest in homelab CI | `duynhne` | RFC-0032 Phase 2 PR | A digest on GHCR with a verifiable signature |
+| `images/clickhouse-ddl/` (Dockerfile + `sql/`, moved out of the ConfigMap) | `duynhne` | RFC-0032 Phase 2 PR | The five files exist only there |
+| Image build + sign + attest in homelab CI, required before merge | `duynhne` | RFC-0032 Phase 2 PR | A digest on GHCR with a verifiable signature |
 | Job volume swapped to `image:`, the ConfigMap removed, the header rewritten, `force: enabled` on the Job | `duynhne` | RFC-0032 Phase 2 PR | `make validate` green; Flux applies it |
 | File-count assertion in the Job script | `duynhne` | RFC-0032 Phase 2 PR | An empty mount fails the Job |
 | `disallow-latest-tag` covers `spec.volumes[].image.reference` and requires a digest | `duynhne` | RFC-0032 Phase 2 PR | A CLI test fixture passes one pinned volume and rejects one undigested volume |
@@ -226,6 +232,7 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-09-28 | Proposed / Not started | Created when RFC-0032 moved to `Accepted`. The build tool narrowed to `FROM scratch` (apko needs a package per file set), and the Job-immutability mechanism named explicitly (`force: enabled` on this Job) |
+| 2026-09-28 | Proposed / Not started | Owner choices: build in homelab under `images/clickhouse-ddl/`; re-run by `force` plus a digest bump; CI publish required before merge; `flux push` ruled out |
 
 ---
 _Last updated: 2026-09-28_

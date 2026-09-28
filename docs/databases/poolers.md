@@ -42,8 +42,8 @@ flowchart LR
     PgBouncer --> PlatformRW["platform-db-rw :5432"]
     Direct["Temporal / Keycloak"] -->|"direct"| PlatformRW
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class ProductClients,Payment,PlatformClients,Direct service;
     class PgDog,PgBouncer,ProductRW,ProductR,PlatformRW platform;
 ```

@@ -131,11 +131,11 @@ flowchart LR
   COL -->|"span_metrics connector"| VM[("VictoriaMetrics")]
   VEC --> VL
 
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 
   class APP service;
   class EG edge;
@@ -163,10 +163,10 @@ flowchart LR
   COL2 --> VL2
   COL2 --> CH2[("ClickHouse")]
 
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
   classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
 
   class EGW edge;
   class COL2 log;

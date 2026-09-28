@@ -86,11 +86,11 @@ Run from this skill directory (`.agents/skills/homelab-drawio/`).
 
 | Command | Does |
 |---|---|
-| `scripts/doctor.py [--adding-icon]` | Preflight: `drawio` (required), ImageMagick + `rsvg-convert` (for adding icons) |
+| `scripts/doctor.py [--adding-icon]` | Preflight: `drawio` (required; wrapped in `xvfb-run -a` on a Linux box with no display, `--no-sandbox` as root), ImageMagick + `rsvg-convert` (for adding icons), and which font renders Helvetica. Install hints follow the OS (apt on Linux, brew on macOS) |
 | `scripts/icon_style.py style <name> --role <role>` | Emit a paste-ready label style with the logo embedded + palette applied (adds `dashed=1` for `planned`) |
 | `scripts/icon_style.py list` | Show the icon catalogue, aliases, and `none` decisions |
 | `scripts/icon_style.py audit <dir>` | Advisory, recursive: product boxes rendering without a logo; logos on frames |
-| `scripts/validate_house.py <file> [--strict]` | House-style checks (embed traps, planned state, frame icons, font, legend, title, unlabelled dashed edges) |
+| `scripts/validate_house.py <file> [--strict]` | House-style checks (embed traps, planned state, frame icons, font, legend, title, unlabelled dashed edges, v1 saturated fills / white text / drop shadows) |
 | `scripts/export.py <file> [--png --png-dir <dir>]` | Reproducible SVG/PNG export with version + per-format size budget |
 
 `python3 -m unittest discover -s tests` covers the helpers (catalog checksums,

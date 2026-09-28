@@ -123,9 +123,9 @@ flowchart LR
   Col -->|"logs + traces (RFC-0019)"| CH[("ClickHouse<br/>otel_logs / otel_traces")]
   CH --> Graf["Grafana<br/>clickhouse datasource"]
 
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
   class Apps service;
   class Col collector;
   class VM,VL,VT,CH data;

@@ -89,9 +89,9 @@ flowchart LR
     P["product"] -->|"BatchGetAvailability<br/>(/details enrichment, soft-fail)"| INV
     INV --> DB[("inventory DB<br/>on product-db via PgDog :6432")]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class CK,P,INV,OAPI service;
     class W worker;
     class DB data;

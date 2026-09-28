@@ -40,6 +40,7 @@ docs/
 │   ├── README.md                 # Index: which question each .drawio answers
 │   ├── topology.drawio           # Request path: edge → apps → data
 │   ├── observability-delivery.drawio # Flux waves that deliver observability + their gates
+│   ├── observability-signal-flow.drawio # Collector pipelines → backends → retention
 │   └── img/                      # PNG exports (GitHub strips text from Draw.io SVG)
 ├── frontend/                     # Browser apps at the platform layer (build, expose, watch)
 │   ├── README.md                 # Area hub: storefront + admin portal, the build-arg contract

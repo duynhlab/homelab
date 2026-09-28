@@ -18,6 +18,10 @@ WARNINGS (exit 0, or 1 with --strict):
     ("planned migration") legitimately say the word; legend cells and text
     annotations are skipped outright.
   * a non-Helvetica font                 -- the house font
+  * a v1 saturated role fill, or white text on a content box, or a drop
+    shadow                               -- the v2 palette is soft tints with
+                                           dark text and no shadows; these are
+                                           what make a large diagram read heavy
   * no legend cell                       -- an architecture diagram needs one
   * no title cell                        -- a reader must see what they opened
   * an unlabelled DASHED edge            -- AGENTS.md step 5: a dotted arrow
@@ -44,6 +48,10 @@ from _common import is_frame, parent_ids
 # #64748B is also the `external` role's FILL, so a substring test flagged every
 # dashed external box as a mislabelled planned one.
 PLANNED_STROKE_RE = re.compile(r"strokeColor=#64748b\b", re.I)
+# The v1 (pre-2026-09-28) saturated role FILLS. #64748B is left out on purpose:
+# it is still a valid stroke, and as a fill it is only v1's `external`.
+V1_SATURATED_FILLS = {"#2563eb", "#06b6d4", "#f59e0b", "#7c3aed", "#22c55e", "#64748b", "#a5d8ff"}
+FILL_RE = re.compile(r"fillColor=(#[0-9a-f]{6})\b", re.I)
 TITLE_MIN_FONT = 14
 
 
@@ -120,6 +128,15 @@ def check_file(path: str) -> tuple[list[str], list[str]]:
 
         if is_edge and not value and "dashed=1" in style:
             warnings.append(f"{path}#{cid}: unlabelled dashed edge -- say which it is (optional, indirect, planned, exception)")
+
+        if not is_edge and not is_annotation and not exempt and value:
+            m = FILL_RE.search(style)
+            if m and m.group(1).lower() in V1_SATURATED_FILLS:
+                warnings.append(f"{path}#{cid}: v1 saturated fill {m.group(1)} -- use the v2 soft-tint role colours (assets/homelab.json)")
+            if re.search(r"fontColor=#fff(fff)?\b", style, re.I):
+                warnings.append(f"{path}#{cid}: white text on a content box -- v2 roles use dark text on a light fill")
+        if "shadow=1" in style:
+            warnings.append(f"{path}#{cid}: drop shadow -- the v2 house style has none")
 
         if "fontFamily=" in style:
             fam = style.split("fontFamily=", 1)[1].split(";", 1)[0]

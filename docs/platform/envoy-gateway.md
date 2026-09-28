@@ -68,9 +68,9 @@ flowchart TD
   cidr -->|targetRefs| hr
   btp -->|targetRefs| hr
 
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   class gc,gw,hr edge
   class ep,be,cors,jwt,cidr,btp platform
   class svc service
@@ -274,9 +274,9 @@ flowchart LR
   cp2 -->|xDS| dp2
   bfqdn --> dp2
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   class cp1,cp2 platform
   class dp1,dp2 edge
   class kapi,files,ksvc,bfqdn data

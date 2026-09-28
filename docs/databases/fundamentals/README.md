@@ -40,8 +40,8 @@ flowchart LR
     Replication --> Monitor["Monitoring and<br/>investigation"]
     Partition --> Monitor
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Process,MVCC,Schema,Query,Monitor service;
     class Storage,Index,Partition,Replication data;
 ```

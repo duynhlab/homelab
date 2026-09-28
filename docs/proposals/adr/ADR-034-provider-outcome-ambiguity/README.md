@@ -119,9 +119,9 @@ flowchart LR
     Park -->|"same question,<br/>same key"| Op
     Park -.->|"never"| Opposite["Opposite operation<br/>(reverse / rollback / fail)"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
     class Op,Class service;

@@ -112,10 +112,10 @@ flowchart LR
     SDK -->|"OTLP/HTTP :4318<br/>protobuf + gzip"| COL["otel-collector"]
     COL --> BE["Backends<br/>metrics · logs · traces stores"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class LIB,OBSX service;
     class API,SDK platform;
     class COL collector;
@@ -208,7 +208,7 @@ flowchart TB
         col -->|"logs (trace_id field)"| vlN
         col -->|"traces"| tN
     end
-    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef otc fill:#e0f2fe,stroke:#1971c2,color:#0c4a6e;
     classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
     classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
@@ -309,7 +309,7 @@ flowchart LR
     ex -->|"OTLP :4318"| col[/"OTel Collector"/]
     col -->|"VL-Stream-Fields: service.name"| vl[(VictoriaLogs)]
     vec -->|"jsonline"| vl
-    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef otc fill:#e0f2fe,stroke:#1971c2,color:#0c4a6e;
     classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
     class ex,col otc;
     class vl log;
@@ -344,7 +344,7 @@ flowchart LR
     vma --> vm[(VictoriaMetrics)]
     batch -->|"logs (VL-Stream-Fields: service.name)"| vl[(VictoriaLogs)]
     batch -->|"traces"| tr[(VictoriaTraces · ClickHouse)]
-    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef otc fill:#e0f2fe,stroke:#1971c2,color:#0c4a6e;
     classDef metric fill:#ffe8cc,stroke:#e8590c,color:#111;
     classDef log fill:#d3f9d8,stroke:#2f9e44,color:#111;
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
@@ -441,7 +441,7 @@ flowchart LR
     b -->|"OTLP"| col
     col --> vt[(VictoriaTraces)]
     col --> ch[(ClickHouse otel_traces)]
-    classDef otc fill:#a5d8ff,stroke:#1971c2,color:#111;
+    classDef otc fill:#e0f2fe,stroke:#1971c2,color:#0c4a6e;
     classDef trace fill:#c5f6fa,stroke:#0c8599,color:#111;
     class col otc;
     class vt,ch trace;

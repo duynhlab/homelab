@@ -48,7 +48,7 @@ puts a second copy of the SVG in `img/` too.
   nobody could make go away. `export.py` renumbers them by order of appearance
   (`ge-flow-animation-1`, …), which keeps the animation working and makes the
   export byte-identical when nothing changed. Verify with two exports in a row
-  and `md5`.
+  and `md5sum` (Linux) / `md5` (macOS).
 - **Version printed.** A re-export on a different Draw.io build can perturb the
   SVG in ways that read as diff noise; the printed version lets a reviewer trace
   it. Pin the build if you need byte-stable exports across machines.

@@ -236,8 +236,8 @@ flowchart LR
     end
     Today -.->|"expand → shadow → cutover → contract (planned)"| Target
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
     class CK,P,CK2,P2 service;
     class W,W2 worker;

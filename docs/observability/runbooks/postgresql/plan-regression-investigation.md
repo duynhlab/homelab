@@ -50,8 +50,8 @@ flowchart LR
     F & I --> OK["Verify: queryid stops producing<br/>new plan records (&lt;1s again)"]
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class M metric;
     class L log;
     class V,F,I data;

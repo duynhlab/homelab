@@ -122,8 +122,8 @@ flowchart TD
         S2["Pod boots SEALED"] --> K2["Pod asks KMS/HSM<br/>to decrypt its root key"]
         K2 --> R2["UNSEALED at boot<br/>(no key in cluster)"]
     end
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class C1 data; class K2 external;
 ```
 
@@ -240,7 +240,7 @@ flowchart LR
     BAO -.->|"planned"| FLOCI
     BAO -.->|"planned"| HSM
     BAO -.->|"planned"| KMS
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
     class KMS external; class FLOCI,HSM planned;
 ```

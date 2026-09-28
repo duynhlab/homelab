@@ -32,9 +32,9 @@ flowchart LR
   Reject --> Queue["Collector queue and retries grow"]
   Queue --> Loss["Telemetry is dropped after<br/>retry budget is exhausted"]
 
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   class Small service;
   class Parts,Delay,Reject,Memory data;
   class Queue,Loss platform;
@@ -75,9 +75,9 @@ flowchart LR
   Server --> Part["Sorted immutable part"]
   Part --> Merge["Background merge"]
 
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   class SDK service;
   class Receiver,Batch,Exporter collector;
   class Server,Part,Merge data;
@@ -216,8 +216,8 @@ flowchart LR
   Hot["0–7 days<br/>hot PVC"] -->|"TTL move merge"| Cold["7–90 days<br/>RustFS via s3_cache"]
   Cold -->|"TTL delete merge"| Gone["Expired metadata and objects removed"]
 
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   class Hot data;
   class Cold external;
   class Gone external;

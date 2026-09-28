@@ -36,10 +36,10 @@ flowchart TD
     Saga --> Payment["payments.md"]
     Pkg -.->|"contracts ship as the proto module"| Contracts
 
-    classDef hub fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef guide fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef contract fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef workflow fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef hub fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef guide fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef contract fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef workflow fill:#fef3c7,color:#78350f,stroke:#d97706;
     class Hub hub;
     class Shared,Catalog,Rollup,Journeys,Template,Pkg,Consumer guide;
     class Contracts,Basic,Deep,Order,Payment contract;

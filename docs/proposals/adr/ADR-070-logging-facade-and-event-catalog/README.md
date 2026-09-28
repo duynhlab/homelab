@@ -118,9 +118,9 @@ flowchart LR
     COL --> VL[("VictoriaLogs")]
     COL --> CH[("ClickHouse")]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     class H,F service;
     class OB platform;

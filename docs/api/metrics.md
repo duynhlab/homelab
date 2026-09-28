@@ -115,7 +115,7 @@ flowchart LR
     B --> Duration["Duration<br/>histogram_quantile(0.95, _bucket)"]
     B --> Apdex["Apdex<br/>_bucket{le=0.5} + _bucket{le=2}"]
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class H,B,C metric;
     class Rate,Errors,Duration,Apdex platform;
 ```
@@ -236,15 +236,15 @@ flowchart TD
     COL -->|"otlphttp proto"| VMA["vmagent :8429 OTLP ingest<br/>usePrometheusNaming + resource-attr allowlist<br/>relabel service_name→app, k8s_namespace_name→namespace"]
     VMA -->|remote write| VMS[("VictoriaMetrics")]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
     class SDK service;
     class COL collector;
     class VMA,VMS metric;

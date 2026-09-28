@@ -121,7 +121,7 @@ flowchart LR
     A1 --> Rm["Either way: kong:3.9 + kong.yml<br/>+ kong health removed (planned)"]
     A2 --> Rm
 
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
     class Spike worker;

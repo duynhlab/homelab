@@ -66,8 +66,8 @@ flowchart TB
         sc2 --- shared
         note2["isolation = GRANT/REVOKE<br/>on schema + search_path"]
     end
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     class d1,d2,shared data; class r1,r2,s1,s2 service;
 ```
 
@@ -121,8 +121,8 @@ flowchart TD
     pl -->|member of| pa
     rl -->|member of| pro
     pa -.->|"GRANT SELECT to"| pro
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class pl,rl service; class pa,pro data;
 ```
 
@@ -164,7 +164,7 @@ and (for owner=group) `REASSIGN OWNED`. That is a real addition, deliberately de
 ```mermaid
 flowchart LR
     A["(a) Static in Secret<br/>AS-BUILT<br/>never expires"] --> B["(b) Static role, rotated<br/>PLANNED<br/>fixed user, password rotates"] --> C["(c) Dynamic per-lease<br/>REFERENCE<br/>new user each lease, TTL"]
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
     class A data; class B,C planned;
 ```
@@ -269,9 +269,9 @@ flowchart LR
     VOL --> APP["app: dbx BeforeConnect<br/>reads current cred (planned)"]
     APP --> POOL["pooler (passthrough / auth_query)"]
     POOL --> PG[("PostgreSQL")]
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
     class OB,ESO,POOL platform; class APP service; class PG data; class VOL planned;
 ```

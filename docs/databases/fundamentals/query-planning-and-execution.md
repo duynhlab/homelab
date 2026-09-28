@@ -26,9 +26,9 @@ flowchart LR
     Plan --> Execute["Execute plan nodes"]
     Execute --> Rows["Result rows"]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class SQL,Parse,Rewrite,Plan,Execute service;
     class Stats,Costs platform;
     class Indexes,Rows data;

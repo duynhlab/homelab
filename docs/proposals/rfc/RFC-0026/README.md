@@ -144,8 +144,8 @@ flowchart LR
 
   before -.->|"RFC-0026"| after
 
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
   class b1,b2,b3,b4 worker
   class a1,a2 platform
 ```
@@ -195,9 +195,9 @@ flowchart TD
   keda -->|"DescribeTaskQueue backlog"| ts
   keda -->|"replicas 1–3"| d1
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
   class flux,appsk,cm,crds,twc platform
   class conn,wd,d1,d2 worker

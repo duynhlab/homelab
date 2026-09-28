@@ -176,10 +176,10 @@ flowchart TD
   pause --> promote["Last step -> Current version"]
   promote --> old["Previous version -> deprecated"]
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   class edit,bid platform
   class dep,gw,ramp,pause,promote,old worker
   class reg data
@@ -211,9 +211,9 @@ flowchart LR
   sd --> del["deleteDelay 24h<br/>eligibleForDeletion, resources removed"]
   del --> gone["Deployment + per-version<br/>attached resources deleted"]
 
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   class cur,dep worker
   class drain,sd,del data
   class gone external
@@ -611,9 +611,9 @@ flowchart TD
   d2 -->|"poll as build 2.5.0"| ts
   ts -.->|"scraped"| vm
 
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
   class flux,cm platform
   class d1 worker

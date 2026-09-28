@@ -598,6 +598,24 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Diagrams move to a soft-tint palette; a signal-flow diagram joins the
+  observability hub; the Draw.io skill runs cleanly on Linux.** The v1 palette
+  filled boxes with the saturated role colour and white text, and every
+  Draw.io box carried a drop shadow — on a 30-box canvas it read as a wall of
+  colour. v2 keeps each role's hue but puts it on the stroke, with a light
+  fill and dark text (7:1 text and 3:1 stroke contrast for every role), and no
+  shadows. It lands in the AGENTS.md classDef, the skill preset, 739 Mermaid
+  `classDef` lines across 151 docs (all 218 changed blocks re-rendered with
+  `mmdc`, none failing) and the two existing Draw.io sources. New:
+  `docs/architecture/observability-signal-flow.drawio` — which collector
+  pipeline carries each signal, the store and retention behind it, and the
+  paths that bypass the collector — embedded in `docs/observability/README.md`
+  § Architecture. Skill: Linux install paths and apt hints, `xvfb-run` / root
+  `--no-sandbox` handled by one command builder, a Helvetica-substitute check,
+  ImageMagick 6/7 and `md5sum` in the references, a validator warning for v1
+  fills / white text / shadows, and a Pyroscope mark in the catalog
+  (rasterised with headless Chrome where `rsvg-convert` is absent).
+
 - **The observability contracts describe what runs (RFC-0031 Task 4.3).**
   `docs/api/{observability,logs,tracing,metrics,profiling,pkg,temporal}.md`
   and `graceful-shutdown.md` drop the zap era: the `logger/slogx` wiring

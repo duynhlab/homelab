@@ -64,10 +64,10 @@ flowchart TB
   EG -->|"issuer + signature only"| OWN
   KC -.->|"remoteJWKS, auto-refresh"| EG
 
-  classDef external fill:#64748b,color:#fff,stroke:#334155;
-  classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
+  classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
+  classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   class OP external
   class EG edge
   class KC,PORTAL platform

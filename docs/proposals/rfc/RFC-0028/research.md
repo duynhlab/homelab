@@ -151,9 +151,9 @@ flowchart LR
   K -->|"log entry seen"| R2[("replica 2<br/>fetches part from peer")]:::data
   R1 -.->|"HTTP part fetch"| R0
   R2 -.->|"HTTP part fetch"| R0
-  classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
 An INSERT lands on **one** replica, which writes the part locally and appends
@@ -194,9 +194,9 @@ flowchart TD
   D --> S1["shard 1 (replicated pair)"]:::data
   D --> S2["shard 2 (replicated pair)"]:::data
   D --> S3["shard 3 (replicated pair)"]:::data
-  classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-  classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+  classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
 With the operator's generated `internal_replication: true`, an INSERT through
@@ -300,7 +300,7 @@ flowchart LR
   A["Rung 1 — schema ownership<br/>decided by this RFC"]:::planned --> C["Rung 2 — CHK ×3 + CHI 1×3<br/>ReplicatedMergeTree<br/>planned"]:::planned
   A -.->|"optional side-rung,<br/>any time or never"| B["user model<br/>otel_writer / grafana / admin<br/>optional — planned"]:::planned
   C -.-> D["Rung 3 — sharding + Distributed<br/>OUT OF SCOPE — trigger table above<br/>reference, not deployed"]:::planned
-  classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+  classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 ```
 

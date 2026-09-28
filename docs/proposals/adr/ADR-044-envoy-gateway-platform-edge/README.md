@@ -133,10 +133,10 @@ flowchart LR
     GW --> Svc["Owning services<br/>pkg/authmw — authoritative"]
     Kong["Kong OSS 3.9<br/>static RS256 credential"] -.->|"decommissioned"| GW
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 
     class Client edge;

@@ -169,10 +169,10 @@ Kong runs in two deployment topologies. This project uses **DB-less** (Ingress C
 ```mermaid
 flowchart TD
     classDef fe fill:#3b82f6,stroke:#1d4ed8,color:#fff
-    classDef gw fill:#f59e0b,stroke:#b45309,color:#fff
+    classDef gw fill:#fef3c7,stroke:#d97706,color:#78350f
     classDef api fill:#10b981,stroke:#047857,color:#fff
     classDef plugin fill:#8b5cf6,stroke:#5b21b6,color:#fff
-    classDef infra fill:#64748b,stroke:#334155,color:#fff
+    classDef infra fill:#f1f5f9,stroke:#64748b,color:#334155
 
     Browser["Browser"]
 

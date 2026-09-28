@@ -33,8 +33,8 @@ flowchart TD
     DSVM --> Dashboards
     DSVM --> Explore
 
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     class PrometheusRule data;
 

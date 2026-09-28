@@ -77,17 +77,17 @@ flowchart TB
     CH --> Grafana
     Pyro --> Grafana
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Services service;
     class Workers worker;
     class Receiver,Processors collector;
@@ -100,6 +100,7 @@ flowchart TB
     class Edge edge;
     class Infra external;
 ```
+
 ```mermaid
 graph LR
     subgraph Legend["Observability diagram legend"]
@@ -116,18 +117,31 @@ graph LR
         Data["Multi-signal store"]:::data
     end
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef trace fill:#c5f6fa,color:#111,stroke:#0c8599;
     classDef profile fill:#f3d9fa,color:#111,stroke:#9c36b5;
-    classDef collector fill:#a5d8ff,color:#111,stroke:#1971c2;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
+
+The Mermaid map above is the fan-out. The diagram below answers the narrower
+question a reader usually brings to it — **which collector pipeline carries each
+signal, where it is stored, and for how long** — including the paths that bypass
+the collector (the Pyroscope SDK push, vmagent's scrapes, Vector's container
+logs), the span-metrics connector, and the edge access logs that only
+ClickHouse keeps:
+
+<p align="center">
+  <a href="../architecture/observability-signal-flow.svg"><img src="../architecture/img/observability-signal-flow.png" alt="Observability signal flow: producers, OTel Collector pipelines, backends and their retention, Grafana" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/observability-signal-flow.drawio"><code>docs/architecture/observability-signal-flow.drawio</code></a>, authored with the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the source, then re-run its <code>scripts/export.py</code> to refresh this image.</sub></p>
 
 
 ## 3-Layer Service Architecture & APM Integration
@@ -154,9 +168,9 @@ graph TD
     P --> Q["Format response"]
     Q --> R["HTTP response"]
 
-    classDef edge fill:#2563eb,color:#fff,stroke:#1e3a8a;
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class A,R edge;
     class B,C,D,E,H,J,L,N,P,Q service;
     class O data;
@@ -497,6 +511,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-09-18 — added the Draw.io delivery-order diagram under
+_Last updated: 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
 Deployment (Flux waves + the gate that releases each one, and why the two
 ClickHouse waves omit `wait`)._

@@ -919,6 +919,14 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0033 is `provisional`; the research gate passed with owner-confirmed
+  boundaries.** The RFC proposes a human-gated GitHub ledger, schema-normalized task
+  payloads, App-scoped unattended identity, flat isolated workers, independent proof,
+  external routine heartbeat, and measurable promotion gates. The Documentation Steward
+  owns four reader contracts and an explicit safe-example marker. Architecture review
+  and five resulting ADRs remain pending; no schema, workflow, App, routine, hook, or
+  agent definition is installed.
+
 - **RFC-0032 → `Accepted`; ADR-077 created at `Proposed`.** The Kind
   baseline moves to `kindest/node:v1.36.4` by digest before 1.34's EOL
   (2026-10-27). [ADR-077](docs/proposals/adr/ADR-077-image-volume-schema-delivery/README.md)
@@ -935,8 +943,9 @@ Skeleton (copy what you need):
   `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`. The docs give no 3–5 team-size range. It
   also records routine facts that shape failure ownership: routines are per account,
   push to `claude/` branches, and turn off after 72 hours without GitHub. The change
-  train now runs the compose gate before merge and tag. Each of the 11 open questions
-  has a proposed direction for owner review, and the status stays `researching`.
+  train now distinguishes optional pre-merge integration proof from the mandatory
+  pre-tag compose audit. Each of the 11 open questions received a proposed direction;
+  those directions were owner-confirmed when the RFC advanced to `provisional`.
 
 - **RFC-0033 opened at `researching` for a Claude-native autonomous engineering
   organization.** The research separates verified Grok Bot engineering patterns from

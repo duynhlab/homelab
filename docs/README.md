@@ -317,6 +317,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 6. **[Temporal workflows](./api/temporal.md)** - all three workflows as built, saga vs 2PC theory, infrastructure, and operations
 
 7. **[RFCs — research then decide](./proposals/rfc/)** — owner approves next `RFC-NNNN` → `research.md` (plain-language + Context7) → `README.md` → optional `docs/<area>/` spin-off
+   - [RFC-0033 — Claude-native autonomous engineering organization](./proposals/rfc/RFC-0033/) — human-gated coordination, evidence, recovery, and Documentation Steward design
 
 ### Databases
 
@@ -411,9 +412,9 @@ The **owning indexes are complete and are the only place a record's status is
 maintained.** This page deliberately does not duplicate them — a partial copy
 here is how an index starts disagreeing with the records it points at.
 
-- [**ADR index**](./proposals/adr/README.md) — all **76** decisions, each with
+- [**ADR index**](./proposals/adr/README.md) — all **77** decisions, each with
   its `Status` and `Adoption`. The *why* behind significant choices.
-- [**RFC index**](./proposals/rfc/README.md) — all **30** proposals, plus the
+- [**RFC index**](./proposals/rfc/README.md) — all **31** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.
 - [Proposals hub](./proposals/) — templates and how to open a new record.
 
@@ -530,9 +531,10 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-09-25 — **RFC-0033** research now includes a planned Documentation
-Steward and treats `docs/` as the platform's executable learning and knowledge plane;
-the index contains 31 RFC records and 76 ADRs.
+_Last updated: 2026-09-29 — **RFC-0033** is provisional: its human-gated control-loop
+proposal and Documentation Steward design are linked from the learning path; no runtime
+component is installed. The index contains 31 RFC records and 77 ADRs. Previously
+2026-09-25 — RFC-0033 research introduced the executable learning and knowledge plane.
 Previously 2026-09-22 — the RFC and ADR counts on this page were re-derived from the
 folders (30 RFC records, 76 ADRs) after **RFC-0032** opened; they had been stale at 26
 and 65. Previously 2026-09-17 — the metrics guide bullet no longer advertises exemplars,

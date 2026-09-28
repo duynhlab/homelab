@@ -134,7 +134,7 @@ for its own sake.
 | [RFC-0030](RFC-0030/) | Backoffice commerce analytics on ClickHouse | platform-wide | P2 | **Accepted** 2026-09-09 — [ADR-066](../adr/ADR-066-adopt-peerdb-for-commerce-cdc/) through [ADR-069](../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) are `Accepted / Not started`; mandatory Phase 0 qualification gates block rollout and no component is installed |
 | [RFC-0031](RFC-0031/) | Cross-signal telemetry standard and ClickHouse operations | platform-wide | P1 | **Implemented** 2026-09-25 (Accepted 2026-09-17) — [ADR-070](../adr/ADR-070-logging-facade-and-event-catalog/) through [ADR-076](../adr/ADR-076-semantic-convention-registry/) all `Accepted / Complete`; facade `pkg/logger/slogx` on the whole fleet in one train (2026-09-24), Weaver registry + live-check gate, fleet lint policy blocking with a version floor, both final gates passed on the final pins (compose #1095, Kind 2026-09-25) |
 | [RFC-0032](RFC-0032/) | Move the Kind baseline to Kubernetes 1.36 (feature evaluation for 1.35/1.36; OCI image volumes adopted for schema delivery) | infra | P1 | **Accepted** 2026-09-28 ([ADR-077](../adr/ADR-077-image-volume-schema-delivery/) at `Proposed`; the Kyverno 1.19.1 prerequisite landed with it). **Phase 1 landed 2026-09-29 on `v1.35.8`**, not 1.36.4: the 1.36 kubelet crash-loops on a ZFS-backed Docker root, so the RFC is amended to bridge through 1.35 (a Kyverno-tested pairing) and recreate on 1.36 once the upstream fix ships. Phase 2 open — research gate PASSED 2026-09-22; target `kindest/node:v1.36.4` pinned by digest before 1.34 reaches EOL on 2026-10-27, with the missing Kyverno 1.36 pairing **accepted explicitly** and evidenced by the full Kind gate rather than waited out. Every 1.35/1.36 feature carries a verdict; only OCI image volumes are adopted, replacing the ClickHouse DDL ConfigMap |
-| [RFC-0033](RFC-0033/research.md) | Claude-native autonomous engineering organization | platform-wide | P1 | **researching** — verified Grok Bot patterns are adapted to Claude routines, isolated workers, a GitHub ledger, independent proof, human-gated merges, and a Documentation Steward for the `docs/` learning and knowledge plane; no runtime component is installed |
+| [RFC-0033](RFC-0033/) | Claude-native autonomous engineering organization | platform-wide | P1 | **provisional** 2026-09-28 — research gate PASSED and owner approved RFC authoring; proposes a human-gated GitHub ledger, bounded isolated workers, independent proof, phased routine qualification, and a Documentation Steward. Architecture review and five resulting ADRs remain pending; no runtime component is installed |
 
 ## Backlog — candidate RFCs
 
@@ -162,7 +162,12 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-09-28 — **RFC-0031** → `implemented` (2026-09-25): every delivery-plan
+_Last updated: 2026-09-29 — **RFC-0033** → `provisional` (2026-09-28): the research
+gate passed with owner-confirmed directions, including a schema-normalized GitHub task
+contract, App-scoped unattended identity, external heartbeat, measurable promotion bars,
+and documentation page/example contracts. The architecture choice remains undecided
+pending review; no runtime component is installed. Previously 2026-09-28 — **RFC-0031**
+→ `implemented` (2026-09-25): every delivery-plan
 task done, both final gates passed, ADR-070 through ADR-076 at `Adoption: Complete`.
 Previously 2026-09-25 — **RFC-0033** reserved at `researching` for a
 Claude-native autonomous engineering organization. The research corrects unsupported

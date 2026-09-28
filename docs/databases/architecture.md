@@ -55,6 +55,19 @@ flowchart TB
     class Platform,Product,DR,Store data;
 ```
 
+The Draw.io view below answers the same question with the detail the Mermaid map
+leaves out:
+- the exact host each client group connects to;
+- the migration Jobs that always target the `-rw` services;
+- OpenBao rotating the `notification` password;
+- the WAL and base backups in RustFS that the DR replica recovers from.
+
+<p align="center">
+  <a href="../architecture/databases/topology.svg"><img src="../architecture/databases/img/topology.png" alt="Database connection and recovery paths: clients, poolers, CNPG clusters, RustFS backups and the DR replica" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/databases/topology.drawio"><code>databases/topology.drawio</code></a> · <a href="../architecture/databases/topology.svg">SVG</a></sub></p>
+
 ## Cluster behavior
 
 Both operational clusters declare synchronous quorum `ANY 1` with
@@ -123,4 +136,4 @@ services, not by the infrastructure manifests.
 - [CloudNativePG 1.30 service management](https://cloudnative-pg.io/docs/1.30/service_management/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 
-_Last updated: 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._
+_Last updated: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._

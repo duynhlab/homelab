@@ -60,7 +60,7 @@ flowchart TB
 
         Grafana{{"Grafana"}}
     end
-    style Cluster fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    style Cluster fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#1e293b
 
     Services & Workers -->|"OTLP metrics · logs · traces"| Receiver
     Services & Workers -->|"pprof push"| Pyro
@@ -141,10 +141,10 @@ logs), the span-metrics connector, and the edge access logs that only
 ClickHouse keeps:
 
 <p align="center">
-  <a href="../architecture/observability-signal-flow.svg"><img src="../architecture/img/observability-signal-flow.png" alt="Observability signal flow: producers, OTel Collector pipelines, backends and their retention, Grafana" width="960"></a>
+  <a href="../architecture/observability/signal-flow.svg"><img src="../architecture/observability/img/signal-flow.png" alt="Observability signal flow: producers, OTel Collector pipelines, backends and their retention, Grafana" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/observability-signal-flow.drawio"><code>docs/architecture/observability-signal-flow.drawio</code></a>, generated from <a href="../architecture/observability-signal-flow.ir.yaml"><code>observability-signal-flow.ir.yaml</code></a> by the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the IR, then re-run its <code>scripts/generate.py</code> and <code>scripts/export.py</code> to refresh this image.</sub></p>
+<p align="center"><sub>Source <a href="../architecture/observability/signal-flow.drawio"><code>observability/signal-flow.drawio</code></a> · <a href="../architecture/observability/signal-flow.svg">SVG</a></sub></p>
 
 
 ## 3-Layer Service Architecture & APM Integration
@@ -462,10 +462,10 @@ The prose above is the summary; the diagram below is the graph as declared, wave
 by wave, with the gate that releases each one:
 
 <p align="center">
-  <a href="../architecture/observability-delivery.svg"><img src="../architecture/img/observability-delivery.png" alt="Observability delivery order: Flux waves and their gates" width="960"></a>
+  <a href="../architecture/observability/delivery.svg"><img src="../architecture/observability/img/delivery.png" alt="Observability delivery order: Flux waves and their gates" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/observability-delivery.drawio"><code>docs/architecture/observability-delivery.drawio</code></a>, generated from <a href="../architecture/observability-delivery.ir.yaml"><code>observability-delivery.ir.yaml</code></a> by the <a href="../../.agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill — click through for the SVG. Edit the IR, then re-run its <code>scripts/generate.py</code> and <code>scripts/export.py</code> to refresh this image.</sub></p>
+<p align="center"><sub>Source <a href="../architecture/observability/delivery.drawio"><code>observability/delivery.drawio</code></a> · <a href="../architecture/observability/delivery.svg">SVG</a></sub></p>
 
 The detail worth carrying away: **`clickhouse-keeper-local` and
 `clickhouse-local` omit `wait` on purpose.** The objects worth gating on are

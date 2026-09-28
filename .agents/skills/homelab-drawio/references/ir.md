@@ -13,7 +13,7 @@ between them, the tier each sits in, which rules must hold — is a field here.
 Filling it in is the plan; generating it is the drawing.
 
 The schema is [`../schema/diagram-ir.schema.json`](../schema/diagram-ir.schema.json).
-The three committed examples are `docs/architecture/*.ir.yaml`.
+The committed examples live under `docs/architecture/<domain>/*.ir.yaml`; `docs/architecture/README.md` lists them.
 
 ## Shape
 

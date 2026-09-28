@@ -125,7 +125,10 @@ shape to aim for when hand-editing one:
   the browser, Git, the local registry container, a third-party API (role
   `external`). A reader then sees at once what is ours and what is not.
   The same holds for Mermaid: one `subgraph` for the cluster, the others
-  nested in it. `validate.py --ir` warns on a platform node left outside
+  nested in it, styled so it stands out from the nested subgraphs'
+  default fill:
+  `style Cluster fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#1e293b`.
+  A near-white fill with a light stroke disappears on GitHub. `validate.py --ir` warns on a platform node left outside
   (`layout.unframed_node`).
 - **Boundaries nest** (cluster → domain → group). A frame owns its boxes, and a
   frame is never used for decoration.

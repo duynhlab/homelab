@@ -132,6 +132,16 @@ depend on. Without these the operator cannot reach the database pods and
 | **product** | intra-namespace | `:5432`, `:6432`, `:8000` | CNPG replica WAL streaming + product-service → PgDog + PgDog → Postgres + operator status probe. |
 | **product** | `monitoring` | `:9187` (postgres exporter), `:9090` (PgDog openmetrics) | VMAgent scrapes the postgres/pooler exporters. |
 
+The same allows as a picture, one box per namespace, with the identity tier and the
+floci KMS pod added. It answers one question: **who may reach the data and identity
+tier, and on which port.** The app-to-app mesh is § 3.
+
+<p align="center">
+  <a href="../architecture/security/network-policies.svg"><img src="../architecture/security/img/network-policies.png" alt="NetworkPolicy allows into the product, platform and identity namespaces and the floci pod, by source namespace and port" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/security/network-policies.drawio"><code>security/network-policies.drawio</code></a> · <a href="../architecture/security/network-policies.svg">SVG</a></sub></p>
+
 ---
 
 ## 3. Allowed-ingress topology
@@ -269,4 +279,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._
+_Last updated: 2026-09-28 — Draw.io view of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._

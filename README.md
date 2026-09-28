@@ -83,7 +83,7 @@ flowchart TD
             openbao --> eso
         end
     end
-    style Cluster fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    style Cluster fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#1e293b
 
     Browser -->|HTTPS| EG
     EG --> SPA & BO & SVC
@@ -100,10 +100,10 @@ flowchart TD
 Same palette as the Platform map above.
 
 <p align="center">
-  <a href="docs/architecture/topology.drawio"><img src="docs/architecture/img/topology.png" alt="Request-path topology (Draw.io edition)" width="920"></a>
+  <a href="docs/architecture/platform/topology.drawio"><img src="docs/architecture/platform/img/topology.png" alt="Request-path topology (Draw.io edition)" width="920"></a>
 </p>
 
-<p align="center"><sub>Draw.io edition, with logos — source <a href="docs/architecture/topology.drawio"><code>docs/architecture/topology.drawio</code></a>, generated from <a href="docs/architecture/topology.ir.yaml"><code>topology.ir.yaml</code></a> by the <a href=".agents/skills/homelab-drawio/SKILL.md"><code>homelab-drawio</code></a> skill. Edit the IR, then re-run its <code>scripts/generate.py</code> and <code>scripts/export.py</code> to refresh this image.</sub></p>
+<p align="center"><sub>Source <a href="docs/architecture/platform/topology.drawio"><code>platform/topology.drawio</code></a> · <a href="docs/architecture/platform/topology.svg">SVG</a></sub></p>
 
 ---
 
@@ -138,7 +138,7 @@ flowchart LR
         Infra["kubernetes/infra"]:::platform
         Apps["kubernetes/apps"]:::service
     end
-    style Cluster fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    style Cluster fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#1e293b
     Push --> Flux
     Flux --> Infra
     Infra --> Apps

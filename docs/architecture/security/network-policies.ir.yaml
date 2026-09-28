@@ -1,0 +1,75 @@
+# Source of docs/architecture/security/network-policies.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/security/network-policies.ir.yaml
+# Verified on 2026-09-28 against kubernetes/infra/configs/network-policies/*.yaml
+# (every allow rule into product, platform and identity), controllers/secrets/floci/networkpolicy.yaml
+# and configs/kyverno/cluster-policies/default-deny-networkpolicy.yaml. All policies
+# are ingress-only; kindnet enforces them on Kind (docs/security/network-policies.md).
+diagram:
+  id: network-policies
+  title: "duynhlab homelab — NetworkPolicy: who may reach the data and identity tier"
+  scope: "Allowed ingress into the fenced product, platform and identity namespaces and the floci KMS pod, by source namespace and port. The app-to-app mesh (:8080 / :9090) is the Mermaid map in § 3; egress is not fenced anywhere."
+  question: domain-topology
+  level: L4
+  pin_order: true
+  legend:
+    roles:
+      edge: "Namespace: gateway"
+      service: "Namespaces: service groups"
+      platform: "Namespace: platform component"
+      data: "Namespace: database tier"
+      collector: "Namespace: monitoring"
+    edges:
+      data: "allowed ingress: SQL / pooler port"
+      control: "allowed ingress: operator / engine"
+      traffic: "allowed ingress: HTTP"
+      "telemetry:metric": "allowed ingress: metrics scrape"
+
+layers: [open, apps, tier]
+
+boundaries:
+  - {id: f_cluster, label: "Kind cluster · homelab"}
+  - {id: f_open, label: "No NetworkPolicy — ingress open", parent: f_cluster}
+  - {id: f_openbao, label: "openbao namespace", parent: f_cluster}
+  - {id: f_fenced, label: "Fenced · deny-all", parent: f_cluster}
+  - {id: f_apps, label: "Service namespaces", parent: f_fenced}
+
+nodes:
+  # pin_order: each layer reads left to right in this order.
+  - {id: openbao, label: "openbao server + Jobs\n(not fenced)", role: platform, layer: open, parent: f_openbao, icon: openbao}
+  - {id: cnpg, label: "cloudnative-pg\nCNPG operator", role: platform, layer: open, parent: f_open, icon: cloudnativepg}
+  - {id: temporal, label: "temporal\nTemporal server", role: platform, layer: open, parent: f_open, icon: temporal}
+  - {id: monitoring, label: "monitoring\nVMAgent · Grafana", role: collector, layer: open, parent: f_open, icon: victoriametrics}
+  - {id: envoy, label: "envoy-gateway\nEnvoy Gateway proxies", role: edge, layer: open, parent: f_open, icon: envoy}
+
+  - {id: floci, label: "floci KMS pod\npod-scoped allow", role: platform, layer: apps, parent: f_openbao}
+  - {id: apps_product, label: "cart · order · payment\ncheckout · inventory", role: service, layer: apps, parent: f_apps, icon: go}
+  - {id: apps_platform, label: "user · notification\nshipping · review", role: service, layer: apps, parent: f_apps, icon: go}
+  - {id: identity, label: "identity\nKeycloak", role: platform, layer: apps, parent: f_fenced, icon: keycloak}
+
+  - {id: product, label: "product\nproduct-db · pgdog-product", role: data, layer: tier, parent: f_fenced, icon: postgresql}
+  - {id: platform, label: "platform\nplatform-db · PgBouncer pooler", role: data, layer: tier, parent: f_fenced, icon: postgresql}
+
+edges:
+  - {id: a_product, source: apps_product, target: product, type: data, label: ":6432 · :5432"}
+  - {id: a_platform, source: apps_platform, target: platform, type: data, label: ":5432"}
+  - {id: a_identity, source: identity, target: platform, type: data, label: ":5432"}
+  - {id: a_temporal, source: temporal, target: platform, type: data, label: ":5432"}
+  - {id: a_openbao, source: openbao, target: platform, type: control, label: ":5432 (rotation)"}
+  - {id: a_floci, source: openbao, target: floci, type: control, label: ":4566"}
+
+  - {id: c_product, source: cnpg, target: product, type: control, label: ":8000 · :5432"}
+  - {id: c_platform, source: cnpg, target: platform, type: control, label: ":8000 · :5432"}
+
+  - {id: m_product, source: monitoring, target: product, type: telemetry, signal: metric, label: ":9187 · :9090"}
+  - {id: m_platform, source: monitoring, target: platform, type: telemetry, signal: metric, label: ":9187 · :9127"}
+  - {id: m_identity, source: monitoring, target: identity, type: telemetry, signal: metric, label: ":9000 · :8080"}
+
+  - {id: g_identity, source: envoy, target: identity, type: traffic, label: ":8080"}
+
+notes:
+  - id: note_rules
+    title: "Reading it"
+    text: "Every namespace inside the fenced frame starts from deny-all-ingress (Kyverno generates it for tier=app namespaces; identity carries a committed copy), so an arrow is the only way in. Not drawn, but allowed: the ten service namespaces reach identity :8080 for JWKS; pods inside product reach each other on :5432 / :6432 / :8000 and inside platform on :5432 / :8000; envoy-gateway and the service mesh reach the services on :8080 / :9090 (§ 3)."
+  - id: note_limits
+    title: "Not fenced (yet)"
+    text: "No egress rules exist anywhere, so DNS and outbound traffic are open. mTLS on gRPC :9090 and a ClickHouse policy for :9000 / :8123 are planned follow-ups, not deployed."

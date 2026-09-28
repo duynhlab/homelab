@@ -1,5 +1,5 @@
-# Source of docs/architecture/topology.drawio -- edit this, then regenerate:
-#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/topology.ir.yaml
+# Source of docs/architecture/platform/topology.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/platform/topology.ir.yaml
 # Verified against kubernetes/ (HTTPRoute hostnames, apps/services db_host,
 # configs/databases/clusters, controllers/keycloak + temporal) on 2026-09-28.
 diagram:

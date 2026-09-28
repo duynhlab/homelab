@@ -132,12 +132,12 @@
           <mxGeometry relative="1" as="geometry" x="0" />
         </mxCell>
         <mxCell id="e_cache" value="cache-aside" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.68;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="valkey">
-          <mxGeometry relative="1" as="geometry" x="-0.54">
+          <mxGeometry relative="1" as="geometry" x="-0.52">
             <Array as="points">
               <mxPoint x="760" y="520" />
               <mxPoint x="760" y="520" />
-              <mxPoint x="760" y="660" />
-              <mxPoint x="673.83" y="660" />
+              <mxPoint x="760" y="670" />
+              <mxPoint x="673.83" y="670" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -191,10 +191,10 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_tmpdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.21;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tmp" target="platformdb">
-          <mxGeometry relative="1" as="geometry" x="-0.5">
+        <mxCell id="e_tmpdb" value="direct SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.69;exitY=1;exitDx=0;exitDy=0;entryX=0.21;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tmp" target="platformdb">
+          <mxGeometry relative="1" as="geometry" x="-0.45">
             <Array as="points">
-              <mxPoint x="650" y="660" />
+              <mxPoint x="678.83" y="660" />
               <mxPoint x="540" y="660" />
               <mxPoint x="540" y="805" />
               <mxPoint x="1045" y="805" />

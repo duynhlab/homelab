@@ -1,12 +1,12 @@
-# Source of docs/architecture/observability-signal-flow.drawio -- edit this, then regenerate:
-#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/observability-signal-flow.ir.yaml
+# Source of docs/architecture/observability/signal-flow.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/observability/signal-flow.ir.yaml
 # Verified on 2026-09-28 against controllers/tracing/otel-collector/otel-collector.yaml
 # (service.pipelines, exporter endpoints), the VMSingle/VLSingle/VTSingle
 # retentionPeriod, the Pyroscope compactor retention and the clickhouse-schema DDL TTL.
 diagram:
   id: signal-flow
   title: "duynhlab homelab — Observability signal flow and retention"
-  scope: "Where every signal goes on the cluster: which OTel Collector pipeline carries it, which backend stores it, and for how long. Delivery order is a different question — see observability-delivery.drawio."
+  scope: "Where every signal goes on the cluster: which OTel Collector pipeline carries it, which backend stores it, and for how long. Delivery order is a different question — see delivery.drawio."
   question: domain-topology
   level: L3
   pin_order: true

@@ -75,6 +75,28 @@ spec:
       allow_loading_unsigned_plugins: victoriametrics-metrics-datasource,victoriametrics-logs-datasource
 ```
 
+**The Prometheus and Pyroscope plugins are the image's, never self-updated.** Grafana 13
+ships them as *preinstalled* plugins and by default updates them at startup when a newer
+release exists. On this cluster that update cannot succeed: it unregisters the bundled
+copy first, then fails to replace it because the container's root filesystem is
+read-only. The plugin is then simply absent and every prometheus-type datasource breaks
+at once — which happened on 2026-09-25 (107 panels on 28 of 43 boards, vendored and
+as-code alike). The CR therefore sets `preinstall_auto_update: "false"` (local-stack
+sets `GF_PLUGINS_PREINSTALL_AUTO_UPDATE` to match); a plugin upgrade is a Grafana image
+bump.
+
+How it looks, so it is recognised next time: panels read "Datasource … was not found",
+datasource template variables read "No data sources found", the pod log carries
+`Failed to install plugin … read-only file system`, and
+`/api/plugins/prometheus/settings` answers "Plugin not found". **`/api/datasources` still
+lists every datasource and the dashboard-reference check (k6 K5.7) still passes**, because
+both look at datasource objects rather than plugins — the only reliable check is
+rendering the boards and reading each panel's query errors.
+
+The same render audit found the one as-code defect worth remembering: several queries in
+one panel must carry distinct refIds (Grafana rejects duplicates). `grafana-dashboards`
+assigns them since `v0.2.1`, and a registry-wide test holds it.
+
 ## Dashboards
 
 **24 `GrafanaDashboard` CRs** still vendored here, plus **18 dashboards and 6 folders
@@ -180,4 +202,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-09-28 — § Plugins: why the bundled Prometheus/Pyroscope plugins are not self-updated, how the failure looks, and the distinct-refId rule. Previously 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

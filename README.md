@@ -37,70 +37,11 @@ edge. Application source lives in separate repositories.
 
 ## Topology
 
-How a request travels once the platform is up, and what each hop talks to.
-
-```mermaid
-flowchart TD
-    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
-    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
-    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
-    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
-    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
-
-    Browser["Browser"]:::external
-    subgraph Cluster ["Kind cluster · homelab"]
-        EG["Envoy Gateway<br/>gateway.duynh.me<br/>(TLS, JWT, CORS, rate-limit)"]:::edge
-        KC["Keycloak<br/>id.duynh.me (OIDC)"]:::platform
-
-        subgraph Apps ["Applications"]
-            SPA["Storefront SPA<br/>local.duynh.me"]:::service
-            BO["Back-office portal<br/>backoffice.duynh.me"]:::service
-            SVC["10 Go services<br/>identity · catalog · checkout<br/>· fulfillment · comms"]:::service
-            TMP["Temporal server"]:::platform
-            WK["Temporal workers<br/>checkout-worker · order-worker"]:::worker
-        end
-
-        subgraph Data ["Data"]
-            valkey[("Valkey cache")]:::data
-            pgdog["PgDog pooler"]:::data
-            pgb["CNPG pooler<br/>(PgBouncer)"]:::data
-            productdb[("product-db<br/>CNPG HA + DR replica")]:::data
-            platformdb[("platform-db<br/>CNPG HA")]:::data
-        end
-
-        subgraph Obs ["Observability"]
-            direction LR
-            otel["OTel Collector<br/>+ vmagent · Vector"]:::platform
-            backends["VictoriaMetrics · VictoriaLogs<br/>VictoriaTraces · Pyroscope · ClickHouse"]:::platform
-            grafana["Grafana<br/>+ Sloth SLOs"]:::platform
-            otel --> backends --> grafana
-        end
-
-        subgraph Sec ["Secrets"]
-            openbao["OpenBAO (HA Raft)"]:::platform
-            eso["External Secrets Operator"]:::platform
-            openbao --> eso
-        end
-    end
-    style Cluster fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#1e293b
-
-    Browser -->|HTTPS| EG
-    EG --> SPA & BO & SVC
-    EG -.->|"JWKS"| KC
-    SVC -->|"Cache-Aside"| valkey
-    SVC --> TMP --> WK
-    SVC -->|"catalog/checkout SQL"| pgdog ==> productdb
-    SVC -->|"identity/comms SQL"| pgb ==> platformdb
-    KC & TMP -->|"direct SQL"| platformdb
-    SVC & WK -.->|"OTLP"| otel
-    eso -.->|"secrets"| SVC
-```
-
-Same palette as the Platform map above.
+How a request travels once the platform is up, and what each hop talks to. The
+primary flow (requests) moves in the diagram.
 
 <p align="center">
-  <a href="docs/architecture/platform/topology.drawio"><img src="docs/architecture/platform/topology.svg" alt="Request-path topology (Draw.io edition)" width="920"></a>
+  <a href="docs/architecture/platform/topology.svg"><img src="docs/architecture/platform/topology.svg" alt="Request-path topology: browser, Envoy Gateway, applications, workflows, data, secrets and observability inside the Kind cluster" width="920"></a>
 </p>
 
 <p align="center"><sub>Source <a href="docs/architecture/platform/topology.drawio"><code>platform/topology.drawio</code></a> · <a href="docs/architecture/platform/img/topology.png">PNG</a></sub></p>

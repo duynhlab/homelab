@@ -153,9 +153,13 @@ def ir_problems(ir: dict) -> list[tuple[str, list[str], str]]:
         if planned and "planned" not in n["label"].lower():
             out.append(("house.planned_label", [n["id"]], f"node '{n['id']}' is planned but its label omits the word 'planned'"))
     for e in ir["edges"]:
-        for end in ("source", "target"):
-            if e[end] not in nodes:
-                out.append(("connectivity.dangling_edge", [e["id"]], f"edge '{e['id']}' {end} '{e[end]}' is not a node"))
+        if e["source"] not in nodes:
+            out.append(("connectivity.dangling_edge", [e["id"]], f"edge '{e['id']}' source '{e['source']}' is not a node"))
+        if e["target"] not in nodes and e["target"] not in bounds:
+            out.append(("connectivity.dangling_edge", [e["id"]],
+                        f"edge '{e['id']}' target '{e['target']}' is neither a node nor a boundary"))
+        elif e["target"] in bounds and e.get("via"):
+            out.append(("structural.frame_edge_via", [e["id"]], f"edge '{e['id']}' into a frame cannot take `via`"))
         if e.get("status") in ("planned", "optional") and not (e.get("label") or e.get("protocol")):
             out.append(("house.dashed_unlabelled", [e["id"]], f"edge '{e['id']}' is {e['status']} (dashed) and needs a label"))
         if e.get("status") == "planned" and "planned" not in (e.get("label") or "").lower():
@@ -243,6 +247,8 @@ def build_dot(ir: dict, sizes: dict[str, tuple[int, int]]) -> str:
             for a, b in zip(ids, ids[1:]):
                 out.append(f"{_dot_id(a)} -> {_dot_id(b)} [style=invis, weight=0];")
     for e in ir["edges"]:
+        if e["target"] not in li:
+            continue  # an edge into a whole frame is routed after layout
         attrs = [f"id={_dot_id(e['id'])}"]
         if li[e["target"]] < li[e["source"]]:
             attrs.append("constraint=false")  # an upward edge must not re-rank the layers
@@ -373,6 +379,11 @@ class Layout:
         return [(f[0], f[0] + text_width(labels.get(fid, ""), 13, bold=True) + 30)
                 for fid, f in self.frame.items() if above <= f[1] <= top]
 
+    def frame_title(self, fid: str) -> list[tuple[float, float, float]]:
+        label = next((b["label"] for b in self.ir.get("boundaries", []) if b["id"] == fid), "")
+        f = self.frame[fid]
+        return [(f[0], f[0] + text_width(label, 13, bold=True) + 30, f[1])]
+
     def ancestor_titles(self, nid: str) -> list[tuple[float, float, float]]:
         """(x0, x1, frame top) of the title text of every frame around `nid`."""
         bounds = {b["id"]: b for b in self.ir.get("boundaries", [])}
@@ -441,12 +452,29 @@ def _widest_free(lo: float, hi: float, spans: list[tuple[float, float]]) -> tupl
     return best if best and best[1] - best[0] >= 20 else (lo, hi)
 
 
+def _route_into_frame(lay: Layout, sb: list, fr: list, title: list) -> dict:
+    """An edge that stands for "every box in this frame": from the bottom of the
+    source to the top border of the frame, clear of the frame's title."""
+    sx = sb[0] + sb[2] / 2
+    lo, hi = _widest_free(fr[0] + 20, fr[0] + fr[2] - 20, title)
+    tx = _snap(max(lo, min(sx, hi)), 5)
+    ports = ((sx - sb[0]) / sb[2], 1, (tx - fr[0]) / fr[2], 0)
+    if abs(tx - sx) < 1:
+        return {"points": [], "ports": ports}
+    y = _snap((sb[1] + sb[3] + fr[1]) / 2, 5)
+    return {"points": [(sx, y), (tx, y)], "ports": ports}
+
+
 def route_edges(ir: dict, lay: Layout) -> dict[str, dict]:
     """Per edge: ports (exit/entry fractions) and absolute waypoints."""
     routes: dict[str, dict] = {}
     plans = []
     for e in ir["edges"]:
         s, t = e["source"], e["target"]
+        if t in lay.frame:
+            routes[e["id"]] = _route_into_frame(lay, lay.box[s], lay.frame[t],
+                                                [(a, b) for a, b, _ in lay.frame_title(t)])
+            continue
         ls, lt = lay.li[s], lay.li[t]
         sb, tb = lay.box[s], lay.box[t]
         if e.get("via"):
@@ -605,7 +633,7 @@ def _replace_attr(style: str, key: str, value: str) -> str:
 
 
 def _path(lay: Layout, e: dict, r: dict) -> list[tuple[float, float]]:
-    sb, tb = lay.box[e["source"]], lay.box[e["target"]]
+    sb, tb = lay.box[e["source"]], lay.box.get(e["target"]) or lay.frame[e["target"]]
     ex, ey, nx, ny = r["ports"]
     return [(sb[0] + sb[2] * ex, sb[1] + sb[3] * ey), *r["points"], (tb[0] + tb[2] * nx, tb[1] + tb[3] * ny)]
 

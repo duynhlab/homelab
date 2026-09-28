@@ -236,7 +236,8 @@
             "$ref": "#/$defs/id"
           },
           "target": {
-            "$ref": "#/$defs/id"
+            "$ref": "#/$defs/id",
+            "description": "A node id, or a boundary id for an edge that reaches every box in that frame"
           },
           "type": {
             "enum": [

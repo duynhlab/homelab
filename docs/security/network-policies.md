@@ -209,6 +209,17 @@ flowchart LR
 > namespace. Internal-audience routes ride these same hops — the
 > NetworkPolicy is the fence, never a route rule.
 
+The same question, drawn per namespace:
+- the gateway's ten north-south allows collapse into one arrow into the fenced frame;
+- east-west calls are drawn caller → callee, with their ports;
+- the moving dashes follow the calls.
+
+<p align="center">
+  <a href="../architecture/security/app-mesh.svg"><img src="../architecture/security/app-mesh.svg" alt="NetworkPolicy: allowed app-mesh ingress between envoy-gateway and the service namespaces, caller to callee" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/security/app-mesh.drawio"><code>security/app-mesh.drawio</code></a> · <a href="../architecture/security/img/app-mesh.png">PNG</a></sub></p>
+
 ---
 
 ## 4. How it is wired (GitOps)
@@ -279,4 +290,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-09-28 — Draw.io view of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._
+_Last updated: 2026-09-28 — Draw.io views of the app mesh (§ 3) and of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._

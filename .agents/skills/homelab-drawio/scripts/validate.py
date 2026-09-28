@@ -273,6 +273,9 @@ def gate_connectivity(d: Diagram) -> list[dict]:
                                "connect both ends (a free-floating arrow belongs in the legend)"))
             continue
         touched |= {s, t}
+        if t in d.by_id and d.is_frame(d.by_id[t]):
+            # An edge into a frame reaches every box in it.
+            touched |= {c.get("id") for c in d.cells if t in d.ancestors(c.get("id"))}
         key = (s, t, (e.get("value") or "").strip())
         if key in seen:
             out.append(finding("WARN", "connectivity.duplicate_edge", [seen[key], eid], "same source, target and label twice",

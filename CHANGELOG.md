@@ -598,6 +598,17 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The NetworkPolicy app mesh gets its Draw.io view; the root README keeps
+  only the Draw.io topology.**
+  - New: `security/app-mesh`, verified against every ingress rule in
+    `configs/network-policies/`. It answers § 3's question, "which app-mesh
+    ingress is allowed", per namespace and caller → callee.
+  - The gateway's ten north-south allows are one arrow into the fenced frame.
+    This is a new IR capability: an edge may target a boundary and reaches
+    every box inside it. It took the diagram from 28 crossings to 4.
+  - The root README drops its Mermaid topology, which answered the same
+    question as the Draw.io image beside it.
+
 - **Diagrams show their primary flow moving, on GitHub too.**
   - Each IR names the edge types that animate (`diagram.animate`). The generator
     adds draw.io's `flowAnimation` to them and to their legend sample; planned and

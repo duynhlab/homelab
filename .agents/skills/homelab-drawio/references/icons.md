@@ -85,6 +85,9 @@ catalog. Never put a Redis logo on Valkey: it would assert Redis is deployed.)
 - **PNG, comma-joined.** `image=data:image/png,<base64>` — a comma, never
   `;base64,` (truncates the mxCell style and drops every property after it). An
   SVG data URI exports as an empty box under headless Draw.io.
+- **Never invent or counterfeit a vendor logo.** No redrawn "close enough"
+  mark and no generic icon passed off as a brand. When steps 1–4 miss, the box
+  stays plain (step 5).
 - **Icon the box's subject, not its prose.** A box titled *Leaf certificates*
   whose second line says "cert-manager-issued" gets no cert-manager logo.
 - **Never on a grouping frame.** A logo on a frame labels the grouping, not a

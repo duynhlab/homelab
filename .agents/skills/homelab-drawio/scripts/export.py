@@ -14,18 +14,24 @@ whoever runs it:
   * a trailing newline is appended to each SVG (Draw.io omits it)
   * flowAnimation keyframe ids are normalised: Draw.io mints a fresh random one
     on every export, so an animated diagram produced a different SVG every run
+  * the PNG is reduced to a 256-colour palette, undithered (Pillow, else
+    ImageMagick). A flat-colour diagram loses nothing visible and the file
+    shrinks ~3x -- which is what lets a tall top-down diagram stay inside the
+    budget at the README width. --no-quantize keeps the 24-bit file.
 
 Prints the Draw.io version so a diff that looks like noise can be traced to a
 different build. SVG is the default; add --png for the one raster GitHub needs.
 
 Usage: export.py <src.drawio> [--out-dir DIR] [--png] [--budget-kb 500]
                   [--png-budget-kb 400] [--png-width 1536] [--png-dir DIR]
+                  [--no-quantize]
 """
 from __future__ import annotations
 
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -77,6 +83,25 @@ def _append_newline(path: str) -> None:
             fh.write(b"\n")
 
 
+def quantize_png(path: str) -> str:
+    """Rewrite `path` as a 256-colour palette PNG; returns the tool used, or ''."""
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
+    if Image is not None:
+        with Image.open(path) as im:
+            q = im.convert("RGB").quantize(colors=256, method=Image.Quantize.MEDIANCUT,
+                                           dither=Image.Dither.NONE)
+        q.save(path, optimize=True)
+        return "pillow"
+    magick = shutil.which("magick") or shutil.which("convert")
+    if magick:
+        subprocess.run([magick, path, "+dither", "-colors", "256", f"PNG8:{path}"], check=True)
+        return os.path.basename(magick)
+    return ""
+
+
 def _run(drawio: str, args: list[str]) -> None:
     proc = subprocess.run([*drawio_command(drawio), *args], capture_output=True, text=True)
     if proc.returncode != 0:
@@ -99,6 +124,8 @@ def main() -> int:
                         "the widest that fits the 400 KB budget for a full-platform diagram). "
                         "--width beats -s because it is absolute -- a scale factor makes the "
                         "output depend on the page size, so a bigger canvas silently means a bigger file")
+    p.add_argument("--no-quantize", action="store_true",
+                   help="keep the 24-bit PNG instead of the 256-colour palette one")
     args = p.parse_args()
 
     drawio = find_drawio()
@@ -136,6 +163,10 @@ def main() -> int:
         os.makedirs(png_dir, exist_ok=True)
         png = os.path.join(png_dir, f"{name}.png")
         _run(drawio, ["-x", "-f", "png", "--width", str(args.png_width), "-b", "10", "-o", png, src])
+        if not args.no_quantize:
+            tool = quantize_png(png)
+            print(f"png: 256-colour palette via {tool}" if tool else
+                  "png: kept 24-bit -- install Pillow or ImageMagick to quantize")
         produced.append(png)
 
     print(f"\nexported {len(produced)} file(s):")

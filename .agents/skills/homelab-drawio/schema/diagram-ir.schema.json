@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "homelab-drawio/diagram-ir",
+  "title": "homelab Diagram IR",
+  "description": "Provider-neutral architecture model that scripts/generate.py projects into a top-down .drawio. One IR answers one question (references/diagram-types.md). Roles are the semantic palette in assets/homelab.json; edge types are the eight relationship kinds in references/house-style.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "diagram",
+    "layers",
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "diagram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "scope",
+        "question",
+        "level"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Draw.io <diagram id>; stable across regenerations"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One line under the title: what the diagram covers and what it leaves out"
+        },
+        "question": {
+          "enum": [
+            "platform-landscape",
+            "domain-topology",
+            "request-path",
+            "delivery",
+            "migration"
+          ]
+        },
+        "level": {
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3",
+            "L4",
+            "L5"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "top-down"
+          ],
+          "default": "top-down"
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Plan-phase notes; not drawn"
+        },
+        "legend": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Override legend lines: roles keyed by role, edges keyed by edge type",
+          "properties": {
+            "roles": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "edges": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "pin_order": {
+          "type": "boolean",
+          "default": false,
+          "description": "Place each layer's nodes left to right in IR order (nodes of one boundary must then be listed together)"
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9-]*$"
+      },
+      "description": "Ordered tiers, top of the canvas first. Every node sits in exactly one."
+    },
+    "boundaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parent": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "role",
+          "layer"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "\\n starts a new line; the first line is the name"
+          },
+          "role": {
+            "enum": [
+              "edge",
+              "service",
+              "worker",
+              "platform",
+              "data",
+              "external",
+              "metric",
+              "log",
+              "trace",
+              "profile",
+              "collector",
+              "planned"
+            ]
+          },
+          "layer": {
+            "type": "string"
+          },
+          "parent": {
+            "$ref": "#/$defs/id"
+          },
+          "icon": {
+            "type": "string",
+            "description": "Catalogue name in assets/icons/manifest.json"
+          },
+          "shape": {
+            "enum": [
+              "card",
+              "datastore"
+            ],
+            "default": "card"
+          },
+          "status": {
+            "enum": [
+              "deployed",
+              "planned"
+            ],
+            "default": "deployed"
+          },
+          "w": {
+            "type": "integer",
+            "minimum": 40
+          },
+          "h": {
+            "type": "integer",
+            "minimum": 30
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source",
+          "target",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "source": {
+            "$ref": "#/$defs/id"
+          },
+          "target": {
+            "$ref": "#/$defs/id"
+          },
+          "type": {
+            "enum": [
+              "traffic",
+              "data",
+              "control",
+              "dependency",
+              "event",
+              "replication",
+              "trust",
+              "telemetry"
+            ]
+          },
+          "signal": {
+            "enum": [
+              "metric",
+              "log",
+              "trace",
+              "profile"
+            ],
+            "description": "telemetry only: colour the edge by signal"
+          },
+          "label": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "deployed",
+              "planned",
+              "optional"
+            ],
+            "default": "deployed",
+            "description": "planned/optional draw dashed and require a label"
+          },
+          "label_pos": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1,
+            "description": "Draw.io label position along the path (-1 source .. 1 target)"
+          },
+          "via": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Absolute waypoints overriding the computed route"
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "rule"
+        ],
+        "properties": {
+          "rule": {
+            "enum": [
+              "no-public-datastore",
+              "entry-via-edge",
+              "telemetry-has-destination",
+              "gitops-has-reconciler"
+            ]
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "Short reading notes drawn as a text block between the diagram and the legend. Keep them to what the boxes cannot say.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    }
+  }
+}

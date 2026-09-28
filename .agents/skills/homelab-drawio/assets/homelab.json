@@ -96,8 +96,17 @@
     "storage": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;",
     "scaling": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=classic;",
     "planned": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;",
-    "request_animated": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;"
+    "request_animated": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;",
+    "traffic": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;",
+    "data": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;",
+    "control": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1.5;endArrow=classic;",
+    "dependency": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#475569;strokeWidth=1.5;endArrow=open;",
+    "event": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=block;endFill=0;",
+    "replication": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;",
+    "trust": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1E3A8A;strokeWidth=1.5;endArrow=open;startArrow=oval;startFill=0;",
+    "telemetry": "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#1971C2;strokeWidth=1.5;endArrow=classic;"
   },
+  "_edge_types_note": "The eight relationship types an IR edge may carry (references/house-style.md § Relationship types). Colours reuse the node palette's strokes, so an edge reads as the kind of thing it touches: traffic = edge blue, data/replication = data green (replication thicker), control = platform violet, event = worker amber (hollow head: asynchronous), telemetry = collector blue (or, with `signal`, the metric/log/trace/profile stroke), trust = edge navy with an open circle at the relying party, dependency = slate with an open head. request/storage/scaling/planned stay for hand-authored diagrams. A planned or optional edge takes the `planned` style (dashed) and must carry a label.",
   "_edges_note": "flowAnimation=1 animates the dashes along the connector to show flow direction. It moves only in SVG and in the Draw.io editor -- a PNG export is static, and GitHub may strip the animation from an embedded SVG. Use it sparingly, on the diagram's primary flow only; append ';flowAnimation=1;' to any edge role to animate it.",
   "frame": {
     "fillColor": "#F8FAFC",

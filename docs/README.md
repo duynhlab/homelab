@@ -38,9 +38,9 @@ docs/
 │   └── _template-service.md      # v2 template for a new service contract
 ├── architecture/                 # Draw.io diagram sources + committed exports
 │   ├── README.md                 # Index: which question each .drawio answers
-│   ├── topology.drawio           # Request path: edge → apps → data
-│   ├── observability-delivery.drawio # Flux waves that deliver observability + their gates
-│   ├── observability-signal-flow.drawio # Collector pipelines → backends → retention
+│   ├── topology.ir.yaml          # Request path: edge → apps → data (IR; .drawio + .svg generated beside it)
+│   ├── observability-delivery.ir.yaml # Flux waves that deliver observability + their gates (IR)
+│   ├── observability-signal-flow.ir.yaml # Collector pipelines → backends → retention (IR)
 │   └── img/                      # PNG exports (GitHub strips text from Draw.io SVG)
 ├── frontend/                     # Browser apps at the platform layer (build, expose, watch)
 │   ├── README.md                 # Area hub: storefront + admin portal, the build-arg contract

@@ -89,6 +89,51 @@ Solid = a current path. Dashed = optional, planned, or a documented exception �
 and a dashed edge must carry a label saying which. A planned edge's label
 contains the word `planned` (same rule as nodes).
 
+### Relationship types
+
+An IR edge carries one of eight types (`assets/homelab.json` → `edges`). Each
+colour reuses the stroke of the node role it most often touches, so the palette
+stays one system:
+
+| Type | Colour / head | Means | Label with |
+|---|---|---|---|
+| `traffic` | edge blue, filled head | a runtime request | the protocol or route: HTTPS, HTTPRoute, gRPC |
+| `data` | data green | reads / writes a store, or a store read by a viewer | what is read: SQL, cache-aside, queried |
+| `control` | platform violet | reconciles / manages / releases | the verb: manages, syncs Secrets |
+| `dependency` | slate, open head | needs, without a runtime flow | why: depends on, skips a layer |
+| `event` | worker amber, hollow head | asynchronous message or signal | the queue or event |
+| `replication` | data green, thick | a store copying to a store | the mechanism: WAL, DR replica |
+| `trust` | edge navy, open circle at the relying party | authentication / authorization | the artefact: JWKS, OIDC |
+| `telemetry` | collector blue, or the signal's colour with `signal:` | logs / metrics / traces / profiles | the protocol: OTLP/HTTP, scrape |
+
+`request` / `storage` / `scaling` remain for hand-authored diagrams. The
+`planned` edge style is what a `status: planned` edge of any type becomes.
+
+## Top-down layout
+
+The default for every generated diagram (`scripts/generate.py`), and the
+shape to aim for when hand-editing one:
+
+- **Tiers run top to bottom** in the order a request meets them: users → edge
+  → platform / applications → data. One IR `layer` is one row, and the primary
+  flow reads down the page.
+- **Peers sit side by side**, one row per tier: replicas, workers, pipelines,
+  stores.
+- **Boundaries nest** (cluster → domain → group). A frame owns its boxes, and a
+  frame is never used for decoration.
+- **Orthogonal edges only.** A horizontal run belongs in the channel between two
+  tiers, never through a box. Each run gets its own lane.
+- **Labels sit on a vertical run**, where they do not collide. Never on a box,
+  on another label, or over a frame title.
+- **When it gets crowded:**
+  1. split into two views;
+  2. collapse repetition into one box;
+  3. re-tier or reorder;
+  4. only then shrink text or boxes, and never under 10px.
+
+The generator implements these; `validate.py` checks them
+([`quality-gates.md`](quality-gates.md)).
+
 ### Flow animation (`flowAnimation=1`)
 
 Append `;flowAnimation=1;` to an edge (or use the `request_animated` role in the

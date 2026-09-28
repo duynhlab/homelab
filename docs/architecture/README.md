@@ -3,16 +3,18 @@
 Draw.io (`.drawio`) diagram sources for the platform, plus their committed
 exports. Draw.io is the **exception** here — [Mermaid is the default](../../AGENTS.md)
 for diagrams in this repo; these files exist for the large, logo-bearing views
-that earn an editable vector source. They are authored with the
-[`homelab-drawio`](../../.agents/skills/homelab-drawio/SKILL.md) skill.
+that earn an editable vector source. Each is **generated top-down from a YAML
+model** (`<name>.ir.yaml`, the IR) by the
+[`homelab-drawio`](../../.agents/skills/homelab-drawio/SKILL.md) skill, so the
+IR is what you edit and the `.drawio` is its output.
 
 | Fact | Value |
 |------|-------|
-| Sources | `*.drawio` in this directory |
+| Sources | `*.ir.yaml` (the model you edit) → `*.drawio` (generated, still editable in Draw.io) |
 | Exports | SVG beside the source; PNG under [`img/`](img/) (GitHub strips text from Draw.io SVG, so a Markdown page embeds the PNG and links the SVG for zooming) |
 | Style | homelab house style — palette mirrors the Mermaid `classDef` in [AGENTS.md](../../AGENTS.md) |
-| Regenerate | edit the `.drawio`, then `python3 .agents/skills/homelab-drawio/scripts/export.py <file> --png --png-dir docs/architecture/img` |
-| Re-layout | a dependency graph is laid out, not hand-placed: `drawio --layout '[{"layout":"elkLayered","config":{"elk.direction":"DOWN"}}]' -x -f xml -u -o <file> <file>` |
+| Regenerate | `S=.agents/skills/homelab-drawio/scripts; python3 $S/generate.py docs/architecture/<name>.ir.yaml && python3 $S/export.py docs/architecture/<name>.drawio --png --png-dir docs/architecture/img` |
+| Validate | `python3 .agents/skills/homelab-drawio/scripts/validate.py docs/architecture/<name>.drawio --ir docs/architecture/<name>.ir.yaml` — 0 errors to ship |
 
 ## Sources
 
@@ -32,14 +34,15 @@ that earn an editable vector source. They are authored with the
 - **Logos** come from the skill's curated catalog
   ([`assets/icons/manifest.json`](../../.agents/skills/homelab-drawio/assets/icons/manifest.json));
   a box gets a logo only for the product it is.
-- **Commit the source and its export together** — a source edit without a
-  re-export ships a stale picture.
+- **Edit the IR, never the generated `.drawio`.** `validate.py --ir` fails a
+  file that no longer matches its IR, and the skill's tests check every IR in the
+  repo against its committed `.drawio`.
+- **Commit the IR, the `.drawio` and its exports together** — a source edit
+  without a regenerate and re-export ships a stale picture.
 - **Frames own their children** (`container=1`): moving a domain frame moves the
   boxes inside it, and it is what makes the "no logo on a grouping frame" check
   able to fire at all.
-- Validate before exporting:
-  `python3 .agents/skills/homelab-drawio/scripts/validate_house.py <file>` — then
-  **open the render and look**, which is where clipping and overlapping labels
-  are caught.
+- Validate before exporting (the table above), then **open the render and
+  look**, which is where a crowded corner or an ambiguous crossing is caught.
 
-_Last updated: 2026-09-28 — `observability-signal-flow.drawio` added; all sources recoloured to the v2 soft-tint palette (light fill, role-hue stroke, dark text, no shadows). Previously 2026-09-18._
+_Last updated: 2026-09-28 — all three sources redrawn top-down from YAML IRs (`*.ir.yaml`) by the skill's generator, with routed edges and placed labels; PNGs quantized to 256 colours. Earlier the same day: `observability-signal-flow.drawio` added and the v2 soft-tint palette applied._

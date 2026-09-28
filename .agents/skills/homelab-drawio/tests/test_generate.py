@@ -188,6 +188,18 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("flowAnimation=1", cells["e6"].get("style"))   # optional never moves
         self.assertIn("flowAnimation=1", cells["legend-edge-traffic"].get("style"))
 
+    def test_edge_into_a_frame(self):
+        ir = _ir()
+        ir["edges"] = [e for e in ir["edges"] if e["id"] not in ("e2", "e3")]
+        ir["edges"].append({"id": "e_all", "source": "gw", "target": "f_apps", "type": "traffic",
+                            "label": "every app"})
+        cells = _cells(generate.build(ir))
+        self.assertEqual(cells["e_all"].get("target"), "f_apps")
+        self.assertIn("entryY=0", cells["e_all"].get("style"))
+        f = self._validate(ir)
+        self.assertNotIn("connectivity.orphan_node", {x["rule_id"] for x in f})  # a, b reached via the frame
+        self.assertEqual([x for x in f if x["severity"] == "ERROR"], [])
+
     def test_spline_parser_handles_multi_piece_splines(self):
         pts = generate._spline_points("e,10,20 1,2 3,4 5,6;s,7,8 9,10 11,12 13,14")
         self.assertEqual(pts[0], (1.0, 2.0))

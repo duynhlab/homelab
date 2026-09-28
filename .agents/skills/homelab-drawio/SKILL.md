@@ -99,12 +99,13 @@ stop.
      longer matches its IR.
    - At most five rounds. After two geometry rounds that do not converge, ask the
      owner: the model is unclear.
-8. **Embed, report and commit.** The page shows the PNG and links the SVG, under a
+8. **Embed, report and commit.** The page shows the SVG (so the primary flow
+   moves; GitHub renders it with its labels) and links the PNG, under a
    one-line lead-in saying which question this copy answers (and, beside a Mermaid
    map of the same question, what it adds). The caption is only the source link:
    ```html
-   <p align="center"><a href="../architecture/<domain>/<name>.svg"><img src="../architecture/<domain>/img/<name>.png" alt="…" width="960"></a></p>
-   <p align="center"><sub>Source <a href="../architecture/<domain>/<name>.drawio"><code><domain>/<name>.drawio</code></a> · <a href="../architecture/<domain>/<name>.svg">SVG</a></sub></p>
+   <p align="center"><a href="../architecture/<domain>/<name>.svg"><img src="../architecture/<domain>/<name>.svg" alt="…" width="960"></a></p>
+   <p align="center"><sub>Source <a href="../architecture/<domain>/<name>.drawio"><code><domain>/<name>.drawio</code></a> · <a href="../architecture/<domain>/img/<name>.png">PNG</a></sub></p>
    ```
    Commit the `.ir.yaml`, the `.drawio`, the SVG and the PNG together, and add the
    row to `docs/architecture/README.md`.

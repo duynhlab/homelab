@@ -10,6 +10,7 @@ diagram:
   scope: "Every path into Postgres: which pooler or direct host each client uses, who manages the clusters, and where WAL and backups go, including the DR replica that recovers from them. Engine internals are out of scope."
   question: domain-topology
   level: L2
+  animate: [data, replication]
   legend:
     roles:
       service: "Service clients"

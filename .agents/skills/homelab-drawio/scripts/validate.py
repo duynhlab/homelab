@@ -366,6 +366,17 @@ def gate_geometry(d: Diagram, ir: dict | None) -> tuple[list[dict], list]:
             pa, pb = routes[a], routes[b]
             if any(_segs_cross(p1, p2, p3, p4) for p1, p2 in zip(pa, pa[1:]) for p3, p4 in zip(pb, pb[1:])):
                 crossings.append([a, b])
+    moving = [eid for eid in (e.get("id") for e in edges) if "flowAnimation=1" in (d.by_id[eid].get("style") or "")]
+    kinds = {_attr(e.get("style") or "", "strokeColor") for e in edges}
+    still = {_attr(e.get("style") or "", "strokeColor") for e in edges
+             if "flowAnimation=1" not in (e.get("style") or "")}
+    # Animation marks the primary flow, so something must stay still for it to
+    # stand out. A graph with one kind of edge (a delivery graph) is all
+    # primary flow and may move entirely.
+    if moving and len(kinds) > 1 and not still:
+        out.append(finding("WARN", "house.animation_overuse", moving,
+                           "every kind of edge animates, so nothing marks the primary flow",
+                           "narrow diagram.animate to the flow the diagram is about (house-style.md § Flow animation)"))
     for pair in crossings:
         out.append(finding("WARN", "geometry.edge_crossing", pair, "edges cross", "reorder peers in the IR, or accept and keep the count low"))
     if ir is not None:

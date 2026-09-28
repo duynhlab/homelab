@@ -70,7 +70,7 @@
         <mxCell id="replica" value="&lt;b&gt;product-db-replica ×3&lt;/b&gt;&lt;br&gt;DR: designated primary&lt;br&gt;+ 2 cascading standbys" style="shape=cylinder3;whiteSpace=wrap;html=1;shadow=0;size=8;fillColor=#DCFCE7;strokeColor=#16A34A;strokeWidth=1.5;fontColor=#14532D;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_product">
           <mxGeometry x="15" y="545" width="150" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="e_platform" value=":5432" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.13;exitY=1;exitDx=0;exitDy=0;entryX=0.93;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_platform" target="pgbouncer">
+        <mxCell id="e_platform" value=":5432" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.13;exitY=1;exitDx=0;exitDy=0;entryX=0.93;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_platform" target="pgbouncer">
           <mxGeometry relative="1" as="geometry" x="0.71">
             <Array as="points">
               <mxPoint x="105" y="265" />
@@ -78,7 +78,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_product" value=":6432" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.89;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_product" target="pgdog">
+        <mxCell id="e_product" value=":6432" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.89;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_product" target="pgdog">
           <mxGeometry relative="1" as="geometry" x="0.61">
             <Array as="points">
               <mxPoint x="1010" y="265" />
@@ -86,7 +86,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_payment" value="direct TLS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.95;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_payment" target="productdb">
+        <mxCell id="e_payment" value="direct TLS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.95;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_payment" target="productdb">
           <mxGeometry relative="1" as="geometry" x="-0.42">
             <Array as="points">
               <mxPoint x="1210" y="265" />
@@ -96,7 +96,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_keycloak" value="direct" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.55;exitY=1;exitDx=0;exitDy=0;entryX=0.76;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_keycloak" target="platformdb">
+        <mxCell id="e_keycloak" value="direct" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.55;exitY=1;exitDx=0;exitDy=0;entryX=0.76;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_keycloak" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="-0.33">
             <Array as="points">
               <mxPoint x="368.66" y="265" />
@@ -106,7 +106,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_temporal" value="direct" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.48;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_temporal" target="platformdb">
+        <mxCell id="e_temporal" value="direct" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.48;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_temporal" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="0.1">
             <Array as="points">
               <mxPoint x="575" y="265" />
@@ -136,7 +136,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_pgbouncer" value="primary" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgbouncer" target="platformdb">
+        <mxCell id="e_pgbouncer" value="primary" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgbouncer" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="0.57">
             <Array as="points">
               <mxPoint x="230" y="415" />
@@ -144,7 +144,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_pgdog" value="-rw / -r" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.89;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgdog" target="productdb">
+        <mxCell id="e_pgdog" value="-rw / -r" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.89;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgdog" target="productdb">
           <mxGeometry relative="1" as="geometry" x="-0.76">
             <Array as="points">
               <mxPoint x="1060" y="440" />
@@ -188,7 +188,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_wal_platform" value="WAL + base backups" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.76;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="platformdb" target="rustfs">
+        <mxCell id="e_wal_platform" value="WAL + base backups" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.76;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="platformdb" target="rustfs">
           <mxGeometry relative="1" as="geometry" x="-0.97">
             <Array as="points">
               <mxPoint x="260" y="585" />
@@ -196,7 +196,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_wal_product" value="WAL + base backups" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.89;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="productdb" target="rustfs">
+        <mxCell id="e_wal_product" value="WAL + base backups" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.89;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="productdb" target="rustfs">
           <mxGeometry relative="1" as="geometry" x="0.68">
             <Array as="points">
               <mxPoint x="1060" y="585" />
@@ -204,7 +204,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_recover" value="continuous WAL recovery" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.67;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="rustfs" target="replica">
+        <mxCell id="e_recover" value="continuous WAL recovery" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.67;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="rustfs" target="replica">
           <mxGeometry relative="1" as="geometry" x="-0.88">
             <Array as="points">
               <mxPoint x="810" y="805" />
@@ -245,7 +245,7 @@
         <mxCell id="legend-role-data-text" value="Pooler / database / bucket" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="524" y="34" width="140" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-data" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;" edge="1" parent="legend">
+        <mxCell id="legend-edge-data" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="682" y="45" as="sourcePoint" />
             <mxPoint x="708" y="45" as="targetPoint" />
@@ -272,7 +272,7 @@
         <mxCell id="legend-edge-control-text" value="manages / rotates" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="1030" y="34" width="100" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-replication" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;" edge="1" parent="legend">
+        <mxCell id="legend-edge-replication" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=2.5;endArrow=classic;flowAnimation=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="14" y="67" as="sourcePoint" />
             <mxPoint x="40" y="67" as="targetPoint" />

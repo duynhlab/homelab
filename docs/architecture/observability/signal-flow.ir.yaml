@@ -9,6 +9,7 @@ diagram:
   scope: "Where every signal goes on the cluster: which OTel Collector pipeline carries it, which backend stores it, and for how long. Delivery order is a different question — see delivery.drawio."
   question: domain-topology
   level: L3
+  animate: [telemetry]
   pin_order: true
   legend:
     roles:

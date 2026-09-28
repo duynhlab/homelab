@@ -92,6 +92,23 @@
           "type": "boolean",
           "default": false,
           "description": "Place each layer's nodes left to right in IR order (nodes of one boundary must then be listed together)"
+        },
+        "animate": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "traffic",
+              "data",
+              "control",
+              "dependency",
+              "event",
+              "replication",
+              "trust",
+              "telemetry"
+            ]
+          },
+          "description": "Edge types drawn with flowAnimation (moving dashes in the SVG): the diagram's primary flow. Planned/optional edges never animate."
         }
       }
     },
@@ -274,6 +291,10 @@
               "maxItems": 2
             },
             "description": "Absolute waypoints overriding the computed route"
+          },
+          "animate": {
+            "type": "boolean",
+            "description": "Override diagram.animate for this edge"
           }
         }
       }

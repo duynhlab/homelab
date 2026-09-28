@@ -114,10 +114,10 @@ scaling detail the Mermaid map summarises:
 - the services the activities call.
 
 <p align="center">
-  <a href="../architecture/workflows/temporal-keda.svg"><img src="../architecture/workflows/img/temporal-keda.png" alt="Temporal work layer and KEDA autoscaling: starters, the Temporal server, the two WorkerDeployments, the Worker Controller and KEDA" width="960"></a>
+  <a href="../architecture/workflows/temporal-keda.svg"><img src="../architecture/workflows/temporal-keda.svg" alt="Temporal work layer and KEDA autoscaling: starters, the Temporal server, the two WorkerDeployments, the Worker Controller and KEDA" width="960"></a>
 </p>
 
-<p align="center"><sub>Source <a href="../architecture/workflows/temporal-keda.drawio"><code>workflows/temporal-keda.drawio</code></a> · <a href="../architecture/workflows/temporal-keda.svg">SVG</a></sub></p>
+<p align="center"><sub>Source <a href="../architecture/workflows/temporal-keda.drawio"><code>workflows/temporal-keda.drawio</code></a> · <a href="../architecture/workflows/img/temporal-keda.png">PNG</a></sub></p>
 
 > **In plain terms:** three workflows, two queues, two workers — and since
 > [ADR-064](../proposals/adr/ADR-064-all-workers-under-controller/) ONE lifecycle:

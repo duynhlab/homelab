@@ -19,11 +19,12 @@ puts a second copy of the SVG in `img/` too.
 
 ## What it does, and why
 
-- **SVG is the default format.** It scales, stays sharp when zoomed, and is a
-  fraction of a PNG's size. Add `--png` only for a source GitHub renders inline
-  (GitHub's Markdown sanitizer strips the `<foreignObject>` Draw.io puts labels
-  in, so a Draw.io SVG in a `README.md` shows a diagram with no text — that one
-  file needs a PNG too).
+- **SVG is the default format, and the one pages embed.** It scales, stays sharp
+  when zoomed, is a fraction of a PNG's size, and carries the flow animation.
+  GitHub renders a Draw.io SVG in an `<img>` with its `<foreignObject>` HTML
+  labels intact. The "GitHub strips the labels" rule this file used to state was
+  re-tested on 2026-09-28 against a pushed branch in a real browser and no longer
+  holds. `--png` still writes the static raster that pages link as a fallback.
 - **`--embed-svg-fonts false`.** Draw.io embeds the full font as base64 by
   default (often >1 MB). The house font is web-safe Helvetica, resolved locally,
   so embedding buys nothing and blows the size budget.

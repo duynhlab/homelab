@@ -64,10 +64,10 @@
         <mxCell id="cart" value="&lt;b&gt;cart&lt;/b&gt;&lt;br&gt;REST :8080 (ClearCart)" style="shape=label;rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;image=data:image/png,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABmJLR0QA/wD/AP+gvaeTAAAFRUlEQVR4nO2YfWhVZRzHP79z7jbzhZRcrczE6bx3vizDl8JIpSx0BLbdbWH7I9IUpBhGof0hJBgEBaVQoVGamGB3u9tCcxVsmjqVUJPGtnu3ge+ZZG3iYm675zz9MUfb7jn3Zd71Rz2f/87v5Xue3+8853mec0Cj0Wg0Go1Go9FoNBqNRqPR/J+Qf+UuSgnBtrkY1nPYLMFQU1CSBXQBN4BTCDVEvAcpEStp/WBLNliLEaaiZDIoEyUdGHIBW9Xi9zYgopxSR7YBW5TBnJZiUJuB2XHjRTVh8zZFuQfixgYaszA9ZaBKgUfiCLeB/Q4Nvv1sEXuQJ+6NhksgNBWTr4EFw8j+FMtb5jgbdp5OY+LYrcAGICNJ3RNgF+Gfea3fMDINqAqvwFb7gAl3obIbv2/1IEuwaQoYAWDhXeheRYxnKZzRDCPRgPLmpRjyHck/nWgUayjy7QLuTHmzHsi+a11oJaPncZ7Pa09tAyqbZqOM48C9KVK8gYdsui2FaRwFeSxFuiDsotC3JroBfe9YAMhLUOosfl8xhw97+PPBU8A8lzgFqhqbHYwyztIVsTE8TyD2qyAFLjmtIKUo+2VEXnMvRjVhG3sxrIOkR67Sk5YJshzFRmCSS1YvGD5PlHlS+li6jU9ckjIQe/TgssyTALRnbcC9+JtglOKf8e0Q+yHgEBWh9QgfA9eBOoRaIlYtJbMuUd68CEPWu+hGUGyhwffekNW9HWihsnkfSmpwXojTUPaq1LwCgcZ0TPMikOXgvQ32k/hnno2p8U3DA6yccz3KHgzVAMudk2Qtfu/nMXWDrQ+DFQLGRKfzg1AR2o5QFlPEDVuWUeytJRh+EdR+xxjFRop8HwyyVbbdj7LHxtVXZCL2CcBwcFbhzy1MaJzB8E5Q6xw8v3mw2YZpbE9IaCCGZeP3Xei7sPNdNpQu7LTPBlkqW3JRkXNAetx7xJyf5rbEBgoo+wgiTg2Y4KHEdz5mciA8CVOit7Rez1//XMhcl+yTlEy7OWQ0m0ik+NhcoTDnWBLxnS52O3oRHEh5+CkM9SOo6GdhUg30r97THfOFXwddV7dNxoq8FGew8RGa3M72zvGS6+L5I3YDir3HGPj+7T4/isxb9wDw+7iuAZGJfcBEet9AJC2h2FgoxiWXIMvAoV9CU+wGDOWVqbeB2w6eHsd4xfxB14ZcQFHuMJLxoJ5NYiQLqDo/noKpHXEjK0LzXbWVOpKabTAYqgcWOfoMyafAW+Oaq5RQGQ4ARUnd02l3GUqgNRPTqgdyHLwW2NMctpdh8ZOrx1ZfUBH2OfoOtWZQGfoS9+LPuOoK71IRznf1V4YfxbTqcC4eYD/+mRdTMwOqmudhy+kYEZ3AR2BXg6cDiYxGmYtBvYn7x80lPL0LiaQ1Ave5xFgIe1DGHjz2zxidFj2j88AsvbPvu+02HZiePF6Yfjl1H0OVocMolqZIrRdhOYW+OoKhzcDWFOlC32pYgt9XAY4nrGESsdYCt1KgpEDWUOirA8Cy3kdxLgW6fdpK3uovHlLZgJJZbShVivMukSgRkNfxe/cO0O3BtlYCsQ9s8ekBtZoi74cDjSP1Q6QcmJhk5mVgFX5fvaO376PmK2DJMEb1C4aspcAbtVinbgb0U5x7BMvyotgB9CaQcQ3YRJc527V4AH/OFRq8T4Mqo69ZCSCNiKzjRud8p+JhpP8KHwhPpFsVI2oxSDZ9s6IdoQNUPajjjEo7Sn5Od1K6fT9tVqB4BmEB8BAwBsU1kIugTgHf4/eeSerIrNFoNBqNRqPRaDQajUaj0Wj+8/wNFEGuOHMUyrcAAAAASUVORK5CYII=;imageAlign=left;imageVerticalAlign=middle;imageWidth=24;imageHeight=24;spacingLeft=42;align=left;fillColor=#CFFAFE;strokeColor=#0891B2;strokeWidth=1.5;fontColor=#164E63;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_targets">
           <mxGeometry x="380" y="65" width="180" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="s_confirm" value="confirm → CreateOrder" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="checkout_api" target="order_api">
+        <mxCell id="s_confirm" value="confirm → CreateOrder" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="checkout_api" target="order_api">
           <mxGeometry relative="1" as="geometry" x="0" />
         </mxCell>
-        <mxCell id="s_order" value="start OrderFulfillment · Cancellation" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.66;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="order_api" target="server">
+        <mxCell id="s_order" value="start OrderFulfillment · Cancellation" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.66;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="order_api" target="server">
           <mxGeometry relative="1" as="geometry" x="0.56">
             <Array as="points">
               <mxPoint x="910" y="300" />
@@ -75,7 +75,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="s_checkout" value="Signal-With-Start AbandonedCheckout" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.55;exitY=1;exitDx=0;exitDy=0;entryX=0.34;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="checkout_api" target="server">
+        <mxCell id="s_checkout" value="Signal-With-Start AbandonedCheckout" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.55;exitY=1;exitDx=0;exitDy=0;entryX=0.34;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="checkout_api" target="server">
           <mxGeometry relative="1" as="geometry" x="0.53">
             <Array as="points">
               <mxPoint x="572.45" y="300" />
@@ -83,7 +83,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="s_ui" value=":7233" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="web" target="server">
+        <mxCell id="s_ui" value=":7233" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="web" target="server">
           <mxGeometry relative="1" as="geometry" x="-0.4" />
         </mxCell>
         <mxCell id="p_db" value="direct :5432" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="server" target="db">
@@ -94,7 +94,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="q_order" value="queue order-fulfillment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=block;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.61;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="server" target="wd_order">
+        <mxCell id="q_order" value="queue order-fulfillment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=block;endFill=0;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.61;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="server" target="wd_order">
           <mxGeometry relative="1" as="geometry" x="0.83">
             <Array as="points">
               <mxPoint x="720" y="500" />
@@ -102,7 +102,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="q_checkout" value="queue checkout" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=block;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.39;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="server" target="wd_checkout">
+        <mxCell id="q_checkout" value="queue checkout" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=block;endFill=0;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.39;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="server" target="wd_checkout">
           <mxGeometry relative="1" as="geometry" x="0.42">
             <Array as="points">
               <mxPoint x="660" y="490" />
@@ -142,7 +142,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="a_grpc" value="activities" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="grpc_targets">
+        <mxCell id="a_grpc" value="activities" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.69;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="grpc_targets">
           <mxGeometry relative="1" as="geometry" x="0.41">
             <Array as="points">
               <mxPoint x="1300" y="695" />
@@ -150,7 +150,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="a_cart" value="ClearCart" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.76;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="cart">
+        <mxCell id="a_cart" value="ClearCart" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.76;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="wd_order" target="cart">
           <mxGeometry relative="1" as="geometry" x="0.5">
             <Array as="points">
               <mxPoint x="1360" y="680" />
@@ -197,7 +197,7 @@
         <mxCell id="legend-role-worker-text" value="Temporal worker (WorkerDeployment)" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="736" y="34" width="200" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-traffic" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;" edge="1" parent="legend">
+        <mxCell id="legend-edge-traffic" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#2563EB;strokeWidth=1.5;endArrow=classic;flowAnimation=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="954" y="45" as="sourcePoint" />
             <mxPoint x="980" y="45" as="targetPoint" />
@@ -215,7 +215,7 @@
         <mxCell id="legend-edge-data-text" value="persistence" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
           <mxGeometry x="1170" y="34" width="70" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="legend-edge-event" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=block;endFill=0;" edge="1" parent="legend">
+        <mxCell id="legend-edge-event" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#D97706;strokeWidth=1.5;endArrow=block;endFill=0;flowAnimation=1;" edge="1" parent="legend">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1258" y="45" as="sourcePoint" />
             <mxPoint x="1284" y="45" as="targetPoint" />

@@ -162,7 +162,9 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-09-25 — **RFC-0033** reserved at `researching` for a
+_Last updated: 2026-09-28 — **RFC-0031** → `implemented` (2026-09-25): every delivery-plan
+task done, both final gates passed, ADR-070 through ADR-076 at `Adoption: Complete`.
+Previously 2026-09-25 — **RFC-0033** reserved at `researching` for a
 Claude-native autonomous engineering organization. The research corrects unsupported
 viral attribution and headcount claims, evaluates an always-on but human-gated target,
 adds a Documentation Steward for an executable `docs/` learning and knowledge plane,

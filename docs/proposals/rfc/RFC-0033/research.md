@@ -6,7 +6,7 @@
 | **Status** | researching |
 | **Scope** | platform-wide |
 | **Created** | 2026-09-24 |
-| **Last updated** | 2026-09-25 |
+| **Last updated** | 2026-09-28 |
 
 > **Research only.** Nothing described here is installed, scheduled, or authorized to
 > merge or deploy. This document separates the useful engineering pattern behind the
@@ -435,6 +435,14 @@ minimum contract is:
 | Escalation | Conditions that require human judgment rather than another prompt |
 | Output | Diff/commits, commands run, results, artifact links, docs-impact verdict, residual risk, blockers |
 
+The checked-in JSON Schema is the machine contract. A GitHub issue form is only a
+human input surface: GitHub converts its fields into Markdown, so the form body is not
+the canonical payload. A normalizer maps stable form field IDs into a schema-versioned
+JSON object, validates it, and writes it to a machine-owned issue comment. Workers may
+lease a task only from that validated comment. Manual edits to the issue body never
+silently change an active task; they require the normalizer to publish a new payload
+revision and checksum.
+
 ### Cross-repository change trains
 
 A platform-wide change is a parent issue with an ordered dependency graph, not one agent
@@ -443,12 +451,16 @@ editing every repository simultaneously. A typical sequence is:
 1. Land or version the shared contract in Homelab or `duynhlab/pkg`.
 2. Open producer changes behind backward-compatible behavior.
 3. Open consumer changes pinned to the new contract/library version.
-4. Run the mandatory compose E2E release audit (API, browser, telemetry) on the PR
-   code **before** any service PR merges or is tagged, as `AGENTS.md` requires for
-   service, `pkg`, gateway, compose, and SPA changes.
-5. Merge, tag, and pin the compatible artifacts. Update Kubernetes delivery, then run
-   the Kind gate once as the final pass.
-6. Remove compatibility paths in a later, separately approved train.
+4. Exercise the compatible candidate set from sibling worktrees before merge when the
+   train needs integration proof; this is a proposed early-feedback step, not a current
+   repository mandate.
+5. Merge compatible changes after their repository CI passes, then run the mandatory
+   compose E2E release audit (API, browser, telemetry) against the exact merged commit
+   SHAs intended for release. `AGENTS.md` and the E2E runbook make this a **pre-tag**
+   gate for service, `pkg`, gateway, compose, and SPA changes.
+6. Tag and pin the passing artifacts, update Kubernetes delivery, and run the Kind gate
+   once as the final pass.
+7. Remove compatibility paths in a later, separately approved train.
 
 Only tasks without a file or contract dependency may run in parallel.
 
@@ -580,6 +592,9 @@ idempotency keys, outcomes, and retry history. A scheduled reconciliation run mu
 missed or dropped events and backfill eligible work. Semantic checks must distinguish
 “the routine infrastructure ran” from “the engineering task succeeded.” During the
 research-preview limits, only documented supported GitHub event classes may be used.
+The reconciliation monitor must not share the routine's failure mode: a scheduled
+GitHub Action checks the latest ledger heartbeat and opens or updates one incident issue
+when it is stale. A routine cannot prove its own liveness.
 
 Key boundary: agent teams may be used inside an interactive research/review session, but
 they are not the 24/7 scheduler. Their current experimental lifecycle and interactive
@@ -670,6 +685,15 @@ and isolated execution even when roles share high-level context.
 PR count is intentionally absent. A large number of tiny or rejected PRs is negative
 throughput, not productivity.
 
+For promotion scoring, **first-pass gate** means every predeclared deterministic check
+passes on the first pushed candidate without a worker follow-up. **Rework** means a
+human-requested correctness, scope, security, or contract change; spelling and formatting
+do not count. An **escaped defect** is a merged change that requires a corrective PR or
+revert because an acceptance criterion, contract, or safety boundary was wrong. **Human
+intervention minutes** count active routing and review time, not time waiting for CI.
+Each accepted Phase 1 change has a seven-day observation window before it contributes to
+the consecutive-success count.
+
 ### Minimum eval set before unattended drafting
 
 1. Read-only service inventory drift with seeded true and false mismatches.
@@ -746,87 +770,92 @@ Pause automated triggers when any of these occur:
 
 ## Open questions
 
-Each question below has a proposed direction instead of being left open. A direction is
-not a decision. It is the owner's to confirm or override before this research becomes an
-RFC, and a confirmed answer is marked *owner-confirmed*.
+The owner confirmed the directions below on 2026-09-28 for promotion into a provisional
+RFC. They remain subject to architecture review before the RFC can become `Accepted`.
 
-- [ ] **What exact low-risk repository and task class should be the Phase 1 canary?**
-      *Proposed:* Homelab `docs/` corrections, meaning broken links, stale counts, and
-      deployed/planned label drift. The limits are one area per task and no manifests.
-      The gates are already deterministic: the CI `markdown-links` and `validate` jobs,
-      plus Mermaid rendering. The change has no deploy path. Service dependency bumps
-      come second, because Renovate and Dependabot already cover that lane without agents.
-- [ ] **Should the durable task schema live in GitHub issue forms, a checked-in schema,
-      or both?** *Proposed:* both, with one owner. A versioned JSON Schema in Homelab
-      is the contract. A GitHub issue form (`.github/ISSUE_TEMPLATE/`, which does not
-      exist today) is only its human entry point. A CI check validates each task against
-      the schema, so the form cannot drift into a second definition.
-- [ ] **Which GitHub identity and token model provides one-repo least privilege while
-      preserving attributable audit history?** *Proposed:* a dedicated GitHub App
+- [x] **What exact low-risk repository and task class should be the Phase 1 canary?**
+      *Owner-confirmed:* Homelab `docs/` corrections, one area per task and no manifests.
+      Broken links, orphan-index findings, and diagram-render failures are the deterministic
+      canary class. Count or deployed/planned corrections additionally require the canonical
+      source, a reproducible query or command, and an independent domain-owner verdict;
+      link and render checks alone cannot prove semantic truth. Service dependency bumps
+      come later because Renovate and Dependabot already cover that lane.
+- [x] **Should the durable task schema live in GitHub issue forms, a checked-in schema,
+      or both?** *Owner-confirmed:* both, with the checked-in JSON Schema as the only
+      contract. A GitHub issue form (`.github/ISSUE_TEMPLATE/`, which does not exist
+      today) captures human input. A normalizer converts the resulting Markdown fields
+      into the validated, machine-owned JSON comment described in [The work contract](#the-work-contract).
+- [x] **Which GitHub identity and token model provides one-repo least privilege while
+      preserving attributable audit history?** *Owner-confirmed:* a dedicated GitHub App
       installed per repository. It uses short-lived installation tokens and only the
       contents, pull-requests, and issues permissions, with no admin or workflow scope.
       Routines cannot provide this, because they act as the owner's own GitHub user.
       Phases 0–2 therefore either accept owner attribution, labelled on every PR, or run
       as bounded GitHub Actions jobs under the App. The unattended write path waits
       until the App path is qualified.
-- [ ] **Which checks are universal, and how does a worker discover repository-specific
-      release gates without duplicating them in the coordinator?** *Proposed:* four
+- [x] **Which checks are universal, and how does a worker discover repository-specific
+      release gates without duplicating them in the coordinator?** *Owner-confirmed:* four
       universal checks: task-schema validity, base-SHA freshness, a clean worktree, and
       evidence completeness. Everything else is discovered from the target repository's
       `AGENTS.md`, which all 10 service repos, `pkg`, and `frontend` already carry. The
       worker cites the gate section it ran. The coordinator stores only the *reference*,
       and a missing or ambiguous gate blocks the task.
-- [ ] **What numeric thresholds define acceptable intervention, rework, escaped defects,
-      and cost for each trust-ladder promotion?** *Proposed starting bars*, measured
+- [x] **What numeric thresholds define acceptable intervention, rework, escaped defects,
+      and cost for each trust-ladder promotion?** *Owner-confirmed starting bars*, measured
       against Phase 0 human baselines and revised with evidence:
 
       | Promotion | Bar |
       |---|---|
       | 0 → 1 | All ten evals pass twice in a row; seeded false-positive rate ≤ 10% |
-      | 1 → 2 | ≥ 10 consecutive draft PRs: first-pass gate ≥ 80%, rework ≤ 20%, zero escaped defects, human minutes per accepted change ≤ 50% of baseline |
+      | 1 → 2 | ≥ 10 consecutive accepted draft-PR candidates, each observed for seven days: first-pass gate ≥ 80%, rework ≤ 20%, zero escaped defects, human minutes per accepted change ≤ 50% of baseline |
       | 2 → 3 | ≥ 3 cross-repo trains with zero ordering errors; cost per accepted change within the owner-set ceiling |
       | 3 → 4 | 30 days of routines with no silent drop left unreconciled for more than one cycle |
 
       Any escaped defect resets the current phase's count.
-- [ ] **What run telemetry may be retained without storing prompts, source code,
-      secrets, or sensitive issue content?** *Proposed:* metrics and ledger metadata
+- [x] **What run telemetry may be retained without storing prompts, source code,
+      secrets, or sensitive issue content?** *Owner-confirmed:* metrics and ledger metadata
       only. That covers the task ID, repo, phase, outcome, retry count, duration, tokens,
       cost, and human-intervention minutes. Claude Code's OpenTelemetry export redacts
       prompts, responses, tool arguments, and tool content by default.
       `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_ASSISTANT_RESPONSES`, `OTEL_LOG_TOOL_DETAILS`,
       `OTEL_LOG_TOOL_CONTENT`, and `OTEL_LOG_RAW_API_BODIES` all stay unset. The OAuth
-      `user.email` attribute is dropped at the collector, and retention follows the
-      platform's existing VictoriaMetrics and VictoriaLogs defaults.
-- [ ] **Who owns the 24/7 coordinator/routine failure path and response expectation?**
-      *Proposed:* the platform owner, on a best-effort basis with no response SLA. The
+      `user.email` attribute is dropped at the collector. Metrics use VictoriaMetrics'
+      seven-day retention. Detailed agent-run logs are not exported; durable task metadata
+      remains in the GitHub ledger under the repository's normal lifecycle.
+- [x] **Who owns the 24/7 coordinator/routine failure path and response expectation?**
+      *Owner-confirmed:* the platform owner, on a best-effort basis with no response SLA. The
       default behavior on failure is *pause and record*, never *retry until green*.
       Routines are tied to one individual account, and one with a lost GitHub connection
-      turns itself off after 72 hours, so a heartbeat alert is the minimum control. The
-      scheduled reconciliation run then backfills. Asking for anything stronger means
-      asking for Path 2 and its on-call burden.
-- [ ] **Which existing area should pilot the junior-to-master capability map without a
-      disruptive tree-wide documentation reorganization?** *Proposed:*
+      turns itself off after 72 hours. A scheduled GitHub Action outside the routine checks
+      the ledger heartbeat and raises the incident; reconciliation backfills after recovery.
+      Asking for a stronger availability target means asking for Path 2 and its on-call burden.
+- [x] **Which existing area should pilot the junior-to-master capability map without a
+      disruptive tree-wide documentation reorganization?** *Owner-confirmed:*
       `docs/observability/`. It already has the house-shape model page
-      (`profiling/README.md`), a hub, and a recent stack migration (RFC-0027/0031) whose
-      deployed/planned drift makes a realistic Steward eval. No other area is touched
-      until the pilot's reader-task metrics are recorded.
-- [ ] **Which documentation examples are safe to execute in CI, which require an
+      (`profiling/README.md`), a hub, and canonical visual views under
+      `docs/architecture/observability/`. The recent RFC-0027/0031 migration makes its
+      deployed/planned drift a realistic Steward eval. No other area is touched until
+      the pilot's reader-task metrics are recorded.
+- [x] **Which documentation examples are safe to execute in CI, which require an
       ephemeral environment, and which must remain review-only because they are
-      destructive?** *Proposed:* three tags on the fenced block, defaulting to
-      review-only. **`ci-safe`** covers read-only or offline commands such as
+      destructive?** *Owner-confirmed:* place one HTML marker immediately before the
+      fenced block: `<!-- example-policy: ci-safe -->`, `ephemeral`, or `review-only`.
+      An absent marker defaults to review-only. **`ci-safe`** covers read-only or offline commands such as
       `make validate`, `kustomize build`, `mmdc`, and `kyverno test`.
       **`ephemeral`** needs local-stack or Kind, for example `make e2e GATE=compose|kind`
-      and `curl` against the gateway. **`review-only`** covers anything that deletes,
-      rotates secrets, reconciles Flux, or touches real data. Untagged blocks are never
-      executed.
-- [ ] **Should the stable page contracts be encoded as Markdown templates, a project
+      and a specifically reviewed gateway request. **`review-only`** covers anything that
+      deletes, rotates secrets, reconciles Flux, mutates real data, or has not been
+      classified. The marker applies to the complete block, not to a command name in isolation.
+- [x] **Should the stable page contracts be encoded as Markdown templates, a project
       skill, lintable metadata, or a deliberately small combination of all three?**
-      *Proposed:* Markdown templates as the source, one Documentation Steward section
-      inside the existing `platform-engineer` skill that points to them (no new skill),
-      and front-matter metadata linted in CI only after the observability pilot shows
-      which fields reviewers actually use.
-- [ ] **Is Option B sufficient after Phase 3, or is there measured evidence for an Agent
-      SDK controller?** *Proposed:* this stays undecided by design, and Phase 4 exists to
+      *Owner-confirmed:* four Markdown templates under `docs/_templates/` — tutorial,
+      how-to, reference, and explanation — are the source. One Documentation Steward
+      section inside the existing `platform-engineer` skill points to them; no new skill
+      is introduced. Front-matter metadata is linted only after the observability pilot
+      shows which fields reviewers actually use.
+- [x] **Is Option B sufficient after Phase 3, or is there measured evidence for an Agent
+      SDK controller?** *Owner-confirmed decision gate:* this stays undecided by design,
+      and Phase 4 exists to
       answer it. The trigger for Path 2 is a named gap that Option B cannot close with
       configuration: identity separation, queue durability, or concurrency control
       beyond the routine caps. The SDK's `max_budget_usd`, depth, and concurrency limits
@@ -1022,8 +1051,8 @@ must be re-checked in Phase 3 qualification.
 - [x] Mermaid diagrams label every candidate component and flow as **planned**
 - [x] No Kubernetes manifest, runtime configuration, hook, routine, or agent definition
       is changed by this research
-- [ ] Owner sign-off: **ready for RFC**
+- [x] Owner sign-off: **ready for RFC** — confirmed 2026-09-28
 
-_Last verified: 2026-09-25 (Context7 rerun for Claude Code docs; official xAI,
+_Last verified: 2026-09-28 (Context7 rerun for Claude Code docs; official xAI,
 Diátaxis, Google, and Kubernetes documentation; repository cross-check. Open questions
-carry proposed directions awaiting owner confirmation)._
+carry owner-confirmed directions for provisional RFC review)._

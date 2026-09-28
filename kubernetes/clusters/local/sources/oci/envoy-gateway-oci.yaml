@@ -20,5 +20,5 @@ spec:
     # Tag kept for human readability; the digest is the actual pin (when both
     # are set, Flux resolves the digest). Verified 2026-08-18 with
     # `crane digest docker.io/envoyproxy/gateway-helm:v1.9.0`.
-    tag: v1.9.0
-    digest: sha256:06e7c26e50d40f0b98d6d1243a3c8dd094464c6099df727216876c19401ffe5f
+    tag: 1.9.2
+    digest: sha256:80fcfff897c47ea3af290d5d9bbf2e6c4c2c0b4d740c8d60694110a977443c84

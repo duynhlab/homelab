@@ -39,7 +39,7 @@ Official reference: [Roles and permissions](https://grafana.com/docs/grafana/lat
 - **Backend** / **Frontend** teams can own service-specific folders.
 - **Viewer** org role + **Editor** on a folder allows targeted edit rights without org-wide Editor.
 
-Official: [Team sync](https://grafana.com/docs/grafana/latest/administration/team-sync/), [Folder permissions](https://grafana.com/docs/grafana/latest/administration/user-management/manage-dashboard-permissions/).
+Official: [Team sync](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-team-sync/), [Folder permissions](https://grafana.com/docs/grafana/latest/administration/user-management/manage-dashboard-permissions/).
 
 ---
 

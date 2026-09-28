@@ -1,0 +1,93 @@
+# Source of docs/architecture/api/platform-api.drawio -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/api/platform-api.ir.yaml
+# Verified on 2026-09-28 against docs/api/api.md (Platform API Topology, Current East-West
+# Call Graph) and docs/api/<service>.md (the contracts, which this diagram follows),
+# kubernetes/apps/services/*.yaml + domains/*-rs.yaml (the *_GRPC_ADDR inputs, domain
+# labels, authmw), apps/{order-worker,checkout-worker,mockpay}.yaml,
+# configs/envoy-gateway/{routes,policies}/*.yaml.
+diagram:
+  id: platform-api
+  title: "duynhlab homelab — Platform API topology"
+  scope: "Who calls whom, over which protocol, grouped by domain: the SPAs through the gateway, the gRPC calls between services and the order worker's activities. Workflow starts and task queues are the Temporal diagram; stores are the database diagram."
+  question: domain-topology
+  level: L2
+  animate: [traffic]
+  legend:
+    roles:
+      external: "Browser app (static SPA)"
+      edge: "Gateway"
+      platform: "Identity provider"
+      service: "Service API"
+      worker: "Temporal worker"
+    edges:
+      traffic: "call: gRPC :9090 unless labelled HTTP / REST"
+      trust: "OIDC / JWKS"
+
+layers: [client, edge, entry, core, leaf, sink]
+
+boundaries:
+  - {id: f_cluster, label: "Kind cluster · homelab"}
+  - {id: f_services, label: "Services · HTTP :8080 on gateway.duynh.me", parent: f_cluster}
+
+nodes:
+  # Listed in the order dot starts from: the fewest crossings of ~600
+  # orderings measured with validate.py on 2026-09-28. Domain frames were tried
+  # and dropped: calls cross domains, and grouping by domain cost ~15 crossings.
+  - {id: storefront, label: "Storefront SPA\nlocal.duynh.me · customer realm", role: external, layer: client}
+  - {id: backoffice, label: "Back-office SPA\nbackoffice.duynh.me · staff realm", role: external, layer: client}
+
+  - {id: envoy, label: "Envoy Gateway\nJWT per realm · CORS", role: edge, layer: edge, parent: f_cluster, icon: envoy}
+  - {id: keycloak, label: "Keycloak\nid.duynh.me · duynhlab + duynhlab-staff", role: platform, layer: edge, parent: f_cluster, icon: keycloak}
+
+  - {id: checkout, label: "checkout\ncheckout domain\ngRPC client only", role: service, layer: entry, parent: f_services, icon: go}
+  - {id: user, label: "user\nidentity domain", role: service, layer: entry, parent: f_services, icon: go}
+
+  - {id: product, label: "product\ncatalog domain", role: service, layer: core, parent: f_services, icon: go}
+  - {id: worker, label: "order-worker\ncheckout domain\nfulfillment activities", role: worker, layer: core, parent: f_services, icon: go}
+  - {id: order, label: "order API\ncheckout domain", role: service, layer: core, parent: f_services, icon: go}
+
+  - {id: payment, label: "payment\ncheckout domain", role: service, layer: leaf, parent: f_services, icon: go}
+  - {id: shipping, label: "shipping\ncomms domain", role: service, layer: leaf, parent: f_services, icon: go}
+  - {id: review, label: "review\ncatalog domain", role: service, layer: leaf, parent: f_services, icon: go}
+  - {id: cart, label: "cart\ncheckout domain", role: service, layer: leaf, parent: f_services, icon: go}
+  - {id: inventory, label: "inventory\nfulfillment domain\nHTTP: protected only", role: service, layer: leaf, parent: f_services, icon: go}
+
+  - {id: notification, label: "notification\ncomms domain", role: service, layer: sink, parent: f_services, icon: go}
+  - {id: mockpay, label: "mockpay\ncheckout domain\npayment provider (in-cluster)", role: service, layer: sink, parent: f_services, icon: go}
+
+edges:
+  - {id: s_store, source: storefront, target: envoy, type: traffic, label: "HTTPS · /public /private"}
+  - {id: s_back, source: backoffice, target: envoy, type: traffic, label: "HTTPS · /protected"}
+  - {id: s_login, source: storefront, target: keycloak, type: trust, label: "OIDC login (PKCE)"}
+  - {id: g_all, source: envoy, target: f_services, type: traffic, label: "HTTP :8080 · one route set per service"}
+  - {id: g_jwks, source: envoy, target: keycloak, type: trust, label: "remoteJWKS · id route"}
+
+  - {id: c_cart, source: checkout, target: cart, type: traffic, label: "GetCart"}
+  - {id: c_price, source: checkout, target: product, type: traffic, label: "BatchGetCurrentPrices"}
+  - {id: c_avail, source: checkout, target: inventory, type: traffic, label: "CheckAvailability"}
+  - {id: c_quote, source: checkout, target: shipping, type: traffic, label: "GetQuote"}
+  - {id: c_order, source: checkout, target: order, type: traffic, label: "CreateOrder"}
+
+  - {id: p_review, source: product, target: review, type: traffic, label: "GetProductReviews"}
+  - {id: p_avail, source: product, target: inventory, type: traffic, label: "BatchGetAvailability"}
+
+  - {id: o_ship, source: order, target: shipping, type: traffic, label: "GetShipmentByOrder"}
+  - {id: o_pay, source: order, target: payment, type: traffic, label: "GetPayment"}
+  - {id: o_res, source: order, target: inventory, type: traffic, label: "GetReservation"}
+
+  - {id: w_inv, source: worker, target: inventory, type: traffic, label: "Reserve · Commit · Release"}
+  - {id: w_ship, source: worker, target: shipping, type: traffic, label: "Create / CancelShipment"}
+  - {id: w_notif, source: worker, target: notification, type: traffic, label: "SendEmail"}
+  - {id: w_pay, source: worker, target: payment, type: traffic, label: "Authorize · Capture · Void · Refund"}
+  - {id: w_cart, source: worker, target: cart, type: traffic, label: "REST ClearCart"}
+
+  - {id: m_charge, source: payment, target: mockpay, type: traffic, label: "HTTP charge · capture · refund"}
+  - {id: m_hook, source: mockpay, target: payment, type: traffic, label: "HMAC webhook"}
+
+notes:
+  - id: note_edge
+    title: "Reading the gateway arrow"
+    text: "The gateway reaches every service on HTTP :8080 through its route set on gateway.duynh.me: /public and /private for the storefront (customer realm JWT), /protected for the back-office on product, inventory, order, payment, shipping and user (staff realm JWT). Inventory exposes only /protected over HTTP. Every service also verifies tokens itself against Keycloak's JWKS (pkg/authmw), which is not drawn."
+  - id: note_scope
+    title: "Elsewhere"
+    text: "checkout starts AbandonedCheckoutWorkflow and the order API starts OrderFulfillmentWorkflow and CancellationWorkflow on Temporal; the order worker's calls above are that workflow's activities (workflows/temporal-keda). mockpay posts its webhook to payment in-cluster; the gateway's webhook route is used by local-stack only. Databases and the Valkey cache are databases/topology."

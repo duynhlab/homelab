@@ -200,6 +200,23 @@ class TestGenerate(unittest.TestCase):
         self.assertNotIn("connectivity.orphan_node", {x["rule_id"] for x in f})  # a, b reached via the frame
         self.assertEqual([x for x in f if x["severity"] == "ERROR"], [])
 
+    def test_dot_failure_on_flat_labels_retries_without_them(self):
+        from unittest import mock
+        real, calls = generate.run_dot, []
+        def flaky(src):
+            calls.append(src)
+            if len(calls) == 1:
+                raise SystemExit("generate.py: dot failed: routesplines")
+            return real(src)
+        ir = _ir()
+        ir["edges"].append({"id": "flat", "source": "a", "target": "b", "type": "traffic", "label": "same row"})
+        with mock.patch.object(generate, "run_dot", side_effect=flaky):
+            xml = generate.build(ir)
+        self.assertEqual(len(calls), 2)
+        self.assertIn('label="same row"', calls[0])
+        self.assertNotIn('label="same row"', calls[1])
+        self.assertIn('id="flat"', xml)
+
     def test_spline_parser_handles_multi_piece_splines(self):
         pts = generate._spline_points("e,10,20 1,2 3,4 5,6;s,7,8 9,10 11,12 13,14")
         self.assertEqual(pts[0], (1.0, 2.0))

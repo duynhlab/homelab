@@ -94,6 +94,23 @@ classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
 classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
 ```
 
+The Draw.io view below draws the same pipeline with what keeps OpenBao running:
+- floci auto-unseal and the one-shot bootstrap Job;
+- the two ClusterSecretStores, and the database engine rotating `notification`
+  every 720 h;
+- where the Secrets land;
+- the edge certificate and the homelab CA bundle.
+
+It follows the manifests where the Mermaid is looser: the listener is plain HTTP
+(TLS is planned), and the CA bundle reaches only `monitoring`, with no consumer
+yet.
+
+<p align="center">
+  <a href="../architecture/secrets/pipeline.svg"><img src="../architecture/secrets/pipeline.svg" alt="Secrets, TLS and trust pipeline: floci and the bootstrap Job keep OpenBao running; ESO turns KV and static creds into Kubernetes Secrets for services, platform components, CNPG and cert-manager" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/secrets/pipeline.drawio"><code>secrets/pipeline.drawio</code></a> · <a href="../architecture/secrets/img/pipeline.png">PNG</a></sub></p>
+
 ### ESO sync path
 
 ```mermaid
@@ -360,4 +377,4 @@ present as active).
 
 ---
 
-_Last updated: 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._
+_Last updated: 2026-09-28 — Draw.io view of the secrets, TLS and trust pipeline. 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._

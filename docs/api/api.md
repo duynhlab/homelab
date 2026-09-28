@@ -172,6 +172,22 @@ east-west edges are intentionally shown only in
 [Current East-West Call Graph](#current-east-west-call-graph); feature and data
 authority lives in [microservices.md](./microservices.md).
 
+The Draw.io view below puts the two together:
+- the SPAs' routes through the gateway;
+- every documented gRPC method between services;
+- the order worker's activity calls;
+- the payment ↔ mockpay loop, which runs in-cluster: mockpay posts its webhook
+  straight to payment, not through the edge.
+
+Calls are drawn caller → callee and animated; stores and workflow starts are
+left to their own diagrams.
+
+<p align="center">
+  <a href="../architecture/api/platform-api.svg"><img src="../architecture/api/platform-api.svg" alt="Platform API topology: SPAs, gateway, Keycloak and the gRPC calls between the ten services, the order worker and mockpay" width="960"></a>
+</p>
+
+<p align="center"><sub>Source <a href="../architecture/api/platform-api.drawio"><code>api/platform-api.drawio</code></a> · <a href="../architecture/api/img/platform-api.png">PNG</a></sub></p>
+
 ### Inside Each Service
 
 Every Go microservice follows the same dependency direction. HTTP and gRPC are
@@ -866,4 +882,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._
+_Last updated: 2026-09-28 — Draw.io view of the platform API topology. 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._

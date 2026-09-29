@@ -661,6 +661,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **PostgreSQL internals now has a curriculum contract before chapter work
+  starts** ([#1137](https://github.com/duynhlab/homelab/issues/1137)). The
+  fundamentals hub is rewritten as the learning contract: fourteen planned
+  chapters absorbing the nine existing pages, the evidence vocabulary, a shared
+  glossary, and a read-only safety boundary built on `kubectl cnpg psql` with
+  the safe session header (never the poolers); its chapter template records
+  cluster, instance, role, and database with every live observation. The
+  former vendor-neutral boundary rule is retired in favor of deployed evidence.
 - **ClickHouse internals now has a documentation contract before chapter work
   starts** ([#1127](https://github.com/duynhlab/homelab/issues/1127)). The
   learning hub fixes the 12-chapter order, evidence vocabulary, shared glossary,

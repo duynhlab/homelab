@@ -17,8 +17,12 @@ or find the right recovery procedure without mixing those three concerns.
 
 ### Learn PostgreSQL
 
-Use this vendor-neutral path for PostgreSQL internals. Platform products,
-manifests, and cluster names are intentionally excluded.
+The [PostgreSQL internals learning path](./fundamentals/README.md) is being
+rebuilt as an explanation-first curriculum grounded in the deployed CNPG
+clusters ([#1137](https://github.com/duynhlab/homelab/issues/1137)): fourteen
+chapters, each with one read-only evidence lab. Its README owns the curriculum
+order, evidence vocabulary, and safety boundary. The pages below remain the
+current material until their absorbing chapter lands.
 
 1. [Fundamentals overview](./fundamentals/README.md)
 2. [Process and memory](./fundamentals/process-and-memory.md)
@@ -122,4 +126,4 @@ this area documents the resulting platform and its operation.
 - [CloudNativePG documentation](https://cloudnative-pg.io/documentation/current/)
 - [PgDog documentation](https://docs.pgdog.dev/)
 
-_Last updated: 2026-09-09 — added the SRE learning and symptom-first troubleshooting paths._
+_Last updated: 2026-09-29 — the Learn path now points at the internals curriculum contract for issue #1137. Previously 2026-09-09 — added the SRE learning and symptom-first troubleshooting paths._

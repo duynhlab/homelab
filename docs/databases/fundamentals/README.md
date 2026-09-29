@@ -1,64 +1,208 @@
-# PostgreSQL Internals
+# PostgreSQL internals learning path
 
-PostgreSQL is easier to operate when its process, storage, concurrency, query,
-and replication models are understood as one system.
+Learn PostgreSQL from the clusters that already run this platform's data: begin
+with a small mental model, follow the mechanism inside the engine, and then
+prove the model against read-only evidence from the CNPG clusters on the Kind
+cluster.
 
-| Item | Scope |
+| Quick facts | |
 |---|---|
-| **Audience** | Engineers learning how PostgreSQL works below SQL APIs |
-| **Version baseline** | PostgreSQL 18 |
-| **Included** | Stable engine concepts and diagnostic mental models |
-| **Excluded** | Deployment products, environment topology, manifests, and runbooks |
+| **Status** | Curriculum contract approved for issue [#1137](https://github.com/duynhlab/homelab/issues/1137); chapters are planned until linked below |
+| **Primary audience** | Platform engineers learning PostgreSQL, from first principles through failure and capacity reasoning |
+| **Page type** | Explanation-first chapters with one embedded, read-only observation lab |
+| **Version baseline** | PostgreSQL 18 (deployed 18.1; record the live minor per observation) |
+| **Case study** | One committed row's journey on `product-db`: WAL → `ANY 1` sync acknowledgement → archive → replay on the archive-fed `product-db-replica` |
+| **Safety boundary** | Observe only: `SELECT` on `pg_catalog`/`pg_stat_*`, `SHOW`, `EXPLAIN`, `kubectl cnpg status`, Kubernetes reads, and existing telemetry |
+| **Canonical platform guide** | [Databases hub](../README.md) |
+| **Authoring contract** | [Chapter template and review gate](_template.md) |
 
-## Learning path
+## Purpose
 
-Read the pages in this order:
+This path teaches the engine by connecting four layers in order:
 
-1. [Processes and memory](./process-and-memory.md) — how connections become
-   backend processes and how shared state is coordinated.
-2. [Storage and WAL](./storage-and-wal.md) — how pages change, why WAL makes
-   commits durable, and how checkpoints bound crash recovery.
-3. [MVCC, locking, and vacuum](./mvcc-locking-and-vacuum.md) — how concurrent
-   transactions see data and why old tuple versions must be reclaimed.
-4. [Query planning and execution](./query-planning-and-execution.md) — how SQL
-   becomes a plan and how to read execution evidence.
-5. [Schema and integrity](./schema-and-integrity.md) — types, constraints, and concurrency-safe invariants.
-6. [Indexes and access paths](./indexes-and-access-paths.md) — access methods, write costs, and plan evidence.
-7. [Partitioning and retention](./partitioning-and-retention.md) — pruning and lifecycle boundaries.
-8. [Replication](./replication.md) — how physical and logical replication move changes and where lag or retained WAL comes from.
-9. [Monitoring and performance investigation](./monitoring-and-performance-investigation.md) — waits, plans, capacity, and mitigation order.
+1. a plain-language mental model;
+2. the internal data structures and state transitions;
+3. the configuration and clusters deployed in this repository; and
+4. evidence that you can inspect without changing the running clusters.
 
-```mermaid
-flowchart LR
-    Process["Processes<br/>and memory"] --> Storage["Storage<br/>and WAL"]
-    Storage --> MVCC["MVCC, locks,<br/>and vacuum"]
-    MVCC --> Schema["Schema<br/>and integrity"]
-    Schema --> Query["Planning<br/>and execution"]
-    Query --> Index["Indexes and<br/>access paths"]
-    Index --> Partition["Partitioning<br/>and retention"]
-    Storage --> Replication["Replication"]
-    Replication --> Monitor["Monitoring and<br/>investigation"]
-    Partition --> Monitor
+The goal is not to memorize SQL or copy an operations runbook. You should be
+able to predict what PostgreSQL does next, explain why it does that, and read
+the catalog and statistics evidence that confirms or disproves your model.
 
-    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
-    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    class Process,MVCC,Schema,Query,Monitor service;
-    class Storage,Index,Partition,Replication data;
-```
+This directory previously held nine vendor-neutral concept pages under a rule
+that forbade naming the deployment. Issue
+[#1137](https://github.com/duynhlab/homelab/issues/1137) retires that rule:
+each chapter below absorbs its predecessor pages and grounds the same concepts
+in the deployed CNPG clusters, their manifests, and live evidence.
 
-The diagram answers how the topics depend on one another. It is a learning
-sequence, not a deployment topology.
+## Audience and prerequisites
 
-## Boundary rule
+Start here if you can use `kubectl` and basic SQL but do not yet feel confident
+explaining pages, tuples, WAL, snapshots, vacuum, or replication slots. The
+chapters progress from junior mental models to senior failure and capacity
+trade-offs; they do not require prior PostgreSQL operations experience.
 
-These pages explain PostgreSQL itself. They must not contain environment names,
-deployment products, infrastructure manifests, or operational commands tied to
-one installation. Those facts change independently from the engine concepts.
+Before the live observation blocks, know how to:
+
+- select the Ubuntu Kind kubeconfig without changing another cluster context;
+- reach an instance with `kubectl cnpg psql <cluster>` (never through the
+  poolers) and identify the pod and its role;
+- open every session with the
+  [safe session header](../observability-and-troubleshooting.md#safe-session-header)
+  plus `SET default_transaction_read_only = on;`
+- distinguish repository intent from a timestamped live observation; and
+- stop when a command would write data or alter cluster state.
+
+## How to use this path
+
+Read the chapters in order on the first pass. Within a chapter, use the depth
+that matches your goal:
+
+| Depth | Read through | You should be able to |
+|---|---|---|
+| **Foundation** | Mental model | Define the essential terms and describe the mechanism without implementation detail |
+| **Practitioner** | Internal mechanism + homelab case study | Map the model to the deployed manifests, GUCs, and data path |
+| **Operator** | Live observation + failure modes | Interpret real evidence and identify the failing layer |
+| **Mastery** | Challenges + teach-back | Predict behavior under a new scenario and defend the trade-off |
+
+Do not skip directly to a command and treat its output as self-explanatory.
+Read the mechanism first, then use the observation to test it.
+
+## Curriculum
+
+A linked title is part of the published learning path; an unlinked title is
+planned. When a chapter is published, the pages it absorbs are deleted and
+every inbound link is repointed in the same pull request.
+
+| # | Planned chapter | Owning question | Absorbs | Depends on |
+|---:|---|---|---|---|
+| 1 | `01-processes-and-memory.md` | Which processes run inside a CNPG instance, and how is memory divided? | [Processes and memory](process-and-memory.md) | Databases hub |
+| 2 | `02-storage-pages-and-tuples.md` | Where does a row physically live on disk? | storage half of [Storage and WAL](storage-and-wal.md) | 01 |
+| 3 | `03-buffer-manager-and-io.md` | How does an 8 KiB page travel between disk and RAM? | (new) | 01–02 |
+| 4 | `04-wal-and-checkpoints.md` | What makes a commit durable? | WAL half of [Storage and WAL](storage-and-wal.md) | 02–03 |
+| 5 | `05-mvcc-and-snapshots.md` | How do two transactions see different data at once? | MVCC part of [MVCC, locking, and vacuum](mvcc-locking-and-vacuum.md) | 02 |
+| 6 | `06-locking-and-wait-events.md` | Who is blocking whom, and which evidence proves it? | locking part of [MVCC, locking, and vacuum](mvcc-locking-and-vacuum.md); blocking chains from [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 05 |
+| 7 | `07-vacuum-and-freezing.md` | Why does vacuum exist, and when does it lose? | vacuum part of [MVCC, locking, and vacuum](mvcc-locking-and-vacuum.md); vacuum pressure from [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 05 |
+| 8 | `08-query-processing.md` | How does SQL become a plan and then rows? | [Query planning and execution](query-planning-and-execution.md); plan investigation from [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 03, 05 |
+| 9 | `09-indexes-and-access-methods.md` | How does a B-tree find — and punish — you? | [Indexes and access paths](indexes-and-access-paths.md) | 02, 08 |
+| 10 | `10-schema-and-integrity.md` | Which constraint is enforced where, and which migration is safe? | [Schema and integrity](schema-and-integrity.md) | 06, 09 |
+| 11 | `11-partitioning-and-retention.md` | What does partitioning buy, and at what price? | [Partitioning and retention](partitioning-and-retention.md) | 09–10 |
+| 12 | `12-replication-and-slots.md` | How do standbys converge, and how do slots hold WAL hostage? | [Replication](replication.md) | 04 |
+| 13 | `13-backup-and-pitr.md` | How does the engine restore to a point in time? | (new; recovery notes from [Storage and WAL](storage-and-wal.md)) | 04, 12 |
+| 14 | `14-monitoring-and-capacity.md` | What do you measure to name the failing layer? | [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 01–13 |
+
+The sequence is deliberate: processes → storage → buffers → WAL → MVCC →
+locks → vacuum → queries → indexes → schema → partitioning → replication →
+backup → monitoring.
+
+## Content ownership
+
+Each chapter answers one question. It links to, rather than copies, content
+owned elsewhere.
+
+| Content | Canonical owner |
+|---|---|
+| Cluster inventory, topology, services, connection paths | [Databases architecture](../architecture.md) |
+| Operator behavior, resource model, reconciliation | [CloudNativePG](../cloudnativepg.md) |
+| Backup schedules, retention, recovery model | [Backup policy](../backup-policy.md) |
+| DR plan, standby taxonomy, PITR procedures, RPO/RTO | [Disaster recovery](../disaster-recovery.md) and [reliability targets](../reliability-targets.md) |
+| Pooler inventory and modes | [Poolers](../poolers.md) |
+| Extension inventory per database | [Extensions](../extensions.md) |
+| Symptom-first triage and safe session header | [Observability and troubleshooting](../observability-and-troubleshooting.md) |
+| Task procedures (restore, failover drills, role rotation) | [Databases runbooks](../runbooks/README.md) |
+| Per-alert diagnosis | [PostgreSQL alert runbooks](../../observability/runbooks/postgresql/README.md) |
+
+Chapter 13 explains restore mechanics inside the engine; it does not copy the
+DR plan or the restore runbooks. Chapter 14 owns investigation method, not
+per-alert procedures.
+
+## Evidence vocabulary
+
+Every non-trivial claim uses one of these evidence classes. The label may be in
+the sentence, a callout, or an evidence table; it must be unambiguous.
+
+| Class | Meaning | Required proof |
+|---|---|---|
+| **Upstream invariant** | Product behavior intended to hold across deployments | Current official documentation, source, or specification |
+| **Repository fact** | Behavior declared by this Git revision | Link to the smallest owning manifest, GUC block, or canonical document |
+| **Live observation** | Behavior seen on one running environment at one time | Timestamp, timezone, `SELECT version()`, context, cluster, instance pod and role, database, command, and abbreviated output |
+| **Inference** | A conclusion derived from evidence but not directly observed | Name the evidence and the limit of the inference |
+| **Reference — not deployed** | A useful PostgreSQL pattern absent from this platform | Official source plus an explicit not-deployed label |
+| **Planned** | Accepted direction that has not been applied | Owning accepted RFC/ADR and an explicit planned label |
+
+Dynamic evidence is never a platform constant. An LSN, XID age, WAL segment
+name, buffer count, lag value, or `pg_stat_*` counter captured from the
+cluster must say **observed example** and include its observation context.
+Cumulative `pg_stat_*` counters also name their last reset time.
+
+## Shared glossary
+
+Chapters define a term inline on first use and link back here when readers need
+the short cross-chapter meaning. They do not create separate glossaries.
+
+| Term | Meaning in this learning path |
+|---|---|
+| **Page** | The 8 KiB block PostgreSQL reads and writes as one unit, in memory and on disk |
+| **Tuple** | One physical row version inside a page, carrying `xmin`/`xmax` visibility metadata |
+| **TOAST** | The side storage for values too large to fit a page inline |
+| **XID** | A 32-bit transaction identifier whose finite space makes freezing mandatory |
+| **Snapshot** | The set of transaction visibility decisions a statement or transaction reads through |
+| **WAL** | The append-only log whose flush, not the data-file write, makes a commit durable |
+| **LSN** | A byte position in the WAL stream; ordering and lag are measured as LSN distances |
+| **Checkpoint** | The act of forcing dirty pages to disk so recovery can start from a known REDO point |
+| **Vacuum** | Background reclamation of dead tuples and the freezing that keeps XIDs usable |
+| **Replication slot** | Server-side state that pins WAL until a consumer confirms it, deliberately trading disk for safety |
+| **Timeline** | The recovery lineage identifier that diverges whenever a restore or promotion rewrites history |
+| **Instance** | One PostgreSQL process tree in one pod; a CNPG cluster is one primary plus its standbys |
+
+## Observation safety
+
+Labs connect with `kubectl cnpg psql <cluster>` (add `--replica` for a
+standby), never through PgDog or PgBouncer: transaction pooling breaks session
+state, and read routing hides which instance answered. The connection is a
+superuser, so every lab opens with the
+[safe session header](../observability-and-troubleshooting.md#safe-session-header)
+and `SET default_transaction_read_only = on;`.
+
+Allowed evidence collection:
+
+- bounded `SELECT` on `pg_catalog`, `pg_stat_*`, `pg_settings`, and existing
+  tables; `SHOW`; system functions such as `pg_current_wal_lsn()` and
+  `pg_control_checkpoint()`;
+- `EXPLAIN` without `ANALYZE` on any writing statement;
+- `kubectl get`, `describe`, `cnpg status`, and bounded log reads; and
+- existing metrics, dashboards, logs, and dated audits.
+
+Forbidden on the shared Kind cluster:
+
+- any DML or DDL — including `CREATE EXTENSION`; `pageinspect`,
+  `pg_buffercache`, `pg_visibility`, and `pg_walinspect` are not installed and
+  must stay that way here;
+- `CHECKPOINT`, `pg_switch_wal()`, `VACUUM`, `ANALYZE`, or settings changes at
+  cluster scope;
+- `kubectl cnpg promote`, `fencing`, `restart`, `backup`, or `hibernate`,
+  deleting pods, or editing Cluster resources; and
+- shelling into the data directory, including `pg_waldump`.
+
+Page-level and WAL-file forensics belong in an isolated disposable lab (a
+throwaway PostgreSQL 18 container); a chapter that uses one says so explicitly.
+
+## Authoring and review
+
+Start every chapter from the [chapter template](_template.md). The template is
+the contributor contract; do not paste its review checklist into published
+chapters. A chapter is complete only when its evidence, diagram, links, and
+teach-back gate pass the template's review checklist.
 
 ## References
 
-- [PostgreSQL 18 documentation](https://www.postgresql.org/docs/18/)
-- [PostgreSQL architecture tutorial](https://www.postgresql.org/docs/18/tutorial-arch.html)
+- [PostgreSQL 18 documentation](https://www.postgresql.org/docs/18/index.html)
+- [PostgreSQL 18 release notes](https://www.postgresql.org/docs/18/release-18.html)
+- [CloudNativePG documentation](https://cloudnative-pg.io/documentation/)
+- [Diátaxis documentation framework](https://diataxis.fr/)
 
-_Last updated: 2026-09-14 — schema, index, partitioning, and investigation
-modules added._
+---
+_Last updated: 2026-09-29 — rewrote this page as the curriculum contract for
+issue #1137: fourteen planned chapters, evidence vocabulary, shared glossary,
+and the read-only safety boundary. The previous vendor-neutral boundary rule is
+retired; the nine existing pages remain until their absorbing chapter lands._

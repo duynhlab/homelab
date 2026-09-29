@@ -16,7 +16,11 @@
 # exits 0, so re-running is safe. Jobs are immutable — to re-run after editing:
 #   kubectl delete job temporal-search-attributes -n temporal
 #   flux reconcile kustomization temporal-config-local -n flux-system
-# (No kustomize.toolkit.fluxcd.io/force on Jobs — openbao-bootstrap rationale.)
+# kustomize.toolkit.fluxcd.io/force is not set. It would be safe (the Job is
+# idempotent), but it only re-creates a Job when an apply fails on an immutable
+# field — a template edit — never on an unchanged reconcile; the delete above is
+# the documented re-run. No ttlSecondsAfterFinished either, so the completed Job
+# stays put and is never re-run on its own.
 ---
 apiVersion: batch/v1
 kind: Job

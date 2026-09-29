@@ -40,7 +40,6 @@ is indexed in [microservices.md](./microservices.md).
 flowchart TB
     %% ===== Layer 1: External actors =====
     Internet((Shoppers / operators))
-    Provider["MockPay / payment provider"]
 
     %% ===== Layer 2: Clients =====
     Internet --> Storefront["Storefront SPA"]
@@ -49,7 +48,6 @@ flowchart TB
     %% ===== Layer 3: Gateway =====
     Storefront -->|"HTTP/JSON"| Edge["Envoy Gateway<br/>edge"]
     Backoffice -->|"HTTP/JSON"| Edge
-    Provider -->|"signed webhook"| Edge
 
     %% ===== Layer 4: Application platform =====
     subgraph Platform["duynhlab application platform"]
@@ -70,6 +68,7 @@ flowchart TB
             Checkout["checkout"]
             Order["order"]
             Payment["payment"]
+            MockPay["mockpay<br/>payment provider (in-cluster)"]
             CheckoutWorker["checkout-worker"]
             OrderWorker["order-worker"]
         end
@@ -105,8 +104,10 @@ flowchart TB
     Temporal -->|"checkout task queue"| CheckoutWorker
     Temporal -->|"order task queue"| OrderWorker
 
-    %% Outbound call to external payment provider
-    Payment -->|"provider HTTP"| Provider
+    %% Payment provider loop: mockpay runs in the payment namespace
+    Payment -->|"provider HTTP<br/>charge · capture · refund"| MockPay
+    MockPay -->|"HMAC webhook"| Payment
+    MockPay -.->|"local-stack only:<br/>webhook via the edge"| Edge
 
     %% ===== Layer 5: Data stores =====
     subgraph Data["Data stores"]
@@ -139,11 +140,11 @@ flowchart TB
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class Storefront,Backoffice,Edge edge;
-    class User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification service;
+    class User,Product,Review,Cart,Checkout,Order,Inventory,Shipping,Payment,Notification,MockPay service;
     class CheckoutWorker,OrderWorker worker;
     class Keycloak,Temporal platform;
     class PlatformDB,ProductDB,Valkey data;
-    class Internet,Provider external;
+    class Internet external;
 ```
 
 ```mermaid
@@ -882,4 +883,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-28 — Draw.io view of the platform API topology. 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._
+_Last updated: 2026-09-29 — topology map: mockpay drawn in-cluster (webhook straight to payment; the edge leg is local-stack only). Earlier: 2026-09-28 — Draw.io view of the platform API topology. 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._

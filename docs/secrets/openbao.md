@@ -151,7 +151,7 @@ sequenceDiagram
     participant Standby2 as openbao-2 (Standby)
     participant Raft as Raft Log (PVC)
 
-    Client->>Active: HTTPS :8200 — read/write request
+    Client->>Active: HTTP :8200 (TLS planned) — read/write request
     Active->>Raft: Append log entry
     Active->>Standby1: Replicate (port 8201)
     Active->>Standby2: Replicate (port 8201)
@@ -517,17 +517,17 @@ sequenceDiagram
     note over PG: Old user automatically removed
 ```
 
-#### Database Connection Configuration
+#### Database Connection Configuration (planned)
 
 ```mermaid
 flowchart LR
-    subgraph cnpg_setup["product-db Connection Setup (one-time)"]
+    subgraph cnpg_setup["planned — product-db Connection Setup (one-time)"]
         vault_admin["vault_admin user\n(created in PG with CREATEROLE)\nstored as static role\nin OpenBAO"]
         db_engine["OpenBAO Database Engine\ndatabase/config/product-db\nconnection_url: postgres://...\nallowed_roles: *-app-rw, *-readonly"]
         vault_admin --> db_engine
     end
 
-    subgraph roles["Dynamic Roles (per database)"]
+    subgraph roles["planned — Dynamic Roles (per database)"]
         r1["product-app-rw\nCREATE, SELECT, INSERT,\nUPDATE, DELETE\nTTL: 1h / max: 24h"]
         r2["product-readonly\nSELECT only\nTTL: 8h / max: 24h"]
         r3["cart-app-rw\nTTL: 1h"]
@@ -1137,4 +1137,4 @@ gantt
 
 ---
 
-_Last updated: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_
+_Last updated: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

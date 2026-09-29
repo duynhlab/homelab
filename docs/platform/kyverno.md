@@ -365,7 +365,9 @@ make validate      # includes the Kyverno CLI test fixtures
 **Expected**: the three fixtures under `configs/kyverno/tests/`
 (`disallow-default-namespace`, `require-probes`, `require-resources`) all pass.
 This is the same gate the `validate` CI job runs, with the CLI pinned to engine
-v1.19.1.
+v1.19.1. The gate also fails if any result comes back `Excluded`: the CLI scores
+an expected `pass` as met when a rule was skipped, so a green run alone does not
+prove a policy evaluated anything.
 
 ### Step 8: Metrics are actually arriving
 
@@ -397,6 +399,16 @@ resolving against a field that is absent. `require-probes` hit exactly this with
 Pods that have no `ownerReferences`, found by its own test fixture; the fix was a
 `|| []` default in the precondition. Reproduce it locally against the fixture
 before changing the policy.
+
+### One policy reports nothing while the others do
+
+Background scans never write `skip` into a PolicyReport, so a rule that skips
+every resource is invisible rather than failing. `require-probes` did this until
+2026-09-29: its pattern used `"<(periodSeconds)": 300`, a **global anchor**. That
+is a condition ("apply only where the value is 300"), not an assertion, so every
+compliant pod was skipped and the reports held zero `require-probes` results in
+all ten namespaces. Check a suspect policy with `kyverno test --detailed-results`
+(look for `Excluded`) or `kyverno apply <policy> --cluster -n <ns>`.
 
 ### Nothing is being reported at all
 
@@ -542,7 +554,9 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
+_Last updated: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
+
+_2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
 
 _2026-08-24 — refactored to the house shape: adds a quick-facts table, a **Policy inventory** (the doc previously named no policy file at all), a decision-path diagram, an exceptions table, an 8-step verification runbook, and troubleshooting by symptom with a failure-modes table. Corrects a self-contradiction: the adoption matrix called Policy Reporter “planned — not deployed” while three other sections, the HelmRelease, the HTTPRoute and `setup-hosts.sh` all say it is live — the architecture diagram's `planned` node is gone with it. The PolicyException YAML block now delegates to `policy-exceptions.md` instead of duplicating it._
 

@@ -103,3 +103,29 @@ spec:
       livenessProbe:
         httpGet: {path: /healthz, port: 8080}
         periodSeconds: 10
+---
+# foreach walks every container: a sidecar without probes fails the Pod even
+# when the main container is compliant.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rs-owned-sidecar-without-probes
+  namespace: product
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: ReplicaSet
+      name: product-abc123
+      uid: 44444444-4444-4444-8444-444444444444
+      controller: true
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/product-service/product-service:v1.0.0
+      livenessProbe:
+        httpGet: {path: /healthz, port: 8080}
+        periodSeconds: 10
+      readinessProbe:
+        httpGet: {path: /readyz, port: 8080}
+        periodSeconds: 10
+    - name: sidecar
+      image: ghcr.io/duynhlab/product-service/product-service:v1.0.0

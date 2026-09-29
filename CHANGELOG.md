@@ -1150,6 +1150,21 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **`require-probes` evaluates compliant pods instead of skipping them.**
+  - Symptom: the PolicyReports held zero `require-probes` results in all ten
+    app namespaces, although the policy was Ready.
+  - Cause: the pattern used `"<(periodSeconds)": 300`, a global anchor. That is
+    a condition ("apply only where periodSeconds is 300"), so every real pod
+    (10s/20s periods) was skipped, and skips never reach a report. A missing
+    probe still failed, which is why nothing looked broken.
+  - Why the fixture missed it: `kyverno test` scores an expected `pass` as met
+    when the result is `Excluded`. Both pass rows had been Excluded all along.
+  - Fix: `periodSeconds: ">0"` on both probes (the apiserver defaults it on
+    every stored probe, so it reads as "present"). New fixture: a sidecar
+    without probes fails. `make validate` now fails on any `Excluded` result,
+    and did fail on the old policy with the current fixtures.
+  - Verified: `kyverno apply --cluster` against Kind returns pass for all 22
+    pods across the ten namespaces, zero fail.
 - **Service namespaces now have one owner: `namespaces.yaml`.**
   - This is step 2 of the `deny-all-ingress` fix: the five domain ResourceSet
     templates no longer render a Namespace. Step 1 had put

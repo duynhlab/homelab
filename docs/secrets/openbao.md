@@ -38,7 +38,7 @@
 - **API-compatible with Vault** — ESO, Kubernetes auth, all existing patterns carry over unchanged
 - **CNCF Sandbox project** under the OpenSSF
 - **Drop-in replacement** — rename `vault` CLI to `bao`, same REST API paths (`/v1/...`)
-- **Actively maintained** — this repo currently deploys OpenBAO 2.6.x via the OpenBAO Helm chart
+- **Actively maintained** — this repo currently deploys OpenBAO 2.7.0 via the OpenBAO Helm chart (pinned at 0.30.0)
 
 ### Why Migrate from Vault Dev Mode
 
@@ -203,6 +203,39 @@ flowchart LR
 > **self-unseal at boot** via `seal "awskms"` pointed at the floci emulator
 > (`alias/openbao-unseal`). Shamir survives only as the **recovery-key break-glass**
 > (`bao operator generate-root`). Production swaps floci's `endpoint` for a real cloud KMS.
+
+### The awskms seal is a plugin (OpenBAO 2.7+)
+
+OpenBAO 2.7 removed the provider seals (`awskms`, `gcpckms`, `azurekeyvault`, …)
+from its binary; they ship as external **KMS plugins** in the `openbao-plugins`
+collection. The server config therefore declares the plugin next to the seal, and
+the two names must match:
+
+```hcl
+plugin_directory     = "/openbao/data/plugins"
+plugin_auto_download = true
+
+plugin "kms" "awskms" {
+  image = "ghcr.io/openbao/openbao-plugin-kms-aws:v0.1.0@sha256:fe9fb948…"
+}
+
+seal "awskms" { … unchanged, still pointing at floci … }
+```
+
+How it behaves, as measured on Kind on 2026-09-29:
+
+- **First start:** each server downloads the plugin from GHCR *before* it unseals
+  and logs `Auto Seal: awskms (builtin: false, …)`. A failed download fails startup
+  (`plugin_download_behavior` defaults to `fail`), so a registry outage shows up as
+  a crash rather than a sealed server that looks healthy.
+- **Restart:** the binary is cached on the Raft PVC (`/openbao/data/plugins`), so a
+  restarted pod logs `plugin is cached on disk, skipping download` and unseals with
+  no network call to GHCR.
+- **Pinning:** the image is pinned by its multi-arch index digest. `sha256sum` is
+  deliberately unset because it is a per-architecture binary checksum and would break
+  an arm64 host.
+- **Upgrading the plugin** means changing the digest. Upgrading OpenBAO is changing
+  the chart pin in `helmrelease.yaml`, which is no longer a floating range.
 
 ### Init Ceremony (auto-unseal → recovery keys)
 
@@ -1057,4 +1090,4 @@ gantt
 
 ---
 
-_Last updated: 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_
+_Last updated: 2026-09-29 — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

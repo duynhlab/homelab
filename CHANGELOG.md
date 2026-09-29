@@ -5548,6 +5548,21 @@ Skeleton (copy what you need):
 
 #### Secrets
 
+- **OpenBAO 2.7.0 (chart pinned at 0.30.0), with the awskms seal as an
+  external KMS plugin.** Fixes every fresh bring-up since 2026-09-28. The chart
+  range `>=0.6.0 <1.0.0` resolved to 0.30.0 without a commit, and OpenBAO 2.7.0
+  had removed the built-in `awskms` seal, so `openbao-0` crash-looped on
+  `unknown wrapper: awskms` and every Flux wave behind `secrets-local` stalled.
+  The server config now declares
+  `plugin "kms" "awskms"` (`ghcr.io/openbao/openbao-plugin-kms-aws:v0.1.0`,
+  pinned by multi-arch index digest) beside the unchanged floci `seal "awskms"`
+  stanza. The plugin is downloaded before unsealing and cached on the Raft PVC,
+  so a restarted pod unseals with no registry call (measured: `plugin is cached
+  on disk, skipping download`, then `unsealed with stored key`). The three
+  client Jobs (bootstrap, OIDC config, DB config) move to `openbao/openbao:2.7.0`
+  to stay aligned with the server. ADR-024 is amended; `openbao.md` and the
+  unseal runbook cover the plugin and its failure signatures.
+
 - **OpenBAO CLI jobs 2.5.3 → 2.6.2** (#692, `openbao-db-config` +
   `openbao-bootstrap` Job images): re-aligns the CLI with the server the
   floating chart (0.29.2) already runs, and picks up the 2.5.4–2.6.2 security

@@ -90,6 +90,14 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### CI
+
+- **GitHub issue intake is structured for platform work.** Bug/operations,
+  platform-task, and documentation/research forms collect actionable evidence;
+  `.github/labels.yaml` now manages the repo's area and workflow taxonomy, and
+  `CODEOWNERS` is located under `.github/` with its effective default owner
+  preserved.
+
 #### GitOps
 
 - **KEDA 2.20.2 installed as its own Flux wave, `keda-local`** ([ADR-055](docs/proposals/adr/ADR-055-keda-worker-autoscaling/README.md)).

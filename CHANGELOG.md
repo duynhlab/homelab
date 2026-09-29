@@ -121,6 +121,37 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The ClickHouse schema ships as a digest-pinned image volume (RFC-0032
+  Phase 2, ADR-077 Accepted, Adoption Complete).**
+  - **The image.** The five DDL files moved from the `clickhouse-schema`
+    ConfigMap to `images/clickhouse-ddl/`. That directory builds
+    `ghcr.io/duynhlab/homelab/clickhouse-ddl` `FROM scratch`, for
+    amd64 and arm64.
+  - **Reproducible build.** The same SQL always gives the same digest: BuildKit
+    pinned by digest, `SOURCE_DATE_EPOCH=0`, `rewrite-timestamp`, no in-image
+    attestations, and `COPY --chmod=u=rwX,go=rX`. Without that chmod, the
+    local umask changed the digest.
+    - `make ddl-digest` prints the reference for `job.yaml`.
+    - `make ddl-load` imports it into the Kind nodes, adding the `repo@digest`
+      name the kubelet looks up.
+  - **Workflow `clickhouse-ddl`.** On a pull request it rebuilds and fails if
+    the Job's digest differs. On main it pushes that exact archive (skopeo
+    `--preserve-digests`), re-reads the digest from the registry, signs it with
+    cosign keyless and attests provenance.
+  - **The Job.** It mounts the image with `subPath: sql` and asserts the five
+    files before applying anything, because an empty mount fails silently.
+    It carries `kustomize.toolkit.fluxcd.io/force: enabled`, so a digest bump
+    re-creates it with no `kubectl delete job`.
+  - **Policy and validation.**
+    - `disallow-latest-tag` requires `@sha256:` on image volumes, with new CLI
+      fixtures.
+    - `make validate` checks that the reference is digest-pinned and that its
+      tag matches the SQL.
+  - **Kind 1.35.8 gate:**
+    - 5 files mounted; schema complete on 3 replicas.
+    - The DDL-bump drill re-created the Job and completed.
+    - The tag-only volume reported `fail`; the Job pod reported `pass`.
+
 - **Pod logs also land in ClickHouse, and OpenBao finally has an audit log.**
   - **Two log paths.** Vector keeps sending every pod line it tails to
     VictoriaLogs, and now reshapes the same lines as OTLP (`to_otlp`) and sends

@@ -1,0 +1,113 @@
+# ClickHouse DDL image (ADR-077 / RFC-0032 Phase 2).
+#
+# The clickhouse-schema Job mounts ghcr.io/duynhlab/homelab/clickhouse-ddl as an
+# image volume, pinned by digest. That digest is written in job.yaml by hand
+# (`make ddl-digest`), so this workflow's job is to keep it honest:
+#
+#   pull request -> rebuild with the SAME `make ddl-digest` a person runs (pinned
+#                   BuildKit, SOURCE_DATE_EPOCH=0, rewrite-timestamp) and fail
+#                   unless it equals the reference in job.yaml;
+#   push to main -> the same build, then push that exact OCI archive (skopeo
+#                   --preserve-digests keeps the digest), re-read the digest from
+#                   the registry, sign it (cosign keyless) and attest provenance.
+#
+# No provenance/SBOM is baked into the image: buildx attestation manifests would
+# change the index digest on every build. Provenance is attached to the pushed
+# digest as a separate attestation instead.
+name: clickhouse-ddl
+
+on:
+  pull_request:
+    paths:
+      - images/clickhouse-ddl/**
+      - kubernetes/infra/configs/clickhouse-schema/**
+      - Makefile
+      - .github/workflows/clickhouse-ddl.yml
+  push:
+    branches: [main]
+    paths:
+      - images/clickhouse-ddl/**
+      - kubernetes/infra/configs/clickhouse-schema/**
+      - Makefile
+      - .github/workflows/clickhouse-ddl.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clickhouse-ddl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build reproducibly and compare with job.yaml
+        id: ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          built=$(make -s ddl-digest)
+          pinned=$(yq '.spec.template.spec.volumes[] | select(.name == "sql") | .image.reference' \
+            kubernetes/infra/configs/clickhouse-schema/job.yaml)
+          echo "built:  ${built}"
+          echo "pinned: ${pinned}"
+          if [[ "${built}" != "${pinned}" ]]; then
+            echo "::error file=kubernetes/infra/configs/clickhouse-schema/job.yaml::the sql volume reference does not match what images/clickhouse-ddl builds to; run 'make ddl-digest' and update it"
+            exit 1
+          fi
+          echo "image=${built%@*}" >> "$GITHUB_OUTPUT"
+          echo "digest=${built#*@}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the exact archive
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          IMAGE: ${{ steps.ref.outputs.image }}
+          DIGEST: ${{ steps.ref.outputs.digest }}
+        run: |
+          set -euo pipefail
+          skopeo login ghcr.io -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+          skopeo copy --all --preserve-digests \
+            oci-archive:images/clickhouse-ddl/.out/clickhouse-ddl.oci.tar \
+            "docker://${IMAGE}"
+          got="sha256:$(skopeo inspect --raw "docker://${IMAGE}" | sha256sum | cut -d' ' -f1)"
+          echo "registry digest: ${got}"
+          [[ "${got}" == "${DIGEST}" ]] || { echo "::error::pushed digest ${got} != ${DIGEST}"; exit 1; }
+
+      - name: Install cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Sign
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          COSIGN_YES: "true"
+          IMAGE: ${{ steps.ref.outputs.image }}
+          DIGEST: ${{ steps.ref.outputs.digest }}
+        run: cosign sign --recursive --oidc-provider=github-actions "${IMAGE%:*}@${DIGEST}"
+
+      - name: Attest build provenance
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ghcr.io/duynhlab/homelab/clickhouse-ddl
+          subject-digest: ${{ steps.ref.outputs.digest }}
+          push-to-registry: true

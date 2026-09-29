@@ -61,7 +61,7 @@ Common codes on this platform and where they lead:
 | 252 | `TOO_MANY_PARTS` | [ClickHouseInsertsRejected](ClickHouseInsertsRejected.md) |
 | 242 | `TABLE_IS_READ_ONLY` | [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md) |
 | 241 | `MEMORY_LIMIT_EXCEEDED` | README → *Merge memory pressure*; the insert itself is over budget |
-| 16 / 47 / 53 | `NO_SUCH_COLUMN_IN_TABLE` / `UNKNOWN_IDENTIFIER` / `TYPE_MISMATCH` | schema drift — compare the collector's exporter version with `configs/clickhouse-schema/configmap-schema.yaml` |
+| 16 / 47 / 53 | `NO_SUCH_COLUMN_IN_TABLE` / `UNKNOWN_IDENTIFIER` / `TYPE_MISMATCH` | schema drift — compare the collector's exporter version with `images/clickhouse-ddl/sql/` |
 | 516 | `AUTHENTICATION_FAILED` | the collector's credential Secret vs `clickhouse-credentials` |
 | 499 | `S3_ERROR` | [ClickHouseS3Errors](ClickHouseS3Errors.md) — an insert landing on a cold-tier part |
 

@@ -3,7 +3,17 @@
 set -o errexit
 
 cluster_name="${CLUSTER_NAME:=homelab}"
-cluster_version="${CLUSTER_VERSION:=v1.34.3}"
+# Kubernetes node image, pinned by tag AND digest (RFC-0032). Kind's release
+# notes publish the digest per Kind version; a tag alone can be re-pushed.
+# 1.35, not 1.36: the 1.36 kubelet crash-loops when /var/lib/docker is on ZFS
+# ("failed to get rootfs info", kind#4229, fixed in cadvisor master but in no
+# release yet). Move to 1.36 once a 1.36 patch ships that cadvisor fix.
+# flux-validate.sh reads the version from this line for kubeconform, so keep
+# it the only place the version is written. KIND_NODE_IMAGE overrides it; the
+# rollback is a recreate on the previous baseline:
+#   KIND_NODE_IMAGE=kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48
+# renovate: datasource=docker depName=kindest/node
+node_image="${KIND_NODE_IMAGE:=kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0}"
 reg_name="${cluster_name}-registry"
 reg_localhost_port="5050"
 reg_cluster_port="5000"
@@ -14,7 +24,7 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
-    image: kindest/node:${cluster_version}
+    image: ${node_image}
     kubeadmConfigPatches:
       - |
         kind: InitConfiguration
@@ -29,11 +39,11 @@ nodes:
         hostPort: 443
         protocol: TCP
   - role: worker
-    image: kindest/node:${cluster_version}
+    image: ${node_image}
   - role: worker
-    image: kindest/node:${cluster_version}
+    image: ${node_image}
   - role: worker
-    image: kindest/node:${cluster_version}
+    image: ${node_image}
 EOF
 }
 

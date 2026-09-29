@@ -26,7 +26,27 @@
       "/^kubernetes/.+\\.yaml$/",
     ],
   },
+  customManagers: [
+    {
+      // The Kind node image in scripts/kind-up.sh, pinned by tag and digest
+      // (RFC-0032). The regex takes the line after the `# renovate:` comment.
+      customType: "regex",
+      managerFilePatterns: ["/^scripts/kind-up\\.sh$/"],
+      matchStrings: [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[^\\n]*?:(?<currentValue>v[0-9.]+)@(?<currentDigest>sha256:[a-f0-9]+)",
+      ],
+    },
+  ],
   packageRules: [
+    {
+      // Patch and digest bumps only. A Kubernetes minor is a cluster
+      // recreation with its own gate (RFC-0032), and a node image newer than
+      // the Kind CLI supports fails at create time.
+      matchDatasources: ["docker"],
+      matchPackageNames: ["kindest/node"],
+      matchUpdateTypes: ["major", "minor"],
+      enabled: false,
+    },
     {
       // Hold Tempo on 2.x. Tempo 3.0 removed the `ingester` and `compactor`
       // modules, so the major is a hand-written config migration (drop both

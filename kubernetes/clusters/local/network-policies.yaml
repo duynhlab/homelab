@@ -1,6 +1,6 @@
 # Ingress NetworkPolicies fencing internal routes per app namespace.
 # LIVE on this Kind cluster — kindnet DOES enforce NetworkPolicy on K8s 1.30+
-# (verified on 1.34.3). Depends on controllers-local for namespaces; databases-local
+# (verified on 1.34.3 and 1.35.8). Depends on controllers-local for namespaces; databases-local
 # depends on this so operators init behind an already-fenced network (see Bug 20).
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1

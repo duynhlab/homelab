@@ -38,7 +38,7 @@ so the highest-value Kyverno features are:
 | 4 | Verify Images (Cosign) | ⏳ planned — not deployed | 2 | Layer atop Flux OCI Cosign verify |
 | 5 | Cleanup Policies | ✅ | 4 | Completed/Evicted Pods > 24h |
 | 6 | PolicyException | ✅ required | — | Only sanctioned way to whitelist |
-| 7 | ValidatingAdmissionPolicy (CEL/VAP) | ❌ not adopted | — | No version blocker: the cluster runs Kind v1.34.3 (`scripts/kind-up.sh`) where the API is GA — the Gateway API CRD bundle already ships a `safe-upgrades` ValidatingAdmissionPolicy the cluster accepts. Candidate for CEL-only rules |
+| 7 | ValidatingAdmissionPolicy (CEL/VAP) | ❌ not adopted | — | No version blocker: the cluster runs Kind v1.35.8 (`scripts/kind-up.sh`) where the API is GA — the Gateway API CRD bundle already ships a `safe-upgrades` ValidatingAdmissionPolicy the cluster accepts. Candidate for CEL-only rules |
 | 8 | Pod Security Standards | ✅ | 1 | Baseline cluster-wide; restricted-on-apps **disabled 2026-08-17** ([catalog — known gaps](../security/policy-catalog.md#known-gaps--history)) |
 | 9 | PolicyReport CRD | ✅ | 1 | Auto, no config |
 | 10 | Policy Reporter UI | ✅ | 2 | **Deployed** at `kyverno.duynh.me` — chart `kyverno/policy-reporter` 3.9.1 via `policy-reporter-local`, HTTPRoute in `routes/infra.yaml`, hostname in `scripts/setup-hosts.sh`. See [Reports](#observability) |

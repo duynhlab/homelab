@@ -5,6 +5,10 @@ SHELL := /usr/bin/env bash -o pipefail
 
 .DEFAULT_GOAL := help
 
+# Oldest Kind CLI that can create the node image pinned in scripts/kind-up.sh
+# (RFC-0032). Kind publishes node images per CLI release.
+KIND_MIN_VERSION := v0.33.0
+
 ##@ General
 
 .PHONY: up
@@ -20,8 +24,16 @@ sync: flux-push flux-sync ## Push and reconcile manifests
 ##@ Cluster
 
 .PHONY: cluster-up
-cluster-up: ## Create Kind cluster and local registry
+cluster-up: kind-floor ## Create Kind cluster and local registry
 	./scripts/kind-up.sh
+
+.PHONY: kind-floor
+kind-floor: ## Fail if the Kind CLI is older than KIND_MIN_VERSION
+	@v=$$(kind version | awk '{print $$2}'); \
+	if [ "$$(printf '%s\n' "$(KIND_MIN_VERSION)" "$$v" | sort -V | head -1)" != "$(KIND_MIN_VERSION)" ]; then \
+	  echo "  FAIL kind $$v is older than $(KIND_MIN_VERSION), which the pinned node image needs"; exit 1; \
+	fi; \
+	echo "  OK   kind $$v (>= $(KIND_MIN_VERSION))"
 
 .PHONY: cluster-down
 cluster-down: ## Delete Kind cluster and registry
@@ -154,6 +166,7 @@ prereqs: ## Check prerequisites (flux, kubectl, kind, helm, docker, tofu)
 	  if command -v $$bin >/dev/null 2>&1; then echo "  OK   $$bin"; \
 	  else echo "  MISS $$bin"; fi; \
 	done
+	@$(MAKE) --no-print-directory kind-floor
 
 .PHONY: help
 help: ## Display this help

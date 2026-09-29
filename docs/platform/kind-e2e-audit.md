@@ -144,10 +144,12 @@ the tag exists; running it earlier audits the previous release.
   container-runtime quota wearing a database costume.
 
 - [ ] **K0.2** Bring-up tools present. `make prereqs` checks six:
-  `flux kubectl kind helm docker tofu`. `tofu` must be ≥1.11, or export
+  `flux kubectl kind helm docker tofu`, then `kind-floor` asserts the Kind CLI
+  is at least `KIND_MIN_VERSION` (v0.33.0, which the pinned node image needs;
+  `make cluster-up` runs the same check). `tofu` must be ≥1.11, or export
   `TF_BIN=terraform`. `git` needs an `origin` remote.
   `make prereqs`
-  **FAIL:** any `MISS` line.
+  **FAIL:** any `MISS` or `FAIL` line.
 
 - [ ] **K0.3** Validation tools present. **`make prereqs` does not check these**
   and `make validate` needs all four:
@@ -275,7 +277,8 @@ the tag exists; running it earlier audits the previous release.
   **FAIL:** a non-zero exit; read `scripts/flux-up.sh`'s header before retrying.
 
 - [ ] **K1.3** The cluster is the expected shape: 1 control-plane + 3 workers on
-  the `CLUSTER_VERSION` in `scripts/kind-up.sh`, and the registry container is up.
+  the `node_image` pinned in `scripts/kind-up.sh` (every node's image ID equals its
+  digest), and the registry container is up.
   `kubectl get nodes -o wide && docker ps --filter name=homelab-registry`
   **FAIL:** fewer than 4 nodes, or no registry.
 
@@ -487,7 +490,8 @@ cannot be derived from a single file — they get their own row (K2.3).
   assert both — the commands are verified against the current tree:
   ```bash
   W=kubernetes/apps; S=$W/services
-  [ "$(yq '.spec.values.image.tag' $W/checkout-worker.yaml)" = "$(yq '.spec.defaultValues.image_tag' $S/checkout.yaml)" ] \
+  # checkout-worker is a WorkerDeployment: its tag is the one image field.
+  [ "$(yq 'select(.kind == "WorkerDeployment") | .spec.template.spec.containers[0].image' $W/checkout-worker.yaml | cut -d: -f2)" = "$(yq '.spec.defaultValues.image_tag' $S/checkout.yaml)" ] \
     && echo "checkout-worker coupled" || echo "SKEW checkout-worker vs checkout"
   [ "$(yq '.spec.values.image.tag' $W/mockpay.yaml)" = "$(yq '.spec.defaultValues.image_tag' $S/payment.yaml)" ] \
     && echo "mockpay coupled" || echo "SKEW mockpay vs payment"
@@ -615,17 +619,24 @@ cannot be derived from a single file — they get their own row (K2.3).
 
 - [ ] **K3.5** Edge isolation holds — **and read what this row can and cannot
   prove.** `./scripts/edge-isolation-sweep.sh --live`
-  **Kind's default CNI is `kindnet`, which ships no NetworkPolicy controller, so
-  NetworkPolicy is declared here and NOT enforced.** Measured 2026-08-21: a pod in
-  `user` reached `inventory:8080`, which `allow-inventory-protected-http` grants to
-  envoy-gateway *only*, in a namespace that also carries `deny-all-ingress`. The
-  policies are correct; nothing applies them. The sweep now detects this and marks
-  the deny probes `SKIP` rather than reporting them as isolation failures — before
-  that it read as `FAIL live: inventory:9090 -> got=open want=closed`, which
-  blames the manifests for the CNI's behaviour.
-  So: **manifest mode is the only isolation evidence this gate can give.** Do not
-  let a green K3.5 be read as "network isolation verified". Getting more requires
-  swapping in Calico or Cilium, which is its own change.
+  **kindnet DOES enforce NetworkPolicy on this cluster — measured, not assumed.**
+  On Kind 1.35.8 (2026-09-29, RFC-0032) a denied and an allowed probe per port gave
+  `user`→`inventory:9090` and `user`→`inventory:8080` **closed** (4/4 and 3/3),
+  while `order`→`inventory:9090` and `envoy-gateway`→`inventory:8080` were
+  **open**. Probe it yourself with a plain pod rather than the sweep's `--live`
+  mode (unreliable, below):
+  ```bash
+  IP=$(kubectl -n inventory get svc inventory -o jsonpath='{.spec.clusterIP}')
+  kubectl run np-probe -n user --rm -i --restart=Never --image=busybox:1.37 \
+    -- sh -c "nc -z -w 3 $IP 8080 && echo OPEN || echo CLOSED"   # want CLOSED
+  ```
+  > This row used to say the opposite. On 2026-08-21 a pod in `user` reached
+  > `inventory:8080` and the row concluded that kindnet ships no NetworkPolicy
+  > controller. That measurement is superseded: the same probe is closed on 1.35.8,
+  > and [`network-policies.md`](../security/network-policies.md) had recorded
+  > enforcement on 1.34.3. Treat enforcement as something each run re-measures.
+  Manifest mode below is still the isolation evidence the sweep gives; the probe
+  above is what proves the policies are applied.
   **FAIL:** a non-zero exit — i.e. a manifest-mode gap (a namespace the edge must
   reach with no allow on that port, the blackhole risk) or an allow probe that
   cannot connect. Deny probes cannot fail here, and that is the point of the row.
@@ -1355,6 +1366,48 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 ## Previous runs
 
+### 2026-09-29 — the Kubernetes 1.35.8 baseline (RFC-0032 Phase 1)
+
+Cluster: kind `homelab`, 4 nodes,
+`kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0`
+(every node's image ID equals it), recreated for this run; Kind CLI v0.33.0
+Host: Linux + Docker (cgroup v2, `/var/lib/docker` on ZFS), arch amd64;
+containerd 2.3.4 in the nodes
+Revision: `chore/rfc-0032-kind-136` on `main` at #1118 — the pins unchanged
+from the 2026-09-25 run
+Preconditions: no service code changed (a platform-version run, not a release),
+so no compose gate applies · no prior cluster
+
+| Group | Result | Evidence |
+|---|---|---|
+| K0 machine | PASS | tools present; 21/21 route hostnames resolve; `homelab-ca` (valid to 2036-09-26) trusted in NSS |
+| K1 bring-up | PASS | `make up` 1m36s exit 0; **29 declared + `flux-system` = 30/30 Ready**, no force-sync needed; `kind-seed.sh` 8/8; WorkerDeployments Current = Target (`2.9.0-7869`, `0.12.0-7d47`) |
+| K2 delivery | PASS | 10/10 service pins + frontend `3.2.1`, admin-service `0.4.1`, mockpay and checkout-worker coupled; 7/7 ResourceSets and every HelmRelease Ready; `auth` absent |
+| K3 admission/secrets | PASS, with finding 1 | Kyverno 3.9.1 / v1.19.1: 6 ClusterPolicies Ready (1 Enforce), 1 cleanup policy, 2 exceptions (expire 2026-12-31), **0 policy failures**, default-namespace pod rejected; OpenBAO 3/3 unsealed (`awskms`, plugin); 38/38 ExternalSecrets synced; db-isolation **72/72**; edge sweep (manifest) PASS; **kindnet enforces NetworkPolicy** (K3.5 probes) |
+| K4 edge/identity | PASS, with finding 2 | 35/35 HTTPRoutes and 33/33 policies Accepted, Gateway Programmed; k6 saga 4/4 (9/9), smoke 15/15 (50/50), staff 5/5 (59/59), operator 1/1 (26/26), rate limit RL.1/RL.2; browser: storefront sign-in as `alice` over the real edge (15 products, 4 notifications), backoffice sign-in as `duyne` through `duynhlab-staff` (7 nav items, cards rendered, catalog rows) |
+| K5 signals | PASS | smoke telemetry rows green; 78/78 scrape targets up; firing: `Watchdog`, the count-once `CheckoutAvailabilityUnknownSKU` from A21, and three `ticket` slow-burn alerts from the gate's deliberate errors (1h SLI ratio back to 0) — expected, see K5.8 |
+| Platform version | PASS | `ImageVolume` beta **enabled** and `KubeletPSI` on; 6 `container_pressure_*` families × 374 series observed, not adopted; `StrictIPCIDRValidation` is alpha and off on 1.35; deprecated-API requests are Kyverno's own legacy types, the Temporal Worker Controller's only (deprecated) `v1alpha1`, and one `endpoints/v1` caller — none removed in any release |
+| K6 wrap | PASS | `make down` removes cluster and registry |
+
+**Findings:**
+
+1. **The app namespaces lose `deny-all-ingress` once `apps-local` applies.**
+   `namespaces.yaml` gives them `platform.duynhlab.dev/tier: app`; the five
+   domain ResourceSets then apply the same Namespaces from a template without
+   that label, flux-operator takes the objects over, the label is gone, and
+   Kyverno's `synchronize: true` deletes the generated NetworkPolicy. Only
+   `platform` and `identity` keep one. Independent of the Kubernetes version;
+   filed as its own change.
+2. **The Backoffice renders a blank page on a reload with a live staff session**
+   (`#root` empty, no JS error, no failed request, still blank after 12 s),
+   while a fresh load and client-side navigation work. Seen in headless Chrome;
+   to confirm in a desktop browser before filing against `admin-service`.
+3. **This runbook's K3.5 claimed kindnet does not enforce NetworkPolicy**, and K2.3's
+   checkout-worker command read a field the WorkerDeployment no longer has. Both
+   corrected in this run.
+
+**Decision: ELIGIBLE** for the 1.35.8 baseline.
+
 ### 2026-09-25 — train #2 and the RFC-0031 final gate
 
 Cluster: kind `homelab`, 4 nodes, `kindest/node:v1.34.3`, recreated for this run
@@ -1822,4 +1875,4 @@ kubectl -n temporal exec deploy/temporal-admintools -- \
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_
+_Last updated: 2026-09-29 — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

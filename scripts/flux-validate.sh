@@ -26,7 +26,17 @@ kustomize_flags=("--load-restrictor=LoadRestrictionsNone")
 # -ignore-missing-schemas does not help: the schema is found, it is just old.
 # The ClickHouseKeeperInstallation schema IS current and does validate, which is
 # the CR this train adds and the one a typo would most likely land in.
-kubeconform_flags=("-skip=Secret,ClickHouseInstallation")
+# Validate against the Kubernetes version the Kind baseline actually runs
+# (RFC-0032), not the default master schemas. The version is read from the
+# one line in kind-up.sh that pins the node image, so there is no second copy
+# to drift.
+k8s_version=$(sed -n 's|^node_image=.*kindest/node:v\([0-9.]*\)@.*|\1|p' "$(dirname "$0")/kind-up.sh")
+if [[ -z "${k8s_version}" ]]; then
+  echo "ERROR - cannot read the node image version from scripts/kind-up.sh"
+  exit 1
+fi
+
+kubeconform_flags=("-skip=Secret,ClickHouseInstallation" "-kubernetes-version" "${k8s_version}")
 kubeconform_config=(
   "-strict" 
   "-ignore-missing-schemas" 
@@ -127,7 +137,7 @@ validate_yaml_syntax() {
 }
 
 validate_standalone_manifests() {
-  echo "INFO - Validating standalone Kubernetes manifests"
+  echo "INFO - Validating standalone Kubernetes manifests (schemas: Kubernetes ${k8s_version})"
   local count=0
   while IFS= read -r -d $'\0' f; do
     kubeconform "${kubeconform_flags[@]}" "${kubeconform_config[@]}" "$f"

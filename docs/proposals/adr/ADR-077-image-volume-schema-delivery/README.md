@@ -20,7 +20,7 @@
 | **Related research** | [research.md](../../rfc/RFC-0032/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
-| **Implementation tracking** | RFC-0032 Phase 2, one homelab PR, after the Phase 1 cluster is on 1.36 |
+| **Implementation tracking** | RFC-0032 Phase 2, one homelab PR, after the Phase 1 cluster is on 1.35.8 |
 | **Adoption** | Not started |
 
 ## Context
@@ -41,9 +41,12 @@ That shape has three costs, all visible today:
 - **The payload rides inside the GitOps artifact.** It is bundled with the
   manifests rather than published as a separate, addressable object.
 
-Kubernetes 1.36 makes image volumes stable and enabled by default, and RFC-0032
-Phase 1 moves the Kind baseline there. A pod can now mount the contents of an
-OCI image read-only, pinned by digest.
+Image volumes are beta and enabled by default from Kubernetes 1.35 and stable in
+1.36. RFC-0032 Phase 1 moves the Kind baseline to 1.35.8; its
+[amendment](../../rfc/RFC-0032/#amendment-2026-09-29--bridge-to-1358) records
+why not 1.36 yet. `ImageVolume` was measured enabled there on both the API
+server and the kubelet. A pod can now mount the contents of an OCI image
+read-only, pinned by digest.
 
 ## Scope
 
@@ -199,7 +202,7 @@ as the fallback because it keeps the one property that matters most.
 | Requirement | Verification |
 |-------------|--------------|
 | The volume mounts a real image, non-empty | The Job's log lists the five files under `/sql`; the Job fails otherwise |
-| The Job completes on a fresh store | Kind gate on a new 1.36 cluster: Job `Complete`, replicas verified per ADR-065 |
+| The Job completes on a fresh store | Kind gate on a new cluster on the Phase 1 baseline: Job `Complete`, replicas verified per ADR-065 |
 | A DDL bump re-runs the Job with no manual step | Change the digest, reconcile, and observe a new Job UID and a completed run |
 | References are pinned | `kyverno test` fixture, plus admission rejecting an undigested image volume on the cluster |
 | No `hostUsers: false` beside an image volume | Review rule; no manifest in the repo sets it |

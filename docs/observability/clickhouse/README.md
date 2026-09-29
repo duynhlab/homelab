@@ -17,6 +17,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 | **Storage** | hot: local PVC `standard` `10Gi` **per replica** (cluster) + small keeper PVCs; cold: RustFS bucket `clickhouse-otel/{replica}/` behind a 1Gi local cache (policy `hot_cold`); a named `clickhouse-data` volume and no tier (local-stack, which stays single-node) |
 | **Query** | Grafana `grafana-clickhouse-datasource` **4.20.0** (`uid: clickhouse`, native `:9000`) + 5 provisioned dashboards in the **ClickHouse** folder (suite Overview→Logs→Traces, service deep dive, platform SQL) |
 | **App code** | **Unchanged** — `pkg/obsx` / `pkg/grpcx` untouched; adding ClickHouse is a Collector-exporter change |
+| **Deep learning** | [ClickHouse internals curriculum](internals/README.md) — explanation-first chapters grounded in read-only evidence from this deployment |
 | **Design** | [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/) · [RFC-0028](../../proposals/rfc/RFC-0028/) · [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/) |
 
 > **In one line:** the same OTel telemetry, a second sink. Because everything is
@@ -63,14 +64,17 @@ or for the primary observability stack.
 
 ## Reading path
 
-1. **Engine** — [fundamentals](fundamentals.md) (OLAP, columnar, MergeTree, 1×3 vs the VLDB paper)
-2. **Junior skill** — [schema-and-queries](schema-and-queries.md) (`ORDER BY` → `EXPLAIN` granules → codecs last)
-3. **Trace-id lookup** — [materialized-views](materialized-views.md) (incremental `TO`, not a Postgres index)
-4. **Storage lifecycle** — [parts, merges, partitions, and TTL](parts-merges-and-ttl.md)
-5. **On call** — [operations](operations.md) → [alert runbooks](../runbooks/clickhouse/README.md)
-6. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Grafana](#grafana)
-7. **Hands-on** — [Playground](#playground--mergetree-by-hand)
-8. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
+1. **Structured curriculum** — [ClickHouse internals](internals/README.md)
+   progresses from architecture to scaling, with one read-only evidence lab per
+   chapter and an explicit teach-back gate.
+2. **Engine** — [fundamentals](fundamentals.md) (OLAP, columnar, MergeTree, 1×3 vs the VLDB paper)
+3. **Junior skill** — [schema-and-queries](schema-and-queries.md) (`ORDER BY` → `EXPLAIN` granules → codecs last)
+4. **Trace-id lookup** — [materialized-views](materialized-views.md) (incremental `TO`, not a Postgres index)
+5. **Storage lifecycle** — [parts, merges, partitions, and TTL](parts-merges-and-ttl.md)
+6. **On call** — [operations](operations.md) → [alert runbooks](../runbooks/clickhouse/README.md)
+7. **This platform** — [Architecture](#architecture) → [How it works here](#how-it-works-in-this-platform) → [Grafana](#grafana)
+8. **Hands-on** — [Playground](#playground--mergetree-by-hand)
+9. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
 
 Pair with the PostgreSQL [storage and WAL fundamentals](../../databases/fundamentals/storage-and-wal.md)
 if you already know Postgres heap / WAL / B-tree.

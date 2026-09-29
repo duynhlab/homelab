@@ -876,6 +876,15 @@ breaks a command copied from the Compose audit:
   `backoffice_admin`), not a sign-in problem — read which one before reporting.
   Cards stuck at zero after K1.6 passed means the portal is reaching the edge but
   the aggregate routes are not wired.
+  **Then reload the page while still signed in.** It must render the shell again
+  with `Signed in as duyne`, and the network must show a
+  `POST …/duynhlab-staff/protocol/openid-connect/token`. A blank page with no
+  error is keycloak-js `check-sso` hanging: its `/silent-check-sso.html` iframe
+  was refused. The edge must send `X-Frame-Options: SAMEORIGIN` (with
+  `frame-ancestors 'self'`) for this host, not the `DENY` every other host gets:
+  `curl -skI https://backoffice.duynh.me/silent-check-sso.html`. A first load
+  with no session never uses that iframe, so it passes either way. Only the
+  reload catches this, which is why the row names it.
 
 - [ ] **K4.8** The realm fence holds at the edge. A **customer** token on a
   `/protected/` route dies as wrong-issuer before any service role logic —
@@ -1400,8 +1409,12 @@ so no compose gate applies · no prior cluster
    filed as its own change.
 2. **The Backoffice renders a blank page on a reload with a live staff session**
    (`#root` empty, no JS error, no failed request, still blank after 12 s),
-   while a fresh load and client-side navigation work. Seen in headless Chrome;
-   to confirm in a desktop browser before filing against `admin-service`.
+   while a fresh load and client-side navigation work. **Resolved.** It was
+   reproduced in a headed Chrome, and the cause was the edge, not
+   `admin-service`: the HTTPRoute set `X-Frame-Options: DENY`, which refused
+   keycloak-js's same-origin `/silent-check-sso.html` iframe, so `init()` never
+   settled. The route now sends `SAMEORIGIN` + `frame-ancestors 'self'`, and K4.7
+   gains the reload step.
 3. **This runbook's K3.5 claimed kindnet does not enforce NetworkPolicy**, and K2.3's
    checkout-worker command read a field the WorkerDeployment no longer has. Both
    corrected in this run.

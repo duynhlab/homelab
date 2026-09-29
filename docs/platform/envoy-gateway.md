@@ -189,7 +189,11 @@ changing a prefix — the prefix *is* the security boundary
 
 Every one of the 18 also carries a `ResponseHeaderModifier` security-headers
 filter (`nosniff`, `strict-origin-when-cross-origin`, `X-Frame-Options: DENY`,
-HSTS).
+HSTS). The one exception is `backoffice`, which sends `X-Frame-Options:
+SAMEORIGIN` plus `Content-Security-Policy: frame-ancestors 'self'`: keycloak-js
+`check-sso` loads `/silent-check-sso.html` in a same-origin iframe on every
+reload with a live session, and `DENY` blocks that frame and leaves the portal
+blank.
 
 ### Policies
 
@@ -684,4 +688,4 @@ Kind-fallback arm was never needed.
 - [Envoy Gateway documentation](https://gateway.envoyproxy.io/docs/) — upstream
 - [Gateway API](https://gateway-api.sigs.k8s.io/) — the portable API this builds on
 
-_Last updated: 2026-08-27 — ADR-062 issuer hairpin added to the inventory (Service `edge` + the CoreDNS ConfigMap takeover) and `openbao-oidc-config-local` to the Flux position. 2026-08-24 — refactored to the house shape. Adds a **Resource inventory** (core objects, route families, the 18-row API surface with its guarding realm, and all 33 policy objects), a TLS section, the Flux position, a signal/consumer table with the 12 alerts and 10 recording rules, a 9-step verification runbook replacing the 3-command triad, troubleshooting by symptom with commands, and a **Design decisions** section carrying the ADR-044/045/046 links the ADR-044 validation row required and this file never had. Counts moved out of a diagram label, where they had drifted: monitoring is 8 routes not 10, infra is 4 not 3, and 4 of the 39 do not reconcile — the previous total of 39 was right only by coincidence. Two route files still carry stale header comments (`api.yaml` says 12, `monitoring.yaml` says 10). Previously — 2026-08-20: HTTPRoute count 38 → 39 (mcp 3 → 4: the Grafana MCP route, also added to the admin-CIDR fence and btp-admin). 2026-08-19: cluster status corrected to "reconciled on Kind" (#791 fixed two runtime defects live; only the K-row gate pass remains), resource model recounted (13 JWT policies across two realms, admin-CIDR + btp-admin added, Backend marked compose-only); earlier same day: local edge bumped to v1.9.0 with the ADR-053 train_
+_Last updated: 2026-09-29 — backoffice SAMEORIGIN exception; 2026-08-27 — ADR-062 issuer hairpin added to the inventory (Service `edge` + the CoreDNS ConfigMap takeover) and `openbao-oidc-config-local` to the Flux position. 2026-08-24 — refactored to the house shape. Adds a **Resource inventory** (core objects, route families, the 18-row API surface with its guarding realm, and all 33 policy objects), a TLS section, the Flux position, a signal/consumer table with the 12 alerts and 10 recording rules, a 9-step verification runbook replacing the 3-command triad, troubleshooting by symptom with commands, and a **Design decisions** section carrying the ADR-044/045/046 links the ADR-044 validation row required and this file never had. Counts moved out of a diagram label, where they had drifted: monitoring is 8 routes not 10, infra is 4 not 3, and 4 of the 39 do not reconcile — the previous total of 39 was right only by coincidence. Two route files still carry stale header comments (`api.yaml` says 12, `monitoring.yaml` says 10). Previously — 2026-08-20: HTTPRoute count 38 → 39 (mcp 3 → 4: the Grafana MCP route, also added to the admin-CIDR fence and btp-admin). 2026-08-19: cluster status corrected to "reconciled on Kind" (#791 fixed two runtime defects live; only the K-row gate pass remains), resource model recounted (13 JWT policies across two realms, admin-CIDR + btp-admin added, Backend marked compose-only); earlier same day: local edge bumped to v1.9.0 with the ADR-053 train_

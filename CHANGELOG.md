@@ -661,6 +661,15 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The ClickHouse internals learning path is authored: twelve
+  explanation-first chapters from architecture through scaling**
+  ([#1127](https://github.com/duynhlab/homelab/issues/1127)). Each chapter
+  follows the Phase-0 contract — mental model, engine mechanism, deployed
+  evidence with class labels, one bounded read-only lab, failure reasoning, and
+  teach-back — and links the canonical platform pages instead of repeating
+  them. Live observation labs ship with pending-verification placeholders until
+  their evidence is captured on the Ubuntu Kind cluster; sharding and Kafka are
+  explicit reference-only, not-deployed comparisons.
 - **ClickHouse internals now has a documentation contract before chapter work
   starts** ([#1127](https://github.com/duynhlab/homelab/issues/1127)). The
   learning hub fixes the 12-chapter order, evidence vocabulary, shared glossary,

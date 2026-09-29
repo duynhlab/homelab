@@ -7,7 +7,7 @@ cluster.
 
 | Quick facts | |
 |---|---|
-| **Status** | Curriculum contract approved for issue [#1127](https://github.com/duynhlab/homelab/issues/1127); chapters are planned until linked below |
+| **Status** | All 12 chapters authored for issue [#1127](https://github.com/duynhlab/homelab/issues/1127); each chapter's live observation lab is pending verification on the Ubuntu Kind cluster until its observation-context table is filled |
 | **Primary audience** | Platform engineers learning ClickHouse, from first principles through failure and scale reasoning |
 | **Page type** | Explanation-first chapters with one embedded, read-only observation lab |
 | **Case study** | `otel.otel_logs`, `otel.otel_traces`, and `otel.otel_traces_trace_id_ts` on the local Kind deployment |
@@ -60,23 +60,23 @@ Read the mechanism first, then use the observation to test it.
 
 ## Curriculum
 
-Files remain plain text until their chapter is written and reviewed. A linked
-title is part of the published learning path; an unlinked title is planned.
+A linked title is part of the published learning path; an unlinked title is
+planned.
 
-| # | Planned chapter | Owning question | Depends on |
+| # | Chapter | Owning question | Depends on |
 |---:|---|---|---|
-| 1 | `01-architecture.md` | Where does ClickHouse sit, and how does telemetry reach and leave it? | Platform hub |
-| 2 | `02-query-pipeline.md` | What happens between SQL submission and returned rows? | 01 |
-| 3 | `03-mergetree.md` | How does MergeTree organize data so analytical reads are fast? | 01–02 |
-| 4 | `04-parts-and-merges.md` | How does an insert become immutable parts, and how do those parts evolve? | 03 |
-| 5 | `05-replication.md` | What is replicated, and how do replicas converge? | 04 |
-| 6 | `06-keeper.md` | Why does replication need Keeper, and what changes without quorum? | 05 |
-| 7 | `07-sharding.md` | How do replication, sharding, distributed reads, and distributed inserts differ? | 05–06 |
-| 8 | `08-ingestion-pipeline.md` | What delivery guarantees exist from a telemetry producer to a durable part? | 04–06 |
-| 9 | `09-materialized-views.md` | When does an incremental materialized view run, and what data does it see? | 03–04, 08 |
-| 10 | `10-storage-s3.md` | Where do bytes live across hot, cold, cache, and retention boundaries? | 04, 06 |
-| 11 | `11-failure-recovery.md` | Given a symptom, which layer failed and what evidence proves it? | 01–10 |
-| 12 | `12-scaling.md` | Which bottleneck should be scaled, and what cost follows? | 01–11 |
+| 1 | [ClickHouse in this platform](01-architecture.md) | Where does ClickHouse sit, and how does telemetry reach and leave it? | Platform hub |
+| 2 | [Query pipeline](02-query-pipeline.md) | What happens between SQL submission and returned rows? | 01 |
+| 3 | [MergeTree layout](03-mergetree.md) | How does MergeTree organize data so analytical reads are fast? | 01–02 |
+| 4 | [Parts and merges](04-parts-and-merges.md) | How does an insert become immutable parts, and how do those parts evolve? | 03 |
+| 5 | [Replication](05-replication.md) | What is replicated, and how do replicas converge? | 04 |
+| 6 | [Keeper](06-keeper.md) | Why does replication need Keeper, and what changes without quorum? | 05 |
+| 7 | [Sharding and Distributed tables](07-sharding.md) | How do replication, sharding, distributed reads, and distributed inserts differ? | 05–06 |
+| 8 | [Ingestion pipeline](08-ingestion-pipeline.md) | What delivery guarantees exist from a telemetry producer to a durable part? | 04–06 |
+| 9 | [Materialized views](09-materialized-views.md) | When does an incremental materialized view run, and what data does it see? | 03–04, 08 |
+| 10 | [Tiered storage](10-storage-s3.md) | Where do bytes live across hot, cold, cache, and retention boundaries? | 04, 06 |
+| 11 | [Failure reasoning](11-failure-recovery.md) | Given a symptom, which layer failed and what evidence proves it? | 01–10 |
+| 12 | [Scaling decisions](12-scaling.md) | Which bottleneck should be scaled, and what cost follows? | 01–11 |
 
 The sequence is deliberate: topology → read path → storage engine → write
 lifecycle → coordination → distribution → ingestion → derived data → storage
@@ -173,5 +173,8 @@ teach-back gate pass the template's review checklist.
 - [ClickHouse documentation style guide (historical repository)](https://github.com/ClickHouse/clickhouse-docs/blob/main/contribute/style-guide.md)
 
 ---
-_Last updated: 2026-09-29 — established the curriculum, evidence vocabulary,
-shared glossary, and authoring boundary before the first internals chapter._
+_Last updated: 2026-09-29 — linked all twelve authored chapters into the
+curriculum; live observation labs remain pending verification on the Ubuntu
+Kind cluster. Earlier the same day — established the curriculum, evidence
+vocabulary, shared glossary, and authoring boundary before the first internals
+chapter._

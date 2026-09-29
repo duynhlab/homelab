@@ -105,10 +105,32 @@ rehearsed on Kind (swap `endpoint` for prod).
   the bootstrap must handle re-runs via that path (no persisted root token).
 - A recovery key still exists (break-glass) — lesser risk than a live unseal key.
 
+## Amendment 2026-09-29 — the awskms seal is a plugin since OpenBAO 2.7
+
+The decision is unchanged: floci, the `awskms` seal and alias-based binding all
+stay. Only the way the seal reaches the server changes. OpenBAO 2.7.0 removed the
+built-in provider seals, and the chart's floating range picked it up without a
+commit, so every fresh bring-up crash-looped on `unknown wrapper: awskms`.
+
+- The server config declares `plugin "kms" "awskms"` with the image
+  `ghcr.io/openbao/openbao-plugin-kms-aws:v0.1.0`, pinned by its multi-arch index
+  digest, next to the unchanged `seal "awskms"` stanza.
+- The plugin is downloaded at startup, before unsealing, into
+  `/openbao/data/plugins` on the Raft PVC. A restarted pod reuses the cached
+  binary and needs no registry access to unseal. A failed first download fails
+  startup instead of leaving a sealed server running.
+- The chart is pinned at `0.30.0` (OpenBAO 2.7.0) instead of `>=0.6.0 <1.0.0`.
+- New accepted cost: a server's **first** start depends on `ghcr.io`, the same
+  registry the service images already come from. Production should mirror the
+  plugin to a registry it controls.
+
+Details and the measured behaviour: [`docs/secrets/openbao.md` § The awskms seal
+is a plugin](../../../secrets/openbao.md#the-awskms-seal-is-a-plugin-openbao-27).
+
 ## Related
 
 - [RFC-0008](../../rfc/RFC-0008/) · [research.md](../../rfc/RFC-0008/research.md) (auto-unseal spine + PoC)
 - [`docs/secrets/openbao.md`](../../../secrets/openbao.md) · [ADR-005 (OpenBAO HA Raft)](../ADR-005-openbao-ha-raft/)
 
 ---
-_Last updated: 2026-07-20_
+_Last updated: 2026-09-29 — amendment: the awskms seal ships as an external KMS plugin since OpenBAO 2.7_

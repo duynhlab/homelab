@@ -54,6 +54,22 @@ sequenceDiagram
    `Seal Type awskms` + `Sealed true` means auto-unseal failed at boot →
    continue. (`Sealed false` everywhere → skip to step 5.)
 
+   **A pod that never answers `bao status` at all** (CrashLoopBackOff) failed
+   before it could seal or unseal. Read its log first:
+
+   ```bash
+   kubectl logs -n openbao openbao-0 --previous | grep -E "plugin|seal|wrapper"
+   ```
+
+   - `unknown wrapper: awskms` means the server has no awskms plugin. OpenBAO 2.7
+     removed the built-in seal, so the `plugin "kms" "awskms"` stanza is missing
+     from the rendered config (`kubectl get cm -n openbao openbao-config -o yaml`).
+   - A plugin download error means the first start could not reach `ghcr.io`.
+     Restarts reuse the copy cached in `/openbao/data/plugins` on the Raft PVC, so
+     this only happens on a new PVC. See [`openbao.md` § The awskms seal is a
+     plugin](../openbao.md#the-awskms-seal-is-a-plugin-openbao-27).
+   - `Alias not found` → step 2 (floci).
+
 2. **Check the floci KMS shim** — the usual root cause:
 
    ```bash
@@ -125,4 +141,4 @@ production points the same `seal "awskms"` stanza at a real cloud KMS.
 
 ---
 
-_Last updated: 2026-08-27 — recovery-key purpose updated: generate-root is the fallback behind the ADR-062 OIDC login. 2026-08-19: rewritten for awskms auto-unseal (ADR-024)._
+_Last updated: 2026-09-29 — crash-loop triage for the awskms KMS plugin (OpenBAO 2.7). Previously 2026-08-27 — recovery-key purpose updated: generate-root is the fallback behind the ADR-062 OIDC login. 2026-08-19: rewritten for awskms auto-unseal (ADR-024)._

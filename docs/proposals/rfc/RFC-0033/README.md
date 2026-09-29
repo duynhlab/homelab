@@ -66,16 +66,18 @@ unverified hierarchy or optimizing for PR volume. See
 
 ## Proposal
 
-Adopt a phased, flat control plane with four ownership lanes and disposable workers:
+Adopt a phased, flat control plane with one coordinator, four specialist lanes, a
+trusted publisher, and disposable workers:
 
-| Lane | Responsibility | Initial authority |
+| Role | Responsibility | Initial authority |
 |------|----------------|-------------------|
 | Coordinator | Normalize goals, build the task graph, lease work, monitor bounded retries, and assemble evidence | Read truth, update qualified ledger fields, request work; no merge or deploy |
 | Contract and architecture | Check API ownership, RFC/ADR status, compatibility, and cross-repository order | Read and report constraints |
 | Delivery | Select repository-local procedures and launch a scoped worker | Launch only within the validated task envelope |
 | Assurance and agent ops | Re-run proof from independent context, classify failures, and propose guardrail changes | Verdict and request-changes only |
 | Documentation Steward | Protect technical truth, reader contracts, learning paths, examples, navigation, and accessibility | Draft and review; technical owner approves truth |
-| Worker | Implement one leased task in one repository/worktree | Assigned branch and paths only |
+| Trusted publisher | Validate the complete patch against the authorized lease before using a short-lived GitHub App token | Assigned repository, branch, and paths only |
+| Worker | Implement one leased task in one repository/worktree | Read checkout and produce a local patch; no GitHub write token |
 
 The topology stays flat. The coordinator may launch workers; workers cannot launch more
 agents. Runtime depth, concurrency, retry, turn, time, and spend limits are explicit and
@@ -132,13 +134,16 @@ sequenceDiagram
     participant Ledger as GitHub ledger
     participant Coord as Planned coordinator
     participant Worker as Planned isolated worker
+    participant Publish as Planned trusted publisher
     participant CI as CI and deterministic gates
     participant Verify as Planned independent verifier
 
-    Owner->>Ledger: Record bounded goal and human decisions
-    Coord->>Ledger: Read validated task revision and immutable base SHA
+    Owner->>Ledger: Authorize exact revision and checksum
+    Coord->>Ledger: Read authorized task revision and immutable base SHA
     Coord->>Worker: Lease one repository and allowed paths
-    Worker->>Ledger: Push planned branch and draft PR
+    Worker->>Publish: Return patch and evidence without a write token
+    Publish->>Publish: Validate full diff, lease, base SHA, and branch
+    Publish->>Ledger: Push planned branch and draft PR
     Ledger->>CI: Run repository-owned gates
     CI-->>Ledger: Publish immutable results
     Coord->>Verify: Request clean-context evidence review
@@ -158,11 +163,19 @@ Homelab owns a versioned JSON Schema for the task payload. Required fields are t
 repository and allowed paths, immutable base SHA, inputs, acceptance proof, forbidden
 actions, risk, retry/time/turn/cost budgets, escalation conditions, and expected output.
 
-A GitHub issue form is only the human entry point because GitHub renders submitted fields
-as Markdown. A normalizer maps stable form field IDs into JSON, validates it, and writes
-a machine-owned issue comment containing the schema version, payload revision, checksum,
-and validation result. That comment is the leaseable contract. Editing the issue body
-does not mutate active work; the normalizer must publish a new revision.
+A GitHub issue form is only an untrusted human entry point because GitHub renders and
+allows edits to submitted Markdown; its YAML field IDs are not assumed to survive as a
+documented machine interface. Phase 0 must fixture the exact rendered body, pin the form
+template version and checksum, and fail closed on an unknown heading or structural edit.
+If that representation cannot be qualified, intake moves to a structured surface.
+
+A trusted normalizer converts qualified input into schema-versioned JSON and publishes a
+candidate revision and checksum. Syntax validity is not authority. Before lease, an
+allowlisted owner must create a separate authorization record binding their identity to
+that exact task revision, payload checksum, immutable base SHA, and approval timestamp.
+Editing the body or publishing another candidate never mutates authorized work in place;
+it creates a new revision that requires new approval. The normalizer identity is separate
+from workers, which cannot write or forge task, authorization, or lease records.
 
 Every task carries these universal gates:
 
@@ -178,12 +191,21 @@ A missing, contradictory, or ambiguous rule blocks the task.
 
 Phases 0–2 use human-started Claude sessions or bounded GitHub Actions jobs. Each worker
 uses one repository and isolated worktree. The worker and verifier have separate context;
-that is a quality boundary, not an identity boundary.
+that is a quality boundary, not an identity boundary. Workers receive a read-only checkout
+and no GitHub write token. They return a patch plus evidence to a trusted publisher.
 
 Unattended repository writes require a dedicated GitHub App installed only on the target
-repository. Installation tokens are short-lived. Initial permissions are repository
-contents, pull requests, and issues; administration and workflows are excluded. The
-exact endpoint-to-permission proof is an acceptance test for the identity ADR.
+repository. Installation tokens are short-lived and available only to the publisher,
+which validates the complete diff against the authorized lease, allowed and forbidden
+paths, base SHA, and destination branch before writing. GitHub's `contents:write` is a
+repository permission, not a task-specific path boundary; the publisher supplies that
+missing enforcement outside the prompt.
+
+The candidate permission envelope is contents, pull requests, and issues for writes;
+checks and commit statuses are read-only. Actions is read-only only when an accepted
+evidence flow must retrieve workflow artifacts. Administration and workflow-definition
+writes are excluded. The identity ADR must prove an endpoint-by-endpoint permission
+matrix and negative tests before any unattended write path is enabled.
 
 Claude Code routines act through the owner's linked identity and belong to an individual
 account. Until an execution path can route writes through the qualified App, routines
@@ -192,8 +214,17 @@ repository-write authority.
 
 ### Trigger, ledger, and recovery semantics
 
-GitHub stores desired state, task revisions, leases, idempotency keys, retry history,
-evidence, outcomes, and dead-letter state. A trigger does not own that state.
+GitHub stores desired state, task revisions, authorizations, leases, idempotency keys,
+retry history, evidence, outcomes, and dead-letter state. A trigger does not own that
+state. Comments provide an audit trail, not compare-and-swap semantics.
+
+A single trusted dispatcher serializes transitions for each task revision, backed by a
+task-and-revision-keyed GitHub Actions concurrency group. The authoritative lifecycle is
+`ready → leased → verifying → ready-for-human`, with terminal or recovery transitions to
+`blocked`, `expired`, or `dead-letter`. A lease binds the authorized revision and checksum,
+base SHA, holder/run ID, acquisition time, expiry, and renewal time. Only the dispatcher
+may acquire or renew it. A newer payload revision invalidates eligibility for the old
+revision; an active old lease stops at its next boundary and never changes scope in place.
 
 Phase 3 may add supported routine schedules or GitHub events only after drills prove:
 
@@ -204,9 +235,15 @@ Phase 3 may add supported routine schedules or GitHub events only after drills p
 - retries stop at declared budgets;
 - a stale lease becomes visible and recoverable.
 
-A scheduled GitHub Action, outside the routine failure domain, checks the latest ledger
-heartbeat. It opens or updates one incident issue when the heartbeat is stale. Recovery
-reconciles desired state from the ledger; the routine cannot certify its own liveness.
+The trusted dispatcher writes a heartbeat only after one semantic reconciliation scan
+completes. It includes a monotonically advancing ledger-event watermark and completion
+timestamp; the minimum expected cadence is one hour. A separate scheduled GitHub Action
+checks watermark age and opens or updates one incident issue when stale. Recovery resumes
+from the last watermark. The check is outside Claude's failure domain, but it still shares
+GitHub, workflow, repository-permission, and incident-issue failure domains. A total GitHub
+outage or disabled workflow is therefore undetectable inside this best-effort, no-SLO
+pilot. An external alert path requires a separate operating decision; the routine cannot
+certify its own liveness.
 
 ### Change trains and release proof
 
@@ -255,14 +292,22 @@ Definitions and starting bars are normative for the pilot:
 - **Escaped defect:** a merged change needs a corrective PR or revert because an
   acceptance criterion, contract, or safety boundary was wrong.
 - **Human intervention:** active routing and review minutes, excluding CI wait time.
+- **Accepted candidate:** a human-merged Phase 1 PR whose seven-day observation window
+  completed without an escaped defect.
+- **Matched baseline:** at least ten human-run tasks in the same repository, task class,
+  and risk bucket, measured with the same active-minute definition.
+- **Reconciliation cycle:** one completed hourly scan of all ledger events after the
+  previous monotonic watermark.
 
-Phase 0 requires all ten versioned evals to pass twice with at most 10% seeded false
-positives. Phase 1 requires ten consecutive accepted candidates, each observed for seven
-days, at least 80% first-pass gates, at most 20% rework, zero escaped defects, and at
-most half the baseline human minutes. Phase 2 requires three cross-repository trains
-without ordering errors and within the owner-set cost ceiling. Phase 3 requires 30 days
-with no silent drop unreconciled for longer than one cycle. An escaped defect resets the
-current phase's consecutive count.
+Phase 0 requires all ten versioned evals to pass twice; no more than 10% of all seeded
+negative assertions across those 20 runs may be incorrectly reported as findings.
+Phase 1 requires ten consecutive accepted candidates, at least 80% first-pass gates, at
+most 20% rework, zero escaped defects, and median human minutes at most half the matched
+baseline. Phase 2 requires three cross-repository trains without ordering errors and
+within a numeric USD ceiling recorded in the versioned eval configuration before the
+phase starts. Phase 3 requires a fresh continuous 30-day window with no silent drop left
+unreconciled for longer than one hourly cycle. An escaped defect resets the applicable
+observation window; promotion never relies on an undefined ceiling or denominator.
 
 ### Enablement, disablement, and drawbacks
 
@@ -281,8 +326,8 @@ does not promise continuous availability or eliminate model judgment.
 
 - Retrieved issues, comments, websites, logs, and routine payloads are untrusted data,
   not instructions or approval.
-- Repository and path scope, branch protection, App permissions, and human gates are
-  enforced outside prompts.
+- Repository scope, branch protection, App permissions, owner authorization, and the
+  publisher's full-diff path validation are enforced outside prompts.
 - Worker isolation prevents file collisions but does not prevent logical contract
   conflicts; immutable SHAs and the dependency graph remain mandatory.
 - Workers cannot spawn agents. Depth is pinned to one, the `Agent` tool is absent from
@@ -299,10 +344,11 @@ does not promise continuous availability or eliminate model judgment.
 The pilot has no availability SLO and is owned by the platform owner on a best-effort
 basis. Failure defaults to pause and record.
 
-Run telemetry is limited to task ID, repository, phase, outcome, retry count, duration,
-tokens, cost, and human-intervention minutes. Metrics use the existing seven-day
-VictoriaMetrics retention. Detailed agent-run logs are not exported; GitHub retains the
-durable task and evidence history under normal repository lifecycle rules.
+The GitHub ledger retains the task ID and per-task evidence. VictoriaMetrics receives
+only bounded labels such as repository, phase, outcome, and failure class; retry count,
+duration, tokens, cost, and human-intervention minutes are values, never labels. Metrics
+use the existing seven-day retention. Detailed agent-run logs are not exported; GitHub
+retains the durable task and evidence history under normal repository lifecycle rules.
 
 Before Phase 3, add a heartbeat-age alert, queue-age view, dead-letter count, budget
 exhaustion signal, and promotion-score report. A stronger response target requires a
@@ -329,8 +375,14 @@ or evidence history. A later phase cannot inherit broader authority automaticall
 - Seed true and false documentation drift, an incompatible dependency, a cross-repo
   ordering error, prompt injection, flaky CI, overlapping file ownership, stale input,
   a mixed-purpose page, and a stale tutorial command.
-- Validate task revisions against the checked-in JSON Schema and reject malformed,
-  stale, or unsigned-normalizer output before lease.
+- Fixture the rendered Issue Form Markdown and reject template/checksum or structural
+  drift; validate task revisions against the checked-in JSON Schema.
+- Reject malformed, stale, unauthorized, or checksum-mismatched revisions before lease;
+  prove that workers cannot create task, authorization, lease, or publisher records.
+- Race duplicate triggers against the task-keyed serializer, expire and renew a lease,
+  and publish a new payload revision while an old lease is active.
+- Prove the publisher rejects an out-of-scope path, forbidden control-plane file, stale
+  base SHA, wrong branch, incomplete diff, and unapproved revision before using a token.
 - Prove worker and verifier start from clean context and reproduce the declared gates.
 - Drill duplicate, dropped, rejected, and false-green routine events plus a disabled
   GitHub connection and stale heartbeat.

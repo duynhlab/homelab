@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **RFC** | RFC-0033 |
-| **Status** | researching |
+| **Status** | researching → gate passed with provisional RFC |
 | **Scope** | platform-wide |
 | **Created** | 2026-09-24 |
 | **Last updated** | 2026-09-28 |
@@ -158,12 +158,13 @@ Homelab.
 | Component | Role | Durable state | Initial authority |
 |-----------|------|---------------|-------------------|
 | Human owner | Sets goals, resolves architecture/product ambiguity, approves merge and deployment | RFC/ADR decisions, PR reviews | Final approval |
-| Coordinator | Ingests events, reads platform truth, decomposes goals, assigns workers, monitors bounded retries, assembles evidence | GitHub issue/PR/check state | Create tasks and draft PRs; no merge/deploy |
+| Coordinator | Ingests events, reads platform truth, decomposes goals, assigns workers, monitors bounded retries, assembles evidence | GitHub issue/PR/check state | Create candidate tasks and qualified ledger updates; no repository write, merge, or deploy |
 | Contract and architecture lane | Checks API ownership, RFC/ADR obligations, compatibility, and cross-repo sequencing | `docs/api/`, RFCs, ADRs, issue plan | Read and recommend |
 | Delivery lane | Plans repository-scoped implementation and selects the appropriate worker definition | Issue task graph and PR branches | Launch isolated workers within explicit repository scope |
 | Assurance and agent-ops lane | Independently re-runs gates, reviews diffs and evidence, classifies failures, proposes playbook changes | Checks, evidence comments, eval results, postmortems | Report and request changes; no self-approval |
 | Documentation Steward lane | Treats `docs/` as the platform's learning and knowledge plane; classifies content, designs reading paths, checks pedagogy and technical accuracy, and coordinates documentation review | Versioned docs, learning paths, link/diagram/build evidence | Propose and review docs; cannot redefine contracts or approve its own changes |
-| Ephemeral worker | Implements one bounded task in one repository/worktree | Branch, commits, artifacts | Write only to assigned branch/worktree |
+| Trusted publisher | Validates a complete patch against the authorization, lease, paths, base SHA, and branch before using a short-lived App token | Publisher audit and GitHub branch/PR state | Write only the validated patch to the assigned branch |
+| Ephemeral worker | Implements one bounded task in one repository/worktree | Local patch and artifacts | Read checkout and modify an isolated worktree; no GitHub write token |
 | Homelab truth plane | Supplies cross-repository contracts, platform policy, release gates, and decision history | This repository | Normative read source; changes use normal PR review |
 | GitHub work ledger | Carries goals, base SHAs, task states, PRs, reviews, checks, and evidence links across sessions | GitHub | Durable coordination and audit |
 | Deterministic gates | Enforce formatting, tests, policy, manifests, E2E, and release conditions | CI and repository commands | Pass/fail; cannot waive policy |
@@ -331,6 +332,7 @@ flowchart TD
   Assurance["planned: assurance / agent-ops lane"]
   Docs["planned: Documentation Steward<br/>learning + knowledge plane"]
   Workers["planned: ephemeral workers<br/>one repo + isolated worktree"]
+  Publisher["planned: trusted publisher<br/>diff + lease enforcement"]
   Evals[("planned: run telemetry + eval ledger")]
 
   Owner -->|"planned: bounded goal"| Coordinator
@@ -343,7 +345,8 @@ flowchart TD
   Delivery -->|"planned: worker brief"| Ledger
   Docs -->|"planned: learning-ready docs + evidence"| Ledger
   Coordinator -->|"planned: direct launch"| Workers
-  Workers -->|"planned: branch + proof"| Ledger
+  Workers -->|"planned: patch + proof"| Publisher
+  Publisher -->|"planned: validated branch + PR"| Ledger
   Ledger -->|"planned: verification input"| Assurance
   Assurance -->|"planned: review packet + verdict"| Owner
   Coordinator -->|"planned: outcome signals"| Evals
@@ -360,7 +363,7 @@ flowchart TD
   class Owner,LHuman edge;
   class Events,LExternal external;
   class Truth,Ledger,LData data;
-  class Coordinator,Contract,Delivery,Assurance,Docs,Workers,Evals,LPlanned planned;
+  class Coordinator,Contract,Delivery,Assurance,Docs,Workers,Publisher,Evals,LPlanned planned;
 
   classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
@@ -369,8 +372,9 @@ flowchart TD
 ```
 
 > **In plain terms:** the coordinator may organize and retry work, but it does not
-> become the source of truth or the approver. Workers write branches; an independent
-> lane verifies them; the human decides whether the evidence justifies merge.
+> become the source of truth or the approver. Workers produce patches without write
+> credentials; the publisher enforces the authorized scope, an independent lane verifies
+> the result, and the human decides whether the evidence justifies merge.
 
 ### Runtime mapping to Claude capabilities
 
@@ -397,16 +401,22 @@ sequenceDiagram
   participant Truth as Homelab truth plane
   participant GitHub as GitHub ledger and CI
   participant Worker as planned isolated worker
+  participant Publish as planned trusted publisher
   participant Verify as planned independent verifier
 
   Trigger->>Coord: planned bounded event
   Coord->>Truth: read current contracts and policy
-  Coord->>GitHub: record goal, base SHA, tasks, risk, acceptance proof
+  Coord->>GitHub: record candidate goal, base SHA, tasks, risk, proof
+  Human->>GitHub: authorize exact task revision and checksum
+  Coord->>GitHub: acquire serialized lease for authorized revision
   Coord->>Worker: planned repo-scoped brief
-  Worker->>GitHub: push branch and open draft PR with artifacts
+  Worker->>Publish: return patch and artifacts without a write token
+  Publish->>Publish: validate full diff, lease, paths, SHA, and branch
+  Publish->>GitHub: push branch and open draft PR
   GitHub-->>Coord: CI, review, and conflict state
   Coord->>Verify: planned verification request from clean context
-  Verify->>GitHub: reproduce gates and post evidence verdict
+  Verify-->>Coord: reproduce gates and return evidence verdict
+  Coord->>GitHub: record verifier evidence
   alt evidence complete and risk allowed
     Coord->>Human: planned ready-for-review packet
     Human->>GitHub: approve and merge, or request changes
@@ -435,13 +445,14 @@ minimum contract is:
 | Escalation | Conditions that require human judgment rather than another prompt |
 | Output | Diff/commits, commands run, results, artifact links, docs-impact verdict, residual risk, blockers |
 
-The checked-in JSON Schema is the machine contract. A GitHub issue form is only a
-human input surface: GitHub converts its fields into Markdown, so the form body is not
-the canonical payload. A normalizer maps stable form field IDs into a schema-versioned
-JSON object, validates it, and writes it to a machine-owned issue comment. Workers may
-lease a task only from that validated comment. Manual edits to the issue body never
-silently change an active task; they require the normalizer to publish a new payload
-revision and checksum.
+The checked-in JSON Schema is the machine contract. A GitHub issue form is only an
+untrusted human input surface: GitHub converts its fields into editable Markdown, and its
+YAML field IDs are not a documented submitted-data interface. Phase 0 must fixture the
+exact rendered body, pin the form template version and checksum, and fail closed on
+structural drift; otherwise intake moves to a structured surface. A trusted normalizer
+publishes a candidate JSON revision and checksum. Before lease, an allowlisted owner must
+separately authorize that exact revision, checksum, immutable base SHA, and timestamp.
+Manual edits and new candidates never alter authorized work in place.
 
 ### Cross-repository change trains
 
@@ -587,14 +598,20 @@ subagents for stable roles, and worktree isolation for implementation. This is t
 recommended initial candidate because most orchestration state stays in systems already
 operated by the project.
 
-Routines are only a trigger surface. GitHub carries the durable desired state, leases,
-idempotency keys, outcomes, and retry history. A scheduled reconciliation run must detect
-missed or dropped events and backfill eligible work. Semantic checks must distinguish
+Routines are only a trigger surface. GitHub carries durable desired state, authorization,
+leases, idempotency keys, outcomes, and retry history. A single trusted dispatcher and a
+task/revision-keyed concurrency group serialize lease transitions; comments are audit,
+not a lock. Each lease binds its revision/checksum, base SHA, run holder, expiry, and
+renewal. A scheduled reconciliation run must detect missed or dropped events and backfill
+eligible work. Semantic checks must distinguish
 “the routine infrastructure ran” from “the engineering task succeeded.” During the
 research-preview limits, only documented supported GitHub event classes may be used.
-The reconciliation monitor must not share the routine's failure mode: a scheduled
-GitHub Action checks the latest ledger heartbeat and opens or updates one incident issue
-when it is stale. A routine cannot prove its own liveness.
+After each semantic scan, the dispatcher writes a heartbeat with a monotonic ledger-event
+watermark. A separate hourly GitHub Action checks its age and opens or updates one incident
+issue when stale. This avoids Claude's failure domain but still shares GitHub, workflow,
+permission, and incident-issue failures. A total GitHub outage or disabled workflow is
+undetectable in the best-effort pilot without a separately approved external alert path.
+A routine cannot prove its own liveness.
 
 Key boundary: agent teams may be used inside an interactive research/review session, but
 they are not the 24/7 scheduler. Their current experimental lifecycle and interactive
@@ -628,7 +645,7 @@ and have documented resume and task-state limitations.
 |--------|--------------------|----------------|
 | Read public docs and in-scope repositories | Allowed within task scope | No |
 | Create an issue or update task/evidence fields | Allowed only after linked-user behavior and external repository controls prove the requested scope | No, after template/eval qualification |
-| Create a branch and draft PR | Allowed in assigned repository through the linked identity, with branch protection and path/task scope enforced outside the prompt | No, after Phase 1 qualification |
+| Create a branch and draft PR | Worker returns a patch without a write token; a trusted publisher validates the complete diff, authorized lease, paths, base SHA, and branch before using the App | No, after Phase 1 qualification |
 | Modify agent instructions, hooks, permissions, or CI | Propose in a normal PR | **Yes** |
 | Approve or merge a PR | Forbidden | **Yes** |
 | Push to protected/default branches | Forbidden | **Yes** |
@@ -642,6 +659,9 @@ and have documented resume and task-state limitations.
 |-------------------|-------------|------------------|
 | Prompt injection in issues, PR comments, websites, or logs | Worker treats untrusted content as instruction | Mark trust boundaries in the task; allowlisted tools/domains; instructions outrank retrieved content; human gate for permission changes |
 | Credential bleed between roles | A low-trust task gains unrelated access | Claude subagents share parent-session credentials and routine actions use the linked user's identities. Treat independent context as a quality boundary only; minimize connectors, rely on server-side permissions/branch protection, and require a separately qualified automation identity, GitHub Action, or SDK controller where identity separation is mandatory |
+| Schema-valid task from an unauthorized issue author | Tokens are consumed or repository writes begin without owner intent | Treat issue content as untrusted; require an allowlisted owner authorization record bound to exact revision, checksum, base SHA, and timestamp before lease |
+| Worker forges ledger state or writes outside its path envelope | Untrusted execution expands its own authority | Give workers no GitHub write token; separate normalizer and publisher identities; publisher validates the full diff and forbidden paths before minting a short-lived App token |
+| Duplicate triggers acquire the same task | Conflicting writes and double spend | Single trusted dispatcher, task/revision-keyed workflow concurrency, explicit lease expiry/renewal, and fail-closed revision changes; comments are not locks |
 | Two workers edit the same file or contract | Lost work or incompatible changes | One-owner task graph, worktree isolation, path ownership, base SHA, and optimistic conflict check before handoff |
 | Coordinator delegates recursively | Runaway work and unclear accountability | Flat topology enforced by `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` (the default allows three nested layers), `Agent` absent from worker tools, `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` ceiling, spend budget, and no nested teams |
 | Stale memory or documentation | Plausible but incorrect implementation | Re-read current files and immutable SHAs on every run; memory only locates sources |
@@ -692,7 +712,10 @@ do not count. An **escaped defect** is a merged change that requires a correctiv
 revert because an acceptance criterion, contract, or safety boundary was wrong. **Human
 intervention minutes** count active routing and review time, not time waiting for CI.
 Each accepted Phase 1 change has a seven-day observation window before it contributes to
-the consecutive-success count.
+the consecutive-success count. An accepted candidate is a human-merged PR that completes
+that window without an escaped defect. Human-time comparison uses at least ten baseline
+tasks matched by repository, task class, and risk bucket. One reconciliation cycle is one
+completed hourly scan after the previous monotonic watermark.
 
 ### Minimum eval set before unattended drafting
 
@@ -783,12 +806,17 @@ RFC. They remain subject to architecture review before the RFC can become `Accep
 - [x] **Should the durable task schema live in GitHub issue forms, a checked-in schema,
       or both?** *Owner-confirmed:* both, with the checked-in JSON Schema as the only
       contract. A GitHub issue form (`.github/ISSUE_TEMPLATE/`, which does not exist
-      today) captures human input. A normalizer converts the resulting Markdown fields
-      into the validated, machine-owned JSON comment described in [The work contract](#the-work-contract).
+      today) captures untrusted human input. Phase 0 fixtures its exact rendered Markdown,
+      pins the template version/checksum, and fails closed on structural drift. A trusted
+      normalizer creates a candidate JSON revision; an allowlisted owner separately
+      authorizes its exact checksum and base SHA before it becomes leaseable.
 - [x] **Which GitHub identity and token model provides one-repo least privilege while
       preserving attributable audit history?** *Owner-confirmed:* a dedicated GitHub App
-      installed per repository. It uses short-lived installation tokens and only the
-      contents, pull-requests, and issues permissions, with no admin or workflow scope.
+      installed per repository. Workers have no write token. A trusted publisher alone
+      uses short-lived installation tokens after full-diff, lease, path, SHA, and branch
+      validation. Candidate writes cover contents, pull requests, and issues; checks and
+      commit statuses are read-only, and Actions is read-only only when artifact retrieval
+      is required. There is no admin or workflow-definition write scope.
       Routines cannot provide this, because they act as the owner's own GitHub user.
       Phases 0–2 therefore either accept owner attribution, labelled on every PR, or run
       as bounded GitHub Actions jobs under the App. The unattended write path waits
@@ -806,16 +834,17 @@ RFC. They remain subject to architecture review before the RFC can become `Accep
 
       | Promotion | Bar |
       |---|---|
-      | 0 → 1 | All ten evals pass twice in a row; seeded false-positive rate ≤ 10% |
-      | 1 → 2 | ≥ 10 consecutive accepted draft-PR candidates, each observed for seven days: first-pass gate ≥ 80%, rework ≤ 20%, zero escaped defects, human minutes per accepted change ≤ 50% of baseline |
-      | 2 → 3 | ≥ 3 cross-repo trains with zero ordering errors; cost per accepted change within the owner-set ceiling |
-      | 3 → 4 | 30 days of routines with no silent drop left unreconciled for more than one cycle |
+      | 0 → 1 | All ten evals pass twice; false findings ≤ 10% of all seeded negative assertions across the 20 runs |
+      | 1 → 2 | ≥ 10 consecutive human-merged candidates that complete seven-day observation: first-pass gate ≥ 80%, rework ≤ 20%, zero escaped defects, median human minutes ≤ 50% of at least ten baseline tasks matched by repository/task class/risk |
+      | 2 → 3 | ≥ 3 cross-repo trains with zero ordering errors; cost per accepted change within a numeric USD ceiling recorded in versioned eval configuration before Phase 2 starts |
+      | 3 → 4 | A fresh continuous 30-day window with no silent drop left unreconciled for more than one completed hourly cycle |
 
-      Any escaped defect resets the current phase's count.
+      Any escaped defect resets the applicable observation window.
 - [x] **What run telemetry may be retained without storing prompts, source code,
       secrets, or sensitive issue content?** *Owner-confirmed:* metrics and ledger metadata
-      only. That covers the task ID, repo, phase, outcome, retry count, duration, tokens,
-      cost, and human-intervention minutes. Claude Code's OpenTelemetry export redacts
+      only. GitHub retains the task ID. VictoriaMetrics receives only bounded labels such
+      as repo, phase, outcome, and failure class; retry count, duration, tokens, cost, and
+      human-intervention minutes are metric values. Claude Code's OpenTelemetry export redacts
       prompts, responses, tool arguments, and tool content by default.
       `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_ASSISTANT_RESPONSES`, `OTEL_LOG_TOOL_DETAILS`,
       `OTEL_LOG_TOOL_CONTENT`, and `OTEL_LOG_RAW_API_BODIES` all stay unset. The OAuth
@@ -826,9 +855,12 @@ RFC. They remain subject to architecture review before the RFC can become `Accep
       *Owner-confirmed:* the platform owner, on a best-effort basis with no response SLA. The
       default behavior on failure is *pause and record*, never *retry until green*.
       Routines are tied to one individual account, and one with a lost GitHub connection
-      turns itself off after 72 hours. A scheduled GitHub Action outside the routine checks
-      the ledger heartbeat and raises the incident; reconciliation backfills after recovery.
-      Asking for a stronger availability target means asking for Path 2 and its on-call burden.
+      turns itself off after 72 hours. The dispatcher writes a monotonic reconciliation
+      watermark after each semantic scan; a separate hourly GitHub Action checks its age
+      and raises the incident. That Action still shares GitHub and workflow failure modes,
+      so total GitHub or workflow loss is undetectable inside this no-SLO pilot.
+      Asking for a stronger availability target requires a separate external alerting and
+      operating decision, potentially Path 2 and its on-call burden.
 - [x] **Which existing area should pilot the junior-to-master capability map without a
       disruptive tree-wide documentation reorganization?** *Owner-confirmed:*
       `docs/observability/`. It already has the house-shape model page

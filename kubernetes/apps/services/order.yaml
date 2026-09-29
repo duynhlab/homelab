@@ -85,9 +85,14 @@ spec:
     db_secret: "product-db-order-secret"
     db_sslmode: "disable"
     pool_max: "30"
-    # order calls shipping + publishes notifications over gRPC (headless :9090).
+    # The API calls shipping over gRPC (headless :9090). It does not call
+    # notification: only the worker does (apps/order-worker.yaml sets its own
+    # NOTIFICATION_GRPC_ADDR), so the API carries no notification address.
     shipping_grpc_addr: "dns:///shipping.shipping.svc.cluster.local:9090"
-    notification_grpc_addr: "dns:///notification.notification.svc.cluster.local:9090"
+    # The API dials inventory for the order-details enrichment
+    # (GetReservation). Same value as the code default; explicit so the
+    # call graph can be read off this file, like payment below.
+    inventory_grpc_addr: "dns:///inventory.inventory.svc.cluster.local:9090"
     # The API dials payment for the order-details enrichment (GetPayment).
     # Explicit because the code default points at the (correct) plain
     # `payment` Service name — kept explicit for auditability. The saga's payment steps are

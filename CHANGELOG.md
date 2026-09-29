@@ -1189,6 +1189,11 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **order API env matches the calls it makes.** It carried
+  `NOTIFICATION_GRPC_ADDR`, which only the worker uses (the worker sets its
+  own), and lacked `INVENTORY_GRPC_ADDR`, although the API dials inventory
+  for the order-details `GetReservation` enrichment. That call worked
+  through the code default (the same address); it is now explicit.
 - **Two Job headers no longer blame `force` for re-runs it does not
   cause.** `openbao-bootstrap` said `kustomize.toolkit.fluxcd.io/force`
   re-creates a Job on every reconcile and races the unseal;
@@ -1598,6 +1603,18 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Docs follow what the #1115 diagram review measured.**
+  - `openbao.md`: the Raft sequence said `HTTPS :8200`; the listener runs
+    with `tls_disable`, so it now says HTTP (TLS planned). The product-db
+    connection diagram is labelled planned: the only deployed database
+    config is `platform-db` with the `notification` static role.
+  - `secrets/README.md`: the pipeline map drew "trust-enabled workloads"
+    mounting `homelab-ca-bundle`. The ConfigMap exists only in `monitoring`
+    and no pod mounts it, so the consumer node is gone.
+  - `api/api.md`: the topology map drew mockpay as an external provider
+    posting its webhook through the edge. In the cluster it runs in the
+    `payment` namespace and posts straight to payment; the edge leg is
+    local-stack only and is drawn dotted.
 - **The `platform-engineer` skill now routes answers, focused fixes, and RFC work
   through their applicable gates.** It permits sourced API explanations without
   duplicating contracts and distinguishes early PR integration evidence from the

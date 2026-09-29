@@ -64,8 +64,7 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     cm(cert-manager<br/>ClusterIssuers + Certificates):::platform
     edgecert[(platform-edge-tls<br/>namespace: envoy-gateway)]:::edge
     tm(trust-manager Bundle<br/>homelab-ca-bundle):::platform
-    cabundle[(ConfigMap<br/>ca-bundle.pem)]:::data
-    trusted(Trust-enabled Workloads):::service
+    cabundle[(ConfigMap homelab-ca-bundle<br/>monitoring only · no workload mounts it yet)]:::data
 
     staff(Operators<br/>staff OIDC login — ADR-062):::service
 
@@ -82,7 +81,6 @@ subgraph homelab["Homelab Secrets, TLS, and Trust Pipeline"]
     cm -->|"local: homelab-ca (reconciled)<br/>prod: Let's Encrypt DNS-01"| edgecert
     cm -->|"homelab CA source"| tm
     tm -->|"namespaceSelector: needs-trust=true"| cabundle
-    cabundle -->|"mounted PEM trust store"| trusted
 end
 
 classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
@@ -376,4 +374,4 @@ present as active).
 
 ---
 
-_Last updated: 2026-09-29 — the backup label lives only in namespaces.yaml (ResourceSets no longer render Namespaces). Previously 2026-09-28 — Draw.io view of the secrets, TLS and trust pipeline. 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._
+_Last updated: 2026-09-29 — the pipeline map no longer draws a consumer for homelab-ca-bundle (none mounts it). Earlier: 2026-09-29 — the backup label lives only in namespaces.yaml (ResourceSets no longer render Namespaces). Previously 2026-09-28 — Draw.io view of the secrets, TLS and trust pipeline. 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._

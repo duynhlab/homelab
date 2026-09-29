@@ -1,19 +1,17 @@
 ---
 name: platform-engineer
 description: >-
-  Senior Platform Engineer workflow for the homelab repo — use whenever work
-  touches GitOps, Kubernetes manifests, observability, databases, secrets,
-  security policy, docs/proposals, microservices at the platform layer, API
-  gateway routes, NetworkPolicy, or RFC/ADR design, even if the user does not
-  say "platform engineer" or "skill". Trust docs/api/ for API truth; redirect
-  handler/UI work to service repos. Read this skill before non-trivial homelab
-  tasks.
+  Homelab platform workflow for GitOps, Kubernetes, observability, databases,
+  secrets, security, gateway, API contracts, and platform docs or proposals.
+  Use for non-trivial work in this repo; route application code and shared CI
+  to their owning repositories.
 ---
 
 # Platform engineer (homelab)
 
-You operate as a **Senior Platform Engineer** — owner of delivery path, day-2
-ops, and guardrails — not a feature developer or generic coding assistant.
+You operate as a **Senior Platform Engineer** for Homelab's delivery path,
+day-2 operations, and guardrails. Application implementation belongs in its
+own repository.
 
 **Outcomes:** GitOps correctness, operability (alerts, runbooks, SLO),
 security posture (Kyverno, NetworkPolicy, secrets), accurate docs vs
@@ -24,17 +22,6 @@ existing patterns (Flux `dependsOn`, ResourceSet, Kyverno catalog) over new
 abstractions.
 
 ## Scope: which repo?
-
-```mermaid
-flowchart TD
-  task[Incoming task] --> scope{Which layer?}
-  scope -->|Infra GitOps observability secrets DB platform docs| homelab[Work in homelab]
-  scope -->|Service logic handlers tests| service[Redirect to service repo]
-  scope -->|Shared CI workflow| gha[Redirect to gha-workflows]
-  homelab --> read[Read area hub + manifests]
-  read --> plan[State assumptions blast radius verify step]
-  plan --> implement[Surgical change make validate]
-```
 
 | Work | Repository |
 |------|------------|
@@ -52,8 +39,10 @@ Homelab agents **trust [`docs/api/`](../../../docs/api/README.md)** — not
 service-repo README API tables — for routes, payloads, deployment status, call
 graph, and cross-service ownership.
 
-**Do not summarize or excerpt contract files in chat or in new docs.** Open the
-canonical file and link it. `docs/api/` is the learning store.
+For an answer, explain the relevant contract in your own words and link its
+canonical file. For a repository change, update the owning `docs/api/` file
+when the contract changes; other pages may summarize it with a link, but must
+not become a competing source of exact routes or payloads.
 
 | Question | Open |
 |----------|------|
@@ -91,19 +80,23 @@ and respect the Flux dependency chain (see [AGENTS.md](../../../AGENTS.md) Gotch
 | Local e2e | [`local-stack/README.md`](../../../local-stack/README.md) |
 | Design record | [`docs/proposals/README.md`](../../../docs/proposals/README.md) |
 
-## Before coding
+## Route the work
 
-1. Read **`using-agent-skills`** (agent IDE); pick a row from [IDE skills map](#ide-skills-map) below.
-2. Confirm work belongs in homelab; else redirect.
-3. Pick one domain; read that hub + relevant manifests. Verify deployed reality
-   (`local-stack/compose.yaml`, cluster manifests) before changing topology docs.
-4. State assumptions, blast radius, success criteria; implement surgically.
-5. **Operability:** new signal or component → alert, runbook, SLO, or dashboard
-   (or document the gap).
-6. **Security:** Kyverno + NetworkPolicy + no secrets in git; exceptions →
-   PolicyException + catalog.
-7. **Done:** `make validate`; e2e when touching local-stack or gateway (Phase B:
-   **agent-browser** skill + [`local-stack/docs/e2e-audit.md`](../../../local-stack/docs/e2e-audit.md)).
+1. Identify the request type and owning repository. For an answer, review, or
+   diagnosis, inspect the relevant sources and report evidence; change files
+   only when the request includes implementation.
+2. For a change, choose one primary domain and read its hub plus the relevant
+   code, manifests, or runbook. Check deployed reality before changing topology
+   docs. Cross-domain work states ownership and rollout order, including Flux
+   dependencies.
+3. Match the gate to the change: focused PR for a small fix; the
+   [RFC / ADR process](#rfc--adr-gate) for a substantial or contested design.
+   State success criteria, affected systems, and verification before editing.
+4. When adding a component or signal, account for alerts, runbooks, SLOs, and
+   dashboards where relevant. For security changes, apply the Kyverno,
+   NetworkPolicy, and exception rules in [AGENTS.md](../../../AGENTS.md).
+5. Use applicable IDE skills from the [map](#ide-skills-map) when available.
+   Their absence does not remove this repository's checks or authority gates.
 
 ## RFC / ADR gate
 
@@ -118,23 +111,23 @@ Design **before** building when the change is substantial or contested.
 - **ADR** (`docs/proposals/adr/ADR-NNN-slug/`) — one decision each; **`Proposed`**
   during RFC review, **`Accepted`** with the RFC. Template:
   [`ADR-0000-template/`](../../../docs/proposals/adr/ADR-0000-template/).
-- Small bugs, cleanups, dependency bumps → **no RFC**; focused PR.
+- A small standalone decision may go directly to an ADR. Bugs, cleanups,
+  dependency bumps, and narrow documentation corrections use a focused PR.
 - Hub: [`docs/proposals/`](../../../docs/proposals/), [`adr/README.md`](../../../docs/proposals/adr/README.md).
 
-```mermaid
-flowchart TD
-  task[Task] --> meta[using-agent-skills]
-  meta --> spec[spec-driven-development]
-  spec --> plan[planning-and-task-breakdown]
-  plan --> rfcGate[Homelab RFC gate]
-  rfcGate --> impl[incremental-implementation]
-  impl --> verify[make validate / e2e]
-  verify --> review[code-review-and-quality]
-  review --> adr[documentation-and-adrs]
-```
+## Verification and release
 
-**Trivial escape:** typo, pin, single doc line → skip full lifecycle; still
-surgical + verify.
+- Run `make validate` before every push, including documentation-only changes.
+- For changes affecting a service repository, any `pkg` module, gateway config,
+  `local-stack/compose.yaml`, or the SPA, the full API/browser/telemetry audit in
+  [`local-stack/docs/e2e-audit.md`](../../../local-stack/docs/e2e-audit.md) is
+  mandatory on the exact merged commit SHAs **before tagging**. An earlier
+  integration run on PR worktrees is useful evidence but does not satisfy the
+  pre-tag gate. Follow [AGENTS.md](../../../AGENTS.md#build-test-deploy) for the
+  gate's scope and evidence requirements.
+- When running browser Phase B, read the IDE's `agent-browser` skill, load its
+  core guidance, and follow the E2E runbook. A task that does not run Phase B
+  does not need the browser skill.
 
 ## Contribution workflow
 
@@ -152,13 +145,12 @@ surgical + verify.
 
 ## IDE skills map
 
-Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)), not in this repo. This project skill lives in `.agents/skills/platform-engineer/` (Agent Skills standard — Cursor reads it natively; Claude Code reads it through the `.claude/skills/platform-engineer` symlink).
+Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)). Use an available skill when its specific workflow applies; the table does not prescribe a sequence for every task. This project skill lives in `.agents/skills/platform-engineer/` and Claude Code reads the same file through `.claude/skills/platform-engineer`.
 
 | Homelab work | IDE skill | Homelab gate |
 |--------------|-----------|--------------|
-| Any non-trivial task | `using-agent-skills` | This skill + domains |
 | Unclear ask | `interview-me`, `idea-refine` | — |
-| RFC / substantial change | `spec-driven-development` → `planning-and-task-breakdown` | Owner OK RFC #, `research.md` |
+| RFC / substantial change | `spec-driven-development`, `planning-and-task-breakdown` | Owner OK RFC #, `research.md` |
 | ADR | `documentation-and-adrs` | `docs/proposals/adr/` |
 | Manifest / GitOps | `incremental-implementation`, `source-driven-development` | `make validate`, Flux `dependsOn` |
 | Secrets / high stakes | `doubt-driven-development`, `security-and-hardening` | Kyverno catalog |
@@ -173,10 +165,3 @@ Generic workflows live in the **agent IDE** ([addyosmani/agent-skills](https://g
 **Homelab overrides** (win over generic skill defaults): RFC/ADR paths and owner
 gates → Proposals; commits → above; Kyverno/netpol/secrets → [AGENTS.md](../../../AGENTS.md);
 API truth → **`docs/api/`** whole tree.
-
-## Behavioral guidelines
-
-1. **Think before coding** — state assumptions; ask when uncertain; surface tradeoffs.
-2. **Simplicity first** — minimum code for the task; no speculative abstractions.
-3. **Surgical changes** — match existing style; every changed line traces to the request.
-4. **Goal-driven execution** — verifiable success criteria; loop until met.

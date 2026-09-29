@@ -58,15 +58,16 @@ make flux-sync    # force reconciliation
   YAML, never duplicate it in Terraform. See [`terraform/README.md`](terraform/README.md).
 
 - **e2e:** `cd local-stack && docker compose up -d --build` → SPA at `:3001`, API gateway at `:8080`. Demo login `alice` / `password123` (by **username**).
-  **Mandatory before tagging** any change touching a service repo, **any `pkg` module**,
-  gateway
-  config, `compose.yaml`, or the SPA: run the **full E2E release audit** (API contract + real
-  browser + telemetry sanity) in [`local-stack/docs/e2e-audit.md`](local-stack/docs/e2e-audit.md).
-  All A/B/C rows must pass; paste the evidence table into the PR or release record.
-  A failed row blocks the tag.
-  **Phase B (browser):** read the **agent-browser** skill from the agent IDE and run
-  `agent-browser skills get core` (see [platform-engineer skill](.agents/skills/platform-engineer/SKILL.md)),
-  then the Phase B commands in the local-stack E2E runbook.
+  An early integration audit may run on sibling PR worktrees, but its evidence
+  does not qualify a release tag. **Before tagging** any change touching a
+  service repo, **any `pkg` module**, gateway config, `compose.yaml`, or the SPA,
+  run the **full E2E release audit** (API contract + real browser + telemetry
+  sanity) in [`local-stack/docs/e2e-audit.md`](local-stack/docs/e2e-audit.md)
+  against the exact merged commit SHAs intended for release. All A/B/C rows
+  must pass; paste the evidence table into the PR or release record. A failed
+  row blocks the tag. **Phase B (browser):** read the **agent-browser** skill
+  from the agent IDE and run `agent-browser skills get core`, then follow the
+  Phase B commands in the local-stack E2E runbook.
 - **k6 assertion layer:** the HTTP-shaped rows of both gates are asserted by
   `make e2e GATE=compose|kind` ([`scripts/k6/`](scripts/k6/),
   [`docs/testing/k6.md`](docs/testing/k6.md), ADR-056). A failed row exits

@@ -1532,6 +1532,12 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The `platform-engineer` skill now routes answers, focused fixes, and RFC work
+  through their applicable gates.** It permits sourced API explanations without
+  duplicating contracts and distinguishes early PR integration evidence from the
+  mandatory audit on merged SHAs before a release tag; `AGENTS.md` uses the same
+  release wording.
+
 - **Seven as-built statements in `docs/` caught up with reality.** `metrics.md`,
   `tracing.md`, `logs.md` and `observability.md` said traces reach **five** stores;
   they reach two (VictoriaTraces and ClickHouse — the span-metrics connector is a

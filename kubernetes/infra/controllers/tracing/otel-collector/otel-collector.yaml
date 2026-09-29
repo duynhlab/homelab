@@ -289,6 +289,14 @@ spec:
               endpoint: 0.0.0.0:4317
             http:
               endpoint: 0.0.0.0:4318
+        # Pod stdout logs from Vector, which already sends them to VictoriaLogs
+        # itself. A receiver of their own feeds ONLY logs/vector below: through
+        # the shared `otlp` receiver they would reach the VictoriaLogs pipeline
+        # too and land there twice.
+        otlp/vector:
+          protocols:
+            http:
+              endpoint: 0.0.0.0:4319
       service:
         extensions:
         - health_check
@@ -337,6 +345,18 @@ spec:
             - batch
             receivers:
             - otlp
+          # Vector's pod logs (OpenBao audit included) into the same otel_logs
+          # table the services write to.
+          logs/vector:
+            exporters:
+            - clickhouse
+            processors:
+            - memory_limiter
+            - transform/privacy
+            - resource/cluster
+            - batch
+            receivers:
+            - otlp/vector
           metrics:
             exporters:
             - otlp_http/victoriametrics
@@ -404,6 +424,11 @@ spec:
         enabled: true
         protocol: TCP
         servicePort: 4318
+      otlp-vector:
+        containerPort: 4319
+        enabled: true
+        protocol: TCP
+        servicePort: 4319
     readinessProbe:
       httpGet:
         path: /

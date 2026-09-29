@@ -3,7 +3,8 @@
 The **collection agent** of the logs pillar's infra path: one cluster-wide
 DaemonSet that tails the stdout of everything **not** OTel-instrumented —
 databases (including parsed PostgreSQL `auto_explain` plans), the frontend, and
-system pods — and ships it to [VictoriaLogs](victorialogs.md). App pods and the
+system pods — and ships it to [VictoriaLogs](victorialogs.md), and since
+2026-09-29 the same lines to ClickHouse (`otel_logs`) through the collector. App pods and the
 Envoy edge ship their own logs over OTLP and are excluded here by label
 ([hub](README.md#overview)), with one deliberate carve-out since ADR-061: a
 dedicated source tails the proxy pods again for their **runtime lines only**.
@@ -12,7 +13,7 @@ dedicated source tails the proxy pods again for their **runtime lines only**.
 |---|---|
 | **Deployment** | Helm chart `vector` `0.57.0`, `role: Agent` (DaemonSet), ns `kube-system` |
 | **Sources** | `kubernetes_logs` (`extra_label_selector: platform.duynhlab.dev/otlp-logs!=true`) + `envoy_proxy_logs` (ADR-061: proxy pods only, runtime lines only) |
-| **Sinks** | 3 × VictoriaLogs jsonline (`all`, `pg_plans`, `pg_parse_failures`) + `prometheus_exporter` `:9090` |
+| **Sinks** | 3 × VictoriaLogs jsonline (`all`, `pg_plans`, `pg_parse_failures`) + `otel_clickhouse` (OTLP → collector `:4319` → ClickHouse `otel_logs`) + `prometheus_exporter` `:9090` |
 | **Resources** | requests `20m` / `32Mi`, limits `200m` / `256Mi` |
 | **Self-monitoring** | `podMonitor` → VMPodScrape → VMAgent; Grafana dashboard `21954` (provisioned) |
 | **Manifest** | [`kubernetes/infra/controllers/logging/vector/vector.yaml`](../../../kubernetes/infra/controllers/logging/vector/vector.yaml) |
@@ -61,6 +62,8 @@ flowchart LR
     PJ --> FAE["filter_pg_auto_explain<br/>keep lines containing plan:"]
     FAE --> PAE["parse_pg_auto_explain<br/>extract plan + metadata"]
     AL --> ALL["victorialogs_all"]
+    AL --> TO["to_otlp<br/>OTLP shape + OpenBao audit fields"]
+    TO --> OC["otel_clickhouse"] -->|"OTLP/HTTP :4319<br/>otlp/vector receiver"| COL["otel-collector<br/>logs/vector pipeline"] --> CH[("ClickHouse<br/>otel.otel_logs")]
     PAE --> PLANS["victorialogs_pg_plans"]
     PAE -. "dropped (parse errors)" .-> FAILS["victorialogs_pg_parse_failures"]
     ALL & PLANS & FAILS --> VL[("VictoriaLogs :9428<br/>/insert/jsonline")]
@@ -70,8 +73,8 @@ flowchart LR
     classDef log fill:#d3f9d8,color:#111,stroke:#2f9e44;
     classDef metric fill:#ffe8cc,color:#111,stroke:#e8590c;
     class K8S,EGP external;
-    class SRC,ESRC,ERT,AL,PJ,FAE,PAE,IM collector;
-    class ALL,PLANS,FAILS,VL log;
+    class SRC,ESRC,ERT,AL,PJ,FAE,PAE,IM,TO,COL collector;
+    class ALL,PLANS,FAILS,VL,OC,CH log;
     class PE,VM metric;
 ```
 
@@ -80,6 +83,7 @@ flowchart LR
 | Transform | Type | What it does |
 |---|---|---|
 | `add_labels` | remap | Builds the stream fields: `service` from the pod's `app` label (pod name as fallback, `"system"` last resort), `namespace`, `pod_name`, `container_name`; keeps `stream` (stdout/stderr) as a regular field; parses the message as JSON to lift `level` when present |
+| `to_otlp` | remap | The `add_labels` output again, reshaped as OTLP `resourceLogs` for the opentelemetry sink: `service.name` from `app.kubernetes.io/name` → `app` → container name, `k8s.*` resource attributes, body = the raw line, `log.source=vector`. OpenBao audit lines (JSON, `type` request/response) also get `event.name=openbao.audit.<type>` and `openbao.request.path`, `.operation`, `.mount_type`, `openbao.auth.display_name`, `openbao.error` |
 | `filter_envoy_runtime` | filter | ADR-061: from the `envoy_proxy_logs` source, keeps only Envoy *runtime* lines (`!starts_with(.message, "{")`) — the access-log JSON travels OTLP → ClickHouse instead |
 | `parse_pg_json` | remap | For CNPG `postgres` containers (label `cnpg.io/cluster`): parses the CloudNativePG JSON wrapper into `.log` |
 | `filter_pg_auto_explain` | filter | Keeps only records whose `log.record.message` contains `plan:` — the `auto_explain` signature |
@@ -97,6 +101,20 @@ rather than blocking the agent. Headers (stream identity per sink) are owned by
 | `victorialogs_all` | `add_labels` | 1000 / 5s | 10000 |
 | `victorialogs_pg_plans` | `parse_pg_auto_explain` | 100 / 5s | 1000 |
 | `victorialogs_pg_parse_failures` | `parse_pg_auto_explain.dropped` | 100 / 10s | 500 |
+| `otel_clickhouse` | `to_otlp` | sink default | 10000 |
+
+**The ClickHouse leg goes through the collector, on a receiver of its own.**
+`otel_clickhouse` posts OTLP to the collector's `otlp/vector` receiver
+(`:4319`), which feeds only the `logs/vector` pipeline → the `clickhouse`
+exporter. Sending it to the shared `otlp` receiver would also route it into the
+VictoriaLogs pipeline, so every line would land in VictoriaLogs twice. Rows are
+told apart in SQL by `LogAttributes['log.source'] = 'vector'`:
+
+```sql
+SELECT ServiceName, count() FROM otel.otel_logs
+WHERE LogAttributes['log.source'] = 'vector' AND Timestamp > now() - INTERVAL 1 HOUR
+GROUP BY ServiceName ORDER BY count() DESC;
+```
 
 At scale: size buffers up or switch to disk buffers, and drop or sample noisy
 debug lines in a transform *before* they ship — volume control belongs at the
@@ -334,7 +352,7 @@ Query-side symptoms (logs ingested but blank in Grafana) are
 
 ---
 
-_Last updated: 2026-08-25 — ADR-061 adds the edge-runtime carve-out: a second
+_Last updated: 2026-09-29 — second log path: the same lines also reach ClickHouse `otel_logs` via `to_otlp` → `otel_clickhouse` → the collector's `otlp/vector` receiver; OpenBao audit fields extracted. Previously 2026-08-25 — ADR-061 adds the edge-runtime carve-out: a second
 `kubernetes_logs` source scoped to the EG proxy pods whose filter keeps only
 non-JSON runtime lines (the access log is ClickHouse-only now). Earlier the same
 day: the PostgreSQL pipeline section was rebuilt hop-by-hop after a live audit

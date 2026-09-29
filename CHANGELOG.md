@@ -121,6 +121,30 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Pod logs also land in ClickHouse, and OpenBao finally has an audit log.**
+  - **Two log paths.** Vector keeps sending every pod line it tails to
+    VictoriaLogs, and now reshapes the same lines as OTLP (`to_otlp`) and sends
+    them to a dedicated collector receiver, `otlp/vector` on `:4319`. A
+    `logs/vector` pipeline writes them to `otel.otel_logs`. The separate receiver
+    keeps these lines out of the VictoriaLogs pipeline, where they would
+    otherwise be stored twice.
+    - Rows carry `LogAttributes['log.source']='vector'` and a `service.name`
+      taken from `app.kubernetes.io/name`, then `app`, then the container name.
+    - Measured: about 10k rows in the first two minutes, across 23 services.
+  - **OpenBao audit.**
+    - The server config now declares `audit "file" "to-stdout"`. The bootstrap
+      Job's `bao audit enable` had never worked: API-created audit devices are
+      refused by default, and `2>/dev/null` hid the failure behind "already
+      enabled", so the server ran with **no audit device**. That step is removed.
+    - Every request and response is one JSON line. Only the active node writes,
+      and secret values are HMAC-ed.
+    - In ClickHouse the lines get `event.name=openbao.audit.request|response`
+      plus the request path, operation, mount type, auth display name and error.
+  - **OpenBao telemetry.** `telemetry {}` is enabled, with unauthenticated
+    metrics on the listener. The chart's ServiceMonitor exposes about 260
+    `vault_*` series names to vmagent. The chart's dashboard (grafana.com
+    23725) is imported from its ConfigMap into the new `Secrets` folder.
+
 - **Eighteen dashboards now come only from the as-code artifact; the
   hand-drawn copies are gone.** `OCIRepository grafana-dashboards-as-code`
   (`v0.2.0`) and two waves (`grafana-dashboards-as-code-folders-local`,

@@ -15,7 +15,7 @@
 > | App secret delivery | ✅ ESO + **KV v2 static** secrets (`refreshInterval: 1h`) for most services; **notification reads a DB-engine static role** via the `openbao-db` store | per-request dynamic DB creds |
 > | Auth (ESO) | ✅ Kubernetes auth, least-privilege `eso-read` policy | same |
 > | Auth (humans) | ✅ **OIDC via the `duynhlab-staff` realm** ([ADR-062](../proposals/adr/ADR-062-staff-groups-sso/)): UI button + `bao login -method=oidc`; groups → external groups → team policies (`infra-team`, `sre-team`) | same, real IdP hostname |
-> | Audit | ⚠ `file → stdout` **best-effort** (enablement is not fail-closed; `auditStorage` off) | durable, fail-closed |
+> | Audit | ✅ declarative `audit "file" "to-stdout"` (active node only) → Vector → VictoriaLogs **and** ClickHouse `otel_logs`; still stdout-only, no durable `auditStorage` | durable, fail-closed |
 > | **Database secrets engine** | ✅ **enabled — pattern-A pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)): static role `notification` on `platform-db` (`rotation_period` 720h), read through the dedicated `openbao-db` ClusterSecretStore. Per-request dynamic roles and other services: §5.2, §6, §10 — still *planned* | per-request dynamic roles, more services |
 > | Unseal | ⚠️ **awskms auto-unseal via the floci KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot; `openbao-init-keys` holds only a break-glass recovery key; **root token revoked**. floci is a loose, zero-auth emulator (parity/rehearsal, not real crypto) | Real cloud KMS (`awskms`/`gcpckms`, IRSA/Workload Identity) |
 > | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager |
@@ -1001,6 +1001,53 @@ bao write database/roles/product-app-rw \
 
 ---
 
+## Audit and telemetry
+
+**Audit.** The server config declares one audit device:
+
+```hcl
+audit "file" "to-stdout" {
+  options { file_path = "stdout" }
+}
+```
+
+- Every request and every response is one JSON line on stdout. Only the active
+  node writes (standbys ignore the stanza), so a line is never duplicated across
+  pods. Secret values and tokens are HMAC-ed before writing: a KV read shows
+  `password: hmac-sha256:…`, never the value.
+- It is declared, not API-created. OpenBAO refuses API-created audit devices by
+  default (`unsafe_allow_api_audit_creation = false`), and the root token is
+  revoked anyway. The bootstrap Job's old `bao audit enable file` had therefore
+  never worked: it failed silently behind an "already enabled" message, and until
+  2026-09-29 the server had **no audit device at all**.
+- Vector ships the lines with every other pod log to VictoriaLogs and to
+  ClickHouse (`otel.otel_logs`, see [`vector.md`](../observability/logging/vector.md)).
+  In ClickHouse the main fields are lifted into `LogAttributes`:
+
+  ```sql
+  SELECT LogAttributes['event.name']              AS event,
+         LogAttributes['openbao.request.path']     AS path,
+         LogAttributes['openbao.request.operation'] AS op,
+         LogAttributes['openbao.auth.display_name'] AS who,
+         count()
+  FROM otel.otel_logs
+  WHERE ServiceName = 'openbao' AND LogAttributes['event.name'] LIKE 'openbao.audit.%'
+  GROUP BY event, path, op, who ORDER BY count() DESC;
+  ```
+
+  The full record stays in `Body` (`JSONExtractString(Body, 'request', 'path')`).
+
+**Telemetry.** `telemetry { prometheus_retention_time = "12h" }` plus
+`unauthenticated_metrics_access` on the listener expose `vault_*` metrics at
+`/v1/sys/metrics?format=prometheus`; the chart's ServiceMonitor (enabled) lets
+vmagent scrape them (≈260 series names, `vault_core_*`, `vault_audit_*`,
+`vault_raft_*`, `vault_token_*`, …). The chart points the ServiceMonitor at the
+`openbao-active` Service, so the series describe the node that serves requests.
+Retention must outlive `usage_gauge_period` (10m): the usage gauges
+(`vault_secret_kv_count`, `vault_token_count`, identity counts) are emitted once
+per period, and with a 30s retention they disappeared between scrapes, which left
+the dashboard's KV, token and entity panels empty.
+
 ## Operations And Runbooks
 
 Operational commands are kept out of this architecture document so the learning material stays readable. Use these task-focused runbooks:
@@ -1090,4 +1137,4 @@ gantt
 
 ---
 
-_Last updated: 2026-09-29 — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_
+_Last updated: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

@@ -1550,6 +1550,12 @@ Skeleton (copy what you need):
 
 #### Services
 
+- **The Backoffice renders signed out instead of blank when sign-in stalls
+  (admin-service `v0.4.2`).** `keycloak.init()` gained a 10s bound: if the
+  check-sso iframe never answers (the failure #1128 fixed at the edge), the
+  portal logs why and shows the login page. Init failures are now logged in
+  every build, not only in dev, so the next stall leaves a trace. Tested on
+  Kind with the iframe aborted in a headed browser (admin-service#14).
 - **mockpay no longer reissues ids after a restart (payment `v2.4.2`).**
   Charges, refunds and webhook events were numbered by in-memory counters,
   so the 2.4.1 rollout on Kind handed out `mp_3` a second time — two

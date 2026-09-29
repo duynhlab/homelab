@@ -345,7 +345,8 @@ After confirming ConfigMaps DCS works, you can safely upgrade Kubernetes to v1.3
 For Kind clusters, version upgrade requires cluster recreation:
 
 ```bash
-# Update scripts/kind-up.sh: CLUSTER_VERSION=v1.34.3
+# Update node_image in scripts/kind-up.sh (tag AND digest, from the Kind
+# release notes), or override it for one run with KIND_NODE_IMAGE=...
 make down && make up
 ```
 

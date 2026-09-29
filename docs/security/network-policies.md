@@ -2,7 +2,7 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | **Implemented and enforced** — manifests reconciled by Flux; **actively enforced by kindnet** on the local Kind cluster (K8s 1.34.3) |
+| **Status** | **Implemented and enforced** — manifests reconciled by Flux; **actively enforced by kindnet** on the local Kind cluster (K8s 1.35.8) |
 | **Scope** | Ingress fencing across app-tier namespaces — app HTTP `:8080` / gRPC `:9090`, Keycloak (`identity`) `:8080`/`:9000`, plus DB-tier ports (poolers, CNPG status, exporters) |
 | **Purpose** | Make the cluster the fence for `internal` audiences — internal routes are reachable only from explicitly allowed namespaces, not merely "absent from the Ingress" |
 | **Related** | [`policy-catalog.md`](policy-catalog.md) (Kyverno catalog), [`../api/api.md`](../api/api.md#audience-segments) (audiences), [gRPC security](../api/api.md#security) (`:9090` caller fences) |
@@ -42,7 +42,8 @@
 - The checkout service is a pure gRPC **client** east-west: nothing dials into
   it on `:9090`, while it appears as a `:9090` caller on cart, order, product,
   shipping, and inventory.
-- **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3). These
+- **kindnet enforces NetworkPolicy** (verified on Kind K8s 1.34.3, re-measured on
+  1.35.8 on 2026-09-29). These
   policies are the *active* boundary on the local Kind cluster today — any
   ingress not explicitly allowed is dropped. No additional CNI is required.
 - `payment` stays the tightest namespace-wide fence: `envoy-gateway`→`:8080`
@@ -230,7 +231,7 @@ flowchart LR
     FLUX["Flux Kustomization<br/>network-policies-local"] -->|reconciles| ALLOW["allow policies<br/>(12 committed files)"]
     DENY --> NET["Net allowlist per namespace"]
     ALLOW --> NET
-    NET -->|"enforced by kindnet<br/>(K8s 1.34.3)"| EFF["Effective boundary"]
+    NET -->|"enforced by kindnet<br/>(K8s 1.35.8)"| EFF["Effective boundary"]
 ```
 
 - **Manifests:** `kubernetes/infra/configs/network-policies/{cart,checkout,identity,inventory,notification,order,payment,platform,product,review,shipping,user}.yaml`
@@ -273,8 +274,11 @@ flowchart LR
 
 ## 5. Known limitations
 
-- **Enforced by kindnet.** The local Kind cluster (K8s 1.34.3) enforces these
-  NetworkPolicies at runtime — verified during the bring-up hardening pass. No
+- **Enforced by kindnet.** The local Kind cluster (K8s 1.35.8) enforces these
+  NetworkPolicies at runtime. First verified on 1.34.3 during the bring-up
+  hardening pass; re-measured on 1.35.8 on 2026-09-29 (RFC-0032) with a denied and
+  an allowed probe per port: `user`→`inventory:9090` and `user`→`inventory:8080`
+  closed, `order`→`inventory:9090` and `envoy-gateway`→`inventory:8080` open. No
   extra CNI (Cilium/Calico) is required; any ingress not explicitly allowed is dropped.
 - **HTTP `:8080` + gRPC `:9090`.** The gRPC callees (`shipping`, `review`,
   `notification`, `cart`, `order`, `product`, `inventory`, and `payment` — the
@@ -290,4 +294,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-09-28 — Draw.io views of the app mesh (§ 3) and of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._
+_Last updated: 2026-09-29 — kindnet enforcement re-measured on Kind 1.35.8 (RFC-0032). 2026-09-28 — Draw.io views of the app mesh (§ 3) and of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._

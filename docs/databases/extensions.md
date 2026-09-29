@@ -109,7 +109,9 @@ schema change.
 CloudNativePG 1.30 can mount immutable extension OCI images through
 `spec.postgresql.extensions`. The official requirements include PostgreSQL 18,
 an ImageVolume-capable container runtime, and Kubernetes 1.35 or Kubernetes
-1.33/1.34 with the feature gate enabled.
+1.33/1.34 with the feature gate enabled. The Kubernetes half is met: the Kind
+baseline is 1.35.8 ([RFC-0032](../proposals/rfc/RFC-0032/)), where `ImageVolume`
+is beta and measured enabled. PostgreSQL 18 is still the blocker.
 
 This repository declares none of the following:
 

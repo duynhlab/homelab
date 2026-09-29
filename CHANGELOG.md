@@ -5356,6 +5356,27 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **Kind baseline 1.34.3 → 1.35.8, pinned by digest (RFC-0032 Phase 1).**
+  - `scripts/kind-up.sh` has one `node_image` line with tag and digest. It
+    replaces `CLUSTER_VERSION` and the four tag-only lines. `KIND_NODE_IMAGE`
+    overrides it, and the comment records the 1.34.3 rollback digest.
+  - `make cluster-up` and `make prereqs` enforce a Kind CLI floor of v0.33.0
+    through `kind-floor`.
+  - kubeconform validates against `-kubernetes-version`, which is read from the
+    pin.
+  - A Renovate regex manager proposes node-image patch and digest bumps only.
+  - The target was 1.36.4. Its kubelet crash-loops when `/var/lib/docker` is on
+    ZFS (kind#4229; the cAdvisor fix is in no release yet). The RFC is amended to
+    bridge through 1.35, which Kyverno 1.19 tests, and to recreate on 1.36 once
+    the fix ships.
+  - Kind gate on a fresh cluster: ELIGIBLE.
+    - 30/30 Kustomizations; seed 8/8; db-isolation 72/72.
+    - k6: saga, smoke, staff, operator and rate limit all green.
+    - Both browser sign-ins pass.
+    - `ImageVolume` beta measured on.
+    - kindnet measured enforcing NetworkPolicy. The runbook's K3.5 said
+      otherwise and is corrected.
+
 - **RustFS chart 0.8.0 → 0.12.0 (app 1.0.0-beta.8 → beta.12).** The review
   blocker was verified against the artifacts, not release notes: the chart's
   new fail-closed guard (`templates/secret.yaml` `fail`s on default/empty

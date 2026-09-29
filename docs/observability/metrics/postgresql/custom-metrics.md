@@ -193,7 +193,8 @@ label. `[cluster]` = runs once per instance (instance-wide view).
 - **Columns** — label `wait_event_type`; gauge `active_backends`.
 - **Why** — the trend of *where active sessions are stuck*. **Honest limit:**
   this is scrape-interval sampling, not `pg_wait_sampling` (that extension is
-  not in the operand image; CNPG image-volume extensions need K8s ≥ 1.35) — a
+  not in the operand image; CNPG image-volume extensions also need PostgreSQL 18,
+  though the Kind baseline now meets their Kubernetes ≥ 1.35 half) — a
   wait that starts and ends between two scrapes is invisible.
 - **PromQL**
   ```promql

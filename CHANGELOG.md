@@ -1154,6 +1154,24 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Nothing we deploy reads the deprecated `endpoints/v1` API any more.**
+  - An apiserver audit scoped to `endpoints` on Kind 1.35.8 named two clients:
+    - vmagent: the VM operator renders every converted ServiceMonitor as
+      `role: endpoints`, and vmagent LISTed and WATCHed namespace- and
+      cluster-wide.
+    - Pyroscope's metastore client: the chart's default
+      `-metastore.address=kubernetes:///…` uses a vendored kuberesolver that
+      watches Endpoints.
+  - **Fixes:**
+    - `VM_VMSERVICESCRAPEDEFAULT_ENFORCEENDPOINTSLICES=true` on the operator:
+      35/35 scrapes now use `role: endpointslice`, and 79/79 targets are up.
+    - `metastore.address: dnssrvnoa+_grpc._tcp.pyroscope-headless…`: Ready in
+      55 s, 15 services profiling. `dns:///` is not a scheme the metastore
+      discovery accepts; it was measured, and Helm rolled it back.
+  - A clean audit window afterwards showed only the control plane, which keeps
+    `apiserver_requested_deprecated_apis{resource="endpoints"}` at 1.
+  - The procedure is in the Kind runbook's Diagnostics.
+
 - **Five as-code panels query again** (`grafana-dashboards` `v0.2.1`).
   `pg-io-waits` (shared buffers, IO time, throughput) and
   `kubernetes-cluster-overview` (network I/O, PVC utilization) sent duplicate

@@ -103,6 +103,7 @@ docs/
 │   │   └── README.md             # Pyroscope (CPU, heap, goroutine)
 │   ├── clickhouse/               # ClickHouse OTel logs+traces OLAP (deployed)
 │   │   ├── README.md             # Platform hub, architecture, and Grafana
+│   │   ├── internals/            # Engine learning path + chapter authoring contract
 │   │   ├── parts-merges-and-ttl.md # Storage lifecycle deep dive
 │   │   └── operations.md         # Day-2 diagnosis and recovery
 │   ├── grafana/                  # Visualization layer

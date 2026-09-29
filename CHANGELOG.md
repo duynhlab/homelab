@@ -653,6 +653,13 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **ClickHouse internals now has a documentation contract before chapter work
+  starts** ([#1127](https://github.com/duynhlab/homelab/issues/1127)). The
+  learning hub fixes the 12-chapter order, evidence vocabulary, shared glossary,
+  and read-only cluster boundary; its chapter template enforces the progression
+  from mental model through engine mechanism, deployed evidence, failure
+  reasoning, and teach-back. Kafka remains a reference-only comparison inside
+  the deployed ingestion chapter rather than a standalone chapter.
 - **Two more Draw.io views: the platform API and the secrets pipeline.**
   - `api/platform-api`, from the `docs/api` contracts and the service manifests:
     - the SPAs through the gateway;

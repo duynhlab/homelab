@@ -315,6 +315,9 @@ docs/observability/
 │
 ├── clickhouse/                   # ClickHouse OTel logs+traces OLAP (deployed)
 │   ├── README.md                 # Platform architecture, schema, Grafana, playground
+│   ├── internals/                # Progressive engine curriculum and authoring contract
+│   │   ├── README.md             # Learning path, evidence vocabulary, shared glossary
+│   │   └── _template.md          # Mandatory chapter shape and review gate
 │   ├── fundamentals.md           # Columnar OLAP and MergeTree mental model
 │   ├── schema-and-queries.md      # Sorting keys, granules, EXPLAIN, codecs
 │   ├── materialized-views.md      # Trace-id lookup materialized view
@@ -507,6 +510,7 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [Alert Catalog](alerting/alert-catalog.md) -- full reference of all deployed alerts + coverage-gap analysis
 - [SLO System](slo/README.md) -- Sloth Operator and burn-rate alerts
 - [ClickHouse OTel logs+traces OLAP](clickhouse/README.md) -- deployed supplementary OLAP; long-retention SQL + trace_id JOIN ([RFC-0019](../proposals/rfc/RFC-0019/) · [ADR-023](../proposals/adr/ADR-023-clickhouse-observability-olap/))
+- [ClickHouse internals learning path](clickhouse/internals/README.md) -- explanation-first curriculum from architecture through scaling, grounded in read-only Kind evidence
 - [ClickHouse fundamentals](clickhouse/fundamentals.md) -- OLAP vs search, MergeTree, 1×3 vs VLDB paper
 - [ClickHouse schema and queries](clickhouse/schema-and-queries.md) -- ORDER BY → EXPLAIN granules → codecs
 - [ClickHouse materialized views](clickhouse/materialized-views.md) -- incremental `TO` trace-id table
@@ -514,6 +518,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-09-29 — the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
+_Last updated: 2026-09-29 — added the ClickHouse internals curriculum and authoring contract; the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
 Deployment (Flux waves + the gate that releases each one, and why the two
 ClickHouse waves omit `wait`)._

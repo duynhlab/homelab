@@ -1084,6 +1084,27 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Security
+
+- **App namespaces no longer lose their generated `deny-all-ingress`.**
+  - **Cause:** each of the 10 service namespaces had two owners.
+    `namespaces.yaml` (`controllers-local`) creates it with
+    `platform.duynhlab.dev/tier: app`. The five domain ResourceSets then applied
+    the same Namespace from a template without that label.
+  - **What happened on each ResourceSet reconcile:** flux-operator took the
+    object over (kustomize-controller's `managedFields` entry was removed) and
+    SSA deleted `tier`. Kyverno's `default-deny-networkpolicy`
+    (`synchronize: true`) then deleted the deny-all in 9 namespaces until the next
+    `controllers-local` run, up to 10 minutes later.
+  - **Measured on Kind:** reconciling `rs-checkout` removed `cart`'s deny-all
+    within seconds.
+  - **Fix:** the ResourceSet templates now carry `tier: app`. Two rounds of
+    `controllers-local` then 5 × ResourceSet reconciles kept 12/12 deny-alls and
+    10/10 labels.
+  - **Groundwork for the follow-up:** the templates also carry
+    `fluxcd.controlplane.io/prune: disabled`, so the duplicate Namespace can be
+    removed later without the operator garbage-collecting the namespace.
+
 #### GitOps
 
 - **mockpay reports the version it runs.** Its `OTEL_RESOURCE_ATTRIBUTES`

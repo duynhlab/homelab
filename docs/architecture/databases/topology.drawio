@@ -67,7 +67,7 @@
         <mxCell id="rustfs" value="&lt;b&gt;RustFS bucket pg-backups-cnpg&lt;/b&gt;&lt;br&gt;platform-db/ · product-db/ (30 d)&lt;br&gt;product-db-replica/ (7 d)" style="shape=cylinder3;whiteSpace=wrap;html=1;shadow=0;size=8;fillColor=#DCFCE7;strokeColor=#16A34A;strokeWidth=1.5;fontColor=#14532D;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_rustfs">
           <mxGeometry x="20" y="45" width="200" height="90" as="geometry" />
         </mxCell>
-        <mxCell id="replica" value="&lt;b&gt;product-db-replica ×3&lt;/b&gt;&lt;br&gt;DR: designated primary&lt;br&gt;+ 2 cascading standbys" style="shape=cylinder3;whiteSpace=wrap;html=1;shadow=0;size=8;fillColor=#DCFCE7;strokeColor=#16A34A;strokeWidth=1.5;fontColor=#14532D;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_product">
+        <mxCell id="replica" value="&lt;b&gt;product-db-replica ×1&lt;/b&gt;&lt;br&gt;DR: designated primary&lt;br&gt;(3 on promotion)" style="shape=cylinder3;whiteSpace=wrap;html=1;shadow=0;size=8;fillColor=#DCFCE7;strokeColor=#16A34A;strokeWidth=1.5;fontColor=#14532D;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="f_product">
           <mxGeometry x="15" y="545" width="150" height="90" as="geometry" />
         </mxCell>
         <mxCell id="e_platform" value=":5432" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.13;exitY=1;exitDx=0;exitDy=0;entryX=0.93;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="c_platform" target="pgbouncer">

@@ -25,7 +25,7 @@ PgBouncer pooler and one PgDog pooler
 | -------------------- | ------------- | ---------- | --------- | ------- | ----------------------------------------- | ------------------------------------ |
 | platform-db          | CloudNativePG | 18.1       | platform  | 3 nodes (1 primary + 1 sync + 1 async) | CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`, ADR-026) | User, Notification, Shipping, Review, Keycloak, Temporal |
 | product-db              | CloudNativePG | 18.1       | product   | 3 nodes (1 primary + 1 sync + 1 async) | PgDog v0.39 (`pgdog-product`) | Product, Cart, Order, Checkout, Inventory, Payment (payment app: direct-TLS) |
-| product-db-replica      | CloudNativePG | 18.1       | product   | 3 nodes (designated primary + 2 cascading) | —                                         | DR (continuous WAL recovery)         |
+| product-db-replica      | CloudNativePG | 18.1       | product   | 1 node (designated primary; 3 on promotion) | —                                         | DR (continuous WAL recovery)         |
 
 
 ## Connection Endpoints

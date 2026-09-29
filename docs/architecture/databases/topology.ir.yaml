@@ -53,7 +53,7 @@ nodes:
 
   - {id: rustfs, label: "RustFS bucket pg-backups-cnpg\nplatform-db/ · product-db/ (30 d)\nproduct-db-replica/ (7 d)", role: data, layer: storage, parent: f_rustfs, shape: datastore}
 
-  - {id: replica, label: "product-db-replica ×3\nDR: designated primary\n+ 2 cascading standbys", role: data, layer: dr, parent: f_product, shape: datastore}
+  - {id: replica, label: "product-db-replica ×1\nDR: designated primary\n(3 on promotion)", role: data, layer: dr, parent: f_product, shape: datastore}
 
 edges:
   - {id: e_platform, source: c_platform, target: pgbouncer, type: data, label: ":5432"}

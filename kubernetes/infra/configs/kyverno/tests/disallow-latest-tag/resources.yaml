@@ -1,0 +1,44 @@
+# Fixtures for disallow-latest-tag's image-volume rule (ADR-077). The first
+# mirrors the clickhouse-schema Job's pod: container pinned by tag, DDL volume
+# pinned by tag AND digest.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-volume-digest
+  namespace: monitoring
+spec:
+  containers:
+    - name: schema
+      image: clickhouse/clickhouse-server:26.7
+  volumes:
+    - name: sql
+      image:
+        reference: ghcr.io/duynhlab/homelab/clickhouse-ddl:sql-fd2bd9d0f0a8@sha256:88cdc952b9eb32392852210e828442ef2b2d81661741aada49e445624b22bfac
+        pullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-volume-tag-only
+  namespace: monitoring
+spec:
+  containers:
+    - name: schema
+      image: clickhouse/clickhouse-server:26.7
+  volumes:
+    - name: sql
+      image:
+        reference: ghcr.io/duynhlab/homelab/clickhouse-ddl:sql-fd2bd9d0f0a8
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: no-image-volume
+  namespace: monitoring
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/order-service/order-service:2.9.0
+  volumes:
+    - name: tmp
+      emptyDir: {}

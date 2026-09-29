@@ -158,6 +158,51 @@ e2e-load: ## Order load; reports the Temporal backlog it built
 e2e-restock: ## Top demo stock back up to the seed baseline (kind-seed.sh cannot -- ON CONFLICT DO NOTHING)
 	GATE=$(or $(GATE),kind) k6 run scripts/k6/restock.js
 
+##@ ClickHouse DDL image (ADR-077)
+
+# The schema Job mounts this image as a volume. The digest in job.yaml must be
+# what the SQL builds to, so every build here pins BuildKit and strips time:
+# the same SQL gives the same digest on any machine and in CI
+# (.github/workflows/clickhouse-ddl.yml uses the same three values).
+DDL_DIR       := images/clickhouse-ddl
+DDL_IMAGE     := ghcr.io/duynhlab/homelab/clickhouse-ddl
+DDL_BUILDKIT  := moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+DDL_PLATFORMS := linux/amd64,linux/arm64
+DDL_BUILDER   := clickhouse-ddl
+DDL_OUT       := $(DDL_DIR)/.out/clickhouse-ddl.oci.tar
+# Tag = hash of the SQL itself, so it names the content without depending on BuildKit.
+DDL_TAG        = sql-$(shell cd $(DDL_DIR)/sql && sha256sum *.sql | sha256sum | cut -c1-12)
+
+.PHONY: ddl-image
+ddl-image: ## Build the DDL image reproducibly into an OCI tarball
+	@docker buildx inspect $(DDL_BUILDER) >/dev/null 2>&1 || \
+	  docker buildx create --name $(DDL_BUILDER) --driver docker-container \
+	    --driver-opt image=$(DDL_BUILDKIT) >/dev/null
+	@mkdir -p $(dir $(DDL_OUT))
+	@SOURCE_DATE_EPOCH=0 docker buildx build --builder $(DDL_BUILDER) \
+	  --platform $(DDL_PLATFORMS) --provenance=false --sbom=false \
+	  --output type=oci,dest=$(DDL_OUT),rewrite-timestamp=true,name=$(DDL_IMAGE):$(DDL_TAG) \
+	  --quiet $(DDL_DIR) >/dev/null
+
+.PHONY: ddl-digest
+ddl-digest: ddl-image ## Print the DDL image reference (tag@digest) for job.yaml
+	@echo "$(DDL_IMAGE):$(DDL_TAG)@$$(tar -xOf $(DDL_OUT) index.json | jq -r '.manifests[0].digest')"
+
+.PHONY: ddl-load
+ddl-load: ddl-image ## Import the DDL image into every Kind node (pre-merge testing)
+	@# Streamed over stdin: /tmp in a Kind node is a tmpfs, so a `docker cp` into
+	@# it lands under the mount where ctr cannot see it.
+	@# The digest name matters too: the kubelet resolves a tag@digest reference by
+	@# its repo@digest form, and an import only creates the tag name -- without
+	@# the second name IfNotPresent still pulls, from a registry that may not
+	@# have the image yet.
+	@digest=$$(tar -xOf $(DDL_OUT) index.json | jq -r '.manifests[0].digest'); \
+	for n in $$(kind get nodes --name $${CLUSTER_NAME:-homelab}); do \
+	  docker exec -i $$n ctr -n k8s.io images import --all-platforms - < $(DDL_OUT) >/dev/null && \
+	  docker exec $$n ctr -n k8s.io images tag --force $(DDL_IMAGE):$(DDL_TAG) $(DDL_IMAGE)@$$digest >/dev/null && \
+	  echo "  loaded into $$n ($$digest)"; \
+	done
+
 ##@ Utilities
 
 .PHONY: prereqs

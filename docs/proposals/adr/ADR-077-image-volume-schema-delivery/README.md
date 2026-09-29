@@ -10,18 +10,18 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-09-29 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | How bootstrap SQL/DDL payloads reach a run-once Job, starting with the ClickHouse schema Job; not the schema itself, not the Job's verification logic |
-| **Affected components** | `monitoring` Job `clickhouse-schema` and its ConfigMap, the `clickhouse-schema-local` wave, the Kyverno policy `disallow-latest-tag`, homelab CI (a new image publish) |
+| **Affected components** | `monitoring` Job `clickhouse-schema` (its former ConfigMap is removed), the `clickhouse-schema-local` wave, the Kyverno policy `disallow-latest-tag`, homelab CI (a new image publish) |
 | **Related RFC** | [RFC-0032](../../rfc/RFC-0032/) (Phase 2) |
 | **Related research** | [research.md](../../rfc/RFC-0032/research.md) |
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0032 Phase 2, one homelab PR, after the Phase 1 cluster is on 1.35.8 |
-| **Adoption** | Not started |
+| **Adoption** | **Complete**: Kind gate 2026-09-29 on 1.35.8. The Job mounts the image and lists the 5 files; schema complete on 3 replicas; a DDL bump re-created the Job with no manual step; an undigested image volume reported `fail`. Publishing to GHCR happens on merge |
 
 ## Context
 
@@ -109,6 +109,9 @@ to require a `@sha256:` digest there.
 | **Not `flux push`** | `flux push artifact` writes Flux's own media type, which only source-controller reads; containerd mounts it empty. Build with `docker buildx` (or `crane`) |
 | **Isolation** | Never combine an image volume with `hostUsers: false`: containerd cannot idmap the overlay mount, and the pod fails to start |
 | **Failure behavior** | The Job asserts that `/sql` holds the expected files before running any statement. An empty mount fails the Job; it never runs "no DDL" as success |
+| **Mount** | The volume mounts the image **root**, so the Job mounts it with `subPath: sql`. Without it the files appear at `/sql/sql/`, and the Job's file check fails (measured on the first run) |
+| **Reproducibility** | `make ddl-digest` and the workflow share one build: BuildKit pinned by digest, `SOURCE_DATE_EPOCH=0`, `rewrite-timestamp=true`, no in-image provenance or SBOM, and `COPY --chmod=u=rwX,go=rX`. Without the chmod, the local umask (0664 vs 0644) changed the digest; an octal 0644 made `/sql` untraversable |
+| **Local testing** | `make ddl-load` imports the archive into every Kind node **and** adds the `repo@digest` name. The kubelet resolves `tag@digest` by that name, so without it `IfNotPresent` still pulls |
 | **Build tool** | `FROM scratch`, not apko. apko assembles images from APK packages, so shipping five local files through it would need a melange package for every schema revision. The signing and attestation path is still the one `wolfi-images` uses |
 
 ### Decision view
@@ -235,7 +238,8 @@ requires a new ADR that supersedes this one.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-09-28 | Proposed / Not started | Created when RFC-0032 moved to `Accepted`. The build tool narrowed to `FROM scratch` (apko needs a package per file set), and the Job-immutability mechanism named explicitly (`force: enabled` on this Job) |
+| 2026-09-29 | Accepted / Complete | Implemented and gated on Kind 1.35.8 (see Adoption). Owner chose one PR per schema change with a reproducible build, checked by CI. Mount, reproducibility and local-testing rules added from what the gate measured |
 | 2026-09-28 | Proposed / Not started | Owner choices: build in homelab under `images/clickhouse-ddl/`; re-run by `force` plus a digest bump; CI publish required before merge; `flux push` ruled out |
 
 ---
-_Last updated: 2026-09-28_
+_Last updated: 2026-09-29 — Accepted, Adoption Complete_

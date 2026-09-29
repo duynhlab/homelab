@@ -62,3 +62,26 @@ spec:
               - image: "!*:latest"
             =(ephemeralContainers):
               - image: "!*:latest"
+    # ADR-077: a Pod can mount an OCI image as a VOLUME, and the two rules above
+    # only look at containers -- a `volumes[].image.reference` could say `:latest`
+    # or float on a tag unseen. An image volume is data the kubelet pulls, so it is
+    # pinned harder than a container: the reference must carry a digest.
+    - name: require-image-volume-digest
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - flux-system
+                - kyverno
+      validate:
+        message: "Image volumes must be pinned by digest (reference: <image>:<tag>@sha256:<digest>)."
+        pattern:
+          spec:
+            =(volumes):
+              - =(image):
+                  reference: "*@sha256:*"

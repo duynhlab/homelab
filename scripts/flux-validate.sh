@@ -375,6 +375,29 @@ validate_worker_versioning
 # The RustFS bucket list lives in two places -- the run-once setup Job and the
 # 30-minute CronJob -- and the Job's header says to keep them in step. Nothing
 # did until now.
+validate_clickhouse_ddl_reference() {
+  # ADR-077: the schema Job mounts the DDL as an image volume. The reference must
+  # be pinned by digest, and its tag names the SQL it was built from
+  # (sql-<hash of images/clickhouse-ddl/sql/*.sql>, the Makefile's DDL_TAG), so a
+  # SQL edit without a new reference fails here, before any build. Whether the
+  # digest is what that SQL builds to is checked by the clickhouse-ddl workflow,
+  # which rebuilds it with the pinned BuildKit.
+  local job="kubernetes/infra/configs/clickhouse-schema/job.yaml"
+  local ref tag want
+  echo "INFO - Checking the ClickHouse DDL image-volume reference"
+  ref=$(yq '.spec.template.spec.volumes[] | select(.name == "sql") | .image.reference' "${job}")
+  if [[ "${ref}" != ghcr.io/duynhlab/homelab/clickhouse-ddl:*@sha256:* ]]; then
+    echo "ERROR - ${job}: the sql volume must be ghcr.io/duynhlab/homelab/clickhouse-ddl:<tag>@sha256:<digest>, got '${ref}'" >&2
+    exit 1
+  fi
+  tag=${ref#*:}; tag=${tag%@*}
+  want="sql-$(cd images/clickhouse-ddl/sql && sha256sum *.sql | sha256sum | cut -c1-12)"
+  if [[ "${tag}" != "${want}" ]]; then
+    echo "ERROR - ${job}: DDL tag ${tag} does not match the SQL in images/clickhouse-ddl/sql (${want}); run 'make ddl-digest' and update the reference" >&2
+    exit 1
+  fi
+}
+
 validate_service_namespaces() {
   # namespaces.yaml is the only owner of the service namespaces. The domain
   # ResourceSets used to render the same Namespace; each apply took the object
@@ -426,5 +449,6 @@ validate_clickhouse_embedded_xml
 validate_clickhouse_replica_count
 validate_rustfs_bucket_lists
 validate_service_namespaces
+validate_clickhouse_ddl_reference
 validate_production
 echo "INFO - All validations passed"

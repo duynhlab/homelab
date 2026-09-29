@@ -176,8 +176,10 @@ pressure, merge memory, cold-tier moves, and retention, read
 ### Deployed schema (real DDL)
 
 This DDL is **committed**, in
-`kubernetes/infra/configs/clickhouse-schema/configmap-schema.yaml`, and applied
-by the `clickhouse-schema` Job. It was captured with `SHOW CREATE TABLE` from a
+[`images/clickhouse-ddl/sql/`](../../../images/clickhouse-ddl/), built into a
+digest-pinned image and mounted into the `clickhouse-schema` Job as an image
+volume ([ADR-077](../../proposals/adr/ADR-077-image-volume-schema-delivery/)); a
+schema change is a new digest, and the Job re-creates itself. It was captured with `SHOW CREATE TABLE` from a
 cluster the exporter itself had built, so it matches what the exporter expects
 to INSERT into — note the replicated engine, the sort key, day-partitioning,
 90-day TTL, per-column codecs, and skipping indexes:
@@ -253,7 +255,7 @@ would cost a RustFS round-trip per lookup for no space gain.
 | Disks `s3`, `s3_cache`; policy `hot_cold` | CHI `spec.configuration.files` `03-storage-rustfs.xml` | `move_factor 0` (only TTL moves — the hot disk is the quota-less node filesystem, so free-space-driven moves would fire at node <10 % and write to that same filesystem); `perform_ttl_move_on_insert false` (an INSERT never waits on RustFS); zero-copy replication explicitly off |
 | Credentials | `clickhouse-rustfs-credentials` (ClusterExternalSecret from the OpenBAO RustFS keys) → container env `CLICKHOUSE_S3_*` → `from_env` in the XML | Never written into the manifest; not named `AWS_*` so the SDK's default chain cannot pick them up for unrelated `s3()` calls |
 | Bucket | `clickhouse-otel`, created by the RustFS `mc` Job and 30-minute CronJob (two lists, `make validate` keeps them equal) | `clickhouse-local` `dependsOn: storage-local` because the `s3` disk runs an access check at server start |
-| DDL | `configmap-schema.yaml` (tiered CREATEs, in the server's normalised form) | Fresh `make up` creates the tiered form directly; no migration path by decision. The schema Job refuses to start until every replica has the policy and verifies two tiered tables plus both S3 disks |
+| DDL | `images/clickhouse-ddl/sql/` (tiered CREATEs, in the server's normalised form) | Fresh `make up` creates the tiered form directly; no migration path by decision. The schema Job refuses to start until every replica has the policy and verifies two tiered tables plus both S3 disks |
 
 **How a part moves.** TTL is applied by background merges, so a part crosses to
 cold once *every* row in it is older than 7 days — with daily partitions that is

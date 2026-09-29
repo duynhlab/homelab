@@ -1,8 +1,9 @@
 # Schema bootstrap for the ClickHouse OTel store (RFC-0028 / ADR-065).
 #
-# Runs the DDL in configmap-schema.yaml so the otel-collector can run with
-# create_schema: false. Why that matters is in the ConfigMap's header; what
-# matters here is the shape of the work:
+# Runs the DDL shipped in the clickhouse-ddl image (images/clickhouse-ddl/,
+# mounted read-only at /sql as an image volume, ADR-077) so the otel-collector
+# can run with create_schema: false. Why that matters is in that image's
+# README; what matters here is the shape of the work:
 #
 #   1. Assert against the INTENDED replica count, not a discovered one. The first
 #      version trusted `system.clusters`, and a clean bring-up proved that wrong
@@ -22,13 +23,18 @@
 #      total_replicas on EVERY replica and fails the Job otherwise.
 #
 # Idempotent: every statement is IF NOT EXISTS, and the verify step is a read.
-# Jobs are immutable, so to re-run after editing the SQL:
-#   kubectl delete job clickhouse-schema -n monitoring
-#   flux reconcile kustomization clickhouse-schema-local -n flux-system
-# (No kustomize.toolkit.fluxcd.io/force: the SQL lives in a ConfigMap, so the
-# pod template does not change when the DDL does — there is no immutable-field
-# apply failure to work around, and force on a bootstrap Job is discouraged
-# elsewhere in this repo.)
+# Re-running after a schema change needs no manual step: editing the SQL means a
+# new image digest in the volume reference below, i.e. a new pod template, and
+# kustomize.toolkit.fluxcd.io/force lets Flux delete and re-create this
+# immutable Job on exactly that change. force acts only when an apply fails on
+# an immutable field, so an unchanged digest never re-runs it (measured: three
+# reconciles kept rustfs-setup-buckets-init's UID, 2026-09-28).
+#
+# Image volume, not a ConfigMap (ADR-077): pinned by tag AND digest (Kyverno
+# disallow-latest-tag requires the digest on image volumes), built reproducibly
+# so the digest is what the SQL builds to (`make ddl-digest`; CI checks it on
+# every pull request). Never pair an image volume with hostUsers: false --
+# containerd cannot idmap the mount and the pod does not start.
 #
 # No ttlSecondsAfterFinished on purpose: clickhouse-schema-local gates on this
 # Job with wait: true, and a TTL-deleted Job cannot be health-checked.
@@ -42,6 +48,10 @@ metadata:
     app.kubernetes.io/name: clickhouse-schema
     app.kubernetes.io/component: bootstrap
     app.kubernetes.io/part-of: observability
+  annotations:
+    # A new DDL digest changes the pod template; Jobs are immutable, so force
+    # lets Flux re-create the Job instead of failing the apply. See the header.
+    kustomize.toolkit.fluxcd.io/force: enabled
 spec:
   # High because this Job legitimately races its dependency: the CHI's replicas
   # come up one at a time, and the wave's health checks gate on StatefulSets,
@@ -88,6 +98,16 @@ spec:
           args:
             - |
               set -eu
+              # An image that mounts but carries no files (an OCI artifact rather
+              # than an image, ADR-077) gives an EMPTY /sql with no error. Fail
+              # here, loudly, instead of "applying" nothing and verifying a store
+              # that was never created.
+              echo "==> DDL files in /sql:"
+              for f in 00-database.sql 10-otel_logs.sql 20-otel_traces.sql \
+                       30-otel_traces_trace_id_ts.sql 40-otel_traces_trace_id_ts_mv.sql; do
+                [ -s "/sql/$f" ] || { echo "FAIL: /sql/$f missing or empty -- is the image volume a real image?"; ls -la /sql; exit 1; }
+                echo "    $f ($(wc -c < "/sql/$f") bytes)"
+              done
               LB=clickhouse-clickhouse.monitoring.svc.cluster.local
               cli() { host=$1; shift; clickhouse-client --host "$host" --password "$CLICKHOUSE_PASSWORD" "$@" ; }
 
@@ -230,6 +250,10 @@ spec:
           volumeMounts:
             - name: sql
               mountPath: /sql
+              # An image volume mounts the IMAGE ROOT; the files live under
+              # /sql inside it. Without subPath they appear at /sql/sql/ and the
+              # file check above fails (measured on the first run).
+              subPath: sql
               readOnly: true
             - name: tmp
               mountPath: /tmp
@@ -247,7 +271,8 @@ spec:
                 - ALL
       volumes:
         - name: sql
-          configMap:
-            name: clickhouse-schema
+          image:
+            reference: ghcr.io/duynhlab/homelab/clickhouse-ddl:sql-fd2bd9d0f0a8@sha256:88cdc952b9eb32392852210e828442ef2b2d81661741aada49e445624b22bfac
+            pullPolicy: IfNotPresent
         - name: tmp
           emptyDir: {}

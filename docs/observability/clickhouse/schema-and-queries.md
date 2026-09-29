@@ -8,7 +8,7 @@ breaks ingest.
 | | |
 |---|---|
 | **Skill** | `ORDER BY` prefix → `EXPLAIN indexes = 1` → codecs last |
-| **Tables** | `otel.otel_logs`, `otel.otel_traces` (DDL in `kubernetes/infra/configs/clickhouse-schema/configmap-schema.yaml`) |
+| **Tables** | `otel.otel_logs`, `otel.otel_traces` (DDL in `images/clickhouse-ddl/sql/`, shipped to the schema Job as an image volume) |
 | **Why ClickHouse exists next to VictoriaLogs** | LogsQL finds a line. This store is for **GROUP BY**, percentiles, and `TraceId` correlation over 90 days — [fundamentals](fundamentals.md) |
 | **Hands-on** | Hub [Playground §3](README.md#3-see-the-sparse-index-prune-granules) |
 
@@ -226,7 +226,7 @@ Full connect + `system.parts` recipes: [Playground](README.md#playground--merget
 - [EXPLAIN](https://clickhouse.com/docs/sql-reference/statements/explain)
 - [Column compression codecs](https://clickhouse.com/docs/sql-reference/statements/create/table#column-compression-codecs)
 - [Observability schema design](https://clickhouse.com/docs/use-cases/observability/schema-design)
-- DDL: [`configmap-schema.yaml`](../../../kubernetes/infra/configs/clickhouse-schema/configmap-schema.yaml)
+- DDL: [`images/clickhouse-ddl/sql/`](../../../images/clickhouse-ddl/)
 - [Fundamentals](fundamentals.md) · [Materialized views](materialized-views.md) · [Hub](README.md)
 
 ---

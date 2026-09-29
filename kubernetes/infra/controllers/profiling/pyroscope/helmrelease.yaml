@@ -40,6 +40,17 @@ spec:
         log.level: warn
         # Expand ${ACCESS_KEY_ID}/${ACCESS_SECRET_KEY} from the env into the config.
         config.expand-env: "true"
+        # The chart defaults the metastore client to kubernetes:///…, Pyroscope's
+        # vendored kuberesolver, which WATCHES the Endpoints API of the headless
+        # Service -- deprecated since Kubernetes 1.33, and the second caller an
+        # apiserver audit found (2026-09-29). The metastore discovery
+        # (pkg/metastore/discovery/parse.go) accepts only kubernetes:///,
+        # dnssrvnoa+ or a static peer list -- NOT dns:///, which it would take as
+        # a literal peer and never become ready (measured). dnssrvnoa+ on the
+        # gRPC SRV record yields the same raft server IDs kuberesolver builds
+        # (<pod>.<svc>.<ns>.svc.cluster.local.:9095), the same scheme the chart
+        # uses for raft.bootstrap-peers.
+        metastore.address: "dnssrvnoa+_grpc._tcp.pyroscope-headless.$(NAMESPACE_FQDN)"
       extraCustomEnvVars:
         - name: ACCESS_KEY_ID
           valueFrom:

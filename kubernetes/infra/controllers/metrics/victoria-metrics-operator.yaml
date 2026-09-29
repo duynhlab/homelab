@@ -36,6 +36,16 @@ spec:
       # Delete converted VM objects when the original Prometheus objects are deleted
       enable_converter_ownership: true
 
+    # vmagent discovers ServiceMonitor targets through EndpointSlices, not the
+    # Endpoints API (deprecated since Kubernetes 1.33). Without this every
+    # converted VMServiceScrape renders `role: endpoints`, and an apiserver audit
+    # on 2026-09-29 showed vmagent as the only non-control-plane client listing
+    # and watching Endpoints, namespace- and cluster-wide. vmagent's ClusterRole
+    # already grants discovery.k8s.io/endpointslices.
+    env:
+      - name: VM_VMSERVICESCRAPEDEFAULT_ENFORCEENDPOINTSLICES
+        value: "true"
+
     resources:
       requests:
         cpu: 20m

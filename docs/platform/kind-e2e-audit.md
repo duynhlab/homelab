@@ -1386,7 +1386,7 @@ so no compose gate applies · no prior cluster
 | K3 admission/secrets | PASS, with finding 1 | Kyverno 3.9.1 / v1.19.1: 6 ClusterPolicies Ready (1 Enforce), 1 cleanup policy, 2 exceptions (expire 2026-12-31), **0 policy failures**, default-namespace pod rejected; OpenBAO 3/3 unsealed (`awskms`, plugin); 38/38 ExternalSecrets synced; db-isolation **72/72**; edge sweep (manifest) PASS; **kindnet enforces NetworkPolicy** (K3.5 probes) |
 | K4 edge/identity | PASS, with finding 2 | 35/35 HTTPRoutes and 33/33 policies Accepted, Gateway Programmed; k6 saga 4/4 (9/9), smoke 15/15 (50/50), staff 5/5 (59/59), operator 1/1 (26/26), rate limit RL.1/RL.2; browser: storefront sign-in as `alice` over the real edge (15 products, 4 notifications), backoffice sign-in as `duyne` through `duynhlab-staff` (7 nav items, cards rendered, catalog rows) |
 | K5 signals | PASS | smoke telemetry rows green; 78/78 scrape targets up; firing: `Watchdog`, the count-once `CheckoutAvailabilityUnknownSKU` from A21, and three `ticket` slow-burn alerts from the gate's deliberate errors (1h SLI ratio back to 0) — expected, see K5.8 |
-| Platform version | PASS | `ImageVolume` beta **enabled** and `KubeletPSI` on; 6 `container_pressure_*` families × 374 series observed, not adopted; `StrictIPCIDRValidation` is alpha and off on 1.35; deprecated-API requests are Kyverno's own legacy types, the Temporal Worker Controller's only (deprecated) `v1alpha1`, and one `endpoints/v1` caller — none removed in any release |
+| Platform version | PASS | `ImageVolume` beta **enabled** and `KubeletPSI` on; 6 `container_pressure_*` families × 374 series observed, not adopted; `StrictIPCIDRValidation` is alpha and off on 1.35; deprecated-API requests are Kyverno's own legacy types, the Temporal Worker Controller's only (deprecated) `v1alpha1`, and `endpoints/v1` — none removed in any release. A follow-up apiserver audit named the Endpoints clients: vmagent (converted ServiceMonitors rendered `role: endpoints`) and Pyroscope's metastore client (`kubernetes:///`), both moved off it; only the control plane reads Endpoints now, which keeps `apiserver_requested_deprecated_apis{resource="endpoints"}` at 1 |
 | K6 wrap | PASS | `make down` removes cluster and registry |
 
 **Findings:**
@@ -1861,6 +1861,43 @@ kubectl -n temporal exec deploy/temporal-admintools -- \
 
 ---
 
+**Who calls a deprecated API.** `apiserver_requested_deprecated_apis` says an API
+was used, not by whom, and most clients never log the deprecation warning header.
+`apiserver_request_total{resource="…"}` splits it by verb and scope, which
+separates writers (usually the control plane) from informers (LIST/WATCH). To name
+the client, audit only that resource on the Kind API server for a few minutes.
+Restarting the apiserver makes every informer re-LIST, so a short window catches
+them all. Controllers that lose their lease exit and come back through
+CrashLoopBackOff; that is expected, and Flux settles again within minutes.
+
+```bash
+C=homelab-control-plane
+docker exec $C sh -c 'cp /etc/kubernetes/manifests/kube-apiserver.yaml /root/kas.bak
+mkdir -p /etc/kubernetes/audit && cat > /etc/kubernetes/audit/policy.yaml <<EOF
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages: ["RequestReceived"]
+rules:
+  - level: Metadata
+    resources: [{group: "", resources: ["endpoints"]}]   # the API under suspicion
+  - level: None
+EOF'
+# add to the static pod: --audit-policy-file=/etc/kubernetes/audit/policy.yaml,
+# --audit-log-path=/var/log/kubernetes/audit.log, and hostPath mounts for both dirs
+docker exec $C cat /var/log/kubernetes/audit.log | jq -r \
+  '[.user.username, (.userAgent|split(" ")[0]), .verb,
+    (if .objectRef.namespace then "ns" else "cluster" end)] | @tsv' | sort | uniq -c | sort -rn
+# revert: restore /root/kas.bak over the manifest, delete the policy and log dirs
+```
+
+Measured on 2026-09-29 (`endpoints/v1`, Kubernetes 1.35.8):
+
+| Client | Requests | Fix |
+|---|---|---|
+| `monitoring:vmagent-victoria-metrics` | LIST/WATCH, namespace- and cluster-scoped | `VM_VMSERVICESCRAPEDEFAULT_ENFORCEENDPOINTSLICES=true` on the VM operator, so the 35 converted scrapes render `role: endpointslice` |
+| `monitoring:pyroscope` | WATCH `pyroscope-headless` | `metastore.address: dnssrvnoa+_grpc._tcp.pyroscope-headless…` instead of the chart's `kubernetes:///` (the metastore client accepts only `kubernetes:///`, `dnssrvnoa+` or static peers; `dns:///` never became ready) |
+| `endpoint-controller`, `kube-controller-manager`, `system:apiserver` | writes and reads | none: the control plane maintains Endpoints itself |
+
 ## References
 
 - [Compose E2E release audit](../../local-stack/docs/e2e-audit.md) — the twin gate
@@ -1875,4 +1912,4 @@ kubectl -n temporal exec deploy/temporal-admintools -- \
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-09-29 — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_
+_Last updated: 2026-09-29 — Diagnostics: "Who calls a deprecated API" (scoped apiserver audit) with the measured `endpoints/v1` clients and fixes. Earlier the same day — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

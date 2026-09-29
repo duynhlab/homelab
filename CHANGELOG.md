@@ -1165,6 +1165,17 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **Two Job headers no longer blame `force` for re-runs it does not
+  cause.** `openbao-bootstrap` said `kustomize.toolkit.fluxcd.io/force`
+  re-creates a Job on every reconcile and races the unseal;
+  `temporal-search-attributes` repeated it. Flux only re-creates an object
+  when an apply fails on an immutable field: the forced
+  `rustfs-setup-buckets-init` kept its UID across three `--with-source`
+  reconciles. What does re-run the OpenBao Jobs about hourly is
+  `ttlSecondsAfterFinished: 3600` plus Flux re-applying the deleted Job, and
+  that was measured harmless: bootstrap exits "already bootstrapped
+  (revoked)", OIDC config is idempotent, and DB config rewrites the static
+  roles without rotating a password. Comment-only change.
 - **mockpay reports the version it runs.** Its `OTEL_RESOURCE_ATTRIBUTES`
   hard-coded `service.version=2.4.3`, so spans and profiles from the `2.5.0`
   pod carried the old version (seen on the 2026-09-25 Kind gate's Pyroscope

@@ -3,7 +3,7 @@
 This runbook is a focused pointer for `product-db-replica` bootstrap and recovery
 checks. The canonical DRP now lives in [../disaster-recovery.md](../disaster-recovery.md); the CNPG
 technical flow lives in the [disaster recovery plan](../disaster-recovery.md)
-and the PostgreSQL [replication fundamentals](../fundamentals/replication.md).
+and the PostgreSQL [replication and slots chapter](../fundamentals/12-replication-and-slots.md).
 
 ## When to Use
 

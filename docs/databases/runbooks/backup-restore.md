@@ -7,7 +7,7 @@ Reference docs:
 
 - [Database DRP](../disaster-recovery.md)
 - [Backup policy](../backup-policy.md)
-- [Storage and WAL](../fundamentals/storage-and-wal.md)
+- [WAL and checkpoints](../fundamentals/04-wal-and-checkpoints.md)
 - [Database Integration](../architecture.md)
 
 ## Overview
@@ -105,7 +105,7 @@ counts, and application smoke tests before routing traffic or extracting data.
 ### Validate CNPG restore
 
 ```bash
-kubectl exec -it platform-db-restore-1 -n platform -- psql -U auth -d auth -c "\dt"
+kubectl exec -it platform-db-restore-1 -n platform -- psql -U temporal -d temporal -c "\dt"
 kubectl exec -it platform-db-restore-1 -n platform -- psql -U user -d user -c "SELECT count(*) FROM users;"
 ```
 

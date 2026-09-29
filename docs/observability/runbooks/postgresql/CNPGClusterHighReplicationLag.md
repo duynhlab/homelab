@@ -124,7 +124,7 @@ conditions.
 - [CNPGClusterPhysicalReplicationLagWarning](CNPGClusterPhysicalReplicationLagWarning.md)
 - [CNPGClusterPhysicalReplicationLagCritical](CNPGClusterPhysicalReplicationLagCritical.md)
 - [CNPGClusterStandbyNotStreaming](CNPGClusterStandbyNotStreaming.md)
-- [Replication fundamentals](../../../databases/fundamentals/replication.md)
+- [Replication and slots](../../../databases/fundamentals/12-replication-and-slots.md)
 - [Database troubleshooting](../../../databases/observability-and-troubleshooting.md)
 
 ---

@@ -17,23 +17,27 @@ or find the right recovery procedure without mixing those three concerns.
 
 ### Learn PostgreSQL
 
-The [PostgreSQL internals learning path](./fundamentals/README.md) is being
-rebuilt as an explanation-first curriculum grounded in the deployed CNPG
-clusters ([#1137](https://github.com/duynhlab/homelab/issues/1137)): fourteen
-chapters, each with one read-only evidence lab. Its README owns the curriculum
-order, evidence vocabulary, and safety boundary. The pages below remain the
-current material until their absorbing chapter lands.
+The [PostgreSQL internals learning path](./fundamentals/README.md) is an
+explanation-first curriculum grounded in the deployed CNPG clusters
+([#1137](https://github.com/duynhlab/homelab/issues/1137)): fourteen chapters,
+each with one read-only evidence lab. Its README owns the curriculum order,
+evidence vocabulary, glossary, and safety boundary.
 
-1. [Fundamentals overview](./fundamentals/README.md)
-2. [Process and memory](./fundamentals/process-and-memory.md)
-3. [Storage and WAL](./fundamentals/storage-and-wal.md)
-4. [MVCC, locking, and vacuum](./fundamentals/mvcc-locking-and-vacuum.md)
-5. [Query planning and execution](./fundamentals/query-planning-and-execution.md)
-6. [Schema and integrity](./fundamentals/schema-and-integrity.md)
-7. [Indexes and access paths](./fundamentals/indexes-and-access-paths.md)
-8. [Partitioning and retention](./fundamentals/partitioning-and-retention.md)
-9. [Replication](./fundamentals/replication.md)
-10. [Monitoring and performance investigation](./fundamentals/monitoring-and-performance-investigation.md)
+1. [Learning path overview](./fundamentals/README.md)
+2. [Processes and memory](./fundamentals/01-processes-and-memory.md)
+3. [Storage, pages, and tuples](./fundamentals/02-storage-pages-and-tuples.md)
+4. [Buffer manager and I/O](./fundamentals/03-buffer-manager-and-io.md)
+5. [WAL and checkpoints](./fundamentals/04-wal-and-checkpoints.md)
+6. [MVCC and snapshots](./fundamentals/05-mvcc-and-snapshots.md)
+7. [Locking and wait events](./fundamentals/06-locking-and-wait-events.md)
+8. [Vacuum and freezing](./fundamentals/07-vacuum-and-freezing.md)
+9. [Query processing](./fundamentals/08-query-processing.md)
+10. [Indexes and access methods](./fundamentals/09-indexes-and-access-methods.md)
+11. [Schema and integrity](./fundamentals/10-schema-and-integrity.md)
+12. [Partitioning and retention](./fundamentals/11-partitioning-and-retention.md)
+13. [Replication and slots](./fundamentals/12-replication-and-slots.md)
+14. [Backup and PITR](./fundamentals/13-backup-and-pitr.md)
+15. [Monitoring and capacity](./fundamentals/14-monitoring-and-capacity.md)
 
 ### Understand this homelab
 
@@ -126,4 +130,4 @@ this area documents the resulting platform and its operation.
 - [CloudNativePG documentation](https://cloudnative-pg.io/documentation/current/)
 - [PgDog documentation](https://docs.pgdog.dev/)
 
-_Last updated: 2026-09-29 — the Learn path now points at the internals curriculum contract for issue #1137. Previously 2026-09-09 — added the SRE learning and symptom-first troubleshooting paths._
+_Last updated: 2026-09-29 — the Learn path lists the fourteen authored internals chapters; earlier the same day it pointed at the curriculum contract for issue #1137. Previously 2026-09-09 — added the SRE learning and symptom-first troubleshooting paths._

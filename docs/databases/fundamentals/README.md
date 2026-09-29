@@ -7,7 +7,7 @@ cluster.
 
 | Quick facts | |
 |---|---|
-| **Status** | Curriculum contract approved for issue [#1137](https://github.com/duynhlab/homelab/issues/1137); chapters are planned until linked below |
+| **Status** | All 14 chapters authored for issue [#1137](https://github.com/duynhlab/homelab/issues/1137); each chapter's live observation lab is pending verification on the Ubuntu Kind cluster until its observation-context table is filled |
 | **Primary audience** | Platform engineers learning PostgreSQL, from first principles through failure and capacity reasoning |
 | **Page type** | Explanation-first chapters with one embedded, read-only observation lab |
 | **Version baseline** | PostgreSQL 18 (deployed 18.1; record the live minor per observation) |
@@ -31,9 +31,9 @@ the catalog and statistics evidence that confirms or disproves your model.
 
 This directory previously held nine vendor-neutral concept pages under a rule
 that forbade naming the deployment. Issue
-[#1137](https://github.com/duynhlab/homelab/issues/1137) retires that rule:
-each chapter below absorbs its predecessor pages and grounds the same concepts
-in the deployed CNPG clusters, their manifests, and live evidence.
+[#1137](https://github.com/duynhlab/homelab/issues/1137) retired that rule: the
+chapters below absorbed those pages and ground the same concepts in the
+deployed CNPG clusters, their manifests, and live evidence.
 
 ## Audience and prerequisites
 
@@ -71,25 +71,24 @@ Read the mechanism first, then use the observation to test it.
 ## Curriculum
 
 A linked title is part of the published learning path; an unlinked title is
-planned. When a chapter is published, the pages it absorbs are deleted and
-every inbound link is repointed in the same pull request.
+planned. The Absorbed column records which retired page each chapter replaced.
 
-| # | Planned chapter | Owning question | Absorbs | Depends on |
+| # | Chapter | Owning question | Absorbed | Depends on |
 |---:|---|---|---|---|
-| 1 | `01-processes-and-memory.md` | Which processes run inside a CNPG instance, and how is memory divided? | [Processes and memory](process-and-memory.md) | Databases hub |
-| 2 | `02-storage-pages-and-tuples.md` | Where does a row physically live on disk? | storage half of [Storage and WAL](storage-and-wal.md) | 01 |
-| 3 | `03-buffer-manager-and-io.md` | How does an 8 KiB page travel between disk and RAM? | (new) | 01–02 |
-| 4 | `04-wal-and-checkpoints.md` | What makes a commit durable? | WAL half of [Storage and WAL](storage-and-wal.md) | 02–03 |
-| 5 | `05-mvcc-and-snapshots.md` | How do two transactions see different data at once? | MVCC part of [MVCC, locking, and vacuum](mvcc-locking-and-vacuum.md) | 02 |
-| 6 | `06-locking-and-wait-events.md` | Who is blocking whom, and which evidence proves it? | locking part of [MVCC, locking, and vacuum](mvcc-locking-and-vacuum.md); blocking chains from [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 05 |
-| 7 | `07-vacuum-and-freezing.md` | Why does vacuum exist, and when does it lose? | vacuum part of [MVCC, locking, and vacuum](mvcc-locking-and-vacuum.md); vacuum pressure from [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 05 |
-| 8 | `08-query-processing.md` | How does SQL become a plan and then rows? | [Query planning and execution](query-planning-and-execution.md); plan investigation from [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 03, 05 |
-| 9 | `09-indexes-and-access-methods.md` | How does a B-tree find — and punish — you? | [Indexes and access paths](indexes-and-access-paths.md) | 02, 08 |
-| 10 | `10-schema-and-integrity.md` | Which constraint is enforced where, and which migration is safe? | [Schema and integrity](schema-and-integrity.md) | 06, 09 |
-| 11 | `11-partitioning-and-retention.md` | What does partitioning buy, and at what price? | [Partitioning and retention](partitioning-and-retention.md) | 09–10 |
-| 12 | `12-replication-and-slots.md` | How do standbys converge, and how do slots hold WAL hostage? | [Replication](replication.md) | 04 |
-| 13 | `13-backup-and-pitr.md` | How does the engine restore to a point in time? | (new; recovery notes from [Storage and WAL](storage-and-wal.md)) | 04, 12 |
-| 14 | `14-monitoring-and-capacity.md` | What do you measure to name the failing layer? | [Monitoring and performance investigation](monitoring-and-performance-investigation.md) | 01–13 |
+| 1 | [Processes and memory](01-processes-and-memory.md) | Which processes run inside a CNPG instance, and how is memory divided? | `process-and-memory.md` | Databases hub |
+| 2 | [Storage, pages, and tuples](02-storage-pages-and-tuples.md) | Where does a row physically live on disk? | storage half of `storage-and-wal.md` | 01 |
+| 3 | [Buffer manager and I/O](03-buffer-manager-and-io.md) | How does an 8 KiB page travel between disk and RAM? | (new) | 01–02 |
+| 4 | [WAL and checkpoints](04-wal-and-checkpoints.md) | What makes a commit durable? | WAL half of `storage-and-wal.md` | 02–03 |
+| 5 | [MVCC and snapshots](05-mvcc-and-snapshots.md) | How do two transactions see different data at once? | MVCC part of `mvcc-locking-and-vacuum.md` | 02 |
+| 6 | [Locking and wait events](06-locking-and-wait-events.md) | Who is blocking whom, and which evidence proves it? | locking part of `mvcc-locking-and-vacuum.md`; blocking chains from `monitoring-and-performance-investigation.md` | 05 |
+| 7 | [Vacuum and freezing](07-vacuum-and-freezing.md) | Why does vacuum exist, and when does it lose? | vacuum part of `mvcc-locking-and-vacuum.md`; vacuum pressure from `monitoring-and-performance-investigation.md` | 05 |
+| 8 | [Query processing](08-query-processing.md) | How does SQL become a plan and then rows? | `query-planning-and-execution.md`; plan investigation from `monitoring-and-performance-investigation.md` | 03, 05 |
+| 9 | [Indexes and access methods](09-indexes-and-access-methods.md) | How does a B-tree find — and punish — you? | `indexes-and-access-paths.md` | 02, 08 |
+| 10 | [Schema and integrity](10-schema-and-integrity.md) | Which constraint is enforced where, and which migration is safe? | `schema-and-integrity.md` | 06, 09 |
+| 11 | [Partitioning and retention](11-partitioning-and-retention.md) | What does partitioning buy, and at what price? | `partitioning-and-retention.md` | 09–10 |
+| 12 | [Replication and slots](12-replication-and-slots.md) | How do standbys converge, and how do slots hold WAL hostage? | `replication.md` | 04 |
+| 13 | [Backup and PITR](13-backup-and-pitr.md) | How does the engine restore to a point in time? | (new; recovery notes from `storage-and-wal.md`) | 04, 12 |
+| 14 | [Monitoring and capacity](14-monitoring-and-capacity.md) | What do you measure to name the failing layer? | `monitoring-and-performance-investigation.md` | 01–13 |
 
 The sequence is deliberate: processes → storage → buffers → WAL → MVCC →
 locks → vacuum → queries → indexes → schema → partitioning → replication →
@@ -202,7 +201,8 @@ teach-back gate pass the template's review checklist.
 - [Diátaxis documentation framework](https://diataxis.fr/)
 
 ---
-_Last updated: 2026-09-29 — rewrote this page as the curriculum contract for
-issue #1137: fourteen planned chapters, evidence vocabulary, shared glossary,
-and the read-only safety boundary. The previous vendor-neutral boundary rule is
-retired; the nine existing pages remain until their absorbing chapter lands._
+_Last updated: 2026-09-29 — linked all fourteen authored chapters into the
+curriculum and retired the nine absorbed pages; live observation labs remain
+pending verification on the Ubuntu Kind cluster. Earlier the same day — rewrote
+this page as the curriculum contract for issue #1137 (evidence vocabulary,
+shared glossary, read-only safety boundary)._

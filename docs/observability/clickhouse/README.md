@@ -76,7 +76,7 @@ or for the primary observability stack.
 8. **Hands-on** — [Playground](#playground--mergetree-by-hand)
 9. **Lookup** — [Glossary](#glossary) · [FAQ](#faq)
 
-Pair with the PostgreSQL [storage and WAL fundamentals](../../databases/fundamentals/storage-and-wal.md)
+Pair with the PostgreSQL [WAL and checkpoints chapter](../../databases/fundamentals/04-wal-and-checkpoints.md)
 if you already know Postgres heap / WAL / B-tree.
 
 ---

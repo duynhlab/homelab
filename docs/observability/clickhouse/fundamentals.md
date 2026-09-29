@@ -367,7 +367,7 @@ Connect commands: [Playground](README.md#playground--mergetree-by-hand).
 - [MergeTree](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree)
 - [Choosing a primary key](https://clickhouse.com/docs/best-practices/choosing-a-primary-key)
 - Platform: [ClickHouse hub](README.md) · [schema-and-queries](schema-and-queries.md) · [materialized views](materialized-views.md)
-- Postgres contrast: [storage and WAL](../../databases/fundamentals/storage-and-wal.md)
+- Postgres contrast: [WAL and checkpoints](../../databases/fundamentals/04-wal-and-checkpoints.md)
 
 ---
 

@@ -661,6 +661,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The PostgreSQL internals learning path is authored: fourteen
+  explanation-first chapters from processes through capacity**
+  ([#1137](https://github.com/duynhlab/homelab/issues/1137)). Each chapter
+  follows the Phase-0 contract — mental model, engine mechanism grounded in the
+  PostgreSQL 18 documentation, deployed CNPG evidence with class labels, one
+  bounded read-only lab entered via `kubectl cnpg psql`, failure reasoning, and
+  teach-back. The nine former fundamentals pages are absorbed and retired, and
+  every inbound link is repointed to the owning chapter. Live observation labs
+  ship with pending-verification placeholders until their evidence is captured
+  on the Ubuntu Kind cluster.
 - **PostgreSQL internals now has a curriculum contract before chapter work
   starts** ([#1137](https://github.com/duynhlab/homelab/issues/1137)). The
   fundamentals hub is rewritten as the learning contract: fourteen planned

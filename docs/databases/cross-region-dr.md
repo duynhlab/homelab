@@ -112,7 +112,7 @@ write. RPO in region B is therefore bounded by object-replication lag on top of
 
 - [disaster-recovery.md](./disaster-recovery.md) — parent DRP, "separate failure domain" baseline.
 - [Disaster recovery plan](./disaster-recovery.md) — current recovery topology and decision paths.
-- [Replication fundamentals](./fundamentals/replication.md) — sync vs async replication and cascading behavior.
+- [Replication and slots](./fundamentals/12-replication-and-slots.md) — sync vs async replication and slot behavior.
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — the promotion drill that validates this.
 
 ---

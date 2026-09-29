@@ -68,7 +68,7 @@ docs/
 │   ├── reliability-targets.md    # RPO/RTO targets and evidence
 │   ├── poolers.md                # Current PgBouncer and PgDog inventory
 │   ├── extensions.md             # Current extension policy and inventory
-│   ├── fundamentals/             # Vendor-neutral PostgreSQL learning path
+│   ├── fundamentals/             # PostgreSQL 18 internals learning path (14 chapters, CNPG-grounded)
 │   ├── observability-and-troubleshooting.md # Symptom-to-runbook SRE map
 │   ├── runbooks/                 # Current task-focused procedures
 │   └── reference/                # Comparisons and historical learning notes
@@ -446,7 +446,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Cross-Region / Cross-Zone DR](./databases/cross-region-dr.md) - Planned roadmap to independent failure domains
 - [Declarative Role & Database Management](./databases/declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
 - [PostgreSQL Further Reading](./databases/reference/further-reading.md) - Curated external references
-- [PostgreSQL Internals](./databases/fundamentals/README.md) - Vendor-neutral SRE path from processes and storage to schema, indexes, replication, and investigation
+- [PostgreSQL internals learning path](./databases/fundamentals/README.md) - Fourteen explanation-first chapters from processes through capacity, grounded in the deployed CNPG clusters with read-only evidence labs
 - [PostgreSQL observability and troubleshooting](./databases/observability-and-troubleshooting.md) - Symptom-to-evidence-to-runbook map
 
 ### Caching
@@ -532,7 +532,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-09-29 — **RFC-0033** is provisional: its human-gated control-loop
+_Last updated: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — **RFC-0033** is provisional: its human-gated control-loop
 proposal and Documentation Steward design are linked from the learning path; no runtime
 component is installed. The index contains 31 RFC records and 77 ADRs. Previously
 2026-09-25 — RFC-0033 research introduced the executable learning and knowledge plane.

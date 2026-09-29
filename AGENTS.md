@@ -140,6 +140,22 @@ Every manifest applied to the cluster must satisfy admission:
 - **Add a service:** declare its namespace in `kubernetes/infra/controllers/namespaces.yaml` (with `platform.duynhlab.dev/tier: app`; that file is the only owner, and the domain templates render no Namespace), then create `kubernetes/apps/services/<name>.yaml` (`ResourceSetInputProvider`, label `platform.duynhlab.dev/domain: <domain>`); the domain ResourceSet auto-discovers it. `make validate && make sync`. Guide: [`docs/platform/application-delivery.md`](docs/platform/application-delivery.md).
 - **Demo creds:** `alice` / `password123` — login by `username`, not email.
 
+## Contribution workflow
+
+**Commits**
+
+- **No attribution trailers** (`Signed-off-by`, `Co-authored-by`, `Assisted-by`,
+  `Generated-by`, etc.).
+- **Subject:** ≤50 chars, capitalised, imperative, no trailing period.
+- **Body:** what + why, wrap 72; no `Fixes #123` or @-mentions in commits.
+
+**Branches**
+
+- **Never push to `main`.** Branch → PR → squash-merge.
+- Prefix: `feat/` `fix/` `chore/` `docs/` `refactor/` `ci/`.
+- `git config user.email` = duynhlab identity; **`gh auth switch --user duynhne`**
+  for PRs.
+
 ## Docs conventions
 
 Docs are a first-class deliverable in this repo. When writing or refactoring them:

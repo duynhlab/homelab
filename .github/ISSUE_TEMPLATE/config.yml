@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Propose a substantial platform change (RFC process)
+    url: https://github.com/duynhlab/homelab/blob/main/docs/proposals/rfc/README.md
+    about: Start with the research-first RFC process; an issue does not reserve an RFC number or approve implementation.

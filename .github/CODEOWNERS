@@ -1,0 +1,8 @@
+# The CODEOWNERS file assigns reviewers for repository paths.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for repository content.
+* @duyhenryer
+
+# Keep ownership of this policy explicit if repository rules become more specific.
+/.github/CODEOWNERS @duyhenryer

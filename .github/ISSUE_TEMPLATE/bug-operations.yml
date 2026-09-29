@@ -1,0 +1,45 @@
+name: Bug or operational problem
+description: Report a failure in GitOps, cluster infrastructure, observability, databases, or local-stack.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share enough detail to reproduce or diagnose the problem. Redact credentials, tokens, and personal data.
+  - type: textarea
+    id: observed
+    attributes:
+      label: What happened?
+      description: Include the affected component and the visible symptom.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and scope
+      description: Which cluster, environment, services, or users are affected? When did it start?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps or checks to reproduce
+      description: Include commands and query output when available. Keep destructive actions out of the report unless already approved and performed.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and related links
+      description: Add redacted logs, events, screenshots, manifests, dashboards, or related issues.
+    validations:
+      required: false

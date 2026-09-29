@@ -1,6 +1,6 @@
-# Core GitHub labels managed by .github/workflows/sync-labels.yml.
-# Automation-owned labels (for example size/* and review labels) stay outside
-# this file; delete-other-labels remains false so label-sync preserves them.
+# Repository-owned labels managed by .github/workflows/sync-labels.yml.
+# GitHub defaults and automation-owned labels (for example size/* and review
+# labels) stay outside this file; delete-other-labels remains false.
 
 - name: bug
   description: Something isn't working
@@ -17,3 +17,72 @@
 - name: github-actions
   description: Pull requests that update GitHub Actions workflows
   color: '#A3E89A'
+- name: task
+  description: Planned maintenance or operational work with a clear completion check
+  color: '#1d76db'
+- name: hold
+  description: Issues and pull requests intentionally paused
+  color: '#ff0000'
+- name: blocked/upstream
+  description: Blocked by an upstream dependency or issue
+  color: '#ff5700'
+- name: blocked/requires-rfc
+  description: Needs the repository RFC research and approval process before implementation
+  color: '#ff8c00'
+- name: umbrella-issue
+  description: Tracks a larger effort made up of multiple issues or workstreams
+  color: '#c45dac'
+- name: area/gitops
+  description: Flux Operator, FluxInstance, and cluster Kustomization chain
+  color: '#86efc9'
+- name: area/git
+  description: GitRepository and Git-based source configuration
+  color: '#863faf'
+- name: area/oci
+  description: OCI artifact registry and OCI-based sources
+  color: '#c739ff'
+- name: area/kustomization
+  description: Kustomize overlays and Kustomization resources
+  color: '#00e54d'
+- name: area/helm
+  description: HelmRelease and Helm chart configuration
+  color: '#1673b6'
+- name: area/apps
+  description: Application delivery, ResourceSets, InputProviders, and service manifests
+  color: '#06b6d4'
+- name: area/platform
+  description: Platform infrastructure, gateway, security policy, and setup
+  color: '#7c3aed'
+- name: area/terraform
+  description: OpenTofu bootstrap and Terraform modules
+  color: '#7B42BC'
+- name: area/local-stack
+  description: Docker Compose local-stack and end-to-end audit
+  color: '#64748b'
+- name: area/databases
+  description: CloudNativePG, PgDog, database manifests, and runbooks
+  color: '#22c55e'
+- name: area/secrets
+  description: OpenBAO, External Secrets Operator, and secret bootstrap
+  color: '#f59e0b'
+- name: area/security
+  description: Kyverno policies, NetworkPolicy, and security docs
+  color: '#e54d16'
+- name: area/observability
+  description: Traces, logs, profiles, SLOs, and cross-signal observability
+  color: '#0c8599'
+- name: area/monitoring
+  description: Metrics, VictoriaMetrics, Grafana dashboards, and alerting rules
+  color: '#dd75ae'
+- name: area/docs
+  description: Documentation related issues and pull requests
+  color: '#0075ca'
+- name: area/ci
+  description: CI workflows, scripts, and validation tooling
+  color: '#f7cc45'
+- name: area/rfc
+  description: Feature request proposals following the RFC process
+  color: '#D621C3'
+- name: area/adr
+  description: Architecture Decision Records
+  color: '#9c36b5'

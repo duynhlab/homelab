@@ -1,0 +1,39 @@
+name: Documentation or research request
+description: Request a documentation improvement, learning guide, or evidence-based research task.
+title: "docs: "
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Repository documentation is written in English. Link existing docs and distinguish deployed facts from planned or reference material.
+  - type: textarea
+    id: audience
+    attributes:
+      label: Audience and learning goal
+      description: Who will use the result, and what should they be able to understand or do?
+    validations:
+      required: true
+  - type: textarea
+    id: questions
+    attributes:
+      label: Questions to answer
+      description: List the concrete questions or knowledge gaps this work should address.
+    validations:
+      required: true
+  - type: textarea
+    id: existing
+    attributes:
+      label: Existing material and evidence
+      description: Link relevant repository docs, manifests, live evidence, or authoritative references.
+    validations:
+      required: false
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Expected deliverables and acceptance criteria
+      description: Describe the expected pages, diagrams, links, and review checks.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true

@@ -7,8 +7,9 @@ VictoriaLogs by **two complementary paths**: instrumented Go services ship over
 **OTLP** (otelzap → OpenTelemetry Collector), and everything not OTel-instrumented
 (databases, the frontend, system pods, the edge's *runtime* lines) is tailed by
 **Vector**. Both land in **VictoriaLogs**, queryable with LogsQL and correlated
-to traces by `trace_id`. The app-log OTLP path additionally writes to
-**ClickHouse** `otel_logs` — a second store on purpose, for 90-day SQL
+to traces by `trace_id`. Both paths additionally write to **ClickHouse**
+`otel_logs` (Vector's since 2026-09-29, through the collector's `otlp/vector`
+receiver) — a second store on purpose, for 90-day SQL
 ([ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)); see
 [ClickHouse](../clickhouse/README.md). The one stream that does **not** follow
 this shape is the edge's **access log**: it is ClickHouse-**only**
@@ -58,9 +59,12 @@ The platform has **two log paths**, and the OTLP one lands in **two stores**:
   dedicated Vector source tails the proxy pods again for their **runtime lines
   only** — access-log JSON is filtered out because it travels the OTLP road.
 
-VictoriaLogs is the **ops** log backend and the only one Vector writes to (Loki was
-removed). It is **not** the only log store: the collector's `logs` pipeline also exports to
-ClickHouse `otel_logs`, which keeps 90 days for SQL while VictoriaLogs keeps 7 for LogsQL.
+VictoriaLogs is the **ops** log backend (Loki was removed). It is **not** the only log
+store: ClickHouse `otel_logs` keeps 90 days for SQL while VictoriaLogs keeps 7 for LogsQL.
+The collector's `logs/clickhouse` pipeline writes the OTLP app logs there, and since
+2026-09-29 Vector sends the same lines it gives VictoriaLogs to the collector's
+`otlp/vector` receiver, which feeds a ClickHouse-only `logs/vector` pipeline
+([vector.md](vector.md#sinks)).
 Application logs preserve `trace_id`, so they join directly to distributed traces. Infrastructure
 logs normally correlate by namespace, pod, and time unless their source also
 emits a trace ID.
@@ -302,7 +306,7 @@ blank-Grafana-panel case in
 
 ---
 
-_Last updated: 2026-08-25 — ADR-061 routes the edge's logs by class: the access
+_Last updated: 2026-09-29 — Vector's lines also reach ClickHouse `otel_logs` (second path via `otlp/vector`). Previously 2026-08-25 — ADR-061 routes the edge's logs by class: the access
 log is now **ClickHouse-only** (filtered out of the VictoriaLogs pipeline — it was
 an attributes-only record LogsQL free-text could never see, and the noisiest OTLP
 stream), while the proxy's **runtime** lines — previously collected nowhere — reach

@@ -188,7 +188,7 @@ packages are the contract for new and migrated code. Details:
 
 ### End-to-End Request with APM
 
-Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching VictoriaTraces and ClickHouse, app logs are teed to OTLP (Vector still ships the non-instrumented pods), and app metrics are pushed over OTLP (SDK → OTel Collector → VMAgent OTLP ingest → VMSingle) — VMAgent still scrapes the infra exporters (kube-state, cAdvisor, pg_exporter, …).
+Tracing and profiling are out-of-band: spans go through the OTel Collector before reaching VictoriaTraces and ClickHouse, app logs are teed to OTLP (Vector still ships the non-instrumented pods, to VictoriaLogs and — through the collector's `otlp/vector` receiver — to ClickHouse), and app metrics are pushed over OTLP (SDK → OTel Collector → VMAgent OTLP ingest → VMSingle) — VMAgent still scrapes the infra exporters (kube-state, cAdvisor, pg_exporter, …).
 
 ```mermaid
 sequenceDiagram
@@ -514,6 +514,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
+_Last updated: 2026-09-29 — the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
 Deployment (Flux waves + the gate that releases each one, and why the two
 ClickHouse waves omit `wait`)._

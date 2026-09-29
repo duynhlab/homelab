@@ -1086,6 +1086,24 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Service namespaces now have one owner: `namespaces.yaml`.**
+  - This is step 2 of the `deny-all-ingress` fix: the five domain ResourceSet
+    templates no longer render a Namespace. Step 1 had put
+    `fluxcd.controlplane.io/prune: disabled` on the live objects, so removing it
+    left the namespaces in place.
+  - The dead `platform_backup_label` input is gone. `order`'s `backup: cnpg`,
+    which only that input set, moves to `namespaces.yaml`.
+  - `make validate` now fails when a service namespace is missing from
+    `namespaces.yaml`, lacks `tier: app`, or a domain template renders a
+    Namespace again. Both failure paths were tested.
+  - Measured on Kind:
+    - 5/5 ResourceSets Ready, with no Namespace left in their inventories.
+    - `cart` kept its UID.
+    - 12/12 deny-alls and 10/10 labels held through two reconcile rounds.
+    - `order`'s `pg-backup-rustfs-cnpg` stayed synced.
+  - The onboarding docs and AGENTS.md now say to declare a new service's
+    namespace in `namespaces.yaml`.
+
 - **App namespaces no longer lose their generated `deny-all-ingress`.**
   - **Cause:** each of the 10 service namespaces had two owners.
     `namespaces.yaml` (`controllers-local`) creates it with

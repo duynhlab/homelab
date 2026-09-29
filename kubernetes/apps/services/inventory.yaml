@@ -50,9 +50,6 @@ spec:
     # pairs belong in the manifest rather than in compiled defaults.
     authmw: true
     staffauthmw: true
-    # No platform_backup_label: that label routes CNPG/barman S3 credentials to
-    # namespaces hosting a database cluster — inventory's data lives on
-    # product-db in the product namespace, which is already backed up.
     replicaCount: 1
     # Runtime through the PgDog pooler (house pattern, RFC-0020 target: all
     # app→DB via pooler); migrations go direct to CNPG (product-db-rw) like

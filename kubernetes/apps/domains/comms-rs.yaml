@@ -10,26 +10,6 @@ spec:
         matchLabels:
           platform.duynhlab.dev/domain: comms
   resourcesTemplate: |
-    apiVersion: v1
-    kind: Namespace
-    metadata:
-      name: << inputs.namespace >>
-      # namespaces.yaml (controllers-local) creates this namespace first and
-      # is meant to own it. Until this copy is removed, it must carry the same
-      # labels: whenever flux-operator applies it, SSA takes over the object
-      # and deletes any label missing here -- losing `tier: app` made Kyverno
-      # delete the generated deny-all-ingress (measured 2026-09-29).
-      # prune: disabled lets the copy be dropped later without the operator
-      # garbage-collecting the namespace.
-      annotations:
-        fluxcd.controlplane.io/prune: disabled
-      labels:
-        environment: local
-        platform.duynhlab.dev/tier: app
-        <<- if (index inputs "platform_backup_label") >>
-        platform.duynhlab/backup: << index inputs "platform_backup_label" | quote >>
-        <<- end >>
-    ---
     apiVersion: helm.toolkit.fluxcd.io/v2
     kind: HelmRelease
     metadata:

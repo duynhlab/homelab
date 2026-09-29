@@ -67,10 +67,19 @@ spec:
             value: 0
       validate:
         message: "Containers must declare both livenessProbe and readinessProbe."
+        # `periodSeconds: ">0"` is how a pattern says "this probe exists": the
+        # apiserver defaults periodSeconds to 10 on every probe it stores, so a
+        # present probe always matches and a missing one never does. It used to
+        # read `"<(periodSeconds)": 300` -- a GLOBAL anchor, which is a condition
+        # ("apply this rule only where periodSeconds is 300"), not an assertion.
+        # No pod runs a 300s period, so every compliant pod was `skip`ped, and
+        # skips never reach a PolicyReport: the cluster showed zero results for
+        # this policy in all ten namespaces (measured 2026-09-29). A missing
+        # probe still failed, which is why nothing looked broken.
         foreach:
           - list: "request.object.spec.containers"
             pattern:
               livenessProbe:
-                "<(periodSeconds)": 300
+                periodSeconds: ">0"
               readinessProbe:
-                "<(periodSeconds)": 300
+                periodSeconds: ">0"

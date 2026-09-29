@@ -37,3 +37,9 @@ results:
     resources:
       - product/rs-owned-readiness-missing
     result: fail
+  - policy: require-probes
+    rule: validate-probes
+    kind: Pod
+    resources:
+      - product/rs-owned-sidecar-without-probes
+    result: fail

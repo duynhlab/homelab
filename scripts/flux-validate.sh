@@ -358,8 +358,19 @@ validate_kyverno_policies() {
     exit 1
   fi
   echo "INFO - Running $count Kyverno policy test suite(s)"
-  if ! kyverno test "$dir"; then
+  local out
+  if ! out=$(kyverno test "$dir" --detailed-results 2>&1); then
+    echo "$out"
     echo "ERROR - Kyverno policy tests failed" >&2
+    exit 1
+  fi
+  # `kyverno test` scores an expected `pass` as met when the rule was EXCLUDED
+  # (a global anchor that did not match), so a policy that skips every
+  # compliant resource still reads 100% green. require-probes did exactly that
+  # until 2026-09-29. No fixture here expects an exclusion, so any is a bug.
+  if grep -q "Excluded" <<<"$out"; then
+    grep "Excluded" <<<"$out" >&2
+    echo "ERROR - a Kyverno test result was Excluded, not evaluated: a pattern anchor is acting as a condition" >&2
     exit 1
   fi
   echo "INFO - Kyverno policy tests passed"

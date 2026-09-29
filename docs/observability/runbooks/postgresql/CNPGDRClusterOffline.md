@@ -82,10 +82,10 @@ kubectl -n product get pods -l cnpg.io/cluster=product-db-replica
 flux get kustomization databases-cnpg-dr-local -n flux-system
 ```
 
-- The CNPG Cluster is healthy with 3/3 instances.
-- One designated primary remains in recovery from `product-db-primary`; two
-  cascading instances are healthy.
-- `cnpg_collector_up{cnpg_io_cluster="product-db-replica"}` has three series.
+- The CNPG Cluster is healthy with 1/1 instances (a single designated primary
+  since 2026-09-29).
+- The designated primary remains in recovery from `product-db-primary`.
+- `cnpg_collector_up{cnpg_io_cluster="product-db-replica"}` has one series.
 - `databases-cnpg-dr-local` is `Ready=True`.
 - The alert is inactive after the five-minute window clears.
 
@@ -104,5 +104,5 @@ restored; application health alone does not close it.
 
 ---
 
-_Last updated: 2026-09-14 — added explicit coverage for complete DR-cluster
+_Last updated: 2026-09-29 — expected state is 1/1 instance (DR cluster down from 3). Earlier: 2026-09-14 — added explicit coverage for complete DR-cluster
 absence and separated it from standby-streaming failures._

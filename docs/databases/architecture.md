@@ -33,7 +33,7 @@ flowchart TB
     PgDog["PgDog<br/>pgdog-product :6432"]
     Platform[("platform-db<br/>3 instances")]
     Product[("product-db<br/>3 instances")]
-    DR[("product-db-replica<br/>3 instances")]
+    DR[("product-db-replica<br/>1 instance")]
     Store[("RustFS object storage")]
 
     CNPG --> Platform
@@ -136,4 +136,4 @@ services, not by the infrastructure manifests.
 - [CloudNativePG 1.30 service management](https://cloudnative-pg.io/docs/1.30/service_management/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 
-_Last updated: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._
+_Last updated: 2026-09-29 — DR cluster `product-db-replica` down to 1 instance (3 on promotion). Earlier: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._

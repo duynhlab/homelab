@@ -1,19 +1,22 @@
 # DR Replica Cluster (CloudNativePG)
-# Designated primary (instance 1) continuously recovering from the product-db WAL
-# archive, with two cascading standbys. Promotable to standalone primary for DR.
+# A single designated primary continuously recovering from the product-db WAL
+# archive. Promotable to standalone primary for DR.
 #
-# Why 3 instances and not 1: promotion is the moment the cluster stops being a
-# spare and becomes the system of record. At 1 instance the promoted cluster is a
-# single point of failure with no quorum -- HA would have to be built during the
-# incident. The standbys cascade from the designated primary and cost only local
-# replication.
+# Why 1 instance (it was 3 from 2026-09-01 to 2026-09-29): on the Kind host the
+# three standbys each ran restore_command against RustFS every few seconds, and
+# every attempt forks the manager plus a Python barman-cloud-wal-restore, so the
+# spare cost more CPU than the serving cluster. The owner chose 1 (2026-09-29).
+# Accepted trade-off: once PROMOTED this cluster is a single point of failure
+# with no quorum. Promotion therefore includes raising `instances` back to 3
+# (see docs/databases/runbooks/cnpg-dr-replica-bootstrap.md); CNPG adds the two
+# standbys from the new primary.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: product-db-replica
   namespace: product
 spec:
-  instances: 3
+  instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
 
   plugins:

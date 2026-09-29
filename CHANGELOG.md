@@ -5949,6 +5949,20 @@ Skeleton (copy what you need):
   running.
 
 
+### Performance
+
+#### Databases
+
+- **The DR cluster `product-db-replica` runs one instance, not three.** Each
+  standby ran `restore_command` against RustFS every few seconds, and every
+  attempt forks the CNPG manager plus a Python `barman-cloud-wal-restore`, so
+  on the Kind host the spare cost more CPU than the serving cluster (bursts of
+  ~1100% on a single `wal-restore`). One designated primary keeps the recovery
+  layer, the promotion target and `CNPGDRClusterOffline` quiet. Accepted
+  trade-off: a promoted cluster would be a single point of failure, so the
+  bootstrap runbook's promotion step now raises `instances` back to 3. Docs,
+  runbooks and the `databases/topology` Draw.io view updated.
+
 ## [0.110.0] - 2026-08-07
 
 <!-- markdown-link-check-disable -->

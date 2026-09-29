@@ -61,8 +61,8 @@ Expected:
 
 - `product-db` has a recent completed backup.
 - `product-db` reports `ContinuousArchiving=True`.
-- `product-db-replica` reaches healthy state with three ready pods (designated
-  primary plus two cascading standbys).
+- `product-db-replica` reaches healthy state with one ready pod (the designated
+  primary; the cluster runs a single instance since 2026-09-29).
 
 ## Common Failure Points
 
@@ -146,9 +146,8 @@ Record the change/incident ID and obtain database-owner approval first.
    flux get kustomization databases-cnpg-dr-local -n flux-system
    ```
 
-   Confirm the designated primary is still in recovery, the two cascading
-   replicas are healthy, the replay timestamp advances, and the new daily backup
-   can write under the rotated identity.
+   Confirm the designated primary is still in recovery, the replay timestamp
+   advances, and the new daily backup can write under the rotated identity.
 
 The old generation becomes an intentional orphan. Inventory and remove it only
 through a separate object-store cleanup change after its recovery window and
@@ -168,6 +167,12 @@ Promotion semantics: the replica **cluster** transitions via
 into a replica requires destroying the cluster and re-bootstrapping (re-cloning)
 from the then-current primary.
 
+**Raise `instances` to 3 in the same promotion change.** The DR cluster runs a
+single instance to keep the spare cheap (2026-09-29), so a promoted cluster
+would otherwise be a single point of failure with no quorum. CNPG adds the two
+standbys by streaming from the new primary; they do not need the object store.
+
 ---
-_Last updated: 2026-09-14 — documented the owner-approved Barman `serverName`
+_Last updated: 2026-09-29 — the DR cluster runs one instance; promotion raises
+it back to 3. 2026-09-14 — documented the owner-approved Barman `serverName`
 rotation required before a DR re-clone and corrected the stale WAL-only claim._

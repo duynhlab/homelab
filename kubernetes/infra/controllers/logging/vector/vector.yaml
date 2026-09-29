@@ -1,5 +1,6 @@
 # Vector Agent HelmRelease
-# Ships Kubernetes logs to VictoriaLogs
+# Ships Kubernetes logs to VictoriaLogs, and the same logs to ClickHouse (otel_logs)
+# through the collector's otlp/vector receiver
 # Includes PostgreSQL auto_explain parsing pipeline for CloudNativePG clusters
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -171,6 +172,71 @@ spec:
               if aerr == null {
                 . = merge(., object!(access))
               }
+            }
+
+        # ----------------------------------------------------------------------
+        # Transform: to_otlp -- the same pod logs, shaped as OTLP for ClickHouse
+        # ----------------------------------------------------------------------
+        # Everything add_labels sends to VictoriaLogs also goes to otel_logs in
+        # ClickHouse, through the collector's dedicated otlp/vector receiver
+        # (sink otel_clickhouse below). The opentelemetry sink's `otlp` codec
+        # needs the event in OTLP's own shape, which is what this builds.
+        # OpenBao audit lines (JSON with type request|response) get their main
+        # fields as attributes; the full record stays in the body.
+        to_otlp:
+          type: remap
+          inputs:
+            - add_labels
+          source: |
+            labels = object(.kubernetes.pod_labels) ?? {}
+            # string(), not to_string(): to_string(null) is "" and would stop the
+            # fallback chain at the first missing label.
+            svc = string(labels."app.kubernetes.io/name") ?? string(labels."app") ?? string(.container_name) ?? "unknown"
+            msg = to_string(.message) ?? encode_json(.message)
+            now_ns = to_unix_timestamp(now(), unit: "nanoseconds")
+            ts_ns = now_ns
+            if is_timestamp(.timestamp) {
+              ts_ns = to_unix_timestamp!(.timestamp, unit: "nanoseconds")
+            }
+            sev = upcase(to_string(.level) ?? "")
+
+            attrs = [
+              {"key": "log.iostream", "value": {"stringValue": to_string(.stream) ?? "stdout"}},
+              {"key": "log.source", "value": {"stringValue": "vector"}}
+            ]
+            if .namespace == "openbao" {
+              a, err = parse_json(msg)
+              if err == null && is_object(a) && includes(["request", "response"], a.type) {
+                sev = "INFO"
+                attrs = push(attrs, {"key": "event.name", "value": {"stringValue": "openbao.audit." + string!(a.type)}})
+                attrs = push(attrs, {"key": "openbao.request.path", "value": {"stringValue": to_string(a.request.path) ?? ""}})
+                attrs = push(attrs, {"key": "openbao.request.operation", "value": {"stringValue": to_string(a.request.operation) ?? ""}})
+                attrs = push(attrs, {"key": "openbao.request.mount_type", "value": {"stringValue": to_string(a.request.mount_type) ?? ""}})
+                attrs = push(attrs, {"key": "openbao.auth.display_name", "value": {"stringValue": to_string(a.auth.display_name) ?? ""}})
+                attrs = push(attrs, {"key": "openbao.error", "value": {"stringValue": to_string(a.error) ?? ""}})
+              }
+            }
+
+            . = {
+              "resourceLogs": [{
+                "resource": {"attributes": [
+                  {"key": "service.name", "value": {"stringValue": svc}},
+                  {"key": "k8s.namespace.name", "value": {"stringValue": to_string(.namespace) ?? ""}},
+                  {"key": "k8s.pod.name", "value": {"stringValue": to_string(.pod_name) ?? ""}},
+                  {"key": "k8s.container.name", "value": {"stringValue": to_string(.container_name) ?? ""}},
+                  {"key": "k8s.node.name", "value": {"stringValue": to_string(.kubernetes.pod_node_name) ?? ""}}
+                ]},
+                "scopeLogs": [{
+                  "scope": {"name": "vector.kubernetes_logs"},
+                  "logRecords": [{
+                    "timeUnixNano": ts_ns,
+                    "observedTimeUnixNano": now_ns,
+                    "severityText": sev,
+                    "body": {"stringValue": msg},
+                    "attributes": attrs
+                  }]
+                }]
+              }]
             }
 
         # ======================================================================
@@ -360,6 +426,26 @@ spec:
               VL-Stream-Fields: namespace,service,pod_name,container_name
               AccountID: "0"
               ProjectID: "0"
+          healthcheck:
+            enabled: false
+
+        # ----------------------------------------------------------------------
+        # Sink: ClickHouse (otel_logs) via the collector -- the second log path
+        # ----------------------------------------------------------------------
+        otel_clickhouse:
+          type: opentelemetry
+          inputs:
+            - to_otlp
+          protocol:
+            type: http
+            uri: http://otel-collector-opentelemetry-collector.monitoring.svc:4319/v1/logs
+            method: post
+            encoding:
+              codec: otlp
+          buffer:
+            type: memory
+            max_events: 10000
+            when_full: drop_newest
           healthcheck:
             enabled: false
 

@@ -28,6 +28,8 @@ resources:
   # no panel read it. This board closes that, and carries the ClickHouse
   # per-edge self-join beside it.
   - grafana-dashboard-service-graph.yaml
+  # OpenBao: the chart's dashboard, imported from the ConfigMap the openbao HelmRelease renders
+  - grafana-dashboard-openbao.yaml
 
 # ClickHouse dashboard JSON → ConfigMap (referenced by grafana-dashboard-clickhouse.yaml
 # via configMapRef; stable name, so the hash suffix is disabled).

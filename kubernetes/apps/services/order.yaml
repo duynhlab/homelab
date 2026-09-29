@@ -78,7 +78,6 @@ spec:
     # same reason as the customer one: left empty the service derives it
     # from the staff ISSUER, which is the public host.
     staffauthmw: true
-    platform_backup_label: "cnpg"
     replicaCount: 1
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"

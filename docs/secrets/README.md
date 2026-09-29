@@ -280,15 +280,14 @@ metadata:
     platform.duynhlab/backup: "cnpg"   # CloudNativePG / Barman backup credentials
 ```
 
-**ResourceSet namespaces**: microservice namespaces are also created by Flux
-**ResourceSet** templates under
-[`kubernetes/apps/domains/`](../../kubernetes/apps/domains/). If the `Namespace`
-resource there omits `platform.duynhlab/backup`, app reconciliation can overwrite
-metadata and **drop** the label from `controllers/namespaces.yaml`, so
-ClusterExternalSecret **stops** matching and `pg-backup-rustfs-credentials` is not
-created. Keep the label in the ResourceSet `Namespace` block (now `cnpg`
-fleet-wide — set via `platform_backup_label` in the ResourceSetInputProvider
-where the domain hosts a CNPG cluster).
+**Namespace labels have one owner**: `platform.duynhlab/backup` is set only in
+[`controllers/namespaces.yaml`](../../kubernetes/infra/controllers/namespaces.yaml).
+The ResourceSet templates under
+[`kubernetes/apps/domains/`](../../kubernetes/apps/domains/) used to render the
+same Namespaces, and each apply dropped any label missing from their copy. This
+paragraph once told you to duplicate the label there (via `platform_backup_label`)
+to keep ClusterExternalSecret matching. Since 2026-09-29 the templates render no
+Namespace and that input is gone: set the label in `namespaces.yaml`.
 
 #### Infrastructure ExternalSecrets (per-namespace)
 
@@ -377,4 +376,4 @@ present as active).
 
 ---
 
-_Last updated: 2026-09-28 — Draw.io view of the secrets, TLS and trust pipeline. 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._
+_Last updated: 2026-09-29 — the backup label lives only in namespaces.yaml (ResourceSets no longer render Namespaces). Previously 2026-09-28 — Draw.io view of the secrets, TLS and trust pipeline. 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._

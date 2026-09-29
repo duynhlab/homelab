@@ -1,4 +1,13 @@
 # Cluster-wide Namespace definitions (single source of truth).
+#
+# The ONLY owner of every namespace, including the ten service namespaces the
+# domain ResourceSets deploy into. Those templates used to render the same
+# Namespace too; each ResourceSet apply then took the object over and deleted
+# any label missing from its copy -- losing `platform.duynhlab.dev/tier: app`
+# made Kyverno delete the generated deny-all-ingress (2026-09-29). Adding a
+# service means adding its namespace HERE: network-policies, databases and
+# envoy-gateway-config put objects into it before apps-local runs, and a
+# Kustomization does not create namespaces. `make validate` checks it.
 # Lives under controllers/ so Kustomize can reference it without `../` (default
 # load restrictor allows only files inside the kustomization root).
 # Flux path `./controllers` includes this file first via kustomization.yaml.
@@ -79,6 +88,9 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # No backup label: that label routes CNPG/barman S3 credentials to
+    # namespaces hosting a database cluster -- inventory's data lives on
+    # product-db in the product namespace, which is already backed up.
     platform.duynhlab.dev/tier: app
   name: inventory
 ---
@@ -87,6 +99,9 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # Carried over from the order ResourceSet input (platform_backup_label),
+    # which set it until this file became the namespace's only owner.
+    platform.duynhlab/backup: "cnpg"
     platform.duynhlab.dev/tier: app
   name: order
 ---
@@ -95,6 +110,8 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+    # No backup label: payment's data lives on product-db in the product
+    # namespace, which is already backed up.
     platform.duynhlab.dev/tier: app
   name: payment
 ---

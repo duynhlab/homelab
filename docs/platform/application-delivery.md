@@ -110,7 +110,7 @@ Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
 
 | Directory | Kind | Purpose |
 |-----------|------|---------|
-| `domains/*.yaml` | ResourceSet | Domain-scoped template rendering Namespace + HelmRelease per service |
+| `domains/*.yaml` | ResourceSet | Domain-scoped template rendering a HelmRelease per service, into a namespace that `infra/controllers/namespaces.yaml` owns (the template renders no Namespace) |
 | `services/*.yaml` | ResourceSetInputProvider (Static) | Per-service configuration, discovered via label selector |
 | `frontend-rs.yaml` | ResourceSet | Frontend HelmRelease (standalone, different chart values, no DB) |
 | `backoffice-rs.yaml` | ResourceSet | Backoffice portal HelmRelease (standalone, no DB; RFC-0023) |
@@ -353,6 +353,15 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 
 ## 6. Onboarding New Microservices
 
+0. **Declare the namespace** in `kubernetes/infra/controllers/namespaces.yaml`,
+   with `platform.duynhlab.dev/tier: app` (Kyverno generates its
+   `deny-all-ingress` from that label). That file is the namespace's only owner:
+   the network policies, database secrets and edge routes land in it before
+   `apps-local` runs, and a Kustomization does not create namespaces. The
+   domain template no longer renders one. It used to, and every ResourceSet apply
+   then took the Namespace over and deleted the labels missing from its copy
+   (2026-09-29). `make validate` fails if the namespace is missing or unlabelled.
+
 1. **Create InputProvider file** `kubernetes/apps/services/<name>.yaml`:
    ```yaml
    apiVersion: fluxcd.controlplane.io/v1
@@ -473,4 +482,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._
+_Last updated: 2026-09-29 — namespaces are owned by `namespaces.yaml` alone (the domain templates render no Namespace); onboarding step 0 declares it. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._

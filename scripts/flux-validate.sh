@@ -375,6 +375,34 @@ validate_worker_versioning
 # The RustFS bucket list lives in two places -- the run-once setup Job and the
 # 30-minute CronJob -- and the Job's header says to keep them in step. Nothing
 # did until now.
+validate_service_namespaces() {
+  # namespaces.yaml is the only owner of the service namespaces. The domain
+  # ResourceSets used to render the same Namespace; each apply took the object
+  # over and deleted labels missing from that copy, and losing
+  # `platform.duynhlab.dev/tier: app` made Kyverno delete the generated
+  # deny-all-ingress (2026-09-29). So: every service namespace must be declared
+  # there WITH that label, and no domain template may render a Namespace again.
+  local ns_file="kubernetes/infra/controllers/namespaces.yaml"
+  local f ns tier
+  echo "INFO - Checking service namespaces have one owner (${ns_file})"
+  if grep -l '^\s*kind: Namespace' kubernetes/apps/domains/*.yaml >/dev/null 2>&1; then
+    echo "ERROR - a domain ResourceSet renders a Namespace ($(grep -l '^\s*kind: Namespace' kubernetes/apps/domains/*.yaml | tr '\n' ' ')); declare it in ${ns_file} instead" >&2
+    exit 1
+  fi
+  for f in kubernetes/apps/services/*.yaml; do
+    ns=$(yq '.spec.defaultValues.namespace' "${f}")
+    tier=$(yq eval-all "select(.kind == \"Namespace\" and .metadata.name == \"${ns}\") | .metadata.labels.\"platform.duynhlab.dev/tier\"" "${ns_file}")
+    if [[ -z "${tier}" ]]; then
+      echo "ERROR - ${f}: namespace '${ns}' is not declared in ${ns_file}" >&2
+      exit 1
+    fi
+    if [[ "${tier}" != "app" ]]; then
+      echo "ERROR - ${ns_file}: namespace '${ns}' lacks platform.duynhlab.dev/tier: app, so it gets no generated deny-all-ingress" >&2
+      exit 1
+    fi
+  done
+}
+
 validate_rustfs_bucket_lists() {
   echo "INFO - Validating RustFS bucket lists agree"
   local job="kubernetes/infra/controllers/storage/rustfs/job-setup-buckets.yaml"
@@ -397,5 +425,6 @@ validate_kyverno_policies
 validate_clickhouse_embedded_xml
 validate_clickhouse_replica_count
 validate_rustfs_bucket_lists
+validate_service_namespaces
 validate_production
 echo "INFO - All validations passed"

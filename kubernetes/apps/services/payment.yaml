@@ -61,9 +61,6 @@ spec:
     # same reason as the customer one: left empty the service derives it
     # from the staff ISSUER, which is the public host.
     staffauthmw: true
-    # No platform_backup_label: that label routes CNPG/barman S3 credentials to
-    # namespaces hosting a database cluster — payment's data lives on product-db
-    # in the product namespace, which is already backed up.
     # Single replica, still deliberately — but the reason has narrowed. The
     # reconciler IS now fenced: every pass takes a session-level advisory lease,
     # so a second replica would stand down rather than run a concurrent pass

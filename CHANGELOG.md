@@ -1124,6 +1124,30 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Gateway
+
+- **The Backoffice no longer goes blank on a reload with a live staff session.**
+  - **Symptom:** after signing in, any reload rendered an empty page, with no
+    error and no failed request.
+  - **Mechanism:** the portal renders only after keycloak-js `init({onLoad:
+    'check-sso'})` settles. With a session, check-sso loads
+    `/silent-check-sso.html` in a **same-origin iframe** that posts the auth code
+    back.
+  - **Cause:** the `backoffice` HTTPRoute set `X-Frame-Options: DENY` on every
+    response. That forbids even same-origin framing and overrode the portal's own
+    nginx `SAMEORIGIN`. The iframe was refused, `init()` never settled, and React
+    never mounted.
+  - **Why it hid:** a first load with no session never uses that iframe.
+    local-stack serves the portal from nginx without the edge. Both kept working.
+  - **Fix:** this host now sends `SAMEORIGIN` + `Content-Security-Policy:
+    frame-ancestors 'self'`; every other host keeps `DENY`.
+  - **Verified in a headed Chrome on Kind:**
+    - before the fix, reload → blank, no token request;
+    - after it, reload → `Signed in as duyne` and `POST …/token` 200;
+    - logout and first load still work;
+    - `make e2e-staff GATE=kind` 5/5.
+  - The Kind runbook's K4.7 now includes the reload.
+
 #### Security
 
 - **Service namespaces now have one owner: `namespaces.yaml`.**

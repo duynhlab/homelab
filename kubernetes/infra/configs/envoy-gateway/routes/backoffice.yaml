@@ -32,8 +32,19 @@ spec:
                 value: nosniff
               - name: Referrer-Policy
                 value: strict-origin-when-cross-origin
+              # SAMEORIGIN, not DENY like the other hosts. The portal signs in
+              # with keycloak-js `check-sso`: with a live staff session it loads
+              # /silent-check-sso.html in a SAME-ORIGIN iframe that postMessages
+              # the auth code back. DENY forbids even same-origin framing, so the
+              # iframe never rendered, keycloak.init() never settled, and every
+              # reload with a session showed a blank page (measured in a headed
+              # Chrome, 2026-09-29). A first load with no session skips that
+              # iframe, which is why it kept working. The portal's own nginx
+              # already sends SAMEORIGIN; this used to override it.
               - name: X-Frame-Options
-                value: DENY
+                value: SAMEORIGIN
+              - name: Content-Security-Policy
+                value: "frame-ancestors 'self'"
               - name: Strict-Transport-Security
                 value: "max-age=31536000; includeSubDomains"
             remove:

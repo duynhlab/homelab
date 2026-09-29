@@ -50,10 +50,19 @@ PARTITION BY toDate(Timestamp)
 ```
 
 Dashboards filter a **time window** and often a **service**. The five-minute
-bucket is the first sparse-index key so a dashboard range can skip granules
-that fall in other buckets; `ServiceName` is next so a service filter inside
-that window is still cheap. A filter that matches neither prefix (random map
-key, no time bound) will scan.
+bucket is the first sparse-index key so a time range *can* skip granules in
+other buckets, with `ServiceName` next so a service filter inside that window
+stays cheap. A filter that matches neither prefix (random map key, no time
+bound) will scan.
+
+**Measured caveat (2026-09-29, ClickHouse 26.7):** a bare `Timestamp` range does
+**not** get that pruning. On a 27-granule part, a five-minute
+`Timestamp >= … AND Timestamp < …` read **17/27** granules. Adding the same
+bounds on the key expression, `toStartOfFiveMinutes(Timestamp) >= … AND < …`,
+read **5/27** and returned the same rows; an equality on the bucket read 1/27.
+Repeat the window on the key expression in any `otel_logs` query that has to be
+cheap. The numbers are in the hub [Playground §3](README.md#3-see-the-sparse-index-prune-granules).
+The ClickHouse dashboards still filter with `$__timeFilter(Timestamp)` alone.
 
 Junior rule: *the column you filter most often stands first — unless time
 pruning is the actual first cut, as it is on logs.*
@@ -222,4 +231,4 @@ Full connect + `system.parts` recipes: [Playground](README.md#playground--merget
 
 ---
 
-_Last updated: 2026-09-04_
+_Last updated: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_

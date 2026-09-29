@@ -117,6 +117,9 @@ retired Tempo and Jaeger deployments and are historical, not current topology.
 ```mermaid
 flowchart LR
   Apps["10 services + 2 workers<br/>+ edge"] -->|OTLP| Col["OTel Collector<br/>(contrib)"]
+  Pods["Other pods' stdout<br/>(Postgres, ClickHouse, OpenBao audit, …)"] --> Vec["Vector<br/>DaemonSet"]
+  Vec -->|jsonline| VL
+  Vec -->|"OTLP :4319<br/>otlp/vector → logs/vector"| Col
   Col -->|metrics| VM[("VictoriaMetrics")]
   Col -->|logs| VL[("VictoriaLogs")]
   Col -->|traces| VT[("VictoriaTraces")]
@@ -126,8 +129,8 @@ flowchart LR
   classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef collector fill:#e0f2fe,color:#0c4a6e,stroke:#1971c2;
-  class Apps service;
-  class Col collector;
+  class Apps,Pods service;
+  class Col,Vec collector;
   class VM,VL,VT,CH data;
 ```
 
@@ -147,7 +150,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 | **Coordination** | `ClickHouseKeeperInstallation` `keeper`, 3 replicas, referenced by name (`zookeeper.keeper.name`); holds the replication metadata. A replica that loses its Keeper session serves reads and refuses writes |
 | **Storage** | PVC `standard` `10Gi` per replica (`volumeClaimTemplates`) + keeper data `2Gi` (no log PVC — the operator's keeper logs to console); S3 disk `s3` on RustFS + cache disk `s3_cache` + policy `hot_cold` from `03-storage-rustfs.xml` on the CHI, credentials via `from_env` from `clickhouse-rustfs-credentials`; local-stack uses a named `clickhouse-data` volume |
 | **Credentials** | `default` user password from OpenBAO `secret/local/infra/clickhouse/admin` via the `clickhouse-credentials` `ClusterExternalSecret` → Secret in `monitoring` (selector label `platform.duynhlab/clickhouse`); local-stack uses an inline dev password |
-| **Ingest** | Collector contrib `clickhouse` exporter appended to the `traces` + `logs` pipelines, **INSERT-only** (`create_schema: false`); `async_insert`, `sending_queue`, `retry_on_failure`; password via `${env:CLICKHOUSE_PASSWORD}` (`extraEnvs` secretKeyRef) |
+| **Ingest** | Collector contrib `clickhouse` exporter on the `traces`, `logs/clickhouse` and `logs/vector` pipelines (the last fed only by Vector's pod logs on the `otlp/vector` receiver, `:4319`; rows carry `LogAttributes['log.source']='vector'`), **INSERT-only** (`create_schema: false`); `async_insert`, `sending_queue`, `retry_on_failure`; password via `${env:CLICKHOUSE_PASSWORD}` (`extraEnvs` secretKeyRef) |
 | **Schema owner** | The `clickhouse-schema` **Job**, SQL committed in `kubernetes/infra/configs/clickhouse-schema/` ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). It creates the `otel` database with `ENGINE = Replicated` on each replica, then the tables once; the database's Keeper log propagates them. TTL 90d and the 7-day `TO VOLUME 'cold'` move live in that DDL. Fresh-only: there is no migration path, a pre-tier cluster is rebuilt by `make up` |
 | **Security** | `runAsNonRoot`, `runAsUser: 101`, `fsGroup: 101`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault`; `/ping` liveness+readiness; pinned image (PSS-baseline + no-latest) |
 | **Access** | Grafana datasource `uid: clickhouse` (`clickhouse-clickhouse.monitoring.svc.cluster.local:9000`, native, password via `valuesFrom`); **not** on any public Ingress; the `default` password is the access control (no NetworkPolicy — `monitoring` has no default-deny and netpol is inert on kindnet; a `:9000`/`:8123` NetworkPolicy is a follow-up for an enforcing CNI) |
@@ -856,8 +859,12 @@ response; the Collector runs `create_schema: false` and cannot rebuild it.
 
 ## Playground — MergeTree by hand
 
-Explore the **live** engine. All output below is from the running local-stack
-instance — reproduce it to see MergeTree's write→part→merge→TTL lifecycle.
+Explore the **live** engine. The output below was captured on **2026-09-29 on the
+Kind cluster** (ClickHouse `26.7.16.2`, three replicas, replica `-0-0-0`), about an
+hour after a fresh bring-up and half an hour after Vector began sending every pod
+log here too ([vector.md](../logging/vector.md)). Numbers will differ on your
+run; the shapes and ratios are the point. local-stack answers the same queries
+with one replica and smaller numbers.
 
 ### Connect
 
@@ -874,13 +881,13 @@ docker compose exec clickhouse clickhouse-client --password otel
 # answered. Loop over the pods when comparing them.
 CH_USER="$(kubectl -n monitoring get secret clickhouse-credentials \
   -o jsonpath='{.data.username}' | base64 -d)"
-kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -- \
+kubectl exec -it -n monitoring chi-clickhouse-otel-0-0-0 -c clickhouse -- \
   clickhouse-client --user="$CH_USER" --ask-password
 
 # all three, e.g. to confirm a table really has three live replicas
 for p in $(kubectl -n monitoring get po -l clickhouse.altinity.com/chi=clickhouse -o name); do
   echo "== $p"
-  kubectl -n monitoring exec -it "${p#pod/}" -- \
+  kubectl -n monitoring exec -it "${p#pod/}" -c clickhouse -- \
     clickhouse-client --user="$CH_USER" --ask-password --query \
     "SELECT table, is_readonly, total_replicas, active_replicas, absolute_delay
      FROM system.replicas WHERE database='otel' FORMAT PrettyCompact"
@@ -894,81 +901,151 @@ SELECT table, count() AS parts, sum(rows) AS rows,
        formatReadableSize(sum(data_compressed_bytes))   AS comp,
        formatReadableSize(sum(data_uncompressed_bytes)) AS uncomp,
        round(sum(data_uncompressed_bytes)/sum(data_compressed_bytes),1) AS ratio
-FROM system.parts WHERE database='otel' AND active GROUP BY table;
+FROM system.parts WHERE database='otel' AND active GROUP BY table ORDER BY table;
 ```
 ```
-┌─table───────┬─parts─┬─rows─┬─comp───────┬─uncomp───┬─ratio─┐
-│ otel_logs   │     5 │ 8328 │ 262.59 KiB │ 2.06 MiB │     8 │
-│ otel_traces │     1 │ 4287 │ 117.09 KiB │ 1.20 MiB │  10.5 │
-└─────────────┴───────┴──────┴────────────┴──────────┴───────┘
+┌─table───────────────────┬─parts─┬───rows─┬─comp───────┬─uncomp─────┬─ratio─┐
+│ otel_logs               │     6 │ 201201 │ 6.57 MiB   │ 115.66 MiB │  17.6 │
+│ otel_traces             │     5 │   8010 │ 395.24 KiB │ 4.94 MiB   │  12.8 │
+│ otel_traces_trace_id_ts │     2 │   2930 │ 54.61 KiB  │ 137.34 KiB │   2.5 │
+└─────────────────────────┴───────┴────────┴────────────┴────────────┴───────┘
 ```
 Each INSERT batch from the Collector becomes a **part**; background **merges**
-combine them (here `otel_traces` has already merged down to a single active part).
-Columnar + ZSTD gives 8–10× compression.
+combine them. Columnar storage plus per-column codecs gives **17.6×** on logs,
+which are repetitive text (the same services, levels, keys); traces compress
+less and the MV target, a narrow table of unique ids, hardly at all.
 
 ### 2. Watch merges happen
 
 ```sql
--- how many background merges have run recently
-SELECT count() FROM system.part_log
-WHERE database='otel' AND event_type='MergeParts' AND event_time > now() - 3600;
--- → 1431
-
--- force it yourself and re-check part count
-OPTIMIZE TABLE otel.otel_logs FINAL;
-SELECT count() FROM system.parts WHERE database='otel' AND table='otel_logs' AND active;
+SELECT event_type, count() FROM system.part_log
+WHERE database='otel' AND event_time > now() - 3600
+GROUP BY event_type ORDER BY 2 DESC;
 ```
+```
+┌─event_type──────┬─count()─┐
+│ RemovePart      │     832 │
+│ DownloadPart    │     755 │
+│ MergeParts      │     252 │
+│ MergePartsStart │     252 │
+│ NewPart         │     136 │
+└─────────────────┴─────────┘
+```
+- `NewPart` is an INSERT that landed **on this replica**. `DownloadPart` is a part
+  another replica created and this one **fetched** through Keeper. That row only
+  exists on a replicated table, and it outnumbers `NewPart` because the
+  collector's INSERTs are spread across three replicas.
+- `RemovePart` counts source parts deleted after a merge had replaced them.
+
+Force a merge and read the part names:
+
+```sql
+SELECT count() FROM system.parts WHERE database='otel' AND table='otel_logs' AND active;  -- 3
+OPTIMIZE TABLE otel.otel_logs FINAL;
+SELECT partition, name, rows, level FROM system.parts
+WHERE database='otel' AND table='otel_logs' AND active ORDER BY name;
+```
+```
+┌─partition──┬─name───────────────┬───rows─┬─level─┐
+│ 2026-09-29 │ 20260929_0_456_17  │ 202237 │    17 │
+│ 2026-09-29 │ 20260929_457_457_0 │    555 │     0 │
+└────────────┴────────────────────┴────────┴───────┘
+```
+A part name is `<partition>_<min block>_<max block>_<level>`. `0_456_17` holds
+blocks 0–456 and has been merged 17 times. `457_457_0` is a **brand-new** insert
+that arrived while `OPTIMIZE` ran: `FINAL` merges what exists, and ingest never
+stops.
 
 ### 3. See the sparse index prune granules
 
+**Traces**, whose sort key starts with `ServiceName`:
+
 ```sql
 EXPLAIN indexes = 1
-SELECT count() FROM otel.otel_traces WHERE ServiceName = 'platform.envoy-gateway-system';
+SELECT count() FROM otel.otel_traces WHERE ServiceName = 'platform.envoy-gateway';
 ```
 ```
-ReadFromMergeTree (otel.otel_traces)
-Indexes:
-  PrimaryKey
-    Keys:  ServiceName
-    Condition: (ServiceName in ['platform.envoy-gateway-system', 'platform.envoy-gateway-system'])
-    Parts: 1/5          -- 4 parts skipped outright
-    Granules: 1/5       -- only 1 granule read
+PrimaryKey
+  Keys: ServiceName
+  Condition: (ServiceName in ['platform.envoy-gateway', 'platform.envoy-gateway'])
+  Parts: 1/5
+  Granules: 1/5
+  Search Algorithm: binary search
 ```
-Because `ServiceName` is the first `ORDER BY` key, ClickHouse reads **1 of 5
-granules** instead of scanning everything — the payoff of the sort key.
-`platform.envoy-gateway-system` is the edge's `service.name` as **derived** by
-Envoy Gateway (`<gateway>.<namespace>`, locally `platform` in
-`envoy-gateway-system`) — not configured, and environment-dependent since it
-embeds the namespace.
+Four of five parts are skipped outright and one granule is read.
+`platform.envoy-gateway` is the edge's `service.name` on the cluster. Envoy
+Gateway derives it as `<gateway>.<namespace>`, so local-stack, where the gateway
+runs in `envoy-gateway-system`, writes `platform.envoy-gateway-system` instead.
 
-How to turn that `Granules: a/b` line into a habit on `otel_logs` too:
-[schema-and-queries](schema-and-queries.md).
+**Logs** sort by `(toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp)`,
+which makes time the first cut. Measured on one merged part of 27 granules, for
+a five-minute window holding about 31k rows:
+
+| `WHERE` | Granules read | Search |
+|---|---|---|
+| `Timestamp >= '…02:30' AND Timestamp < '…02:35'` | **17/27** | generic exclusion |
+| the same + `ServiceName = 'clickhouse'` | 13/27 | generic exclusion |
+| `toStartOfFiveMinutes(Timestamp)` bounds + the `Timestamp` range | **5/27** | generic exclusion |
+| the same + `ServiceName = 'clickhouse'` | **4/27** | generic exclusion |
+| `toStartOfFiveMinutes(Timestamp) = '…02:00'` (equality on the key) | 1/27 | binary search |
+
+On this version a bare `Timestamp` range barely uses the key's first column.
+Repeating the window on the **key expression** is what prunes, and it returns the
+same rows (17456 both ways):
+
+```sql
+WHERE toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes(toDateTime('2026-09-29 02:30:00'))
+  AND toStartOfFiveMinutes(Timestamp) <  toDateTime('2026-09-29 02:35:00')
+  AND Timestamp >= '2026-09-29 02:30:00' AND Timestamp < '2026-09-29 02:35:00'
+```
+
+The habit, and how to read `Granules: a/b`: [schema-and-queries](schema-and-queries.md).
 
 ### 4. Inspect partitions & TTL
 
 ```sql
-SELECT partition, count() AS parts, min(min_time) AS oldest, max(max_time) AS newest
-FROM system.parts WHERE database='otel' AND table='otel_traces' AND active
-GROUP BY partition;
--- one partition per day (PARTITION BY toDate(Timestamp)); TTL 90d drops whole
--- partitions (ttl_only_drop_parts = 1) — cheap, no row rewrite.
+SELECT table, partition, count() AS parts, sum(rows) AS rows,
+       min(min_time) AS oldest, max(max_time) AS newest, any(disk_name) AS disk
+FROM system.parts WHERE database='otel' AND active
+GROUP BY table, partition ORDER BY table;
 ```
+```
+┌─table───────────────────┬─partition──┬─parts─┬───rows─┬──────────────oldest─┬──────────────newest─┬─disk────┐
+│ otel_logs               │ 2026-09-29 │     6 │ 206872 │ 2026-09-29 01:48:51 │ 2026-09-29 02:46:58 │ default │
+│ otel_traces             │ 2026-09-29 │     5 │   8011 │ 2026-09-29 01:48:11 │ 2026-09-29 02:46:34 │ default │
+│ otel_traces_trace_id_ts │ 2026-09-29 │     3 │   2931 │ 2026-09-29 01:48:11 │ 2026-09-29 02:46:34 │ default │
+└─────────────────────────┴────────────┴───────┴────────┴─────────────────────┴─────────────────────┴─────────┘
+```
+One partition per day (`PARTITION BY toDate(Timestamp)`). Everything is still on
+the `default` (hot) disk: parts move to `cold` (RustFS) once every row is 7 days
+old, and TTL drops whole partitions at 90 days (`ttl_only_drop_parts = 1`), which
+is cheap because nothing is rewritten.
 
 ### 5. The trace_id materialized view
 
 ```sql
-SHOW CREATE TABLE otel.otel_traces_trace_id_ts_mv;
--- MATERIALIZED VIEW … AS SELECT TraceId, min(Timestamp) AS Start, max(Timestamp) AS End
--- FROM otel.otel_traces WHERE TraceId != '' GROUP BY TraceId
--- → a compact TraceId → time-range index so single-trace lookups don't scan the
---   service-sorted main table.
+SELECT name, engine FROM system.tables WHERE database='otel' ORDER BY name;
 ```
+```
+┌─name───────────────────────┬─engine──────────────┐
+│ otel_logs                  │ ReplicatedMergeTree │
+│ otel_traces                │ ReplicatedMergeTree │
+│ otel_traces_trace_id_ts    │ ReplicatedMergeTree │
+│ otel_traces_trace_id_ts_mv │ MaterializedView    │
+└────────────────────────────┴─────────────────────┘
+```
+The MV is `SELECT TraceId, min(Timestamp) AS Start, max(Timestamp) AS End FROM
+otel.otel_traces WHERE TraceId != '' GROUP BY TraceId`. It writes a compact
+TraceId → time-range table, so a single-trace lookup does not scan the
+service-sorted main table. Inspect `system.parts` on the **target**
+`otel_traces_trace_id_ts`, then `EXPLAIN` both tables: [materialized-views](materialized-views.md).
 
-Inspect `system.parts` on the **target** table `otel_traces_trace_id_ts`, then
-`EXPLAIN` both tables: [materialized-views](materialized-views.md).
-
-> **Safe to experiment:** local-stack storage is ephemeral. `CREATE TABLE playground …`,
-> insert rows, `OPTIMIZE`, and `DROP` freely — you cannot hurt the ops primaries.
+> **Safe to experiment — with one difference between the two stacks.**
+> local-stack storage is ephemeral: create, insert, `OPTIMIZE` and `DROP` freely.
+> On the cluster the `otel` database is `ENGINE = Replicated`, so a `CREATE TABLE`
+> there is replicated to all three hosts. Experiment in a scratch database of
+> your own (`CREATE DATABASE scratch` on one replica is local to it) and drop it
+> afterwards; `OPTIMIZE` on the `otel` tables is harmless.
 
 ---
 
@@ -1054,6 +1131,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-14 — added the operator learning path, real Kind audit,
+_Last updated: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
 credential-safe query examples, and current runtime evidence for parts, TTL,
 cold storage, and the 22-rule ClickHouse alert group._

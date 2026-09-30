@@ -1,8 +1,8 @@
-# RFC-0032 Move the Kind baseline to Kubernetes 1.36
+# RFC-0032 Move the Kind baseline to Kubernetes 1.36 (closed at 1.35.8)
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | infra | [./research.md](./research.md) — gate passed 2026-09-22 | 2026-09-22 | 2026-09-28 |
+| implemented (closed at 1.35.8, [amendment 2026-09-30](#amendment-2026-09-30--close-at-1358)) | infra | [./research.md](./research.md) — gate passed 2026-09-22 | 2026-09-22 | 2026-09-30 |
 
 > **Don't forget: every decision is a tradeoff.** The cost of this one is named
 > in the Summary rather than buried: the platform will run a Kyverno/Kubernetes
@@ -278,6 +278,38 @@ What this changes:
 second gate. That cost is now paid by an external blocker rather than chosen, and
 the Kyverno 1.19 prerequisite it named is already done.
 
+### Amendment 2026-09-30 — close at 1.35.8
+
+**Re-audit (sources: the kubernetes/kubernetes and kubernetes-sigs/kind
+repositories, 2026-09-30).** One correction to the amendment above: the
+cAdvisor ZFS fix (fall back to `statfs`) *has* shipped, in cAdvisor
+**v0.60.6** (2026-09-18). What still blocks this host is that no Kubernetes
+release vendors it.
+
+| Candidate | cAdvisor vendored | `kindest/node` image | On this ZFS host |
+|---|---|---|---|
+| `v1.35.8` (current pin) | older line, no ZFS path on start | yes, digest-pinned | **works** (Phase 1 + 2 gates) |
+| `v1.36.5` (latest 1.36) and `release-1.36` | `v0.56.2` | up to `v1.36.4` | kubelet crash-loop |
+| `v1.37.1` (latest 1.37) | `lib v0.60.5` (fix is in v0.60.6) | up to `v1.37.0` | kubelet crash-loop |
+
+`kind#4229` is still open, and no backport of the cAdvisor bump to
+`release-1.36` exists. The newest `kindest/node` image on the 1.35 line is
+`v1.35.8`, which is already pinned.
+
+**Decision (owner, 2026-09-30).** Close this RFC at the 1.35.8 baseline.
+Everything it set out to deliver has landed: the baseline off 1.34 before that
+version's end of life (2026-10-27), the Kyverno 1.19 prerequisite, the
+digest-pinned node image with its floor and Renovate manager, and Phase 2's
+image volumes (ADR-077 Complete). What did not land is only the version number:
+moving to 1.36 or later needs no redesign, just a node image this host can run.
+
+**Revisit trigger (not tracked here).** Move off 1.35 when either happens:
+- a `kindest/node` image ships whose kubelet vendors cAdvisor ≥ v0.60.6, or
+- Docker's data root moves off ZFS.
+
+The Renovate manager already proposes node-image bumps. Such a bump is
+therefore a routine dependency PR gated by the Kind audit, not a new RFC.
+
 ## Architecture & Diagrams
 
 **Target state — what the baseline looks like after Phase 1 and Phase 2.** This
@@ -517,6 +549,11 @@ choice.
   - [ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) is Accepted,
     Adoption Complete.
   - Remaining: the 1.36 recreation once a 1.36 patch ships the cAdvisor ZFS fix.
+- 2026-09-30 — **closed at 1.35.8** ([amendment](#amendment-2026-09-30--close-at-1358)).
+  The re-audit found no Kubernetes release that vendors cAdvisor v0.60.6, so
+  1.36 and 1.37 still crash on this host. Status → `implemented`. PRs: #1116
+  (Kyverno 1.19.1), #1118 (OpenBao 2.7 KMS plugin, found by the gate), #1119
+  (Phase 1), #1124 (`endpoints/v1` callers), #1126 (Phase 2).
 
 ## Related
 
@@ -529,4 +566,4 @@ choice.
 - [`docs/platform/setup.md`](../../../platform/setup.md) — the Flux dependency chain the rebuild walks
 
 ---
-_Last updated: 2026-09-29 — Phase 2 landed (ADR-077 Accepted/Complete); only the 1.36 recreation remains. Earlier the same day — Phase 1 landed on 1.35.8 after the ZFS kubelet blocker on 1.36 (amendment + Implementation History); Kind gate ELIGIBLE. Previously 2026-09-28 — **Accepted** by the owner; [ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) created at `Proposed`, stating two things this RFC left implicit: the image is built `FROM scratch` (apko assembles from packages, not local files), and the Job carries `kustomize.toolkit.fluxcd.io/force: enabled` because a Job's pod template is immutable. The Kyverno 1.19 prerequisite ships in the same PR as this status change. Previously 2026-09-22 — opened at `provisional`: baseline to `kindest/node:v1.36.4` by digest, the Kyverno 1.36 gap accepted explicitly rather than waited out, every 1.35/1.36 feature given a verdict, and OCI image volumes adopted for the ClickHouse DDL as the single Phase 2 deliverable (`ADR-077` at review)._
+_Last updated: 2026-09-30 — closed at 1.35.8 (status implemented): re-audit shows cAdvisor v0.60.6 carries the ZFS fix but no Kubernetes release vendors it yet. Earlier: 2026-09-29 — Phase 2 landed (ADR-077 Accepted/Complete); only the 1.36 recreation remains. Earlier the same day — Phase 1 landed on 1.35.8 after the ZFS kubelet blocker on 1.36 (amendment + Implementation History); Kind gate ELIGIBLE. Previously 2026-09-28 — **Accepted** by the owner; [ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) created at `Proposed`, stating two things this RFC left implicit: the image is built `FROM scratch` (apko assembles from packages, not local files), and the Job carries `kustomize.toolkit.fluxcd.io/force: enabled` because a Job's pod template is immutable. The Kyverno 1.19 prerequisite ships in the same PR as this status change. Previously 2026-09-22 — opened at `provisional`: baseline to `kindest/node:v1.36.4` by digest, the Kyverno 1.36 gap accepted explicitly rather than waited out, every 1.35/1.36 feature given a verdict, and OCI image volumes adopted for the ClickHouse DDL as the single Phase 2 deliverable (`ADR-077` at review)._

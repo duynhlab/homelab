@@ -992,6 +992,13 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0032 closed at 1.35.8 (implemented).** A re-audit found that the
+  cAdvisor ZFS fix shipped in v0.60.6, but no Kubernetes release vendors it:
+  1.36.5 carries v0.56.2 and 1.37.1 carries v0.60.5. On this ZFS host 1.36 and
+  1.37 kubelets therefore still crash, and `kindest/node` v1.35.8 is already the
+  newest image on the 1.35 line. Everything else the RFC set out to do has
+  landed. Moving on is left to a routine Renovate node-image bump once an image
+  with the fix exists, or once Docker's data root moves off ZFS.
 - **ADR-078 (Proposed): migrate Kyverno policies to the CEL policy types.**
   Kyverno's migration guide says the legacy `ClusterPolicy`,
   `ClusterCleanupPolicy` and `kyverno.io` `PolicyException` are removed in

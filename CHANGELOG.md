@@ -90,6 +90,25 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Security
+
+- **Kyverno CEL migration, step 1 of 4 (ADR-078, now Accepted).**
+  `require-probes` and `require-resources` are `policies.kyverno.io/v1`
+  ValidatingPolicy objects: CEL `containers.all(...)`, the same ten
+  namespaces, Pods only, Audit, background on. The legacy ClusterPolicies are
+  deleted.
+  - `require-probes` keeps the Job-owned exclusion as a `matchCondition`.
+    Autogen is set off explicitly: a ValidatingPolicy autogens controller
+    variants by default, and for this policy that rewrites the owner-reference
+    condition onto a pod template, which is the trap the legacy autogen hit on
+    2026-08-21.
+  - The `require-resources` waiver in `postgres-operators` was inert
+    (`application=cnpg` matches 0 pods, and the operator pod is outside the
+    policy's namespaces), so it was dropped rather than migrated.
+  - Checked on Kind with `kyverno apply --cluster` across all app pods: 19/19
+    pass for each policy, 0 fail, the same pod-level verdicts as the legacy
+    policies. CLI fixtures: 14/14.
+
 #### CI
 
 - **GitHub issue intake is structured for platform work.** Bug/operations,

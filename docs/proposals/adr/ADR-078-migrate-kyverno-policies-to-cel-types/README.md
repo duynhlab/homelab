@@ -11,8 +11,8 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Proposed |
-| **Decision date** | — |
+| **Status** | Accepted |
+| **Decision date** | 2026-09-30 |
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | The policy objects under `kubernetes/infra/configs/kyverno/` (cluster policies, the cleanup policy, the exceptions) and their CLI fixtures; not the Kyverno controllers' deployment, not which rules the platform enforces |
@@ -22,7 +22,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | One homelab PR per policy family, after this record is Accepted |
-| **Adoption** | Not started |
+| **Adoption** | Partial — step 1 (`require-probes`, `require-resources`) |
 
 ## Context
 
@@ -120,9 +120,12 @@ replacement, so no rule is evaluated twice.
    two rules of one policy may become two exceptions, or a narrower policy
    split. They stay in namespace `kyverno` with the `owner` / `expires-at`
    annotations.
-4. **Autogen** is not assumed. The CEL types match the kinds they list, so each
-   policy names Pod plus the controller kinds explicitly, or matches Pods only
-   as `require-probes` already does.
+4. **Autogen is explicit.** A `ValidatingPolicy` autogens controller variants
+   by default (measured in step 1: Deployment and ReplicaSet results appeared
+   next to the Pod ones). Each policy states its choice: `autogen.podControllers.controllers: []`
+   where the legacy policy had autogen off (`require-probes`, whose owner-reference
+   condition autogen rewrites into a meaningless pod-template path), and the
+   default where the legacy policy had it on (`require-resources`).
 5. **Generate:** the `GeneratingPolicy` must reproduce `synchronize: true` and
    generate-existing, verified by deleting a generated `deny-all-ingress` and
    watching it return.
@@ -246,7 +249,8 @@ fix ships only on 1.20 or later.
 | Date | Status / adoption | Change |
 |---|---|---|
 | 2026-09-30 | Proposed / Not started | Created. Removal version (1.20) read from the Kyverno migration guide, due date 2026-10-23 from the upstream milestone. |
+| 2026-09-30 | Accepted / Partial | Owner accepted it and chose 4 PRs. Step 1 landed: `require-probes` and `require-resources` are ValidatingPolicy. Pod-level verdicts equal the legacy ones on Kind (19/19 pass each, 0 fail). Autogen proved to default on, so rule 4 now says so. The `require-resources` half of `postgres-operators` was inert and was dropped rather than migrated. |
 
 ---
 
-_Last updated: 2026-09-30 — created (Proposed)._
+_Last updated: 2026-09-30 — Accepted; step 1 landed (require-probes, require-resources); autogen defaults on, rule 4 corrected. Earlier: 2026-09-30 — created (Proposed)._

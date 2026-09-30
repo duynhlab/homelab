@@ -14,8 +14,8 @@ cluster runs these policies today.
 | `pss-baseline` | 1 | Audit | Enforce | Ignore | All namespaces except 7 infra ns (kube-system, kube-public, kube-node-lease, flux-system, kyverno, cert-manager, external-secrets-system) |
 | `pss-restricted-apps` | 1 | **Disabled** | **Disabled** | — | App namespaces (10) — see [Known gaps](#known-gaps--history) |
 | `disallow-latest-tag` | 1 | Audit | Enforce | Ignore | All except kube-system, flux-system, kyverno. Three rules: a container tag is required, `:latest` is forbidden, and since ADR-077 an **image volume** (`volumes[].image.reference`) must carry `@sha256:` |
-| `require-resources` | 1 | Audit | Enforce | Ignore | The 10 app namespaces |
-| `require-probes` | 1 | Audit | Enforce | Ignore | The 10 app namespaces |
+| `require-resources` | 1 | Audit | Enforce | Ignore | The 10 app namespaces. `ValidatingPolicy` (CEL) since 2026-09-30, ADR-078 |
+| `require-probes` | 1 | Audit | Enforce | Ignore | The 10 app namespaces. `ValidatingPolicy` (CEL) since 2026-09-30, ADR-078 |
 | `disallow-default-namespace` | 1 | **Enforce** | Enforce | Fail | All Pods |
 | `verify-images-cosign` | 2 | planned | planned | Ignore | `ghcr.io/duynhlab/*` |
 | `require-network-policy` | 2 | planned | planned | Ignore | App namespaces |
@@ -84,4 +84,4 @@ kindnet enforcement status, and GitOps wiring:
 
 ---
 
-_Last updated: 2026-09-29 — disallow-latest-tag gains require-image-volume-digest (ADR-077). Previously 2026-08-19 — table un-split (the pss-restricted note had broken it, hiding the Tier 2/3 rows), scopes corrected against the manifests, prod modes marked planned (production overlay is a stub), cleanup row reflects the restored >24h age gate. Previously updated 2026-08-17 (pss-restricted disabled) without a footer bump._
+_Last updated: 2026-09-30 — require-probes and require-resources moved to ValidatingPolicy (ADR-078 step 1). Earlier: 2026-09-29 — disallow-latest-tag gains require-image-volume-digest (ADR-077). Previously 2026-08-19 — table un-split (the pss-restricted note had broken it, hiding the Tier 2/3 rows), scopes corrected against the manifests, prod modes marked planned (production overlay is a stub), cleanup row reflects the restored >24h age gate. Previously updated 2026-08-17 (pss-restricted disabled) without a footer bump._

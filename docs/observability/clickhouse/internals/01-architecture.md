@@ -12,7 +12,7 @@ producer and the panel is involved* — and this chapter gives you that map.
 | **Prerequisites** | Basic SQL and `kubectl`; the [learning hub](README.md) safety rules |
 | **Deployment status** | Deployed |
 | **Platform scope** | `monitoring` namespace: ClickHouse cluster `otel`, Keeper ensemble, OpenTelemetry Collector, Grafana; `rustfs` namespace for the cold tier |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:18–11:20 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Where ClickHouse sits, and how telemetry reaches and leaves it |
 | **Not this page** | Deployed component inventory and Grafana wiring — [ClickHouse platform hub](../README.md); engine mechanics — chapters [03](03-mergetree.md)–[04](04-parts-and-merges.md); coordination — chapter [06](06-keeper.md) |
 | **Previous / next** | [Learning hub](README.md) / [Query pipeline](02-query-pipeline.md) |
@@ -77,6 +77,24 @@ individual rows ([chapter 05](05-replication.md)).
   same replica. Load balancing happens outside ClickHouse, in the Kubernetes
   Service. *(Repository fact — see below.)*
 
+### Inside one replica — the engine's layers
+
+This picture answers *what sits inside one replica and what touches each
+layer*; the Mermaid map further down answers *how telemetry reaches and leaves
+the cluster*. The layers are the ones ClickHouse's own architecture overview
+names (access, query processing, storage, orthogonal components, replication
+through Keeper), filled with what this deployment actually runs.
+
+<p align="center"><a href="../../../architecture/observability/clickhouse-engine.svg"><img src="../../../architecture/observability/clickhouse-engine.svg" alt="One ClickHouse replica: clients reach the access layer (native TCP 9000, HTTP 8123, Prometheus 9363); SQL flows through parser, planner and pipeline executor; the executor reads and writes the Replicated database otel on a hot local disk and an s3_cache cold disk backed by RustFS; parts replicate to replicas 0-1 and 0-2 over 9009 and the replication log lives in Keeper" width="960"></a></p>
+<p align="center"><sub>Source <a href="../../../architecture/observability/clickhouse-engine.drawio"><code>observability/clickhouse-engine.drawio</code></a> · <a href="../../../architecture/observability/img/clickhouse-engine.png">PNG</a></sub></p>
+
+What the picture leaves out is as deliberate as what it shows: no Distributed
+table, dictionary, or second shard exists here ([chapter 07](07-sharding.md)
+treats them as reference), and no backup mechanism is deployed. Every box is
+*Observed* on 2026-09-30 from `system.tables`, `system.disks`,
+`system.storage_policies`, `system.server_settings`, and `system.users` on
+`chi-clickhouse-otel-0-0-0`.
+
 ### The single process behind four ports
 
 `clickhouse-server` is one process with four externally relevant listeners:
@@ -95,6 +113,12 @@ too, but in this deployment its only steady consumer is the kubelet probing
 [CHI pod template](../../../../kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml))*.
 Port 9009 is invisible to clients yet is where replication actually moves
 bytes; [chapter 05](05-replication.md) walks that flow.
+
+Observed difference (2026-09-30 11:40 UTC, listening sockets in
+`chi-clickhouse-otel-0-0-0`): the process also listens on MySQL **9004** and
+PostgreSQL **9005**, because the image's `config.xml` enables both by default.
+Neither is a Service port and no client uses them; gRPC (9100) and HTTPS (8443)
+are commented out. The four listeners above are the ones this platform relies on.
 
 ### What the operator turns manifests into
 
@@ -260,19 +284,40 @@ LIMIT 1;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+$ kubectl -n monitoring get sts -l clickhouse.altinity.com/chi=clickhouse
+NAME                      READY   AGE
+chi-clickhouse-otel-0-0   1/1     9h
+chi-clickhouse-otel-0-1   1/1     9h
+chi-clickhouse-otel-0-2   1/1     8h
+$ kubectl -n monitoring get sts -l clickhouse-keeper.altinity.com/chk=keeper
+chk-keeper-keeper-0-0   1/1     9h
+chk-keeper-keeper-0-1   1/1     9h
+chk-keeper-keeper-0-2   1/1     9h
+
+cluster  shard_num  replica_num  host_name                port
+otel     1          1            chi-clickhouse-otel-0-0  9000
+otel     1          2            chi-clickhouse-otel-0-1  9000
+otel     1          3            chi-clickhouse-otel-0-2  9000
+
+answering_replica          server_version
+chi-clickhouse-otel-0-0-0  26.7.17.7
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:18–11:20 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.clusters` (cluster `otel`) |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
+
+Declared versus observed: the CHI pins the floating tag
+`clickhouse/clickhouse-server:26.7`; the running patch release was
+**26.7.17.7** (2026-09-30 11:20 UTC). Keeper reports the same build. The tag
+alone never tells you the patch — a pod restart can move it.
 
 ### How to read the result
 
@@ -360,9 +405,10 @@ Before continuing, explain these without rereading the chapter:
 ## References
 
 - [ClickHouse architecture overview](https://clickhouse.com/docs/resources/develop-contribute/introduction/architecture)
+- [Architecture overview — layers of the engine](https://clickhouse.com/docs/concepts/core-concepts/academic-overview)
 - [Network ports and interfaces](https://clickhouse.com/docs/concepts/features/security/tls/configuring-tls)
 - [Prometheus metrics endpoint](https://clickhouse.com/docs/concepts/features/interfaces/prometheus)
 - [Altinity ClickHouse operator](https://github.com/Altinity/clickhouse-operator)
 
 ---
-_Last updated: 2026-09-29 — first published version of the architecture chapter; live lab pending verification._
+_Last updated: 2026-09-30 — engine-layers Draw.io diagram added; MySQL/PostgreSQL listeners recorded as an observed difference. Earlier the same day: live lab verified: 3 replicas + 3 Keeper members, patch 26.7.17.7 behind the `26.7` tag. Earlier: 2026-09-29 — first published version of the architecture chapter; live lab pending verification._

@@ -7,7 +7,7 @@ cluster.
 
 | Quick facts | |
 |---|---|
-| **Status** | All 12 chapters authored for issue [#1127](https://github.com/duynhlab/homelab/issues/1127); each chapter's live observation lab is pending verification on the Ubuntu Kind cluster until its observation-context table is filled |
+| **Status** | All 12 chapters authored for issue [#1127](https://github.com/duynhlab/homelab/issues/1127) and their live labs **verified** read-only on the Kind cluster on 2026-09-30 (ClickHouse 26.7.17.7); each chapter's observation-context table records timestamp, commit, table, and replica |
 | **Primary audience** | Platform engineers learning ClickHouse, from first principles through failure and scale reasoning |
 | **Page type** | Explanation-first chapters with one embedded, read-only observation lab |
 | **Case study** | `otel.otel_logs`, `otel.otel_traces`, and `otel.otel_traces_trace_id_ts` on the local Kind deployment |
@@ -173,7 +173,7 @@ teach-back gate pass the template's review checklist.
 - [ClickHouse documentation style guide (historical repository)](https://github.com/ClickHouse/clickhouse-docs/blob/main/contribute/style-guide.md)
 
 ---
-_Last updated: 2026-09-29 — linked all twelve authored chapters into the
+_Last updated: 2026-09-30 — status: all twelve live labs verified on the Kind cluster. Earlier: 2026-09-29 — linked all twelve authored chapters into the
 curriculum; live observation labs remain pending verification on the Ubuntu
 Kind cluster. Earlier the same day — established the curriculum, evidence
 vocabulary, shared glossary, and authoring boundary before the first internals

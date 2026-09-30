@@ -12,7 +12,7 @@ scaling action that addresses it, and names what each action costs.
 | **Prerequisites** | All previous chapters; especially [parts and merges](04-parts-and-merges.md), [replication](05-replication.md), [sharding](07-sharding.md), [tiered storage](10-storage-s3.md) |
 | **Deployment status** | Deployed limits (1 shard × 3 replicas, 2Gi memory limit, 10Gi PVC); scale-out options are Reference — not deployed |
 | **Platform scope** | Cluster `otel`; the `otel.*` tables; Keeper and RustFS as scaling dependencies |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The bottleneck → scaling-action decision model and its cost accounting |
 | **Not this page** | Merge-debt response procedure — [capacity and merge debt](../operations.md#capacity-and-merge-debt); the sharding trigger analysis — [RFC-0028 research](../../../proposals/rfc/RFC-0028/research.md) |
 | **Previous / next** | [Failure reasoning](11-failure-recovery.md) / [Learning path hub](README.md) |
@@ -207,19 +207,33 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+table                    disk_name  active_parts  rows     on_disk
+otel_logs                default    9             3269125  248.38 MiB
+otel_traces              default    3             6694     335.00 KiB
+otel_traces_trace_id_ts  default    5             3216     87.60 KiB
+
+metric                    value
+CGroupMemoryTotal         2147483648   (2 GiB)
+MaxPartCountForPartition  9
+ReplicasMaxAbsoluteDelay  0
+
+metric          value
+DelayedInserts  0
+MemoryTracking  145477059     (≈ 139 MiB, ≈ 7 % of the 0.9 × 2 GiB budget)
+Merge           0
+PartsActive     66
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.parts`, `system.asynchronous_metrics`, `system.metrics` (database `otel`) |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
 
 ### How to read the result
 
@@ -327,5 +341,5 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse knowledge base: `max_threads` and pipeline parallelism](https://clickhouse.com/docs/resources/support-center/knowledge-base/performance-optimization/async-vs-optimize-read-in-order)
 
 ---
-_Last updated: 2026-09-29 — first draft of the scaling-decisions chapter; live
+_Last updated: 2026-09-30 — live lab verified: 2 GiB cgroup, ~139 MiB tracked memory at idle, no delayed inserts. Earlier: 2026-09-29 — first draft of the scaling-decisions chapter; live
 observation pending verification on the Ubuntu Kind cluster._

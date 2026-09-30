@@ -13,7 +13,7 @@ keeps) when quorum goes away.
 | **Prerequisites** | [Replication](05-replication.md); the [shared glossary](README.md#shared-glossary) terms replica, part, Keeper |
 | **Deployment status** | Deployed — external 3-member ClickHouseKeeperInstallation `keeper` in `monitoring` |
 | **Platform scope** | Coordination for database `otel` and all ReplicatedMergeTree tables; Keeper cluster `keeper` (`chk-keeper-keeper-0-{0,1,2}`) |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20–11:24 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The quorum mental model, what state Keeper holds, session lifecycle, and outage behavior |
 | **Not this page** | What the replication log entries *do* — [Replication](05-replication.md); per-alert recovery — [Keeper runbooks](../../runbooks/clickhouse/README.md) |
 | **Previous / next** | [Replication](05-replication.md) / [Sharding and Distributed tables](07-sharding.md) |
@@ -48,7 +48,7 @@ It stores a small filesystem-like tree of **znodes** (named nodes holding a few
 bytes each) and gives ClickHouse three primitives: totally ordered writes,
 unique sequential numbers, and liveness detection through sessions. Keeper is
 a notary's ledger, not a warehouse: it records *that* part
-`20260929_457_457_0` exists and *who* must fetch it, never the part's bytes.
+`20260930_7093_7093_0` exists and *who* must fetch it, never the part's bytes.
 The analogy stops at scale — a notary is one person, while Keeper is itself a
 replicated system whose availability is governed by quorum arithmetic.
 
@@ -221,19 +221,44 @@ kubectl exec -n monitoring chk-keeper-keeper-0-0-0 -- \
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- system.zookeeper_connection on chi-clickhouse-otel-0-0-0
+name     host                                                       port  index  connected_time       is_expired
+default  chk-keeper-keeper-0-0-client.monitoring.svc.cluster.local. 2181  0      2026-09-30 02:17:34  0
+
+-- children of /clickhouse/databases/otel (the Replicated database)
+name                         czxid  mzxid  numChildren
+counter                      79     79     0
+first_replica_database_name  84     102    0
+log                          79     79     7
+logs_to_keep                 79     79     0
+max_log_ptr                  79     323    0
+metadata                     79     79     4
+replicas                     79     79     3
+
+-- echo mntr | nc (11:21 UTC)
+member                    zk_server_state  zk_synced_followers  zk_znode_count  zk_ephemerals_count  connections
+chk-keeper-keeper-0-0-0   leader           2                    2409            19                   2
+chk-keeper-keeper-0-1-0   follower         -                    2409            19                   0
+chk-keeper-keeper-0-2-0   follower         -                    2409            19                   1
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20–11:24 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.zookeeper_connection`; `system.zookeeper` path `/clickhouse/databases/otel` |
+| **Replica** | `chi-clickhouse-otel-0-0-0`; `mntr` from all three Keeper members |
+
+The table-replication state lives elsewhere: `system.replicas` reports
+`zookeeper_path` = `/clickhouse/tables/<table-uuid>/0` for each `otel` table,
+while `/clickhouse/databases/otel` holds only the `Replicated` database's DDL
+log and replica list. Three client connections across the ensemble match the
+three ClickHouse replicas; which member each one uses is a client choice, not a
+role.
 
 ### How to read the result
 
@@ -326,6 +351,6 @@ Before continuing, explain these without rereading the chapter:
 - [`system.zookeeper`](https://clickhouse.com/docs/reference/system-tables/zookeeper) and [`system.zookeeper_connection`](https://clickhouse.com/docs/reference/system-tables/zookeeper_connection)
 
 ---
-_Last updated: 2026-09-29 — first draft: quorum mental model, znode inventory,
+_Last updated: 2026-09-30 — live lab verified: one leader and two synced followers, 2,409 znodes; database vs table znode paths distinguished. Earlier: 2026-09-29 — first draft: quorum mental model, znode inventory,
 session→read-only lifecycle, outage capability matrix, and the deployed
 3-member CHK; live lab pending verification._

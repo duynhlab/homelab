@@ -12,7 +12,7 @@ bytes, where each copy lives, and which layer owns deletion.
 | **Prerequisites** | [Parts and merges](04-parts-and-merges.md), [Keeper](06-keeper.md) |
 | **Deployment status** | Deployed (`hot_cold` policy on `otel_logs` and `otel_traces`; the trace-ID lookup table stays local) |
 | **Platform scope** | `otel.otel_logs`, `otel.otel_traces`, `otel.otel_traces_trace_id_ts`; disks `default`, `s3`, `s3_cache`; RustFS bucket `clickhouse-otel` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20–11:22 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Where bytes live across hot, cold, cache, and retention boundaries, and which layer owns each move and each delete |
 | **Not this page** | Why TTL is merge work and how partitions bound it — [Parts, merges, partitions, and TTL](../parts-merges-and-ttl.md); day-2 disk and cold-tier procedures — [ClickHouse operations](../operations.md#disk-and-cold-tier) |
 | **Previous / next** | [Materialized views](09-materialized-views.md) / [Failure reasoning](11-failure-recovery.md) |
@@ -266,19 +266,47 @@ or a literal `{replica}/` — the manifest marks this unverified.
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+name      type           path                           total       unreserved
+default   Local          /var/lib/clickhouse/           500.10 GiB  273.63 GiB
+s3        ObjectStorage  /var/lib/clickhouse/disks/s3/  16.00 EiB   16.00 EiB
+s3_cache  ObjectStorage  /var/lib/clickhouse/disks/s3/  16.00 EiB   16.00 EiB
+          (s3_cache: cache_path /var/lib/clickhouse/disks/s3_cache/, metadata_type Local)
+
+policy_name  volume_name  volume_priority  disks         perform_ttl_move_on_insert
+default      default      1                ['default']   1
+hot_cold     hot          1                ['default']   1
+hot_cold     cold         2                ['s3_cache']  0
+
+table                    disk_name  active_parts  active_bytes  oldest_partition
+otel_logs                default    8             248.31 MiB    2026-09-30
+otel_traces              default    3             335.00 KiB    2026-09-30
+otel_traces_trace_id_ts  default    5             87.60 KiB     2026-09-30
+
+system.remote_data_paths: 0 objects
+rendered S3 endpoint: http://rustfs-svc.rustfs.svc.cluster.local:9000/clickhouse-otel/{replica}/
+system.macros: replica = chi-clickhouse-otel-0-0
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20–11:22 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.disks`, `system.storage_policies`, `system.parts`, `system.remote_data_paths` |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
+
+Declared versus observed (2026-09-30 11:22 UTC): the cold tier is **empty**.
+The cluster was rebuilt the same morning, every part is in partition
+`2026-09-30`, and the move TTL is 7 days, so no part has crossed to
+`s3_cache` yet (`remote_data_paths` = 0). That leaves the CHI's UNVERIFIED
+`{replica}` claim open: the rendered server config still contains the literal
+`{replica}` in the endpoint, and the `replica` macro exists
+(`chi-clickhouse-otel-0-0`), but whether the object-store client expands it can
+only be proven by the first object's key. Revisit after the first cold move
+(≥ 7 days of uptime) — until then the claim stays **Inference**.
 
 ### How to read the result
 
@@ -387,5 +415,5 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse: `system.remote_data_paths`](https://clickhouse.com/docs/reference/system-tables/remote_data_paths)
 
 ---
-_Last updated: 2026-09-29 — first draft of the tiered-storage chapter; live
+_Last updated: 2026-09-30 — live lab verified: disks and `hot_cold` policy live, cold tier still empty so the `{replica}` expansion stays unverified. Earlier: 2026-09-29 — first draft of the tiered-storage chapter; live
 observation pending verification on the Ubuntu Kind cluster._

@@ -13,7 +13,7 @@ you touch anything.
 | **Prerequisites** | Chapters [01](01-architecture.md)–[10](10-storage-s3.md); this chapter assumes the mechanisms and only adds the reasoning order |
 | **Deployment status** | Deployed topology; the failure behaviors themselves are upstream invariants and inferences — none was induced on this cluster |
 | **Platform scope** | The whole ingestion-to-query path: Collector → ClickHouse (3 replicas) → Keeper (3 members) → RustFS → Grafana |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20–11:24 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The propagation model: symptom → failing layer → evidence, and which invariant survives each failure |
 | **Not this page** | Recovery *procedures* — [ClickHouse operations](../operations.md#recovery-checklist) and the [per-alert runbooks](../../runbooks/clickhouse/README.md) own every command that changes state |
 | **Previous / next** | [Tiered storage](10-storage-s3.md) / [Scaling decisions](12-scaling.md) |
@@ -223,19 +223,45 @@ LIMIT 20;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- replica health
+table                    is_readonly  is_session_expired  queue_size  absolute_delay  active/total
+otel_logs                0            0                   0           0               3/3
+otel_traces              0            0                   0           0               3/3
+otel_traces_trace_id_ts  0            0                   0           0               3/3
+
+-- part pressure per partition
+table                    partition   active_parts  rows
+otel_logs                2026-09-30  8             3268598
+otel_traces_trace_id_ts  2026-09-30  5             3216
+otel_traces              2026-09-30  3             6694
+
+-- system.errors (top, since server start 02:17 UTC)
+name                   code  occurrences  last_error_time
+TYPE_MISMATCH          53    6            2026-09-30 11:20:37
+NO_ELEMENTS_IN_CONFIG  139   3            2026-09-30 02:21:49
+WRONG_PASSWORD         193   21           2026-09-30 02:20:34
+AUTHENTICATION_FAILED  516   21           2026-09-30 02:20:34
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20–11:24 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.replicas`, `system.parts`, `system.errors` (database `otel`) |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
+
+Reading the error counters against their timestamps: the 21
+`WRONG_PASSWORD`/`AUTHENTICATION_FAILED` all stop at 02:20:34, three minutes
+after the server started and never recur — the shape of a bring-up
+ordering window, not of an ongoing attack or a standing misconfiguration
+(Inference — from the timestamps; which client failed is not recorded in the
+counter, and the server log for that window is the proof). `TYPE_MISMATCH` is recent; `system.errors` keeps only the
+last occurrence, so attributing it needs `system.query_log` or the server log —
+a counter alone proves neither cause nor impact.
 
 ### How to read the result
 
@@ -350,5 +376,5 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse: MergeTree settings — `parts_to_delay_insert`, `parts_to_throw_insert`](https://clickhouse.com/docs/reference/settings/merge-tree-settings/parts-to)
 
 ---
-_Last updated: 2026-09-29 — first draft of the failure-reasoning chapter; live
+_Last updated: 2026-09-30 — live lab verified: healthy replicas, bring-up authentication errors bounded to the first minutes. Earlier: 2026-09-29 — first draft of the failure-reasoning chapter; live
 observation pending verification on the Ubuntu Kind cluster._

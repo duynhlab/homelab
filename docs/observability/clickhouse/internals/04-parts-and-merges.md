@@ -1,8 +1,8 @@
 # Parts and merges — how an insert becomes immutable parts that evolve
 
-Two parts observed in the same partition on this cluster — `20260929_0_456_17`
-with 202,237 rows and `20260929_457_457_0` with 555 rows — look like arbitrary
-file names until you can read them. This chapter teaches the write lifecycle
+Two parts observed in the same partition of `otel.otel_logs` on this cluster —
+`20260930_0_2977_18` with 1,374,649 rows and `20260930_7093_7093_0` with 528
+rows — look like arbitrary file names until you can read them. This chapter teaches the write lifecycle
 that produced them: how a batch of telemetry becomes an immutable part, and how
 background merges rewrite parts without ever modifying one.
 
@@ -13,7 +13,7 @@ background merges rewrite parts without ever modifying one.
 | **Prerequisites** | [MergeTree layout](03-mergetree.md); the [shared glossary](README.md#shared-glossary) terms block, granule, part, partition, merge |
 | **Deployment status** | Deployed — `otel.otel_logs`, `otel.otel_traces`, `otel.otel_traces_trace_id_ts` on the Kind cluster |
 | **Platform scope** | Database `otel`, all three replicated tables; write path from the OpenTelemetry Collector |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:18:22 (snapshot A) and 11:48:30 UTC (snapshot B), ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | How an insert becomes immutable parts, how those parts evolve, and the live two-part case study |
 | **Not this page** | Merge pressure thresholds, partitions, and TTL mechanics — [Parts, merges, partitions, and TTL](../parts-merges-and-ttl.md); replica convergence — [Replication](05-replication.md) |
 | **Previous / next** | [MergeTree layout](03-mergetree.md) / [Replication](05-replication.md) |
@@ -22,7 +22,7 @@ background merges rewrite parts without ever modifying one.
 
 - What sequence of states does data pass through between an INSERT and an
   immutable part on disk?
-- What do the four fields of a part name like `20260929_0_456_17` record, and
+- What do the four fields of a part name like `20260930_0_2977_18` record, and
   what can each field not prove?
 - When does the deployed asynchronous-insert buffer flush, and what does the
   client acknowledgement mean at each setting?
@@ -133,37 +133,59 @@ stateDiagram-v2
 `<partition-id>_<min-block>_<max-block>_<level>` — and after a mutation, a
 fifth field `_<mutation-version>`. ClickHouse ships an introspection function,
 [`mergeTreePartInfo`](https://clickhouse.com/docs/reference/functions/regular-functions/introspection),
-that unpacks exactly these fields. Applied to the two observed parts
-(partition `2026-09-29`, table identity **pending live verification**):
+that unpacks exactly these fields. Applied to the two case-study parts
+(`otel.otel_logs`, partition `2026-09-30`, observed 2026-09-30 11:18–11:28 UTC;
+`mergeTreePartInfo` returned `('20260930','','',0,2977,18,0)` and
+`('20260930','','',7093,7093,0,0)`):
 
-| Field | `20260929_0_456_17` | `20260929_457_457_0` | Meaning |
+| Field | `20260930_0_2977_18` | `20260930_7093_7093_0` | Meaning |
 |---|---|---|---|
-| Partition ID | `20260929` | `20260929` | `PARTITION BY toDate(...)` renders one day as `YYYYMMDD` |
-| Min block | `0` | `457` | Lowest block number the part covers |
-| Max block | `456` | `457` | Highest block number the part covers |
-| Level | `17` | `0` | Merge depth: 17 generations of merging vs. a raw insert |
+| Partition ID | `20260930` | `20260930` | `PARTITION BY toDate(...)` renders one day as `YYYYMMDD` |
+| Min block | `0` | `7093` | Lowest block number the part covers |
+| Max block | `2977` | `7093` | Highest block number the part covers |
+| Level | `18` | `0` | Merge depth: 18 generations of merging vs. a raw insert |
 
-The big part is the merged history of every block from 0 through 456 in that
-day's partition that still has surviving rows; the small part is a single
-freshly inserted block (min = max = 457) that no merge has touched yet
-(level 0). The natural next step for the engine is a future merge producing
-something like `20260929_0_457_18`. (Inference — from the naming rule; whether
-that merge has happened is a live observation to capture, not a promise.)
+The big part is the merged history of every block from 0 through 2977 of that
+day that still has surviving rows. `system.part_log` shows how it was born: one
+merge at 05:58:51 that took 20.3 s and read seven inputs at levels 16, 17, 16,
+16, 14, 12 and 8 — so its level is 17 + 1 = 18. The small part is one freshly
+inserted block (min = max = 7093) that no merge had touched: level 0.
+
+Its whole life is in the logs of two replicas. `chi-clickhouse-otel-0-2-0`
+wrote it (`NewPart`, 528 rows, 25 ms, 11:09:29); `chi-clickhouse-otel-0-0-0`
+fetched it in the same second (`DownloadPart`) and 17 s later merged it with
+four neighbours into `20260930_7093_7097_1` (level 1). That part fed
+`20260930_7054_7101_7` (level 7 = max(6, 1, 0) + 1), and the level-0 part was
+physically removed at 11:21:14 on one replica and 11:22:15 on the other — about
+twelve minutes after it stopped being active.
+
+The issue that commissioned this chapter named two other parts,
+`20260929_0_456_17` and `20260929_457_457_0`, observed on 2026-09-29. They no
+longer exist anywhere: the cluster was destroyed and rebuilt on 2026-09-30, and
+neither `system.parts` nor `system.part_log` (whose earliest event is
+2026-09-30 02:17 UTC) has a row for them. Absence plus the start of the log is
+the only evidence left, so the case study moved to parts that can still be
+queried. Their names read exactly as the table above teaches.
 
 **What the name cannot prove** — the limits of inference required by this case
 study:
 
-- **Level 17 records merge depth, not a count of 17 merge operations.** Level
-  is max(input levels) + 1 per merge, along one deepest path. Many more (or
-  fewer) total merge operations across the partition can lie behind a level-17
-  part than 17.
+- **Level 18 records merge depth, not a count of 18 merge operations.** Level
+  is max(input levels) + 1 per merge, along one deepest path. On this replica
+  alone `otel_logs` ran 163 merges in the hour before the snapshot; the seven
+  inputs of `20260930_0_2977_18` each carried their own histories. Far more
+  than 18 merges lie behind it.
 - **Max block 456 is not proof of 457 client INSERT requests.** The deployed
   collector inserts with `async_insert=true` (repository fact —
   [`otel-collector.yaml`](../../../../kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml)),
   so one block typically aggregates many buffered insert queries; conversely a
   large flush can split into several blocks. Block numbers count blocks, not
-  requests — and not rows.
-- **202,237 rows is not the total ever ingested for that day.** Merges keep
+  requests — and not rows. Measured: block numbers advanced from 7054 to 7210
+  between 11:08 and 11:18 UTC (≈ 157 blocks in 10 minutes) while the inserting
+  replica logged 200 INSERT queries in 15 minutes (≈ 133 per 10 minutes) — close
+  to one block per ~5 s flush, but not one per request.
+- **1,374,649 rows is not the total ever ingested for that day.** At the same
+  moment the partition held 3.25 M rows across seven active parts. Merges keep
   only surviving rows, and delete-TTL drops whole expired parts
   (`ttl_only_drop_parts = 1` in the
   [DDL](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql)). Rows in
@@ -171,7 +193,9 @@ study:
   written".
 - **The name says nothing about which replica created it.** On a replicated
   table the same part name exists on every replica, whether it was written
-  locally or fetched — [chapter 05](05-replication.md) owns that distinction.
+  locally or fetched — `20260930_7093_7093_0` was `NewPart` on one replica and
+  `DownloadPart` on another. [Chapter 05](05-replication.md) owns that
+  distinction.
 
 ### Merge selection, and mutations versus merges
 
@@ -201,7 +225,7 @@ you can recognize a five-field part name if one ever shows up in evidence.
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
 | Async-insert buffering before block formation | The ClickHouse exporter sets `async_insert: true` on its connection; batching upstream of it is 512–1024 items or 5 s | [`otel-collector.yaml`](../../../../kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml) | Repository fact |
-| Acknowledgement mode `wait_for_async_insert` | Not set in the exporter config, so the server default applies; upstream default acknowledges only after the buffer flushes to a part | [Async inserts](https://clickhouse.com/docs/optimize/asynchronous-inserts); live value pending | Upstream invariant + Inference (verify `system.settings` live) |
+| Acknowledgement mode `wait_for_async_insert` | Not set in the exporter config, so the server default applies: acknowledge only after the buffer flushes to a part | [Async inserts](https://clickhouse.com/docs/optimize/asynchronous-inserts); live `system.settings`: `wait_for_async_insert = 1`, `changed = 0` (2026-09-30) | Observed |
 | One part per flushed block, per partition | Daily partitions (`PARTITION BY toDate(...)`) mean a flush spanning midnight writes at least two parts | [`10-otel_logs.sql`](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql) | Repository fact |
 | Whole-part TTL drops | `ttl_only_drop_parts = 1` on all three `otel` tables — expired data leaves as `RemovePart` of whole parts, never as row rewrites | [`10-otel_logs.sql`](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql), [`30-otel_traces_trace_id_ts.sql`](../../../../images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql) | Repository fact |
 | Part-count guardrails | Alerts fire at 300 active parts (total and per partition) | [Part pressure](../parts-merges-and-ttl.md#part-pressure-and-the-two-guard-dimensions), [`ClickHouseTooManyParts` runbook](../../runbooks/clickhouse/ClickHouseTooManyParts.md) | Repository fact |
@@ -215,8 +239,10 @@ owned by [Parts, merges, partitions, and TTL](../parts-merges-and-ttl.md).
 
 ## Observe it on the live cluster
 
-This lab identifies the two case-study parts, decodes them from
-`system.parts`, and reads their lineage from `system.part_log`. It is
+This lab lists today's parts of `otel_logs`, decodes one from its name, and
+reads its lineage from `system.part_log`. The parts it names are the ones
+observed on 2026-09-30; on your run, pick the highest-level active part and
+any recent level-0 part from the first query and substitute their names. It is
 read-only. Do not run `OPTIMIZE` to force the pending merge — the hub
 Playground demonstrates `OPTIMIZE` on a scratch basis, but the
 [safety boundary](README.md#observation-safety) forbids it here; if you want to
@@ -232,16 +258,9 @@ naturally.
 
 ### Query
 
-Identify the case-study parts wherever they live, then decode the partition's
-active set:
-
-```sql
-SELECT database, table, name, rows, level, active, disk_name
-FROM system.parts
-WHERE name IN ('20260929_0_456_17', '20260929_457_457_0')
-ORDER BY name
-LIMIT 10;
-```
+Today's partition, active and recently outdated parts together — outdated
+parts linger for a few minutes after a merge, which is what makes lineage
+visible here:
 
 ```sql
 SELECT
@@ -255,17 +274,28 @@ SELECT
     modification_time
 FROM system.parts
 WHERE database = 'otel'
-  AND partition = '2026-09-29'      -- adjust table/partition to the first query's answer
-  AND active
-ORDER BY min_block_number
-LIMIT 20;
+  AND table = 'otel_logs'
+  AND partition = toString(today())
+ORDER BY min_block_number, level
+LIMIT 40;
 ```
 
+Decode a name with the engine's own parser:
+
 ```sql
-SELECT event_time, event_type, part_name, rows, merge_reason, error
+SELECT mergeTreePartInfo('20260930_0_2977_18') AS big,
+       mergeTreePartInfo('20260930_7093_7093_0') AS small;
+```
+
+Then the lineage of both parts — how each was born and what consumed it:
+
+```sql
+SELECT event_time, event_type, part_name, rows, length(merged_from) AS inputs, merged_from
 FROM system.part_log
 WHERE database = 'otel'
-  AND part_name IN ('20260929_0_456_17', '20260929_457_457_0')
+  AND table = 'otel_logs'
+  AND (part_name IN ('20260930_0_2977_18', '20260930_7093_7093_0')
+       OR has(merged_from, '20260930_7093_7093_0'))
 ORDER BY event_time
 LIMIT 20;
 ```
@@ -273,25 +303,77 @@ LIMIT 20;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- lost sample parts (issue, 2026-09-29) on chi-clickhouse-otel-0-0-0
+system.parts 0 rows · system.part_log 0 rows · earliest part_log event 2026-09-30 02:17:39
+
+-- snapshot A 11:18:22 UTC, otel.otel_logs partition 2026-09-30, active parts
+name                   rows     marks level on_disk     part_type
+20260930_0_2977_18     1374649  180   18    103.21 MiB  Wide
+20260930_2978_5708_18  1201717  158   18    91.19 MiB   Wide
+20260930_5709_6180_16  214208   30    16    16.51 MiB   Wide
+20260930_6181_6861_16  304614   41    16    23.49 MiB   Wide
+20260930_6862_7053_14  87716    12    14    6.94 MiB    Wide
+20260930_7054_7205_11  69105    10    11    5.48 MiB    Wide
+... plus inactive 7054_7073_3 → 7054_7078_4 → ... → 7054_7151_10 (active = 0)
+
+-- mergeTreePartInfo
+big:   ('20260930','','',0,2977,18,0)
+small: ('20260930','','',7093,7093,0,0)
+
+-- lineage (part_log)
+05:58:51  MergeParts    20260930_0_2977_18    1374649 rows  20288 ms  7 inputs
+          0_728_16, 729_1484_17, 1485_1870_16, 1871_2636_16,
+          2637_2804_14, 2805_2933_12, 2934_2977_8
+11:09:29  NewPart       20260930_7093_7093_0  528 rows (on -0-2-0, the logs inserter)
+11:09:29  DownloadPart  20260930_7093_7093_0  (on -0-0-0)
+11:09:46  MergeParts    20260930_7093_7097_1  2512 rows   5 inputs
+11:10:02  MergeParts    20260930_7054_7101_7  21684 rows  6 inputs
+11:10:47  MergeParts    20260930_7054_7111_8  → 11:11:32 20260930_7054_7121_9
+11:21:14  RemovePart    20260930_7093_7093_0  (-0-0-0; 11:22:15 on -0-2-0)
+
+-- snapshot B 11:48:30 UTC, same partition, active parts
+20260930_0_2977_18     1374649  180  18  Wide      (unchanged)
+20260930_2978_5708_18  1201717  158  18  Wide      (unchanged)
+20260930_5709_6180_16  214208   30   16  Wide
+20260930_6181_6861_16  304614   41   16  Wide
+20260930_6862_7344_15  221283   30   15  Wide      11:28:42
+20260930_7345_7526_12  80470    11   12  Wide      11:42:07
+20260930_7527_7599_11  32476    5    11  Wide      11:47:43
+20260930_7600_7608_2   3857     2    2   Compact
+20260930_7609_7609_0   520      2    0   Compact
+
+-- merges between the snapshots (part_log, -0-0-0)
+11:28:42  20260930_6862_7344_15  ← 6862_7053_14, 7054_7205_11, 7206_7316_12, 7317_7344_5
+11:42:07  20260930_7345_7526_12  ← 7345_7444_11, 7445_7513_11, 7514_7522_2, 7523..7526 (level 0)
+11:18:22–11:48:30 event counts: MergeParts 83 · DownloadPart 398 · RemovePart 489 · NewPart 0
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:18:22 (snapshot A) and 11:48:30 UTC (snapshot B) |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `otel.otel_logs` partition `2026-09-30` |
+| **Replica** | `chi-clickhouse-otel-0-0-0` (the `NewPart` row for `7093` from `chi-clickhouse-otel-0-2-0`) |
+
+Snapshot B, thirty minutes after snapshot A and with no `OPTIMIZE`, shows
+merges happening on their own. Two level-18 parts sat untouched. The level-14 and
+level-11 parts from snapshot A were folded into `20260930_6862_7344_15`, whose
+inputs were at levels 14, 11, 12, and 5, so its level is 15, one more than the
+highest input. `20260930_7345_7526_12` repeats the rule: 11, 11, 2, 0 → 12.
+Both are **Observed** on `chi-clickhouse-otel-0-0-0`. That replica shows
+`NewPart` 0 because every logs insert lands on `-0-2-0` and this replica only
+downloads them ([chapter 08](08-ingestion-pipeline.md)). Yet it ran 83 merges
+of its own: merges are computed locally ([chapter 05](05-replication.md)).
 
 ### How to read the result
 
 | Field or relationship | Interpretation | What it cannot prove |
 |---|---|---|
-| `database`, `table` from query 1 | The case-study parts' owner; the issue supplied only names, so this is the identification step | Nothing about which replica first wrote them |
+| `active = 0` rows between active ones | Outdated inputs of a recent merge, kept until cleanup — each run of them is a merge you can reconstruct | How long they will stay: removal is asynchronous (about twelve minutes in the 2026-09-30 run) |
 | `level` vs. `rows` | High level + many rows = accumulated merge history; level 0 + few rows = one raw insert block | Level does not count merge operations, and rows do not count ingested rows |
 | `min_block_number`..`max_block_number` ranges tiling the partition | Active parts cover disjoint block ranges; gaps mean those blocks' rows now live inside a wider merged part or were dropped by TTL | A missing range is not evidence of data loss |
 | `part_type` | `Wide` or `Compact` representation ([chapter 03](03-mergetree.md)) | — |
@@ -302,8 +384,9 @@ Observation context:
 ### What to notice
 
 - Every value above is an **observed example**, not a platform constant. Part
-  names, row counts, and levels change with every flush and merge; the two
-  case-study parts may already be `Outdated` or gone when you look.
+  names, row counts, and levels change with every flush and merge; a level-0
+  part is typically merged within seconds and removed within minutes, and the
+  2026-09-29 parts named in the issue were gone entirely after one rebuild.
 - If query 1 returns rows from more than one replica's perspective (or none),
   that is itself evidence: parts exist per replica, and lineage differs per
   replica even when content converges.
@@ -324,11 +407,11 @@ background work catches up.
 
 ## Misconceptions and challenge questions
 
-### "Part `20260929_0_456_17` was produced by 17 merges of 457 inserts"
+### "Part `20260930_0_2977_18` was produced by 18 merges of 2,978 inserts"
 
-Both numbers are misread. Level 17 means the deepest merge chain behind this
-part is 17 generations — the total number of merge operations in the partition
-is neither 17 nor derivable from the name. Block range 0–456 counts *blocks*
+Both numbers are misread. Level 18 means the deepest merge chain behind this
+part is 18 generations — the total number of merge operations in the partition
+is neither 18 nor derivable from the name. Block range 0–2977 counts *blocks*
 allocated in the partition, and with the deployed `async_insert: true` one
 block usually aggregates many client insert requests, while one large flush
 can also produce several blocks. The name proves coverage and depth; it counts
@@ -353,7 +436,7 @@ Before continuing, explain these without rereading the chapter:
 
 - [ ] The write path from INSERT to active part, in your own words, including
       where the async-insert buffer sits and what makes a part immutable.
-- [ ] What each of the four fields in `20260929_0_456_17` records, where that
+- [ ] What each of the four fields in `20260930_0_2977_18` records, where that
       metadata lives (part directory name and `system.parts`), and which
       component allocates block numbers.
 - [ ] What happens to buffered rows if the server restarts before a flush,
@@ -385,6 +468,7 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse 2026 OSS changelog — merge selector, insert deduplication](https://clickhouse.com/docs/resources/changelogs/oss/2026)
 
 ---
-_Last updated: 2026-09-29 — first draft: write lifecycle, part-name case study
-for `20260929_0_456_17` / `20260929_457_457_0`, and the async-insert
-acknowledgement boundary; live lab pending verification._
+_Last updated: 2026-09-30 — case study re-anchored on live parts
+`20260930_0_2977_18` / `20260930_7093_7093_0` with their full `part_log`
+lineage across two replicas and a second snapshot; the issue's 2026-09-29 parts
+were lost with the cluster rebuild. Earlier: 2026-09-29 — first draft._

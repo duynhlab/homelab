@@ -12,7 +12,7 @@ makes some filters on `otel_logs` unable to skip much at all.
 | **Prerequisites** | [Query pipeline](02-query-pipeline.md) — where pruning numbers come from |
 | **Deployment status** | Deployed |
 | **Platform scope** | `otel.otel_logs` and `otel.otel_traces` on cluster `otel` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | How MergeTree organizes data on disk so analytical reads are fast |
 | **Not this page** | How parts are born and merged over time — [Parts and merges](04-parts-and-merges.md); choosing/tuning keys — [Schema and queries](../schema-and-queries.md) |
 | **Previous / next** | [Query pipeline](02-query-pipeline.md) / [Parts and merges](04-parts-and-merges.md) |
@@ -238,19 +238,33 @@ LIMIT 20;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+name                   part_type  rows     marks  avg_rows_per_granule  on_disk     pk_in_memory
+20260930_0_2977_18     Wide       1374649  180    7637                  103.21 MiB  2.46 KiB
+20260930_2978_5708_18  Wide       1201717  158    7606                  91.19 MiB   2.19 KiB
+20260930_6181_6861_16  Wide       304614   41     7430                  23.49 MiB   698.00 B
+20260930_5709_6180_16  Wide       214208   30     7140                  16.51 MiB   540.00 B
+20260930_6862_7053_14  Wide       87716    12     7310                  6.94 MiB    236.00 B
+(all on disk `default`)
+
+table                    name                type_full                            granularity
+otel_logs                idx_log_attr_key    text(tokenizer = 'array')            100000000
+otel_logs                idx_lower_body      text(tokenizer = 'splitByNonAlpha')  100000000
+… 8 text indexes on otel_logs, all 100000000
+otel_traces              idx_duration        minmax                               1
+otel_traces              idx_trace_id        bloom_filter(0.001)                  1
+… 5 bloom_filter(0.01) indexes on otel_traces / otel_traces_trace_id_ts, all 1
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `otel.otel_logs` (parts); `otel.*` (skip indexes) |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
 
 ### How to read the result
 
@@ -348,4 +362,4 @@ Before continuing, explain these without rereading the chapter:
 - [Architecture overview — MergeTree](https://clickhouse.com/docs/resources/develop-contribute/introduction/architecture)
 
 ---
-_Last updated: 2026-09-29 — first published version of the MergeTree layout chapter; live lab pending verification._
+_Last updated: 2026-09-30 — live lab verified: part anatomy (~7,600 rows per granule) and skip-index granularities. Earlier: 2026-09-29 — first published version of the MergeTree layout chapter; live lab pending verification._

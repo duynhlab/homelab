@@ -13,7 +13,7 @@ and why a retried insert usually does not duplicate data.
 | **Prerequisites** | [Parts and merges](04-parts-and-merges.md); the [shared glossary](README.md#shared-glossary) terms part, replica, merge |
 | **Deployment status** | Deployed — one shard, three replicas, all `otel` tables on ReplicatedMergeTree |
 | **Platform scope** | Database `otel` on cluster `otel` (`chi-clickhouse-otel-0-{0,1,2}`) |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20–11:24 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The replication log/queue mechanism, part exchange, insert deduplication, and convergence after downtime |
 | **Not this page** | Keeper consensus and session mechanics — [Keeper](06-keeper.md); the decision to run 1×3 — [ADR-065](../../../proposals/adr/ADR-065-clickhouse-replicated-topology/README.md) |
 | **Previous / next** | [Parts and merges](04-parts-and-merges.md) / [Keeper](06-keeper.md) |
@@ -40,7 +40,7 @@ consumes the log independently, copies pending entries into its private
 **queue**, and executes them at its own pace.
 
 So the unit of replication is the **part**, and the medium is the **log
-entry**. An entry says "part `20260929_457_457_0` now exists — get it" or
+entry**. An entry says "part `20260930_7093_7093_0` now exists — get it" or
 "merge these six parts into that one". Rows travel between replicas only when
 a replica downloads a part it does not have. A replica two hours behind is not
 broken; it is a consumer with a large unread backlog. (Upstream invariant —
@@ -93,15 +93,15 @@ platform-context version of this walk, with component names, is the
 ```mermaid
 sequenceDiagram
     participant C as Collector (client)
-    participant R1 as Replica 0-0
+    participant R1 as Replica 0-2
     participant K as Keeper (log)
-    participant R2 as Replica 0-1
+    participant R2 as Replica 0-0
 
     C->>R1: INSERT (one block after async flush)
     R1->>K: allocate block number and register block hash
-    K-->>R1: number 457 (or: hash seen → dedup, drop silently)
-    R1->>R1: write part 20260929_457_457_0 locally
-    R1->>K: append log entry GET_PART 20260929_457_457_0
+    K-->>R1: number 7093 (or: hash seen → dedup, drop silently)
+    R1->>R1: write part 20260930_7093_7093_0 locally
+    R1->>K: append log entry GET_PART 20260930_7093_7093_0
     R1-->>C: acknowledge
     K-->>R2: (R2 polls) new entries after its log_pointer
     R2->>R2: copy entry into queue
@@ -234,19 +234,51 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- system.replicas on chi-clickhouse-otel-0-0-0 (11:24 UTC)
+table                    is_leader  is_readonly  total  active  queue_size  absolute_delay  log_pointer  lost_part_count
+otel_logs                1          0            3      3       0           0               8716         0
+otel_traces              1          0            3      3       0           0               2086         0
+otel_traces_trace_id_ts  1          0            3      3       0           0               2047         0
+
+-- system.replication_queue: no rows (queue fully drained)
+
+-- the same row on every replica, 11:24:27 UTC
+replica                    table      is_leader  log_pointer  queue  delay
+chi-clickhouse-otel-0-0-0  otel_logs  1          8721         0      0
+chi-clickhouse-otel-0-1-0  otel_logs  1          8721         0      0
+chi-clickhouse-otel-0-2-0  otel_logs  1          8721         0      0
+
+-- system.part_log, otel_logs, last hour, per replica
+replica  NewPart  DownloadPart  MergeParts  RemovePart
+0-2      798      0             163         974
+0-0      0        796           163         973
+0-1      0        796           162         973
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20–11:24 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `otel.otel_logs`, `otel.otel_traces`, `otel.otel_traces_trace_id_ts` (`system.replicas`, `system.replication_queue`, `system.part_log`) |
+| **Replica** | `chi-clickhouse-otel-0-0-0`; cross-replica rows from all three |
+
+What this evidence adds (2026-09-30):
+
+- **Every replica is a leader.** `is_leader = 1` on all three — current
+  releases allow several merge-assigning leaders, so "the leader" is not a
+  single node here.
+- **Inserts landed on one replica, parts reached all three.** In that hour only
+  `chi-clickhouse-otel-0-2-0` wrote new `otel_logs` parts (`NewPart` 798); the
+  other two recorded ~796 `DownloadPart` each — the `GET_PART` path above.
+- **Merged parts were computed, not fetched.** All three replicas executed
+  ~163 `MergeParts`, and no replica downloaded a merged part (`DownloadPart`
+  ≈ `NewPart`, i.e. only level-0 parts crossed the wire). Each replica ran the
+  same assigned merge locally; fetching the result remains the fallback, not
+  what happened in this window.
 
 ### How to read the result
 
@@ -341,6 +373,6 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse 2026 OSS changelog — insert deduplication defaults](https://clickhouse.com/docs/resources/changelogs/oss/2026)
 
 ---
-_Last updated: 2026-09-29 — first draft: log/queue mechanism, dedup window,
+_Last updated: 2026-09-30 — live lab verified: every replica a leader, inserts on one replica, level-0 parts fetched, merges computed locally on all three. Earlier: 2026-09-29 — first draft: log/queue mechanism, dedup window,
 merge fetch-vs-execute, offline catch-up, and the single-replica durability
 window; live lab pending verification._

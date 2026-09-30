@@ -13,7 +13,7 @@ that expose them.
 | **Prerequisites** | [ClickHouse in this platform](01-architecture.md); basic SQL |
 | **Deployment status** | Deployed |
 | **Platform scope** | Any single replica of cluster `otel`; worked examples use `otel.otel_logs` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20–11:22 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | What happens between SQL submission and returned rows |
 | **Not this page** | Schema tuning and pruning practice — [Schema and queries](../schema-and-queries.md); how data got into sorted parts — chapters [03](03-mergetree.md)–[04](04-parts-and-merges.md) |
 | **Previous / next** | [ClickHouse in this platform](01-architecture.md) / [MergeTree layout](03-mergetree.md) |
@@ -82,7 +82,7 @@ the index during planning, not during cooking.
 
 ### Lifecycle or sequence
 
-Walking `SELECT count() FROM otel.otel_logs WHERE ServiceName = 'cart-service'
+Walking `SELECT count() FROM otel.otel_logs WHERE ServiceName = 'clickhouse'
 AND Timestamp >= now() - INTERVAL 1 HOUR` through the stages:
 
 1. **Parse.** Text → AST. Syntax errors stop here. Inspect with `EXPLAIN AST`.
@@ -156,7 +156,7 @@ EXPLAIN indexes = 1
 SELECT count()
 FROM otel.otel_logs
 WHERE Timestamp >= now() - INTERVAL 1 HOUR
-  AND ServiceName = 'cart-service';
+  AND ServiceName = 'clickhouse';
 ```
 
 The physical pipeline and its parallelism for the same query:
@@ -166,7 +166,7 @@ EXPLAIN PIPELINE
 SELECT count()
 FROM otel.otel_logs
 WHERE Timestamp >= now() - INTERVAL 1 HOUR
-  AND ServiceName = 'cart-service';
+  AND ServiceName = 'clickhouse';
 ```
 
 Then run the query itself, and read its record back from this replica's log:
@@ -177,7 +177,7 @@ SELECT
     count() AS matching_rows
 FROM otel.otel_logs
 WHERE Timestamp >= now() - INTERVAL 1 HOUR
-  AND ServiceName = 'cart-service';
+  AND ServiceName = 'clickhouse';
 ```
 
 ```sql
@@ -190,6 +190,7 @@ SELECT
 FROM system.query_log
 WHERE type = 'QueryFinish'
   AND query LIKE '%matching_rows%'
+  AND query NOT ILIKE '%system.query_log%'   -- skip this lookup itself
   AND event_time >= now() - INTERVAL 10 MINUTE
 ORDER BY event_time DESC
 LIMIT 3;
@@ -198,19 +199,57 @@ LIMIT 3;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- EXPLAIN indexes = 1, ServiceName = 'clickhouse', last hour (11:22 UTC)
+AggregatingProjection
+├──ReadFromMergeTree (otel.otel_logs)
+│     Prewhere filter column: Timestamp >= '2026-09-30 10:22:10' AND ServiceName = 'clickhouse'
+│     Min-Max   (Timestamp)          Parts: 7/10   Granules: 66/431
+│     Partition (toDate(Timestamp))  Parts: 7/7    Granules: 66/66
+│     PrimaryKey (columns behind the key: ServiceName, Timestamp)
+│                                    Parts: 7/7    Granules: 53/66
+│                                    Search Algorithm: generic exclusion search
+│     Ranges: 24
+└──ReadFromPreparedSource (_exact_count_projection)
+
+-- EXPLAIN PIPELINE (same query shape)
+MergeTreeSelect(pool: ReadPoolInOrder, algorithm: InOrder) × 4 0 → 1
+Concat 4 → 1 → AggregatingTransform → ExpressionTransform
+
+-- the query itself
+replica                    matching_rows
+chi-clickhouse-otel-0-0-0  219958
+
+-- query_log read-back for the first run (value 'cart-service', see below)
+event_time           query_duration_ms  read_rows  read_bytes  result_rows
+2026-09-30 11:20:37  21                 164619     161.42 KiB  1
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20–11:22 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `otel.otel_logs` |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
+
+Declared versus observed (2026-09-30 11:20 UTC): the chapter first used
+`ServiceName = 'cart-service'`, which matches **no** rows. `otel_logs` here
+holds pod logs shipped by Vector, and the busiest `ServiceName` in the hour
+was `clickhouse` (219,825 rows), followed by `postgresql` and `kindnet`; the
+queries above now use `clickhouse`. The zero-match run is still instructive:
+it read 164,619 rows (21 of 62 granules survived the primary index), because
+`ServiceName` is not the first sort-key column — within each five-minute bucket
+the index can only skip granules whose `ServiceName` range excludes the value.
+The `query_log` lookup now also excludes itself, since its own text contains
+`matching_rows`. `EXPLAIN` lists the *columns behind* the key: the key itself is
+`(toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp)`
+(`system.tables.primary_key`). The `_exact_count_projection` branch is the
+engine's implicit exact-count projection: the plan shape shows `count()` being
+satisfied partly without reading the columns (Inference — from the plan; the
+read-back row counts above are the measured cost).
 
 ### How to read the result
 
@@ -307,4 +346,4 @@ Before continuing, explain these without rereading the chapter:
 - [Architecture overview](https://clickhouse.com/docs/resources/develop-contribute/introduction/architecture)
 
 ---
-_Last updated: 2026-09-29 — first published version of the query-pipeline chapter; live lab pending verification._
+_Last updated: 2026-09-30 — live lab verified; example value `cart-service` (no rows in pod logs) replaced by `clickhouse`, query_log read-back excludes itself. Earlier: 2026-09-29 — first published version of the query-pipeline chapter; live lab pending verification._

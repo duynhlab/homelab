@@ -12,7 +12,7 @@ sharding, and confusing the two is the fastest way to scale the wrong axis.
 | **Prerequisites** | [Replication](05-replication.md), [Keeper](06-keeper.md) |
 | **Deployment status** | Deployed: one shard × three replicas. Everything multi-shard on this page is **Reference — not deployed** |
 | **Platform scope** | Cluster `otel` in the `clickhouse` installation; `system.clusters` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | How replication, sharding, distributed reads, and distributed INSERTs differ |
 | **Not this page** | Replica convergence ([Replication](05-replication.md)); coordination ([Keeper](06-keeper.md)); when to scale which axis ([Scaling decisions](12-scaling.md)) |
 | **Previous / next** | [Keeper](06-keeper.md) / [Ingestion pipeline](08-ingestion-pipeline.md) |
@@ -184,19 +184,22 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+cluster  shard_num  replica_num  host_name                is_local
+otel     1          1            chi-clickhouse-otel-0-0  1
+otel     1          2            chi-clickhouse-otel-0-1  0
+otel     1          3            chi-clickhouse-otel-0-2  0
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.clusters` (cluster `otel`) |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
 
 ### How to read the result
 
@@ -280,5 +283,5 @@ Before continuing, explain these without rereading the chapter:
 - [`SYSTEM` statements for managing distributed tables](https://clickhouse.com/docs/sql-reference/statements/system)
 
 ---
-_Last updated: 2026-09-29 — first published version; live observation pending
+_Last updated: 2026-09-30 — live lab verified: one shard, three replicas. Earlier: 2026-09-29 — first published version; live observation pending
 verification on the Ubuntu Kind cluster._

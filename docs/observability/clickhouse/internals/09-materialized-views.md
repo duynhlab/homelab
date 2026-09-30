@@ -13,7 +13,7 @@ separates it from a stored query or a Postgres index.
 | **Prerequisites** | [MergeTree layout](03-mergetree.md), [Parts and merges](04-parts-and-merges.md), [Ingestion pipeline](08-ingestion-pipeline.md) |
 | **Deployment status** | Deployed: `otel.otel_traces_trace_id_ts_mv`; refreshable views are **Reference — not deployed** |
 | **Platform scope** | `otel.otel_traces` → MV → `otel.otel_traces_trace_id_ts` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | When an incremental materialized view runs and what data it sees |
 | **Not this page** | The deployed view's operational description and lookup query pattern ([Materialized views platform page](../materialized-views.md)); part lifecycle of the target table ([04](04-parts-and-merges.md)) |
 | **Previous / next** | [Ingestion pipeline](08-ingestion-pipeline.md) / [Tiered storage](10-storage-s3.md) |
@@ -187,19 +187,37 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+event_time           view_name                        view_type     status       read_rows  written_rows
+2026-09-30 11:20:16  otel.otel_traces_trace_id_ts_mv  Materialized  QueryFinish  0          0
+2026-09-30 11:20:16  otel.otel_traces_trace_id_ts_mv  Materialized  QueryFinish  1          1
+2026-09-30 11:20:11  otel.otel_traces_trace_id_ts_mv  Materialized  QueryFinish  0          0
+2026-09-30 11:20:11  otel.otel_traces_trace_id_ts_mv  Materialized  QueryFinish  1          1
+2026-09-30 11:19:01  otel.otel_traces_trace_id_ts_mv  Materialized  QueryFinish  2          2
+… (10 rows shown; exception empty on every row)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.query_views_log` (view `otel.otel_traces_trace_id_ts_mv`) |
+| **Replica** | `chi-clickhouse-otel-0-0-0` |
+
+Two things the live run shows that the prose does not predict:
+
+- **At this traffic, `written_rows` equals `read_rows`.** Each block on
+  this replica carried one or two spans per trace (it was the traces inserter
+  in that window — see [chapter 08](08-ingestion-pipeline.md)), so the
+  per-block `GROUP BY TraceId` had nothing to collapse. The `≪` relationship below
+  appears only under load with many spans per trace in one block.
+- **Executions come in pairs with the same timestamp, one of them empty.**
+  Recorded as a knowledge gap for the owner interview rather than explained
+  here; the view's own definition filters `TraceId != ''`, which is one
+  candidate, not a verified cause.
 
 ### How to read the result
 
@@ -297,5 +315,5 @@ Before continuing, explain these without rereading the chapter:
 - [Refreshable materialized views](https://clickhouse.com/docs/concepts/features/materialized-views/refreshable-materialized-view)
 
 ---
-_Last updated: 2026-09-29 — first published version; live observation pending
+_Last updated: 2026-09-30 — live lab verified: per-block executions; at low traffic written = read, paired executions left as a knowledge gap. Earlier: 2026-09-29 — first published version; live observation pending
 verification on the Ubuntu Kind cluster._

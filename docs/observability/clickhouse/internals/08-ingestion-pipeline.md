@@ -12,7 +12,7 @@ exact points where telemetry can be lost, duplicated, or delayed.
 | **Prerequisites** | [Parts and merges](04-parts-and-merges.md), [Replication](05-replication.md), [Keeper](06-keeper.md) |
 | **Deployment status** | Deployed (OTLP → Collector → ClickHouse); the Kafka comparison is **Reference — not deployed** |
 | **Platform scope** | Producers → OpenTelemetry Collector → `otel.otel_logs` and `otel.otel_traces` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-09-30 11:20–11:23 UTC, ClickHouse 26.7.17.7 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The delivery-guarantee analysis: acknowledgement and durability boundary at every hop |
 | **Not this page** | Collector deployment and pipeline inventory ([Collector](../../opentelemetry/collector.md)); how a flushed insert becomes parts ([04](04-parts-and-merges.md)); replica convergence ([05](05-replication.md)) |
 | **Previous / next** | [Sharding and Distributed tables](07-sharding.md) / [Materialized views](09-materialized-views.md) |
@@ -234,19 +234,46 @@ LIMIT 20;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- the chapter query on chi-clickhouse-otel-0-0-0 (11:20 UTC, last 15 min)
+table        status  buffer_entries  bytes_buffered  last_flush
+otel_traces  Ok      48              108566          2026-09-30 11:20:16
+
+-- follow-up: who received INSERTs in the last 15 min (11:22 UTC)
+replica                    table        inserts_15m  rows    async_insert_log
+chi-clickhouse-otel-0-0-0  otel_traces  46           140     46 × Ok
+chi-clickhouse-otel-0-1-0  —            0            0       —
+chi-clickhouse-otel-0-2-0  otel_logs    200          91580   200 × Ok
+
+-- server settings seen by the collector's user (system.settings)
+async_insert = 1   wait_for_async_insert = 1   async_insert_busy_timeout_ms = 200
+async_insert_deduplicate = 0   insert_deduplicate = 1
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **ClickHouse** | _pending_ |
-| **Database/table** | _pending_ |
-| **Replica** | _pending_ |
+| **Observed at** | 2026-09-30 11:20–11:23 UTC |
+| **Repository** | `docs/clickhouse-internals-chapters` at `423a1c04` (main merged at `f326a367`) |
+| **Cluster/context** | `kind-homelab` — Kind 1.35.8, cluster rebuilt 2026-09-30 ≈02:10 UTC |
+| **ClickHouse** | `26.7.17.7` (image tag `clickhouse/clickhouse-server:26.7`); Keeper `v26.7.17.7-stable` |
+| **Database/table** | `system.asynchronous_insert_log`, `system.query_log` (database `otel`) |
+| **Replica** | `chi-clickhouse-otel-0-0-0`; follow-up on all three replicas |
+
+What the live run changed in this chapter's picture (2026-09-30):
+
+- **Each signal was pinned to one replica.** The ClickHouse exporter keeps
+  long-lived native connections, and the Service balances *connections*, not
+  queries — so for this window every logs INSERT went to
+  `chi-clickhouse-otel-0-2-0`, every traces INSERT to `-0-0-0`, and `-0-1-0`
+  received none. The "both signals on this replica" row below therefore depends
+  on which replica you ask; run the query on all three before reading absence
+  as a stall. The other replicas still hold every part — they fetch them
+  ([replication](05-replication.md)).
+- **`wait_for_async_insert = 1` is the live default**, so the collector's
+  acknowledgement arrives only after the buffer is flushed into a part — the
+  durability boundary this chapter draws at hop 7 holds as observed. The value
+  is the server default (`changed = 0`), not an exporter override.
 
 ### How to read the result
 
@@ -343,5 +370,5 @@ Before continuing, explain these without rereading the chapter:
 - [Kafka table engine integration guide (delivery semantics, consumer groups)](https://clickhouse.com/docs/integrations/connectors/data-ingestion/kafka/kafka-table-engine)
 
 ---
-_Last updated: 2026-09-29 — first published version; live observation pending
+_Last updated: 2026-09-30 — live lab verified: `wait_for_async_insert = 1`; logs and traces each pinned to one replica by long-lived exporter connections. Earlier: 2026-09-29 — first published version; live observation pending
 verification on the Ubuntu Kind cluster._

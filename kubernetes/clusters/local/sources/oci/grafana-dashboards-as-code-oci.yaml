@@ -47,4 +47,9 @@ spec:
     # 18 boards reach ManifestSynchronized=True and read back through
     # /apis/dashboard.grafana.app/v2 with a title and element count matching the
     # generated spec.
-    semver: "0.2.1"
+    #
+    # 0.2.2 filters kube-state-metrics series on exported_namespace (KSM is
+    # scraped without honorLabels, so its `namespace` is kube-system). Before
+    # it the KEDA HPA/worker panels and the cluster board's namespace
+    # variable (only kube-system) were empty for every app namespace.
+    semver: "0.2.2"

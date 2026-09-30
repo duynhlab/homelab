@@ -1376,6 +1376,17 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The KEDA and Kubernetes cluster-overview boards show app namespaces
+  again** (grafana-dashboards `v0.2.2`). kube-state-metrics is scraped
+  without honorLabels, so its series carry `namespace="kube-system"` and
+  the object's namespace in `exported_namespace`. The KEDA board's HPA,
+  replica-change and worker-replica panels (and `$deployment`) filtered on
+  `namespace` and were empty. On the cluster board, `$namespace` offered
+  only `kube-system`, which blocked even the correct cAdvisor panels. KSM
+  queries now filter on `exported_namespace`. Checked on Kind: the HPA
+  query went from 0 to 2 series and the namespace variable from 1 to 30
+  values.
+
 - **kube-state-metrics alerts name the object, not the KSM pod.** KSM is
   scraped without `honorLabels`, so on every `kube_*` series `namespace`,
   `pod` and `container` name the KSM pod and the object's own labels are

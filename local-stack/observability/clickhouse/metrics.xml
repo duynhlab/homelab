@@ -26,4 +26,8 @@
     <asynchronous_metrics>true</asynchronous_metrics>
     <errors>true</errors>
   </prometheus>
+  <!-- 26.8+: per-device async metrics are Map metrics; `both` also keeps the
+       old scalar names (ClickHouseAsyncMetrics_DiskAvailable_default ...) that
+       the vmalert rules read. Same setting as the cluster CHI. -->
+  <asynchronous_metrics_key_values_mode>both</asynchronous_metrics_key_values_mode>
 </clickhouse>

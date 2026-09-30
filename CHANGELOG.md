@@ -5917,6 +5917,26 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse server 26.7 → 26.8 LTS on the cluster, the schema Job
+  client and local-stack**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G5,
+  supersedes #1010, which targeted 26.9). 26.8 is the LTS line (about a
+  year of backports), which matches how production runs ClickHouse.
+  26.9's system-log schema rename and ZSTD default are not part of this
+  step. The upstream order is servers first; Keeper follows in its own
+  change.
+  - 26.8 turns per-device async metrics into Map metrics
+    (`ClickHouseAsyncMetrics_DiskAvailable_default` →
+    `…_DiskAvailable{disk="default"}`), which would blank the disk panels,
+    the local vmalert rules and the disk runbooks.
+    `asynchronous_metrics_key_values_mode: both` keeps the old names
+    beside the new ones until those readers migrate.
+  - Checked against 26.8.15.10 in a container: our retention config and
+    `metrics.xml` load, `both` exports both forms, and all five DDL files
+    (text indexes, TTL volume moves, the materialized view) apply.
+  - 26.8's `include_from` default change does not apply: the live config
+    uses only `from_env`, and there is no `/etc/metrika.xml`.
+
 - **Vector chart 0.57.0 → 0.58.0 on the cluster, local-stack 0.50.0 →
   0.58.0** ([#1107](https://github.com/duynhlab/homelab/issues/1107) G7,
   supersedes #1015 + #1081). No config change is needed on either side.

@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: schema
-      image: clickhouse/clickhouse-server:26.7
+      image: clickhouse/clickhouse-server:26.8
   volumes:
     - name: sql
       image:
@@ -24,7 +24,7 @@ metadata:
 spec:
   containers:
     - name: schema
-      image: clickhouse/clickhouse-server:26.7
+      image: clickhouse/clickhouse-server:26.8
   volumes:
     - name: sql
       image:

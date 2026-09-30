@@ -89,7 +89,19 @@ Read the three dates against each other:
    fix that first — this alert is a symptom of it.
 3. **Push stalled, one proxy only**: restart that proxy pod; the PDB keeps the
    other serving.
-4. Do **not** hand-edit the Secret. Flux and cert-manager both own it and will
+4. **Listener up but serving no certificate** (the gauge above looks fine):
+   envoy#47309, called out in Envoy Gateway's v1.9.1 notes. A proxy that was
+   already running when a (new or restarted) controller came up can activate
+   its TLS listeners without a certificate once the SDS initial-fetch timeout
+   (15 s) expires, and it keeps reporting Ready. The signal is
+   `envoy_sds_init_fetch_timeout > 0` or
+   `increase(envoy_listener_server_ssl_socket_factory_downstream_context_secrets_not_ready[5m]) > 0`
+   on a proxy. Replace the proxies, not the controller:
+   `kubectl -n envoy-gateway rollout restart deploy -l gateway.envoyproxy.io/owning-gateway-name=platform`.
+   The EnvoyProxy runs `maxSurge: 100%` / `maxUnavailable: 0`, so every proxy
+   is replaced at once and no stale one keeps serving. After step 2, check
+   this signal before closing.
+5. Do **not** hand-edit the Secret. Flux and cert-manager both own it and will
    revert or fight the change.
 
 ## Escalation
@@ -111,4 +123,4 @@ git log --oneline -5 -- kubernetes/infra/configs/envoy-gateway/certificate.yaml
 ```
 
 ---
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `EnvoySSLCertificateExpiringSoon` / `EnvoySSLCertificateExpired`; the upstream `< 0` critical can never fire on an unsigned day gauge, so ours is `< 1`)_
+_Last updated: 2026-09-30 — step 4: the certless-listener signal (envoy#47309) and replace-all proxies. Earlier: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `EnvoySSLCertificateExpiringSoon` / `EnvoySSLCertificateExpired`; the upstream `< 0` critical can never fire on an unsigned day gauge, so ours is `< 1`)_

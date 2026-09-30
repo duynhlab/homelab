@@ -22,7 +22,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | One homelab PR per policy family, after this record is Accepted |
-| **Adoption** | Partial — step 1 (`require-probes`, `require-resources`) |
+| **Adoption** | Partial — steps 1–2 of 4 (`require-probes`, `require-resources`, `disallow-latest-tag`, `disallow-default-namespace`) |
 
 ## Context
 
@@ -250,7 +250,8 @@ fix ships only on 1.20 or later.
 |---|---|---|
 | 2026-09-30 | Proposed / Not started | Created. Removal version (1.20) read from the Kyverno migration guide, due date 2026-10-23 from the upstream milestone. |
 | 2026-09-30 | Accepted / Partial | Owner accepted it and chose 4 PRs. Step 1 landed: `require-probes` and `require-resources` are ValidatingPolicy. Pod-level verdicts equal the legacy ones on Kind (19/19 pass each, 0 fail). Autogen proved to default on, so rule 4 now says so. The `require-resources` half of `postgres-operators` was inert and was dropped rather than migrated. |
+| 2026-09-30 | Accepted / Partial | Step 2 landed: `disallow-latest-tag` (three validations, autogen on as before) and `disallow-default-namespace` (the only `Deny`, `failurePolicy: Fail`, autogen off). Server dry-run: denied in `default`, even for a manifest without `metadata.namespace`; allowed in `product`. Pod-level verdicts equal the legacy ones (90/90, 119/119 pass). Reports are now one result per resource instead of per rule. |
 
 ---
 
-_Last updated: 2026-09-30 — Accepted; step 1 landed (require-probes, require-resources); autogen defaults on, rule 4 corrected. Earlier: 2026-09-30 — created (Proposed)._
+_Last updated: 2026-09-30 — step 2 landed (disallow-latest-tag, disallow-default-namespace). Earlier: 2026-09-30 — Accepted; step 1 landed (require-probes, require-resources); autogen defaults on, rule 4 corrected. Earlier: 2026-09-30 — created (Proposed)._

@@ -5899,6 +5899,19 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Vector chart 0.57.0 → 0.58.0 on the cluster, local-stack 0.50.0 →
+  0.58.0** ([#1107](https://github.com/duynhlab/homelab/issues/1107) G7,
+  supersedes #1015 + #1081). No config change is needed on either side.
+  The 0.55 sink `request.headers` move is already in place, and neither
+  config uses `${VAR}` interpolation (off by default since 0.57), an `api`
+  block, or a templated URI host (rejected since 0.58). 0.58 removes the
+  `buffer_byte_size`/`buffer_events` gauges. No repo alert or
+  dashboards-as-code board reads them, but the upstream Vector board
+  (Grafana.com 21954, fetched at `latest`) still does for its buffer-bytes
+  panel, which now stays empty; the replacement is
+  `vector_buffer_size_bytes`. The docs' PromQL moves to
+  `vector_buffer_size_events`.
+
 - **OpenTelemetry Collector contrib 0.159.0 → 0.161.0 (chart `<0.175.0`,
   0.174.0) on the cluster and local-stack**
   ([#1107](https://github.com/duynhlab/homelab/issues/1107) G6, supersedes
@@ -5912,7 +5925,6 @@ Skeleton (copy what you need):
   `resource_to_telemetry_conversion` in favour of
   `resource_constant_labels`. It is a warning for now, and the migration
   is a follow-up.
-
 - **Pyroscope 2.1.0 → 2.3.1 on the cluster and 2.2.1 → 2.3.1 on
   local-stack; the two now run the same version**
   ([#1107](https://github.com/duynhlab/homelab/issues/1107) G11,

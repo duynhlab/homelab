@@ -5917,6 +5917,13 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **ClickHouse Keeper 26.7 → 26.8 LTS**, after the servers
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G5 step 2,
+  supersedes #1055, which targeted 26.9). This follows the upstream order,
+  servers first and then Keeper, and returns Keeper to the server's line.
+  The operator (0.27.4) rolls one Keeper at a time without dropping below
+  Raft quorum.
+
 - **Altinity clickhouse-operator 0.27.3 → 0.27.4**, ahead of the
   ClickHouse and Keeper upgrades. Keeper rolls no longer drop the ensemble
   below Raft quorum, and ZooKeeper endpoint edits no longer restart

@@ -37,6 +37,13 @@ spec:
         name: deny-all-ingress
         namespace: "{{request.object.metadata.name}}"
         synchronize: true
+        # Keep the generated NetworkPolicies when this rule/policy is deleted.
+        # Without it, removing this legacy policy (ADR-078 step 4 replaces it
+        # with a GeneratingPolicy) deletes every deny-all-ingress it created:
+        # measured on Kind 2026-09-30, 9 app namespaces had NO default-deny for
+        # ~6 s until the new generator re-created them. This flag must be live
+        # on the cluster BEFORE the swap, which is why it ships on its own.
+        orphanDownstreamOnPolicyDelete: true
         data:
           spec:
             podSelector: {}

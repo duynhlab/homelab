@@ -1279,6 +1279,25 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **kube-state-metrics alerts name the object, not the KSM pod.** KSM is
+  scraped without `honorLabels`, so on every `kube_*` series `namespace`,
+  `pod` and `container` name the KSM pod and the object's own labels are
+  `exported_*`. Seven rules ignored that:
+  - `KeycloakRestartLoop` was **blind**: it selected `namespace="identity",
+    container="keycloak"`, which no KSM series carries (0 series live; the
+    exported selector finds the keycloak pod).
+  - `KubePodNotReady` grouped by `namespace, pod` and so collapsed every
+    pending pod into one series keyed to KSM.
+  - `KubePodOOMKilled`, `KubePodCrashLooping`, `KubeDeploymentReplicasMismatch`,
+    `KubeStatefulSetReplicasMismatch` and `KubeHPAMaxedOut` fired, but their
+    annotations named `kube-system/kube-state-metrics-…`. On 2026-09-30 the
+    OOM alert blamed KSM for three Vector OOM kills.
+  All now select or group by `exported_*` and copy it back with
+  `label_replace`, the pattern `KubePodMemoryNearLimit` already used. Checked
+  on live data: the OOM query now names `vector-gp6m6/rdrx4/rkn4l`.
+- **Vector gets 512Mi.** At 256Mi three of four pods were OOMKilled during a
+  fresh bring-up, peaking at 220–245 MiB while the in-memory sink buffers
+  filled; steady state is 45–72 MiB. Request 32Mi → 64Mi.
 - **SLO burn-rate alerts no longer page on a handful of requests.** On an
   idle Kind cluster `CheckoutHighLatency` paged on 3 slow requests out of 8 in
   six hours and failed gate K5.8. Sloth v0.16 has no minimum-events field, so

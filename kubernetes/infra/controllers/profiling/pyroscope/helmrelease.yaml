@@ -19,7 +19,7 @@ spec:
   chart:
     spec:
       chart: pyroscope
-      version: "2.2.1"
+      version: "2.3.1"
       sourceRef:
         kind: HelmRepository
         name: grafana
@@ -35,7 +35,7 @@ spec:
       replicaCount: 1
       fullnameOverride: pyroscope
       image:
-        tag: "2.1.0"
+        tag: "2.3.1"
       extraArgs:
         log.level: warn
         # Expand ${ACCESS_KEY_ID}/${ACCESS_SECRET_KEY} from the env into the config.

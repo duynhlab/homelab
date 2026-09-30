@@ -5877,6 +5877,17 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Pyroscope 2.1.0 → 2.3.1 on the cluster and 2.2.1 → 2.3.1 on
+  local-stack; the two now run the same version**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G11,
+  supersedes #1056 + #925). The HelmRelease had been pinning
+  `image.tag: "2.1.0"` since the 2026-06-25 chart migration, so every chart
+  bump since then left the server on 2.1.0. The chart and the pinned image
+  now move together to 2.3.1. The 2.2.0 → 2.3.1 notes carry no config or
+  storage breaking item, and the services' SDK (pyroscope-go v1.3.1) needs
+  no change. Verified on local-stack: profiles arrive for all 13 service
+  identities on 2.3.1.
+
 - **VM Operator chart 0.66.2 → 0.67.2 (app v0.73.1 → v0.74.0) — the cluster's
   VictoriaLogs converges with local-stack.** The operator's embedded defaults
   move VLSingle v1.51.0 → **v1.52.0** (the LogsQL bare-filter-pipe fix the

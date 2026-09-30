@@ -92,6 +92,23 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Kyverno CEL migration complete (ADR-078 step 4).** No legacy Kyverno
+  object remains, so the platform can take Kyverno 1.20.
+  - `default-deny-networkpolicy` is a GeneratingPolicy (CREATE and UPDATE,
+    generateExisting, synchronize, orphanDownstreamOnPolicyDelete). It is now
+    the **only** owner of `deny-all-ingress` in the 11 app-tier namespaces.
+    The same objects had also been committed as static manifests since
+    2026-05-30, so Flux and Kyverno fought over them. The 11 copies are
+    removed; `identity`, which is not app-tier, keeps its own.
+  - A new `make validate` check refuses a static `deny-all-ingress` for any
+    app-tier namespace.
+  - The swap was rehearsed on Kind in the worst reconcile order. Without
+    #1148 it left 9 namespaces with no default-deny for about 6 s; with it,
+    81/81 per-second samples stayed at 12. A deleted deny-all returns in
+    about 1 s, and a newly labelled namespace gets one in about 1 s.
+  - `cleanup-completed-pods` is a DeletingPolicy (same schedule, phases and
+    24h age, using `time.now()`).
+  - `kyverno.md` runbook steps 2 and 3 now query the CEL kinds.
 - **Kyverno CEL migration, step 3 of 4 (ADR-078): PSS baseline and
   exceptions.**
   - The legacy `pss-baseline` ClusterPolicy (`validate.podSecurity`) has no

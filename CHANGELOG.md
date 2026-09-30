@@ -5917,6 +5917,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Altinity clickhouse-operator 0.27.3 → 0.27.4**, ahead of the
+  ClickHouse and Keeper upgrades. Keeper rolls no longer drop the ensemble
+  below Raft quorum, and ZooKeeper endpoint edits no longer restart
+  ClickHouse. A failed schema step now reports `Aborted` instead of
+  `Completed`. None of the breaking items touch us:
+  - the removed `k8s_secret_` syntax has 0 references;
+  - the new informer label filter applies only to operator-generated
+    objects, never to the CHI/CHK themselves (read in the 0.27.4 source);
+  - the CHI/CHK/CHIT CRD schemas are unchanged.
+
+  The pre-upgrade CRD hook now uses `registry.k8s.io/kubectl:v1.36.3` with
+  server-side apply, and passes Kyverno admission in a server-side
+  dry-run.
+
 - **Vector chart 0.57.0 → 0.58.0 on the cluster, local-stack 0.50.0 →
   0.58.0** ([#1107](https://github.com/duynhlab/homelab/issues/1107) G7,
   supersedes #1015 + #1081). No config change is needed on either side.

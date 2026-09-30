@@ -361,7 +361,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, count()/$__interval_s AS v FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, count()/$__interval_s AS v FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName IN (${service:singlequote}) GROUP BY time ORDER BY time",
           "format": 1,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
@@ -487,7 +487,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT count() AS v FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND SeverityNumber >= 17 AND ServiceName IN (${service:singlequote})",
+          "rawSql": "SELECT count() AS v FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND SeverityNumber >= 17 AND ServiceName IN (${service:singlequote})",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.19.0"
@@ -1149,7 +1149,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, SeverityText, count() AS logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY time, SeverityText ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, SeverityText, count() AS logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName IN (${service:singlequote}) GROUP BY time, SeverityText ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.19.0"
@@ -1215,7 +1215,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT SeverityText, count() AS c FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) GROUP BY SeverityText ORDER BY c DESC",
+          "rawSql": "SELECT SeverityText, count() AS c FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName IN (${service:singlequote}) GROUP BY SeverityText ORDER BY c DESC",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.19.0"
@@ -1354,7 +1354,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT ServiceName, Body, count() AS count FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND SeverityNumber >= 17 AND ServiceName IN (${service:singlequote}) GROUP BY ServiceName, Body ORDER BY count DESC LIMIT 15",
+          "rawSql": "SELECT ServiceName, Body, count() AS count FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND SeverityNumber >= 17 AND ServiceName IN (${service:singlequote}) GROUP BY ServiceName, Body ORDER BY count DESC LIMIT 15",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.19.0"
@@ -1562,7 +1562,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT t.ServiceName AS service, count(DISTINCT t.TraceId) AS traces, count(l.TraceId) AS correlated_logs FROM otel.otel_traces t ANY LEFT JOIN otel.otel_logs l ON t.TraceId = l.TraceId WHERE $__timeFilter(t.Timestamp) AND t.TraceId != '' AND t.ServiceName IN (${service:singlequote}) GROUP BY t.ServiceName ORDER BY traces DESC",
+          "rawSql": "SELECT t.ServiceName AS service, count(DISTINCT t.TraceId) AS traces, count(l.TraceId) AS correlated_logs FROM otel.otel_traces t ANY LEFT JOIN (SELECT TraceId FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND TraceId != '') l ON t.TraceId = l.TraceId WHERE $__timeFilter(t.Timestamp) AND t.TraceId != '' AND t.ServiceName IN (${service:singlequote}) GROUP BY t.ServiceName ORDER BY traces DESC",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.19.0"
@@ -1612,7 +1612,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp, ServiceName, SeverityText, TraceId, Body FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND SeverityNumber >= 13 AND ServiceName IN (${service:singlequote}) ORDER BY Timestamp DESC LIMIT 100",
+          "rawSql": "SELECT Timestamp, ServiceName, SeverityText, TraceId, Body FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND SeverityNumber >= 13 AND ServiceName IN (${service:singlequote}) ORDER BY Timestamp DESC LIMIT 100",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.19.0"

@@ -11,8 +11,8 @@ mode, so a violation is reported rather than blocked.
 | **Policies** | 7 deployed — 6 `ClusterPolicy` + 1 `ClusterCleanupPolicy` — plus 1 disabled. See [Policy inventory](#policy-inventory) |
 | **Enforcing** | Exactly one: `disallow-default-namespace` (`failurePolicy: Fail`). The other five validating policies are Audit |
 | **Exceptions** | 2 registered, both expiring 2026-12-31, accepted only from ns `kyverno` |
-| **Tests** | 3 CLI fixtures under `configs/kyverno/tests/`, run by `make validate` + the `validate` CI job |
-| **Reports UI** | Policy Reporter 3.9.1 at `kyverno.duynh.me` — **deployed** |
+| **Tests** | 4 CLI fixture suites under `configs/kyverno/tests/`, run by `make validate` + the `validate` CI job (fails on any `Excluded` result) |
+| **Reports UI** | Policy Reporter 3.10.0 at `kyverno.duynh.me` — **deployed** |
 | **Flux** | `kyverno-policies-local` (`./configs/kyverno`), after `controllers-local` + `monitoring-local` |
 | **Signals** | 4 ServiceMonitors · 4 alerts + 4 runbooks · chart-native Grafana dashboard |
 | **Design record** | The operative manifest contract is [AGENTS.md § Kyverno admission rules](../../AGENTS.md); per-policy modes are owned by [policy-catalog.md](../security/policy-catalog.md) |
@@ -41,7 +41,7 @@ so the highest-value Kyverno features are:
 | 7 | ValidatingAdmissionPolicy (CEL/VAP) | ❌ not adopted | — | No version blocker: the cluster runs Kind v1.35.8 (`scripts/kind-up.sh`) where the API is GA — the Gateway API CRD bundle already ships a `safe-upgrades` ValidatingAdmissionPolicy the cluster accepts. Candidate for CEL-only rules |
 | 8 | Pod Security Standards | ✅ | 1 | Baseline cluster-wide; restricted-on-apps **disabled 2026-08-17** ([catalog — known gaps](../security/policy-catalog.md#known-gaps--history)) |
 | 9 | PolicyReport CRD | ✅ | 1 | Auto, no config |
-| 10 | Policy Reporter UI | ✅ | 2 | **Deployed** at `kyverno.duynh.me` — chart `kyverno/policy-reporter` 3.9.1 via `policy-reporter-local`, HTTPRoute in `routes/infra.yaml`, hostname in `scripts/setup-hosts.sh`. See [Reports](#observability) |
+| 10 | Policy Reporter UI | ✅ | 2 | **Deployed** at `kyverno.duynh.me` — chart `kyverno/policy-reporter` 3.10.0 via `policy-reporter-local`, HTTPRoute in `routes/infra.yaml`, hostname in `scripts/setup-hosts.sh`. See [Reports](#observability) |
 | 11 | Background scan | ✅ | 1 | Catches pre-Kyverno resources |
 | 12 | Auto-gen rules | ✅ | 1 | Default-on |
 | 13 | JMESPath / context | ✅ when needed | — | Use sparingly (latency) |
@@ -61,7 +61,10 @@ VAP is no longer version-blocked (row 7) — unadopted by choice, not constraint
 the CEL types in `policies.kyverno.io` (`ValidatingPolicy`, `GeneratingPolicy`,
 …). Every policy and exception here is a legacy type, so `kyverno test` and
 admission print a deprecation warning per file. They still load and enforce
-unchanged; migrating to the CEL types is future work, not part of the 1.19 bump.
+unchanged, but Kyverno's migration guide says they are **removed in v1.20**
+(upstream milestone due 2026-10-23). The move to the CEL types is decided in
+[ADR-078](../proposals/adr/ADR-078-migrate-kyverno-policies-to-cel-types/)
+(Proposed); until it is complete, do not take Kyverno 1.20.
 Only row 4 (Cosign) remains **⏳ planned**: it describes intent, and nothing for
 it is deployed.
 
@@ -99,7 +102,7 @@ flowchart LR
 kubernetes/
   infra/
     controllers/kyverno/          # HelmRelease (Kyverno chart 3.9.1)
-    controllers/policy-reporter/  # HelmRelease (policy-reporter 3.9.1) — the reports UI
+    controllers/policy-reporter/  # HelmRelease (policy-reporter 3.10.0) — the reports UI
     configs/kyverno/
       cluster-policies/           # 8 active + 1 disabled — see Policy inventory
       exceptions/                 # PolicyException resources (2)
@@ -362,8 +365,9 @@ namespace.
 make validate      # includes the Kyverno CLI test fixtures
 ```
 
-**Expected**: the three fixtures under `configs/kyverno/tests/`
-(`disallow-default-namespace`, `require-probes`, `require-resources`) all pass.
+**Expected**: the four fixture suites under `configs/kyverno/tests/`
+(`disallow-default-namespace`, `disallow-latest-tag`, `require-probes`,
+`require-resources`) all pass.
 This is the same gate the `validate` CI job runs, with the CLI pinned to engine
 v1.19.1. The gate also fails if any result comes back `Excluded`: the CLI scores
 an expected `pass` as met when a rule was skipped, so a green run alone does not
@@ -467,7 +471,7 @@ allowed source. Enforcement is unaffected — see the Reports bullet under
 - **Tracing**: **not enabled, and the reason is not cost** — see
   [Why tracing is not adopted](#why-tracing-is-not-adopted) after this list.
 - **Reports**: **Policy Reporter** at `kyverno.duynh.me` — chart
-  `kyverno/policy-reporter` 3.9.1, delivered by the `policy-reporter-local`
+  `kyverno/policy-reporter` 3.10.0, delivered by the `policy-reporter-local`
   Kustomization (`controllers/policy-reporter`). Three Deployments: the core
   (watches PolicyReports, serves the REST API and Prometheus metrics), the **UI**,
   and the **Kyverno plugin**. `kubectl get policyreport -A` still works and is the
@@ -554,7 +558,7 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
+_Last updated: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
 
 _2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
 

@@ -822,7 +822,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, TraceId, SpanId FROM otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) ORDER BY Timestamp DESC LIMIT 200",
+          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, TraceId, SpanId FROM otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName = '${service}' AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) ORDER BY Timestamp DESC LIMIT 200",
           "refId": "A",
           "format": 2
         }

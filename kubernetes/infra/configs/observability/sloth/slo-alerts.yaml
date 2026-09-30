@@ -1,0 +1,263 @@
+# Burn-rate alerts for the SLOs in inventory-grpc-slo.yaml and
+# keycloak-login-slo.yaml, emitted here instead of by Sloth. The same pattern
+# for the nine HTTP services lives in the mop chart (templates/slo-alerts.yaml,
+# chart >= 0.18.0).
+#
+# Sloth keeps the SLIs and every recording rule, so the error budget and the SLO
+# dashboards are unchanged; the two PSL files only set pageAlert/ticketAlert
+# `disable: true`. Each rule below is Sloth's own multi-window expression
+# (page 14.4x 5m+1h OR 6x 30m+6h; ticket 3x 2h+1d OR 1x 6h+3d) with the same
+# name, labels and annotations Sloth generated, plus ONE addition Sloth v0.16 has
+# no field for: every arm also needs at least 10 events in its long window,
+# counted on that SLO's own totalQuery counter.
+#
+# Why: a ratio over a handful of events is not a burn rate. On an idle Kind
+# cluster CheckoutHighLatency paged on 3 slow requests out of 8 in six hours and
+# failed gate K5.8. Below 10 events one event moves the ratio by more than 10
+# points. Accepted trade-off: fewer than 10 events in 1h cannot page; the ticket
+# arms (1d / 3d windows) still catch a sustained problem.
+#
+# KEEP IN SYNC with the two PSL files: objective, alert name, labels,
+# annotations and the total counter are repeated here. A change to an SLO there
+# is a change here.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/component: alerting-rules
+spec:
+  groups:
+  - name: slo-alerts-inventory-grpc-availability
+    rules:
+    - alert: InventoryGrpcHighErrorRate
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate5m{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (14.4 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1h{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (14.4 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory"}[1h])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate30m{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (6 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate6h{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (6 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory"}[6h])) >= 10
+        )
+      labels:
+        category: availability
+        service: inventory
+        severity: page
+        sloth_severity: page
+        channel: '#alerts'
+      annotations:
+        title: (page) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: inventory gRPC is failing calls — checkout fails closed on every one
+        description: inventory.v1.InventoryService is returning server faults fast enough to burn the 99.9% availability budget. Checkout turns each one into a 503 (there is no fallback authority since RFC-0021 phase 4), so this is customer-visible even though no HTTP alert can see it.
+        runbook: 'Break the ratio down by method and code first — sum by (rpc_method, rpc_response_status_code) (rate(rpc_server_call_duration_seconds_count{app="inventory"}[5m])) — then read it as: Unavailable/DeadlineExceeded points at the pod or pgdog-product; Internal points at the service or a constraint violation in inventory_balances; ResourceExhausted at the pool (DB_POOL_MAX_CONNECTIONS=25). If the paired CheckoutAvailabilityErrors alert is quiet while this fires, the failing method is on the WRITE path (Reserve/Commit, i.e. the order saga) rather than the availability read.'
+    - alert: InventoryGrpcHighErrorRate
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate2h{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (3 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1d{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (3 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory"}[1d])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate6h{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (1 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate3d{sloth_id="inventory-grpc-availability", sloth_service="inventory", sloth_slo="grpc-availability"} > (1 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory"}[3d])) >= 10
+        )
+      labels:
+        category: availability
+        service: inventory
+        severity: ticket
+        sloth_severity: ticket
+        channel: '#incidents'
+      annotations:
+        title: (ticket) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: inventory gRPC is failing calls — checkout fails closed on every one
+        description: inventory.v1.InventoryService is returning server faults fast enough to burn the 99.9% availability budget. Checkout turns each one into a 503 (there is no fallback authority since RFC-0021 phase 4), so this is customer-visible even though no HTTP alert can see it.
+        runbook: 'Break the ratio down by method and code first — sum by (rpc_method, rpc_response_status_code) (rate(rpc_server_call_duration_seconds_count{app="inventory"}[5m])) — then read it as: Unavailable/DeadlineExceeded points at the pod or pgdog-product; Internal points at the service or a constraint violation in inventory_balances; ResourceExhausted at the pool (DB_POOL_MAX_CONNECTIONS=25). If the paired CheckoutAvailabilityErrors alert is quiet while this fires, the failing method is on the WRITE path (Reserve/Commit, i.e. the order saga) rather than the availability read.'
+  - name: slo-alerts-inventory-reserve-latency
+    rules:
+    - alert: InventoryReserveHighLatency
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate5m{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (14.4 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1h{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (14.4 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory", rpc_method="inventory.v1.InventoryService/Reserve"}[1h])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate30m{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (6 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate6h{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (6 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory", rpc_method="inventory.v1.InventoryService/Reserve"}[6h])) >= 10
+        )
+      labels:
+        category: latency
+        service: inventory
+        severity: page
+        sloth_severity: page
+        channel: '#alerts'
+      annotations:
+        title: (page) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: inventory Reserve slower than 250ms for >5% of calls
+        description: Reserve is burning its latency budget. It runs inside checkout confirm, so this latency is added to a shopper's request and composes with the confirm timeout before anything else notices.
+        runbook: 'Reserve holds row locks on inventory_balances, so the usual cause is contention rather than CPU: check DBClientQueryP95High and PgxPoolAcquireWaitHigh for inventory, then pg_stat_activity on product-db for lock waits on the balance rows of a hot SKU. Compare against the gRPC span in VictoriaTraces to see whether the time is in the DB or in the handler.'
+    - alert: InventoryReserveHighLatency
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate2h{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (3 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1d{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (3 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory", rpc_method="inventory.v1.InventoryService/Reserve"}[1d])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate6h{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (1 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate3d{sloth_id="inventory-reserve-latency", sloth_service="inventory", sloth_slo="reserve-latency"} > (1 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(rpc_server_call_duration_seconds_count{app="inventory", namespace="inventory", rpc_method="inventory.v1.InventoryService/Reserve"}[3d])) >= 10
+        )
+      labels:
+        category: latency
+        service: inventory
+        severity: ticket
+        sloth_severity: ticket
+        channel: '#incidents'
+      annotations:
+        title: (ticket) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: inventory Reserve slower than 250ms for >5% of calls
+        description: Reserve is burning its latency budget. It runs inside checkout confirm, so this latency is added to a shopper's request and composes with the confirm timeout before anything else notices.
+        runbook: 'Reserve holds row locks on inventory_balances, so the usual cause is contention rather than CPU: check DBClientQueryP95High and PgxPoolAcquireWaitHigh for inventory, then pg_stat_activity on product-db for lock waits on the balance rows of a hot SKU. Compare against the gRPC span in VictoriaTraces to see whether the time is in the DB or in the handler.'
+  - name: slo-alerts-keycloak-login-availability
+    rules:
+    - alert: KeycloakLoginHighErrorRate
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate5m{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (14.4 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1h{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (14.4 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(keycloak_user_events_total{job="keycloak", event="login"}[1h])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate30m{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (6 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate6h{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (6 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(keycloak_user_events_total{job="keycloak", event="login"}[6h])) >= 10
+        )
+      labels:
+        category: availability
+        service: keycloak
+        severity: page
+        sloth_severity: page
+        channel: '#alerts'
+      annotations:
+        title: (page) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: Keycloak logins are failing — new sessions cannot start
+        description: Login events are carrying error labels fast enough to burn the 99.9% availability budget. Already-issued tokens keep verifying locally, so authenticated users look fine while every NEW login and refresh is at risk — this burn is invisible to the RED alerts of the Go services.
+        runbook: 'Split the failures first — sum by (error, client_id) (rate(keycloak_user_events_total{event="login", error!=""}[5m])) — then read it as: invalid_user_credentials/user_not_found at high volume is credential stuffing or a broken SPA login form; anything else points at Keycloak itself — check KeycloakDown, KeycloakDbPoolExhausted (agroal_awaiting_count) and platform-db before the realm config.'
+    - alert: KeycloakLoginHighErrorRate
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate2h{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (3 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1d{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (3 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(keycloak_user_events_total{job="keycloak", event="login"}[1d])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate6h{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (1 * (1 - 99.9 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate3d{sloth_id="keycloak-login-availability", sloth_service="keycloak", sloth_slo="login-availability"} > (1 * (1 - 99.9 / 100))) without (sloth_window)
+            and on()
+            sum(increase(keycloak_user_events_total{job="keycloak", event="login"}[3d])) >= 10
+        )
+      labels:
+        category: availability
+        service: keycloak
+        severity: ticket
+        sloth_severity: ticket
+        channel: '#incidents'
+      annotations:
+        title: (ticket) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: Keycloak logins are failing — new sessions cannot start
+        description: Login events are carrying error labels fast enough to burn the 99.9% availability budget. Already-issued tokens keep verifying locally, so authenticated users look fine while every NEW login and refresh is at risk — this burn is invisible to the RED alerts of the Go services.
+        runbook: 'Split the failures first — sum by (error, client_id) (rate(keycloak_user_events_total{event="login", error!=""}[5m])) — then read it as: invalid_user_credentials/user_not_found at high volume is credential stuffing or a broken SPA login form; anything else points at Keycloak itself — check KeycloakDown, KeycloakDbPoolExhausted (agroal_awaiting_count) and platform-db before the realm config.'
+  - name: slo-alerts-keycloak-auth-latency
+    rules:
+    - alert: KeycloakAuthHighLatency
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate5m{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (14.4 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1h{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (14.4 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(http_server_requests_seconds_count{job="keycloak", uri=~"/realms/.*"}[1h])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate30m{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (6 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate6h{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (6 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(http_server_requests_seconds_count{job="keycloak", uri=~"/realms/.*"}[6h])) >= 10
+        )
+      labels:
+        category: latency
+        service: keycloak
+        severity: page
+        sloth_severity: page
+        channel: '#alerts'
+      annotations:
+        title: (page) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: Keycloak realm endpoints slower than 250ms for >5% of requests
+        description: The /realms/* endpoints are burning their latency budget. Logins and token refreshes feel slow platform-wide before anything errors — this is the leading edge of a Keycloak saturation incident.
+        runbook: 'The #1 cause is DB connection-pool saturation — check KeycloakDbPoolExhausted and agroal_awaiting_count first, then split by endpoint: histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="keycloak", uri=~"/realms/.*"}[5m]))). Token endpoint slow with pool healthy points at platform-db latency or JVM pressure (jvm_* on the same scrape).'
+    - alert: KeycloakAuthHighLatency
+      expr: |
+        (
+            max(slo:sli_error:ratio_rate2h{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (3 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate1d{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (3 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(http_server_requests_seconds_count{job="keycloak", uri=~"/realms/.*"}[1d])) >= 10
+        )
+        or
+        (
+            max(slo:sli_error:ratio_rate6h{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (1 * (1 - 95 / 100))) without (sloth_window)
+            and
+            max(slo:sli_error:ratio_rate3d{sloth_id="keycloak-auth-latency", sloth_service="keycloak", sloth_slo="auth-latency"} > (1 * (1 - 95 / 100))) without (sloth_window)
+            and on()
+            sum(increase(http_server_requests_seconds_count{job="keycloak", uri=~"/realms/.*"}[3d])) >= 10
+        )
+      labels:
+        category: latency
+        service: keycloak
+        severity: ticket
+        sloth_severity: ticket
+        channel: '#incidents'
+      annotations:
+        title: (ticket) {{$labels.sloth_service}} {{$labels.sloth_slo}} SLO error budget burn rate is too fast.
+        summary: Keycloak realm endpoints slower than 250ms for >5% of requests
+        description: The /realms/* endpoints are burning their latency budget. Logins and token refreshes feel slow platform-wide before anything errors — this is the leading edge of a Keycloak saturation incident.
+        runbook: 'The #1 cause is DB connection-pool saturation — check KeycloakDbPoolExhausted and agroal_awaiting_count first, then split by endpoint: histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job="keycloak", uri=~"/realms/.*"}[5m]))). Token endpoint slow with pool healthy points at platform-db latency or JVM pressure (jvm_* on the same scrape).'

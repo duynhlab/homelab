@@ -973,6 +973,13 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **ADR-078 (Proposed): migrate Kyverno policies to the CEL policy types.**
+  Kyverno's migration guide says the legacy `ClusterPolicy`,
+  `ClusterCleanupPolicy` and `kyverno.io` `PolicyException` are removed in
+  v1.20 (upstream milestone due 2026-10-23). The record moves the 6 cluster
+  policies, the cleanup policy and the 2 exceptions to
+  `policies.kyverno.io/v1`, one policy per PR with fixtures first, and holds
+  Kyverno 1.20 until the last legacy object is gone.
 - **RFC-0033 is `provisional`; the research gate passed with owner-confirmed
   boundaries.** The RFC proposes a human-gated GitHub ledger, schema-normalized task
   payloads, App-scoped unattended identity, flat isolated workers, independent proof,
@@ -1272,6 +1279,26 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **SLO burn-rate alerts no longer page on a handful of requests.** On an
+  idle Kind cluster `CheckoutHighLatency` paged on 3 slow requests out of 8 in
+  six hours and failed gate K5.8. Sloth v0.16 has no minimum-events field, so
+  Sloth now keeps only the SLIs and recording rules (`pageAlert` /
+  `ticketAlert` `disable: true`), and the alerts are re-emitted with the same
+  names, labels and annotations: by the mop chart 0.18.0
+  (`templates/slo-alerts.yaml`, helm-charts#26) for the 9 HTTP services, and
+  by the new `sloth/slo-alerts.yaml` for inventory and keycloak. Each arm keeps
+  Sloth's multi-window expression and also needs at least 10 events in its
+  long window. Checked with `vmalert-tool unittest` (v1.148.0): low traffic
+  stays silent, real traffic fires page and ticket with Sloth's exact label
+  set, and the original Sloth expression fires on the same low-traffic input.
+- **ClickHouse log panels prune by the sort key.** `otel_logs` sorts by
+  `toStartOfFiveMinutes(Timestamp)` first, and a bare `$__timeFilter(Timestamp)`
+  barely used it. Every `otel_logs` query in the four cluster boards and the
+  four local-stack copies now repeats the window on the key expression, and
+  the two trace-to-log JOIN panels, which read `otel_logs` with no time bound,
+  join a time-bounded subquery. `clickhouse-local` 26.7 on the real key: a
+  15-minute window read 423/423 granules before and 6/423 after, same 36 040
+  rows; all 20 rewritten panel queries execute.
 - **Nothing we deploy reads the deprecated `endpoints/v1` API any more.**
   - An apiserver audit scoped to `endpoints` on Kind 1.35.8 named two clients:
     - vmagent: the VM operator renders every converted ServiceMonitor as
@@ -1647,6 +1674,18 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Stale claims corrected after re-verification.**
+  - Kind runbook K5.7: the 2026-08-22 "OPEN FINDING" (boards referencing a
+    missing uid `prometheus`, `_hAsuzBnz` → `y-Ka8y37k`) is resolved; the
+    "zero `ClickHouse*` series" note is resolved (the engine is scraped); board
+    counts are 25 in git, 26 on the cluster. K5.8 notes the new guard.
+  - Alerting and SLO docs: 31 SLOs / 62 alerts (9 chart services, not 10);
+    the burn-rate table carries `severity: page|ticket` and all four arms.
+  - `openbao.md`: which dashboard panels stay empty and why. The KV and token
+    gauges do populate; *Path Info* works (its variable strips the trailing
+    `/`); Consul panels are empty because storage is Raft, and policy/route
+    create counters appear only after their first event.
+  - `kyverno.md`: 4 fixture suites, Policy Reporter 3.10.0.
 - **Docs follow what the #1115 diagram review measured.**
   - `openbao.md`: the Raft sequence said `HTTPS :8200`; the listener runs
     with `tls_disable`, so it now says HTTP (TLS planned). The product-db

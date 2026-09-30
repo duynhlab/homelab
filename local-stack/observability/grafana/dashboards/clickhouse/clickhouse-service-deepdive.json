@@ -340,7 +340,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT count() AS error_logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SeverityNumber >= 17",
+          "rawSql": "SELECT count() AS error_logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName = ${service:singlequote} AND SeverityNumber >= 17",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -675,7 +675,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, SeverityText, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} GROUP BY time, SeverityText ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, SeverityText, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName = ${service:singlequote} GROUP BY time, SeverityText ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.20.0"
@@ -1638,7 +1638,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp, SeverityText, Body, TraceId, LogAttributes['event'] AS event, if(LogAttributes['http.route'] != '', LogAttributes['http.route'], LogAttributes['rpc.method']) AS route, if(LogAttributes['http.response.status_code'] != '', LogAttributes['http.response.status_code'], LogAttributes['rpc.response.status_code']) AS status FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND $__conditionalAll(SeverityText IN (${severity:singlequote}), $severity) ORDER BY Timestamp DESC LIMIT 100",
+          "rawSql": "SELECT Timestamp, SeverityText, Body, TraceId, LogAttributes['event'] AS event, if(LogAttributes['http.route'] != '', LogAttributes['http.route'], LogAttributes['rpc.method']) AS route, if(LogAttributes['http.response.status_code'] != '', LogAttributes['http.response.status_code'], LogAttributes['rpc.response.status_code']) AS status FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName = ${service:singlequote} AND $__conditionalAll(SeverityText IN (${severity:singlequote}), $severity) ORDER BY Timestamp DESC LIMIT 100",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -1779,7 +1779,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Body, count() AS occurrences, max(Timestamp) AS last_seen FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND SeverityNumber >= 17 GROUP BY Body ORDER BY occurrences DESC LIMIT 15",
+          "rawSql": "SELECT Body, count() AS occurrences, max(Timestamp) AS last_seen FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND ServiceName = ${service:singlequote} AND SeverityNumber >= 17 GROUP BY Body ORDER BY occurrences DESC LIMIT 15",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -1834,7 +1834,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT t.TraceId AS TraceId, any(t.SpanName) AS operation, round(max(t.Duration)/1e6,2) AS ms, count(DISTINCT l.Timestamp) AS log_lines FROM otel.otel_traces t ANY LEFT JOIN otel.otel_logs l ON t.TraceId = l.TraceId WHERE $__timeFilter(t.Timestamp) AND t.ServiceName = ${service:singlequote} AND t.StatusCode = 'Error' GROUP BY t.TraceId ORDER BY ms DESC LIMIT 15",
+          "rawSql": "SELECT t.TraceId AS TraceId, any(t.SpanName) AS operation, round(max(t.Duration)/1e6,2) AS ms, count(DISTINCT l.Timestamp) AS log_lines FROM otel.otel_traces t ANY LEFT JOIN (SELECT TraceId, Timestamp FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND TraceId != '') l ON t.TraceId = l.TraceId WHERE $__timeFilter(t.Timestamp) AND t.ServiceName = ${service:singlequote} AND t.StatusCode = 'Error' GROUP BY t.TraceId ORDER BY ms DESC LIMIT 15",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"

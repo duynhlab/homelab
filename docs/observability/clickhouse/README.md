@@ -604,7 +604,7 @@ The DDL is owned by the `clickhouse-schema` Job, but its *shape* still tracks
 | Schema | Exporter | `otel_logs` shape |
 |--------|----------|-------------------|
 | 1.2.9 | contrib < 0.151.0 | has `TimestampTime` |
-| **1.3.0** | contrib ≥ 0.151.0 | no `TimestampTime` — what both environments write (contrib `0.159.0`) |
+| **1.3.0** | contrib ≥ 0.151.0 | no `TimestampTime` — what both environments write (contrib `0.161.0`) |
 
 Plugin ≥ 4.20.0 **auto-detects the logs schema from the table's columns** when
 the version selector is on auto (latest); our provisioning deliberately does not
@@ -1146,6 +1146,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-30 — Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
+_Last updated: 2026-09-30 — exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
 credential-safe query examples, and current runtime evidence for parts, TTL,
 cold storage, and the 22-rule ClickHouse alert group._

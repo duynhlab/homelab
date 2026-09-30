@@ -1,6 +1,7 @@
 -- The text(...) skipping indexes are the exporter's full-text branch and are
--- 26.x syntax. GRANULARITY is deliberately omitted: the server fills the
--- default the exporter also relied on. The __otel_materialized_* columns are
+-- 26.x syntax. The exporter's own DDL omits GRANULARITY and the server fills
+-- in 100000000; it is written out so this file matches SHOW CREATE TABLE on
+-- the cluster. The __otel_materialized_* columns are
 -- MATERIALIZED, so they are absent from the INSERT surface but queried by
 -- dashboards — dropping them would break those silently.
 CREATE TABLE IF NOT EXISTS otel.otel_logs

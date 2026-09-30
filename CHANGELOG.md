@@ -1790,6 +1790,26 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **ClickHouse docs no longer contradict each other or the deployment**
+  ([#1136](https://github.com/duynhlab/homelab/pull/1136) follow-ups).
+  - One rule for forcing merges. Never on the cluster's `otel` tables for
+    practice; the Playground forces one on local-stack only. In an
+    incident, a targeted `OPTIMIZE … PARTITION` is the last step of the
+    correct response order, never `FINAL`. The three part-pressure
+    runbooks point at that order; one of them called the step "safe and
+    reversible", but a merge cannot be undone.
+  - The Playground no longer calls a part's level a merge count.
+    `DownloadPart` is now explained by per-signal replica pinning.
+  - The hub dates its "22 rules" audit figure; 23 are deployed.
+  - `fundamentals.md`: `otel_traces_trace_id_ts` partitions by
+    `toDate(Start)`, and Distributed / extra shards are reference, not
+    planned.
+  - `schema-and-queries.md` and `ClickHouseInsertsFailing` point at the
+    DDL image source (ADR-077) instead of a ConfigMap.
+  - The `otel_logs` DDL comment no longer claims GRANULARITY is omitted.
+    That changed the image digest, so the schema Job's pin is bumped; Flux
+    re-runs the idempotent `CREATE … IF NOT EXISTS` Job once.
+
 - **Stale claims corrected after re-verification.**
   - Kind runbook K5.7: the 2026-08-22 "OPEN FINDING" (boards referencing a
     missing uid `prometheus`, `_hAsuzBnz` → `y-Ka8y37k`) is resolved; the

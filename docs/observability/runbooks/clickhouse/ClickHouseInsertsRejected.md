@@ -70,8 +70,9 @@ otelcol_exporter_queue_size{exporter="clickhouse"}
 ## Mitigation
 
 Same levers as [ClickHouseTooManyPartsPerPartition](ClickHouseTooManyPartsPerPartition.md),
-in the same order: fix failing merges, then insert cadence, then a targeted
-`OPTIMIZE TABLE ... PARTITION`. Two things specific to rejection:
+in the same order: fix failing merges, then insert cadence, and only then a
+targeted `OPTIMIZE TABLE ... PARTITION` under the conditions of the
+[correct response order](../../clickhouse/parts-merges-and-ttl.md#correct-response-order). Two things specific to rejection:
 
 1. If only one replica rejects, it is behind on merges — often the one that
    was readonly or restarted recently. Its peers keep ingesting; do not touch
@@ -92,4 +93,4 @@ access log (ClickHouse-only, ADR-061) has no other copy.
 - [ClickHouseExporterUnhealthy](ClickHouseExporterUnhealthy.md) — the consumer side.
 
 ---
-_Last updated: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_
+_Last updated: 2026-09-30 — targeted `OPTIMIZE` points at the correct response order's conditions. Earlier: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_

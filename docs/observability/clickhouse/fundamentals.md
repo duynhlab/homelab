@@ -206,7 +206,8 @@ Measured on the deployed cluster:
 
 | Tables | `PARTITION BY` | TTL | `ttl_only_drop_parts` | Verdict |
 |---|---|---|---|---|
-| `otel_logs`, `otel_traces`, `otel_traces_trace_id_ts` | `toDate(Timestamp)` — **daily** | 90 d | **`1`** | aligned; expiry is a part drop |
+| `otel_logs`, `otel_traces` | `toDate(Timestamp)` — **daily** | 90 d | **`1`** | aligned; expiry is a part drop |
+| `otel_traces_trace_id_ts` | `toDate(Start)` — **daily** | 90 d (on `Start`) | **`1`** | aligned; expiry is a part drop |
 | `query_log`, `part_log` | `event_date` — **daily** | 30 d | `0` | aligned; one day rewritten at a time (operator-owned; the setting is a follow-up) |
 | `trace_log` | `event_date` — **daily** | 7 d | **`1`** | aligned; operator table, TTL and setting overridden by this repo |
 | `processors_profile_log`, `aggregated_zookeeper_log`, `zookeeper_connection_log` | `event_date` — **daily** | 30 d | **`1`** | aligned since 2026-09-07; shipped `toYYYYMM` — the misaligned case, 30 `event_date`s per partition expiring on 30 different days |
@@ -263,9 +264,10 @@ flowchart LR
   class Parts data;
 ```
 
-**Distributed tables / extra shards** are **planned** ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)
-out of scope for a second shard). Do not treat a `Distributed` engine as
-installed.
+**Distributed tables / extra shards** are **reference — not deployed**
+([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/) puts a
+second shard out of scope; [internals chapter 07](internals/07-sharding.md)).
+Do not treat a `Distributed` engine as installed.
 
 ---
 
@@ -371,4 +373,4 @@ Connect commands: [Playground](README.md#playground--mergetree-by-hand).
 
 ---
 
-_Last updated: 2026-09-07 — audit table: every repo-managed `system.*` engine string now carries `ttl_only_drop_parts = 1`, the three monthly tables are daily, `query_metric_log` is removed (issue #1025). Previously 2026-09-04 — the platform audit table now shows the five formerly unmanaged `system.*` tables on a 7-day TTL with daily partitions, set by this repo. Earlier the same day: added **Partitions and TTL**: the alignment rule between `PARTITION BY` and TTL granularity, both `ttl_only_drop_parts` modes with the settings read off the deployed cluster, the audit of which `otel.*` and `system.*` tables are aligned, and the object-store lifecycle trap for the planned S3 tier. Inline vendor-figure source links removed (References already cites the overview). Earlier the same day: page created._
+_Last updated: 2026-09-30 — `otel_traces_trace_id_ts` partitions by `toDate(Start)`; Distributed / extra shards are reference, not planned. Earlier: 2026-09-07 — audit table: every repo-managed `system.*` engine string now carries `ttl_only_drop_parts = 1`, the three monthly tables are daily, `query_metric_log` is removed (issue #1025). Previously 2026-09-04 — the platform audit table now shows the five formerly unmanaged `system.*` tables on a 7-day TTL with daily partitions, set by this repo. Earlier the same day: added **Partitions and TTL**: the alignment rule between `PARTITION BY` and TTL granularity, both `ttl_only_drop_parts` modes with the settings read off the deployed cluster, the audit of which `otel.*` and `system.*` tables are aligned, and the object-store lifecycle trap for the planned S3 tier. Inline vendor-figure source links removed (References already cites the overview). Earlier the same day: page created._

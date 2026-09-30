@@ -84,14 +84,7 @@ spec:
       prometheus/events: "true"
       prometheus/asynchronous_metrics: "true"
       prometheus/errors: "true"
-      # ClickHouse 26.8 turned per-device async metrics into Map metrics:
-      # ClickHouseAsyncMetrics_DiskAvailable_default becomes
-      # ClickHouseAsyncMetrics_DiskAvailable{disk="default"}. `both` keeps
-      # publishing the old scalar names beside the new labelled form, so the
-      # disk dashboard panels, the local vmalert rules and the disk runbooks
-      # keep reading until they migrate to the labelled names; then drop it.
-      # Applied by SYSTEM RELOAD CONFIG, no restart needed. Unknown to 26.7,
-      # which ignores it.
+      # 26.8 Map async metrics: keep the old *_default names until readers migrate.
       asynchronous_metrics_key_values_mode: both
     # Retention for the engine's OWN log tables (SIX of them; query_views_log
     # joined 2026-09-06). Until this landed the repo

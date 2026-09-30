@@ -21,7 +21,7 @@ cluster runs these policies today.
 | `require-network-policy` | 2 | planned | planned | Ignore | App namespaces |
 | `default-deny-networkpolicy` | 3 | Generate | Generate | n/a | App-tier namespaces (`platform.duynhlab.dev/tier: app`) |
 | `add-default-labels` | 3 | planned | planned | Ignore | All Pods |
-| `cleanup-completed-pods` | 4 | Enforce | Enforce | n/a | Succeeded/Failed Pods **older than 24h**, swept every 30m (excludes kube-system, flux-system, kyverno) |
+| `cleanup-completed-pods` | 4 | Enforce | Enforce | n/a | Succeeded/Failed Pods **older than 24h**, swept every 30m (excludes kube-system, flux-system, kyverno). `DeletingPolicy` since 2026-09-30 (ADR-078) |
 
 The cleanup policy needs `cleanup-controller-rbac.yaml` (a ClusterRole
 aggregated to Kyverno's cleanup controller) — deployed alongside it, not a
@@ -72,11 +72,16 @@ for re-enabling (a non-root `USER` in the service images first).
 
 ## NetworkPolicy enforcement
 
-`default-deny-networkpolicy` **generates** a `deny-all-ingress` NetworkPolicy
-into every namespace labelled `platform.duynhlab.dev/tier: app`
-(`generateExisting: true`, `synchronize: true`). The matching explicit allow
-policies live in `kubernetes/infra/configs/network-policies/` and are
-reconciled by the `network-policies-local` Flux Kustomization.
+`default-deny-networkpolicy` (a `GeneratingPolicy` since ADR-078) **generates**
+a `deny-all-ingress` NetworkPolicy into every namespace labelled
+`platform.duynhlab.dev/tier: app` (CREATE or UPDATE; `generateExisting`,
+`synchronize`, `orphanDownstreamOnPolicyDelete`). It is the **sole owner** of that
+object in those namespaces: the static copies that `network-policies/` also
+shipped until 2026-09-30 are gone, and `make validate` refuses one coming back.
+The matching explicit allow policies live in
+`kubernetes/infra/configs/network-policies/` and are reconciled by the
+`network-policies-local` Flux Kustomization (`identity`, which is not app-tier,
+keeps its static `deny-all-ingress` there).
 
 **Full reference** — per-service caller matrix, allowed-ingress topology,
 kindnet enforcement status, and GitOps wiring:
@@ -84,4 +89,4 @@ kindnet enforcement status, and GitOps wiring:
 
 ---
 
-_Last updated: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3). Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace moved to ValidatingPolicy (ADR-078 step 2). Earlier: 2026-09-30 — require-probes and require-resources moved to ValidatingPolicy (ADR-078 step 1). Earlier: 2026-09-29 — disallow-latest-tag gains require-image-volume-digest (ADR-077). Previously 2026-08-19 — table un-split (the pss-restricted note had broken it, hiding the Tier 2/3 rows), scopes corrected against the manifests, prod modes marked planned (production overlay is a stub), cleanup row reflects the restored >24h age gate. Previously updated 2026-08-17 (pss-restricted disabled) without a footer bump._
+_Last updated: 2026-09-30 — default-deny-networkpolicy is a GeneratingPolicy (sole owner), cleanup a DeletingPolicy (ADR-078 step 4). Earlier: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3). Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace moved to ValidatingPolicy (ADR-078 step 2). Earlier: 2026-09-30 — require-probes and require-resources moved to ValidatingPolicy (ADR-078 step 1). Earlier: 2026-09-29 — disallow-latest-tag gains require-image-volume-digest (ADR-077). Previously 2026-08-19 — table un-split (the pss-restricted note had broken it, hiding the Tier 2/3 rows), scopes corrected against the manifests, prod modes marked planned (production overlay is a stub), cleanup row reflects the restored >24h age gate. Previously updated 2026-08-17 (pss-restricted disabled) without a footer bump._

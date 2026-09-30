@@ -12,7 +12,7 @@ whom once admitted (east-west micro-segmentation on kindnet, which enforces).
 | Policies | 7 deployed (Audit, except `disallow-default-namespace` which Enforces) + 1 disabled + 3 planned — [catalog](policy-catalog.md) |
 | PSS | baseline Audit cluster-wide (ten CEL ValidatingPolicies under `cluster-policies/pss-baseline/`, ADR-078); `pss-restricted-apps` **disabled 2026-08-17** — [known gaps](policy-catalog.md#known-gaps--history) |
 | Exceptions | 2 registered, owner + expiry mandatory, accepted only from ns `kyverno` — [registry](policy-exceptions.md) |
-| Segmentation | 26 committed NetworkPolicies (12 namespaces) + floci fence + Kyverno-generated `deny-all-ingress` per app namespace — [caller matrix](network-policies.md) |
+| Segmentation | 15 committed NetworkPolicies (12 namespaces) + floci fence + Kyverno-generated `deny-all-ingress` per app namespace (its only owner) — [caller matrix](network-policies.md) |
 | Verification | `make validate` · `scripts/edge-isolation-sweep.sh` · `scripts/db-isolation-sweep.sh` |
 
 ## What to read

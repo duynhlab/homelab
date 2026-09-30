@@ -78,12 +78,15 @@ flowchart TD
     classDef no fill:#fdeaea,stroke:#b3261e,color:#5c0f0a
 ```
 
-The baseline `deny-all-ingress` is also **generated automatically** into every
-`platform.duynhlab.dev/tier: app` namespace by the Kyverno `default-deny-networkpolicy`
-ClusterPolicy (`generateExisting: true`, `synchronize: true`), so a new app namespace
-is fenced by default even before its explicit allow policy lands. (`identity` is
-not labelled `tier: app` — its baseline is the committed `deny-all-ingress` in
-`identity.yaml` only.)
+The baseline `deny-all-ingress` in every `platform.duynhlab.dev/tier: app`
+namespace is **generated** by the Kyverno `default-deny-networkpolicy`
+GeneratingPolicy (generateExisting, synchronize, orphanDownstreamOnPolicyDelete),
+so a new app namespace is fenced by default even before its explicit allow policy
+lands. The generator is its **only** owner: until 2026-09-30 the allow files also
+committed a copy, so Flux and Kyverno fought over one object; those copies are
+gone and `make validate` refuses one for an app-tier namespace. (`identity` is not
+labelled `tier: app` — its baseline is the committed `deny-all-ingress` in
+`identity.yaml`, owned by Flux.)
 
 ---
 
@@ -235,15 +238,17 @@ flowchart LR
 ```
 
 - **Manifests:** `kubernetes/infra/configs/network-policies/{cart,checkout,identity,inventory,notification,order,payment,platform,product,review,shipping,user}.yaml`
-  (+ `kustomization.yaml`) — 26 policy objects covering the **10 deployed
-  services** plus `platform` (DB tier) and `identity` (Keycloak). Every file
-  carries its own committed `deny-all-ingress`; most add one
-  `allow-internal-callers`, while `product` and `inventory` add the pod-scoped
-  policies described in [§1](#1-the-layered-model).
+  (+ `kustomization.yaml`) — 15 policy objects covering the **10 deployed
+  services** plus `platform` (DB tier) and `identity` (Keycloak). Most files carry
+  one `allow-internal-callers`; `product` and `inventory` add the pod-scoped
+  policies described in [§1](#1-the-layered-model). Only `identity.yaml` commits a
+  `deny-all-ingress` — every other baseline is generated (below).
 - **Generated baseline:** `kubernetes/infra/configs/kyverno/cluster-policies/default-deny-networkpolicy.yaml`
-  generates `deny-all-ingress` into all **11 `tier: app` namespaces** (the 10
-  service namespaces + `platform`); `identity` is not `tier: app` and relies on
-  its committed baseline.
+  (a GeneratingPolicy) generates `deny-all-ingress` into all **11 `tier: app`
+  namespaces** (the 10 service namespaces + `platform`) and is their sole owner.
+  Measured on Kind: a deleted one is back in ~1 s, a newly labelled namespace
+  gets one in ~1 s. `identity` is not `tier: app` and relies on its committed
+  baseline.
 - **Secrets-tier policy:** `kubernetes/infra/controllers/secrets/floci/networkpolicy.yaml`
   ships `floci-allow-openbao` (namespace `openbao`, pod-scoped to the floci KMS
   emulator): only pods in the `openbao` namespace may reach `:4566` — anyone
@@ -294,4 +299,4 @@ flowchart LR
 
 ---
 
-_Last updated: 2026-09-29 — kindnet enforcement re-measured on Kind 1.35.8 (RFC-0032). 2026-09-28 — Draw.io views of the app mesh (§ 3) and of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._
+_Last updated: 2026-09-30 — deny-all-ingress in app-tier namespaces has one owner, the Kyverno GeneratingPolicy; committed objects 26 → 15. Earlier: 2026-09-29 — kindnet enforcement re-measured on Kind 1.35.8 (RFC-0032). 2026-09-28 — Draw.io views of the app mesh (§ 3) and of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._

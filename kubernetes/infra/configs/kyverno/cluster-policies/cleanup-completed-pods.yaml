@@ -1,7 +1,14 @@
 # Cleanup completed and evicted Pods older than 24h.
 # Reduces metric cardinality and noise in `kubectl get pods`.
-apiVersion: kyverno.io/v2
-kind: ClusterCleanupPolicy
+#
+# policies.kyverno.io/v1 DeletingPolicy since 2026-09-30 (ADR-078 step 4); the
+# legacy kyverno.io/v2 ClusterCleanupPolicy is removed in Kyverno 1.20. Same
+# behaviour: every 30 minutes, Pods in phase Succeeded or Failed that are older
+# than 24h, outside kube-system, flux-system and kyverno. Age uses the Kyverno
+# CEL time library (`time.now()`). The cleanup controller's delete permission
+# comes from cleanup-controller-rbac.yaml (aggregated ClusterRole), unchanged.
+apiVersion: policies.kyverno.io/v1
+kind: DeletingPolicy
 metadata:
   name: cleanup-completed-pods
   annotations:
@@ -10,26 +17,21 @@ metadata:
     policies.kyverno.io/severity: low
     policies.kyverno.io/subject: Pod
 spec:
-  match:
-    any:
-      - resources:
-          kinds: [Pod]
-  exclude:
-    any:
-      - resources:
-          namespaces:
-            - kube-system
-            - flux-system
-            - kyverno
-  conditions:
-    all:
-      - key: "{{ target.status.phase }}"
-        operator: AnyIn
-        value: [Succeeded, Failed]
-      # Age gate — without it every completed migration/backup Job pod was
-      # deleted at the next 30-minute tick, despite this file's own ">24h"
-      # header. time_diff returns a duration; both sides parse as durations.
-      - key: "{{ time_diff('{{ target.metadata.creationTimestamp }}','{{ time_now_utc() }}') }}"
-        operator: GreaterThan
-        value: "24h"
   schedule: "*/30 * * * *"
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: ["*"]
+        resources: [pods]
+        scope: Namespaced
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, flux-system, kyverno]
+  conditions:
+    - name: finished
+      expression: "object.status.?phase.orValue('') in ['Succeeded', 'Failed']"
+    - name: older-than-24h
+      expression: "time.now() - timestamp(object.metadata.creationTimestamp) > duration('24h')"

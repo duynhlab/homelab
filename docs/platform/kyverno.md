@@ -8,7 +8,7 @@ mode, so a violation is reported rather than blocked.
 | | |
 |---|---|
 | **Chart** | `kyverno/kyverno` 3.9.1 (engine v1.19.1), four controllers (admission, background, cleanup, reports) |
-| **Policies** | 16 deployed — 14 `ValidatingPolicy` (CEL, ADR-078 steps 1–3; ten of them are the PSS baseline), 1 `ClusterPolicy` (generate) and 1 `ClusterCleanupPolicy` — plus 1 disabled. See [Policy inventory](#policy-inventory) |
+| **Policies** | 16 deployed, **all CEL** (ADR-078 complete) — 14 `ValidatingPolicy` (ten of them the PSS baseline), 1 `GeneratingPolicy` and 1 `DeletingPolicy` — plus 1 disabled legacy file (`pss-restricted-apps`). See [Policy inventory](#policy-inventory) |
 | **Enforcing** | Exactly one: `disallow-default-namespace` (ValidatingPolicy, `validationActions: [Deny]`, `failurePolicy: Fail`). The other thirteen validating policies are Audit |
 | **Exceptions** | None active (the last two were removed as inert, 2026-09-30); accepted only from ns `kyverno` |
 | **Tests** | 5 CLI fixture suites under `configs/kyverno/tests/`, run by `make validate` + the `validate` CI job (fails on any `Excluded` result) |
@@ -131,8 +131,8 @@ maintain a second copy of those here.
 | `require-resources` | `ValidatingPolicy` | Audit | `Ignore` | CEL `containers.all(...)`: `requests.cpu`, `requests.memory`, `limits.memory` must be set. Scoped to the 10 app namespaces |
 | `require-probes` | `ValidatingPolicy` | Audit | `Ignore` | CEL `containers.all(...)`: `livenessProbe` + `readinessProbe` required. Job-owned Pods excluded by a `matchCondition`; autogen explicitly off (`controllers: []` — a ValidatingPolicy autogens by default) |
 | `disallow-default-namespace` | `ValidatingPolicy` | **Deny** | **`Fail`** | A Pod may not land in `default`. The only policy that blocks an apply. Autogen off |
-| `default-deny-networkpolicy` | `ClusterPolicy` | Generate | n/a | On a namespace labelled `platform.duynhlab.dev/tier: app`, generates a `deny-all-ingress` NetworkPolicy, `generateExisting: true`, `synchronize: true` |
-| `cleanup-completed-pods` | `ClusterCleanupPolicy` | Cleanup | n/a | Deletes `Succeeded`/`Failed` Pods older than 24 h, every 30 minutes |
+| `default-deny-networkpolicy` | `GeneratingPolicy` | Generate | n/a | On a namespace labelled `platform.duynhlab.dev/tier: app` (CREATE or UPDATE), generates `deny-all-ingress` with `generator.Apply`; `generateExisting`, `synchronize` and `orphanDownstreamOnPolicyDelete` on. **Sole owner** of that object in app-tier namespaces — no static copy may exist (`make validate` refuses one) |
+| `cleanup-completed-pods` | `DeletingPolicy` | Cleanup | n/a | Deletes `Succeeded`/`Failed` Pods older than 24 h (`time.now()` CEL), every 30 minutes |
 | `cleanup-controller-rbac` | `ClusterRole` | n/a | n/a | **Not a policy** — the aggregated role that lets the cleanup controller delete Pods |
 
 Two things about this table are easy to misread:
@@ -161,8 +161,8 @@ flowchart TD
   match -->|"no"| admit["Admitted"]
   match -->|"yes"| verdict{"Validate"}
   verdict -->|"pass"| admit
-  verdict -->|"fail, Audit<br/>5 policies"| audited["Admitted +<br/>PolicyReport entry"]
-  verdict -->|"fail, Enforce<br/>1 policy"| reject
+  verdict -->|"fail, Audit<br/>13 policies"| audited["Admitted +<br/>PolicyReport entry"]
+  verdict -->|"fail, Deny<br/>1 policy"| reject
   admit --> gen{"App-tier namespace?"}
   gen -->|"yes"| np["deny-all-ingress<br/>generated"]
 
@@ -296,25 +296,26 @@ kubectl -n flux-system get kustomization kyverno-policies-local
 
 **Expected**: four Deployments — admission, background, cleanup, reports — each
 `1/1`. The Kustomization is `Ready=True`. If admission is `0/1`, remember the
-eight `Ignore` policies are now failing open.
+`Ignore` policies (every one but `disallow-default-namespace`) are now failing open.
 
 ### Step 2: The webhooks are registered
 
 ```bash
 kubectl get validatingwebhookconfigurations | grep kyverno
-kubectl get clusterpolicy
+kubectl get validatingpolicy
 ```
 
 **Expected**: Kyverno's validating webhook configurations exist, and
-`kubectl get clusterpolicy` lists **6** ClusterPolicies. Two things deliberately
-do not appear: `pss-restricted-apps` (commented out of the kustomization) and
-`cleanup-completed-pods` (a `ClusterCleanupPolicy`, queried below).
+`kubectl get clusterpolicy,clustercleanuppolicy` lists **nothing** — since
+ADR-078 every policy is a CEL type. `pss-restricted-apps` stays commented out of
+the kustomization.
 
 ```bash
-kubectl get clustercleanuppolicy
+kubectl get validatingpolicy,generatingpolicy,deletingpolicy
 ```
 
-**Expected**: `cleanup-completed-pods`, `Ready`.
+**Expected**: 14 ValidatingPolicies (all `READY true`), `default-deny-networkpolicy`
+and `cleanup-completed-pods`.
 
 ### Step 3: Only one policy enforces
 
@@ -559,7 +560,7 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3); both exceptions removed as inert. Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
+_Last updated: 2026-09-30 — ADR-078 complete: default-deny-networkpolicy is a GeneratingPolicy (sole owner of app-tier deny-all-ingress) and cleanup-completed-pods a DeletingPolicy. Earlier: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3); both exceptions removed as inert. Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
 
 _2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
 

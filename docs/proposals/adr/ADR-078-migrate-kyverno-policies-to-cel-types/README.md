@@ -22,7 +22,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | One homelab PR per policy family, after this record is Accepted |
-| **Adoption** | Partial — steps 1–3 of 4 (all validating policies and the exceptions; the generate and cleanup policies remain) |
+| **Adoption** | **Complete** — 2026-09-30, all four steps; no legacy Kyverno object is rendered (`kustomize build` of `configs/kyverno`) |
 
 ## Context
 
@@ -252,7 +252,9 @@ fix ships only on 1.20 or later.
 | 2026-09-30 | Accepted / Partial | Owner accepted it and chose 4 PRs. Step 1 landed: `require-probes` and `require-resources` are ValidatingPolicy. Pod-level verdicts equal the legacy ones on Kind (19/19 pass each, 0 fail). Autogen proved to default on, so rule 4 now says so. The `require-resources` half of `postgres-operators` was inert and was dropped rather than migrated. |
 | 2026-09-30 | Accepted / Partial | Step 2 landed: `disallow-latest-tag` (three validations, autogen on as before) and `disallow-default-namespace` (the only `Deny`, `failurePolicy: Fail`, autogen off). Server dry-run: denied in `default`, even for a manifest without `metadata.namespace`; allowed in `product`. Pod-level verdicts equal the legacy ones (90/90, 119/119 pass). Reports are now one result per resource instead of per rule. |
 | 2026-09-30 | Accepted / Partial | Step 3 landed. The PSS baseline is the ten `kyverno/policies` `pod-security-vpol/baseline` ValidatingPolicies, vendored unchanged at commit `36340047`, plus a kustomize patch for the 7-namespace exclusion and `failurePolicy: Ignore` (upstream sets neither, and a CEL policy defaults to `Fail`). Both remaining exceptions were **removed as inert**: with no exception loaded, 83/83 pods pass all ten checks (830/830), and a fixture shows an `IPC_LOCK` pod does fail `disallow-capabilities`. |
+| 2026-09-30 | Accepted / Partial | Step 4a (#1148): the legacy generator got `orphanDownstreamOnPolicyDelete: true` first. A Kind rehearsal of the swap without it left **9 app namespaces with no default-deny for ~6 s**. |
+| 2026-09-30 | Accepted / **Complete** | Step 4b landed. `default-deny-networkpolicy` is a GeneratingPolicy (CREATE+UPDATE, generateExisting, synchronize, orphan) and the **sole owner** of `deny-all-ingress` in app-tier namespaces: the 11 static copies Flux also applied are removed, and `make validate` refuses one returning. The swap was rehearsed in the worst reconcile order with 4a live: 81/81 per-second samples at 12, no gap. A deleted deny-all returns in ~1 s, and a newly labelled namespace gets one in ~1 s. `cleanup-completed-pods` is a DeletingPolicy using `time.now()`. No legacy object remains. |
 
 ---
 
-_Last updated: 2026-09-30 — step 3 landed (PSS baseline vendored; both exceptions removed as inert). Earlier: 2026-09-30 — step 2 landed (disallow-latest-tag, disallow-default-namespace). Earlier: 2026-09-30 — Accepted; step 1 landed (require-probes, require-resources); autogen defaults on, rule 4 corrected. Earlier: 2026-09-30 — created (Proposed)._
+_Last updated: 2026-09-30 — Adoption Complete (step 4: GeneratingPolicy as sole deny-all owner, DeletingPolicy). Earlier: 2026-09-30 — step 3 landed (PSS baseline vendored; both exceptions removed as inert). Earlier: 2026-09-30 — step 2 landed (disallow-latest-tag, disallow-default-namespace). Earlier: 2026-09-30 — Accepted; step 1 landed (require-probes, require-resources); autogen defaults on, rule 4 corrected. Earlier: 2026-09-30 — created (Proposed)._

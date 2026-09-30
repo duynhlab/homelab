@@ -5,3 +5,4 @@ resources:
   - sloth-ui.yaml
   - inventory-grpc-slo.yaml
   - keycloak-login-slo.yaml
+  - slo-alerts.yaml

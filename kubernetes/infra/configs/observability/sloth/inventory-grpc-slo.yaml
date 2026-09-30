@@ -122,14 +122,11 @@ spec:
             CheckoutAvailabilityErrors alert is quiet while this fires, the
             failing method is on the WRITE path (Reserve/Commit, i.e. the order
             saga) rather than the availability read.
+        # Burn-rate alerts live in slo-alerts.yaml (min-events guard).
         pageAlert:
-          labels:
-            channel: '#alerts'
-            severity: page
+          disable: true
         ticketAlert:
-          labels:
-            channel: '#incidents'
-            severity: ticket
+          disable: true
 
     # ---------------------------------------------------------------------
     # Reserve p95 < 250 ms — RFC-0021's own number
@@ -193,11 +190,8 @@ spec:
             product-db for lock waits on the balance rows of a hot SKU. Compare
             against the gRPC span in VictoriaTraces to see whether the time is in the DB
             or in the handler.
+        # Burn-rate alerts live in slo-alerts.yaml (min-events guard).
         pageAlert:
-          labels:
-            channel: '#alerts'
-            severity: page
+          disable: true
         ticketAlert:
-          labels:
-            channel: '#incidents'
-            severity: ticket
+          disable: true

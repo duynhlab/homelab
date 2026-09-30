@@ -730,6 +730,27 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The ClickHouse internals learning path is authored and verified: twelve
+  explanation-first chapters from architecture through scaling**
+  ([#1127](https://github.com/duynhlab/homelab/issues/1127)).
+  - Each chapter follows the Phase-0 contract (mental model, engine mechanism,
+    deployed evidence with class labels, one bounded read-only lab, failure
+    reasoning, teach-back) and links the canonical platform pages instead of
+    repeating them. Sharding and Kafka are explicit reference-only,
+    not-deployed comparisons.
+  - Every lab was run read-only on the Kind cluster on 2026-09-30 (ClickHouse
+    26.7.17.7) and its output recorded with timestamp, commit, table, and
+    replica.
+  - The live run corrected the drafts in places. The part case study moved to
+    live parts, because the issue's 2026-09-29 parts were lost with the
+    cluster rebuild. Merges were shown to be computed on every replica while
+    only level-0 parts are fetched. Each telemetry signal is pinned to one
+    replica by the exporter's long-lived connections. A chapter's example
+    service name that matched no rows was fixed. The `{replica}` S3 prefix
+    stays unverified until the first cold-tier move.
+  - Chapter 01 gains a Draw.io diagram of one replica's engine layers
+    (`docs/architecture/observability/clickhouse-engine`), drawn from what
+    the replica runs rather than the generic engine.
 - **PostgreSQL internals now has a curriculum contract before chapter work
   starts** ([#1137](https://github.com/duynhlab/homelab/issues/1137)). The
   fundamentals hub is rewritten as the learning contract: fourteen planned

@@ -317,7 +317,8 @@ docs/observability/
 │   ├── README.md                 # Platform architecture, schema, Grafana, playground
 │   ├── internals/                # Progressive engine curriculum and authoring contract
 │   │   ├── README.md             # Learning path, evidence vocabulary, shared glossary
-│   │   └── _template.md          # Mandatory chapter shape and review gate
+│   │   ├── _template.md          # Mandatory chapter shape and review gate
+│   │   └── 01-…12-*.md           # Twelve chapters: architecture → engine → replication → scaling
 │   ├── fundamentals.md           # Columnar OLAP and MergeTree mental model
 │   ├── schema-and-queries.md      # Sorting keys, granules, EXPLAIN, codecs
 │   ├── materialized-views.md      # Trace-id lookup materialized view
@@ -518,6 +519,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-09-29 — added the ClickHouse internals curriculum and authoring contract; the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
+_Last updated: 2026-09-29 — the ClickHouse internals curriculum now lists its twelve authored chapters; earlier the same day, added the curriculum and authoring contract, and the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
 Deployment (Flux waves + the gate that releases each one, and why the two
 ClickHouse waves omit `wait`)._

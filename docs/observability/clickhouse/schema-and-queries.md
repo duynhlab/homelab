@@ -31,7 +31,8 @@ Kind is not marketplace scale. The prune **principle** is identical; the row
 count is not.
 
 Do **not** invent replacement OTel tables. The exporter contract is the
-column list in that ConfigMap.
+column list in the DDL image source,
+[`images/clickhouse-ddl/sql/`](../../../images/clickhouse-ddl/).
 
 ---
 
@@ -238,4 +239,4 @@ Full connect + `system.parts` recipes: [Playground](README.md#playground--merget
 
 ---
 
-_Last updated: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_
+_Last updated: 2026-09-30 — the exporter contract points at the DDL image source, not a ConfigMap. Earlier: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_

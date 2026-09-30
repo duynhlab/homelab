@@ -79,7 +79,8 @@ Follow the code. Two cases have no sibling runbook:
 
 1. **Schema drift**: the collector's `clickhouse` exporter writes a fixed
    column set per version. After a collector image bump, diff the exporter's
-   expected DDL against the schema ConfigMap and ship the schema change first
+   expected DDL against [`images/clickhouse-ddl/sql/`](../../../../images/clickhouse-ddl/)
+   (shipped to the schema Job as an image volume, ADR-077) and ship the schema change first
    (Flux chain: `clickhouse-schema` before `tracing`). Do not let the collector
    create tables (`create_schema: false` is deliberate, ADR-065).
 2. **Credentials**: the collector reads `clickhouse-credentials` via ESO;
@@ -99,4 +100,4 @@ queue, which is the data you were trying to save.
 - [ClickHouseExporterUnhealthy](ClickHouseExporterUnhealthy.md) — the consumer side.
 
 ---
-_Last updated: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_
+_Last updated: 2026-09-30 — schema drift diffs against the DDL image source (ADR-077), not a ConfigMap. Earlier: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_

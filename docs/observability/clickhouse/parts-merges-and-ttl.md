@@ -175,6 +175,11 @@ insert guard.
 3. Check the producer's insert cadence and Collector queue/retry metrics.
 4. Reduce tiny inserts or restore merge capacity.
 5. Re-evaluate part growth over at least two scrape intervals.
+6. Only if parts still do not fall once merges are healthy and the cadence is
+   fixed: a targeted `OPTIMIZE TABLE otel.<table> PARTITION '<day>'` on the
+   affected replica, when it has CPU and disk headroom. It treats the symptom
+   with the same merge I/O the backlog lacks, and a merge cannot be undone.
+   Never `OPTIMIZE … FINAL` on a whole OTel table.
 
 Do not raise `parts_to_throw_insert` during first response. The guard protects
 the server from accepting more merge debt than it can pay. Raising it without
@@ -298,6 +303,6 @@ The audited procedure and results live in the dated
 - [ClickHouse operations](operations.md)
 
 ---
-_Last updated: 2026-09-14 — lifecycle guide synthesized from repository
+_Last updated: 2026-09-30 — correct response order gains step 6, the only sanctioned `OPTIMIZE` (targeted partition, last). Earlier: 2026-09-14 — lifecycle guide synthesized from repository
 manifests and a local learning note; runtime-sensitive values remain
 evidence-labelled._

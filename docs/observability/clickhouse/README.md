@@ -753,8 +753,8 @@ not appearing → [Runbook](#runbook--data-not-appearing).
 ## Metrics & alerting
 
 > **Deployed and audited.** The 2026-09-10 Kind audit observed all three server
-> scrapes, all four ClickHouse engine metric-producer paths, and all 22 rules loaded with
-> `health=ok`. See the [dated evidence](audits/2026-09-10-kind.md). The
+> scrapes, all four ClickHouse engine metric-producer paths, and all 22 rules then
+> deployed loaded with `health=ok` (23 are deployed today). See the [dated evidence](audits/2026-09-10-kind.md). The
 > local-stack does not run the operator, so operator and replication rules are
 > cluster-only.
 
@@ -939,11 +939,16 @@ GROUP BY event_type ORDER BY 2 DESC;
 ```
 - `NewPart` is an INSERT that landed **on this replica**. `DownloadPart` is a part
   another replica created and this one **fetched** through Keeper. That row only
-  exists on a replicated table, and it outnumbers `NewPart` because the
-  collector's INSERTs are spread across three replicas.
+  exists on a replicated table, and it outnumbers `NewPart` on any replica the
+  collector's long-lived connections do not land on — each signal's INSERTs stay
+  on one replica ([chapter 08](internals/08-ingestion-pipeline.md)).
 - `RemovePart` counts source parts deleted after a merge had replaced them.
 
-Force a merge and read the part names:
+Force a merge and read the part names — **local-stack only**. On the cluster,
+do not force it: watch natural merges instead, as
+[internals chapter 04](internals/04-parts-and-merges.md) does with two snapshots
+([why](parts-merges-and-ttl.md#safe-practice-lab)). The output below was captured
+on Kind on 2026-09-29, before that rule was made consistent across these pages.
 
 ```sql
 SELECT count() FROM system.parts WHERE database='otel' AND table='otel_logs' AND active;  -- 3
@@ -958,7 +963,9 @@ WHERE database='otel' AND table='otel_logs' AND active ORDER BY name;
 └────────────┴────────────────────┴────────┴───────┘
 ```
 A part name is `<partition>_<min block>_<max block>_<level>`. `0_456_17` holds
-blocks 0–456 and has been merged 17 times. `457_457_0` is a **brand-new** insert
+blocks 0–456; level 17 is the depth of the merge chain behind it, not a count
+of merges (one merge takes the highest input level plus one —
+[chapter 04](internals/04-parts-and-merges.md)). `457_457_0` is a **brand-new** insert
 that arrived while `OPTIMIZE` ran: `FINAL` merges what exists, and ingest never
 stops.
 
@@ -1051,7 +1058,9 @@ service-sorted main table. Inspect `system.parts` on the **target**
 > On the cluster the `otel` database is `ENGINE = Replicated`, so a `CREATE TABLE`
 > there is replicated to all three hosts. Experiment in a scratch database of
 > your own (`CREATE DATABASE scratch` on one replica is local to it) and drop it
-> afterwards; `OPTIMIZE` on the `otel` tables is harmless.
+> afterwards. Do not run `OPTIMIZE` on the cluster's `otel` tables: it spends
+> merge I/O the scheduler would pace and erases the part evidence you came to see
+> ([safe practice lab](parts-merges-and-ttl.md#safe-practice-lab)).
 
 ---
 
@@ -1137,6 +1146,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
+_Last updated: 2026-09-30 — Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
 credential-safe query examples, and current runtime evidence for parts, TTL,
 cold storage, and the 22-rule ClickHouse alert group._

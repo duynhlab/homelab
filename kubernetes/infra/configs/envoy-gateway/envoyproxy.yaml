@@ -21,6 +21,19 @@ spec:
         # horizontally; the PDB below keeps one pod serving during voluntary
         # disruptions.
         replicas: 2
+        # Replace the whole proxy fleet at once on a rollout. Envoy Gateway's
+        # v1.9.1 notes (envoy#47309): proxies still running when an upgraded
+        # controller starts can bring TLS listeners up with no certificate
+        # about 15s later while still reporting Ready, until the pod is
+        # replaced. Upstream's mitigation is maxSurge 100% / maxUnavailable 0:
+        # new pods come up before any old one goes, so no client is ever
+        # served by a stale proxy. It costs a brief doubling of proxy pods
+        # during a rollout; changing the strategy itself restarts nothing.
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 100%
+            maxUnavailable: 0
         pod:
           labels:
             # LOAD-BEARING (ADR-060). Vector's kubernetes_logs source excludes

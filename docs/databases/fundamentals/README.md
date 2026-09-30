@@ -11,7 +11,7 @@ cluster.
 | **Primary audience** | Platform engineers learning PostgreSQL, from first principles through failure and capacity reasoning |
 | **Page type** | Explanation-first chapters with one embedded, read-only observation lab |
 | **Version baseline** | PostgreSQL 18 (deployed 18.1; record the live minor per observation) |
-| **Case study** | One committed row's journey on `product-db`: WAL → `ANY 1` sync acknowledgement → archive → replay on the archive-fed `product-db-replica` |
+| **Case study** | A representative commit's durability path on `product-db`: local WAL flush → `ANY 1` acknowledgement → archive → replay on the archive-fed `product-db-replica`; shared-cluster evidence demonstrates boundaries, not row-level WAL attribution |
 | **Safety boundary** | Observe only: `SELECT` on `pg_catalog`/`pg_stat_*`, `SHOW`, `EXPLAIN`, `kubectl cnpg status`, Kubernetes reads, and existing telemetry |
 | **Canonical platform guide** | [Databases hub](../README.md) |
 | **Authoring contract** | [Chapter template and review gate](_template.md) |

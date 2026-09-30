@@ -14,7 +14,7 @@ promise that can fill your disk.
 | **Deployment status** | Deployed — `product-db` and `platform-db` (3 instances, quorum sync), `product-db-replica` (archive-fed replica cluster) |
 | **Platform scope** | Clusters `product-db`, `platform-db`, `product-db-replica`; WAL transport between their instances and the RustFS archive |
 | **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
-| **This page owns** | Steps 2 and 4 of the committed-row case study: the `ANY 1` acknowledgement and the archive-fed DR replay ([chapter 04](04-wal-and-checkpoints.md) owns steps 1 and 3: WAL position and archiving) |
+| **This page owns** | Steps 2 and 4 of the representative-commit case study: the `ANY 1` acknowledgement and the archive-fed DR replay ([chapter 04](04-wal-and-checkpoints.md) owns steps 1 and 3: WAL position and archiving) |
 | **Not this page** | Backup, PITR, and timelines — [Backup and PITR](13-backup-and-pitr.md); promotion procedure — [DR replica bootstrap runbook](../runbooks/cnpg-dr-replica-bootstrap.md); DR policy — [Disaster recovery](../disaster-recovery.md) |
 | **Previous / next** | [Partitioning and retention](11-partitioning-and-retention.md) / [Backup and PITR](13-backup-and-pitr.md) |
 
@@ -25,8 +25,7 @@ promise that can fill your disk.
 - Which of the four LSN columns in `pg_stat_replication` corresponds to the
   guarantee a given `synchronous_commit` level buys?
 - How does the archive-fed `product-db-replica` receive changes without a
-  streaming connection, and why is its lag measured in archive cadence rather
-  than health?
+  streaming connection, and which stages contribute to its replay lag?
 - What does a replication slot persist, and what happens to `pg_wal` when a
   slot's consumer disappears?
 - After a failover, why can logical consumers resume at all — what did
@@ -83,6 +82,11 @@ absent — which is exactly when it becomes expensive.
   to the committing session. (Upstream invariant; the deployed level is the
   default `on` — Repository fact, no override in
   [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml).)
+- A synchronous acknowledgement proves that enough standbys processed the
+  commit; it does not prove that an arbitrary remaining failover candidate has
+  it. CloudNativePG's separate failover-quorum mechanism provides that stronger
+  promotion gate, and it is not enabled here. (Upstream invariant + Repository
+  fact — [CloudNativePG failover quorum](https://cloudnative-pg.io/docs/1.30/failover/).)
 - A slot pins WAL from its `restart_lsn` forward until the consumer advances
   it; only `max_slot_wal_keep_size` bounds that retention, and it is not set
   here, so retention is unbounded. (Upstream invariant + Repository fact.)
@@ -136,22 +140,24 @@ sequenceDiagram
     P->>S: walsender streams WAL
     S->>S: write + flush commit record
     S-->>P: flush_lsn acknowledgement
-    P-->>C: COMMIT returns (2 durable copies)
-    Note over P,S: second standby continues async — may lag
-    P->>A: archive_command on segment switch<br/>or archive_timeout 5min (ch. 04)
+    P-->>C: COMMIT returns (primary + at least 1 standby durable)
+    Note over P,S: other standby may already be durable or may lag
+    P->>A: archiver on segment switch<br/>or archive_timeout 5min (ch. 04)
     R->>A: restore_command polls next segment
-    A-->>R: 64 MB segment
+    A-->>R: gzip WAL object<br/>(restores to 64 MB segment)
     R->>R: startup process replays — pg_last_wal_replay_lsn advances
 ```
 
 ### What to notice
 
-- The client's `COMMIT` returns after the **first** standby flush
-  acknowledgement — the diagram's reply arrow — so exactly two instances hold
-  the commit durably at that moment; the third converges asynchronously.
+- The client's `COMMIT` returns after the **first required** standby flush
+  acknowledgement — the diagram's reply arrow — so the primary and at least
+  one standby hold the commit durably. The other standby may already have
+  flushed it; `ANY 1` defines a minimum, not an exact copy count.
 - `product-db-replica` appears **after** the archive, not after the primary:
-  its recency is bounded by segment completion or the five-minute
-  `archive_timeout`, an expected delay that no streaming-lag metric describes.
+  its recency includes segment completion, Barman upload, object-store
+  availability, restore polling, download, and replay. `archive_timeout` bounds
+  only the low-traffic wait for a forced segment switch.
 
 ## How homelab uses it
 
@@ -159,6 +165,7 @@ sequenceDiagram
 |---|---|---|---|
 | Quorum synchronous commit `ANY N` | `method: any, number: 1, dataDurability: required` on `product-db` and `platform-db` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) `synchronous` block | Repository fact |
 | `synchronous_commit` level | Default `on` (flush on the quorum standby), not `remote_apply` | Same manifest — no override in `parameters` | Repository fact |
+| Failover safety gate | `failoverQuorum` is not enabled; synchronous commit and safe promotion are distinct guarantees | Same manifest · [CloudNativePG failover quorum](https://cloudnative-pg.io/docs/1.30/failover/) | Repository fact + Upstream invariant |
 | HA replication slots per standby | Operator-managed slots, plus `synchronizeLogicalDecoding: true` | Same manifest, `replicationSlots.highAvailability` | Repository fact |
 | Failover slot synchronization | `sync_replication_slots: "on"`, `hot_standby_feedback: "on"` | Same manifest, parameters block | Repository fact |
 | Standalone replica cluster in continuous recovery | `product-db-replica`: 1 instance, `replica.enabled`, source `product-db-primary` via Barman object store; three instances until 2026-09-29, reduced because each standby's restore polling cost more CPU than the serving cluster ([#1134](https://github.com/duynhlab/homelab/pull/1134)) | [`product-db-replica/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db-replica/instance.yaml) header + `replica`/`externalClusters` | Repository fact |
@@ -169,7 +176,10 @@ sequenceDiagram
 Why it matters here: the deployed quorum means a single standby restart does
 not block writes (the other can acknowledge), but losing **both** standbys
 freezes commits by design — `dataDurability: required` chooses durability over
-availability. The slot-sync pair (`sync_replication_slots` +
+availability. It does not by itself prove that whichever replica remains
+promotable contains every acknowledged commit; that is the separate guarantee
+the undeployed `failoverQuorum` feature would gate. The slot-sync pair
+(`sync_replication_slots` +
 `synchronizeLogicalDecoding`) exists so that logical consumers (the platform's
 CDC-style consumers, when present) survive a failover: the standby maintains
 copies of failover-enabled logical slots and can serve them after promotion
@@ -253,7 +263,10 @@ Observation context:
 | **Repository** | _pending_ |
 | **Cluster/context** | _pending_ |
 | **PostgreSQL** | _pending_ |
-| **Cluster/instance/role** | _pending_ |
+| **Cluster/instance** | _pending_ |
+| **CNPG role** | _pending_ |
+| **PostgreSQL recovery state** | _pending_ |
+| **Synchronous state** | _pending_ |
 | **Database** | _pending_ |
 
 ### How to read the result
@@ -264,17 +277,17 @@ Observation context:
 | `flush_lsn` vs `replay_lsn` gap on a standby | Commits durable there but not yet visible to its read queries (`synchronous_commit = on` waits only for flush) | Not data loss — replay is behind, durability is not |
 | `write_lag` / `flush_lag` / `replay_lag` | The extra commit latency `remote_write` / `on` / `remote_apply` **would** cost against this standby | Nothing about past lag; these are current-sample estimates |
 | Slot with `active = f` and growing `retained_wal` | A consumer is gone and the primary is pinning WAL for it — the failure mode behind [`CNPGInactiveSlotRetainingWAL`](../../observability/runbooks/postgresql/CNPGInactiveSlotRetainingWAL.md) | Not who the consumer was or whether it returns; the slot has no health opinion |
-| Replica: `in_recovery = t`, `time_since_last_replayed_commit` up to ~5 min or one segment | The archive-fed loop is working as designed — lag equals archive cadence ([chapter 04](04-wal-and-checkpoints.md) owns the `archive_timeout 5min` / 64 MB segment mechanics) | A small value does not prove streaming (there is none), and a growing value alone does not distinguish "no new commits on the primary" from "archive restore failing" — cross-check `pg_stat_archiver` on the primary |
+| Replica: `in_recovery = t`, recent `time_since_last_replayed_commit` | The archive-fed loop has replayed a recent commit | End-to-end lag or archive health by itself: compare primary WAL/archive positions with DR replay, because no new commits, upload delay, restore polling, and replay delay can produce similar timestamps |
 | LSN arithmetic via `pg_wal_lsn_diff` | Byte distance between positions | Not a transaction count and not elapsed time |
 
 ### What to notice
 
 - Every LSN, lag interval, and retained-WAL size above is an **observed
   example** — they change with every commit and every archive cycle.
-- The DR replica can be simultaneously *healthy* (loop running, replay
-  advancing) and *minutes behind* (bounded by archive cadence). One number
-  cannot express both; you need the replay timestamp **and** the primary's
-  archiver evidence.
+- The DR replica can be simultaneously *healthy* (the loop runs and replay
+  advances) and *minutes behind*. No single number proves both health and
+  freshness; correlate the primary's current/archive positions with the DR
+  replay position and timestamp.
 
 ## Failure modes and trade-offs
 
@@ -282,6 +295,7 @@ Observation context:
 |---|---|---|---|---|
 | One `product-db` standby down | Quorum still satisfiable by the other; sender row disappears | None for writers | `pg_stat_replication` row count; `CNPGClusterStandbyNotStreaming` | Redundancy reduced from 2 spare copies to 1 (Inference — not induced here) |
 | Both standbys down | `dataDurability: required` keeps the commit wait; sessions block in `SyncRep` wait | Writes hang, reads fine | `pg_stat_activity.wait_event = SyncRep`; HA alerts | Deliberate: durability over availability; recovery = restore a standby, not weaken the setting (Upstream invariant) |
+| Primary and the standby that acknowledged a commit become unavailable | The remaining standby may be behind that commit; `dataDurability: required` does not validate promotion candidates | A failover to the remaining standby can lose an acknowledged commit | Available-instance LSNs and CNPG failover state; `failoverQuorum` is absent | Wait for an up-to-date instance or accept the recovery trade-off; enabling failover quorum is a separate architecture decision (Upstream invariant + Repository fact) |
 | Standby restarts and reconnects | Sender passes `startup` → `catchup` → `streaming`; slot guarantees no segment gap | Temporary lag spike | `state` column; lag intervals | Catch-up competes with foreground WAL for I/O (Inference) |
 | Slot consumer disappears | `restart_lsn` frozen; WAL accumulates without bound (`max_slot_wal_keep_size` unset) | `pg_wal` growth → disk pressure | `pg_replication_slots.wal_status`, retained bytes; `CNPGInactiveSlotRetainingWAL` | Dropping the slot frees disk but abandons the consumer's resume point permanently (Upstream invariant) |
 | Archive stalls (RustFS down or credentials broken) | Primary keeps segments pending archive; DR replica starves | DR replay timestamp ages; later disk pressure on primary | `pg_stat_archiver.failed_count`; `CNPGWALArchiveFailing`, `CNPGDRClusterOffline` | DR RPO degrades silently first — the primary is healthy while the replica falls behind (Inference) |
@@ -307,23 +321,25 @@ deployed (Repository fact + Upstream invariant —
 ### “The DR replica is lagging, so replication is broken”
 
 The DR replica has no replication connection to break. It replays photocopies:
-finished segments from the archive, at worst one `archive_timeout` (5 min)
-after the fact. Lag inside that envelope is the design working. Broken looks
-different: replay timestamp aging past the cadence **while** the primary's
-archiver reports failures.
+finished segments from the archive. A quiet primary can spend up to roughly
+`archive_timeout` waiting for a forced switch, then upload, polling, download,
+and replay add their own delay. A recent replay timestamp is encouraging but
+does not prove a fixed lag bound; diagnose freshness by comparing both ends of
+the pipeline.
 
-### Challenge: the primary crashes 30 seconds after a `COMMIT` returned
+### Challenge: the primary and acknowledging standby disappear
 
-The synchronous standby had flushed the commit record; the async standby had
-not yet. Which instance may CloudNativePG promote, and can the commit be lost?
+The primary returned `COMMIT` after one standby flushed the record. A partition
+then makes both of those instances unavailable while the other standby remains.
+Can `dataDurability: required` prove that the remaining promotion candidate has
+the commit?
 
-**Model answer:** The operator promotes the most advanced standby — and the
-quorum guarantees at least one standby holds the commit durably, so promoting
-by flush position preserves it. The commit could be lost only if the primary
-**and** the acknowledging standby were destroyed together, which is the
-two-simultaneous-failure case outside the deployed quorum's protection
-(see [Invariants](#invariants); failover mechanics belong to
-[CloudNativePG](../cloudnativepg.md)).
+**Model answer:** No. `dataDurability: required` prevented the commit wait from
+degrading while the transaction ran, but `ANY 1` proves only that *some*
+standby acknowledged. The remaining standby may be behind. This cluster does
+not enable CloudNativePG's separate `failoverQuorum`, so promotion is not gated
+on proving that the candidate contains every synchronously acknowledged commit
+([CloudNativePG failover quorum](https://cloudnative-pg.io/docs/1.30/failover/)).
 
 ## Teach-back checklist
 
@@ -336,8 +352,10 @@ Before continuing, explain these without rereading the chapter:
       down, and why that is a choice rather than a bug.
 - [ ] One row of the slot query and what a frozen `restart_lsn` with growing
       retained WAL does — and does not — tell you.
-- [ ] Why the DR replica's replay lag is bounded by `archive_timeout`, and
-      which two pieces of evidence distinguish that from a real failure.
+- [ ] Which stages contribute to archive-fed DR replay lag, and why
+      `archive_timeout` alone is not an end-to-end bound.
+- [ ] Why synchronous acknowledgement and safe failover are different
+      guarantees when `failoverQuorum` is not enabled.
 
 ## Related documentation
 

@@ -199,7 +199,10 @@ Observation context:
 | **Repository** | _pending_ |
 | **Cluster/context** | _pending_ |
 | **PostgreSQL** | _pending_ |
-| **Cluster/instance/role** | _pending_ |
+| **Cluster/instance** | _pending_ |
+| **CNPG role** | _pending_ |
+| **PostgreSQL recovery state** | _pending_ |
+| **Synchronous state** | _pending_ |
 | **Database** | _pending_ |
 
 ### How to read the result

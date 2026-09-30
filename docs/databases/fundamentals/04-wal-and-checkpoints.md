@@ -11,7 +11,7 @@ is built on that position.
 | **Audience** | Practitioner — the durability spine of the whole path |
 | **Prerequisites** | [Buffer manager and I/O](03-buffer-manager-and-io.md); glossary terms WAL, LSN, checkpoint |
 | **Deployment status** | Deployed — both operational clusters archive WAL continuously |
-| **Platform scope** | WAL production, flushing, checkpointing, and archiving on `product-db` (steps 1 and 3 of the committed-row case study) |
+| **Platform scope** | WAL production, flushing, checkpointing, and archiving on `product-db` (steps 1 and 3 of the representative-commit case study) |
 | **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
 | **This page owns** | WAL records and LSNs, the deployed 64 MB segment lifecycle, full-page writes, checkpoints and the REDO point, and the archive boundary |
 | **Not this page** | Standby acknowledgement and DR replay (case-study steps 2 and 4) — [Replication and slots](12-replication-and-slots.md); restore mechanics — [Backup and PITR](13-backup-and-pitr.md) |
@@ -87,7 +87,7 @@ recovery, a standby, the archiver, or a slot) still needs.
 
 ### Lifecycle or sequence
 
-One committed row on `product-db`, WAL's-eye view (case-study step 1):
+A representative commit on `product-db`, WAL's-eye view (case-study step 1):
 
 1. **Describe.** The backend changes the page in shared buffers and appends
    WAL records into WAL buffers (`wal_buffers 16MB` here).
@@ -110,9 +110,10 @@ One committed row on `product-db`, WAL's-eye view (case-study step 1):
    checkpoint in `pg_control` — readable via `pg_control_checkpoint()`.
 6. **Archive (case-study step 3).** A finished segment is handed to the
    archiver; the Barman Cloud plugin ships it to the RustFS object store.
-   `archive_timeout 5min` force-switches segments so a quiet database still
-   archives on a 5-minute clock — at 64 MB per (compressed) segment, the
-   cadence, not the byte volume, is the contract.
+   `archive_timeout 5min` force-switches segments during quiet periods so old
+   unarchived WAL does not wait indefinitely for a segment to fill. Upload,
+   restore polling, download, and replay add delay after that switch, so five
+   minutes is not an end-to-end DR lag bound.
 7. **Recycle.** Segments no longer needed by recovery, standbys, slots, or the
    archiver are renamed for reuse, bounded by `min_wal_size 2GB` /
    `max_wal_size 8GB` / `wal_keep_size 1GB`.
@@ -151,22 +152,25 @@ sequenceDiagram
 | Segment size | `walSegmentSize: 64` (64 MB; upstream default is 16 MB) | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Checkpoint schedule | `checkpoint_timeout 15min`, `checkpoint_completion_target 0.9`, `max_wal_size 8GB`, `min_wal_size 2GB` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | WAL volume vs CPU | `wal_compression on`; `wal_level logical` (largest record set, enabling logical decoding) | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
-| Quiet-period archiving | `archive_timeout 5min` bounds archive lag on an idle system | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [Backup policy](../backup-policy.md) | Repository fact |
-| Archive transport | Barman Cloud plugin (`isWALArchiver: true`) to the `pg-backups-cnpg` bucket on RustFS | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [Disaster recovery](../disaster-recovery.md) | Repository fact |
+| Quiet-period segment completion | `archive_timeout 5min` limits how long low-traffic WAL waits before a forced segment switch; it does not bound upload or DR replay | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [Backup policy](../backup-policy.md) | Repository fact + Upstream invariant |
+| Archive transport | Barman Cloud plugin (`isWALArchiver: true`) gzip-compresses completed segments and uploads them to the `pg-backups-cnpg` bucket on RustFS | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [`product-db/objectstore.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/objectstore.yaml) | Repository fact |
 | Checkpoint health signal | `CNPGCheckpointPressure` fires when requested checkpoints outpace timed ones | [`deep-signals-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
 | Archive health signal | `CNPGWALArchiveFailing` | [runbook](../../observability/runbooks/postgresql/CNPGWALArchiveFailing.md) | Repository fact |
 | WAL/data volume split | None — WAL shares the 10Gi data PVC (no `walStorage`) | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 
-The 64 MB segment choice trades archive-object count for granularity: four
-times fewer objects in RustFS than the default, at the cost of `archive_timeout`
-force-switching mostly-empty 64 MB files on a quiet cluster (compression
-shrinks what actually ships).
+The three size layers are different. `wal_compression` compresses full-page
+images inside WAL records and can reduce how quickly WAL fills; it does not
+change `wal_segment_size`. A completed or force-switched segment is still a
+64 MB file before archival. Barman's separate `wal.compression: gzip` setting
+shrinks the object uploaded to RustFS, so archive-object bytes cannot be
+derived from the segment count alone.
 
 ## Observe it on the live cluster
 
 This lab captures the WAL position and its segment name, the checkpoint state
 recovery would use, and the archiver's ledger — case-study steps 1 and 3 in
-three queries.
+three queries. These system-wide snapshots demonstrate durability boundaries;
+they cannot attribute a WAL record or archived segment to one application row.
 
 ### Prerequisites and safety
 
@@ -224,7 +228,10 @@ Observation context:
 | **Repository** | _pending_ |
 | **Cluster/context** | _pending_ |
 | **PostgreSQL** | _pending_ |
-| **Cluster/instance/role** | _pending_ |
+| **Cluster/instance** | _pending_ |
+| **CNPG role** | _pending_ |
+| **PostgreSQL recovery state** | _pending_ |
+| **Synchronous state** | _pending_ |
 | **Database** | _pending_ |
 
 ### How to read the result
@@ -235,7 +242,7 @@ Observation context:
 | `current_segment` name | Timeline + position encoded per 64 MB segment; consecutive names advance as the LSN crosses segment boundaries | — |
 | `redo_lsn` vs `checkpoint_lsn` | Recovery would replay from `redo_lsn`; the gap to `current_lsn` approximates crash-recovery replay volume | Recovery *time* — replay speed depends on record mix and I/O |
 | `checkpoint_time` ≤ 15 min ago | The timed schedule is holding | That no requested checkpoints occurred — `pg_stat_checkpointer` splits timed vs requested |
-| `archived_count`, `last_archived_time` | The archive pipeline is moving; on an idle cluster expect roughly one segment per `archive_timeout` | Byte volume in RustFS — count × 64 MB overstates it (compression, force-switched partial segments) |
+| `archived_count`, `last_archived_time` | The archive pipeline is moving; on a quiet cluster a forced switch should make the count advance around the configured `archive_timeout` | End-to-end DR freshness or RustFS bytes — each source segment is 64 MB, but Barman gzip determines stored object size and downstream stages add delay |
 | `failed_count > 0` | Archive attempts failed since `stats_reset` — correlate with the alert | Whether the problem persists; `last_failed_wal` vs `last_archived_wal` ordering answers that |
 
 ### What to notice

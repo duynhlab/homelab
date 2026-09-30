@@ -6,7 +6,7 @@ Kustomization with **server-side apply**. Deliberately *not* a HelmRelease.
 | Attribute | Value |
 |-----------|-------|
 | Gateway API | standard channel, bundle-version `v1.6.1` |
-| Envoy Gateway | extension CRDs, `v1.9.0` |
+| Envoy Gateway | extension CRDs, `v1.9.2` |
 | Objects | 20 — 10 CRDs `gateway.networking.k8s.io`, 8 CRDs `gateway.envoyproxy.io`, 1 ValidatingAdmissionPolicy + 1 binding (`safe-upgrades`) |
 | Applied by | `kustomize-controller` (server-side apply), `prune: false` |
 | Owner of `safe-upgrades` | this directory — the controller chart is told to skip it |
@@ -121,4 +121,4 @@ same change — the CRDs and the controller are versioned together.
 - Design record: [`ADR-044`](../../../../docs/proposals/adr/ADR-044-envoy-gateway-platform-edge/README.md),
   amendments "CRD delivery" (2026-08-17) and "Envoy Gateway v1.9.0" (2026-08-18).
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-09-30 — extension CRDs regenerated at v1.9.2 (only envoyproxies, securitypolicies and envoyextensionpolicies change; Gateway API standard CRDs identical). Earlier: 2026-08-18_

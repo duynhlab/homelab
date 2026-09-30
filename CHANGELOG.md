@@ -5821,6 +5821,24 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **Envoy Gateway v1.9.0 → v1.9.2 on the cluster and local-stack**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G8, supersedes
+  #1005 + #1006). The OCI pin keeps the v-prefixed chart tag, `v1.9.2`
+  (`sha256:be0342…`); upstream's `1.9.2` is a different artifact. The
+  vendored extension CRDs are regenerated from `gateway-crds-helm`
+  `v1.9.2`. The regeneration reproduces the committed v1.9.0 file byte for
+  byte, and between the two only three CRDs change:
+  - `envoyproxies`: 39 added fields;
+  - `securitypolicies`: `oidc.provider.issuer` must now be `https://`.
+    None of the 19 live SecurityPolicies uses OIDC;
+  - `envoyextensionpolicies`: descriptions only.
+
+  The Gateway API standard CRDs are identical. A server-side dry-run of all
+  eight passes against the live cluster. The proxy fleet rolls once, onto
+  Envoy `distroless-v1.39.1`, all at once under the `maxSurge: 100%`
+  strategy that landed first. The EdgeCertExpiry runbook gains the
+  certless-listener signal (envoy#47309).
+
 - **Envoy Gateway v1.8.3 → v1.9.0, Gateway API CRDs v1.5.1 → v1.6.1.** The
   bundle bump is mandatory, not cosmetic: v1.9.0 reconciles
   `TCPRoute`/`UDPRoute` through `gateway.networking.k8s.io/v1` and *silently

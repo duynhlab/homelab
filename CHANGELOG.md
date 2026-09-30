@@ -1790,6 +1790,12 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The OpenBAO `db-strong` password policy is labelled as not deployed**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G1). The page
+  described it as applied to every DB role, but no manifest writes it. It
+  now carries a warning: its symbols (`%`, `@`, `#`, …) corrupt the DSN in
+  the nine services that do not escape the password yet.
+
 - **ClickHouse docs no longer contradict each other or the deployment**
   ([#1136](https://github.com/duynhlab/homelab/pull/1136) follow-ups).
   - One rule for forcing merges. Never on the cluster's `otel` tables for

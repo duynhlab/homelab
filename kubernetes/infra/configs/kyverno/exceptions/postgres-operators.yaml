@@ -3,6 +3,14 @@
 #
 # Owner: platform-team
 # Expires: 2026-12-31 (track upstream hardening of operator-managed pods)
+# Its require-resources half was DROPPED on 2026-09-30 (ADR-078 step 1), not
+# migrated: it was inert. Neither selector matches a pod require-resources
+# evaluates — `application=cnpg` matches 0 pods on the cluster (CNPG instance
+# pods carry cnpg.io/cluster and app.kubernetes.io/managed-by=cloudnative-pg),
+# and the operator pod lives in cloudnative-pg, outside the policy's ten
+# namespaces. CNPG instance pods pass require-resources on their own (the
+# operator sets resources from the Cluster CR). This object now waives only
+# the PSS baseline, until that policy moves too.
 apiVersion: kyverno.io/v2
 kind: PolicyException
 metadata:
@@ -18,10 +26,6 @@ spec:
       ruleNames:
         - baseline
         - autogen-baseline
-    - policyName: require-resources
-      ruleNames:
-        - validate-resources
-        - autogen-validate-resources
   match:
     any:
       - resources:

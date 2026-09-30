@@ -1253,6 +1253,17 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **Envoy proxy rollouts replace the whole fleet at once (`maxSurge: 100%`,
+  `maxUnavailable: 0`)**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G8 prep).
+  Envoy Gateway's v1.9.1 notes (envoy#47309) warn that proxies still
+  running when an upgraded controller starts can bring TLS listeners up
+  with no certificate about 15 s later, while still reporting Ready. The
+  proxy Deployment defaulted to 25 %/25 %, which with 2 replicas replaces
+  one pod at a time and leaves a stale proxy serving. New pods now come up
+  before any old one goes. The strategy change itself restarts nothing;
+  it is merged ahead of the v1.9.2 upgrade.
+
 - **The Backoffice no longer goes blank on a reload with a live staff session.**
   - **Symptom:** after signing in, any reload rendered an empty page, with no
     error and no failed request.

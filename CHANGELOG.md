@@ -5901,6 +5901,19 @@ Skeleton (copy what you need):
   `vector_buffer_size_bytes`. The docs' PromQL moves to
   `vector_buffer_size_events`.
 
+- **OpenTelemetry Collector contrib 0.159.0 → 0.161.0 (chart `<0.175.0`,
+  0.174.0) on the cluster and local-stack**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G6, supersedes
+  #1016 + #1013). None of the 0.160/0.161 breaking items touch our
+  config. We set no `deployment_name_from_replicaset`, use no
+  `Base64Decode`, and neither Kafka, mezmo nor tail sampling. The
+  `clickhouse` exporter is unchanged between the two tags: no file under
+  `internal/sqltemplates` moved and `logs_insert.sql` is byte-identical,
+  so the committed DDL stays compatible. The one applicable item is the
+  deprecation of `prometheus_remote_write`
+  `resource_to_telemetry_conversion` in favour of
+  `resource_constant_labels`. It is a warning for now, and the migration
+  is a follow-up.
 - **Pyroscope 2.1.0 → 2.3.1 on the cluster and 2.2.1 → 2.3.1 on
   local-stack; the two now run the same version**
   ([#1107](https://github.com/duynhlab/homelab/issues/1107) G11,

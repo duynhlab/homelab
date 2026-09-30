@@ -9,7 +9,7 @@
 | | |
 |---|---|
 | **Manifest** | `kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml` (HelmRelease, ns `monitoring`) |
-| **Distribution** | `otel/opentelemetry-collector-contrib:0.159.0` |
+| **Distribution** | `otel/opentelemetry-collector-contrib:0.161.0` |
 | **Mode** | Gateway — `deployment`, 1 replica (SPOF — single replica accepted for the homelab) |
 | **Receivers** | OTLP only — gRPC `:4317`, HTTP `:4318` |
 | **Pipelines** | `traces`, `logs`, `logs/clickhouse`, `metrics`, `metrics/spanmetrics` — see [table below](#the-deployed-pipelines) |
@@ -248,7 +248,7 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 | Log: `Memory usage is above soft limit`, clients see refusals | `memory_limiter` backpressure — collector or a backend is overloaded | Check exporter queue metrics for the slow backend; raise limits/replicas only after the backend is healthy. Never reorder the limiter later in the chain |
 | Export errors: `context deadline exceeded` | Backend unreachable or too slow before the exporter timeout | Verify endpoint/NetworkPolicy; exporters buffer + retry with backoff, so transient blips self-heal — persistent ones need the backend fixed or `timeout` raised |
 | `tls: first record does not look like a TLS handshake` | Exporter speaks TLS to a plaintext endpoint (or vice versa) | Match the exporter `tls.insecure` setting to the backend — in-cluster hops here are plaintext |
-| Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.159.0` |
+| Startup: `unknown type: "…"` | Component not in the running distribution | This platform ships **contrib**; check spelling, then confirm the component exists in `0.161.0` |
 | Collector crash-loops at startup, ClickHouse also down | Historically the `create_schema` DDL coupling (above); **not possible since RFC-0028** — if you see it, check whether `create_schema` was set back to `true` | Restore ClickHouse first; confirm `create_schema: false` in the collector values |
 
 ## References
@@ -258,7 +258,7 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 
 ---
 
-_Last updated: 2026-09-24 — `transform/privacy` on traces and both logs pipelines strips the ADR-071 deny list from every producer. Earlier the same day — RFC-0031 Task 4.4: `k8sattributes` + `resource/cluster` on
+_Last updated: 2026-09-30 — contrib 0.161.0 on the cluster and local-stack. Earlier: 2026-09-24 — `transform/privacy` on traces and both logs pipelines strips the ADR-071 deny list from every producer. Earlier the same day — RFC-0031 Task 4.4: `k8sattributes` + `resource/cluster` on
 both logs pipelines (all seven `k8s.*` columns filled on Kind), both HTTP method
 dimensions on the span-metrics connector, and the pipeline table brought up to the five
 pipelines actually deployed. Previously 2026-08-24 — exporters are **6 defined / 5 wired** after RFC-0027 removed

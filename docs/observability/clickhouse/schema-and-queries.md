@@ -214,7 +214,7 @@ ReplicatedMergeTree is a mutation; it is not a playground first step.
 | Rule | Here |
 |------|------|
 | Who owns DDL | `clickhouse-schema` Job; exporter `create_schema: false` |
-| Who owns INSERT columns | Collector contrib `clickhouse` exporter 0.159.0 |
+| Who owns INSERT columns | Collector contrib `clickhouse` exporter 0.161.0 |
 | Logs sort | Five-minute bucket, then service, then timestamp |
 | Traces sort | Service, span name, time — not TraceId |
 | Grafana | Filters that match those prefixes stay cheap; see [README Grafana](README.md#grafana) |
@@ -239,4 +239,4 @@ Full connect + `system.parts` recipes: [Playground](README.md#playground--merget
 
 ---
 
-_Last updated: 2026-09-30 — the exporter contract points at the DDL image source, not a ConfigMap. Earlier: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_
+_Last updated: 2026-09-30 — exporter 0.161.0 (INSERT columns unchanged from 0.159.0); the exporter contract points at the DDL image source, not a ConfigMap. Earlier: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_

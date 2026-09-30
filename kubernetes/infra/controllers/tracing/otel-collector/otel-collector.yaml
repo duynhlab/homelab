@@ -12,7 +12,7 @@ spec:
         kind: HelmRepository
         name: opentelemetry
         namespace: flux-system
-      version: '<0.171.0'
+      version: '<0.175.0'
   dependsOn:
     - name: victoria-metrics-operator
       namespace: monitoring
@@ -396,7 +396,7 @@ spec:
     image:
       pullPolicy: IfNotPresent
       repository: otel/opentelemetry-collector-contrib
-      tag: 0.159.0
+      tag: 0.161.0
     livenessProbe:
       httpGet:
         path: /

@@ -92,6 +92,24 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Kyverno CEL migration, step 3 of 4 (ADR-078): PSS baseline and
+  exceptions.**
+  - The legacy `pss-baseline` ClusterPolicy (`validate.podSecurity`) has no
+    CEL equivalent. It is replaced by the ten
+    `kyverno/policies` `pod-security-vpol/baseline` ValidatingPolicies, vendored
+    unchanged at commit `36340047` under `cluster-policies/pss-baseline/`.
+  - A kustomize patch adds what upstream leaves open: the same 7-namespace
+    exclusion, and `failurePolicy: Ignore`. Upstream sets none, and a CEL
+    policy then defaults to `Fail`, which would refuse every pod create while
+    Kyverno's webhook is down.
+  - **Both remaining exceptions are removed as inert.** With no exception
+    loaded, every one of the 83 pods passes all ten checks (830/830), including
+    the 8 in `openbao` and `cloudnative-pg` they covered. OpenBao's pods do not
+    request `IPC_LOCK`.
+  - New fixture `tests/pss-baseline` (50 cases): a compliant pod passes every
+    check, and an `IPC_LOCK`, a privileged, a `hostNetwork` and a `hostPath`
+    pod each fail exactly the right one. `policy-exceptions.md` now documents
+    the CEL `PolicyException` form with `spec.expiresAt`.
 - **Kyverno CEL migration, step 2 of 4 (ADR-078).** `disallow-latest-tag`
   and `disallow-default-namespace` are ValidatingPolicy objects.
   - `disallow-latest-tag`: its three legacy rules are three CEL

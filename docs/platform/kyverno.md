@@ -8,10 +8,10 @@ mode, so a violation is reported rather than blocked.
 | | |
 |---|---|
 | **Chart** | `kyverno/kyverno` 3.9.1 (engine v1.19.1), four controllers (admission, background, cleanup, reports) |
-| **Policies** | 7 deployed — 4 `ValidatingPolicy` (CEL, ADR-078 steps 1–2), 2 `ClusterPolicy` and 1 `ClusterCleanupPolicy` — plus 1 disabled. See [Policy inventory](#policy-inventory) |
-| **Enforcing** | Exactly one: `disallow-default-namespace` (ValidatingPolicy, `validationActions: [Deny]`, `failurePolicy: Fail`). The other five validating policies are Audit |
-| **Exceptions** | 2 registered, both expiring 2026-12-31, accepted only from ns `kyverno` |
-| **Tests** | 4 CLI fixture suites under `configs/kyverno/tests/`, run by `make validate` + the `validate` CI job (fails on any `Excluded` result) |
+| **Policies** | 16 deployed — 14 `ValidatingPolicy` (CEL, ADR-078 steps 1–3; ten of them are the PSS baseline), 1 `ClusterPolicy` (generate) and 1 `ClusterCleanupPolicy` — plus 1 disabled. See [Policy inventory](#policy-inventory) |
+| **Enforcing** | Exactly one: `disallow-default-namespace` (ValidatingPolicy, `validationActions: [Deny]`, `failurePolicy: Fail`). The other thirteen validating policies are Audit |
+| **Exceptions** | None active (the last two were removed as inert, 2026-09-30); accepted only from ns `kyverno` |
+| **Tests** | 5 CLI fixture suites under `configs/kyverno/tests/`, run by `make validate` + the `validate` CI job (fails on any `Excluded` result) |
 | **Reports UI** | Policy Reporter 3.10.0 at `kyverno.duynh.me` — **deployed** |
 | **Flux** | `kyverno-policies-local` (`./configs/kyverno`), after `controllers-local` + `monitoring-local` |
 | **Signals** | 4 ServiceMonitors · 4 alerts + 4 runbooks · chart-native Grafana dashboard |
@@ -105,7 +105,7 @@ kubernetes/
     controllers/policy-reporter/  # HelmRelease (policy-reporter 3.10.0) — the reports UI
     configs/kyverno/
       cluster-policies/           # 8 active + 1 disabled — see Policy inventory
-      exceptions/                 # PolicyException resources (2)
+      exceptions/                 # PolicyException resources (none active; CEL form documented in kustomization.yaml)
       tests/                      # Kyverno CLI fixtures (3), run by `make validate`
   clusters/local/
     kyverno.yaml                  # Kustomization kyverno-policies-local
@@ -125,7 +125,7 @@ maintain a second copy of those here.
 
 | Policy | Kind | Mode | `failurePolicy` | What the rule does |
 |--------|------|------|-----------------|--------------------|
-| `pss-baseline` | `ClusterPolicy` | Audit | `Ignore` | Pod Security Standards **baseline** on all Pods, excluding 7 control-plane/operator namespaces |
+| `pss-baseline/` (10 policies) | `ValidatingPolicy` | Audit | `Ignore` | Pod Security Standards **baseline** as ten CEL `ValidatingPolicy` checks vendored from `kyverno/policies` `pod-security-vpol/baseline` (`cluster-policies/pss-baseline/`, ADR-078 step 3) — `disallow-capabilities`, `disallow-host-namespaces`, `disallow-host-path`, `disallow-host-ports`, `disallow-host-process`, `disallow-privileged-containers`, `disallow-proc-mount`, `disallow-selinux`, `restrict-seccomp`, `restrict-sysctls`. A kustomize patch adds the 7-namespace exclusion and `failurePolicy: Ignore` (upstream sets neither; a CEL policy defaults to `Fail`) |
 | `pss-restricted-apps` | — | **disabled 2026-08-17** | — | Commented out of the kustomization. `runAsNonRoot` fails structurally — the service images ship no non-root `USER` — so it produced 63 findings nobody could action. Re-enable conditions are in the file header |
 | `disallow-latest-tag` | `ValidatingPolicy` | Audit | `Ignore` | Three CEL validations: an image must carry a tag, that tag must not be `latest` (containers, `initContainers`, `ephemeralContainers`), and an image volume must be pinned by digest (ADR-077). Autogen on, as before; one report result per resource |
 | `require-resources` | `ValidatingPolicy` | Audit | `Ignore` | CEL `containers.all(...)`: `requests.cpu`, `requests.memory`, `limits.memory` must be set. Scoped to the 10 app namespaces |
@@ -181,14 +181,13 @@ report.
 
 ## Exceptions
 
-Two are registered. Both are accepted only when the `PolicyException` object
+None is active. An exception is accepted only when the `PolicyException` object
 itself lives in namespace `kyverno`, so an app team cannot self-waive by
 shipping one alongside its workload.
 
 | Exception | Waives | For | Expires |
 |-----------|--------|-----|---------|
-| `openbao` | `pss-baseline` (+ autogen) | Pods in ns `openbao` — OpenBAO needs `IPC_LOCK` for `mlock` | 2026-12-31 |
-| `postgres-operators` | `pss-baseline` (+ autogen) | CNPG operator and instance Pods in ns `cloudnative-pg`, `platform`, `product` | 2026-12-31 |
+| — | — | **None active since 2026-09-30.** `openbao` and `postgres-operators` were removed as inert in ADR-078 step 3: every pod passes the CEL baseline without them | — |
 
 The workflow for adding or retiring one — including the required annotations —
 is owned by [policy-exceptions.md](../security/policy-exceptions.md). The Envoy
@@ -262,8 +261,8 @@ itself. The object goes in `kubernetes/infra/configs/kyverno/exceptions/` and mu
 live in namespace `kyverno` to be accepted.
 
 The required annotations and the full add/retire workflow are owned by
-[policy-exceptions.md § Workflow](../security/policy-exceptions.md); the two
-active exceptions are listed in [Exceptions](#exceptions) above.
+[policy-exceptions.md § Workflow](../security/policy-exceptions.md); no exception
+is active today (see [Exceptions](#exceptions) above).
 
 ### Emergency disable
 
@@ -560,7 +559,7 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
+_Last updated: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3); both exceptions removed as inert. Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
 
 _2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
 

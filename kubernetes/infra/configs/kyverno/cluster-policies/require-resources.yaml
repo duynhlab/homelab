@@ -6,8 +6,8 @@
 # and the same fields: requests.cpu, requests.memory, limits.memory (a CPU limit
 # is deliberately not required; see the CPU-throttling notes in the charts).
 # No exception applies: the legacy postgres-operators waiver for this policy
-# was inert and was dropped (see exceptions/postgres-operators.yaml); CNPG
-# instance pods pass on their own.
+# was inert and was dropped in ADR-078 step 1 (see exceptions/kustomization.yaml);
+# CNPG instance pods pass on their own.
 # Autogen stays at the ValidatingPolicy default (on), as the legacy policy had
 # it: violations are reported on the Deployment/ReplicaSet too, so the owner of
 # the manifest sees them, not only the ephemeral pod.

@@ -27,7 +27,7 @@
 # Then uncomment this file and its entry in kustomization.yaml, keep it in
 # Audit until the reports are clean, and only then consider Enforce.
 #
-# NOTE: pss-baseline is untouched and still runs. This disables the stricter
+# NOTE: the PSS baseline (cluster-policies/pss-baseline/) is untouched and still runs. This disables the stricter
 # profile only.
 #
 # # Pod Security Standard — restricted profile (app namespaces only)

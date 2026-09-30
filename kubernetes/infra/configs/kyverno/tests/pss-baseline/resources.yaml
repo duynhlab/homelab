@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Pod
+metadata: {name: compliant, namespace: product}
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/product-service/product-service:1.0.0
+      securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: ipc-lock, namespace: openbao}
+spec:
+  containers:
+    - name: openbao
+      image: openbao/openbao:2.7.0
+      securityContext: {capabilities: {add: [IPC_LOCK]}}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: privileged, namespace: product}
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/product-service/product-service:1.0.0
+      securityContext: {privileged: true}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: host-network, namespace: product}
+spec:
+  hostNetwork: true
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/product-service/product-service:1.0.0
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: host-path, namespace: product}
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/product-service/product-service:1.0.0
+  volumes:
+    - name: h
+      hostPath: {path: /var/run}

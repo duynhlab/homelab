@@ -1,30 +1,41 @@
 # Forbid the `default` namespace for any workload.
 # Trivial enforce — zero risk, prevents kubectl-apply pollution.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+#
+# policies.kyverno.io/v1 ValidatingPolicy since 2026-09-30 (ADR-078 step 2);
+# the legacy kyverno.io/v1 ClusterPolicy is removed in Kyverno 1.20. Still the
+# platform's ONLY denying policy: `validationActions: [Deny]` with
+# `failurePolicy: Fail`, exactly as the legacy Enforce/Fail pair. Pods only,
+# every namespace, background on. Autogen OFF (`controllers: []`), as the
+# legacy `autogen-controllers: none`: a ValidatingPolicy autogens controller
+# variants by default, and a Deployment in `default` is already refused where
+# it creates its first Pod.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
   name: disallow-default-namespace
   annotations:
-    pod-policies.kyverno.io/autogen-controllers: none
     policies.kyverno.io/title: Disallow default namespace
     policies.kyverno.io/category: Multi-Tenancy, Best Practices
     policies.kyverno.io/severity: medium
-    policies.kyverno.io/subject: Pod, Namespace
+    policies.kyverno.io/subject: Pod
     policies.kyverno.io/description: >-
       Forbids workloads from running in the `default` namespace. Forces
       explicit namespace selection and aligns with multi-tenancy boundaries.
 spec:
-  validationFailureAction: Enforce
-  background: true
+  validationActions: [Deny]
   failurePolicy: Fail
-  rules:
-    - name: validate-namespace
-      match:
-        any:
-          - resources:
-              kinds: [Pod]
-      validate:
-        message: "Workloads in the 'default' namespace are not allowed."
-        pattern:
-          metadata:
-            namespace: "!default"
+  autogen:
+    podControllers:
+      controllers: []
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - message: "Workloads in the 'default' namespace are not allowed."
+      expression: "object.metadata.namespace != 'default'"

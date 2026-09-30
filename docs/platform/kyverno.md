@@ -8,8 +8,8 @@ mode, so a violation is reported rather than blocked.
 | | |
 |---|---|
 | **Chart** | `kyverno/kyverno` 3.9.1 (engine v1.19.1), four controllers (admission, background, cleanup, reports) |
-| **Policies** | 7 deployed — 4 `ClusterPolicy`, 2 `ValidatingPolicy` (CEL, ADR-078 step 1) and 1 `ClusterCleanupPolicy` — plus 1 disabled. See [Policy inventory](#policy-inventory) |
-| **Enforcing** | Exactly one: `disallow-default-namespace` (`failurePolicy: Fail`). The other five validating policies are Audit |
+| **Policies** | 7 deployed — 4 `ValidatingPolicy` (CEL, ADR-078 steps 1–2), 2 `ClusterPolicy` and 1 `ClusterCleanupPolicy` — plus 1 disabled. See [Policy inventory](#policy-inventory) |
+| **Enforcing** | Exactly one: `disallow-default-namespace` (ValidatingPolicy, `validationActions: [Deny]`, `failurePolicy: Fail`). The other five validating policies are Audit |
 | **Exceptions** | 2 registered, both expiring 2026-12-31, accepted only from ns `kyverno` |
 | **Tests** | 4 CLI fixture suites under `configs/kyverno/tests/`, run by `make validate` + the `validate` CI job (fails on any `Excluded` result) |
 | **Reports UI** | Policy Reporter 3.10.0 at `kyverno.duynh.me` — **deployed** |
@@ -127,10 +127,10 @@ maintain a second copy of those here.
 |--------|------|------|-----------------|--------------------|
 | `pss-baseline` | `ClusterPolicy` | Audit | `Ignore` | Pod Security Standards **baseline** on all Pods, excluding 7 control-plane/operator namespaces |
 | `pss-restricted-apps` | — | **disabled 2026-08-17** | — | Commented out of the kustomization. `runAsNonRoot` fails structurally — the service images ship no non-root `USER` — so it produced 63 findings nobody could action. Re-enable conditions are in the file header |
-| `disallow-latest-tag` | `ClusterPolicy` | Audit | `Ignore` | Two rules: an image must carry a tag, and that tag must not be `latest`. Covers `initContainers` and `ephemeralContainers` |
+| `disallow-latest-tag` | `ValidatingPolicy` | Audit | `Ignore` | Three CEL validations: an image must carry a tag, that tag must not be `latest` (containers, `initContainers`, `ephemeralContainers`), and an image volume must be pinned by digest (ADR-077). Autogen on, as before; one report result per resource |
 | `require-resources` | `ValidatingPolicy` | Audit | `Ignore` | CEL `containers.all(...)`: `requests.cpu`, `requests.memory`, `limits.memory` must be set. Scoped to the 10 app namespaces |
 | `require-probes` | `ValidatingPolicy` | Audit | `Ignore` | CEL `containers.all(...)`: `livenessProbe` + `readinessProbe` required. Job-owned Pods excluded by a `matchCondition`; autogen explicitly off (`controllers: []` — a ValidatingPolicy autogens by default) |
-| `disallow-default-namespace` | `ClusterPolicy` | **Enforce** | **`Fail`** | A Pod may not land in `default`. The only policy that blocks an apply |
+| `disallow-default-namespace` | `ValidatingPolicy` | **Deny** | **`Fail`** | A Pod may not land in `default`. The only policy that blocks an apply. Autogen off |
 | `default-deny-networkpolicy` | `ClusterPolicy` | Generate | n/a | On a namespace labelled `platform.duynhlab.dev/tier: app`, generates a `deny-all-ingress` NetworkPolicy, `generateExisting: true`, `synchronize: true` |
 | `cleanup-completed-pods` | `ClusterCleanupPolicy` | Cleanup | n/a | Deletes `Succeeded`/`Failed` Pods older than 24 h, every 30 minutes |
 | `cleanup-controller-rbac` | `ClusterRole` | n/a | n/a | **Not a policy** — the aggregated role that lets the cleanup controller delete Pods |
@@ -320,11 +320,13 @@ kubectl get clustercleanuppolicy
 ### Step 3: Only one policy enforces
 
 ```bash
+kubectl get validatingpolicy -o custom-columns='NAME:.metadata.name,ACTION:.spec.validationActions,FAILPOL:.spec.failurePolicy'
 kubectl get clusterpolicy -o custom-columns='NAME:.metadata.name,ACTION:.spec.validationFailureAction,FAILPOL:.spec.failurePolicy'
 ```
 
-**Expected**: `disallow-default-namespace` is `Enforce`/`Fail`; every other row is
-`Audit`/`Ignore`. A second `Enforce` row that nobody planned is a regression —
+**Expected**: `disallow-default-namespace` is `[Deny]`/`Fail` (a ValidatingPolicy
+since ADR-078 step 2); every other row is `Audit`/`Ignore`. Until the migration
+finishes, validating policies live in both kinds, so check both lists. A second `Enforce` row that nobody planned is a regression —
 compare against [Policy inventory](#policy-inventory).
 
 ### Step 4: The Enforce policy actually blocks
@@ -558,7 +560,7 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
+_Last updated: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
 
 _2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
 

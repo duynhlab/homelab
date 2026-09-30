@@ -92,6 +92,21 @@ Skeleton (copy what you need):
 
 #### Security
 
+- **Kyverno CEL migration, step 2 of 4 (ADR-078).** `disallow-latest-tag`
+  and `disallow-default-namespace` are ValidatingPolicy objects.
+  - `disallow-latest-tag`: its three legacy rules are three CEL
+    validations (tag present, no `:latest` across containers, init and
+    ephemeral containers, image volumes pinned by digest), with the same
+    scope. Autogen stays on, as it was. Reports now carry one result per
+    resource rather than one per rule, and the message names the failed check.
+  - `disallow-default-namespace` is still the only denying policy
+    (`validationActions: [Deny]`, `failurePolicy: Fail`, autogen off).
+    Server dry-run through the live webhook: denied in `default`, including a
+    manifest with no `metadata.namespace`; allowed in `product`.
+  - `kyverno apply --cluster` gives 90/90 and 119/119 pass, the legacy
+    pod-level verdicts. The fixtures gained untagged, `:latest` and
+    `:latest`-in-initContainer cases (15/15).
+  - Runbook step 3 in `kyverno.md` now lists both policy kinds.
 - **Kyverno CEL migration, step 1 of 4 (ADR-078, now Accepted).**
   `require-probes` and `require-resources` are `policies.kyverno.io/v1`
   ValidatingPolicy objects: CEL `containers.all(...)`, the same ten

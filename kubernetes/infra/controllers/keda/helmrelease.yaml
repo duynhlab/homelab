@@ -31,7 +31,7 @@
 #     (2.20.2), never `latest`. pullPolicy is pinned to IfNotPresent because the
 #     chart's default `Always` re-pulls three images on every pod start for no
 #     gain on a Kind node.
-#   - `pss-baseline` matches this namespace too; the chart's defaults already
+#   - the PSS baseline policies match this namespace too; the chart's defaults already
 #     run non-root, drop ALL capabilities, read-only root fs, RuntimeDefault
 #     seccomp — nothing to override.
 #   - `require-resources` does NOT match the `keda` namespace (it matches the

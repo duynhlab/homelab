@@ -1,0 +1,323 @@
+# The ten vendored PSS baseline ValidatingPolicies (cluster-policies/pss-baseline/)
+# against one compliant Pod and four that each break exactly one check. It
+# proves the checks bite -- which is what makes "no exception needed" a
+# measured statement rather than a guess: the IPC_LOCK Pod is the one the old
+# openbao exception existed for, and it fails disallow-capabilities.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pss-baseline
+policies:
+- ../../cluster-policies/pss-baseline/disallow-capabilities.yaml
+- ../../cluster-policies/pss-baseline/disallow-host-namespaces.yaml
+- ../../cluster-policies/pss-baseline/disallow-host-path.yaml
+- ../../cluster-policies/pss-baseline/disallow-host-ports.yaml
+- ../../cluster-policies/pss-baseline/disallow-host-process.yaml
+- ../../cluster-policies/pss-baseline/disallow-privileged-containers.yaml
+- ../../cluster-policies/pss-baseline/disallow-proc-mount.yaml
+- ../../cluster-policies/pss-baseline/disallow-selinux.yaml
+- ../../cluster-policies/pss-baseline/restrict-seccomp.yaml
+- ../../cluster-policies/pss-baseline/restrict-sysctls.yaml
+resources:
+- resources.yaml
+results:
+- policy: disallow-capabilities
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-host-namespaces
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-host-path
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-host-ports
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-host-process
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-privileged-containers
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-proc-mount
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-selinux
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: restrict-seccomp
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: restrict-sysctls
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/compliant
+  result: pass
+- policy: disallow-capabilities
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: fail
+- policy: disallow-host-namespaces
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: disallow-host-path
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: disallow-host-ports
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: disallow-host-process
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: disallow-privileged-containers
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: disallow-proc-mount
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: disallow-selinux
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: restrict-seccomp
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: restrict-sysctls
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - openbao/ipc-lock
+  result: pass
+- policy: disallow-capabilities
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: disallow-host-namespaces
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: disallow-host-path
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: disallow-host-ports
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: disallow-host-process
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: disallow-privileged-containers
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: fail
+- policy: disallow-proc-mount
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: disallow-selinux
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: restrict-seccomp
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: restrict-sysctls
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/privileged
+  result: pass
+- policy: disallow-capabilities
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: disallow-host-namespaces
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: fail
+- policy: disallow-host-path
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: disallow-host-ports
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: disallow-host-process
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: disallow-privileged-containers
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: disallow-proc-mount
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: disallow-selinux
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: restrict-seccomp
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: restrict-sysctls
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-network
+  result: pass
+- policy: disallow-capabilities
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: disallow-host-namespaces
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: disallow-host-path
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: fail
+- policy: disallow-host-ports
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: disallow-host-process
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: disallow-privileged-containers
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: disallow-proc-mount
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: disallow-selinux
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: restrict-seccomp
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass
+- policy: restrict-sysctls
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - product/host-path
+  result: pass

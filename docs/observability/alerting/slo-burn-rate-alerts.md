@@ -57,7 +57,36 @@ For a deeper derivation see the [SRE Workbook chapter on alerting on SLOs](https
 
 ## 2. What Sloth generates per SLO
 
-Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules** + **2 alerts per SLO**. With 10 HTTP services covered by 3 SLOs each (availability, latency, and error rate), inventory by 2 gRPC SLOs, and Keycloak by 2 hand-written identity SLOs (`login-availability`, `auth-latency` — [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml)), that is **34 SLOs / 68 alerts**.
+Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules**; the **2 alerts per SLO** are emitted beside it with a minimum-events guard (see [Minimum-events guard](#minimum-events-guard)). With 9 HTTP services (inventory opts out of the chart SLOs) covered by 3 SLOs each (availability, latency, and error rate), inventory by 2 gRPC SLOs, and Keycloak by 2 hand-written identity SLOs (`login-availability`, `auth-latency` — [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml)), that is **31 SLOs / 62 alerts**.
+
+### Minimum-events guard
+
+A ratio over a handful of events is not a burn rate. On an idle Kind cluster,
+3 slow requests out of 8 in six hours paged `CheckoutHighLatency` and failed the
+K5.8 gate. Sloth v0.16's `PrometheusServiceLevel` has no field for a minimum
+event count (the only alert option is `disable`). The platform therefore splits
+the work:
+
+- **Sloth** keeps the SLIs and every recording rule, so the error budget and the
+  SLO dashboards are exact. `pageAlert` and `ticketAlert` are `disable: true`.
+- **The alerts** are re-emitted with the names, labels (`severity`,
+  `sloth_severity`, `channel`, `category`, `service`) and annotations Sloth would
+  have generated. The expression is Sloth's own: page 14.4× over 5m and 1h, or 6×
+  over 30m and 6h; ticket 3× over 2h and 1d, or 1× over 6h and 3d.
+- **One addition:** each arm also requires at least `N` events in its long
+  window, counted on the SLO's own total counter
+  (`and on() sum(increase(<total>[<long window>])) >= N`). `N` defaults to 10.
+  Below it, one event moves the ratio by more than 10 points.
+
+| SLOs | Where the alerts live | `N` |
+|---|---|---|
+| 9 HTTP services × 3 | mop chart `templates/slo-alerts.yaml` (chart ≥ 0.18.0) | `slo.minEvents` (10) |
+| inventory × 2, keycloak × 2 | [`sloth/slo-alerts.yaml`](../../../kubernetes/infra/configs/observability/sloth/slo-alerts.yaml) | 10 |
+
+`sloth_id`, `sloth_slo` and `sloth_service` survive on the result series, so the
+Alertmanager routes and inhibitions that match them are unchanged. Accepted
+trade-off: a service that sees fewer than 10 events in an hour cannot page; the
+ticket arms (1d and 3d long windows) still catch a sustained problem.
 
 ### Recording rules (per SLO, per window)
 
@@ -225,7 +254,7 @@ open http://karma.duynh.me
 
 ## 7. Known limitations / gotchas
 
-- **Burn-rate maths assumes a stable traffic volume.** A service with very low RPS will see one bad request blow the short-window burn rate. Sloth mitigates this by computing the SLI as a ratio over a full window, but if you have <1 RPS sustained, expect noise.
+- **Burn-rate maths assumes a stable traffic volume.** At very low RPS one bad request can blow the short-window burn rate. The [minimum-events guard](#minimum-events-guard) keeps an arm silent until its long window holds at least 10 events; above that, low traffic can still be noisy.
 - **Mixed-traffic services** (background jobs piggybacking on the same `http_server_request_duration_seconds`) pollute the SLI. Filter at the SLI level (`http_route!~"…"`) if needed.
 - **The SLI is a 30-day rolling window.** A burn from 25 days ago still counts toward today's budget. Don't be surprised if the budget is low even when current traffic is healthy.
 - **Notification delivery is pending** — VMAlertmanager has `slack-default`/`slack-critical` receivers wired, but `slack_api_url` is a placeholder. Until it is set (via External Secrets / OpenBAO), "page" severity = "appears in Karma faster". Track via the [Future Roadmap in `alerting/README.md`](./README.md#future-roadmap).
@@ -244,4 +273,4 @@ open http://karma.duynh.me
 - [Sloth](https://github.com/slok/sloth) — generator details and alert overrides (the sloth.dev docs site no longer serves the alerts page)
 
 ---
-_Last updated: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (32 → 34 SLOs, 64 → 68 alerts)_
+_Last updated: 2026-09-30 — minimum-events guard on every burn-rate alert (Sloth alerts disabled, re-emitted by the chart and `sloth/slo-alerts.yaml`); counts corrected to 31 SLOs / 62 alerts. 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (32 → 34 SLOs, 64 → 68 alerts)_

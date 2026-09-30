@@ -1,5 +1,16 @@
+# PolicyExceptions — none are active (2026-09-30).
+#
+# The last two legacy exceptions (openbao, postgres-operators) were removed in
+# ADR-078 step 3 because they were inert: with no exception at all, every pod
+# in openbao and cloudnative-pg passes the ten PSS baseline checks (openbao's
+# pods do not request IPC_LOCK; the chart leaves mlock off), and
+# postgres-operators' `application=cnpg` selector matched no pod.
+#
+# A new exception is a policies.kyverno.io/v1 PolicyException in namespace
+# kyverno that names the policy it waives (`policyRefs`; CEL policies have no
+# rule names), sets `spec.expiresAt` as well as the
+# platform.duynhlab.dev/{owner,expires-at,justification} annotations, and is
+# registered in docs/security/policy-exceptions.md.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources:
-  - postgres-operators.yaml
-  - openbao.yaml
+resources: []

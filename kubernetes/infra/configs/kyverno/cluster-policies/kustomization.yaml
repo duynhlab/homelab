@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - pss-baseline.yaml
+  - pss-baseline/  # 10 ValidatingPolicies vendored from kyverno/policies (ADR-078 step 3)
   # - pss-restricted-apps.yaml # DISABLED 2026-08-17 — see that file's header
   - disallow-latest-tag.yaml
   - require-resources.yaml

@@ -90,6 +90,75 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Security
+
+- **Kyverno CEL migration complete (ADR-078 step 4).** No legacy Kyverno
+  object remains, so the platform can take Kyverno 1.20.
+  - `default-deny-networkpolicy` is a GeneratingPolicy (CREATE and UPDATE,
+    generateExisting, synchronize, orphanDownstreamOnPolicyDelete). It is now
+    the **only** owner of `deny-all-ingress` in the 11 app-tier namespaces.
+    The same objects had also been committed as static manifests since
+    2026-05-30, so Flux and Kyverno fought over them. The 11 copies are
+    removed; `identity`, which is not app-tier, keeps its own.
+  - A new `make validate` check refuses a static `deny-all-ingress` for any
+    app-tier namespace.
+  - The swap was rehearsed on Kind in the worst reconcile order. Without
+    #1148 it left 9 namespaces with no default-deny for about 6 s; with it,
+    81/81 per-second samples stayed at 12. A deleted deny-all returns in
+    about 1 s, and a newly labelled namespace gets one in about 1 s.
+  - `cleanup-completed-pods` is a DeletingPolicy (same schedule, phases and
+    24h age, using `time.now()`).
+  - `kyverno.md` runbook steps 2 and 3 now query the CEL kinds.
+- **Kyverno CEL migration, step 3 of 4 (ADR-078): PSS baseline and
+  exceptions.**
+  - The legacy `pss-baseline` ClusterPolicy (`validate.podSecurity`) has no
+    CEL equivalent. It is replaced by the ten
+    `kyverno/policies` `pod-security-vpol/baseline` ValidatingPolicies, vendored
+    unchanged at commit `36340047` under `cluster-policies/pss-baseline/`.
+  - A kustomize patch adds what upstream leaves open: the same 7-namespace
+    exclusion, and `failurePolicy: Ignore`. Upstream sets none, and a CEL
+    policy then defaults to `Fail`, which would refuse every pod create while
+    Kyverno's webhook is down.
+  - **Both remaining exceptions are removed as inert.** With no exception
+    loaded, every one of the 83 pods passes all ten checks (830/830), including
+    the 8 in `openbao` and `cloudnative-pg` they covered. OpenBao's pods do not
+    request `IPC_LOCK`.
+  - New fixture `tests/pss-baseline` (50 cases): a compliant pod passes every
+    check, and an `IPC_LOCK`, a privileged, a `hostNetwork` and a `hostPath`
+    pod each fail exactly the right one. `policy-exceptions.md` now documents
+    the CEL `PolicyException` form with `spec.expiresAt`.
+- **Kyverno CEL migration, step 2 of 4 (ADR-078).** `disallow-latest-tag`
+  and `disallow-default-namespace` are ValidatingPolicy objects.
+  - `disallow-latest-tag`: its three legacy rules are three CEL
+    validations (tag present, no `:latest` across containers, init and
+    ephemeral containers, image volumes pinned by digest), with the same
+    scope. Autogen stays on, as it was. Reports now carry one result per
+    resource rather than one per rule, and the message names the failed check.
+  - `disallow-default-namespace` is still the only denying policy
+    (`validationActions: [Deny]`, `failurePolicy: Fail`, autogen off).
+    Server dry-run through the live webhook: denied in `default`, including a
+    manifest with no `metadata.namespace`; allowed in `product`.
+  - `kyverno apply --cluster` gives 90/90 and 119/119 pass, the legacy
+    pod-level verdicts. The fixtures gained untagged, `:latest` and
+    `:latest`-in-initContainer cases (15/15).
+  - Runbook step 3 in `kyverno.md` now lists both policy kinds.
+- **Kyverno CEL migration, step 1 of 4 (ADR-078, now Accepted).**
+  `require-probes` and `require-resources` are `policies.kyverno.io/v1`
+  ValidatingPolicy objects: CEL `containers.all(...)`, the same ten
+  namespaces, Pods only, Audit, background on. The legacy ClusterPolicies are
+  deleted.
+  - `require-probes` keeps the Job-owned exclusion as a `matchCondition`.
+    Autogen is set off explicitly: a ValidatingPolicy autogens controller
+    variants by default, and for this policy that rewrites the owner-reference
+    condition onto a pod template, which is the trap the legacy autogen hit on
+    2026-08-21.
+  - The `require-resources` waiver in `postgres-operators` was inert
+    (`application=cnpg` matches 0 pods, and the operator pod is outside the
+    policy's namespaces), so it was dropped rather than migrated.
+  - Checked on Kind with `kyverno apply --cluster` across all app pods: 19/19
+    pass for each policy, 0 fail, the same pod-level verdicts as the legacy
+    policies. CLI fixtures: 14/14.
+
 #### CI
 
 - **GitHub issue intake is structured for platform work.** Bug/operations,
@@ -670,6 +739,14 @@ Skeleton (copy what you need):
   them. Live observation labs ship with pending-verification placeholders until
   their evidence is captured on the Ubuntu Kind cluster; sharding and Kafka are
   explicit reference-only, not-deployed comparisons.
+- **PostgreSQL internals now has a curriculum contract before chapter work
+  starts** ([#1137](https://github.com/duynhlab/homelab/issues/1137)). The
+  fundamentals hub is rewritten as the learning contract: fourteen planned
+  chapters absorbing the nine existing pages, the evidence vocabulary, a shared
+  glossary, and a read-only safety boundary built on `kubectl cnpg psql` with
+  the safe session header (never the poolers); its chapter template records
+  cluster, instance, role, and database with every live observation. The
+  former vendor-neutral boundary rule is retired in favor of deployed evidence.
 - **ClickHouse internals now has a documentation contract before chapter work
   starts** ([#1127](https://github.com/duynhlab/homelab/issues/1127)). The
   learning hub fixes the 12-chapter order, evidence vocabulary, shared glossary,
@@ -974,6 +1051,20 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0032 closed at 1.35.8 (implemented).** A re-audit found that the
+  cAdvisor ZFS fix shipped in v0.60.6, but no Kubernetes release vendors it:
+  1.36.5 carries v0.56.2 and 1.37.1 carries v0.60.5. On this ZFS host 1.36 and
+  1.37 kubelets therefore still crash, and `kindest/node` v1.35.8 is already the
+  newest image on the 1.35 line. Everything else the RFC set out to do has
+  landed. Moving on is left to a routine Renovate node-image bump once an image
+  with the fix exists, or once Docker's data root moves off ZFS.
+- **ADR-078 (Proposed): migrate Kyverno policies to the CEL policy types.**
+  Kyverno's migration guide says the legacy `ClusterPolicy`,
+  `ClusterCleanupPolicy` and `kyverno.io` `PolicyException` are removed in
+  v1.20 (upstream milestone due 2026-10-23). The record moves the 6 cluster
+  policies, the cleanup policy and the 2 exceptions to
+  `policies.kyverno.io/v1`, one policy per PR with fixtures first, and holds
+  Kyverno 1.20 until the last legacy object is gone.
 - **RFC-0033 is `provisional`; the research gate passed with owner-confirmed
   boundaries.** The RFC proposes a human-gated GitHub ledger, schema-normalized task
   payloads, App-scoped unattended identity, flat isolated workers, independent proof,
@@ -1273,6 +1364,45 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **kube-state-metrics alerts name the object, not the KSM pod.** KSM is
+  scraped without `honorLabels`, so on every `kube_*` series `namespace`,
+  `pod` and `container` name the KSM pod and the object's own labels are
+  `exported_*`. Seven rules ignored that:
+  - `KeycloakRestartLoop` was **blind**: it selected `namespace="identity",
+    container="keycloak"`, which no KSM series carries (0 series live; the
+    exported selector finds the keycloak pod).
+  - `KubePodNotReady` grouped by `namespace, pod` and so collapsed every
+    pending pod into one series keyed to KSM.
+  - `KubePodOOMKilled`, `KubePodCrashLooping`, `KubeDeploymentReplicasMismatch`,
+    `KubeStatefulSetReplicasMismatch` and `KubeHPAMaxedOut` fired, but their
+    annotations named `kube-system/kube-state-metrics-…`. On 2026-09-30 the
+    OOM alert blamed KSM for three Vector OOM kills.
+  All now select or group by `exported_*` and copy it back with
+  `label_replace`, the pattern `KubePodMemoryNearLimit` already used. Checked
+  on live data: the OOM query now names `vector-gp6m6/rdrx4/rkn4l`.
+- **Vector gets 512Mi.** At 256Mi three of four pods were OOMKilled during a
+  fresh bring-up, peaking at 220–245 MiB while the in-memory sink buffers
+  filled; steady state is 45–72 MiB. Request 32Mi → 64Mi.
+- **SLO burn-rate alerts no longer page on a handful of requests.** On an
+  idle Kind cluster `CheckoutHighLatency` paged on 3 slow requests out of 8 in
+  six hours and failed gate K5.8. Sloth v0.16 has no minimum-events field, so
+  Sloth now keeps only the SLIs and recording rules (`pageAlert` /
+  `ticketAlert` `disable: true`), and the alerts are re-emitted with the same
+  names, labels and annotations: by the mop chart 0.18.0
+  (`templates/slo-alerts.yaml`, helm-charts#26) for the 9 HTTP services, and
+  by the new `sloth/slo-alerts.yaml` for inventory and keycloak. Each arm keeps
+  Sloth's multi-window expression and also needs at least 10 events in its
+  long window. Checked with `vmalert-tool unittest` (v1.148.0): low traffic
+  stays silent, real traffic fires page and ticket with Sloth's exact label
+  set, and the original Sloth expression fires on the same low-traffic input.
+- **ClickHouse log panels prune by the sort key.** `otel_logs` sorts by
+  `toStartOfFiveMinutes(Timestamp)` first, and a bare `$__timeFilter(Timestamp)`
+  barely used it. Every `otel_logs` query in the four cluster boards and the
+  four local-stack copies now repeats the window on the key expression, and
+  the two trace-to-log JOIN panels, which read `otel_logs` with no time bound,
+  join a time-bounded subquery. `clickhouse-local` 26.7 on the real key: a
+  15-minute window read 423/423 granules before and 6/423 after, same 36 040
+  rows; all 20 rewritten panel queries execute.
 - **Nothing we deploy reads the deprecated `endpoints/v1` API any more.**
   - An apiserver audit scoped to `endpoints` on Kind 1.35.8 named two clients:
     - vmagent: the VM operator renders every converted ServiceMonitor as
@@ -1648,6 +1778,18 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Stale claims corrected after re-verification.**
+  - Kind runbook K5.7: the 2026-08-22 "OPEN FINDING" (boards referencing a
+    missing uid `prometheus`, `_hAsuzBnz` → `y-Ka8y37k`) is resolved; the
+    "zero `ClickHouse*` series" note is resolved (the engine is scraped); board
+    counts are 25 in git, 26 on the cluster. K5.8 notes the new guard.
+  - Alerting and SLO docs: 31 SLOs / 62 alerts (9 chart services, not 10);
+    the burn-rate table carries `severity: page|ticket` and all four arms.
+  - `openbao.md`: which dashboard panels stay empty and why. The KV and token
+    gauges do populate; *Path Info* works (its variable strips the trailing
+    `/`); Consul panels are empty because storage is Raft, and policy/route
+    create counters appear only after their first event.
+  - `kyverno.md`: 4 fixture suites, Policy Reporter 3.10.0.
 - **Docs follow what the #1115 diagram review measured.**
   - `openbao.md`: the Raft sequence said `HTTPS :8200`; the listener runs
     with `tls_disable`, so it now says HTTP (TLS planned). The product-db

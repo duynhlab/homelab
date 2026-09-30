@@ -1,0 +1,57 @@
+# Pod Security Standards — BASELINE, as Kyverno CEL ValidatingPolicies.
+#
+# The ten policy files are VENDORED UNCHANGED from the official policy library:
+#   github.com/kyverno/policies, pod-security-vpol/baseline,
+#   commit 36340047222cf73e8ef2766adeaff46f2aad2362 (2026-09-29).
+# To update, re-download all ten from a newer commit and change the SHA here;
+# do not hand-edit them. Local behaviour lives only in the patch below.
+#
+# They replace the legacy ClusterPolicy `pss-baseline` (validate.podSecurity,
+# level baseline), which has no CEL equivalent: a ValidatingPolicy has no
+# podSecurity shortcut, so baseline is ten explicit checks (ADR-078 step 3).
+# Reports therefore name the check that failed (disallow-capabilities, ...)
+# instead of one `pss-baseline` result.
+#
+# The patch restores what the legacy policy did and upstream leaves open:
+#   - namespaceSelector: the same seven infra namespaces stay out of scope.
+#   - failurePolicy: Ignore. Upstream sets none, and a CEL policy then defaults
+#     to Fail — with Kyverno's webhook down, EVERY pod create in the cluster
+#     would be refused although these policies only Audit. The legacy policy
+#     was Ignore, like every Audit policy here.
+# Autogen stays at its default (on), as the legacy policy had it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - disallow-capabilities.yaml
+  - disallow-host-namespaces.yaml
+  - disallow-host-path.yaml
+  - disallow-host-ports.yaml
+  - disallow-host-process.yaml
+  - disallow-privileged-containers.yaml
+  - disallow-proc-mount.yaml
+  - disallow-selinux.yaml
+  - restrict-seccomp.yaml
+  - restrict-sysctls.yaml
+patches:
+  - target:
+      group: policies.kyverno.io
+      version: v1
+      kind: ValidatingPolicy
+    patch: |-
+      - op: add
+        path: /spec/failurePolicy
+        value: Ignore
+      - op: add
+        path: /spec/matchConstraints/namespaceSelector
+        value:
+          matchExpressions:
+            - key: kubernetes.io/metadata.name
+              operator: NotIn
+              values:
+                - kube-system
+                - kube-public
+                - kube-node-lease
+                - flux-system
+                - kyverno
+                - cert-manager
+                - external-secrets-system

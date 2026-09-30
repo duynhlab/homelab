@@ -129,14 +129,11 @@ spec:
             anything else points at Keycloak itself — check KeycloakDown,
             KeycloakDbPoolExhausted (agroal_awaiting_count) and platform-db
             before the realm config.
+        # Burn-rate alerts live in slo-alerts.yaml (min-events guard).
         pageAlert:
-          labels:
-            channel: '#alerts'
-            severity: page
+          disable: true
         ticketAlert:
-          labels:
-            channel: '#incidents'
-            severity: ticket
+          disable: true
 
     # ---------------------------------------------------------------------
     # Realm endpoints < 250 ms for 95% of requests. Everything under
@@ -190,11 +187,8 @@ spec:
             uri=~"/realms/.*"}[5m]))). Token endpoint slow with pool healthy
             points at platform-db latency or JVM pressure (jvm_* on the same
             scrape).
+        # Burn-rate alerts live in slo-alerts.yaml (min-events guard).
         pageAlert:
-          labels:
-            channel: '#alerts'
-            severity: page
+          disable: true
         ticketAlert:
-          labels:
-            channel: '#incidents'
-            severity: ticket
+          disable: true

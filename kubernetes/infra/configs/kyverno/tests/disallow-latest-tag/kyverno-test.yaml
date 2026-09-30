@@ -3,26 +3,38 @@ kind: Test
 metadata:
   name: disallow-latest-tag
 policies:
-  - ../../cluster-policies/disallow-latest-tag.yaml
+- ../../cluster-policies/disallow-latest-tag.yaml
 resources:
-  - resources.yaml
+- resources.yaml
 results:
-  - policy: disallow-latest-tag
-    rule: require-image-volume-digest
-    kind: Pod
-    resources:
-      - monitoring/image-volume-digest
-      - monitoring/no-image-volume
-    result: pass
-  - policy: disallow-latest-tag
-    rule: require-image-volume-digest
-    kind: Pod
-    resources:
-      - monitoring/image-volume-tag-only
-    result: fail
-  - policy: disallow-latest-tag
-    rule: forbid-latest-tag
-    kind: Pod
-    resources:
-      - monitoring/image-volume-digest
-    result: pass
+- policy: disallow-latest-tag
+  kind: Pod
+  resources:
+  - monitoring/image-volume-digest
+  - monitoring/no-image-volume
+  result: pass
+  isValidatingPolicy: true
+- policy: disallow-latest-tag
+  kind: Pod
+  resources:
+  - monitoring/image-volume-tag-only
+  result: fail
+  isValidatingPolicy: true
+- policy: disallow-latest-tag
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - monitoring/untagged-image
+  result: fail
+- policy: disallow-latest-tag
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - monitoring/latest-container
+  result: fail
+- policy: disallow-latest-tag
+  isValidatingPolicy: true
+  kind: Pod
+  resources:
+  - monitoring/latest-init-container
+  result: fail

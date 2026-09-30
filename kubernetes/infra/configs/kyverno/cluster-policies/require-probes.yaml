@@ -1,19 +1,33 @@
 # Require liveness + readiness probes on app containers.
 # Sloth SLO accuracy depends on the edge gateway only routing to ready Pods.
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
+#
+# policies.kyverno.io/v1 ValidatingPolicy since 2026-09-30 (ADR-078): the
+# legacy kyverno.io/v1 ClusterPolicy is removed in Kyverno 1.20. Behaviour is
+# unchanged — the same ten namespaces, Pods only, Audit, background scan on.
+#
+# History the CEL form keeps honest:
+# - Pods only, autogen OFF (spec.autogen below). A ValidatingPolicy autogens
+#   Deployment/ReplicaSet/CronJob/... variants BY DEFAULT, and for this policy
+#   that is the same trap the legacy autogen fell into (28 `error` results,
+#   2026-08-21): it rewrites the owner-reference matchCondition onto the
+#   controller's pod template (`object.spec.jobTemplate.spec.template...`),
+#   where it means nothing, and every violation is double-counted. Measured on
+#   Kind 2026-09-30 before this was set: 14 Deployment + 12 ReplicaSet results
+#   next to the 19 Pod ones.
+# - Job-owned Pods are out of scope: they are never behind a Service, so an
+#   unready one cannot cause the false-positive SLI errors this policy exists
+#   to prevent, and a readinessProbe on a batch pod would never pass. That is
+#   the matchCondition below; a Pod with no ownerReferences at all (a bare
+#   manifest, `kubectl run`) is still checked.
+# - The legacy pattern used a global anchor, `"<(periodSeconds)": 300`, which
+#   is a condition, not an assertion: every compliant pod was skipped and the
+#   reports showed nothing (fixed 2026-09-29). CEL `has()` asserts presence
+#   directly; tests/require-probes pins pass, fail and skip.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
 metadata:
   name: require-probes
   annotations:
-    # Autogen OFF. The rule matches `kinds: [Pod]` on purpose — every pod in
-    # these namespaces, however it was created — so the Deployment/CronJob
-    # variants Kyverno would synthesise are redundant, and they double-count
-    # every violation in the reports. They also break the precondition below:
-    # autogen rewrites `request.object.metadata.ownerReferences` into
-    # `request.object.spec.template.metadata.ownerReferences`, which does not
-    # exist on a controller, and the rule then reports `error` instead of a
-    # verdict (measured: 28 such errors on this cluster).
-    pod-policies.kyverno.io/autogen-controllers: none
     policies.kyverno.io/title: Require liveness and readiness probes
     policies.kyverno.io/category: Best Practices, Reliability
     policies.kyverno.io/severity: medium
@@ -23,63 +37,31 @@ metadata:
       Missing readinessProbe causes the edge gateway to route to unready Pods, generating
       false-positive SLI errors in Sloth burn-rate alerts.
 spec:
-  validationFailureAction: Audit
-  background: true
+  validationActions: [Audit]
   failurePolicy: Ignore
-  rules:
-    - name: validate-probes
-      match:
-        any:
-          - resources:
-              kinds: [Pod]
-              namespaces:
-                - inventory
-                - user
-                - product
-                - cart
-                - order
-                - review
-                - notification
-                - shipping
-                - payment
-                - checkout
-      # Batch pods are out of scope, and the description above says why: this
-      # policy exists because an unready pod behind the gateway produces
-      # false-positive SLI errors. A Job-owned pod is never in a Service's
-      # endpoints, so it cannot cause that — while a readinessProbe on a batch
-      # pod would never pass, since it serves nothing. Without this the seed Jobs
-      # (`scripts/kind-seed.sh`, the first batch workloads to run in an app
-      # namespace) report eight violations that no one can act on, which is how a
-      # report trains people to stop reading it.
-      # The `|| `[]`` default is load-bearing, not decoration. Without it a Pod
-      # carrying no ownerReferences at all -- a bare manifest, or anything
-      # `kubectl run` creates in one of these namespaces -- makes the JMESPath
-      # measure a null, and the rule reports `error` instead of a verdict. In
-      # Audit mode an `error` is invisible: it reads exactly like a compliant
-      # Pod. Real workloads are ReplicaSet-owned so the field exists, which is
-      # why the cluster never showed this and it survived the autogen fix above.
-      # Found by tests/require-probes on its first run and pinned there: the
-      # fixture covers bare, ReplicaSet-owned and Job-owned Pods.
-      preconditions:
-        all:
-          - key: "{{ request.object.metadata.ownerReferences[?kind=='Job'] || `[]` | length(@) }}"
-            operator: Equals
-            value: 0
-      validate:
-        message: "Containers must declare both livenessProbe and readinessProbe."
-        # `periodSeconds: ">0"` is how a pattern says "this probe exists": the
-        # apiserver defaults periodSeconds to 10 on every probe it stores, so a
-        # present probe always matches and a missing one never does. It used to
-        # read `"<(periodSeconds)": 300` -- a GLOBAL anchor, which is a condition
-        # ("apply this rule only where periodSeconds is 300"), not an assertion.
-        # No pod runs a 300s period, so every compliant pod was `skip`ped, and
-        # skips never reach a PolicyReport: the cluster showed zero results for
-        # this policy in all ten namespaces (measured 2026-09-29). A missing
-        # probe still failed, which is why nothing looked broken.
-        foreach:
-          - list: "request.object.spec.containers"
-            pattern:
-              livenessProbe:
-                periodSeconds: ">0"
-              readinessProbe:
-                periodSeconds: ">0"
+  autogen:
+    podControllers:
+      controllers: []
+  evaluation:
+    background:
+      enabled: true
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [inventory, user, product, cart, order, review, notification, shipping, payment, checkout]
+  matchConditions:
+    - name: not-job-owned
+      expression: >-
+        !has(object.metadata.ownerReferences) ||
+        !object.metadata.ownerReferences.exists(o, o.kind == 'Job')
+  validations:
+    - message: "Containers must declare both livenessProbe and readinessProbe."
+      expression: >-
+        object.spec.containers.all(c, has(c.livenessProbe) && has(c.readinessProbe))

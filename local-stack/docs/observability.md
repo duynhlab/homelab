@@ -117,15 +117,15 @@ Keycloak alert set.
 | OTel Collector fan-out (M/L/T + CH) | ✅ | ✅ | identical pipelines |
 | VictoriaMetrics | ✅ (operator) | ✅ (singleton) | — |
 | VictoriaLogs | ✅ | ✅ | — |
-| VictoriaTraces | ✅ (pilot) | ✅ | — |
+| VictoriaTraces | ✅ (fast trace path, 7d) | ✅ | — |
 | Vector | ✅ (DaemonSet, pod stdout) | ✅ (`docker_logs` source) | same sink, different tailer |
-| Tempo | ✅ | ❌ | intentional; VictoriaTraces is the local surrogate |
+| Tempo | ❌ retired (RFC-0027 / ADR-059) | ❌ | VictoriaTraces is the trace store on both stacks |
 | Pyroscope | ✅ | ✅ | — |
 | Grafana | ✅ (operator) | ✅ (image) | — |
 | Scrape (`vmagent`) | via VM-operator CRs | ✅ static config | `observability/vmagent/prometheus.yml` |
 | Rule evaluation (`vmalert`) | ✅ (PrometheusRule) | ✅ file-mounted rules | `observability/vmalert/rules/` |
 | Alert routing (`alertmanager`) | ✅ | ❌ | deliberate — see Non-goals |
-| ClickHouse operator (Altinity 0.27.3) | ✅ | N/A | Compose runs the server only |
+| ClickHouse operator (Altinity chart 0.27.4) | ✅ | N/A | Compose runs the server only |
 | Operator metrics (`clickhouse_operator_*`) | ✅ `:8888/metrics` | N/A | cannot exist locally |
 | Metrics-exporter (`chi_clickhouse_*`) | ✅ `:8888/chi` | N/A | cannot exist locally |
 | Server built-in `/metrics` (`ClickHouseMetrics_*` …) | ✅ `:9363`, PodMonitor per replica (RFC-0028) | ✅ `:9363` | local was first; the cluster followed when three replicas made per-pod series necessary — see §5 |
@@ -134,7 +134,7 @@ Keycloak alert set.
 | Temporal server metrics (`service_*`, `persistence_*`) | ✅ 4 chart ServiceMonitors | ✅ vmagent job `temporal` (`:8000`) | enabled by `PROMETHEUS_ENDPOINT` in compose; validates the 3 server alerts |
 | Temporal SDK metrics (`temporal_*`) | ✅ OTLP push | ✅ OTLP push | same pipeline as every app metric |
 | VictoriaLogs Grafana datasource | ✅ | ✅ | `victoriametrics-logs-datasource` 0.32.0 both stacks, uid `victorialogs` |
-| ClickHouse alerts | ✅ `clickhouse-alerts.yaml` (12 rules) | ✅ ported subset (11 rules) | same names; two operator rules have no local counterpart |
+| ClickHouse alerts | ✅ `clickhouse-alerts.yaml` (23 rules) | ✅ ported subset (8 in `clickhouse.yaml` + `ClickHouseExporterUnhealthy` in `otel-collector.yaml`) | same names; the replica, Keeper, operator, cold-tier and TTL rules have no local counterpart |
 | `clickhouse-server-engine` dashboard | ✅ | ✅ | **one dual-target JSON serves both** |
 | 5 OTel data-plane CH dashboards | ✅ | ✅ | — |
 | RED spanmetrics / business dashboards | ✅ | ✅ | — |
@@ -191,7 +191,7 @@ and local-stack stays single-node with no keeper, a deliberate divergence.
 
 ### 5B. vmagent + vmalert
 
-Two Compose services on the local VM pin (`v1.150.0` — ahead of the cluster's
+Two Compose services on the local VM pin (`v1.152.0` — ahead of the cluster's
 operator default `v1.148.0`; see the skew note in
 [`docs/observability/README.md`](../../docs/observability/README.md)):
 
@@ -221,7 +221,7 @@ so a runbook practised locally transfers. Different series by design:
 | ClickHouseDiskAlmostFull / Critical | `chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes < 0.15 / 0.05` | `ClickHouseAsyncMetrics_DiskAvailable_default / DiskTotal_default` |
 | ClickHouseTooManyParts | `chi_clickhouse_metric_PartsActive > 300` | `ClickHouseMetrics_PartsActive > 300` |
 | ClickHouseInsertsDelayed | `chi_clickhouse_metric_DelayedInserts > 0` (gauge from system.metrics) | `rate(ClickHouseProfileEvents_DelayedInserts[5m]) > 0` (counter from system.events — a different family, so the shape differs on purpose) |
-| ClickHouseInsertsRejected / InsertsFailing | **deleted on the cluster** 2026-08-22 — the exporter builds `chi_clickhouse_event_*` from `system.events`, which omits counters still at zero, so the series never appeared | `rate(ClickHouseProfileEvents_RejectedInserts[5m])`, `rate(ClickHouseProfileEvents_FailedInsertQuery[5m])` — local-only names, no runbook |
+| ClickHouseInsertsRejected / InsertsFailing | `max by (replica) (rate(ClickHouseProfileEvents_RejectedInserts{job="clickhouse-server"}[5m])) > 0` and the `FailedInsertQuery` twin — the server `:9363` family per replica (the earlier exporter-based rules were deleted 2026-08-22 because `chi_clickhouse_event_*` omits counters still at zero) | `rate(ClickHouseProfileEvents_RejectedInserts[5m])`, `rate(ClickHouseProfileEvents_FailedInsertQuery[5m])` — same family, no `replica` label on one node |
 | ClickHouseServerErrorsElevated | `max by (replica) (rate(ClickHouseErrorMetric_ALL{job="clickhouse-server"}[5m])) > 5` | `sum(rate(ClickHouseErrorMetric_ALL[5m])) > 5` — `sum` is fine on one node; `_ALL` is read directly (the `ClickHouseErrorMetric_.+` regex double-counted) |
 | ClickHouseExporterUnhealthy | `otelcol_exporter_send_failed_*{exporter="clickhouse"}` | **identical** (lives in `otel-collector.yaml`) |
 | OtelCollectorDown | `up{job=~".*otel-collector.*"}` | `up{job="otel-collector"}` |
@@ -291,7 +291,7 @@ in both stacks.
 | Explore engine metrics | Grafana → Explore → VictoriaMetrics → `ClickHouseMetrics_Query`, `ClickHouseProfileEvents_InsertedRows`, `ClickHouseAsyncMetrics_Uptime` |
 | Engine dashboard | Grafana → ClickHouse folder → **ClickHouse Server / Engine** (local series carry the `(local)` legend suffix) |
 
-The release audit asserts this slice: **C20** (vmagent: both targets `up`) and
+The release audit asserts this slice: **C20** (vmagent: every target `up`) and
 **C21** (vmalert: rules loaded, none firing) in [e2e-audit.md](e2e-audit.md).
 Any change to this slice touches `compose.yaml`, which per AGENTS.md means the
 full audit runs before the change merges.
@@ -359,7 +359,7 @@ The pinned tag is in
   [`ADR-023`](../../docs/proposals/adr/ADR-023-clickhouse-observability-olap/)
 - [`local-stack/README.md`](../README.md) · [`e2e-audit.md`](e2e-audit.md)
 
-_Last updated: 2026-10-01 — VictoriaLogs datasource 0.32.0 with the line limit pinned to 50. Earlier: 2026-08-18 — temporal server scrape, VictoriaLogs datasource,
+_Last updated: 2026-10-01 — Tempo marked retired on the cluster, the ClickHouse alert counts and the restored InsertsRejected/Failing cluster rules re-read from the manifests, local VM pin v1.152.0, operator chart 0.27.4. Earlier the same day — VictoriaLogs datasource 0.32.0 with the line limit pinned to 50. Earlier: 2026-08-18 — temporal server scrape, VictoriaLogs datasource,
 collector-health + RFC-0021 boards, Gateway-board divergences recorded;
 previously 2026-08-13 — engine-health slice shipped (metrics.xml, vmagent,
 vmalert, ported rules, dual-target dashboard, audit rows C20/C21)._

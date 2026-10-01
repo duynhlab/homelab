@@ -5,8 +5,9 @@ This guide documents how cert-manager is wired into Flux in this repo: **two Clu
 > **Cluster status:** the `envoy-gateway-config-local` Kustomization that owns
 > this Certificate **has reconciled on Kind** during the RFC-0024 bring-up
 > (#791; see the status table in
-> [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)) — the full
-> end-to-end Kind gate pass (K-rows) is still pending. The ClusterIssuers,
+> [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)) and has since
+> passed the end-to-end Kind gate (see
+> [`kind-e2e-audit.md` § Previous runs](../platform/kind-e2e-audit.md#previous-runs)). The ClusterIssuers,
 > `homelab-ca` Certificate, and trust-manager Bundle described below are live;
 > §6 and §9's steps 3–6 describe the edge Certificate's behavior.
 
@@ -73,7 +74,7 @@ flowchart LR
 | Internal | `selfsigned-bootstrap` → `homelab-ca` Certificate → `homelab-ca` ClusterIssuer | Future internal mTLS (RFC-0020, planned), the two live-CA trust anchors (`openbao-idp-trust`, `flux-web-idp-trust`), **and `platform-edge-tls` on local Kind** (via the overlay patch — reconciled with the RFC-0024 bring-up) | Workloads that mount `homelab-ca-bundle` (trust-manager) |
 | Public | `letsencrypt-staging` / `letsencrypt-prod` (DNS-01 via Cloudflare) | `platform-edge-tls` (browser-facing wildcard) **on prod — planned, not deployed** | Browsers (Mozilla bundle covers LE roots) |
 
-> **Local vs prod:** on the local Kind cluster the `platform-edge-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it would be Let's Encrypt via Cloudflare DNS-01 — **planned**: `kubernetes/clusters/production/` declares no cert-manager or edge Kustomization yet. Webhook serving certs do not come from `homelab-ca` either: each chart (cert-manager, Kyverno, Temporal Worker Controller, Barman plugin) runs its own self-signed Issuer. The switch is a `spec.patches` override in [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) (not `cert-manager-config.yaml` — the edge Certificate lives in the `envoy-gateway` Kustomization, not the `cert-manager` one); prod has no such patch. The patch reconciled on Kind with the RFC-0024 bring-up (#791); the end-to-end Kind gate pass is still pending.
+> **Local vs prod:** on the local Kind cluster the `platform-edge-tls` wildcard is issued by the internal `homelab-ca` (Kind has no real `duynh.me` DNS zone / Cloudflare token, so LE DNS-01 can't complete — a browser warning is expected unless `homelab-ca` is trusted). On prod it would be Let's Encrypt via Cloudflare DNS-01 — **planned**: `kubernetes/clusters/production/` declares no cert-manager or edge Kustomization yet. Webhook serving certs do not come from `homelab-ca` either: each chart (cert-manager, Kyverno, Temporal Worker Controller, Barman plugin) runs its own self-signed Issuer. The switch is a `spec.patches` override in [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) (not `cert-manager-config.yaml` — the edge Certificate lives in the `envoy-gateway` Kustomization, not the `cert-manager` one); prod has no such patch. The patch reconciled on Kind with the RFC-0024 bring-up (#791) and has since passed the end-to-end Kind gate ([Previous runs](../platform/kind-e2e-audit.md#previous-runs)).
 
 ---
 
@@ -133,7 +134,7 @@ spec:
         kind: HelmRepository
         name: jetstack
         namespace: flux-system
-      version: "v1.21.1"
+      version: "v1.21.2"
   install:
     crds: CreateReplace
     createNamespace: false
@@ -320,7 +321,7 @@ spec:
     - "*.duynh.me"
 ```
 
-> **Local overlay:** the base manifest above uses `letsencrypt-prod`, but [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) patches `issuerRef.name` → `homelab-ca` on the local Kind cluster (self-signed; no ACME). Only prod would issue this cert from Let's Encrypt (planned — no production cluster deploys it yet). The `envoy-gateway-config-local` Kustomization carrying this patch has reconciled on Kind (RFC-0024 bring-up, #791); the full Kind gate pass is still pending (see [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
+> **Local overlay:** the base manifest above uses `letsencrypt-prod`, but [`clusters/local/envoy-gateway-config.yaml`](../../kubernetes/clusters/local/envoy-gateway-config.yaml) patches `issuerRef.name` → `homelab-ca` on the local Kind cluster (self-signed; no ACME). Only prod would issue this cert from Let's Encrypt (planned — no production cluster deploys it yet). The `envoy-gateway-config-local` Kustomization carrying this patch has reconciled on Kind (RFC-0024 bring-up, #791) and has since passed the full Kind gate (see [`kind-e2e-audit.md` § Previous runs](../platform/kind-e2e-audit.md#previous-runs)).
 
 On prod, switch `letsencrypt-prod` → `letsencrypt-staging` while iterating to avoid LE prod rate limits.
 
@@ -396,9 +397,9 @@ spec:
 ## 9. Deployment (step-by-step)
 
 > **Kind status:** steps 3–6 are owned by the `envoy-gateway-config-local`
-> Kustomization, which has reconciled on Kind (RFC-0024 bring-up, #791); the
-> end-to-end Kind gate pass is still pending (see
-> [`docs/platform/envoy-gateway.md`](../platform/envoy-gateway.md)).
+> Kustomization, which has reconciled on Kind (RFC-0024 bring-up, #791) and has
+> since passed the end-to-end Kind gate (see
+> [`kind-e2e-audit.md` § Previous runs](../platform/kind-e2e-audit.md#previous-runs)).
 > Steps 1–2 (ClusterIssuers + `cloudflare-api-token`) predate it and are live.
 
 1. **Seed Cloudflare API token in OpenBAO** (host setup, runs once per fresh cluster):
@@ -672,19 +673,19 @@ slice applied**). This section only links to it. The secrets pipeline
 |------|------|
 | Certificates issued from `homelab-ca` | 3 leaves: `platform-edge-tls` (the edge), `openbao-idp-trust` and `flux-web-idp-trust` (only their `ca.crt` is used). There is also the root `Certificate homelab-ca` |
 | Hops with verified TLS | browser → edge, and the two `id.duynh.me` hairpins (OpenBao OIDC config, Flux web UI) |
-| Hops with TLS but no verification | `payment` → `product-db-rw` (`sslmode=require`). PgDog → CNPG and Keycloak → CNPG probably also: the driver default is `prefer`, but this is unconfirmed until `pg_stat_ssl` is checked |
-| Plaintext | every other in-cluster hop: app → pooler, gRPC, Temporal, OpenBao `:8200`, Keycloak `:8080`, Valkey, telemetry, S3 (RustFS) |
+| Hops with TLS but no verification | `payment` → `product-db-rw` (`sslmode=require`), PgDog → CNPG `product-db`, and Keycloak JDBC → `platform-db` — all TLS 1.3, measured on Kind 2026-10-01 via `pg_stat_ssl`. PgDog's `tls_verify` and pgjdbc both default to `prefer`, which never checks the CA |
+| Plaintext | every other in-cluster hop: app → pooler, gRPC, Temporal, OpenBao `:8200`, Keycloak `:8080`, Valkey, telemetry, S3 (RustFS). Temporal → `platform-db` and the OpenBao DB engine → `platform-db` are confirmed plaintext (measured on Kind 2026-10-01 via `pg_stat_ssl`) |
 | Operator-managed TLS (not `homelab-ca`) | CNPG auto-CA (server cert, `streaming_replica`, PgBouncer client cert), the OpenBao Raft cluster port `:8201`, Envoy Gateway xDS (certgen), and chart self-signed webhook Issuers (Temporal Worker Controller, Barman plugin) |
 | Trust bundle | `homelab-ca-bundle` reaches `monitoring` only, and nothing mounts it (§11.2) |
 | local-stack | plaintext end to end, by design (an RFC-0020 non-goal). The only TLS there is Envoy Gateway xDS (`certgen --local`) |
 
 The Draw.io view below is the canonical picture for this question. Every edge
 names its state: `TLS verified`, `TLS unverified` (encrypted, but the client
-does not check who answers), `unconfirmed` (no mode pinned, so the driver default
-decides), `PLAINTEXT`, or `planned`. Telemetry and datasource hops are collapsed
+does not check who answers), `PLAINTEXT`, or `planned`. No edge is left
+`unconfirmed`: every database hop was read from `pg_stat_ssl` on Kind (2026-10-01). Telemetry and datasource hops are collapsed
 to one edge per pair of tiers; §12.1 lists each hop with its evidence.
 
-<p align="center"><a href="../architecture/security/tls-topology.svg"><img src="../architecture/security/tls-topology.svg" alt="TLS topology of the Kind cluster: only browser to Envoy Gateway and the two id.duynh.me hairpins carry verified TLS from homelab-ca; payment's database hop is TLS but unverified; app to pooler, gRPC, Temporal, OpenBao, Keycloak, Valkey, telemetry and RustFS are plaintext; RFC-0020 slices are planned" width="960"></a></p>
+<p align="center"><a href="../architecture/security/tls-topology.svg"><img src="../architecture/security/tls-topology.svg" alt="TLS topology of the Kind cluster: only browser to Envoy Gateway and the two id.duynh.me hairpins carry verified TLS from homelab-ca; the payment, PgDog and Keycloak database hops are TLS 1.3 but unverified; app to pooler, gRPC, Temporal, OpenBao, Keycloak, Valkey, telemetry and RustFS are plaintext; RFC-0020 slices are planned" width="960"></a></p>
 <p align="center"><sub>Source <a href="../architecture/security/tls-topology.drawio"><code>security/tls-topology.drawio</code></a> · <a href="../architecture/security/img/tls-topology.png">PNG</a></sub></p>
 
 ### 12.1 Hop inventory
@@ -702,13 +703,13 @@ to one edge per pair of tiers; §12.1 lists each hop with its evidence.
 | Service ↔ service gRPC `:9090` (incl. workers → payment) | plaintext | — | — | `pkg/grpcx/client.go:71` (`insecure.NewCredentials()`); `grpcx/server.go:116` (no `grpc.Creds`) |
 | Services / workers → Temporal frontend `:7233` | plaintext | — | — | `pkg/temporalx/temporalx.go:58`; `apps/order-worker.yaml:53-54` |
 | 9 services + 2 workers → PgDog `:6432` / PgBouncer `:5432` | plaintext | — | — | `apps/services/*.yaml` `db_sslmode: "disable"` (e.g. `cart.yaml:42`); `apps/order-worker.yaml:228-229`, `checkout-worker.yaml:173-174`; PgDog sets no `tls_*` (`product-db/poolers/helmrelease.yaml`) |
-| `payment` → `product-db-rw:5432` | TLS, **not verified** | CNPG auto-CA | no (`sslmode=require`) | `apps/services/payment.yaml:72-81`; `product-db/instance.yaml:46` (`hostssl`) |
-| PgDog → CNPG `product-db` | **unconfirmed**. PgDog's `tls_verify` default is `prefer`, so the hop is probably encrypted but not verified | CNPG auto-CA | no | `poolers/helmrelease.yaml:71-136` (no `tls_verify`); [RFC-0020 research](../proposals/rfc/RFC-0020/research.md) audit row |
-| CNPG PgBouncer → `platform-db` | TLS + client cert (`auth_query`) | CNPG auto-CA | managed by the operator; the verify mode is not visible in the repo | `platform-db/poolers/pooler.yaml:1-8` |
-| Keycloak → `platform-db-rw` (JDBC) | **unconfirmed**. There is no `sslmode` in the URL, so pgjdbc's default `prefer` applies | CNPG auto-CA | no | `controllers/keycloak/deployment.yaml:56-57` |
-| Temporal → `platform-db-rw` | plaintext (no `tls:` in either datastore) | — | — | `controllers/temporal/helmrelease.yaml:146-198` |
-| OpenBao DB secrets engine → `platform-db-rw` | plaintext | — | — | `platform-db/openbao-db-config.yaml:85` (`sslmode=disable`) |
-| CNPG replication (`streaming_replica`) | TLS + cert auth | CNPG auto-CA | yes (operator-managed) | `product-db/instance.yaml:36-38` |
+| `payment` → `product-db-rw:5432` | TLS, **not verified** | CNPG auto-CA | no (`sslmode=require`) | `apps/services/payment.yaml:72-81`; `product-db/instance.yaml:46` (`hostssl`); TLS 1.3, measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| PgDog → CNPG `product-db` | TLS, **not verified**. Encrypted (TLS 1.3 for all six PgDog backends: cart, checkout, inventory, order, payment, product); PgDog's `tls_verify` default `prefer` does not check the CA | CNPG auto-CA | no | `poolers/helmrelease.yaml:71-136` (no `tls_verify`); measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| CNPG PgBouncer → `platform-db` | TLS + client cert (`auth_query`); the user, review, shipping and notification server connections are TLS 1.3 | CNPG auto-CA | managed by the operator; the verify mode is not visible in the repo | `platform-db/poolers/pooler.yaml:1-8`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| Keycloak → `platform-db-rw` (JDBC) | TLS, **not verified**. Encrypted (TLS 1.3); there is no `sslmode` in the URL, so pgjdbc's default `prefer` applies and the CA is not checked | CNPG auto-CA | no | `controllers/keycloak/deployment.yaml:56-57`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| Temporal → `platform-db-rw` | plaintext (no `tls:` in either datastore); 14 connections with `ssl=f` | — | — | `controllers/temporal/helmrelease.yaml:146-198`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| OpenBao DB secrets engine → `platform-db-rw` | plaintext; `vault_rotator` sessions show `ssl=f` | — | — | `platform-db/openbao-db-config.yaml:85` (`sslmode=disable`); measured on Kind 2026-10-01 via `pg_stat_ssl` |
+| CNPG replication (`streaming_replica`) | TLS + cert auth (TLS 1.3) | CNPG auto-CA | yes (operator-managed) | `product-db/instance.yaml:36-38`; measured on Kind 2026-10-01 via `pg_stat_ssl` |
 | CNPG Barman → RustFS · DR replica restore · ClickHouse cold tier · Pyroscope | plaintext HTTP S3 | — | — | `*/objectstore.yaml:11`; `product-db-replica/instance.yaml:59-65`; `configs/clickhouse/clickhouseinstallation.yaml:347`; `controllers/profiling/pyroscope/helmrelease.yaml:96` |
 | Services → Valkey `:6379` | plaintext, no auth | — | — | `controllers/caching/valkey/helmrelease.yaml:46-47`; `catalog-rs.yaml:155-157` |
 | ESO / bootstrap / OIDC / DB-config Jobs → OpenBao `:8200` | plaintext HTTP | — | — | `controllers/secrets/openbao/helmrelease.yaml:56,94`; `configs/secrets/cluster-secret-store.yaml:24`, `cluster-secret-store-db.yaml:18`; `openbao-bootstrap/configmap.yaml:33` |
@@ -723,7 +724,7 @@ to one edge per pair of tiers; §12.1 lists each hop with its evidence.
 ### 12.2 What to check on a live cluster
 
 ```bash
-# Which Postgres sessions really use TLS (settles the "unconfirmed" rows)
+# Which Postgres sessions really use TLS (re-check the rows measured 2026-10-01)
 kubectl -n product exec product-db-1 -c postgres -- psql -U postgres -c \
   "select a.usename, a.client_addr, s.ssl, s.version from pg_stat_ssl s join pg_stat_activity a using (pid) where a.backend_type='client backend';"
 kubectl -n platform exec platform-db-1 -c postgres -- psql -U postgres -c \
@@ -746,4 +747,4 @@ openssl s_client -connect gateway.duynh.me:443 -servername gateway.duynh.me </de
 
 ---
 
-_Last updated: 2026-10-01 — §12 added: the TLS topology of the deployed Kind cluster (which hops are encrypted, the issuer of each certificate, whether each hop is verified) as the `security/tls-topology` Draw.io view, with a hop inventory that cites file:line evidence. The same day: the Let's Encrypt prod path is labelled planned (no production cluster deploys cert-manager or the edge yet), the "Webhooks" claim on `homelab-ca` is corrected (each webhook chart runs its own self-signed Issuer), and §11.3's mount path now matches the Bundle manifest. Earlier: 2026-08-27 — §11.5 now states plainly that the committed CA is stale on every rebuilt cluster (it broke the ADR-062 OIDC configurator once; PR #933's live-issuer Certificate is the consumer-side pattern) and §11.6 gains the matching troubleshooting row. 2026-08-19 — edge-Certificate status corrected: `envoy-gateway-config-local` reconciled on Kind with the RFC-0024 bring-up (#791), K-row gate pass pending; earlier same day: trust-distribution.md dissolved into §11 (architecture, opt-in, mounting, CA rotation, bootstrap, troubleshooting; the stale `auth` namespace row dropped — only `monitoring` carries `needs-trust`); inline HelmRelease copy synced with the deployed `prometheus.servicemonitor` block. Previously 2026-08-13 — edge Certificate `platform-edge-tls` (ns `envoy-gateway`), LE DNS-01 on prod / `homelab-ca` on local Kind (planned)._
+_Last updated: 2026-10-01 — §12 database hops settled by `pg_stat_ssl` on Kind: PgDog → CNPG, Keycloak JDBC, the CNPG PgBouncer server connections and replication are TLS 1.3 (unverified where the client is `prefer`/`require`); Temporal and the OpenBao DB engine → `platform-db` are plaintext; the edge Certificate has passed the Kind gate (no longer "pending"); inline cert-manager chart copy v1.21.2. Earlier the same day — §12 added: the TLS topology of the deployed Kind cluster (which hops are encrypted, the issuer of each certificate, whether each hop is verified) as the `security/tls-topology` Draw.io view, with a hop inventory that cites file:line evidence. The same day: the Let's Encrypt prod path is labelled planned (no production cluster deploys cert-manager or the edge yet), the "Webhooks" claim on `homelab-ca` is corrected (each webhook chart runs its own self-signed Issuer), and §11.3's mount path now matches the Bundle manifest. Earlier: 2026-08-27 — §11.5 now states plainly that the committed CA is stale on every rebuilt cluster (it broke the ADR-062 OIDC configurator once; PR #933's live-issuer Certificate is the consumer-side pattern) and §11.6 gains the matching troubleshooting row. 2026-08-19 — edge-Certificate status corrected: `envoy-gateway-config-local` reconciled on Kind with the RFC-0024 bring-up (#791), K-row gate pass pending; earlier same day: trust-distribution.md dissolved into §11 (architecture, opt-in, mounting, CA rotation, bootstrap, troubleshooting; the stale `auth` namespace row dropped — only `monitoring` carries `needs-trust`); inline HelmRelease copy synced with the deployed `prometheus.servicemonitor` block. Previously 2026-08-13 — edge Certificate `platform-edge-tls` (ns `envoy-gateway`), LE DNS-01 on prod / `homelab-ca` on local Kind (planned)._

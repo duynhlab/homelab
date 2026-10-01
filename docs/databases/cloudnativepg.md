@@ -9,7 +9,7 @@ the storage and query engine inside every operand pod.
 | **Helm chart** | `cloudnative-pg` 0.29.0 |
 | **Controller namespace** | `cloudnative-pg` |
 | **Operand image** | `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
-| **Backup plugin** | Barman Cloud plugin 0.7.1 |
+| **Backup plugin** | Barman Cloud plugin (chart `plugin-barman-cloud` 0.8.1) |
 
 ## Control-plane boundary
 
@@ -25,7 +25,7 @@ flowchart LR
     Operator --> CRs["Cluster / Database<br/>DatabaseRole / Pooler"]
     CRs --> Runtime["Pods / Services / PVCs"]
     Runtime --> PG[("PostgreSQL 18.1")]
-    Barman["Barman plugin 0.7.1"] --> Backup["Backup / ScheduledBackup"]
+    Barman["Barman plugin 0.8.1"] --> Backup["Backup / ScheduledBackup"]
     Backup --> CRs
 
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
@@ -118,4 +118,4 @@ plugin form one compatibility surface. Upgrade them as an ordered change:
 - [CloudNativePG 1.30 installation and upgrades](https://cloudnative-pg.io/docs/1.30/installation_upgrade/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 
-_Last updated: 2026-08-31._
+_Last updated: 2026-10-01 — Barman Cloud plugin chart 0.7.1 → 0.8.1, matching the HelmRelease. Earlier: 2026-08-31._

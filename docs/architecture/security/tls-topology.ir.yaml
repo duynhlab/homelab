@@ -10,6 +10,7 @@
 # controllers/tracing/otel-collector, clusters/local/flux-system/instance.yaml + sources/oci/,
 # and duynhlab/pkg grpcx/client.go + server.go, temporalx/temporalx.go, obsx/setup.go.
 # Per-hop file:line evidence lives in docs/secrets/cert-manager.md §12.1.
+# Database hop states measured on Kind 2026-10-01 via pg_stat_ssl (client backends on both primaries).
 diagram:
   id: tls-topology
   title: "duynhlab homelab — TLS topology (Kind, as deployed)"
@@ -35,7 +36,6 @@ diagram:
       telemetry: "OTLP · telemetry export"
       dependency: "planned work (RFC-0020)"
   assumptions:
-    - "PgDog -> CNPG and Keycloak JDBC set no TLS mode; the drivers default to prefer, so the hop is probably encrypted but unverified. Unconfirmed until pg_stat_ssl is read on a live cluster."
     - "CNPG writes the PgBouncer TLS settings itself; the verify mode is not visible in the repo."
     - "Temporal's SQL plugin is drawn plaintext because neither datastore has a tls block."
 
@@ -110,9 +110,9 @@ edges:
   - {id: d_valkey, source: svc, target: valkey, type: data, label: "PLAINTEXT · no auth"}
   - {id: d_payment, source: svc, target: proddb, type: data, label: "TLS unverified · payment\nsslmode=require"}
 
-  - {id: d_pgdogup, source: pgdog, target: proddb, type: data, label: "TLS unverified\nunconfirmed · prefer"}
+  - {id: d_pgdogup, source: pgdog, target: proddb, type: data, label: "TLS unverified\n(TLS 1.3 measured) · prefer"}
   - {id: d_pgbup, source: pgb, target: platdb, type: data, label: "TLS · client cert\nCNPG auto-CA (operator)"}
-  - {id: d_kc, source: kc, target: platdb, type: data, label: "TLS unverified\nunconfirmed · JDBC prefer"}
+  - {id: d_kc, source: kc, target: platdb, type: data, label: "TLS unverified\n(TLS 1.3 measured) · JDBC prefer"}
   - {id: d_temporal, source: temporal, target: platdb, type: data, label: "PLAINTEXT · SQL"}
   - {id: c_dbengine, source: bao, target: platdb, type: control, label: "PLAINTEXT · DB engine\nsslmode=disable"}
   - {id: c_opca, source: opca, target: proddb, type: control, label: "server + replication\ncerts (both clusters)"}
@@ -124,7 +124,7 @@ edges:
 notes:
   - id: note_state
     title: "Reading the hop state"
-    text: "TLS verified: the client checks the chain against a CA and checks the hostname. TLS unverified: the hop is encrypted, but the client does not check who answers (sslmode=require, or a driver default of prefer). unconfirmed: the manifest pins no mode, so the driver default decides; read pg_stat_ssl on a live cluster before relying on it. PLAINTEXT: nothing is encrypted on the hop. Operator-managed TLS (CNPG replication and the PgBouncer client cert, the OpenBao Raft cluster port, Envoy Gateway xDS, chart webhook Issuers) uses each operator's own CA, not homelab-ca. platform-db's backups take the same plaintext S3 path as product-db's. kubelet and kube-apiserver scrapes use TLS with insecureSkipVerify."
+    text: "TLS verified: the client checks the chain against a CA and checks the hostname. TLS unverified: the hop is encrypted, but the client does not check who answers (sslmode=require, or a driver default of prefer). Every database hop was read from pg_stat_ssl on Kind (2026-10-01): PgDog, Keycloak, PgBouncer and replication are TLS 1.3; Temporal and the OpenBao DB engine are plaintext. PLAINTEXT: nothing is encrypted on the hop. Operator-managed TLS (CNPG replication and the PgBouncer client cert, the OpenBao Raft cluster port, Envoy Gateway xDS, chart webhook Issuers) uses each operator's own CA, not homelab-ca. platform-db's backups take the same plaintext S3 path as product-db's. kubelet and kube-apiserver scrapes use TLS with insecureSkipVerify."
   - id: note_planned
     title: "Planned, not installed (RFC-0020, provisional)"
     text: "S0 edge issuer decouple · S1 OpenBao listener TLS · S2 CNPG server cert from homelab-ca · S3 pooler TLS · S4 apps on sslmode=verify-full through a pooler · S5 per-hop client certs · S6 gRPC + Temporal mTLS. Added 2026-10-01: S7 intermediate CA · S8 Keycloak HTTPS · S9 platform-db clients · S10 Envoy BackendTLSPolicy · S11 RustFS TLS · S12 Valkey auth + TLS · S13 OCI registry TLS + cosign · S14 KMS over HTTPS (production)."

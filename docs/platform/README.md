@@ -5,7 +5,7 @@ day-2 platform patterns for the duynhlab homelab.
 
 | | |
 |---|---|
-| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (24 declared Flux Kustomizations; `mcp-local` commented out, so 23 apply) |
+| **Deployed today** | Kind cluster — `kubernetes/clusters/local/` (30 declared Flux Kustomizations; `mcp-local` commented out, so 29 apply) |
 | **Applications** | 10 Go microservices + React frontend + back-office portal + Temporal workers (`order-worker`, `checkout-worker`) + `mockpay` |
 | **GitOps** | Flux Operator + OCI artifacts + Kustomize — [`setup.md`](setup.md) |
 | **App onboarding** | Domain ResourceSets + InputProviders — [`application-delivery.md`](application-delivery.md) |
@@ -49,6 +49,7 @@ flowchart TD
     clickhouse["clickhouse-local"]
     tracing["tracing-local + profiling-local"]
     databases["databases-local + DR"]
+    keda["keda-local<br/>KEDA (ADR-055)"]
     temporal["temporal-local + temporal-config-local"]
     apps["apps-local<br/>ResourceSets + workers"]
 
@@ -72,14 +73,18 @@ flowchart TD
     storage --> tracing
     secrets --> databases
     monitoring --> databases
+    controllers --> keda
+    monitoring --> keda
     databases --> temporal
     monitoring --> temporal
+    keda --> temporal
     databases --> apps
     monitoring --> apps
     temporal --> apps
+    keda --> apps
 ```
 
-This diagram is a summary — the full numbered graph of all 24 Kustomization CRs
+This diagram is a summary — the full numbered graph of all 30 Kustomization CRs
 lives in [`setup.md`](setup.md#project-architecture).
 
 `make flux-sync` (inside `make sync`) reconciles only a **subset** of Kustomizations
@@ -118,4 +123,4 @@ Workflow templates (not prose docs): `build_template.yml`, `check_template.yml`.
 - [`kubernetes/apps/`](../../kubernetes/apps/) — ResourceSets and InputProviders
 - [`terraform/README.md`](../../terraform/README.md) — Flux Operator bootstrap
 
-_Last updated: 2026-08-27 — Kustomization count 22 → 24 (mcp split-out earlier; `openbao-oidc-config-local` added by ADR-062). 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle, so `order-worker` is one `WorkerDeployment` and the build id is derived rather than named here. Previously 2026-08-21 — order-worker moved to build `2.4.0` (Temporal SDK v1.48.0; the frozen `1.13.2` had no arm64 leg) and the Kind E2E audit runbook joined the doc map. Previously 2026-08-19 — synced to the deployed platform (22 Kustomizations, back-office portal, `order-worker-1-13-2`, keycloak → monitoring edge)._
+_Last updated: 2026-10-01 — Kustomization count re-counted from `clusters/local/` (30 declared, 29 apply); `keda-local` added to the summary graph (it gates temporal-local and apps-local). 2026-08-27 — Kustomization count 22 → 24 (mcp split-out earlier; `openbao-oidc-config-local` added by ADR-062). 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle, so `order-worker` is one `WorkerDeployment` and the build id is derived rather than named here. Previously 2026-08-21 — order-worker moved to build `2.4.0` (Temporal SDK v1.48.0; the frozen `1.13.2` had no arm64 leg) and the Kind E2E audit runbook joined the doc map. Previously 2026-08-19 — synced to the deployed platform (22 Kustomizations, back-office portal, `order-worker-1-13-2`, keycloak → monitoring edge)._

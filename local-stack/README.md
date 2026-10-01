@@ -58,7 +58,7 @@ delivery uses explicit semver pins; image automation is planned, not active.
   substitute — every command in this document and in the audit is written as
   `docker compose` and works unchanged when podman's socket is exported as
   `DOCKER_HOST`.
-- All application repositories checked out beside `homelab/`, including the 11
+- All application repositories checked out beside `homelab/`, including the 10
   service repositories, the two SPAs (`frontend`, `admin-service`), and the
   shared `pkg` repository.
 - Enough CPU, memory, and disk to build the full fleet and run its observability
@@ -112,7 +112,7 @@ browsed).
 | API gateway (Envoy) | http://localhost:8080 | Pass-through edge for the application services; the root path has no route, so `/` answers 404 by design |
 | Keycloak | http://localhost:8081 | Two realms: `duynhlab` for customers and `duynhlab-staff` for operators (ADR-050). The origin both SPAs log in against and the `iss` in every token |
 | Temporal Web UI | http://localhost:8233 | Order and checkout workflows |
-| Grafana | http://localhost:3002 | **Compose diverges from the cluster here (deliberate):** anonymous Admin, no login — the cluster runs staff SSO with anonymous Viewer ([ADR-062](../docs/proposals/adr/ADR-062-staff-groups-sso/)); compose keeps the frictionless gate flow. 18 dashboards in three folders: Observability (RED, business, Temporal incl. server row, OTel Collector health, Keycloak — Identity, Inventory Service — Stock Authority, Order Saga & Payment — Cutover Baseline), Gateway (3 vendored Envoy boards + Edge Overview), ClickHouse (6, incl. **Server / Engine**); Explore over VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse, and Pyroscope |
+| Grafana | http://localhost:3002 | **Compose diverges from the cluster here (deliberate):** anonymous Admin, no login — the cluster runs staff SSO with anonymous Viewer ([ADR-062](../docs/proposals/adr/ADR-062-staff-groups-sso/)); compose keeps the frictionless gate flow. 18 dashboards in six folders, named as on the cluster: API Gateway (3 vendored Envoy boards + Edge Overview), ClickHouse (6, incl. **Server / Engine**), Business & Product (business, Inventory Service — Stock Authority, Order Saga & Payment — Cutover Baseline), Platform / Infrastructure (Keycloak — Identity, OTel Collector health), Microservices / Golden Signals (2 RED boards), Workflows / Async (Temporal incl. server row); Explore over VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse, and Pyroscope |
 | VictoriaTraces | http://localhost:10428 | Trace storage, Jaeger query API, and vmui |
 | VictoriaMetrics | http://localhost:8428 | OTLP/remote-write metrics, PromQL, and vmui |
 | VictoriaLogs | http://localhost:9428 | OTLP and container logs with LogsQL — via its own vmui or the Grafana `VictoriaLogs` datasource (plugin installed at container start, needs outbound internet once, like the gateway's Envoy image download) |
@@ -151,7 +151,7 @@ sync any more.
 | Route backends | `Backend` resources with `fqdn` endpoints (Compose DNS) | Kubernetes `Service` references |
 | Listener | one plain-HTTP listener on 8000, published as 8080 | HTTPS on 443 with a wildcard certificate, plus a 301 redirect listener |
 | Edge JWT | `remoteJWKS` against `http://keycloak:8080/...`, issuer `http://localhost:8081/realms/duynhlab` | `remoteJWKS` against the in-cluster Service, issuer `https://id.duynh.me/realms/duynhlab` |
-| Rate limit | 50/s, one window, one in-process bucket | 2/s + 50/min + 1250/h per replica |
+| Rate limit | 50/s, one window, one in-process bucket | 25/s per replica (~50/s across 2 replicas), one window |
 
 The **one honest divergence** is the backend reference: Compose has no
 Kubernetes Services, so HTTPRoutes point at `Backend` resources naming the
@@ -196,7 +196,7 @@ flowchart LR
     SVC -->|"gRPC, no edge route"| INV["inventory<br/>gRPC only"]
     SVC -->|"payment provider HTTP"| MP["mockpay<br/>provider stub"]
     MP -->|"signed webhook"| EDGE
-    SVC --> PG[("PostgreSQL<br/>14 databases")]
+    SVC --> PG[("PostgreSQL<br/>13 databases")]
     KC -->|"realm state"| PG
     SVC -->|"product cache"| VALKEY[("Valkey")]
     SVC -->|"order + checkout"| TMP["Temporal server :7233<br/>+ UI :8233"]
@@ -349,7 +349,7 @@ ambiguous.
 |---------|-------------|------------|
 | Runtime | Docker Compose | Kubernetes + Flux Operator |
 | Application image | Built from sibling source checkout | Released semver image pinned in manifests |
-| Database | One PostgreSQL container, 14 databases (including Keycloak's), each owned by its own non-superuser role | CloudNativePG clusters and poolers; the same one-role-per-database triplets |
+| Database | One PostgreSQL container, 13 databases (including Keycloak's and Temporal's two), each owned by its own non-superuser role | CloudNativePG clusters and poolers; the same one-role-per-database triplets |
 | Temporal | `temporalio/server` on that PostgreSQL, all roles in one container, `numHistoryShards: 4` | Official Helm chart, four role Deployments, `numHistoryShards: 512` |
 | Secrets | Inline development values | OpenBAO + External Secrets Operator |
 | Network controls | Single Compose network | NetworkPolicy + Gateway route boundaries |
@@ -369,7 +369,7 @@ Passing one environment never implies that the other environment passes.
 - [Observability](../docs/observability/README.md)
 - [agent-browser CLI](https://github.com/vercel-labs/agent-browser)
 
-_Last updated: 2026-10-01 — each database is owned by its own non-superuser role, as on the cluster. Earlier: 2026-08-18 — Temporal server metrics scraped (in-network
+_Last updated: 2026-10-01 — database count 13 (14 included the dropped `auth` database), 10 service repositories, the cluster edge limit is 25/s per replica in one window, and the Grafana port row lists the six provisioned folders. Earlier the same day — each database is owned by its own non-superuser role, as on the cluster. Earlier: 2026-08-18 — Temporal server metrics scraped (in-network
 `:8000` via `PROMETHEUS_ENDPOINT`), VictoriaLogs Grafana datasource added, and
 the dashboard set grew to 16 (collector health, RFC-0021 parity copies);
 previously 2026-08-13 — the port table became canonical and complete (17

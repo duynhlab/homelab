@@ -1,4 +1,5 @@
-# Vendored from grafana/clickhouse-datasource, src/dashboards (RFC-0027).
+# Vendored from grafana/clickhouse-datasource v4.22.0, src/dashboards (RFC-0027).
+# Local patch to re-apply on re-vendor: otel_logs queries add the toStartOfFiveMinutes sort-key bound (#1142).
 #
 # Why vendored and not imported from the datasource's Dashboards tab: importing
 # through the UI bakes the template variable's *current* value into the saved

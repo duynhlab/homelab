@@ -5923,6 +5923,24 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Grafana ClickHouse datasource 4.20.0 → 4.22.0 on the cluster and
+  local-stack; the six vendored plugin dashboards re-vendored from the
+  `v4.22.0` tag.**
+  - The boards gain a `database` selector, an `interval` variable, case-
+    insensitive free-text search and annotation presets.
+  - The plugin gains trace → logs links that keep the time frame, log
+    volume for SQL-editor queries, any-column log filters, and the
+    `$__rateColumns`/`$__lttb` macros.
+  - Three fixes we carried locally are upstream now: the hard-coded
+    datasource uid in Cluster Analysis (the old K5.7 failure), `hasToken`
+    search, and the Deployments annotation. Cluster Analysis is now
+    byte-identical to upstream.
+  - One local patch is re-applied: `otel_logs` queries keep the
+    `toStartOfFiveMinutes` sort-key bound (#1142), on 8 queries in the
+    Logs Explorer and 1 in the Service Dashboard.
+  - The ClickHouse hub's "manual import, not GitOps" section was stale
+    since #881 and now describes the vendored set.
+
 - **ClickHouse Keeper 26.7 → 26.8 LTS**, after the servers
   ([#1107](https://github.com/duynhlab/homelab/issues/1107) G5 step 2,
   supersedes #1055, which targeted 26.9). This follows the upstream order,

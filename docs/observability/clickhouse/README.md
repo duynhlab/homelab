@@ -710,28 +710,36 @@ ones (`StatusCode` `Ok`/`Error`/`Unset`, `SpanKind` `Server`/`Client`/`Internal`
 and proto packages are named after the owning service, so "who calls product" is
 just client spans where `rpc.method LIKE 'product.v1.%'`.
 
-### Plugin-bundled dashboards (manual import — not GitOps)
+### Plugin-bundled dashboards (vendored on the cluster)
 
-The datasource ships 7 reference dashboards (datasource config page →
-**Dashboards** tab). A UI import lives **only in that Grafana's database** — not
-in git, never on the cluster, wiped when the local volume is recreated:
+The datasource ships reference dashboards (datasource config page →
+**Dashboards** tab). On the **cluster**, six of them are vendored from the
+plugin's `v4.22.0` tag into git and delivered by the grafana-operator
+([`grafana-dashboard-clickhouse-upstream.yaml`](../../../kubernetes/infra/configs/observability/grafana/dashboards/grafana-dashboard-clickhouse-upstream.yaml)).
+They keep the plugin's own uids, so a UI import of the same board is
+overwritten on the next sync. Do not import them from the UI there.
 
 | Dashboard (uid) | Group | What it is |
 |---|---|---|
 | ClickHouse - Query Analysis (`w5Q2Otank`) | **Server admin** | Query performance over `system.query_log` |
 | ClickHouse - Data Analysis (`-B3tt7a7z`) | Server admin | Table/parts/disk usage, compression |
-| ClickHouse - Cluster Analysis (`_hAsuzBnz`) | Server admin | Replication/distributed health (mostly N/A single-node) |
-| Advanced ClickHouse Monitoring (`e336c8cd-…`) | Server admin | Memory, merges, mark cache, background pools |
-| OpenTelemetry Logs Explorer (`otel-logs-explorer`) | **OTel reference** | Upstream generic version of our Logs Explorer |
-| OpenTelemetry Traces Explorer (`otel-traces-explorer`) | OTel reference | Upstream Trace Explorer — its heatmap hard-codes `% 500` sampling (near-empty at our volume) |
-| OpenTelemetry Service Dashboard (`otel-service-dashboard`) | OTel reference | Upstream per-service view — the deep dive covers this with verified enums/keys |
+| ClickHouse - Cluster Analysis (`_hAsuzBnz`) | Server admin | Replication/distributed health across the three replicas |
+| OpenTelemetry Logs Explorer (`otel-logs-explorer`) | **OTel** | Logs by service/level with free-text search; replaces our own explorer on the cluster |
+| OpenTelemetry Traces Explorer (`otel-traces-explorer`) | OTel | Trace search, duration and error panels |
+| OpenTelemetry Service Dashboard (`otel-service-dashboard`) | OTel | Per-service RED, operations, errors and correlated logs |
 
-The server-admin group watches ClickHouse *itself* (`system.*`) — a niche the
-in-repo suite doesn't cover; promote one to a provisioned JSON + CR if it earns
-a permanent place. Provisioned ClickHouse dashboards live in the **ClickHouse**
-Grafana folder on both environments (local: file provider
-`foldersFromFilesStructure` + `dashboards/ClickHouse/`; cluster: the CR
-`folder:` field).
+- **One local patch** is carried on every re-vendor: `otel_logs` queries add
+  the `toStartOfFiveMinutes(Timestamp)` sort-key bound beside
+  `$__timeFilter`, which cuts the granules read from 423/423 to 6/423 (#1142).
+  The plugin's other fixes we used to carry locally (the hard-coded datasource
+  uid in Cluster Analysis, `hasToken` free-text search, the Deployments
+  annotation) are upstream since 4.21.
+- **Not vendored:** `system-dashboards.json` (no uid, broken as shipped; our
+  `clickhouse-server-engine` covers it) and **Advanced ClickHouse Monitoring**
+  (UI import only).
+- **local-stack** does not vendor them yet: it runs our own six boards, and
+  the plugin ones are a UI import there, which lives only in that Grafana's
+  volume.
 
 ### Query performance rules
 
@@ -1146,6 +1154,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-30 — server 26.8 LTS with asynchronous_metrics_key_values_mode=both (Keeper follows separately); operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
+_Last updated: 2026-10-01 — plugin-bundled dashboards: vendored on the cluster from v4.22.0 (the old "manual import" text was stale). Earlier: 2026-09-30 — server 26.8 LTS with asynchronous_metrics_key_values_mode=both (Keeper follows separately); operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
 credential-safe query examples, and current runtime evidence for parts, TTL,
 cold storage, and the 22-rule ClickHouse alert group._

@@ -6,7 +6,8 @@ metadata:
 spec:
   retentionPolicy: "7d"
   configuration:
-    destinationPath: s3://pg-backups-cnpg/product-db-replica/
+    # No trailing slash: RustFS rejects the "//" prefix Barman builds from it.
+    destinationPath: s3://pg-backups-cnpg/product-db-replica
     endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
     s3Credentials:
       accessKeyId:

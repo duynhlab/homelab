@@ -3,7 +3,7 @@
 # App databases: user, notification, shipping, review (RFC-0012 triplets);
 # temporal + temporal_visibility (Temporal server, direct :5432);
 # keycloak (identity provider, direct :5432 — RFC-0022 / RFC-0024 P1).
-# HA: 3 instances (1 primary, 1 sync replica, 1 async replica).
+# HA: 3 instances, quorum sync ANY 1 (either standby acknowledges).
 # DR: WAL archived to RustFS (no separate platform-db-replica in this RFC).
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster

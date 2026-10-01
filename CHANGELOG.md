@@ -1857,6 +1857,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Database docs no longer describe a three-instance DR replica**
+  ([#1137](https://github.com/duynhlab/homelab/issues/1137) follow-up). The
+  architecture inventory, the backup-target reasoning, and the replica's
+  backup manifest comment now match the single-instance `product-db-replica`
+  (three only after promotion). The `product-db` and `platform-db` headers
+  list every hosted database and say quorum `ANY 1` instead of "1 sync, 1
+  async". The CNPG chart rules README marks the physical-lag files as not
+  applied, since `replication-health.yaml` replaced them.
 - **The OpenBAO `db-strong` password policy is labelled as not deployed**
   ([#1107](https://github.com/duynhlab/homelab/issues/1107) G1). The page
   described it as applied to every DB role, but no manifest writes it. It

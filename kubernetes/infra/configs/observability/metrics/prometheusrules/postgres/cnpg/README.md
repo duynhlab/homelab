@@ -21,8 +21,8 @@ helm template x cnpg/cluster --version 0.6.0 -n product \
 | File | Alert (first rule) |
 |------|-------------------|
 | `cluster-offline.yaml` | `CNPGClusterOffline` |
-| `cluster-high_replication_lag.yaml` | `CNPGClusterHighReplicationLag` |
-| `cluster-physical_replication_lag-*.yaml` | Physical replication lag warning/critical |
+| `cluster-high_replication_lag.yaml` | `CNPGClusterHighReplicationLag` — **not applied**; replaced by [`replication-health.yaml`](../replication-health.yaml) |
+| `cluster-physical_replication_lag-*.yaml` | Physical replication lag warning/critical — **not applied**; replaced by [`replication-health.yaml`](../replication-health.yaml) |
 | `cluster-high_connection-*.yaml` | High connections warning/critical |
 | `cluster-ha-*.yaml` | HA warning/critical |
 | `cluster-low_disk_space-*.yaml` | Low disk (kubelet volume metrics) |

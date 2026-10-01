@@ -212,6 +212,19 @@ Skeleton (copy what you need):
   and compose pins, one grouped PR per plugin.
 
 #### Services
+- **The fleet runs on Go 1.27.1** ([#1107](https://github.com/duynhlab/homelab/issues/1107)
+  G2): user 2.5.1, product 1.16.1, inventory 0.9.1, cart 2.4.1, order 2.10.1,
+  review 2.4.1, shipping 1.9.1, notification 2.4.1, payment 2.6.1, checkout
+  0.13.1, the two workers on the same tags (#1182, ramped to Current by the
+  Worker Controller), and mockpay on payment 2.6.1. The builder, the `go`
+  directive and every `duynhlab/pkg` module move together (pkg's Go 1.27.1
+  line: `obsx` v0.48.0, `httpmw` v0.4.0, `logger/slogx` v0.4.0, the rest
+  `v0.38.0`/`v0.37.0`/`v0.45.0`). The `.0` tags carry the same code but cut no
+  GitHub Release, because GoReleaser still pinned Go 1.26. gha-workflows#137
+  makes it read `go.mod`, and the `.1` tags carry the release. Integration
+  tests now wait the way the postgres module prescribes and run on
+  PostgreSQL 18. Every tag passed the full local-stack release audit
+  (A/B/C + C22) on its merged commit.
 - **The fleet runs the 2026-10-01 patch releases**: user 2.4.1, product
   1.15.1, inventory 0.8.1, cart 2.3.1, order 2.9.1, review 2.3.1, shipping
   1.8.1, notification 2.3.1, payment 2.5.1, checkout 0.12.1, the two workers

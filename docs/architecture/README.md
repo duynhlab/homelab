@@ -29,7 +29,8 @@ IR is what you edit and the `.drawio` is its output.
 | databases | [`databases/topology`](databases/topology.drawio) | **Connection and recovery paths** — which pooler or direct host each client uses, who manages the clusters, and how WAL and backups reach the DR replica. | [`databases/architecture.md` § Current topology](../databases/architecture.md#current-topology) |
 | security | [`security/app-mesh`](security/app-mesh.drawio) | **Allowed app-mesh ingress** — which namespace may call which service over :8080 / :9090, caller → callee; the gateway's ten allows drawn as one arrow into the fenced frame. | [`security/network-policies.md` § 3](../security/network-policies.md#3-allowed-ingress-topology) |
 | security | [`security/network-policies`](security/network-policies.drawio) | **Who may reach the data and identity tier** — NetworkPolicy allows by source namespace and port. | [`security/network-policies.md` § DB-tier allows](../security/network-policies.md#db-tier-allows) |
-| workflows | [`workflows/temporal-keda`](workflows/temporal-keda.drawio) | **The Temporal work layer** — who starts each workflow, which queue and worker serve it, and how the Worker Controller and KEDA roll out and scale each build. | [`api/workflows.md`](../api/workflows.md) |
+| workflows | [`workflows/temporal-keda`](workflows/temporal-keda.drawio) | **The Temporal work layer** — who starts each workflow, which queue and worker serve it, and which controllers own each worker's builds and replicas. | [`api/workflows.md`](../api/workflows.md) |
+| workflows | [`workflows/temporal-worker-versions`](workflows/temporal-worker-versions.drawio) | **One worker release** — the builds, the Progressive rollout and the per-build KEDA scaling while order-fulfillment ramps from build A to build B. | [`api/workflows.md`](../api/workflows.md) · [`api/temporal.md` § Worker Deployment Versioning](../api/temporal.md#worker-deployment-versioning-as-built) |
 
 ## Conventions
 

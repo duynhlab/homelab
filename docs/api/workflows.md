@@ -119,6 +119,13 @@ scaling detail the Mermaid map summarises:
 
 <p align="center"><sub>Source <a href="../architecture/workflows/temporal-keda.drawio"><code>workflows/temporal-keda.drawio</code></a> · <a href="../architecture/workflows/img/temporal-keda.png">PNG</a></sub></p>
 
+The companion view answers how one release moves through its builds — the rollout and the
+per-build scaling for order-fulfillment mid-ramp. The canonical explanation is
+[`temporal.md` § Worker Deployment Versioning](temporal.md#worker-deployment-versioning-as-built).
+
+<p align="center"><a href="../architecture/workflows/temporal-worker-versions.svg"><img src="../architecture/workflows/temporal-worker-versions.svg" alt="One worker release: build A Current and build B Ramping, each with its own Deployment and ScaledObject, the Worker Controller setting Ramping and Current on the server, and KEDA scaling each build on its own backlog" width="960"></a></p>
+<p align="center"><sub>Source <a href="../architecture/workflows/temporal-worker-versions.drawio"><code>workflows/temporal-worker-versions.drawio</code></a> · <a href="../architecture/workflows/img/temporal-worker-versions.png">PNG</a></sub></p>
+
 > **In plain terms:** three workflows, two queues, two workers — and since
 > [ADR-064](../proposals/adr/ADR-064-all-workers-under-controller/) ONE lifecycle:
 > the Temporal Worker Controller owns both. (Until 2026-08-27 checkout-worker was a

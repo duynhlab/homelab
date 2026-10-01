@@ -47,7 +47,7 @@ spec:
           # from Docker Hub, and quay.io/minio/mc started answering anonymous pulls with 401
           # (2026-09-25 Kind bring-up: storage-local and twelve waves behind it stalled).
           # The AWS CLI speaks the same S3 API to RustFS and ECR Public needs no auth.
-          image: public.ecr.aws/aws-cli/aws-cli:2.37.3
+          image: public.ecr.aws/aws-cli/aws-cli:2.37.7
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh

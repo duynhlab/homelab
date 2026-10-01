@@ -349,7 +349,7 @@ ambiguous.
 |---------|-------------|------------|
 | Runtime | Docker Compose | Kubernetes + Flux Operator |
 | Application image | Built from sibling source checkout | Released semver image pinned in manifests |
-| Database | One PostgreSQL container, 14 databases (including Keycloak's) | CloudNativePG clusters and poolers |
+| Database | One PostgreSQL container, 14 databases (including Keycloak's), each owned by its own non-superuser role | CloudNativePG clusters and poolers; the same one-role-per-database triplets |
 | Temporal | `temporalio/server` on that PostgreSQL, all roles in one container, `numHistoryShards: 4` | Official Helm chart, four role Deployments, `numHistoryShards: 512` |
 | Secrets | Inline development values | OpenBAO + External Secrets Operator |
 | Network controls | Single Compose network | NetworkPolicy + Gateway route boundaries |
@@ -369,7 +369,7 @@ Passing one environment never implies that the other environment passes.
 - [Observability](../docs/observability/README.md)
 - [agent-browser CLI](https://github.com/vercel-labs/agent-browser)
 
-_Last updated: 2026-08-18 — Temporal server metrics scraped (in-network
+_Last updated: 2026-10-01 — each database is owned by its own non-superuser role, as on the cluster. Earlier: 2026-08-18 — Temporal server metrics scraped (in-network
 `:8000` via `PROMETHEUS_ENDPOINT`), VictoriaLogs Grafana datasource added, and
 the dashboard set grew to 16 (collector health, RFC-0021 parity copies);
 previously 2026-08-13 — the port table became canonical and complete (17

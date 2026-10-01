@@ -48,8 +48,7 @@ x-svc-env: &svc-env
   PORT: "8080"
   DB_HOST: postgres
   DB_PORT: "5432"
-  DB_USER: postgres
-  DB_PASSWORD: postgres
+  # DB_USER/DB_PASSWORD are per service (one role per database, postgres/init.sql).
   DB_SSLMODE: disable
   # RFC-0024 P3: services verify Keycloak realm tokens (pkg authmw).
   # Split-horizon issuer: the browser reaches Keycloak at the published
@@ -109,8 +108,8 @@ services:
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: postgres
-      KC_DB_PASSWORD: postgres
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak-local
       # Dev-only bootstrap admin (cluster: keycloak-bootstrap-admin via ESO).
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
@@ -184,7 +183,7 @@ services:
     # retry rather than failing every Temporal-dependent service behind it.
     restart: on-failure:5
     environment:
-      SQL_PASSWORD: postgres # temporal-sql-tool reads the password from here, not a flag
+      SQL_PASSWORD: temporal-local # temporal-sql-tool reads the password from here, not a flag
     # The two databases are created by postgres/init.sql, mirroring the cluster
     # where CNPG postInitSQL owns creation and Temporal runs with
     # `createDatabase: false`. Re-running is safe: setup-schema skips a database
@@ -197,9 +196,9 @@ services:
         set -e
         for db in temporal temporal_visibility; do
           [ "$$db" = temporal ] && dir=temporal || dir=visibility
-          temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u postgres --db "$$db" \
+          temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u temporal --db "$$db" \
             setup-schema -v 0.0
-          temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u postgres --db "$$db" \
+          temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u temporal --db "$$db" \
             update-schema -d "/etc/temporal/schema/postgresql/v12/$$dir/versioned"
         done
     depends_on:
@@ -231,8 +230,8 @@ services:
       DB: postgres12
       DB_PORT: "5432"
       POSTGRES_SEEDS: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PWD: postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal-local
       DBNAME: temporal
       VISIBILITY_DBNAME: temporal_visibility
       # Cluster runs 512 (helmrelease.yaml). 4 is a deliberate local divergence:
@@ -522,49 +521,49 @@ services:
   user-migrate:
     build: { context: ../../user-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user }
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user, DB_PASSWORD: user-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   product-migrate:
     build: { context: ../../product-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product }
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   cart-migrate:
     build: { context: ../../cart-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart }
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   order-migrate:
     build: { context: ../../order-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order }
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   review-migrate:
     build: { context: ../../review-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review, DB_PASSWORD: review-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   shipping-migrate:
     build: { context: ../../shipping-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping, DB_PASSWORD: shipping-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   notification-migrate:
     build: { context: ../../notification-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification }
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification, DB_PASSWORD: notification-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   payment-migrate:
     build: { context: ../../payment-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment }
+    environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment, DB_USER: payment, DB_PASSWORD: payment-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
@@ -572,13 +571,13 @@ services:
   checkout-migrate:
     build: { context: ../../checkout-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout }
+    environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout, DB_USER: checkout, DB_PASSWORD: checkout-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   inventory-migrate:
     build: { context: ../../inventory-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory }
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
@@ -588,7 +587,7 @@ services:
   user-seed:
     build: { context: ../../user-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user }
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user, DB_PASSWORD: user-local }
     depends_on:
       postgres: { condition: service_healthy }
       user-migrate: { condition: service_completed_successfully }
@@ -596,7 +595,7 @@ services:
   product-seed:
     build: { context: ../../product-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product }
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local }
     depends_on:
       postgres: { condition: service_healthy }
       product-migrate: { condition: service_completed_successfully }
@@ -604,7 +603,7 @@ services:
   cart-seed:
     build: { context: ../../cart-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart }
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local }
     depends_on:
       postgres: { condition: service_healthy }
       cart-migrate: { condition: service_completed_successfully }
@@ -612,7 +611,7 @@ services:
   order-seed:
     build: { context: ../../order-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order }
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local }
     depends_on:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
@@ -620,7 +619,7 @@ services:
   review-seed:
     build: { context: ../../review-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review, DB_PASSWORD: review-local }
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
@@ -628,7 +627,7 @@ services:
   shipping-seed:
     build: { context: ../../shipping-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping, DB_PASSWORD: shipping-local }
     depends_on:
       postgres: { condition: service_healthy }
       shipping-migrate: { condition: service_completed_successfully }
@@ -636,7 +635,7 @@ services:
   notification-seed:
     build: { context: ../../notification-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification }
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification, DB_PASSWORD: notification-local }
     depends_on:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
@@ -644,7 +643,7 @@ services:
   inventory-seed:
     build: { context: ../../inventory-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory }
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local }
     depends_on:
       postgres: { condition: service_healthy }
       inventory-migrate: { condition: service_completed_successfully }
@@ -658,6 +657,8 @@ services:
       SERVICE_NAME: user
       OTEL_SERVICE_NAME: user
       DB_NAME: user
+      DB_USER: user
+      DB_PASSWORD: user-local
       # ADR-050: the protected group verifies the STAFF realm (split-horizon).
       OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
       OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
@@ -677,6 +678,8 @@ services:
       SERVICE_NAME: shipping
       OTEL_SERVICE_NAME: shipping
       DB_NAME: shipping
+      DB_USER: shipping
+      DB_PASSWORD: shipping-local
       GRPC_PORT: "9090"
       # ADR-050: the protected group verifies the STAFF realm (split-horizon).
       OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
@@ -695,6 +698,8 @@ services:
       SERVICE_NAME: review
       OTEL_SERVICE_NAME: review
       DB_NAME: review
+      DB_USER: review
+      DB_PASSWORD: review-local
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -709,6 +714,8 @@ services:
       SERVICE_NAME: notification
       OTEL_SERVICE_NAME: notification
       DB_NAME: notification
+      DB_USER: notification
+      DB_PASSWORD: notification-local
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -723,6 +730,8 @@ services:
       SERVICE_NAME: product
       OTEL_SERVICE_NAME: product
       DB_NAME: product
+      DB_USER: product
+      DB_PASSWORD: product-local
       CACHE_ENABLED: "true"
       CACHE_HOST: cache
       CACHE_PORT: "6379"
@@ -759,6 +768,8 @@ services:
       SERVICE_NAME: cart
       OTEL_SERVICE_NAME: cart
       DB_NAME: cart
+      DB_USER: cart
+      DB_PASSWORD: cart-local
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
@@ -778,6 +789,8 @@ services:
       SERVICE_NAME: inventory
       OTEL_SERVICE_NAME: inventory
       DB_NAME: inventory
+      DB_USER: inventory
+      DB_PASSWORD: inventory-local
       GRPC_PORT: "9090"
       # ADR-050: the protected group verifies the STAFF realm (split-horizon
       # like OIDC_ISSUER above — issuer is the browser-facing origin, JWKS
@@ -801,6 +814,8 @@ services:
       SERVICE_NAME: checkout
       OTEL_SERVICE_NAME: checkout
       DB_NAME: checkout
+      DB_USER: checkout
+      DB_PASSWORD: checkout-local
       CART_GRPC_ADDR: dns:///cart:9090
       PRODUCT_GRPC_ADDR: dns:///product:9090
       # P2 confirm handoff (ADR-018) + abandonment signals (ADR-019). Temporal
@@ -839,6 +854,8 @@ services:
       SERVICE_NAME: checkout
       OTEL_SERVICE_NAME: checkout-worker
       DB_NAME: checkout
+      DB_USER: checkout
+      DB_PASSWORD: checkout-local
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: checkout
@@ -873,6 +890,8 @@ services:
       SERVICE_NAME: payment
       OTEL_SERVICE_NAME: payment
       DB_NAME: payment
+      DB_USER: payment
+      DB_PASSWORD: payment-local
       # Real provider hop: payment calls mockpay over HTTP (empty = in-memory stub).
       MOCKPAY_URL: http://mockpay:8080
       # Shared HMAC secret for verifying mockpay webhook signatures (must match
@@ -895,6 +914,8 @@ services:
       SERVICE_NAME: order
       OTEL_SERVICE_NAME: order
       DB_NAME: order
+      DB_USER: order
+      DB_PASSWORD: order-local
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_SERVICE_URL: http://shipping:8080
       # ADR-050: the protected group verifies the STAFF realm (split-horizon).
@@ -940,6 +961,8 @@ services:
       SERVICE_NAME: order
       OTEL_SERVICE_NAME: order-worker
       DB_NAME: order
+      DB_USER: order
+      DB_PASSWORD: order-local
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
       NOTIFICATION_GRPC_ADDR: dns:///notification:9090

@@ -287,7 +287,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="d_pgdogup" value="TLS unverified&#10;unconfirmed · prefer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgdog" target="proddb">
+        <mxCell id="d_pgdogup" value="TLS unverified&#10;(TLS 1.3 measured) · prefer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pgdog" target="proddb">
           <mxGeometry relative="1" as="geometry" x="0.01">
             <Array as="points">
               <mxPoint x="1200" y="1135" />
@@ -303,7 +303,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="d_kc" value="TLS unverified&#10;unconfirmed · JDBC prefer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.68;exitY=1;exitDx=0;exitDy=0;entryX=0.58;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="kc" target="platdb">
+        <mxCell id="d_kc" value="TLS unverified&#10;(TLS 1.3 measured) · JDBC prefer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#16A34A;strokeWidth=1.5;endArrow=classic;flowAnimation=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.68;exitY=1;exitDx=0;exitDy=0;entryX=0.58;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="kc" target="platdb">
           <mxGeometry relative="1" as="geometry" x="0.96">
             <Array as="points">
               <mxPoint x="1530" y="790" />
@@ -369,7 +369,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="note_state" value="&lt;b&gt;Reading the hop state&lt;/b&gt;&lt;br&gt;TLS verified: the client checks the chain against a CA and checks the hostname. TLS unverified: the hop is encrypted, but the client does not check who answers (sslmode=require, or a driver default of prefer). unconfirmed: the manifest pins no mode, so the driver default decides; read pg_stat_ssl on a live cluster before relying on it. PLAINTEXT: nothing is encrypted on the hop. Operator-managed TLS (CNPG replication and the PgBouncer client cert, the OpenBao Raft cluster port, Envoy Gateway xDS, chart webhook Issuers) uses each operator's own CA, not homelab-ca. platform-db's backups take the same plaintext S3 path as product-db's. kubelet and kube-apiserver scrapes use TLS with insecureSkipVerify." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
+        <mxCell id="note_state" value="&lt;b&gt;Reading the hop state&lt;/b&gt;&lt;br&gt;TLS verified: the client checks the chain against a CA and checks the hostname. TLS unverified: the hop is encrypted, but the client does not check who answers (sslmode=require, or a driver default of prefer). Every database hop was read from pg_stat_ssl on Kind (2026-10-01): PgDog, Keycloak, PgBouncer and replication are TLS 1.3; Temporal and the OpenBao DB engine are plaintext. PLAINTEXT: nothing is encrypted on the hop. Operator-managed TLS (CNPG replication and the PgBouncer client cert, the OpenBao Raft cluster port, Envoy Gateway xDS, chart webhook Issuers) uses each operator's own CA, not homelab-ca. platform-db's backups take the same plaintext S3 path as product-db's. kubelet and kube-apiserver scrapes use TLS with insecureSkipVerify." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
           <mxGeometry x="40" y="1525" width="1745" height="70" as="geometry" />
         </mxCell>
         <mxCell id="note_planned" value="&lt;b&gt;Planned, not installed (RFC-0020, provisional)&lt;/b&gt;&lt;br&gt;S0 edge issuer decouple · S1 OpenBao listener TLS · S2 CNPG server cert from homelab-ca · S3 pooler TLS · S4 apps on sslmode=verify-full through a pooler · S5 per-hop client certs · S6 gRPC + Temporal mTLS. Added 2026-10-01: S7 intermediate CA · S8 Keycloak HTTPS · S9 platform-db clients · S10 Envoy BackendTLSPolicy · S11 RustFS TLS · S12 Valkey auth + TLS · S13 OCI registry TLS + cosign · S14 KMS over HTTPS (production)." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">

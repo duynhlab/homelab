@@ -38,8 +38,9 @@ spec:
     # streaming_replica) and its default host-all catch-all — so the trailing
     # reject preempts the catch-all without touching operator paths.
     # First match wins. `host` (not hostssl) for the pgdog/migration pairs:
-    # their TLS is unverified at best (PgDog default prefer); tighten to hostssl
-    # once pooler upstream TLS lands. Applied by reload, not restart.
+    # their TLS is encrypted but unverified (TLS 1.3 measured on Kind 2026-10-01
+    # via pg_stat_ssl; PgDog default prefer); tighten to hostssl with RFC-0020's
+    # pooler slice. Applied by reload, not restart.
     # Adding a service? Add its allow line ABOVE the reject (the one
     # exception to "never touch instance.yaml" — HBA is cluster infra).
     pg_hba:

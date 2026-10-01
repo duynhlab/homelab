@@ -9,7 +9,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 |---|---|
 | **Status** | **Deployed** — local-stack + cluster (RFC-0019 Phase B) |
 | **Role** | **Supplementary** OLAP for logs+traces SQL. Runs **alongside** VictoriaLogs / VictoriaTraces (day-to-day ops primaries), which are **unchanged** |
-| **Engine** | `clickhouse/clickhouse-server:26.7`, ReplicatedMergeTree, **1 shard × 3 replicas** on a 3-node ClickHouse Keeper quorum |
+| **Engine** | `clickhouse/clickhouse-server:26.8` (LTS), ReplicatedMergeTree, **1 shard × 3 replicas** on a 3-node ClickHouse Keeper quorum |
 | **Operator** | Altinity `clickhouse-operator` `0.27.4` + a `ClickHouseInstallation` CR and a `ClickHouseKeeperInstallation` CR |
 | **Ingest** | OTel Collector contrib `clickhouse` exporter — fan-out on the **traces + logs** pipelines (metrics stay on VictoriaMetrics — **never** here) |
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), created by the **`clickhouse-schema` Job** from DDL committed in git; the exporter only INSERTs |
@@ -148,7 +148,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 
 | Aspect | Detail |
 |--------|--------|
-| **Engine** | `clickhouse/clickhouse-server:26.7`, ReplicatedMergeTree, 1 shard × 3 replicas ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)) |
+| **Engine** | `clickhouse/clickhouse-server:26.8` (LTS), ReplicatedMergeTree, 1 shard × 3 replicas ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)) |
 | **Operator** | Altinity `altinity-clickhouse-operator` `0.27.4` (HelmRelease in the `controllers` wave, ns `monitoring`); CRDs health-checked before the CHI applies (`kubernetes/infra/controllers/clickhouse-operator/`) |
 | **Instance** | `ClickHouseInstallation` `clickhouse` (cluster `otel`) → StatefulSets `chi-clickhouse-otel-0-{0,1,2}`, one per node (host anti-affinity); own Flux Kustomization `clickhouse-local` `dependsOn [controllers-local, secrets-local]`, health-checking **all three** (`kubernetes/infra/configs/clickhouse/`) |
 | **Coordination** | `ClickHouseKeeperInstallation` `keeper`, 3 replicas, referenced by name (`zookeeper.keeper.name`); holds the replication metadata. A replica that loses its Keeper session serves reads and refuses writes |
@@ -1146,6 +1146,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-30 — operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
+_Last updated: 2026-09-30 — server 26.8 LTS with asynchronous_metrics_key_values_mode=both (Keeper follows separately); operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
 credential-safe query examples, and current runtime evidence for parts, TTL,
 cold storage, and the 22-rule ClickHouse alert group._

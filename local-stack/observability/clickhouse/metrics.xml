@@ -26,4 +26,6 @@
     <asynchronous_metrics>true</asynchronous_metrics>
     <errors>true</errors>
   </prometheus>
+  <!-- 26.8 Map async metrics: keep the old *_default names (same as the CHI). -->
+  <asynchronous_metrics_key_values_mode>both</asynchronous_metrics_key_values_mode>
 </clickhouse>

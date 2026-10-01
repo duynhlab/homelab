@@ -31,7 +31,7 @@ completely — read `{{ $labels.job }}` first.
 Depends on the controller:
 
 - **Admission** (`kyverno-svc-metrics`) is the serious one.
-  `disallow-default-namespace` runs `validationFailureAction: Enforce` with
+  `disallow-default-namespace` runs `validationActions: [Deny]` with
   `failurePolicy: Fail`, so a dead admission webhook does not merely stop
   policing — the API server can **refuse** admission for covered resources.
   `config.resourceFilters` and `excludeKyvernoNamespace` keep `kube-system`,

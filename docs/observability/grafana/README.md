@@ -7,7 +7,7 @@ Grafana is the unified visualization layer for all 4 observability pillars. It c
 Grafana is deployed via the **Grafana Operator** using a `Grafana` CR:
 
 - **CR**: `kubernetes/infra/configs/observability/grafana/grafana.yaml`
-- **Image**: `grafana/grafana:13.2.0`
+- **Image**: `grafana/grafana:13.2.2`
 - **Namespace**: `monitoring`
 - **Access**: **staff SSO** ([ADR-062](../../proposals/adr/ADR-062-staff-groups-sso/)) — "Sign in with Keycloak" at https://grafana.duynh.me; the staff realm's `groups` claim maps `infra-team`→Admin, `sre-team`→Editor, else Viewer. Anonymous access remains, as read-only **Viewer**; the user/password form is hidden.
 
@@ -102,9 +102,9 @@ assigns them since `v0.2.1`, and a registry-wide test holds it.
 
 ## Dashboards
 
-**24 `GrafanaDashboard` CRs** still vendored here, plus **18 dashboards and 6 folders
+**25 `GrafanaDashboard` CRs** still vendored here, plus **18 dashboards and 6 folders
 delivered as `GrafanaManifest` from an OCI artifact** (re-derive the first with
-`grep -h -c '^kind: GrafanaDashboard' kubernetes/infra/configs/observability/grafana/dashboards/*.yaml`).
+`cat kubernetes/infra/configs/observability/grafana/dashboards/*.yaml | grep -c '^kind: GrafanaDashboard'`).
 
 ## Dashboards as code
 
@@ -206,4 +206,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-10-01 — VictoriaMetrics/VictoriaLogs plugins 0.26.1 / 0.32.0, VictoriaLogs line limit pinned to 50, and Renovate tracks all three plugins. Earlier: 2026-10-01 — the ClickHouse suite includes six boards vendored from the datasource plugin. Earlier: 2026-09-28 — § Plugins: why the bundled Prometheus/Pyroscope plugins are not self-updated, how the failure looks, and the distinct-refId rule. Previously 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-10-01 — Grafana image `13.2.2`; 25 vendored `GrafanaDashboard` CRs (re-derive command sums across files). Earlier the same day: VictoriaMetrics/VictoriaLogs plugins 0.26.1 / 0.32.0, VictoriaLogs line limit pinned to 50, and Renovate tracks all three plugins. Earlier: 2026-10-01 — the ClickHouse suite includes six boards vendored from the datasource plugin. Earlier: 2026-09-28 — § Plugins: why the bundled Prometheus/Pyroscope plugins are not self-updated, how the failure looks, and the distinct-refId rule. Previously 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

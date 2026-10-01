@@ -377,8 +377,7 @@ grep -q 'Session not active' /tmp/a5-refresh \
 #     inspects a table inside the `auth` database; it asserts the DATABASE itself
 #     is absent (it is dropped from postgres/init.sql). The retired token layer's
 #     cluster surface (apps/services/auth.yaml, the auth DB triplet, the ESO
-#     secrets) retires in RFC-0024 P5, which needs Kind; locally the end state is
-#     already what this gate runs against.
+#     secrets) is gone too — RFC-0024 P5 retired it on Kind.
 audit_curl -s -o /dev/null -w "A6 /private/me:     %{http_code} (want 404 — no route matches at the edge)\n" \
   $BASE/auth/v1/private/me -H "Authorization: Bearer $AT"
 docker compose exec -T postgres psql -U postgres -lqt </dev/null \
@@ -2186,7 +2185,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A3 | Bad/missing token | 401 **at the edge**, `text/plain` body `Jwt is missing`, **and** `www-authenticate: Bearer realm="<requested URL>"` — plus `error="invalid_token"` when a token was present but unverifiable. All three are required |
 | A4 | Refresh reuse (realm) | refresh rotates; replaying the consumed token 400 `invalid_grant` / `Maximum allowed refresh token reuse exceeded`; the replay revokes the family, so the rotated token also 400s (`Session doesn't have required client`) |
 | A5 | Logout (realm) | end-session 204, replay **also 204** (idempotent); refresh afterwards 400 `Session not active` |
-| A6 | Removed surfaces | `/auth/v1/private/*` 404 (no HTTPRoute matches) **and the `auth` database does not exist** — auth-service is removed from local-stack; its cluster surface retires in RFC-0024 P5 |
+| A6 | Removed surfaces | `/auth/v1/private/*` 404 (no HTTPRoute matches) **and the `auth` database does not exist** — auth-service is removed from local-stack, and RFC-0024 P5 retired its cluster surface |
 | A7 | v3 paths (ADR-017) | new `shipments/*` paths 200 and the deprecated `shipping/v1/public/track` alias still 200 (expand phase). The old `auth/v1/public/login` alias is **not** checked — it certified the retired token layer and has no backend |
 | A8 | Internal audience sealed | renamed `notify/*` + `internal/orders/*` 404 in-container (no aliases); and the two `/internal/` paths that DO exist — product create, cart clear — 404 **at the edge** because every HTTPRoute is audience-scoped, so no audience leaks |
 | A9 | Checkout sessions (RFC-0015) | lifecycle **201**→200→200→200 through edge-JWT, with the create's 201 asserted (not just used for its id); no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
@@ -2321,7 +2320,7 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-10-01 — every Phase C row prints an `OK`/`FAIL` verdict; C13 and C15 had been hidden by VictoriaLogs answers that end without a newline, and C13's notes now describe the OTLP access log. Previously 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
+_Last updated: 2026-10-01 — A6 no longer calls the auth-service cluster retirement pending: RFC-0024 P5 removed it. Earlier the same day — every Phase C row prints an `OK`/`FAIL` verdict; C13 and C15 had been hidden by VictoriaLogs answers that end without a newline, and C13's notes now describe the OTLP access log. Previously 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
 RFC-0025: the header's "Sign in" is a link to
 `/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
 storage assertion now names the legitimate residents (`theme`, and a

@@ -225,7 +225,7 @@ every replica already has everything.
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
 | Cluster topology (shards × replicas) | `otel`: 1 shard × 3 replicas | [CHI](../../../../kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml) `shardsCount: 1`, `replicasCount: 3`; decision in [ADR-065](../../../proposals/adr/ADR-065-clickhouse-replicated-topology/README.md) | Repository fact |
-| Server image | `clickhouse/clickhouse-server:26.7` (floating patch tag — record `SELECT version()` per observation) | CHI pod template | Repository fact |
+| Server image | `clickhouse/clickhouse-server:26.8` (floating patch tag — record `SELECT version()` per observation) | CHI pod template | Repository fact |
 | Native protocol ingest | Collector exporter → `tcp://clickhouse-clickhouse.monitoring.svc.cluster.local:9000` | [Collector manifest](../../../../kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml) | Repository fact |
 | Prometheus endpoint | `:9363` per pod, scraped by a PodMonitor (operator Services do not carry the port) | CHI settings and pod-template comment | Repository fact |
 | Replica placement | Required anti-affinity, one replica per node | CHI pod template | Repository fact |
@@ -314,8 +314,8 @@ Observation context:
 | **Database/table** | `system.clusters` (cluster `otel`) |
 | **Replica** | `chi-clickhouse-otel-0-0-0` |
 
-Declared versus observed: the CHI pins the floating tag
-`clickhouse/clickhouse-server:26.7`; the running patch release was
+Declared versus observed: at observation the CHI pinned the floating tag
+`clickhouse/clickhouse-server:26.7` (it now pins `26.8`); the running patch release was
 **26.7.17.7** (2026-09-30 11:20 UTC). Keeper reports the same build. The tag
 alone never tells you the patch — a pod restart can move it.
 
@@ -326,7 +326,7 @@ alone never tells you the patch — a pod restart can move it.
 | Six StatefulSets, each `1/1` | The operator rendered the CHI/CHK into per-replica StatefulSets and all pods are ready | Ready pods do not prove the replicas agree on data — that is `system.replicas` ([chapter 05](05-replication.md)) |
 | `system.clusters` rows for `otel` | The cluster definition this replica would use for distributed queries: expect shard 1, replicas 1–3 | The definition is published asynchronously by the operator and can lag reality; the schema Job was rewritten because a fresh bring-up listed 2 hosts while 3 pods ran, and it returns duplicate rows per host (hence `DISTINCT`) — see the [schema Job header](../../../../kubernetes/infra/configs/clickhouse-schema/job.yaml) |
 | `hostName()` | The pod that served *this* connection | It says nothing about which replica will serve the next connection — the Service balances each one independently |
-| `version()` | The actual patch release behind the floating `26.7` image tag | The tag in Git alone cannot tell you this |
+| `version()` | The actual patch release behind the floating minor image tag | The tag in Git alone cannot tell you this |
 
 ### What to notice
 
@@ -411,4 +411,4 @@ Before continuing, explain these without rereading the chapter:
 - [Altinity ClickHouse operator](https://github.com/Altinity/clickhouse-operator)
 
 ---
-_Last updated: 2026-09-30 — engine-layers Draw.io diagram added; MySQL/PostgreSQL listeners recorded as an observed difference. Earlier the same day: live lab verified: 3 replicas + 3 Keeper members, patch 26.7.17.7 behind the `26.7` tag. Earlier: 2026-09-29 — first published version of the architecture chapter; live lab pending verification._
+_Last updated: 2026-10-01 — the server-image repository fact now reads `26.8` (the CHI moved off `26.7`; the lab record stays as observed). Earlier: 2026-09-30 — engine-layers Draw.io diagram added; MySQL/PostgreSQL listeners recorded as an observed difference. Earlier the same day: live lab verified: 3 replicas + 3 Keeper members, patch 26.7.17.7 behind the `26.7` tag. Earlier: 2026-09-29 — first published version of the architecture chapter; live lab pending verification._

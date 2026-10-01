@@ -164,7 +164,7 @@ deployed topology; not failure-injected on this cluster, per the
 
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
-| Standalone Keeper ensemble | CHK `keeper`: 3 members, one per node, `clickhouse/clickhouse-keeper:26.7`, 2Gi PVC each — external to the database pods so a database restart never destabilizes quorum | [`clickhousekeeperinstallation.yaml`](../../../../kubernetes/infra/configs/clickhouse-keeper/clickhousekeeperinstallation.yaml) | Repository fact |
+| Standalone Keeper ensemble | CHK `keeper`: 3 members, one per node, `clickhouse/clickhouse-keeper:26.8`, 2Gi PVC each — external to the database pods so a database restart never destabilizes quorum | [`clickhousekeeperinstallation.yaml`](../../../../kubernetes/infra/configs/clickhouse-keeper/clickhousekeeperinstallation.yaml) | Repository fact |
 | Client / Raft / metrics ports | `keeper-svc` exposes 2181 (ZooKeeper-compatible client), 9444 (Raft), 7000 (Prometheus) | same manifest | Repository fact |
 | Four-letter-word admin commands | Whitelist narrowed to `ruok,mntr,srvr,stat,conf` (upstream default allows more) | same manifest; [Keeper guide — 4lw](https://clickhouse.com/docs/guides/oss/deployment-and-scaling/keeper) | Repository fact |
 | CHI→CHK by-name reference | The CHI names `keeper`; the operator resolves endpoints **once** and fails open — an empty `<zookeeper>` section reconciles "successfully" if Keeper pods are absent. The Flux wave `clickhouse-local` dependsOn `clickhouse-keeper-local` exists precisely to prevent that ordering | [CHI keeper comment](../../../../kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml) | Repository fact |
@@ -351,6 +351,6 @@ Before continuing, explain these without rereading the chapter:
 - [`system.zookeeper`](https://clickhouse.com/docs/reference/system-tables/zookeeper) and [`system.zookeeper_connection`](https://clickhouse.com/docs/reference/system-tables/zookeeper_connection)
 
 ---
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: one leader and two synced followers, 2,409 znodes; database vs table znode paths distinguished. Earlier: 2026-09-29 — first draft: quorum mental model, znode inventory,
+_Last updated: 2026-10-01 — the Keeper image repository fact now reads `26.8`. Earlier the same day: DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: one leader and two synced followers, 2,409 znodes; database vs table znode paths distinguished. Earlier: 2026-09-29 — first draft: quorum mental model, znode inventory,
 session→read-only lifecycle, outage capability matrix, and the deployed
 3-member CHK; live lab pending verification._

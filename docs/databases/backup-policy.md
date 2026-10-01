@@ -5,7 +5,7 @@ segment, restoration procedure, and validation evidence remain available.
 
 | Item | Current state |
 |---|---|
-| **Mechanism** | CloudNativePG Barman Cloud plugin 0.7.1 |
+| **Mechanism** | CloudNativePG Barman Cloud plugin (chart `plugin-barman-cloud` 0.8.1) |
 | **Object storage** | RustFS S3-compatible endpoint |
 | **Operational schedules** | Every six hours and daily at 02:00 |
 | **Primary recovery window** | 30 days |
@@ -39,11 +39,14 @@ recovery, not merely a completed backup object.
 
 CloudNativePG schedules use six-field cron expressions, including seconds.
 
-| Cluster | Namespace | Destination prefix | Recovery window | Scheduled base backups |
+| Cluster | Namespace | `destinationPath` | Recovery window | Scheduled base backups |
 |---|---|---|---:|---|
-| `platform-db` | `platform` | `s3://pg-backups-cnpg/platform-db/` | 30d | `0 0 */6 * * *`; `0 0 2 * * *` |
-| `product-db` | `product` | `s3://pg-backups-cnpg/product-db/` | 30d | `0 0 */6 * * *`; `0 0 2 * * *` |
-| `product-db-replica` | `product` | `s3://pg-backups-cnpg/product-db-replica/` | 7d | `0 30 3 * * *` (`target: primary`) |
+| `platform-db` | `platform` | `s3://pg-backups-cnpg/platform-db` | 30d | `0 0 */6 * * *`; `0 0 2 * * *` |
+| `product-db` | `product` | `s3://pg-backups-cnpg/product-db` | 30d | `0 0 */6 * * *`; `0 0 2 * * *` |
+| `product-db-replica` | `product` | `s3://pg-backups-cnpg/product-db-replica` | 7d | `0 30 3 * * *` (`target: primary`) |
+
+`destinationPath` carries no trailing slash: Barman joins it with `/`, and RustFS
+rejects the resulting `//` key prefix, which made the retention pass fail.
 
 The operational clusters archive WAL continuously and set `immediate: true` on
 both schedules. Each also declares an initial on-demand `Backup`. The DR replica
@@ -110,4 +113,4 @@ acceptance gate.
 - [CloudNativePG 1.30 backup](https://cloudnative-pg.io/docs/1.30/backup/)
 - [Barman Cloud plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
 
-_Last updated: 2026-10-01 — backup-target reasoning updated for the single-instance DR replica. Earlier: 2026-09-01 — DR replica gained a daily `ScheduledBackup` (`target: primary`); the sidecar retention timer and its backup-driven WAL deletion are spelled out. Earlier the same day — `30d`/`7d` described as Barman recovery windows rather than plain retention._
+_Last updated: 2026-10-01 — Barman Cloud plugin chart 0.8.1; the inventory lists each `destinationPath` exactly as declared (no trailing slash, #1174). Earlier the same day — backup-target reasoning updated for the single-instance DR replica. Earlier: 2026-09-01 — DR replica gained a daily `ScheduledBackup` (`target: primary`); the sidecar retention timer and its backup-driven WAL deletion are spelled out. Earlier the same day — `30d`/`7d` described as Barman recovery windows rather than plain retention._

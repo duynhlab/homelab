@@ -327,7 +327,7 @@ docs/observability/
 │   └── audits/                   # Dated, sanitized Kind evidence
 │
 ├── grafana/                      # Visualization layer
-│   ├── README.md                 # Grafana overview: 42 dashboard CRs / 12 folders, delivery patterns, plugins
+│   ├── README.md                 # Grafana overview: 25 dashboard CRs + 18 as-code boards, delivery patterns, plugins
 │   ├── rbac-multi-team.md        # Staff-SSO group→role mapping (ADR-062), Teams, folder permissions
 │   ├── datasources.md            # Dual datasource strategy (case study)
 │   ├── dashboard-reference.md    # Microservices dashboard (~41 panels, 8 rows)
@@ -352,7 +352,7 @@ docs/observability/
     ├── README.md                 # Runbook index
     ├── _TEMPLATE.md              # Canonical per-alert runbook template
     ├── clickhouse/                 # OTel OLAP store per-alert runbooks
-    ├── envoy-gateway/              # Edge per-alert runbooks (10 files)
+    ├── envoy-gateway/              # Edge per-alert runbooks (13 files)
     ├── gitops/                     # Flux per-alert runbooks (9 files)
     ├── keda/                       # Autoscaler per-alert runbooks (4 files)
     ├── keycloak/                   # Identity per-alert runbooks (5 files, no README)
@@ -381,9 +381,9 @@ trace pilot remains explicit so a future operator bump cannot move it silently.
 | Layer | Version | Pin source |
 |-------|---------|------------|
 | VM Operator | chart `0.67.2`, app `v0.74.0` | Flux `OCIRepository` |
-| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.148.0`, local-stack `v1.150.0` | operator defaults on the cluster; the three compose images are pinned explicitly and still run **ahead** — see the skew note below |
+| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.148.0`, local-stack `v1.152.0` | operator defaults on the cluster; the three compose images are pinned explicitly and still run **ahead** — see the skew note below |
 | VictoriaLogs (`VLSingle`) | `v1.52.0` in both places | operator default on the cluster now matches the explicit compose image |
-| VictoriaTraces (`VTSingle`) | `v0.11.0` | explicit CR and local-stack image |
+| VictoriaTraces (`VTSingle`) | `v0.11.1` | explicit CR and local-stack image |
 | Grafana VM / VL datasources | `v0.26.1` / `v0.32.0` | Grafana CR and datasource CRs |
 | VM / VL MCP charts | `0.3.0` / `0.1.0` | Flux `OCIRepository` |
 
@@ -394,7 +394,7 @@ operator's defaults move — which is exactly how VictoriaLogs converged: the
 operator bump to v0.74.0 moved the cluster's default to v1.52.0 (the LogsQL
 bare-filter-pipe fix local-stack had pinned since v1.51.0 rejected them), so
 VL now matches in both places while VM remains ahead. The trace pilot stays in
-lockstep instead — `VTSingle` is pinned by an explicit CR, so `v0.11.0` is the
+lockstep instead — `VTSingle` is pinned by an explicit CR, so `v0.11.1` is the
 version in both places regardless of the operator's own default (v0.10.0 as of
 v0.74.0).
 
@@ -519,6 +519,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-10-01 — Grafana VM / VL datasource versions bumped to 0.26.1 / 0.32.0. Earlier: 2026-09-29 — the ClickHouse internals curriculum now lists its twelve authored chapters; earlier the same day, added the curriculum and authoring contract, and the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
+_Last updated: 2026-10-01 — component inventory re-checked against the manifests: VictoriaTraces `v0.11.1`, local-stack VM images `v1.152.0`, 13 edge runbooks, Grafana tree line (25 CRs + 18 as-code boards). Earlier the same day: Grafana VM / VL datasource versions bumped to 0.26.1 / 0.32.0. Earlier: 2026-09-29 — the ClickHouse internals curriculum now lists its twelve authored chapters; earlier the same day, added the curriculum and authoring contract, and the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
 Deployment (Flux waves + the gate that releases each one, and why the two
 ClickHouse waves omit `wait`)._

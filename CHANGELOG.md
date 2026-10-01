@@ -180,6 +180,38 @@ Skeleton (copy what you need):
   30-minute wait.
 
 #### Docs
+- **The database TLS hops are measured, not guessed.** `pg_stat_ssl` on
+  both Kind primaries (2026-10-01) settles the rows #1181 left
+  "unconfirmed": PgDog → product-db, Keycloak JDBC, the CNPG PgBouncer server
+  connections and replication run TLS 1.3, still unverified because the
+  clients use `prefer`/`require`; Temporal and the OpenBao DB engine →
+  platform-db are plaintext. cert-manager § 12, the `security/tls-topology`
+  Draw.io view (regenerated), RFC-0020 research and product-db's `pg_hba`
+  comment say so. The edge Certificate notes no longer call the Kind gate
+  "pending" (it has passed since), and the inline cert-manager chart copy
+  reads v1.21.2.
+- **Platform docs match the deployed cluster.** The Kustomization count is
+  re-counted (30 declared, 29 applied; the platform hub said 24). setup.md's
+  tree and dependency graph gain the Keeper, schema, flux-web, KEDA,
+  Policy Reporter and dashboards-as-code waves, and the hub graph gains
+  `keda-local`. `checkout-worker` is a `Connection` + `WorkerDeployment`
+  (ADR-064), not a HelmRelease. Kyverno docs stop describing `ClusterPolicy`
+  as current (ADR-078 is complete). Keycloak's image reads 26.7.4, CI's Go
+  1.27 and golangci-lint v2.14.0, and the docs index's ADR count 83.
+  VictoriaTraces is the fast trace path, not a pilot, and the MCP servers
+  are marked not deployed.
+- **Versions and counts across the area docs match the manifests.**
+  Grafana 13.2.2, VTSingle v0.11.1, ClickHouse and Keeper 26.8, local VM
+  v1.152.0, Barman plugin 0.8.1 (with `destinationPath` shown without its
+  trailing slash), OpenBAO 2.7.0 and ESO v2.11.0. Runbook, dashboard,
+  database and alert counts are re-derived. The KEDA board links point at
+  the dashboards-as-code artifact, not the deleted `keda.json`. Retired Tempo
+  and auth-service no longer read as live in the local-stack parity matrix
+  and the E2E audit's A6 row. The Kyverno exception count is zero.
+  `docs/api/temporal.md` and `observability.md` drop "pending" and "planned"
+  claims that have since landed. The local cluster README describes the
+  OpenTofu bootstrap, the `homelab` cluster and registry, and the real
+  `apps-local` dependencies.
 - **The TLS docs match the manifests.** OpenBAO listener TLS and the ESO
   `https` + `caBundle` target name their owner, RFC-0020 Slice 1; they named
   RFC-0008. The prod Let's Encrypt path is labelled planned, since no

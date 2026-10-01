@@ -9,9 +9,9 @@ runbook links it via its `runbook_url` annotation.
 | Runbook | Purpose | When to Use |
 |---------|---------|-------------|
 | [Microservices runbooks](microservices/README.md) | Per-alert investigation (50 files) + cross-signal workflows, threshold tuning | On-call, when an application alert fires |
-| [Envoy Gateway runbooks](envoy-gateway/README.md) | Per-alert investigation for the edge (9 files covering 11 `Edge*` / `EnvoyGateway*` alerts) | On-call, when an edge alert fires |
+| [Envoy Gateway runbooks](envoy-gateway/README.md) | Per-alert investigation for the edge (13 files covering 16 `Edge*` / `EnvoyGateway*` alerts) | On-call, when an edge alert fires |
 | [PostgreSQL runbooks](postgresql/README.md) | Deployed-rule and manual-workflow index, plus the [plan-regression investigation workflow](postgresql/plan-regression-investigation.md) | On-call, when a PostgreSQL/CNPG alert fires — or a query got slower and you need the plan it ran at the time |
-| [Kubernetes runbooks](kubernetes/README.md) | Per-alert investigation for pods, workloads, storage, nodes, API server, network (21 files) | On-call, when a Kubernetes infra alert fires |
+| [Kubernetes runbooks](kubernetes/README.md) | Per-alert investigation for pods, workloads, storage, nodes, API server, network (29 files) | On-call, when a Kubernetes infra alert fires |
 | [Valkey runbooks](valkey/README.md) | Per-alert investigation for the cache (7 files) | On-call, when a Valkey alert fires |
 | [ClickHouse runbooks](clickhouse/README.md) | Per-alert investigation for the OTel OLAP store plus TTL, merge-memory, and `_N` leftover workflows | On-call, when a `ClickHouse*` alert fires — or a table is past its TTL window |
 | [Kyverno runbooks](kyverno/README.md) | Per-alert investigation for the admission webhook (4 files) | On-call, when a Kyverno alert fires |
@@ -56,4 +56,4 @@ Domain-specific rows and diagnosis dialects live in each folder README's
 - [Prepared Databases](../../databases/reference/zalando/prepared-databases.md) -- preparedDatabases issue runbook
 
 ---
-_Last updated: 2026-09-09 — removed stale hand-maintained runbook counts and linked the validation contract._
+_Last updated: 2026-10-01 — Envoy Gateway (13 files / 16 alerts) and Kubernetes (29 files) counts re-derived from the folders. Earlier: 2026-09-09 — removed stale hand-maintained runbook counts and linked the validation contract._

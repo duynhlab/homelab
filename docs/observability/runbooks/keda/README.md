@@ -16,7 +16,7 @@ workers is alerted on the Temporal side
 |---|---|
 | Alert rules | [`prometheusrules/keda/alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/keda/alerts.yaml) |
 | Alert catalog | [§8c KEDA autoscaling](../../alerting/alert-catalog.md#8c-keda-autoscaling) |
-| Dashboard | Workflows / Async → **KEDA — Worker Autoscaling** ([`grafana/dashboards/keda.json`](../../../../kubernetes/infra/configs/observability/grafana/dashboards/keda.json)) |
+| Dashboard | Kubernetes → **KEDA — Worker Autoscaling** (as-code, [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) `deploy/dashboards/grafanamanifest-keda.yaml`) |
 | Install | [`controllers/keda/helmrelease.yaml`](../../../../kubernetes/infra/controllers/keda/helmrelease.yaml), wave `keda-local` |
 | Scaler templates | [`apps/order-fulfillment-scaler.yaml`](../../../../kubernetes/apps/order-fulfillment-scaler.yaml), [`apps/checkout-abandon-scaler.yaml`](../../../../kubernetes/apps/checkout-abandon-scaler.yaml) |
 | Template | [`_TEMPLATE.md`](../_TEMPLATE.md) |
@@ -59,4 +59,4 @@ Every runbook here follows [`_TEMPLATE.md`](../_TEMPLATE.md): quick facts →
 Meaning → Impact → Diagnosis → Mitigation → Escalation (→ Related).
 
 ---
-_Last updated: 2026-09-05 — created with the KEDA install (ADR-055)_
+_Last updated: 2026-10-01 — the dashboard row points at the as-code board (Kubernetes folder); the in-repo `keda.json` went with #1085. Earlier: 2026-09-05 — created with the KEDA install (ADR-055)_

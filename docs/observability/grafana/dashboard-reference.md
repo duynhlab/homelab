@@ -2,7 +2,7 @@
 
 > **Audience**: SRE/DevOps Engineers  
 > **Dashboard**: Microservices Observability Platform  
-> **Panels**: the board now has **8 rows (~41 panels)** since RFC-0017 W3/W4. The canonical JSON lives in the [`duynhlab/helm-charts`](https://github.com/duynhlab/helm-charts) repo (`charts/grafana-dashboards/dashboards/microservices/microservices-dashboard-otel.json`), delivered to the cluster as a chart ConfigMap consumed via `GrafanaDashboard.configMapRef` — the old `duynhlab/grafana-dashboards` repo is **deprecated**. The local-stack twin is `local-stack/observability/grafana/dashboards/microservices-otel-local.json`.  
+> **Panels**: the board now has **8 rows (~41 panels)** since RFC-0017 W3/W4. The board is defined as code in [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards) (`microservices-monitoring-001-otel`, Microservices folder) and reaches the cluster as a `GrafanaManifest` from the pinned OCI artifact — see [Grafana § Dashboards as code](README.md#dashboards-as-code); the `duynhlab/helm-charts` `grafana-dashboards` chart no longer reaches the cluster. The local-stack twin is `local-stack/observability/grafana/dashboards/microservices-golden-signals/microservices-otel-local.json`.  
 > **Last Updated**: 2026-07-16 — chart-sourced canonical + RFC-0017 W3/W4 revision note
 
 > **Board revision note (RFC-0017 W3/W4):** scrape-era dead panels **7, 8, 16, 17, 19, 22, 32, 33 were removed** (`up`, restarts, `process_cpu`, `go_memstats_*`, `requests_in_flight`, cAdvisor); panel 18 (network) moved into the runtime row; panel 12 widened; the two gRPC rows were re-laid as signal-paired 2-column lines; a **Database (client — otelpgx)** row was added. Sections below marked **🗑 REMOVED** are kept as historical context only.
@@ -1273,7 +1273,7 @@ sum(metric{...}) by (app)
 
 
 ---
-_Last updated: 2026-09-06 — removed the trailing **"Grafana Annotations (Planned
+_Last updated: 2026-10-01 — header names the as-code source (`duynhlab/grafana-dashboards`, GrafanaManifest) instead of the helm-charts ConfigMap that #1085 removed, and the local twin's real path. Earlier: 2026-09-06 — removed the trailing **"Grafana Annotations (Planned
 Feature)"** appendix: ~415 lines of a five-phase implementation plan for something
 that was never built (`/api/annotations` returns `[]` and no Grafana manifest
 configures any), written in Vietnamese inside an English-only tree, embedding a

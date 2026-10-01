@@ -144,7 +144,7 @@ Verified inventory of the actual deployment:
 | Area | Applied |
 |---|---|
 | **Backend** | Grafana Pyroscope `2.3.1` (Helm chart `2.3.1`), single-binary, `fullnameOverride: pyroscope`, ns `monitoring` (`kubernetes/infra/controllers/profiling/pyroscope/helmrelease.yaml`) |
-| **Block storage** | RustFS S3 `rustfs-svc.rustfs.svc.cluster.local:9000`, bucket `pyroscope-profiles`, `force_path_style` + `insecure` (plain HTTP in-cluster), `compactor_blocks_retention_period: 168h` (7d, matches Tempo/VM) |
+| **Block storage** | RustFS S3 `rustfs-svc.rustfs.svc.cluster.local:9000`, bucket `pyroscope-profiles`, `force_path_style` + `insecure` (plain HTTP in-cluster), `compactor_blocks_retention_period: 168h` (7d, matches VM/VictoriaTraces) |
 | **Metastore** | PVC `10Gi` (`standard`) for the v2 raft metastore — survives restarts |
 | **Credentials** | `pyroscope-rustfs` `ClusterExternalSecret` → `pyroscope-rustfs-credentials` (from OpenBAO); bucket created at bring-up by the run-once `rustfs-setup-buckets-init` Job (idempotently kept present by the `*/30` RustFS bucket CronJob) |
 | **Security** | `runAsNonRoot`, `runAsUser: 10001`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault` |
@@ -256,7 +256,7 @@ anything.
 - [Traces to profiles](https://grafana.com/docs/grafana/latest/datasources/pyroscope/configure-traces-to-profiles/)
 
 ---
-_Last updated: 2026-09-30 — backend 2.3.1 on the cluster and local-stack (was 2.1.0 / 2.2.1). Earlier: 2026-09-24 — RFC-0031 Task 4.2: the manual pivot uses `span_name`
+_Last updated: 2026-10-01 — block-retention row compares against VM/VictoriaTraces (Tempo is retired). Earlier: 2026-09-30 — backend 2.3.1 on the cluster and local-stack (was 2.1.0 / 2.2.1). Earlier: 2026-09-24 — RFC-0031 Task 4.2: the manual pivot uses `span_name`
 and states its two limits (no span labels on the four Temporal identities; the
 profile id is not proof a profile exists), and an investigation table maps each
 profile type to the symptom that leads to it. Previously 2026-08-24 — RFC-0027 retired Tempo, which is where `tracesToProfiles`

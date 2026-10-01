@@ -12,7 +12,7 @@ identifies the one session everyone else is queued behind.
 | **Prerequisites** | [MVCC and snapshots](05-mvcc-and-snapshots.md); glossary terms [tuple, XID](README.md#shared-glossary) |
 | **Deployment status** | Deployed — lock telemetry and alerts active on `platform-db` and `product-db` |
 | **Platform scope** | Engine-wide mechanism; metrics exported per cluster, per database |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The blocking-evidence chain: lock modes → waiters → root blocker → wait-event class |
 | **Not this page** | Why versions coexist — [MVCC and snapshots](05-mvcc-and-snapshots.md); per-alert procedures — [PostgreSQL alert runbooks](../../observability/runbooks/postgresql/README.md) |
 | **Previous / next** | [MVCC and snapshots](05-mvcc-and-snapshots.md) / [Vacuum and freezing](07-vacuum-and-freezing.md) |
@@ -108,7 +108,7 @@ application bug — that boundary matters when reading the census below.
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
 | Lock waits are silent by default | `log_lock_waits: "on"` logs any wait crossing `deadlock_timeout`, so every >1 s queue leaves a log line | [product-db GUC block](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
-| Waiters are countable from `pg_locks` / `pg_blocking_pids` | Exported per cluster as `cnpg_pg_blocking_queries_blocked_queries` and `cnpg_pg_locks_count` | [`pg_blocking_queries`, `pg_locks_count` custom queries](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml) | Repository fact |
+| Waiters are countable from `pg_locks` / `pg_blocking_pids` | Exported per cluster as `cnpg_pg_blocking_queries_blocked_queries` and `cnpg_pg_locks_count_count` (query `pg_locks_count`, column `count`) | [`pg_blocking_queries`, `pg_locks_count` custom queries](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml) | Repository fact |
 | Blocking becomes an incident only when sustained | `CNPGBlockedQueries` fires at `> 0` held for 10 m; `CNPGDeadlocksIncreasing` on any deadlock increase over 10 m | [deep-signals alerts](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
 | Wait-event classes locate the stalled layer | Active backends are exported grouped by class (`Lock`, `IO`, `LWLock`, ... or `CPU`) | [`pg_wait_events` custom query](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml) | Repository fact |
 | Transaction mode pooling multiplexes sessions | Through PgDog/PgBouncer, one client's lock can be held by a backend another client observes — a reason labs and lock forensics connect directly | [Poolers](../poolers.md) | Repository fact |
@@ -188,22 +188,37 @@ LIMIT 30;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres
+wait_class  wait_event     backends  description
+Activity    WalSenderMain  2         Waiting in main loop of WAL sender process
+
+blocked_pid | blocker_pids | blocked_for | blocked_query
+(0 rows)
+
+-- pg_locks for the placeholder pid 12345
+(0 rows)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` |
+
+What this run showed:
+
+- The only active, non-self backends were the two WAL senders, idling in their main loop. No client backend was waiting on a lock, LWLock, or I/O.
+- The blocking chain returned zero rows, which is the healthy baseline this lab verifies.
+- The inventory query ran with the placeholder pid and returned nothing, as expected. Substitute a pid from a non-empty chain when using it for real.
+- The exported lock metric is named `cnpg_pg_locks_count_count` in VictoriaMetrics: the query `pg_locks_count` plus its column `count`. The table above is corrected to match.
 
 ### How to read the result
 
@@ -301,6 +316,6 @@ Before continuing, explain these without rereading the chapter:
 - [`pg_locks` view](https://www.postgresql.org/docs/18/view-pg-locks.html)
 
 ---
-_Last updated: 2026-09-29 — first published chapter version for issue #1137;
+_Last updated: 2026-10-01 — live lab verified: an idle wait census and an empty blocking chain; corrected the exported lock metric name to `cnpg_pg_locks_count_count`. Earlier: 2026-09-29 — first published chapter version for issue #1137;
 absorbs the locking sections of the retired mvcc-locking-and-vacuum page and
 the blocking-chain queries of the retired monitoring page._

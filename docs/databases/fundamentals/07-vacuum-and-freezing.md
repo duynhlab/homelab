@@ -13,7 +13,7 @@ both.
 | **Prerequisites** | [MVCC and snapshots](05-mvcc-and-snapshots.md); glossary terms [vacuum, XID, page](README.md#shared-glossary) |
 | **Deployment status** | Deployed — autovacuum tuned on `platform-db` and `product-db`; progress and age exported and alerted |
 | **Platform scope** | Engine-wide mechanism; per-table telemetry on the `product`, `cart`, and `order` databases |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Vacuum phases, autovacuum triggers, freezing, and wraparound risk |
 | **Not this page** | Why dead versions exist — [MVCC and snapshots](05-mvcc-and-snapshots.md); the visibility map's read-side payoff — [Indexes and access methods](09-indexes-and-access-methods.md) |
 | **Previous / next** | [Locking and wait events](06-locking-and-wait-events.md) / [Query processing](08-query-processing.md) |
@@ -145,7 +145,7 @@ stateDiagram-v2
 | Dead-tuple pressure as a ratio | `CNPGAutovacuumFallingBehind` fires when dead/(dead+live) > 0.2 with > 1000 dead for 30 m | [deep-signals alerts](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
 | Wraparound headroom | `CNPGTransactionIDWraparoundWarning` at `age(datfrozenxid) > 1 B` (30 m), `...Critical` at `> 1.5 B` (10 m) | Same alerts file | Repository fact |
 | Standby snapshots hold back cleanup | `hot_standby_feedback: "on"` extends the horizon problem across the cluster | GUC block; mechanism in [Replication and slots](12-replication-and-slots.md) | Repository fact |
-| Eager freezing | PostgreSQL 18 default behavior; `vacuum_max_eager_freeze_failure_rate` not overridden (default 0.03) | Absent from the GUC block — upstream default applies | Inference (verify via `SHOW` in the lab) |
+| Eager freezing | PostgreSQL 18 default behavior; `vacuum_max_eager_freeze_failure_rate` not overridden (default 0.03) | Absent from the GUC block; live `pg_settings` reads `0.03`, source `default` (2026-10-01) | Live observation |
 
 The halved scale factors are a deliberate trade: more frequent, smaller
 vacuums on write-heavy order/cart tables, paid for with pacing (10 ms delay)
@@ -224,22 +224,46 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database product
+table_name (top rows)            xid_age  approx_rows
+pg_statistic                     997      412
+pg_constraint                    997      194
+pg_type                          997      621
+… all 15 rows: 997
+
+datname                                                  datfrozenxid_age
+postgres, template0/1, order, payment, cart,             997 (every row)
+checkout, inventory, product
+
+relname             n_live_tup  n_dead_tup  last_autovacuum  autovacuum_count
+products            19          12                           0
+schema_migrations   1           0                            0
+categories          4           0                            0
+admin_action_audit  16          0                            0
+
+pg_stat_progress_vacuum: (0 rows)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `product` (database ages are cluster-wide) |
+
+What this run showed:
+
+- Every table and database reports the same age of 997, because the cluster is 13 hours old and its freeze watermark is still the one set at initdb. That is the baseline the 1 B / 1.5 B alerts measure from, about one millionth of the way to the warning line.
+- `products` has 12 dead tuples against 19 live (39 %) and has never been autovacuumed. The trigger is `50 + 0.1 × reltuples`, so 12 dead tuples are far below it. The `CNPGAutovacuumFallingBehind` alert also needs more than 1000 dead tuples before its ratio counts. A high ratio on a tiny table is the normal case, not drift.
+- `vacuum_max_eager_freeze_failure_rate` reads `0.03` (source `default`), which confirms the inference in the table above.
+- No vacuum was running, and the per-database progress metric has no series either. The exporter emits nothing for an empty view, so a missing series is not a broken query.
 
 ### How to read the result
 
@@ -338,6 +362,6 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 release notes — eager freezing](https://www.postgresql.org/docs/18/release-18.html)
 
 ---
-_Last updated: 2026-09-29 — first published chapter version for issue #1137;
+_Last updated: 2026-10-01 — live lab verified: uniform XID age 997 on a 13-hour-old cluster, sub-threshold dead tuples, and the eager-freeze default 0.03. Earlier: 2026-09-29 — first published chapter version for issue #1137;
 absorbs the vacuum sections of the retired mvcc-locking-and-vacuum page and
 the maintenance-pressure section of the retired monitoring page._

@@ -7,7 +7,7 @@ cluster.
 
 | Quick facts | |
 |---|---|
-| **Status** | All 14 chapters authored for issue [#1137](https://github.com/duynhlab/homelab/issues/1137); each chapter's live observation lab is pending verification on the Ubuntu Kind cluster until its observation-context table is filled |
+| **Status** | All 14 chapters authored and live-verified for issue [#1137](https://github.com/duynhlab/homelab/issues/1137): every lab ran read-only on `kind-homelab` on 2026-10-01 (PostgreSQL 18.1), including the case study on the DR replica |
 | **Primary audience** | Platform engineers learning PostgreSQL, from first principles through failure and capacity reasoning |
 | **Page type** | Explanation-first chapters with one embedded, read-only observation lab |
 | **Version baseline** | PostgreSQL 18 (deployed 18.1; record the live minor per observation) |
@@ -201,7 +201,9 @@ teach-back gate pass the template's review checklist.
 - [Diátaxis documentation framework](https://diataxis.fr/)
 
 ---
-_Last updated: 2026-09-29 — linked all fourteen authored chapters into the
+_Last updated: 2026-10-01 — every chapter's live lab verified read-only on
+`kind-homelab` (PostgreSQL 18.1), the case study included. Earlier:
+2026-09-29 — linked all fourteen authored chapters into the
 curriculum and retired the nine absorbed pages; live observation labs remain
 pending verification on the Ubuntu Kind cluster. Earlier the same day — rewrote
 this page as the curriculum contract for issue #1137 (evidence vocabulary,

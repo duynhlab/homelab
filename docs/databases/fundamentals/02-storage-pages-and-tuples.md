@@ -11,7 +11,7 @@ from vacuum to index-only scans follows from that fact.
 | **Prerequisites** | [Processes and memory](01-processes-and-memory.md); glossary terms page, tuple, TOAST |
 | **Deployment status** | Deployed — the layout of every database on `platform-db` and `product-db` |
 | **Platform scope** | On-disk anatomy; examples use the `product` database |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The data directory, page, and tuple-header anatomy, and what `ctid`/`xmin`/`xmax` expose |
 | **Not this page** | Which tuple versions a snapshot may *see* — [MVCC and snapshots](05-mvcc-and-snapshots.md); how pages reach RAM — [Buffer manager and I/O](03-buffer-manager-and-io.md) |
 | **Previous / next** | [Processes and memory](01-processes-and-memory.md) / [Buffer manager and I/O](03-buffer-manager-and-io.md) |
@@ -164,22 +164,42 @@ LIMIT 5;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database product
+relname             file_path         relpages  reltuples  main_bytes  fsm  vm  has_toast
+categories          base/16385/16610  0         -1         8192        0    0   t
+products            base/16385/16626  0         -1         8192        0    0   t
+admin_action_audit  base/16385/16698  0         -1         8192        0    0   t
+schema_migrations   base/16385/16715  0         -1         8192        0    0   f
+
+-- pg_class tuple headers
+ctid    xmin  xmax
+(0,10)  756   0
+(0,23)  756   0
+(0,46)  281   0
+(0,47)  544   0
+(1,6)   791   0
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `product` (OID directory `base/16385`) |
+
+What this run showed:
+
+- Every application table in `product` is a single 8 KiB page. Kind is not seeded with catalog data, so `products` holds 19 live rows ([07](07-vacuum-and-freezing.md)'s ledger).
+- `relpages = 0` and `reltuples = -1` sit beside an 8192-byte file. PostgreSQL uses `-1` for "never vacuumed or analyzed", and these tables have not reached the autovacuum or autoanalyze threshold. This is the "`relpages` lags the file" row in the table below, seen for real.
+- No table has earned an FSM or VM fork yet. Both appear after the first vacuum.
+- The `pg_class` rows carry ordinary XIDs (281–791) in `xmin`, so even catalog rows are versioned tuples with headers.
 
 ### How to read the result
 
@@ -273,6 +293,6 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 — `pageinspect`](https://www.postgresql.org/docs/18/pageinspect.html) (disposable lab only)
 
 ---
-_Last updated: 2026-09-29 — chapter authored for issue #1137, absorbing the
+_Last updated: 2026-10-01 — live lab verified: one-page tables with `relpages 0` / `reltuples -1` (never analyzed) beside 8 KiB files. Earlier: 2026-09-29 — chapter authored for issue #1137, absorbing the
 storage half of the former storage-and-wal page; live lab pending
 verification._

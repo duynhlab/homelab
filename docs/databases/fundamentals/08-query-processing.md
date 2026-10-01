@@ -12,7 +12,7 @@ to tune around.
 | **Prerequisites** | [Buffer manager and I/O](03-buffer-manager-and-io.md); [MVCC and snapshots](05-mvcc-and-snapshots.md); glossary terms page, tuple, snapshot |
 | **Deployment status** | Deployed — every statement on `platform-db` and `product-db` passes through this path |
 | **Platform scope** | All CNPG clusters; planner GUCs and `auto_explain`/`pg_stat_statements` from the Cluster manifests |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Parse → rewrite → plan → execute, the cost model, and how to read plan evidence |
 | **Not this page** | Index internals and access-method choice — [Indexes and access methods](09-indexes-and-access-methods.md); workload capacity — [Monitoring and capacity](14-monitoring-and-capacity.md) |
 | **Previous / next** | [Vacuum and freezing](07-vacuum-and-freezing.md) / [Indexes and access methods](09-indexes-and-access-methods.md) |
@@ -126,7 +126,7 @@ workers — deployed caps are `max_parallel_workers_per_gather 4` within
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
 | `random_page_cost` default 4.0 | `1.1` on both operational clusters (SSD assumption) | [`instance.yaml` planner block](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
-| `effective_cache_size` | `1.5GB` against a 2Gi pod limit | same GUC block | Repository fact |
+| `effective_cache_size` | `1.5GB` against a 1Gi pod memory limit — the planner is told about node-level page cache the pod's limit does not cap | same GUC block | Repository fact |
 | Statistics resolution | `default_statistics_target 100` (upstream default) declared explicitly | same GUC block | Repository fact |
 | Plan capture for slow statements | `auto_explain.log_min_duration 1s`, `log_analyze on`, `log_format json` — Vector parses the JSON payload into the log pipeline | [`instance.yaml` auto_explain block](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Workload history | `pg_stat_statements.track all`, `max 10000`, exported by the monitoring ConfigMap | [`monitoring-queries.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml) | Repository fact |
@@ -190,22 +190,47 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres
+Limit  (cost=23.71..23.73 rows=10 width=72)
+  ->  Sort  (cost=23.71..23.97 rows=104 width=72)
+        Sort Key: c.relpages DESC
+        ->  Hash Join  (cost=1.06..21.46 rows=104 width=72)
+              Hash Cond: (c.relnamespace = n.oid)
+              ->  Seq Scan on pg_class c  (cost=0.00..18.15 rows=415 width=76)
+              ->  Hash  (cost=1.05..1.05 rows=1 width=4)
+                    ->  Seq Scan on pg_namespace n  (cost=0.00..1.05 rows=1 width=4)
+                          Filter: (nspname = 'pg_catalog'::name)
+
+pg_stat_statements_info.stats_reset: 2026-09-30 13:45:30 UTC
+
+query_sample (first 80 chars)                           calls  total_ms   mean_ms
+SELECT location, … FROM pg_backup_start($1, $2) …       1      218318.1   218318.13
+SELECT datname, pg_database_size(datname) …             1044   12555.4    12.03
+SELECT … pg_stat_statements.queryid … (exporter)        1044   5257.8     5.04
+SELECT … pg_stat_statements.queryid … (exporter)        1042   4970.6     4.77
+SELECT … pg_stat_statements.queryid … (exporter)        1041   4509.8     4.33
+… five more exporter/catalog queries, 2.3–2.8 s total each
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` |
+
+What this run showed:
+
+- The catalog plan is all sequential scans plus a hash join. With 415 `pg_class` rows, the seq-scan path is genuinely cheapest, which is what the text above predicts.
+- The top statement by total time is CNPG's `pg_backup_start()` call from the first backup (one call, 218 s). That time is the call waiting for a spread checkpoint (`checkpoint_completion_target 0.9` of `checkpoint_timeout 15min`), not CPU. [13](13-backup-and-pitr.md) explains the backup API.
+- Every other top-10 entry is the exporter's own custom SQL, about 1,040 calls each since the reset. On an idle lab cluster, monitoring is the workload. This is the reason to read rankings as deltas over a window.
 
 ### How to read the result
 
@@ -232,7 +257,7 @@ Observation context:
 |---|---|---|---|---|
 | Stale or unrepresentative statistics | Planner misprices paths; cardinality estimates diverge from reality | A previously fast query picks a bad join order or scan | `auto_explain` JSON plans (deployed ≥1s); estimated vs actual rows | `ANALYZE` via autovacuum or the owning service's maintenance; never disable autovacuum ([chapter 07](07-vacuum-and-freezing.md)) |
 | Correlated predicates | Independent-column selectivity multiplies wrongly | Rows estimate off by orders of magnitude on multi-column filters | Plan shows tiny estimate, huge actual | Extended statistics are a schema change owned by the service repo |
-| Hash/sort exceeds `work_mem` (32MB) | Spill to temp files | Latency spike, disk churn | `log_temp_files 0` log lines; `CNPGTempFileSpill` alert | Bounded query rework beats a global `work_mem` raise — 200 connections × 32MB already outsizes the 2Gi pod limit |
+| Hash/sort exceeds `work_mem` (32MB) | Spill to temp files | Latency spike, disk churn | `log_temp_files 0` log lines; `CNPGTempFileSpill` alert | Bounded query rework beats a global `work_mem` raise — 200 connections × 32MB already outsizes the 1Gi pod limit |
 | ≥12 FROM items | GEQO samples join orders instead of exhaustive search | Plan quality varies; plans can change without data changes | `EXPLAIN` across runs; `geqo_threshold` in `pg_settings` | Deterministic per `geqo_seed`, but treat many-join queries as a design smell |
 | Plan regression after data growth | Same SQL, new cheapest path | Latency step-change with unchanged code | [plan-regression runbook](../../observability/runbooks/postgresql/plan-regression-investigation.md); `pg_stat_statements` deltas | Investigate estimates first; forcing planner GUCs is the last resort, scoped and temporary |
 
@@ -305,6 +330,6 @@ Before continuing, explain these without rereading the chapter:
 - [auto_explain](https://www.postgresql.org/docs/18/auto-explain.html)
 
 ---
-_Last updated: 2026-09-29 — first published chapter; absorbs the former
+_Last updated: 2026-10-01 — live lab verified: an all-seq-scan catalog plan, and a workload ranking topped by `pg_backup_start()` and exporter SQL; corrected the pod limit to 1Gi. Earlier: 2026-09-29 — first published chapter; absorbs the former
 query-planning-and-execution page and the plan-investigation half of the
 monitoring page, grounded in the deployed planner GUCs._

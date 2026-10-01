@@ -13,7 +13,7 @@ problem.
 | **Prerequisites** | [Locking and wait events](06-locking-and-wait-events.md); [Indexes and access methods](09-indexes-and-access-methods.md) |
 | **Deployment status** | Deployed — service schemas on both operational clusters are constraint-enforced; migrations run against `-rw` |
 | **Platform scope** | All CNPG clusters; schema DDL is owned by service repositories |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Constraint enforcement internals, ALTER TABLE lock levels, the NOT VALID pattern, PG 18 generated columns and temporal constraints |
 | **Not this page** | Partition DDL and retention — [Partitioning and retention](11-partitioning-and-retention.md); lock diagnosis — [Locking and wait events](06-locking-and-wait-events.md) |
 | **Previous / next** | [Indexes and access methods](09-indexes-and-access-methods.md) / [Partitioning and retention](11-partitioning-and-retention.md) |
@@ -170,22 +170,47 @@ LIMIT 12;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database product
+contype  constraints  not_validated
+c        3            0
+f        1            0
+n        15           0
+p        4            0
+u        2            0
+
+conname                    referencing  referenced  tgname                        trigger_on
+products_category_id_fkey  products     categories  RI_ConstraintTrigger_a_16645  categories
+products_category_id_fkey  products     categories  RI_ConstraintTrigger_a_16646  categories
+products_category_id_fkey  products     categories  RI_ConstraintTrigger_c_16647  products
+products_category_id_fkey  products     categories  RI_ConstraintTrigger_c_16648  products
+
+-- FK count per database (read-only census, same session settings)
+product 1 · cart 0 · order 5 · payment 9 · checkout 2 · inventory 4     (product-db)
+user 0 · review 0 · shipping 0 · notification 0 · keycloak 74
+temporal 0 · temporal_visibility 0                                   (platform-db)
+not-validated constraints: 0 in every database
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1`; census also on `platform-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `product`, then every application database |
+
+What this run showed:
+
+- `contype = n` (15 rows): PostgreSQL 18 now stores `NOT NULL` as real `pg_constraint` rows, so a census on 18 counts them where an older release would not.
+- One FK produced exactly four triggers. The two `_a_` action triggers sit on the referenced `categories` table (delete and update), and the two `_c_` check triggers sit on `products` (insert and update). This is the "both tables pay" point from the text.
+- No `NOT VALID` constraint is pending anywhere. Four service databases (user, review, shipping, notification) declare no foreign keys at all, so their referential integrity lives in application code.
+- The FK lock level is not observable without DDL. `ADD FOREIGN KEY` taking `SHARE ROW EXCLUSIVE` on both tables stays an Upstream invariant, cited above.
 
 ### How to read the result
 
@@ -277,6 +302,6 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 release notes](https://www.postgresql.org/docs/18/release-18.html)
 
 ---
-_Last updated: 2026-09-29 — first published chapter; absorbs the former
+_Last updated: 2026-10-01 — live lab verified: the constraint census (PG 18 `NOT NULL` rows), the four RI triggers behind one FK, and FK counts across all 13 application databases. Earlier: 2026-09-29 — first published chapter; absorbs the former
 schema-and-integrity page and adds enforcement internals, the ALTER TABLE lock
 model, and the PG 18 generated-column and temporal-constraint changes._

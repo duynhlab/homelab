@@ -13,7 +13,7 @@ failing layer instead of a guess.
 | **Prerequisites** | All previous chapters; especially [Locking](06-locking-and-wait-events.md), [Vacuum](07-vacuum-and-freezing.md), [Query processing](08-query-processing.md), [Replication](12-replication-and-slots.md) |
 | **Deployment status** | Deployed — CNPG metrics exporter with custom queries, `pg_stat_statements`, `track_io_timing`, `auto_explain` on all clusters |
 | **Platform scope** | Clusters `product-db`, `platform-db`, `product-db-replica`; the monitoring-queries ConfigMap and the PostgreSQL alert rules |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The statistics system's mechanics, `pg_stat_statements` internals, the investigation loop, the capacity model, and the safe mitigation hierarchy |
 | **Not this page** | Per-alert diagnosis — [PostgreSQL alert runbooks](../../observability/runbooks/postgresql/README.md); symptom-first triage — [Observability and troubleshooting](../observability-and-troubleshooting.md) |
 | **Previous / next** | [Backup and PITR](13-backup-and-pitr.md) / [PostgreSQL internals learning path](README.md) |
@@ -236,28 +236,55 @@ LIMIT 1;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres
+datname    xact_commit  xact_rollback  deadlocks  temp_files  blks_hit  blks_read  hit_pct  stats_reset
+cart       22011        3              0          0           4257149   10         100.00   (null)
+checkout   53426        3              0          0           729277    19         100.00   (null)
+inventory  28015        7              0          0           720250    18         100.00   (null)
+order      109983       46             0          0           5322070   44         100.00   (null)
+payment    26593        4582           0          0           817192    53         99.99    (null)
+product    63760        9              0          0           11546407  493        100.00   (null)
+
+calls  total_ms   mean_ms    query_shape
+1      218318.1   218318.13  SELECT location, … FROM pg_backup_start($1, $2) …
+1044   12555.4    12.03      SELECT datname, pg_database_size(datname) …   (exporter)
+1044   5257.8     5.04       SELECT … pg_stat_statements.queryid …         (exporter)
+1042   4970.6     4.77       (exporter)
+1041   4509.8     4.33       (exporter)
+
+dealloc  stats_reset
+0        2026-09-30 13:45:30 UTC
+
+-- VictoriaMetrics: 181 cnpg_* metric names; e.g. cnpg_pg_stat_io_hits,
+-- cnpg_pg_wait_events_active_backends{cnpg_io_instanceRole="primary",…}
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` (the sweep reads all six service databases) |
+
+What this run showed:
+
+- `stats_reset` is NULL in `pg_stat_database`: those counters have never been explicitly reset. Their epoch is the start of the counters (cluster creation, 2026-09-30 ≈13:45 UTC), not "unknown". `pg_stat_statements` keeps its own epoch (13:45:30).
+- `payment` rolls back 4,582 transactions against 26,593 commits (≈15 %), while every other database stays below 0.1 %. Counters cannot say why. This is the kind of outlier the loop sends to logs and traces, not a conclusion.
+- No temp files and no deadlocks anywhere, and the hit ratio is about 100 % on a 28 MB cluster. `dealloc = 0`, so the 10,000-entry table has not evicted anything yet.
+- The exporter follows `cnpg_<query>_<column>`, for example `cnpg_pg_locks_count_count` for column `count` of query `pg_locks_count`. The role label is `cnpg_io_instanceRole`, and the scrape interval is 15 s on both PodMonitors.
 
 ### How to read the result
 
 | Field or relationship | Interpretation | What it cannot prove |
 |---|---|---|
-| `stats_reset` per database | The zero point of every other column in that row | Counters from before the reset — or before the last crash — are gone; compare rates across a known interval, never lifetime totals |
+| `stats_reset` per database | The zero point of every other column in that row; NULL means never explicitly reset, so the epoch is when the counters started (cluster creation or the last unclean restart) | Counters from before the reset — or before the last crash — are gone; compare rates across a known interval, never lifetime totals |
 | `cache_hit_pct` | Share of block requests served from shared buffers ([chapter 03](03-buffer-manager-and-io.md)) — the SQL behind the `CNPGLowCacheHitRatio` alert's intent | Not latency: a 99% ratio with slow disks can hurt more than 95% on fast ones; and OS page cache hits count as "reads" here |
 | `temp_files` / `temp_volume` | Work that overflowed `work_mem 32MB` to disk | Which query did it — join to `pg_stat_statements.temp_blks_written` for shapes |
 | Top-5 by `total_exec_time` | Where cumulative time went since the extension's own reset | Not a current regression: a lifetime total ranks history, not now; check `dealloc` before trusting completeness |
@@ -347,6 +374,6 @@ Before continuing, explain these without rereading the chapter:
 - [CloudNativePG monitoring](https://cloudnative-pg.io/docs/1.30/monitoring)
 
 ---
-_Last updated: 2026-09-29 — first version: statistics mechanics, the deployed
+_Last updated: 2026-10-01 — live lab verified: never-reset database counters, a payment rollback outlier, and the `cnpg_<query>_<column>` naming with its role label. Earlier: 2026-09-29 — first version: statistics mechanics, the deployed
 exporter pipeline, the investigation loop, capacity model, and mitigation
 hierarchy, absorbing the former monitoring-and-performance-investigation page._

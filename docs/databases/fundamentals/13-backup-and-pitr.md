@@ -12,7 +12,7 @@ into any past moment you name, and what a timeline is protecting you from.
 | **Prerequisites** | [WAL and checkpoints](04-wal-and-checkpoints.md); [Replication and slots](12-replication-and-slots.md); glossary terms WAL, LSN, checkpoint, timeline |
 | **Deployment status** | Deployed — Barman Cloud plugin archiving all three clusters to RustFS; restore drills recorded in [reliability targets](../reliability-targets.md) |
 | **Platform scope** | Clusters `product-db`, `platform-db`, `product-db-replica`; object stores `*-backup-store` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Engine restore mechanics: backup label, the `restore_command` loop, recovery targets, consistency, and timelines |
 | **Not this page** | Backup schedules and retention — [Backup policy](../backup-policy.md); the DR plan and PITR procedure — [Disaster recovery](../disaster-recovery.md) and the [backup-restore runbook](../runbooks/backup-restore.md) |
 | **Previous / next** | [Replication and slots](12-replication-and-slots.md) / [Monitoring and capacity](14-monitoring-and-capacity.md) |
@@ -208,22 +208,45 @@ LIMIT 1;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres
+timeline_id  checkpoint_lsn  redo_lsn    redo_segment
+1            2/7C0002F0      2/7C000298  00000001000000020000001F
+
+ERROR:  function pg_is_in_backup() does not exist
+LINE 3:     pg_is_in_backup() AS backup_mode_note -- absent in PG 18...
+            ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+
+in_recovery  timeline_id
+f            1
+
+-- backups on the cluster (kubectl get backups -n product)
+product-db-initial                  completed  2026-09-30 14:00 UTC
+product-db-every-6h-20261001000000  completed  2026-10-01 00:00 UTC
+product-db-daily-20261001020000     completed  2026-10-01 02:00 UTC
+First Point of Recoverability: 2026-09-30 13:50:32 UTC (kubectl cnpg status)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` |
+
+What this run showed:
+
+- `timeline_id = 1`: the cluster was rebuilt on 2026-09-30 and has had no promotion or restore since. The `00000001` prefix of `redo_segment` is the same timeline written into the segment name.
+- `pg_is_in_backup()` fails with `function … does not exist`. On 18.1 the exclusive backup API is gone, and the only backup entry points are `pg_backup_start`/`pg_backup_stop`.
+- Those are exactly the calls CNPG makes. `pg_stat_statements` on the same instance recorded the first base backup's `pg_backup_start()` taking 218 s while it waited for a spread checkpoint ([08](08-query-processing.md)).
+- The PITR window started at the first backup on 2026-09-30 13:50 UTC, not 30 days back. Retention bounds the window from above, and the age of the cluster bounds it in practice.
 
 ### How to read the result
 
@@ -322,6 +345,6 @@ Before continuing, explain these without rereading the chapter:
 - [Barman Cloud plugin concepts](https://cloudnative-pg.io/plugin-barman-cloud/docs/concepts)
 
 ---
-_Last updated: 2026-09-29 — first version: backup label, restore loop,
+_Last updated: 2026-10-01 — live lab verified: timeline 1, the `pg_is_in_backup()` error on 18.1, and a PITR window that starts at the cluster's first backup. Earlier: 2026-09-29 — first version: backup label, restore loop,
 consistency, recovery targets, and timelines, absorbing the recovery notes
 from the former storage-and-WAL page._

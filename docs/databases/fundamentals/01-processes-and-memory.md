@@ -11,7 +11,7 @@ does what decides where you look when the database feels slow.
 | **Prerequisites** | Basic SQL and `kubectl`; the [shared glossary](README.md#shared-glossary) term *instance* |
 | **Deployment status** | Deployed — `platform-db`, `product-db`, `product-db-replica` on the Kind cluster |
 | **Platform scope** | Every CNPG instance pod; examples use `product-db` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | The process inventory of one instance and the shared-versus-private memory split |
 | **Not this page** | Buffer eviction and I/O mechanics — [Buffer manager and I/O](03-buffer-manager-and-io.md); operator reconciliation — [CloudNativePG](../cloudnativepg.md) |
 | **Previous / next** | [PostgreSQL internals learning path](README.md) / [Storage, pages, and tuples](02-storage-pages-and-tuples.md) |
@@ -165,7 +165,7 @@ flowchart TD
 | Shared buffers sizing | `shared_buffers 256MB` inside a 1Gi pod memory limit (512Mi request) | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Private operation memory | `work_mem 32MB`, `maintenance_work_mem 512MB` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Parallel query workers | `max_worker_processes 8`, `max_parallel_workers_per_gather 4` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
-| PG 18 asynchronous I/O processes | `io_method` is not set, so the default `worker` with `io_workers 3` applies | [I/O settings](https://www.postgresql.org/docs/18/runtime-config-resource.html); absence in the manifest | Inference — confirm live with `SHOW io_method` |
+| PG 18 asynchronous I/O processes | `io_method` is not set, so the default `worker` with `io_workers 3` applies | [I/O settings](https://www.postgresql.org/docs/18/runtime-config-resource.html); absence in the manifest; live `pg_settings` and three `io worker` processes on 2026-10-01 | Live observation (lab below) |
 | Process supervision | Instance manager as PID 1, probe endpoints, signal filtering | [CloudNativePG](../cloudnativepg.md) · [instance manager](https://cloudnative-pg.io/docs/1.30/instance_manager) | Repository fact |
 
 The ratio matters more than any single number: 200 potential backends × 32MB
@@ -219,22 +219,49 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres
+backend_type                  state   processes
+archiver                              1
+autovacuum launcher                   1
+background writer                     1
+checkpointer                          1
+client backend                active  1        <- this lab session
+client backend                idle    23
+io worker                             3
+logical replication launcher          1
+walsender                     active  2
+walwriter                             1
+
+-- product-db-2 (replica), same query
+background writer 1 · checkpointer 1 · client backend (active) 1
+io worker 3 · slotsync worker 1 · startup 1 · walreceiver 1
+
+-- pg_settings (identical on both instances)
+io_method worker · io_workers 3 · maintenance_work_mem 524288 kB
+max_connections 200 · max_worker_processes 8
+shared_buffers 32768 × 8kB (= 256MB) · work_mem 32768 kB (= 32MB)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1`; the census repeated with `--replica` on `product-db-2` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` |
+
+What this run showed:
+
+- `io_method = worker` with three `io worker` processes on **both** roles — the inference in the table above is now a live observation.
+- The primary runs 24 client backends against `max_connections 200`; 23 of them are idle pooler and exporter connections, which is the "connection count hides state" point in numbers. `platform-db-1` showed the same cast with 17 idle.
+- The standby has no archiver, autovacuum launcher, or WAL senders. It does have `startup`, `walreceiver`, and a `slotsync worker`; the last is the visible half of `sync_replication_slots = on` ([12](12-replication-and-slots.md)).
+- No autovacuum worker was running at the sample; only the launcher was present.
 
 ### How to read the result
 
@@ -325,5 +352,5 @@ Before continuing, explain these without rereading the chapter:
 - [CloudNativePG — Postgres instance manager](https://cloudnative-pg.io/docs/1.30/instance_manager)
 
 ---
-_Last updated: 2026-09-29 — chapter authored for issue #1137, absorbing the
+_Last updated: 2026-10-01 — live lab verified on `product-db` (primary and standby): three I/O workers, 24 client backends, and the standby's `slotsync worker`. Earlier: 2026-09-29 — chapter authored for issue #1137, absorbing the
 former processes-and-memory page; live lab pending verification._

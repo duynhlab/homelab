@@ -13,7 +13,7 @@ application tables today.
 | **Prerequisites** | [Indexes and access methods](09-indexes-and-access-methods.md); [Schema and integrity](10-schema-and-integrity.md) |
 | **Deployment status** | Reference — not deployed: no service migration declares a partitioned table |
 | **Platform scope** | All CNPG clusters; retention on this platform lives in ClickHouse TTLs, not PostgreSQL partitions |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Declarative partitioning, plan-time vs execution-time pruning, attach/detach locking, the retention workflow |
 | **Not this page** | Constraint rules in general — [Schema and integrity](10-schema-and-integrity.md); ClickHouse partition lifecycle — [Parts, merges, partitions, and TTL](../../observability/clickhouse/parts-merges-and-ttl.md) |
 | **Previous / next** | [Schema and integrity](10-schema-and-integrity.md) / [Replication and slots](12-replication-and-slots.md) |
@@ -185,22 +185,38 @@ LIMIT 50;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database product
+partitioned_table | partstrat | partnatts
+(0 rows)
+
+parent | child | bounds
+(0 rows)
+
+-- same census in every application database
+db                   partitioned_tables  inheritance_edges
+product, cart, order, payment, checkout, inventory           0  0   (product-db)
+user, review, shipping, notification, keycloak,
+temporal, temporal_visibility                                0  0   (platform-db)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1`; census also on `platform-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `product`, then every application database |
+
+What this run showed:
+
+- Both queries returned zero rows in `product`, and the census repeated across all 13 application databases on both clusters found no partitioned table and no inheritance edge.
+- The live catalog agrees with the repository fact above. That includes Keycloak and Temporal, whose schemas come from upstream projects rather than the service repositories.
 
 ### How to read the result
 
@@ -295,7 +311,7 @@ Before continuing, explain these without rereading the chapter:
 - [Explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
 
 ---
-_Last updated: 2026-09-29 — first published chapter; absorbs the former
+_Last updated: 2026-10-01 — live lab verified: no partitioned table or inheritance edge in any of the 13 application databases. Earlier: 2026-09-29 — first published chapter; absorbs the former
 partitioning-and-retention page, adds the three-phase pruning model and
 attach/detach lock mechanics, and records the deliberate zero-partitioned-table
 state of this platform._

@@ -533,7 +533,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
+_Last updated: 2026-10-01 — the PostgreSQL internals chapters are live-verified on Kind. Earlier: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
 authored chapters) from the observability section. Earlier the same day —
 **RFC-0033** is provisional: its human-gated control-loop
 proposal and Documentation Steward design are linked from the learning path; no runtime

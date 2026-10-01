@@ -13,7 +13,7 @@ promise that can fill your disk.
 | **Prerequisites** | [WAL and checkpoints](04-wal-and-checkpoints.md); the [shared glossary](README.md#shared-glossary) terms WAL, LSN, replication slot, instance |
 | **Deployment status** | Deployed — `product-db` and `platform-db` (3 instances, quorum sync), `product-db-replica` (archive-fed replica cluster) |
 | **Platform scope** | Clusters `product-db`, `platform-db`, `product-db-replica`; WAL transport between their instances and the RustFS archive |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43–02:58 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Steps 2 and 4 of the representative-commit case study: the `ANY 1` acknowledgement and the archive-fed DR replay ([chapter 04](04-wal-and-checkpoints.md) owns steps 1 and 3: WAL position and archiving) |
 | **Not this page** | Backup, PITR, and timelines — [Backup and PITR](13-backup-and-pitr.md); promotion procedure — [DR replica bootstrap runbook](../runbooks/cnpg-dr-replica-bootstrap.md); DR policy — [Disaster recovery](../disaster-recovery.md) |
 | **Previous / next** | [Partitioning and retention](11-partitioning-and-retention.md) / [Backup and PITR](13-backup-and-pitr.md) |
@@ -252,22 +252,44 @@ LIMIT 1;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary): the acknowledgement ladder, 02:43 UTC
+application_name  state      sent/write/flush/replay  write_lag  flush_lag  replay_lag  sync_state
+product-db-2      streaming  2/840083F0 (all four)    0.9 ms     3.0 ms     3.2 ms      quorum
+product-db-3      streaming  2/840083F0 (all four)    0.7 ms     2.6 ms     2.7 ms      quorum
+
+slot_name           slot_type  active  restart_lsn  wal_status  retained_wal
+_cnpg_product_db_2  physical   t       2/840083F0   reserved    0 bytes
+_cnpg_product_db_3  physical   t       2/840083F0   reserved    0 bytes
+
+-- product-db-replica-1 (DR, designated primary), case study steps 2 and 4
+              replay_lsn  receive_lsn  last_replayed_commit  time_since
+02:47:00 UTC  2/88000000  (null)       02:44:51              00:02:08
+02:58:15 UTC  2/90000000  (null)       02:54:07              00:04:07
+backend types: archiver, background writer, checkpointer, io worker ×3, startup
+               (no walreceiver)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43–02:58 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1`; DR replay on `product-db-replica` / `product-db-replica-1` |
+| **CNPG role** | `primary` on `product-db-1`; `product-db-replica-1` is the designated primary of the replica cluster (pod labels `cnpg.io/instanceRole`) |
+| **PostgreSQL recovery state** | primary `f`; `product-db-replica-1` `t` (timeline 1) |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` |
+
+What this run showed:
+
+- Both standbys were `quorum` candidates with identical LSNs. Flush lag was about 3 ms, the latency an `on` commit pays to the faster of the two. The same ladder on `platform-db` showed about 1.2 ms.
+- The two HA slots were active, with no retained WAL beyond the standbys' position. `max_slot_wal_keep_size = -1`, so nothing caps retention if a slot goes inactive. The alert, not the engine, is the guard.
+- The DR replica is archive-fed: `pg_last_wal_receive_lsn()` is NULL, and it runs a `startup` process but no `walreceiver`. It also runs an `archiver`, because as the designated primary of its own cluster it archives to its own store.
+- Both replica snapshots had replayed exactly up to the primary's current LSN, which was the start of the segment not yet archived. The last replayed commit was 2–4 minutes old. At 02:58 the commits after 02:56:04 were still in an unarchived segment, so DR freshness is bounded by the `archive_timeout` switch plus restore polling, as [04](04-wal-and-checkpoints.md) explains.
+- The DR replica ran one instance, matching the manifest. It was enabled only for this run, because a local patch keeps it off on Kind to save CPU.
 
 ### How to read the result
 
@@ -375,6 +397,6 @@ Before continuing, explain these without rereading the chapter:
 - [CloudNativePG replication](https://cloudnative-pg.io/docs/1.30/replication) and [replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster)
 
 ---
-_Last updated: 2026-09-29 — first version: quorum acknowledgement semantics,
+_Last updated: 2026-10-01 — live lab verified: quorum ladder at ≈3 ms flush lag, and archive-fed DR replay that caught up to the last archived segment with no walreceiver. Earlier: 2026-09-29 — first version: quorum acknowledgement semantics,
 slot retention, and the archive-fed DR replica, absorbing the former
 replication fundamentals page._

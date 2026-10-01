@@ -11,7 +11,7 @@ becomes "was that page in the buffer pool, and if not, who read it and how?"
 | **Prerequisites** | [Storage, pages, and tuples](02-storage-pages-and-tuples.md); glossary term page |
 | **Deployment status** | Deployed — every instance; PostgreSQL 18 AIO active with defaults |
 | **Platform scope** | Shared buffers and the I/O paths of `platform-db` and `product-db` |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | Buffer lookup, pinning, eviction, ring buffers, the write-out division of labor, and the PG 18 asynchronous I/O subsystem |
 | **Not this page** | WAL flush ordering — [WAL and checkpoints](04-wal-and-checkpoints.md); plan-level read strategies — [Query processing](08-query-processing.md) |
 | **Previous / next** | [Storage, pages, and tuples](02-storage-pages-and-tuples.md) / [WAL and checkpoints](04-wal-and-checkpoints.md) |
@@ -117,7 +117,7 @@ A read miss on PostgreSQL 18, in causal order:
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
 | Shared buffer pool size | `shared_buffers 256MB` per instance, `effective_cache_size 1.5GB` telling the planner about the OS cache above it | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
-| PG 18 AIO configuration | `io_method`/`io_workers` unset in manifests → upstream defaults `worker` / 3 | [I/O settings](https://www.postgresql.org/docs/18/runtime-config-resource.html); absence in the manifest | Inference — confirm with `SHOW io_method` |
+| PG 18 AIO configuration | `io_method`/`io_workers` unset in manifests → upstream defaults `worker` / 3 | [I/O settings](https://www.postgresql.org/docs/18/runtime-config-resource.html); absence in the manifest; live `pg_settings` on 2026-10-01 | Live observation (lab below) |
 | Readahead hinting | `effective_io_concurrency 200` (SSD-tuned); in 18 this feeds the AIO depth rather than only `fadvise` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [release notes](https://www.postgresql.org/docs/18/release-18.html) | Repository fact |
 | I/O timing visibility | `track_io_timing on`, so `pg_stat_io` `*_time` columns carry real milliseconds | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Per-backend-type I/O accounting | The `pg_stat_io` custom query exports reads/writes/hits/evictions/reuses with PG 18 `read_bytes`/`write_bytes` | [`monitoring-queries.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/configmaps/monitoring-queries.yaml) | Repository fact |
@@ -125,7 +125,7 @@ A read miss on PostgreSQL 18, in causal order:
 | Buffer-content inspection | `pg_buffercache` is **not installed** | [Extensions](../extensions.md) | Repository fact — disposable lab only |
 
 256MB of shared buffers under a 1Gi pod limit is a deliberate small-pool
-bet: the OS page cache (and Kind's single-node file system) absorbs the rest.
+bet: the OS page cache (and the Kind host's shared disk) absorbs the rest.
 That makes `pg_stat_io.evictions` the number to watch — a small pool under
 pressure evicts constantly, and the view names *who* paid for it.
 
@@ -179,22 +179,43 @@ LIMIT 15;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres; stats_reset 2026-09-30 13:45:27 UTC
+bgwriter_lru_maxpages 100 · effective_io_concurrency 200 · io_combine_limit 16
+io_method worker · io_workers 3 · shared_buffers 32768 (8kB) · track_io_timing on
+
+backend_type         context    hits      reads  read_bytes  writes  evictions  reuses
+checkpointer         normal                                  7691
+client backend       normal     27747023  1238   12107776    0       0
+client backend       bulkread   4279      516    13484032    0       0          0
+standalone backend   normal     98621     479    4440064     1057    0
+autovacuum worker    normal     580199    35     286720      0       0
+autovacuum worker    vacuum     640       10     163840      0       0          0
+standalone backend   vacuum     954       8      81920       0       0          0
+autovacuum launcher  normal     0         1      8192        0       0
+standalone backend   bulkwrite  7         0      0           0       0          0
+walsender            normal     48        0      0           0       0
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` (`pg_stat_io` is instance-wide) |
+
+What this run showed:
+
+- AIO defaults confirmed live: `worker` / 3. The setting is reloadable (`pg_settings.context = sighup`); only `io_method` needs a restart.
+- `client backend` evictions and writes are **zero** after 13 h. The whole cluster is about 28 MB on disk (`kubectl cnpg status` Size), which fits inside 256 MB of shared buffers, so this sample cannot show the small-pool pressure described above. That stays a reasoned failure mode, not an observed one.
+- The checkpointer did all relation writes (7691). `standalone backend` is single-user mode, which only runs during cluster bootstrap. Its counters sharing the `stats_reset` epoch suggests the bootstrap shut down cleanly and its statistics were carried into the running instance (Inference).
+- Client reads total about 1,750 blocks against 27.7 million hits. Each `read` may still have been served by the kernel page cache.
 
 ### How to read the result
 
@@ -223,7 +244,7 @@ Observation context:
 | Working set outgrows 256MB pool | Constant eviction; every miss pays a victim write when dirty | Rising latency; hit ratio sags | `pg_stat_io.evictions`; [`CNPGLowCacheHitRatio`](../../observability/runbooks/postgresql/CNPGLowCacheHitRatio.md) | Raise `shared_buffers` (restart; memory taken from the pod's 1Gi) or shrink the working set — [14](14-monitoring-and-capacity.md) owns the decision |
 | bgwriter/checkpointer behind write demand | Backends write dirty victims inline | Foreground query latency spikes | `pg_stat_io` `writes`/`fsyncs` on `client backend` (Upstream invariant — the view's own tuning guidance) | Checkpoint tuning is [04](04-wal-and-checkpoints.md)'s territory; the evidence starts here |
 | One reporting query scans a huge table | Ring buffer contains it; the scan recycles its own slots | The *scan* is slower than a warm cache; the rest of the system stays warm | `reuses` in `bulkread` context | Containment by design — the cost lands on the bulk job, not the OLTP path |
-| I/O workers saturated (`io_method = worker`) | Read queue deepens behind 3 workers | Sequential-scan-heavy work slower than raw disk suggests | `pg_aios` backlog during load; `read_time` growth | `io_workers` is a start-time setting; changing it on the shared cluster is out of bounds — measure first, file a change |
+| I/O workers saturated (`io_method = worker`) | Read queue deepens behind 3 workers | Sequential-scan-heavy work slower than raw disk suggests | `pg_aios` backlog during load; `read_time` growth | `io_workers` is reloadable (`sighup`; only `io_method` needs a restart), but changing it on the shared cluster is still out of bounds — measure first, file a change |
 
 The invariant that survives every row: correctness. A thrashing buffer pool is
 slow, never wrong — dirty pages still obey WAL-before-data.
@@ -285,5 +306,5 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 — release notes (AIO subsystem)](https://www.postgresql.org/docs/18/release-18.html)
 
 ---
-_Last updated: 2026-09-29 — new chapter authored for issue #1137 (no
+_Last updated: 2026-10-01 — live lab verified: AIO `worker`/3 (reloadable), and zero client-backend evictions on a 28 MB working set. Earlier: 2026-09-29 — new chapter authored for issue #1137 (no
 predecessor page); live lab pending verification._

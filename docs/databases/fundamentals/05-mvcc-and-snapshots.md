@@ -12,7 +12,7 @@ versions, transaction IDs, and snapshots.
 | **Prerequisites** | [Storage, pages, and tuples](02-storage-pages-and-tuples.md); glossary terms [tuple, XID, snapshot](README.md#shared-glossary) |
 | **Deployment status** | Deployed — every table on `platform-db`, `product-db`, and `product-db-replica` |
 | **Platform scope** | Engine-wide mechanism; observed on the `product` database |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | How a statement decides which row version it can see |
 | **Not this page** | Blocking between writers — [Locking and wait events](06-locking-and-wait-events.md); reclaiming dead versions — [Vacuum and freezing](07-vacuum-and-freezing.md) |
 | **Previous / next** | [WAL and checkpoints](04-wal-and-checkpoints.md) / [Locking and wait events](06-locking-and-wait-events.md) |
@@ -202,22 +202,40 @@ FROM (SELECT pg_current_snapshot() AS snap) AS s;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres
+xmin  xmax  ctid   conname
+4     0     (0,1)  pg_proc_oid_not_null
+4     0     (0,2)  pg_proc_oid_index
+5     0     (0,3)  pg_proc_proname_args_nsp_index
+6     0     (0,4)  pg_type_oid_not_null
+6     0     (0,5)  pg_type_oid_index
+
+snapshot_xmin  snapshot_xmax  full_snapshot
+1741           1741           1741:1741:
+
+oldest_inflight_status
+no transaction in flight
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` |
+
+What this run showed:
+
+- Bootstrap catalog rows carry `xmin` 4–6, which are XIDs assigned during initdb, and `xmax = 0`.
+- The snapshot was `1741:1741:` with an empty `xip`. No write transaction was open on the instance at that instant, so the third query took its `no transaction in flight` branch. As the text warns, this quiet-cluster case cannot show a visibility disagreement.
+- Next-XID 1741 after 13 hours: the services commit tens of thousands of transactions ([14](14-monitoring-and-capacity.md)), but read-only transactions never assign an XID.
 
 ### How to read the result
 
@@ -312,5 +330,5 @@ Before continuing, explain these without rereading the chapter:
 - [System columns](https://www.postgresql.org/docs/18/ddl-system-columns.html)
 
 ---
-_Last updated: 2026-09-29 — first published chapter version for issue #1137;
+_Last updated: 2026-10-01 — live lab verified: bootstrap `xmin` 4–6, and an empty snapshot `1741:1741:` on a quiet primary. Earlier: 2026-09-29 — first published chapter version for issue #1137;
 absorbs the MVCC sections of the retired mvcc-locking-and-vacuum page._

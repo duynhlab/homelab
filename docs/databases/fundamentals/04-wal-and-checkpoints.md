@@ -12,7 +12,7 @@ is built on that position.
 | **Prerequisites** | [Buffer manager and I/O](03-buffer-manager-and-io.md); glossary terms WAL, LSN, checkpoint |
 | **Deployment status** | Deployed — both operational clusters archive WAL continuously |
 | **Platform scope** | WAL production, flushing, checkpointing, and archiving on `product-db` (steps 1 and 3 of the representative-commit case study) |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43–02:58 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | WAL records and LSNs, the deployed 64 MB segment lifecycle, full-page writes, checkpoints and the REDO point, and the archive boundary |
 | **Not this page** | Standby acknowledgement and DR replay (case-study steps 2 and 4) — [Replication and slots](12-replication-and-slots.md); restore mechanics — [Backup and PITR](13-backup-and-pitr.md) |
 | **Previous / next** | [Buffer manager and I/O](03-buffer-manager-and-io.md) / [MVCC and snapshots](05-mvcc-and-snapshots.md) |
@@ -151,7 +151,7 @@ sequenceDiagram
 |---|---|---|---|
 | Segment size | `walSegmentSize: 64` (64 MB; upstream default is 16 MB) | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Checkpoint schedule | `checkpoint_timeout 15min`, `checkpoint_completion_target 0.9`, `max_wal_size 8GB`, `min_wal_size 2GB` | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
-| WAL volume vs CPU | `wal_compression on`; `wal_level logical` (largest record set, enabling logical decoding) | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
+| WAL volume vs CPU | `wal_compression on` (which PostgreSQL runs as `pglz`, live 2026-10-01); `wal_level logical` (largest record set, enabling logical decoding) | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) | Repository fact |
 | Quiet-period segment completion | `archive_timeout 5min` limits how long low-traffic WAL waits before a forced segment switch; it does not bound upload or DR replay | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [Backup policy](../backup-policy.md) | Repository fact + Upstream invariant |
 | Archive transport | Barman Cloud plugin (`isWALArchiver: true`) gzip-compresses completed segments and uploads them to the `pg-backups-cnpg` bucket on RustFS | [`product-db/instance.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) · [`product-db/objectstore.yaml`](../../../kubernetes/infra/configs/databases/clusters/product-db/objectstore.yaml) | Repository fact |
 | Checkpoint health signal | `CNPGCheckpointPressure` fires when requested checkpoints outpace timed ones | [`deep-signals-alerts.yaml`](../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/deep-signals-alerts.yaml) | Repository fact |
@@ -217,22 +217,43 @@ FROM pg_stat_archiver;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database postgres — lab queries at 02:43 UTC
+current_lsn  current_segment           segment_bytes
+2/84000000   000000010000000200000021  67108864
+
+checkpoint_lsn  redo_lsn    redo_wal_file             timeline_id  checkpoint_time
+2/7C0002F0      2/7C000298  00000001000000020000001F  1            2026-10-01 02:35:26+00
+
+archived_count  last_archived_wal         last_archived_time      failed_count  stats_reset
+163             000000010000000200000020  2026-10-01 02:41:02+00  0             2026-09-30 13:45:27+00
+
+-- case study, steps 1 and 3: two snapshots 11 min 22 s apart
+              current_lsn  current_segment           archived  last_archived_wal         at
+02:46:53 UTC  2/88000000   000000010000000200000022  164       000000010000000200000021  02:46:06
+02:58:15 UTC  2/90000000   000000010000000200000024  166       000000010000000200000023  02:56:04
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 and 02:46–02:58 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `postgres` |
+
+What this run showed:
+
+- Every `current_lsn` sat exactly on a 64 MB boundary (`…84000000`, `…88000000`, `…90000000`). The quiet primary had written nothing since the last `archive_timeout` switch, and a forced switch ends the segment early.
+- Between the two snapshots the LSN advanced 128 MB (`pg_wal_lsn_diff` = 134217728), which is exactly two segments, and `archived_count` advanced by 2. That was two forced switches about five minutes apart (about 02:51, then 02:56:04), not 128 MB of new WAL. The remainder of a switched segment is skipped, which is why the table below warns that LSN distance is not a transaction count.
+- The REDO point (`2/7C000298` in segment `…1F`) lagged the write position by 128 MB of LSN, but crash recovery would replay only the few real records in that span (Inference).
+- `checkpoint_time` was 8 minutes old, inside the 15-minute schedule. `pg_stat_checkpointer` counted 51 timed against 5 requested checkpoints since the cluster was created.
+- `wal_segment_size` reads 67108864 (64 MB) from source `default`. That is correct: `walSegmentSize` is an initdb option, not a runtime GUC.
 
 ### How to read the result
 
@@ -327,6 +348,6 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 — WAL monitoring views](https://www.postgresql.org/docs/18/monitoring-stats.html)
 
 ---
-_Last updated: 2026-09-29 — chapter authored for issue #1137, absorbing the
+_Last updated: 2026-10-01 — live lab verified: LSNs on 64 MB boundaries from `archive_timeout` switches, and two segments archived in 11 minutes on a quiet primary. Earlier: 2026-09-29 — chapter authored for issue #1137, absorbing the
 WAL half of the former storage-and-wal page; owns case-study steps 1 and 3;
 live lab pending verification._

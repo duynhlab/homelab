@@ -12,7 +12,7 @@ PostgreSQL 18 can skip through it, and why every index you add bills every
 | **Prerequisites** | [Storage, pages, and tuples](02-storage-pages-and-tuples.md); [Query processing](08-query-processing.md); glossary terms page, tuple |
 | **Deployment status** | Deployed — every service schema on both operational clusters relies on B-tree constraint indexes |
 | **Platform scope** | All CNPG clusters; index statistics exported by the monitoring ConfigMap |
-| **Evidence context** | Repository facts only — live lab pending verification on the Ubuntu Kind cluster |
+| **Evidence context** | Live Kind cluster `kind-homelab`, 2026-10-01 02:43 UTC, PostgreSQL 18.1 — read-only lab below; other rows are labelled by evidence class |
 | **This page owns** | B-tree descent, PG 18 skip scan, HOT interplay, index-only scans, write amplification, non-B-tree methods |
 | **Not this page** | Planner cost pricing — [Query processing](08-query-processing.md); visibility-map maintenance — [Vacuum and freezing](07-vacuum-and-freezing.md) |
 | **Previous / next** | [Query processing](08-query-processing.md) / [Schema and integrity](10-schema-and-integrity.md) |
@@ -181,22 +181,47 @@ LIMIT 10;
 ### Observed example
 
 ```text
-PENDING VERIFICATION — capture on the Ubuntu Kind cluster; see the verification worksheet in the pull request.
+-- product-db-1 (primary), database product
+table_name          index_name               idx_scan  size   unique  primary
+schema_migrations   schema_migrations_pkey   0         16 kB  t       t
+categories          categories_pkey          151       16 kB  t       t
+categories          categories_name_key      4         16 kB  t       f
+categories          idx_categories_name      12        16 kB  f       f
+products            products_pkey            65        16 kB  t       t
+products            unique_product_name      13        16 kB  t       f
+products            idx_products_name        0         16 kB  f       f
+products            idx_products_category    0         16 kB  f       f
+products            idx_products_price       0         16 kB  f       f
+products            idx_products_created_at  2         16 kB  f       f
+products            idx_products_status      25        16 kB  f       f
+admin_action_audit  admin_action_audit_pkey  0         16 kB  t       t
+admin_action_audit  idx_admin_audit_target   2         16 kB  f       f
+
+Limit  (cost=0.27..4.58 rows=10 width=64)
+  ->  Index Only Scan using pg_class_relname_nsp_index on pg_class
+        Index Cond: ((relname >= 'pg'::text) AND (relname < 'ph'::text))
+        Filter: (relname ~~ 'pg_stat%'::text)
 ```
 
 Observation context:
 
 | Field | Value |
 |---|---|
-| **Observed at** | _pending_ |
-| **Repository** | _pending_ |
-| **Cluster/context** | _pending_ |
-| **PostgreSQL** | _pending_ |
-| **Cluster/instance** | _pending_ |
-| **CNPG role** | _pending_ |
-| **PostgreSQL recovery state** | _pending_ |
-| **Synchronous state** | _pending_ |
-| **Database** | _pending_ |
+| **Observed at** | 2026-10-01 02:43 UTC |
+| **Repository** | `main` at `b884a26c` (what Flux served); chapters on `docs/pg-internals-chapters` |
+| **Cluster/context** | `kind-homelab`; both clusters created 2026-09-30 ≈13:45 UTC (the `stats_reset` epoch below) |
+| **PostgreSQL** | `PostgreSQL 18.1 (Debian 18.1-1.pgdg13+2)`, image `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Cluster/instance** | `product-db` / `product-db-1` |
+| **CNPG role** | `primary` (pod label `cnpg.io/instanceRole`; `kubectl cnpg status` could not proxy to the pods in this run) |
+| **PostgreSQL recovery state** | `pg_is_in_recovery() = f` |
+| **Synchronous state** | `ANY 1 ("product-db-2","product-db-3","product-db-1")`; both standbys `streaming`, `sync_state = quorum` |
+| **Database** | `product` |
+
+What this run showed:
+
+- Thirteen B-tree indexes, each two pages (16 kB) on one-page tables. The index tax here is larger than the data.
+- `categories_name_key` (unique constraint) and `idx_categories_name` index the same column twice. Five indexes show `idx_scan = 0` after 13 h. As the table below warns, zero is not proof they are droppable, and the standbys were not checked.
+- The `LIKE 'pg_stat%'` predicate became an index range condition (`>= 'pg'` and `< 'ph'`) and an Index Only Scan. The prefix match is rewritten into B-tree bounds; this works because the catalog uses the `C` collation.
 
 ### How to read the result
 
@@ -292,6 +317,6 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 release notes](https://www.postgresql.org/docs/18/release-18.html)
 
 ---
-_Last updated: 2026-09-29 — first published chapter; absorbs the former
+_Last updated: 2026-10-01 — live lab verified: 13 index inventory rows (a duplicate `categories.name` index and five never-scanned indexes) and a prefix `LIKE` rewritten into an Index Only Scan. Earlier: 2026-09-29 — first published chapter; absorbs the former
 indexes-and-access-paths page and adds B-tree descent mechanics, PG 18 skip
 scan, and the HOT write-tax model._

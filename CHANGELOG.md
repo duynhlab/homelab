@@ -1387,6 +1387,12 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **vmagent memory limit 512Mi → 768Mi.** vmagent was OOMKilled once on
+  2026-09-30 during the ClickHouse 26.8 rollout. Its steady peak RSS was
+  already about 493 MB against the 512Mi limit; the extra ClickHouse
+  series from `asynchronous_metrics_key_values_mode: both` (async series
+  3060 → 4140), plus churn from six pod restarts, pushed it over.
+
 - **The KEDA and Kubernetes cluster-overview boards show app namespaces
   again** (grafana-dashboards `v0.2.2`). kube-state-metrics is scraped
   without honorLabels, so its series carry `namespace="kube-system"` and

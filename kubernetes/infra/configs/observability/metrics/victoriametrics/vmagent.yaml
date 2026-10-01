@@ -60,7 +60,8 @@ spec:
       cpu: 50m
       memory: 128Mi
     limits:
-      memory: 512Mi
+      # 512Mi -> 768Mi (2026-10-01): OOMKilled at a ~493Mi steady peak (#1158).
+      memory: 768Mi
 
   # RFC-0014 P1 (D-3): OTLP-pushed series carry resource-attr labels
   # (service_name, k8s_namespace_name after Prometheus-naming translation);

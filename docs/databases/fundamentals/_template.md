@@ -132,8 +132,11 @@ Record:
 - repository SHA when relevant;
 - Kubernetes context/cluster;
 - SELECT version();
-- CNPG cluster, instance pod, and its role (primary / sync standby /
-  async standby / DR designated primary);
+- CNPG cluster and instance pod;
+- CNPG role (primary / replica / DR designated primary);
+- PostgreSQL recovery state from `pg_is_in_recovery()`;
+- synchronous state observed from the source primary (`sync`, `quorum`,
+  `potential`, `async`, or not applicable);
 - database;
 - exact query and abbreviated output;
 - interpretation and limits, including the last reset time of any cumulative
@@ -187,7 +190,10 @@ Observation context:
 | **Repository** | `{git SHA}` |
 | **Cluster/context** | `{safe kubeconfig context}` |
 | **PostgreSQL** | `{SELECT version() result}` |
-| **Cluster/instance/role** | `{cnpg cluster / pod / primary or standby kind}` |
+| **Cluster/instance** | `{cnpg cluster / pod}` |
+| **CNPG role** | `{primary / replica / DR designated primary}` |
+| **PostgreSQL recovery state** | `{pg_is_in_recovery() result}` |
+| **Synchronous state** | `{sync_state from source primary, or not applicable}` |
 | **Database** | `{database}` |
 
 ### How to read the result

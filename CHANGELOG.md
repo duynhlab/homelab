@@ -744,6 +744,24 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The PostgreSQL internals learning path is authored and verified:
+  fourteen explanation-first chapters from processes through capacity**
+  ([#1137](https://github.com/duynhlab/homelab/issues/1137)).
+  - Each chapter follows the Phase-0 contract (mental model, engine mechanism
+    grounded in the PostgreSQL 18 documentation, deployed CNPG evidence with
+    class labels, one bounded read-only lab via `kubectl cnpg psql`, failure
+    reasoning, teach-back). The nine former fundamentals pages are absorbed
+    and retired, and every inbound link points at the owning chapter.
+  - Every lab was run read-only on the Kind cluster on 2026-10-01
+    (PostgreSQL 18.1) and recorded with time, commit, cluster, instance,
+    role, recovery state and database. The case study followed a commit's
+    durability path from the `product-db` primary through the `ANY 1`
+    quorum and the archive to replay on the DR replica, which was enabled
+    for the run and switched off again.
+  - The live run corrected the drafts. `io_workers` is reloadable, not
+    start-time. `wal_compression on` runs as `pglz`. The exported lock
+    metric is `cnpg_pg_locks_count_count`. The pod memory limit is 1Gi, not
+    2Gi. A NULL `stats_reset` means the counters were never reset.
 - **The ClickHouse internals learning path is authored and verified: twelve
   explanation-first chapters from architecture through scaling**
   ([#1127](https://github.com/duynhlab/homelab/issues/1127)).

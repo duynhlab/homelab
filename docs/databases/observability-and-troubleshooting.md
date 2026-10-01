@@ -152,7 +152,7 @@ objects, or unbounded query text from other tenants.
 
 - [PostgreSQL metrics](../observability/metrics/postgresql/README.md)
 - [PostgreSQL alert runbooks](../observability/runbooks/postgresql/README.md)
-- [Performance investigation](fundamentals/monitoring-and-performance-investigation.md)
+- [Monitoring and capacity](fundamentals/14-monitoring-and-capacity.md)
 - [Emergency recovery](runbooks/emergency-recovery.md)
 - [CloudNativePG](cloudnativepg.md)
 

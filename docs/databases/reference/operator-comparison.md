@@ -130,7 +130,7 @@ temporarily unavailable.
 
 - [cloudnativepg.md](../cloudnativepg.md) - CloudNativePG feature and operations deep dive.
 - [reference/zalando/operator.md](./zalando/operator.md) - Zalando operator feature and operations deep dive.
-- [Replication fundamentals](../fundamentals/replication.md) - Sync vs async replication and commit behavior.
+- [Replication and slots](../fundamentals/12-replication-and-slots.md) - Sync vs async replication and commit behavior.
 - [Backup policy](../backup-policy.md) - Deployed backup, WAL archiving, PITR, and retention policy.
 - [disaster-recovery.md](../disaster-recovery.md) - Production-ready DRP model for this homelab.
 

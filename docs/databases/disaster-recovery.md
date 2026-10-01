@@ -9,8 +9,8 @@ Use this page as the system of record for recovery paths and DR topology.
 Targets and measured evidence belong to [reliability targets](./reliability-targets.md);
 commands belong to runbooks. Use these pages for supporting detail:
 
-- [Replication](./fundamentals/replication.md) - physical/logical replication and commit behavior.
-- [Storage and WAL](./fundamentals/storage-and-wal.md) - WAL, checkpoints, and crash recovery.
+- [Replication and slots](./fundamentals/12-replication-and-slots.md) - physical/logical replication and commit behavior.
+- [WAL and checkpoints](./fundamentals/04-wal-and-checkpoints.md) - WAL, checkpoints, and crash recovery.
 - [Backup policy](./backup-policy.md) - current schedules, retention, and PITR inputs.
 - [cloudnativepg.md](./cloudnativepg.md) - CloudNativePG operator deep dive.
 - [reference/zalando/operator.md](./reference/zalando/operator.md) - Zalando Postgres Operator deep dive.

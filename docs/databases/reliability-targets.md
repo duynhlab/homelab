@@ -84,7 +84,7 @@ These widen the gap between target and as-built; tracked in
 
 - [disaster-recovery.md](./disaster-recovery.md) — parent DRP, scenario matrix, ownership.
 - [Backup policy](./backup-policy.md) — schedules, retention, and object-store paths.
-- [Storage and WAL](./fundamentals/storage-and-wal.md) — WAL durability and checkpoint mechanics.
+- [WAL and checkpoints](./fundamentals/04-wal-and-checkpoints.md) — WAL durability and checkpoint mechanics.
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — how the targets get verified.
 
 ---

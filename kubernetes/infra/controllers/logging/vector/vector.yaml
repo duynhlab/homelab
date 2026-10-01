@@ -15,7 +15,7 @@ spec:
         kind: HelmRepository
         name: vector
         namespace: flux-system
-      version: '0.57.0'
+      version: '0.58.0'
   dependsOn:
     - name: victoria-metrics-operator
       namespace: monitoring
@@ -538,10 +538,13 @@ spec:
       limits:
         # 200m: 50m throttled continuously (KubePodCPUThrottlingHigh, audit).
         cpu: 200m
-        memory: 256Mi
-      requests: 
+        # 512Mi: at 256Mi three of four pods OOMKilled during a fresh bring-up
+        # (2026-09-30), peaking at 220-245 MiB while the in-memory sink buffers
+        # (up to 10k events) filled; steady state is 45-72 MiB.
+        memory: 512Mi
+      requests:
         cpu: 20m
-        memory: 32Mi
+        memory: 64Mi
 
     podMonitor:
       enabled: true

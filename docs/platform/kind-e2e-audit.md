@@ -568,14 +568,14 @@ cannot be derived from a single file — they get their own row (K2.3).
   # the registered set, from git:
   ls kubernetes/infra/configs/kyverno/exceptions/*.yaml | grep -v kustomization
   ```
-  There are **two** exceptions: `openbao` (needs `IPC_LOCK` so unsealed secrets
-  never swap to disk) and `postgres-operators` (operator-defined securityContext,
-  scoped to the namespaces that actually host CNPG Clusters). A third,
-  `vector-hostpath`, was **deleted on 2026-08-19** as inert — it targeted
-  `monitoring` while Vector runs in `kube-system`, which is baseline-excluded.
+  There are **no** exceptions since 2026-09-30. `openbao` and
+  `postgres-operators` were removed as inert in ADR-078 step 3, when every pod
+  passed the ten CEL baseline checks without them. `vector-hostpath` was deleted
+  as inert on 2026-08-19. Policy results are now named per check
+  (`disallow-capabilities`, …) rather than `pss-baseline`.
   Also note `pss-restricted-apps` is **disabled since 2026-08-17**; the Kind audit
   that disabled it is [recorded below](#2026-08-17--the-first-run).
-  **FAIL:** a failing resource not covered by one of the two live exceptions.
+  **FAIL:** any failing resource (no exception is registered).
   Catalog: [`docs/security/policy-exceptions.md`](../security/policy-exceptions.md).
 
 - [ ] **K3.2** Those exceptions have not expired.
@@ -1161,10 +1161,10 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
      writing a number here:
      ```bash
      D=kubernetes/infra/configs/observability/grafana/dashboards
-     grep -h -c '^kind: GrafanaDashboard' $D/*.yaml | paste -sd+ - | bc   # 33 at time of writing
+     grep -h -c '^kind: GrafanaDashboard' $D/*.yaml | paste -sd+ - | bc   # 25 on 2026-09-30
      # ...plus any chart-provisioned CR. Kyverno's chart renders its own
-     # (`grafana.grafanaDashboard.create`), so the cluster holds 34 while git
-     # holds 33 — the git figure is a floor, not the expected total.
+     # (`grafana.grafanaDashboard.create`), so the cluster holds 26 while git
+     # holds 25 — the git figure is a floor, not the expected total.
      kubectl -n monitoring get grafanadashboards
      kubectl -n monitoring get grafanadashboards -o json | jq -r '
        .items[] | select((.status.conditions[]? | select(.type=="DashboardSynchronized") | .status) != "True")
@@ -1211,18 +1211,17 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
      as a legal reference too: older boards write `"uid": "VictoriaMetrics"`,
      which Grafana resolves, and a uid-only view reports those as broken.
 
-     > **OPEN FINDING, 2026-08-22 — three boards carry references that resolve
-     > to nothing**, and this row had never actually been run on a cluster, which
-     > is why nobody knew. On a 41-dashboard cluster: `flux-cluster` and
-     > `cloudnative-pg` both hard-code `"uid": "prometheus"` in panels while
-     > declaring a `DS_PROMETHEUS` variable, and no datasource carries that uid
-     > or that name; `_hAsuzBnz` names `y-Ka8y37k`, an upstream uid that came
-     > with a vendored board. Their panels render `Datasource … was not found`
-     > while the dashboard answers 200 — exactly the failure this assertion
-     > exists to catch. **The row is expected to fail until they are fixed**; do
-     > not weaken the assertion to make the gate green. Note also the count: this
-     > section says 34 CRs while the cluster serves 41 boards, so the chart- and
-     > operator-provisioned extras need reconciling with assertion (1).
+     > **Resolved (re-verified 2026-09-30).** The 2026-08-22 finding here — three
+     > boards whose references resolved to nothing — is fixed, and the row passes
+     > on Kind. `flux-cluster` and `cloudnative-pg` hard-code `"uid":
+     > "prometheus"` in panels; `grafana/datasource-prometheus-alias.yaml` now
+     > provides a datasource with exactly that uid, so the literal resolves
+     > without editing the upstream JSON. `_hAsuzBnz` pointed at `y-Ka8y37k`
+     > because it had been exported from a UI import; it is now vendored from
+     > git (`grafana-dashboard-clickhouse-upstream.yaml`) and resolves its
+     > datasource variable fresh. If a board regresses to this failure, it shows
+     > as `Datasource … was not found` on every panel with a green 200 — do not
+     > weaken the assertion to make the gate pass.
      **Cluster-specific note:** five committed JSONs (`clickhouse-server-engine`,
      `cutover-baseline`, `inventory`, `eg-edge`, `keycloak-identity`) carry an
      `__inputs` block instead of declaring the variable in `templating.list`, and
@@ -1239,12 +1238,13 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
      `chi_*` panels "empty by design, because nothing here runs that operator" —
      false, the Altinity operator *is* deployed. The correction that replaced it
      then predicted empty `chi_*` panels as the likely finding — **also false.**
-     Measured 2026-08-21: **914 `chi_*` series present**, and **zero**
-     `ClickHouse*` series. So the exporter half populates and the engine-native
-     half is the empty one, which is the opposite of what was written down. The
-     engine's own Prometheus endpoint is not scraped at all; those 18 panels stay
-     blank until something scrapes it, and the alert expressions that name
-     `chi_*` families are the ones worth tuning — see
+     On 2026-08-21 the engine half was empty (914 `chi_*` series, **zero**
+     `ClickHouse*`) because nothing scraped the engine's own endpoint. That is
+     fixed: `metrics/podmonitors/clickhouse-server.yaml` scrapes it, and on
+     2026-09-29 the cluster held 1740 `ClickHouseMetrics_*` and 5043
+     `ClickHouseProfileEvents_*` series, so both halves of the board populate.
+     Assert both families are non-zero rather than trusting either count; the
+     alert expressions on either family are covered in
      [K5.10](#k5--the-four-signals).
 
 - [ ] **K5.8 Alert rules loaded, none firing wrongly.** Group the firing set by
@@ -1265,6 +1265,11 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
     `page` variant stayed `inactive` — the shortest ticket window (2h) already
     exceeded the cluster's lifetime, so a couple of client-side 400s dominate the
     ratio. `ReviewHighOverallErrorRate` fired on exactly **two** `400`s.
+    Since 2026-09-30 every burn-rate arm also needs at least 10 events in its
+    long window ([minimum-events guard](../observability/alerting/slo-burn-rate-alerts.md#minimum-events-guard)),
+    so this class — and the `page` that `CheckoutHighLatency` raised on 3 slow
+    requests out of 8 in six hours on 2026-09-29 — should no longer appear. A
+    `page` or `ticket` burn alert firing now means at least 10 events burned.
   - kube-level rows such as `KubePodCPUThrottlingHigh`, which fires on
     `kube-system/kindnet-*` at ~100% throttling. kindnet is Kind's own CNI and
     nothing in this repo sets its limits. Record it and move on.
@@ -1925,4 +1930,4 @@ Measured on 2026-09-29 (`endpoints/v1`, Kubernetes 1.35.8):
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-09-29 — Diagnostics: "Who calls a deprecated API" (scoped apiserver audit) with the measured `endpoints/v1` clients and fixes. Earlier the same day — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_
+_Last updated: 2026-09-30 — K3.1: no exceptions remain (both removed as inert, ADR-078 step 3); K5.7/K5.8 notes refreshed. Earlier: 2026-09-29 — Diagnostics: "Who calls a deprecated API" (scoped apiserver audit) with the measured `endpoints/v1` clients and fixes. Earlier the same day — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

@@ -177,7 +177,7 @@ are in their rows.
 | **inventory** | inventory | **2** | **gRPC** | hand-written [`inventory-grpc-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml); chart SLO off via `slo_disabled` |
 | **keycloak** | identity | **2** | **Keycloak events + HTTP** | hand-written [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml); Keycloak is platform infra, not a mop-chart service |
 
-**Total: 34 SLOs → 68 burn-rate alerts** — 30 chart-rendered (10 services × 3)
+**Total: 31 SLOs → 62 burn-rate alerts** — 27 chart-rendered (9 services × 3)
 through the five domain ResourceSets, plus inventory's 2 and Keycloak's 2
 hand-written ones.
 
@@ -272,4 +272,4 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - [Google SRE Workbook -- Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)
 
 ---
-_Last updated: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (34 SLOs / 68 burn-rate alerts)_
+_Last updated: 2026-09-30 — counts corrected to 31 SLOs / 62 alerts (9 chart services). Earlier: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (34 SLOs / 68 burn-rate alerts)_

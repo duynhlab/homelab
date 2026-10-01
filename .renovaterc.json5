@@ -28,6 +28,23 @@
   },
   customManagers: [
     {
+      // grafana-clickhouse-datasource: the plugin pin and the URL tag of its
+      // dashboards move together (packageRules groups them into one PR).
+      customType: "regex",
+      managerFilePatterns: [
+        "/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/",
+        "/^kubernetes/infra/configs/observability/grafana/dashboards/grafana-dashboard-clickhouse-upstream\\.yaml$/",
+        "/^local-stack/compose\\.yaml$/",
+      ],
+      matchStrings: [
+        "grafana-clickhouse-datasource (?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "grafana/clickhouse-datasource/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/",
+      ],
+      depNameTemplate: "grafana/clickhouse-datasource",
+      datasourceTemplate: "github-releases",
+      extractVersionTemplate: "^v(?<version>.*)$",
+    },
+    {
       // The Kind node image in scripts/kind-up.sh, pinned by tag and digest
       // (RFC-0032). The regex takes the line after the `# renovate:` comment.
       customType: "regex",
@@ -38,6 +55,10 @@
     },
   ],
   packageRules: [
+    {
+      matchPackageNames: ["grafana/clickhouse-datasource"],
+      groupName: "grafana-clickhouse-datasource",
+    },
     {
       // Patch and digest bumps only. A Kubernetes minor is a cluster
       // recreation with its own gate (RFC-0032), and a node image newer than

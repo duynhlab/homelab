@@ -7,8 +7,19 @@ Source manifests live in `kubernetes/infra/configs/kyverno/exceptions/`.
 
 | Name | Policies waived | Targets | Owner | Expires | Justification |
 |------|------------------|---------|-------|---------|---------------|
-| `postgres-operators` | `pss-baseline`, `require-resources` | CNPG Pods in `cloudnative-pg`, `platform`, `product` (the namespaces actually hosting CNPG Clusters) | platform-team | 2026-12-31 | Operator-defined securityContext for postgres lifecycle |
-| `openbao` | `pss-baseline` | All Pods in `openbao` | platform-team | 2026-12-31 | OpenBAO needs `IPC_LOCK` (mlock) so unsealed secrets never swap to disk |
+| — | — | — | — | — | **No exception is active (2026-09-30).** |
+
+**Removed 2026-09-30 as inert (ADR-078 step 3).** Before migrating the last two
+legacy exceptions, the ten CEL PSS baseline checks were run against every pod in
+the cluster with **no** exception loaded. All 83 pods passed, including the 8
+the exceptions had covered:
+- `openbao`: its pods do not request `IPC_LOCK`, because the chart leaves mlock
+  off. The fixture `tests/pss-baseline` shows that an `IPC_LOCK` pod *does* fail
+  `disallow-capabilities`, so the check works and the exception was simply not
+  needed. If mlock is turned on, add a CEL exception for `disallow-capabilities`
+  on the `openbao` pods only.
+- `postgres-operators`: `application=cnpg` matched no pod. The CNPG operator
+  pod passes baseline on its own.
 
 PolicyExceptions are accepted **only from the `kyverno` namespace**
 (`features.policyExceptions` pinned in the Kyverno HelmRelease) — an exception
@@ -21,14 +32,30 @@ manifest in any other namespace is silently ignored.
    - Policy + rule violated
    - Why fixing upstream is not feasible
    - Proposed expiry (max 1 year)
-3. Create `kubernetes/infra/configs/kyverno/exceptions/<name>.yaml` (namespace `kyverno`) with required annotations:
+3. Create `kubernetes/infra/configs/kyverno/exceptions/<name>.yaml` (namespace `kyverno`) as a
+   `policies.kyverno.io/v1` `PolicyException`. It names the **policy** it waives; CEL
+   policies have no rule names. `spec.expiresAt` makes the expiry real, and the
+   annotations keep the registry fields:
    ```yaml
+   apiVersion: policies.kyverno.io/v1
+   kind: PolicyException
    metadata:
+     name: <name>
+     namespace: kyverno
      annotations:
        platform.duynhlab.dev/owner: <team-or-handle>
        platform.duynhlab.dev/expires-at: "YYYY-MM-DD"
        platform.duynhlab.dev/justification: "<short reason>"
+   spec:
+     expiresAt: "YYYY-MM-DDT00:00:00Z"
+     policyRefs:
+       - name: disallow-capabilities   # the one check that fails, not the whole baseline
+         kind: ValidatingPolicy
+     matchConditions:
+       - name: target
+         expression: "object.metadata.namespace == '<ns>' && object.metadata.labels[?'app.kubernetes.io/name'].orValue('') == '<app>'"
    ```
+   Add it to `exceptions/kustomization.yaml`, and add a fixture row proving the `skip`.
 4. Update this table in the same PR.
 5. Add a calendar reminder for the expiry to re-evaluate.
 
@@ -47,4 +74,4 @@ rather than renewed.
 
 ---
 
-_Last updated: 2026-08-19 — inert `vector-hostpath` deleted (targeted the wrong namespace; kube-system is baseline-excluded), `postgres-operators` rescoped to the namespaces that actually host CNPG Clusters (was matching the retired `auth` ns and three cluster-less ns while missing `platform`), exceptions-namespace pin documented, issue-based workflow replaced with PR-based (no GitHub issues on this repo). Previously 2026-08-12 — `kong-openbao` narrowed to `openbao` (RFC-0024 P2.3)._
+_Last updated: 2026-09-30 — last two exceptions removed as inert (ADR-078 step 3); add-workflow uses the CEL PolicyException. Earlier: 2026-09-30 — postgres-operators no longer waives require-resources (inert; dropped during ADR-078 step 1). Earlier: 2026-08-19 — inert `vector-hostpath` deleted (targeted the wrong namespace; kube-system is baseline-excluded), `postgres-operators` rescoped to the namespaces that actually host CNPG Clusters (was matching the retired `auth` ns and three cluster-less ns while missing `platform`), exceptions-namespace pin documented, issue-based workflow replaced with PR-based (no GitHub issues on this repo). Previously 2026-08-12 — `kong-openbao` narrowed to `openbao` (RFC-0024 P2.3)._

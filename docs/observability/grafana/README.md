@@ -141,7 +141,8 @@ Three things follow from that and are easy to get wrong:
    [dashboards-v2.md](dashboards-v2.md).
 
 The boards that remain as in-repo JSON are the ones nothing has ported: the ClickHouse
-suite, the vendored Envoy Gateway set, `service-graph`, `cloudnative-pg`, `redis`, and the
+suite (ours; the six datasource-plugin boards are fetched by `spec.url`, see the
+[ClickHouse hub](../clickhouse/README.md#plugin-bundled-dashboards-fetched-by-url-on-the-cluster)), the vendored Envoy Gateway set, `service-graph`, `cloudnative-pg`, `redis`, and the
 grafana.com / flux2-monitoring-example boards fetched by `spec.url`.
 
 **Folders belong to the artifact.** The six folders (`api-gateway`, `databases`,
@@ -202,4 +203,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-09-28 — § Plugins: why the bundled Prometheus/Pyroscope plugins are not self-updated, how the failure looks, and the distinct-refId rule. Previously 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-10-01 — the ClickHouse suite includes six boards vendored from the datasource plugin. Earlier: 2026-09-28 — § Plugins: why the bundled Prometheus/Pyroscope plugins are not self-updated, how the failure looks, and the distinct-refId rule. Previously 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

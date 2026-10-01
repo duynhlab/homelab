@@ -90,6 +90,75 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Security
+
+- **Kyverno CEL migration complete (ADR-078 step 4).** No legacy Kyverno
+  object remains, so the platform can take Kyverno 1.20.
+  - `default-deny-networkpolicy` is a GeneratingPolicy (CREATE and UPDATE,
+    generateExisting, synchronize, orphanDownstreamOnPolicyDelete). It is now
+    the **only** owner of `deny-all-ingress` in the 11 app-tier namespaces.
+    The same objects had also been committed as static manifests since
+    2026-05-30, so Flux and Kyverno fought over them. The 11 copies are
+    removed; `identity`, which is not app-tier, keeps its own.
+  - A new `make validate` check refuses a static `deny-all-ingress` for any
+    app-tier namespace.
+  - The swap was rehearsed on Kind in the worst reconcile order. Without
+    #1148 it left 9 namespaces with no default-deny for about 6 s; with it,
+    81/81 per-second samples stayed at 12. A deleted deny-all returns in
+    about 1 s, and a newly labelled namespace gets one in about 1 s.
+  - `cleanup-completed-pods` is a DeletingPolicy (same schedule, phases and
+    24h age, using `time.now()`).
+  - `kyverno.md` runbook steps 2 and 3 now query the CEL kinds.
+- **Kyverno CEL migration, step 3 of 4 (ADR-078): PSS baseline and
+  exceptions.**
+  - The legacy `pss-baseline` ClusterPolicy (`validate.podSecurity`) has no
+    CEL equivalent. It is replaced by the ten
+    `kyverno/policies` `pod-security-vpol/baseline` ValidatingPolicies, vendored
+    unchanged at commit `36340047` under `cluster-policies/pss-baseline/`.
+  - A kustomize patch adds what upstream leaves open: the same 7-namespace
+    exclusion, and `failurePolicy: Ignore`. Upstream sets none, and a CEL
+    policy then defaults to `Fail`, which would refuse every pod create while
+    Kyverno's webhook is down.
+  - **Both remaining exceptions are removed as inert.** With no exception
+    loaded, every one of the 83 pods passes all ten checks (830/830), including
+    the 8 in `openbao` and `cloudnative-pg` they covered. OpenBao's pods do not
+    request `IPC_LOCK`.
+  - New fixture `tests/pss-baseline` (50 cases): a compliant pod passes every
+    check, and an `IPC_LOCK`, a privileged, a `hostNetwork` and a `hostPath`
+    pod each fail exactly the right one. `policy-exceptions.md` now documents
+    the CEL `PolicyException` form with `spec.expiresAt`.
+- **Kyverno CEL migration, step 2 of 4 (ADR-078).** `disallow-latest-tag`
+  and `disallow-default-namespace` are ValidatingPolicy objects.
+  - `disallow-latest-tag`: its three legacy rules are three CEL
+    validations (tag present, no `:latest` across containers, init and
+    ephemeral containers, image volumes pinned by digest), with the same
+    scope. Autogen stays on, as it was. Reports now carry one result per
+    resource rather than one per rule, and the message names the failed check.
+  - `disallow-default-namespace` is still the only denying policy
+    (`validationActions: [Deny]`, `failurePolicy: Fail`, autogen off).
+    Server dry-run through the live webhook: denied in `default`, including a
+    manifest with no `metadata.namespace`; allowed in `product`.
+  - `kyverno apply --cluster` gives 90/90 and 119/119 pass, the legacy
+    pod-level verdicts. The fixtures gained untagged, `:latest` and
+    `:latest`-in-initContainer cases (15/15).
+  - Runbook step 3 in `kyverno.md` now lists both policy kinds.
+- **Kyverno CEL migration, step 1 of 4 (ADR-078, now Accepted).**
+  `require-probes` and `require-resources` are `policies.kyverno.io/v1`
+  ValidatingPolicy objects: CEL `containers.all(...)`, the same ten
+  namespaces, Pods only, Audit, background on. The legacy ClusterPolicies are
+  deleted.
+  - `require-probes` keeps the Job-owned exclusion as a `matchCondition`.
+    Autogen is set off explicitly: a ValidatingPolicy autogens controller
+    variants by default, and for this policy that rewrites the owner-reference
+    condition onto a pod template, which is the trap the legacy autogen hit on
+    2026-08-21.
+  - The `require-resources` waiver in `postgres-operators` was inert
+    (`application=cnpg` matches 0 pods, and the operator pod is outside the
+    policy's namespaces), so it was dropped rather than migrated.
+  - Checked on Kind with `kyverno apply --cluster` across all app pods: 19/19
+    pass for each policy, 0 fail, the same pod-level verdicts as the legacy
+    policies. CLI fixtures: 14/14.
+
 #### CI
 
 - **GitHub issue intake is structured for platform work.** Bug/operations,
@@ -128,6 +197,20 @@ Skeleton (copy what you need):
   idle pod per drained version for a day and remove the flap.
 
 #### Observability
+
+- **The six ClickHouse datasource-plugin dashboards are fetched by URL
+  instead of copied into the repo.**
+  - Each `GrafanaDashboard` sets `spec.url` to the plugin repo's
+    `src/dashboards/<board>.json` at the plugin's own tag (`v4.22.0`), with
+    `contentCacheDuration: 24h`, and maps the OTel boards'
+    `DS_GRAFANA_CLICKHOUSE_DATASOURCE` input to `ClickHouse`.
+  - A Renovate regex manager groups the plugin pin (`grafana.yaml`,
+    local-stack) and the URL tag into one PR, so the boards follow the
+    plugin with no copy step.
+  - Trade-off accepted: the upstream boards lack the
+    `toStartOfFiveMinutes` sort-key bound that #1142 added to the
+    `otel_logs` queries, so those panels scan the whole time range again.
+  - The operator now fetches from GitHub at most once a day per board.
 
 - **The ClickHouse schema ships as a digest-pinned image volume (RFC-0032
   Phase 2, ADR-077 Accepted, Adoption Complete).**
@@ -671,6 +754,27 @@ Skeleton (copy what you need):
   every inbound link is repointed to the owning chapter. Live observation labs
   ship with pending-verification placeholders until their evidence is captured
   on the Ubuntu Kind cluster.
+- **The ClickHouse internals learning path is authored and verified: twelve
+  explanation-first chapters from architecture through scaling**
+  ([#1127](https://github.com/duynhlab/homelab/issues/1127)).
+  - Each chapter follows the Phase-0 contract (mental model, engine mechanism,
+    deployed evidence with class labels, one bounded read-only lab, failure
+    reasoning, teach-back) and links the canonical platform pages instead of
+    repeating them. Sharding and Kafka are explicit reference-only,
+    not-deployed comparisons.
+  - Every lab was run read-only on the Kind cluster on 2026-09-30 (ClickHouse
+    26.7.17.7) and its output recorded with timestamp, commit, table, and
+    replica.
+  - The live run corrected the drafts in places. The part case study moved to
+    live parts, because the issue's 2026-09-29 parts were lost with the
+    cluster rebuild. Merges were shown to be computed on every replica while
+    only level-0 parts are fetched. Each telemetry signal is pinned to one
+    replica by the exporter's long-lived connections. A chapter's example
+    service name that matched no rows was fixed. The `{replica}` S3 prefix
+    stays unverified until the first cold-tier move.
+  - Chapter 01 gains a Draw.io diagram of one replica's engine layers
+    (`docs/architecture/observability/clickhouse-engine`), drawn from what
+    the replica runs rather than the generic engine.
 - **PostgreSQL internals now has a curriculum contract before chapter work
   starts** ([#1137](https://github.com/duynhlab/homelab/issues/1137)). The
   fundamentals hub is rewritten as the learning contract: fourteen planned
@@ -983,6 +1087,20 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0032 closed at 1.35.8 (implemented).** A re-audit found that the
+  cAdvisor ZFS fix shipped in v0.60.6, but no Kubernetes release vendors it:
+  1.36.5 carries v0.56.2 and 1.37.1 carries v0.60.5. On this ZFS host 1.36 and
+  1.37 kubelets therefore still crash, and `kindest/node` v1.35.8 is already the
+  newest image on the 1.35 line. Everything else the RFC set out to do has
+  landed. Moving on is left to a routine Renovate node-image bump once an image
+  with the fix exists, or once Docker's data root moves off ZFS.
+- **ADR-078 (Proposed): migrate Kyverno policies to the CEL policy types.**
+  Kyverno's migration guide says the legacy `ClusterPolicy`,
+  `ClusterCleanupPolicy` and `kyverno.io` `PolicyException` are removed in
+  v1.20 (upstream milestone due 2026-10-23). The record moves the 6 cluster
+  policies, the cleanup policy and the 2 exceptions to
+  `policies.kyverno.io/v1`, one policy per PR with fixtures first, and holds
+  Kyverno 1.20 until the last legacy object is gone.
 - **RFC-0033 is `provisional`; the research gate passed with owner-confirmed
   boundaries.** The RFC proposes a human-gated GitHub ledger, schema-normalized task
   payloads, App-scoped unattended identity, flat isolated workers, independent proof,
@@ -1159,6 +1277,17 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **Envoy proxy rollouts replace the whole fleet at once (`maxSurge: 100%`,
+  `maxUnavailable: 0`)**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G8 prep).
+  Envoy Gateway's v1.9.1 notes (envoy#47309) warn that proxies still
+  running when an upgraded controller starts can bring TLS listeners up
+  with no certificate about 15 s later, while still reporting Ready. The
+  proxy Deployment defaulted to 25 %/25 %, which with 2 replicas replaces
+  one pod at a time and leaves a stale proxy serving. New pods now come up
+  before any old one goes. The strategy change itself restarts nothing;
+  it is merged ahead of the v1.9.2 upgrade.
+
 - **The Backoffice no longer goes blank on a reload with a live staff session.**
   - **Symptom:** after signing in, any reload rendered an empty page, with no
     error and no failed request.
@@ -1282,6 +1411,62 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **vmagent memory limit 512Mi → 768Mi.** vmagent was OOMKilled once on
+  2026-09-30 during the ClickHouse 26.8 rollout. Its steady peak RSS was
+  already about 493 MB against the 512Mi limit; the extra ClickHouse
+  series from `asynchronous_metrics_key_values_mode: both` (async series
+  3060 → 4140), plus churn from six pod restarts, pushed it over.
+
+- **The KEDA and Kubernetes cluster-overview boards show app namespaces
+  again** (grafana-dashboards `v0.2.2`). kube-state-metrics is scraped
+  without honorLabels, so its series carry `namespace="kube-system"` and
+  the object's namespace in `exported_namespace`. The KEDA board's HPA,
+  replica-change and worker-replica panels (and `$deployment`) filtered on
+  `namespace` and were empty. On the cluster board, `$namespace` offered
+  only `kube-system`, which blocked even the correct cAdvisor panels. KSM
+  queries now filter on `exported_namespace`. Checked on Kind: the HPA
+  query went from 0 to 2 series and the namespace variable from 1 to 30
+  values.
+
+- **kube-state-metrics alerts name the object, not the KSM pod.** KSM is
+  scraped without `honorLabels`, so on every `kube_*` series `namespace`,
+  `pod` and `container` name the KSM pod and the object's own labels are
+  `exported_*`. Seven rules ignored that:
+  - `KeycloakRestartLoop` was **blind**: it selected `namespace="identity",
+    container="keycloak"`, which no KSM series carries (0 series live; the
+    exported selector finds the keycloak pod).
+  - `KubePodNotReady` grouped by `namespace, pod` and so collapsed every
+    pending pod into one series keyed to KSM.
+  - `KubePodOOMKilled`, `KubePodCrashLooping`, `KubeDeploymentReplicasMismatch`,
+    `KubeStatefulSetReplicasMismatch` and `KubeHPAMaxedOut` fired, but their
+    annotations named `kube-system/kube-state-metrics-…`. On 2026-09-30 the
+    OOM alert blamed KSM for three Vector OOM kills.
+  All now select or group by `exported_*` and copy it back with
+  `label_replace`, the pattern `KubePodMemoryNearLimit` already used. Checked
+  on live data: the OOM query now names `vector-gp6m6/rdrx4/rkn4l`.
+- **Vector gets 512Mi.** At 256Mi three of four pods were OOMKilled during a
+  fresh bring-up, peaking at 220–245 MiB while the in-memory sink buffers
+  filled; steady state is 45–72 MiB. Request 32Mi → 64Mi.
+- **SLO burn-rate alerts no longer page on a handful of requests.** On an
+  idle Kind cluster `CheckoutHighLatency` paged on 3 slow requests out of 8 in
+  six hours and failed gate K5.8. Sloth v0.16 has no minimum-events field, so
+  Sloth now keeps only the SLIs and recording rules (`pageAlert` /
+  `ticketAlert` `disable: true`), and the alerts are re-emitted with the same
+  names, labels and annotations: by the mop chart 0.18.0
+  (`templates/slo-alerts.yaml`, helm-charts#26) for the 9 HTTP services, and
+  by the new `sloth/slo-alerts.yaml` for inventory and keycloak. Each arm keeps
+  Sloth's multi-window expression and also needs at least 10 events in its
+  long window. Checked with `vmalert-tool unittest` (v1.148.0): low traffic
+  stays silent, real traffic fires page and ticket with Sloth's exact label
+  set, and the original Sloth expression fires on the same low-traffic input.
+- **ClickHouse log panels prune by the sort key.** `otel_logs` sorts by
+  `toStartOfFiveMinutes(Timestamp)` first, and a bare `$__timeFilter(Timestamp)`
+  barely used it. Every `otel_logs` query in the four cluster boards and the
+  four local-stack copies now repeats the window on the key expression, and
+  the two trace-to-log JOIN panels, which read `otel_logs` with no time bound,
+  join a time-bounded subquery. `clickhouse-local` 26.7 on the real key: a
+  15-minute window read 423/423 granules before and 6/423 after, same 36 040
+  rows; all 20 rewritten panel queries execute.
 - **Nothing we deploy reads the deprecated `endpoints/v1` API any more.**
   - An apiserver audit scoped to `endpoints` on Kind 1.35.8 named two clients:
     - vmagent: the VM operator renders every converted ServiceMonitor as
@@ -1657,6 +1842,44 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The OpenBAO `db-strong` password policy is labelled as not deployed**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G1). The page
+  described it as applied to every DB role, but no manifest writes it. It
+  now carries a warning: its symbols (`%`, `@`, `#`, …) corrupt the DSN in
+  the nine services that do not escape the password yet.
+
+- **ClickHouse docs no longer contradict each other or the deployment**
+  ([#1136](https://github.com/duynhlab/homelab/pull/1136) follow-ups).
+  - One rule for forcing merges. Never on the cluster's `otel` tables for
+    practice; the Playground forces one on local-stack only. In an
+    incident, a targeted `OPTIMIZE … PARTITION` is the last step of the
+    correct response order, never `FINAL`. The three part-pressure
+    runbooks point at that order; one of them called the step "safe and
+    reversible", but a merge cannot be undone.
+  - The Playground no longer calls a part's level a merge count.
+    `DownloadPart` is now explained by per-signal replica pinning.
+  - The hub dates its "22 rules" audit figure; 23 are deployed.
+  - `fundamentals.md`: `otel_traces_trace_id_ts` partitions by
+    `toDate(Start)`, and Distributed / extra shards are reference, not
+    planned.
+  - `schema-and-queries.md` and `ClickHouseInsertsFailing` point at the
+    DDL image source (ADR-077) instead of a ConfigMap.
+  - The `otel_logs` DDL comment no longer claims GRANULARITY is omitted.
+    That changed the image digest, so the schema Job's pin is bumped; Flux
+    re-runs the idempotent `CREATE … IF NOT EXISTS` Job once.
+
+- **Stale claims corrected after re-verification.**
+  - Kind runbook K5.7: the 2026-08-22 "OPEN FINDING" (boards referencing a
+    missing uid `prometheus`, `_hAsuzBnz` → `y-Ka8y37k`) is resolved; the
+    "zero `ClickHouse*` series" note is resolved (the engine is scraped); board
+    counts are 25 in git, 26 on the cluster. K5.8 notes the new guard.
+  - Alerting and SLO docs: 31 SLOs / 62 alerts (9 chart services, not 10);
+    the burn-rate table carries `severity: page|ticket` and all four arms.
+  - `openbao.md`: which dashboard panels stay empty and why. The KV and token
+    gauges do populate; *Path Info* works (its variable strips the trailing
+    `/`); Consul panels are empty because storage is Raft, and policy/route
+    create counters appear only after their first event.
+  - `kyverno.md`: 4 fixture suites, Policy Reporter 3.10.0.
 - **Docs follow what the #1115 diagram review measured.**
   - `openbao.md`: the Raft sequence said `HTTPS :8200`; the listener runs
     with `tls_disable`, so it now says HTTP (TLS planned). The product-db
@@ -5628,6 +5851,24 @@ Skeleton (copy what you need):
 
 #### Gateway
 
+- **Envoy Gateway v1.9.0 → v1.9.2 on the cluster and local-stack**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G8, supersedes
+  #1005 + #1006). The OCI pin keeps the v-prefixed chart tag, `v1.9.2`
+  (`sha256:be0342…`); upstream's `1.9.2` is a different artifact. The
+  vendored extension CRDs are regenerated from `gateway-crds-helm`
+  `v1.9.2`. The regeneration reproduces the committed v1.9.0 file byte for
+  byte, and between the two only three CRDs change:
+  - `envoyproxies`: 39 added fields;
+  - `securitypolicies`: `oidc.provider.issuer` must now be `https://`.
+    None of the 19 live SecurityPolicies uses OIDC;
+  - `envoyextensionpolicies`: descriptions only.
+
+  The Gateway API standard CRDs are identical. A server-side dry-run of all
+  eight passes against the live cluster. The proxy fleet rolls once, onto
+  Envoy `distroless-v1.39.1`, all at once under the `maxSurge: 100%`
+  strategy that landed first. The EdgeCertExpiry runbook gains the
+  certless-listener signal (envoy#47309).
+
 - **Envoy Gateway v1.8.3 → v1.9.0, Gateway API CRDs v1.5.1 → v1.6.1.** The
   bundle bump is mandatory, not cosmetic: v1.9.0 reconciles
   `TCPRoute`/`UDPRoute` through `gateway.networking.k8s.io/v1` and *silently
@@ -5705,6 +5946,101 @@ Skeleton (copy what you need):
   cutover, never a bump in place.
 
 #### Observability
+
+- **Grafana ClickHouse datasource 4.20.0 → 4.22.0 on the cluster and
+  local-stack; the six vendored plugin dashboards re-vendored from the
+  `v4.22.0` tag.**
+  - The boards gain a `database` selector, an `interval` variable, case-
+    insensitive free-text search and annotation presets.
+  - The plugin gains trace → logs links that keep the time frame, log
+    volume for SQL-editor queries, any-column log filters, and the
+    `$__rateColumns`/`$__lttb` macros.
+  - Three fixes we carried locally are upstream now: the hard-coded
+    datasource uid in Cluster Analysis (the old K5.7 failure), `hasToken`
+    search, and the Deployments annotation. Cluster Analysis is now
+    byte-identical to upstream.
+  - One local patch is re-applied: `otel_logs` queries keep the
+    `toStartOfFiveMinutes` sort-key bound (#1142), on 8 queries in the
+    Logs Explorer and 1 in the Service Dashboard.
+  - The ClickHouse hub's "manual import, not GitOps" section was stale
+    since #881 and now describes the vendored set.
+
+- **ClickHouse Keeper 26.7 → 26.8 LTS**, after the servers
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G5 step 2,
+  supersedes #1055, which targeted 26.9). This follows the upstream order,
+  servers first and then Keeper, and returns Keeper to the server's line.
+  The operator (0.27.4) rolls one Keeper at a time without dropping below
+  Raft quorum.
+
+- **ClickHouse server 26.7 → 26.8 LTS on the cluster, the schema Job
+  client and local-stack**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G5,
+  supersedes #1010, which targeted 26.9). 26.8 is the LTS line (about a
+  year of backports), which matches how production runs ClickHouse.
+  26.9's system-log schema rename and ZSTD default are not part of this
+  step. The upstream order is servers first; Keeper follows in its own
+  change.
+  - 26.8 turns per-device async metrics into Map metrics
+    (`ClickHouseAsyncMetrics_DiskAvailable_default` →
+    `…_DiskAvailable{disk="default"}`), which would blank the disk panels,
+    the local vmalert rules and the disk runbooks.
+    `asynchronous_metrics_key_values_mode: both` keeps the old names
+    beside the new ones until those readers migrate.
+  - Checked against 26.8.15.10 in a container: our retention config and
+    `metrics.xml` load, `both` exports both forms, and all five DDL files
+    (text indexes, TTL volume moves, the materialized view) apply.
+  - 26.8's `include_from` default change does not apply: the live config
+    uses only `from_env`, and there is no `/etc/metrika.xml`.
+- **Altinity clickhouse-operator 0.27.3 → 0.27.4**, ahead of the
+  ClickHouse and Keeper upgrades. Keeper rolls no longer drop the ensemble
+  below Raft quorum, and ZooKeeper endpoint edits no longer restart
+  ClickHouse. A failed schema step now reports `Aborted` instead of
+  `Completed`. None of the breaking items touch us:
+  - the removed `k8s_secret_` syntax has 0 references;
+  - the new informer label filter applies only to operator-generated
+    objects, never to the CHI/CHK themselves (read in the 0.27.4 source);
+  - the CHI/CHK/CHIT CRD schemas are unchanged.
+
+  The pre-upgrade CRD hook now uses `registry.k8s.io/kubectl:v1.36.3` with
+  server-side apply, and passes Kyverno admission in a server-side
+  dry-run.
+
+- **Vector chart 0.57.0 → 0.58.0 on the cluster, local-stack 0.50.0 →
+  0.58.0** ([#1107](https://github.com/duynhlab/homelab/issues/1107) G7,
+  supersedes #1015 + #1081). No config change is needed on either side.
+  The 0.55 sink `request.headers` move is already in place, and neither
+  config uses `${VAR}` interpolation (off by default since 0.57), an `api`
+  block, or a templated URI host (rejected since 0.58). 0.58 removes the
+  `buffer_byte_size`/`buffer_events` gauges. No repo alert or
+  dashboards-as-code board reads them, but the upstream Vector board
+  (Grafana.com 21954, fetched at `latest`) still does for its buffer-bytes
+  panel, which now stays empty; the replacement is
+  `vector_buffer_size_bytes`. The docs' PromQL moves to
+  `vector_buffer_size_events`.
+
+- **OpenTelemetry Collector contrib 0.159.0 → 0.161.0 (chart `<0.175.0`,
+  0.174.0) on the cluster and local-stack**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G6, supersedes
+  #1016 + #1013). None of the 0.160/0.161 breaking items touch our
+  config. We set no `deployment_name_from_replicaset`, use no
+  `Base64Decode`, and neither Kafka, mezmo nor tail sampling. The
+  `clickhouse` exporter is unchanged between the two tags: no file under
+  `internal/sqltemplates` moved and `logs_insert.sql` is byte-identical,
+  so the committed DDL stays compatible. The one applicable item is the
+  deprecation of `prometheus_remote_write`
+  `resource_to_telemetry_conversion` in favour of
+  `resource_constant_labels`. It is a warning for now, and the migration
+  is a follow-up.
+- **Pyroscope 2.1.0 → 2.3.1 on the cluster and 2.2.1 → 2.3.1 on
+  local-stack; the two now run the same version**
+  ([#1107](https://github.com/duynhlab/homelab/issues/1107) G11,
+  supersedes #1056 + #925). The HelmRelease had been pinning
+  `image.tag: "2.1.0"` since the 2026-06-25 chart migration, so every chart
+  bump since then left the server on 2.1.0. The chart and the pinned image
+  now move together to 2.3.1. The 2.2.0 → 2.3.1 notes carry no config or
+  storage breaking item, and the services' SDK (pyroscope-go v1.3.1) needs
+  no change. Verified on local-stack: profiles arrive for all 13 service
+  identities on 2.3.1.
 
 - **VM Operator chart 0.66.2 → 0.67.2 (app v0.73.1 → v0.74.0) — the cluster's
   VictoriaLogs converges with local-stack.** The operator's embedded defaults

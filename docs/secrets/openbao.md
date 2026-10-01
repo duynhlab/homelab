@@ -963,10 +963,23 @@ bao lease revoke -prefix database/creds/product-app-rw/
 
 ## 11. Password Policies
 
-Custom password policies enforce strength requirements for all dynamically generated credentials.
+A custom password policy can enforce strength requirements for dynamically
+generated credentials. **Reference — not deployed:** no manifest writes
+`db-strong` and no role sets `password_policy`. Today the one dynamic
+credential (notification) uses OpenBAO's default generator (letters, digits,
+`-`).
+
+> [!WARNING]
+> Do not wire this policy (or any symbol set with `%`, `@`, `#`, `&`, `=`,
+> `+`, `/`, `:` or a space) to a database role until every service builds
+> its Postgres DSN with `url.UserPassword`. Nine services still paste the raw
+> password into `postgresql://user:password@…`, so such a password corrupts
+> the DSN. With pgx ≥ 5.11, malformed percent-encoding is a parse error, and
+> the service cannot connect. Tracked in
+> [#1107 G1](https://github.com/duynhlab/homelab/issues/1107).
 
 ```hcl
-# Policy: db-strong (applied to all DB engine roles)
+# Policy: db-strong (reference only; not applied to any role)
 length = 32
 
 rule "charset" {
@@ -1047,6 +1060,20 @@ Retention must outlive `usage_gauge_period` (10m): the usage gauges
 (`vault_secret_kv_count`, `vault_token_count`, identity counts) are emitted once
 per period, and with a 30s retention they disappeared between scrapes, which left
 the dashboard's KV, token and entity panels empty.
+
+**What the dashboard shows empty, and why (checked 2026-09-30).** The board is
+the chart's own (`serverTelemetry.grafanaDashboard`, chart 0.30.0), imported
+into the `Secrets` folder. The KV (`vault_secret_kv_count`) and token panels
+populate. Three things stay blank, none of them a scrape fault:
+- **Consul Requests** (`vault_consul_*`): storage here is integrated Raft, so no
+  Consul metric exists. The `vault_raft_*` families carry the equivalent signal.
+- **Policy Set** (`vault_policy_set_policy_count`) and the **create/delete**
+  series in *Path Info* (`vault_route_create_*`, `vault_route_delete_*`):
+  OpenBao registers a counter on its first event, and policies are only written
+  by the one-shot bootstrap. After a restart these series stay absent until the
+  next write.
+- *Path Info* itself works. Its `mountpoint` variable strips the trailing `/`
+  from `mount_point="secret/"`, so the panels query `vault_route_read_secret__count`.
 
 ## Operations And Runbooks
 
@@ -1137,4 +1164,4 @@ gantt
 
 ---
 
-_Last updated: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_
+_Last updated: 2026-09-30 — § 11 `db-strong` marked reference, not deployed, with a warning that its symbol set breaks unescaped DSNs. Earlier the same day: which dashboard panels stay empty and why (Consul on Raft; lazily registered policy and route counters). Earlier: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

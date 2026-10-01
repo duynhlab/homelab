@@ -21,6 +21,12 @@ spec:
         # horizontally; the PDB below keeps one pod serving during voluntary
         # disruptions.
         replicas: 2
+        # envoy#47309: replace all proxies at once so none serves a certless listener.
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 100%
+            maxUnavailable: 0
         pod:
           labels:
             # LOAD-BEARING (ADR-060). Vector's kubernetes_logs source excludes

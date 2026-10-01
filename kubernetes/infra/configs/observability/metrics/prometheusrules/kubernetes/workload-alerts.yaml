@@ -23,9 +23,13 @@ spec:
         # TSDB: 0 series for the name used here, 71 for the real one. The sibling
         # rule below had it right all along, which is the cheapest available proof.
         - alert: KubeDeploymentReplicasMismatch
+          # KSM label collision (no honorLabels): the object's namespace is
+          # exported_namespace; copy it back for the annotation.
           expr: |
-            kube_deployment_spec_replicas
-            != kube_deployment_status_replicas_ready
+            label_replace(
+              kube_deployment_spec_replicas
+              != kube_deployment_status_replicas_ready,
+            "namespace", "$1", "exported_namespace", "(.+)")
           for: 15m
           labels:
             severity: warning
@@ -36,9 +40,13 @@ spec:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/kubernetes/KubeDeploymentReplicasMismatch.md"
 
         - alert: KubeStatefulSetReplicasMismatch
+          # KSM label collision (no honorLabels): the object's namespace is
+          # exported_namespace; copy it back for the annotation.
           expr: |
-            kube_statefulset_status_replicas_ready
-            != kube_statefulset_status_replicas
+            label_replace(
+              kube_statefulset_status_replicas_ready
+              != kube_statefulset_status_replicas,
+            "namespace", "$1", "exported_namespace", "(.+)")
           for: 15m
           labels:
             severity: warning
@@ -70,9 +78,13 @@ spec:
       interval: 1m
       rules:
         - alert: KubeHPAMaxedOut
+          # KSM label collision (no honorLabels): the object's namespace is
+          # exported_namespace; copy it back for the annotation.
           expr: |
-            kube_horizontalpodautoscaler_status_current_replicas
-            == kube_horizontalpodautoscaler_spec_max_replicas
+            label_replace(
+              kube_horizontalpodautoscaler_status_current_replicas
+              == kube_horizontalpodautoscaler_spec_max_replicas,
+            "namespace", "$1", "exported_namespace", "(.+)")
           for: 15m
           labels:
             severity: warning

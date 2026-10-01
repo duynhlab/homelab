@@ -31,7 +31,8 @@ Kind is not marketplace scale. The prune **principle** is identical; the row
 count is not.
 
 Do **not** invent replacement OTel tables. The exporter contract is the
-column list in that ConfigMap.
+column list in the DDL image source,
+[`images/clickhouse-ddl/sql/`](../../../images/clickhouse-ddl/).
 
 ---
 
@@ -62,7 +63,14 @@ bounds on the key expression, `toStartOfFiveMinutes(Timestamp) >= … AND < …`
 read **5/27** and returned the same rows; an equality on the bucket read 1/27.
 Repeat the window on the key expression in any `otel_logs` query that has to be
 cheap. The numbers are in the hub [Playground §3](README.md#3-see-the-sparse-index-prune-granules).
-The ClickHouse dashboards still filter with `$__timeFilter(Timestamp)` alone.
+Every `otel_logs` panel now repeats the window on the key expression
+(2026-09-30): `$__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >=
+toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <=
+$__toTime`, in the cluster boards and the local-stack copies. Checked with
+`clickhouse-local` 26.7 on the real sort key: a 15-minute window over one
+day's part read 423/423 granules bare and **6/423** with the key bounds, for the
+same 36 040 rows. The two trace-to-log JOIN panels read `otel_logs` with no time
+bound at all; they now join a time-bounded subquery instead.
 
 Junior rule: *the column you filter most often stands first — unless time
 pruning is the actual first cut, as it is on logs.*
@@ -206,7 +214,7 @@ ReplicatedMergeTree is a mutation; it is not a playground first step.
 | Rule | Here |
 |------|------|
 | Who owns DDL | `clickhouse-schema` Job; exporter `create_schema: false` |
-| Who owns INSERT columns | Collector contrib `clickhouse` exporter 0.159.0 |
+| Who owns INSERT columns | Collector contrib `clickhouse` exporter 0.161.0 |
 | Logs sort | Five-minute bucket, then service, then timestamp |
 | Traces sort | Service, span name, time — not TraceId |
 | Grafana | Filters that match those prefixes stay cheap; see [README Grafana](README.md#grafana) |
@@ -231,4 +239,4 @@ Full connect + `system.parts` recipes: [Playground](README.md#playground--merget
 
 ---
 
-_Last updated: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_
+_Last updated: 2026-09-30 — exporter 0.161.0 (INSERT columns unchanged from 0.159.0); the exporter contract points at the DDL image source, not a ConfigMap. Earlier: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_

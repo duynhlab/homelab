@@ -338,7 +338,7 @@ services:
   # Mirrors the in-cluster topology (services → otel-collector → VictoriaTraces/Grafana),
   # with spanmetrics standing in for Tempo's metrics-generator locally.
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.159.0 # contrib: spanmetrics connector lives here; 0.159.0 matches cluster (OTel logs schema 1.3.0, no TimestampTime)
+    image: otel/opentelemetry-collector-contrib:0.161.0 # contrib: spanmetrics connector lives here; 0.161.0 matches cluster (OTel logs schema 1.3.0, no TimestampTime)
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
@@ -366,7 +366,7 @@ services:
   # the collector fans logs+traces here too. otel_logs/otel_traces auto-created by
   # the exporter (create_schema). Dev: default user, no password.
   clickhouse:
-    image: clickhouse/clickhouse-server:26.7
+    image: clickhouse/clickhouse-server:26.8
     environment:
       CLICKHOUSE_DB: otel
       CLICKHOUSE_PASSWORD: otel # dev password (CH ≥25.3 requires one for default); cluster uses an ESO secret
@@ -412,7 +412,7 @@ services:
   # socket, read-only) and ships structured lines to VictoriaLogs. See
   # observability/vector.yaml.
   vector:
-    image: timberio/vector:0.50.0-alpine
+    image: timberio/vector:0.58.0-alpine
     command: ["--config", "/etc/vector/vector.yaml"]
     volumes:
       - ./observability/vector.yaml:/etc/vector/vector.yaml:ro
@@ -484,7 +484,7 @@ services:
   # The Go services push pprof data here (PROFILING_ENABLED=true + PYROSCOPE_ENDPOINT
   # in x-svc-env). View flame graphs in Grafana → Explore → Pyroscope.
   pyroscope:
-    image: grafana/pyroscope:2.2.1
+    image: grafana/pyroscope:2.3.1
     ports:
       - "4040:4040" # Pyroscope UI/API; services reach it in-network at pyroscope:4040
     volumes:
@@ -501,7 +501,7 @@ services:
       # (datasource-victorialogs.yaml) — closes the "logs only via vmui" gap.
       # Plugin install happens at container start and needs outbound internet
       # once (cached in the grafana volume afterwards).
-      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.20.0,victoriametrics-logs-datasource 0.29.0
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.22.0,victoriametrics-logs-datasource 0.29.0
       # Same as the cluster (grafana.yaml): keep the Prometheus/Pyroscope plugins
       # the image ships instead of self-updating them at start. Here the update
       # succeeds (writable filesystem), so the stack would silently run a newer
@@ -981,14 +981,14 @@ services:
   # It is a separate service because the image is distroless — no shell, so
   # `certgen && server` cannot be chained inside one container.
   gateway-certgen:
-    image: envoyproxy/gateway:v1.9.0@sha256:6f40c7b218b4ff1c4cb481923ed2c9a7634580365913434dd5dda9e954c0114b
+    image: envoyproxy/gateway:v1.9.2@sha256:9d67017c442a70e6ae9f1a358e6c80eb653c67c2e40823d9a991e0daf37ba926
     command: ["certgen", "--local", "--overwrite", "--config-home", "/var/lib/eg"]
     volumes:
       - envoy-gateway-data:/var/lib/eg
     restart: "no"
 
   gateway:
-    image: envoyproxy/gateway:v1.9.0@sha256:6f40c7b218b4ff1c4cb481923ed2c9a7634580365913434dd5dda9e954c0114b
+    image: envoyproxy/gateway:v1.9.2@sha256:9d67017c442a70e6ae9f1a358e6c80eb653c67c2e40823d9a991e0daf37ba926
     # The image ENTRYPOINT is /usr/local/bin/envoy-gateway, so `command` is just
     # its arguments.
     command: ["server", "--config-path", "/config/standalone.yaml"]

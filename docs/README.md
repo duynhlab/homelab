@@ -291,6 +291,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 7. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
 8. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 9. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
+    - [Internals learning path](./observability/clickhouse/internals/README.md) - twelve explanation-first chapters, architecture through scaling, each with a read-only evidence lab
     - [Fundamentals](./observability/clickhouse/fundamentals.md) - OLAP vs LogsQL, MergeTree, deployed 1×3
     - [Schema and queries](./observability/clickhouse/schema-and-queries.md) - ORDER BY, EXPLAIN granules, codecs
     - [Materialized views](./observability/clickhouse/materialized-views.md) - incremental `TO` trace-id table
@@ -382,7 +383,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 - [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [ClickHouse OTel OLAP](./observability/clickhouse/README.md) - Deployed supplementary OLAP; OTel logs/traces SQL ([RFC-0019](./proposals/rfc/RFC-0019/))
-- [ClickHouse fundamentals](./observability/clickhouse/fundamentals.md) · [parts/merges/TTL](./observability/clickhouse/parts-merges-and-ttl.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md) · [operations](./observability/clickhouse/operations.md)
+- [ClickHouse internals learning path](./observability/clickhouse/internals/README.md) · [fundamentals](./observability/clickhouse/fundamentals.md) · [parts/merges/TTL](./observability/clickhouse/parts-merges-and-ttl.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md) · [operations](./observability/clickhouse/operations.md)
 - [Alert lifecycle and runbook engineering](./observability/alerting/alert-lifecycle-and-runbooks.md) - Rule validation and on-call runbook contract
 - [Logging (platform)](./observability/logging/README.md) - OTLP app logs + Vector for non-instrumented pods
 - [Application logging](./api/logs.md) - App-side logging contract (libraries, levels, JSON fields)
@@ -532,7 +533,9 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — **RFC-0033** is provisional: its human-gated control-loop
+_Last updated: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
+authored chapters) from the observability section. Earlier the same day —
+**RFC-0033** is provisional: its human-gated control-loop
 proposal and Documentation Steward design are linked from the learning path; no runtime
 component is installed. The index contains 31 RFC records and 77 ADRs. Previously
 2026-09-25 — RFC-0033 research introduced the executable learning and knowledge plane.

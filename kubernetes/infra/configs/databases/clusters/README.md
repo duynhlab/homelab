@@ -144,4 +144,4 @@ fundamentals path.
 - **Database Architecture Overview**: [`docs/databases/architecture.md`](../../../../../docs/databases/architecture.md)
 - **Pooler inventory**: [`docs/databases/poolers.md`](../../../../../docs/databases/poolers.md)
 - **Monitoring Setup**: [`docs/observability/metrics/README.md`](../../../../../docs/observability/metrics/README.md)
-- **Replication Fundamentals**: [`docs/databases/fundamentals/replication.md`](../../../../../docs/databases/fundamentals/replication.md)
+- **Replication and slots**: [`docs/databases/fundamentals/12-replication-and-slots.md`](../../../../../docs/databases/fundamentals/12-replication-and-slots.md)

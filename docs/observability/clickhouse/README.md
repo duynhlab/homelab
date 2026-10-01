@@ -9,8 +9,8 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 |---|---|
 | **Status** | **Deployed** — local-stack + cluster (RFC-0019 Phase B) |
 | **Role** | **Supplementary** OLAP for logs+traces SQL. Runs **alongside** VictoriaLogs / VictoriaTraces (day-to-day ops primaries), which are **unchanged** |
-| **Engine** | `clickhouse/clickhouse-server:26.7`, ReplicatedMergeTree, **1 shard × 3 replicas** on a 3-node ClickHouse Keeper quorum |
-| **Operator** | Altinity `clickhouse-operator` `0.27.3` + a `ClickHouseInstallation` CR and a `ClickHouseKeeperInstallation` CR |
+| **Engine** | `clickhouse/clickhouse-server:26.8` (LTS), ReplicatedMergeTree, **1 shard × 3 replicas** on a 3-node ClickHouse Keeper quorum |
+| **Operator** | Altinity `clickhouse-operator` `0.27.4` + a `ClickHouseInstallation` CR and a `ClickHouseKeeperInstallation` CR |
 | **Ingest** | OTel Collector contrib `clickhouse` exporter — fan-out on the **traces + logs** pipelines (metrics stay on VictoriaMetrics — **never** here) |
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), created by the **`clickhouse-schema` Job** from DDL committed in git; the exporter only INSERTs |
 | **Retention** | `otel.*`: **TTL 90 days** (`ttl_only_drop_parts`) vs 7d on the ops primaries — the long-retention payoff; `otel_logs` / `otel_traces` parts older than **7 days move to the RustFS cold tier** first ([details](#cold-tier-on-rustfs)). The engine's own `system.*` log tables run [7–30 days from three different owners](#the-engines-own-log-tables) |
@@ -148,8 +148,8 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 
 | Aspect | Detail |
 |--------|--------|
-| **Engine** | `clickhouse/clickhouse-server:26.7`, ReplicatedMergeTree, 1 shard × 3 replicas ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)) |
-| **Operator** | Altinity `altinity-clickhouse-operator` `0.27.3` (HelmRelease in the `controllers` wave, ns `monitoring`); CRDs health-checked before the CHI applies (`kubernetes/infra/controllers/clickhouse-operator/`) |
+| **Engine** | `clickhouse/clickhouse-server:26.8` (LTS), ReplicatedMergeTree, 1 shard × 3 replicas ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)) |
+| **Operator** | Altinity `altinity-clickhouse-operator` `0.27.4` (HelmRelease in the `controllers` wave, ns `monitoring`); CRDs health-checked before the CHI applies (`kubernetes/infra/controllers/clickhouse-operator/`) |
 | **Instance** | `ClickHouseInstallation` `clickhouse` (cluster `otel`) → StatefulSets `chi-clickhouse-otel-0-{0,1,2}`, one per node (host anti-affinity); own Flux Kustomization `clickhouse-local` `dependsOn [controllers-local, secrets-local]`, health-checking **all three** (`kubernetes/infra/configs/clickhouse/`) |
 | **Coordination** | `ClickHouseKeeperInstallation` `keeper`, 3 replicas, referenced by name (`zookeeper.keeper.name`); holds the replication metadata. A replica that loses its Keeper session serves reads and refuses writes |
 | **Storage** | PVC `standard` `10Gi` per replica (`volumeClaimTemplates`) + keeper data `2Gi` (no log PVC — the operator's keeper logs to console); S3 disk `s3` on RustFS + cache disk `s3_cache` + policy `hot_cold` from `03-storage-rustfs.xml` on the CHI, credentials via `from_env` from `clickhouse-rustfs-credentials`; local-stack uses a named `clickhouse-data` volume |
@@ -604,7 +604,7 @@ The DDL is owned by the `clickhouse-schema` Job, but its *shape* still tracks
 | Schema | Exporter | `otel_logs` shape |
 |--------|----------|-------------------|
 | 1.2.9 | contrib < 0.151.0 | has `TimestampTime` |
-| **1.3.0** | contrib ≥ 0.151.0 | no `TimestampTime` — what both environments write (contrib `0.159.0`) |
+| **1.3.0** | contrib ≥ 0.151.0 | no `TimestampTime` — what both environments write (contrib `0.161.0`) |
 
 Plugin ≥ 4.20.0 **auto-detects the logs schema from the table's columns** when
 the version selector is on auto (latest); our provisioning deliberately does not
@@ -710,28 +710,43 @@ ones (`StatusCode` `Ok`/`Error`/`Unset`, `SpanKind` `Server`/`Client`/`Internal`
 and proto packages are named after the owning service, so "who calls product" is
 just client spans where `rpc.method LIKE 'product.v1.%'`.
 
-### Plugin-bundled dashboards (manual import — not GitOps)
+### Plugin-bundled dashboards (fetched by URL on the cluster)
 
-The datasource ships 7 reference dashboards (datasource config page →
-**Dashboards** tab). A UI import lives **only in that Grafana's database** — not
-in git, never on the cluster, wiped when the local volume is recreated:
+The datasource ships reference dashboards (datasource config page →
+**Dashboards** tab). On the **cluster**, six of them are delivered by the
+grafana-operator straight from the plugin repository: each `GrafanaDashboard`
+in
+[`grafana-dashboard-clickhouse-upstream.yaml`](../../../kubernetes/infra/configs/observability/grafana/dashboards/grafana-dashboard-clickhouse-upstream.yaml)
+sets `spec.url` to `src/dashboards/<board>.json` at the **same tag as the
+plugin pin** (`v4.22.0`), with `contentCacheDuration: 24h`. The OTel boards map
+their `DS_GRAFANA_CLICKHOUSE_DATASOURCE` input to the `ClickHouse` datasource.
+Renovate bumps the plugin pin and the URL tag in one PR. The boards keep the
+plugin's own uids, so a UI import of the same board is overwritten on the next
+sync. Do not import them from the UI there.
 
 | Dashboard (uid) | Group | What it is |
 |---|---|---|
 | ClickHouse - Query Analysis (`w5Q2Otank`) | **Server admin** | Query performance over `system.query_log` |
 | ClickHouse - Data Analysis (`-B3tt7a7z`) | Server admin | Table/parts/disk usage, compression |
-| ClickHouse - Cluster Analysis (`_hAsuzBnz`) | Server admin | Replication/distributed health (mostly N/A single-node) |
-| Advanced ClickHouse Monitoring (`e336c8cd-…`) | Server admin | Memory, merges, mark cache, background pools |
-| OpenTelemetry Logs Explorer (`otel-logs-explorer`) | **OTel reference** | Upstream generic version of our Logs Explorer |
-| OpenTelemetry Traces Explorer (`otel-traces-explorer`) | OTel reference | Upstream Trace Explorer — its heatmap hard-codes `% 500` sampling (near-empty at our volume) |
-| OpenTelemetry Service Dashboard (`otel-service-dashboard`) | OTel reference | Upstream per-service view — the deep dive covers this with verified enums/keys |
+| ClickHouse - Cluster Analysis (`_hAsuzBnz`) | Server admin | Replication/distributed health across the three replicas |
+| OpenTelemetry Logs Explorer (`otel-logs-explorer`) | **OTel** | Logs by service/level with free-text search; replaces our own explorer on the cluster |
+| OpenTelemetry Traces Explorer (`otel-traces-explorer`) | OTel | Trace search, duration and error panels |
+| OpenTelemetry Service Dashboard (`otel-service-dashboard`) | OTel | Per-service RED, operations, errors and correlated logs |
 
-The server-admin group watches ClickHouse *itself* (`system.*`) — a niche the
-in-repo suite doesn't cover; promote one to a provisioned JSON + CR if it earns
-a permanent place. Provisioned ClickHouse dashboards live in the **ClickHouse**
-Grafana folder on both environments (local: file provider
-`foldersFromFilesStructure` + `dashboards/ClickHouse/`; cluster: the CR
-`folder:` field).
+- **Unpatched, by choice (2026-10-01).** The URL serves upstream as-is, so
+  the `toStartOfFiveMinutes(Timestamp)` sort-key bound that #1142 added to the
+  `otel_logs` queries is gone: the Logs Explorer and the Service Dashboard's
+  logs panel read every granule of the time range again (423/423 instead of
+  6/423 measured on 26.7). Accepted for now; the fix belongs upstream, or the
+  two boards go back to a patched in-repo copy if they get slow.
+- **Runtime dependency:** the operator fetches from `raw.githubusercontent.com`
+  at most once a day per board. If GitHub is unreachable the last fetched
+  content stays.
+- **Not delivered:** `system-dashboards.json` (no uid, broken as shipped; our
+  `clickhouse-server-engine` covers it) and **Advanced ClickHouse Monitoring**
+  (UI import only).
+- **local-stack** does not provision them: it runs our own six boards, and the
+  plugin ones are a UI import there.
 
 ### Query performance rules
 
@@ -753,8 +768,8 @@ not appearing → [Runbook](#runbook--data-not-appearing).
 ## Metrics & alerting
 
 > **Deployed and audited.** The 2026-09-10 Kind audit observed all three server
-> scrapes, all four ClickHouse engine metric-producer paths, and all 22 rules loaded with
-> `health=ok`. See the [dated evidence](audits/2026-09-10-kind.md). The
+> scrapes, all four ClickHouse engine metric-producer paths, and all 22 rules then
+> deployed loaded with `health=ok` (23 are deployed today). See the [dated evidence](audits/2026-09-10-kind.md). The
 > local-stack does not run the operator, so operator and replication rules are
 > cluster-only.
 
@@ -939,11 +954,16 @@ GROUP BY event_type ORDER BY 2 DESC;
 ```
 - `NewPart` is an INSERT that landed **on this replica**. `DownloadPart` is a part
   another replica created and this one **fetched** through Keeper. That row only
-  exists on a replicated table, and it outnumbers `NewPart` because the
-  collector's INSERTs are spread across three replicas.
+  exists on a replicated table, and it outnumbers `NewPart` on any replica the
+  collector's long-lived connections do not land on — each signal's INSERTs stay
+  on one replica ([chapter 08](internals/08-ingestion-pipeline.md)).
 - `RemovePart` counts source parts deleted after a merge had replaced them.
 
-Force a merge and read the part names:
+Force a merge and read the part names — **local-stack only**. On the cluster,
+do not force it: watch natural merges instead, as
+[internals chapter 04](internals/04-parts-and-merges.md) does with two snapshots
+([why](parts-merges-and-ttl.md#safe-practice-lab)). The output below was captured
+on Kind on 2026-09-29, before that rule was made consistent across these pages.
 
 ```sql
 SELECT count() FROM system.parts WHERE database='otel' AND table='otel_logs' AND active;  -- 3
@@ -958,7 +978,9 @@ WHERE database='otel' AND table='otel_logs' AND active ORDER BY name;
 └────────────┴────────────────────┴────────┴───────┘
 ```
 A part name is `<partition>_<min block>_<max block>_<level>`. `0_456_17` holds
-blocks 0–456 and has been merged 17 times. `457_457_0` is a **brand-new** insert
+blocks 0–456; level 17 is the depth of the merge chain behind it, not a count
+of merges (one merge takes the highest input level plus one —
+[chapter 04](internals/04-parts-and-merges.md)). `457_457_0` is a **brand-new** insert
 that arrived while `OPTIMIZE` ran: `FINAL` merges what exists, and ingest never
 stops.
 
@@ -1051,7 +1073,9 @@ service-sorted main table. Inspect `system.parts` on the **target**
 > On the cluster the `otel` database is `ENGINE = Replicated`, so a `CREATE TABLE`
 > there is replicated to all three hosts. Experiment in a scratch database of
 > your own (`CREATE DATABASE scratch` on one replica is local to it) and drop it
-> afterwards; `OPTIMIZE` on the `otel` tables is harmless.
+> afterwards. Do not run `OPTIMIZE` on the cluster's `otel` tables: it spends
+> merge I/O the scheduler would pace and erases the part evidence you came to see
+> ([safe practice lab](parts-merges-and-ttl.md#safe-practice-lab)).
 
 ---
 
@@ -1137,6 +1161,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
+_Last updated: 2026-10-01 — plugin-bundled dashboards fetched by URL at the plugin tag (no local patch; the #1142 sort-key bound is dropped). Earlier the same day: vendored on the cluster from v4.22.0 (the old "manual import" text was stale). Earlier: 2026-09-30 — server 26.8 LTS with asynchronous_metrics_key_values_mode=both (Keeper follows separately); operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
 credential-safe query examples, and current runtime evidence for parts, TTL,
 cold storage, and the 22-rule ClickHouse alert group._

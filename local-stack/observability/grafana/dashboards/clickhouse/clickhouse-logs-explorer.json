@@ -209,7 +209,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, lower(SeverityText) AS level, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY time, level ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, lower(SeverityText) AS level, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY time, level ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.20.0"
@@ -350,7 +350,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT lower(SeverityText) AS level, count() AS c FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY level ORDER BY c DESC",
+          "rawSql": "SELECT lower(SeverityText) AS level, count() AS c FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY level ORDER BY c DESC",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -486,7 +486,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT ServiceName, count() AS logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY ServiceName ORDER BY logs DESC LIMIT 12",
+          "rawSql": "SELECT ServiceName, count() AS logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY ServiceName ORDER BY logs DESC LIMIT 12",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -559,7 +559,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, lower(SeverityText) AS level, ServiceName, TraceId, SpanId, LogAttributes['event'] AS event, if(LogAttributes['http.route'] != '', LogAttributes['http.route'], LogAttributes['rpc.method']) AS route, if(LogAttributes['http.response.status_code'] != '', LogAttributes['http.response.status_code'], LogAttributes['rpc.response.status_code']) AS status FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) ORDER BY Timestamp DESC LIMIT 200",
+          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, lower(SeverityText) AS level, ServiceName, TraceId, SpanId, LogAttributes['event'] AS event, if(LogAttributes['http.route'] != '', LogAttributes['http.route'], LogAttributes['rpc.method']) AS route, if(LogAttributes['http.response.status_code'] != '', LogAttributes['http.response.status_code'], LogAttributes['rpc.response.status_code']) AS status FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) ORDER BY Timestamp DESC LIMIT 200",
           "format": 2,
           "queryType": "logs",
           "pluginVersion": "4.20.0"
@@ -635,7 +635,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Body, count() AS occurrences, uniqExact(ServiceName) AS services, max(Timestamp) AS last_seen, anyIf(TraceId, TraceId != '') AS sample_trace FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND SeverityNumber >= 17 AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) GROUP BY Body ORDER BY occurrences DESC LIMIT 15",
+          "rawSql": "SELECT Body, count() AS occurrences, uniqExact(ServiceName) AS services, max(Timestamp) AS last_seen, anyIf(TraceId, TraceId != '') AS sample_trace FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND SeverityNumber >= 17 AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) GROUP BY Body ORDER BY occurrences DESC LIMIT 15",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -713,7 +713,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, ServiceName, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY time, ServiceName ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, ServiceName, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service) AND $__conditionalAll(lower(SeverityText) IN (${severity:singlequote}), $severity) AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) AND $__conditionalAll(TraceId = '$traceid', $traceid) GROUP BY time, ServiceName ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.20.0"

@@ -437,6 +437,27 @@ validate_service_namespaces() {
   done
 }
 
+validate_deny_all_single_owner() {
+  # deny-all-ingress in an app-tier namespace has ONE owner: the Kyverno
+  # GeneratingPolicy default-deny-networkpolicy (ADR-078 step 4). Until then
+  # network-policies/ also shipped static copies of the same objects, so Flux
+  # and Kyverno fought over them. Refuse a static deny-all-ingress for any
+  # namespace namespaces.yaml labels platform.duynhlab.dev/tier: app.
+  local ns_file="kubernetes/infra/controllers/namespaces.yaml"
+  local np_dir="kubernetes/infra/configs/network-policies"
+  local app_ns static ns
+  echo "INFO - Checking deny-all-ingress has one owner in app-tier namespaces"
+  app_ns=$(yq -N eval-all 'select(.kind == "Namespace" and .metadata.labels."platform.duynhlab.dev/tier" == "app") | .metadata.name' "${ns_file}")
+  static=$(kustomize build "${np_dir}" | yq -N eval-all 'select(.kind == "NetworkPolicy" and .metadata.name == "deny-all-ingress") | .metadata.namespace')
+  for ns in ${static}; do
+    if grep -qx "${ns}" <<<"${app_ns}"; then
+      echo "ERROR - ${np_dir}: static deny-all-ingress for app-tier namespace '${ns}'; the GeneratingPolicy default-deny-networkpolicy owns it — remove the manifest" >&2
+      exit 1
+    fi
+  done
+  echo "  app-tier namespaces: $(wc -w <<<"${app_ns}"), static deny-all-ingress outside them: $(wc -w <<<"${static}")"
+}
+
 validate_rustfs_bucket_lists() {
   echo "INFO - Validating RustFS bucket lists agree"
   local job="kubernetes/infra/controllers/storage/rustfs/job-setup-buckets.yaml"
@@ -460,6 +481,7 @@ validate_clickhouse_embedded_xml
 validate_clickhouse_replica_count
 validate_rustfs_bucket_lists
 validate_service_namespaces
+validate_deny_all_single_owner
 validate_clickhouse_ddl_reference
 validate_production
 echo "INFO - All validations passed"

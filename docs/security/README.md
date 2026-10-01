@@ -10,9 +10,9 @@ whom once admitted (east-west micro-segmentation on kindnet, which enforces).
 |---|---|
 | Admission engine | Kyverno (chart `3.9.1`, engine v1.19.1, single-replica controllers on Kind) |
 | Policies | 7 deployed (Audit, except `disallow-default-namespace` which Enforces) + 1 disabled + 3 planned — [catalog](policy-catalog.md) |
-| PSS | `pss-baseline` Audit cluster-wide; `pss-restricted-apps` **disabled 2026-08-17** — [known gaps](policy-catalog.md#known-gaps--history) |
+| PSS | baseline Audit cluster-wide (ten CEL ValidatingPolicies under `cluster-policies/pss-baseline/`, ADR-078); `pss-restricted-apps` **disabled 2026-08-17** — [known gaps](policy-catalog.md#known-gaps--history) |
 | Exceptions | 2 registered, owner + expiry mandatory, accepted only from ns `kyverno` — [registry](policy-exceptions.md) |
-| Segmentation | 26 committed NetworkPolicies (12 namespaces) + floci fence + Kyverno-generated `deny-all-ingress` per app namespace — [caller matrix](network-policies.md) |
+| Segmentation | 15 committed NetworkPolicies (12 namespaces) + floci fence + Kyverno-generated `deny-all-ingress` per app namespace (its only owner) — [caller matrix](network-policies.md) |
 | Verification | `make validate` · `scripts/edge-isolation-sweep.sh` · `scripts/db-isolation-sweep.sh` |
 
 ## What to read
@@ -59,4 +59,4 @@ flowchart LR
 - [docs/api/identity.md](../api/identity.md) — where a token is verified, and why the edge is not authoritative
 
 ---
-_Last updated: 2026-09-28 — Kyverno chart 3.9.1 / engine v1.19.1 (RFC-0032 prerequisite). Previously 2026-08-24 — policy count trued up: 7 deployed + 1 disabled (`pss-restricted-apps`) rather than 8 deployed, matching the [platform guide's inventory](../platform/kyverno.md#policy-inventory). Adds the Keycloak and identity cross-links. Previously — 2026-08-19: hub created (the folder was the last docs area without one)._
+_Last updated: 2026-09-30 — PSS baseline is ten CEL ValidatingPolicies (ADR-078 step 3). Earlier: 2026-09-28 — Kyverno chart 3.9.1 / engine v1.19.1 (RFC-0032 prerequisite). Previously 2026-08-24 — policy count trued up: 7 deployed + 1 disabled (`pss-restricted-apps`) rather than 8 deployed, matching the [platform guide's inventory](../platform/kyverno.md#policy-inventory). Adds the Keycloak and identity cross-links. Previously — 2026-08-19: hub created (the folder was the last docs area without one)._

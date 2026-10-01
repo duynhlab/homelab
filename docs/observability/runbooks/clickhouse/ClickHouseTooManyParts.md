@@ -74,8 +74,10 @@ max by (hostname) (chi_clickhouse_metric_PartsActive)
    *not* a source of merge pressure there. The `system.*` tables use the default
    `0` and do rewrite — see the hub's
    [Partitions and TTL](../../clickhouse/fundamentals.md#the-alignment-rule).
-4. `OPTIMIZE TABLE … FINAL` is a last resort, not a routine fix: it forces a full
-   merge and will make CPU and disk worse before better.
+4. Forcing a merge is the last step, not a routine fix: a targeted
+   `OPTIMIZE TABLE otel.<table> PARTITION '<day>'`, only after steps 1–3, and
+   never `FINAL` on a whole table. It makes CPU and disk worse before better —
+   conditions in the [correct response order](../../clickhouse/parts-merges-and-ttl.md#correct-response-order).
 
 ## Escalation
 
@@ -89,4 +91,4 @@ Warning. Escalate if it is climbing rather than flat, or if
   disk.
 
 ---
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_
+_Last updated: 2026-09-30 — forced merge aligned with the correct response order (targeted partition, never `FINAL`). Earlier: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

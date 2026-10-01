@@ -1,7 +1,11 @@
+# RE-ENABLING (ADR-078, 2026-09-30): do NOT uncomment the legacy ClusterPolicy
+# below — Kyverno 1.20 no longer loads kyverno.io/v1. Vendor the CEL set
+# kyverno/policies pod-security-vpol/restricted the way cluster-policies/
+# pss-baseline/ vendors the baseline set, scoped to the app namespaces.
 # Pod Security Standard — restricted profile (app namespaces only)
 #
-# DISABLED 2026-08-17. The whole policy is commented out below, verbatim, so
-# re-enabling it is uncommenting rather than rewriting.
+# DISABLED 2026-08-17. The whole policy is commented out below, verbatim, as
+# the record of what ran (see RE-ENABLING above: it is not revivable as-is).
 #
 # WHY
 # The Kind audit ran this policy against a real cluster for the first time and
@@ -27,7 +31,7 @@
 # Then uncomment this file and its entry in kustomization.yaml, keep it in
 # Audit until the reports are clean, and only then consider Enforce.
 #
-# NOTE: pss-baseline is untouched and still runs. This disables the stricter
+# NOTE: the PSS baseline (cluster-policies/pss-baseline/) is untouched and still runs. This disables the stricter
 # profile only.
 #
 # # Pod Security Standard — restricted profile (app namespaces only)

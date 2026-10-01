@@ -131,17 +131,10 @@ Design **before** building when the change is substantial or contested.
 
 ## Contribution workflow
 
-**Commits**
-- **No attribution trailers** (`Signed-off-by`, `Co-authored-by`, `Assisted-by`,
-  `Generated-by`, etc.).
-- **Subject:** ≤50 chars, capitalised, imperative, no trailing period.
-- **Body:** what + why, wrap 72; no `Fixes #123` or @-mentions in commits.
-
-**Branches**
-- **Never push to `main`.** Branch → PR → squash-merge.
-- Prefix: `feat/` `fix/` `chore/` `docs/` `refactor/` `ci/`.
-- `git config user.email` = duynhlab identity; **`gh auth switch --user duynhne`**
-  for PRs.
+Commit and branch rules (no attribution trailers, subject/body shape, never
+push to `main`, branch prefixes, duynhlab identity) live in
+[AGENTS.md § Contribution workflow](../../../AGENTS.md#contribution-workflow) —
+one owner, no copies.
 
 ## IDE skills map
 

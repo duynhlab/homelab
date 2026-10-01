@@ -324,7 +324,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT count() AS error_logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND SeverityNumber >= 17",
+          "rawSql": "SELECT count() AS error_logs FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND SeverityNumber >= 17",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -578,7 +578,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, lower(SeverityText) AS level, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) GROUP BY time, level ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(Timestamp) AS time, lower(SeverityText) AS level, count() AS lines FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) GROUP BY time, level ORDER BY time",
           "format": 0,
           "queryType": "timeseries",
           "pluginVersion": "4.20.0"
@@ -845,7 +845,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT ServiceName, count() AS error_logs, max(Timestamp) AS last_seen FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND SeverityNumber >= 17 GROUP BY ServiceName ORDER BY error_logs DESC LIMIT 10",
+          "rawSql": "SELECT ServiceName, count() AS error_logs, max(Timestamp) AS last_seen FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND SeverityNumber >= 17 GROUP BY ServiceName ORDER BY error_logs DESC LIMIT 10",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"
@@ -932,7 +932,7 @@
             "uid": "${ds}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp, ServiceName, lower(SeverityText) AS SeverityText, Body, TraceId FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND SeverityNumber >= 17 ORDER BY Timestamp DESC LIMIT 15",
+          "rawSql": "SELECT Timestamp, ServiceName, lower(SeverityText) AS SeverityText, Body, TraceId FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND toStartOfFiveMinutes(Timestamp) >= toStartOfFiveMinutes($__fromTime) AND toStartOfFiveMinutes(Timestamp) <= $__toTime AND $__conditionalAll(`__otel_materialized_deployment.environment.name` IN (${environment:singlequote}), $environment) AND SeverityNumber >= 17 ORDER BY Timestamp DESC LIMIT 15",
           "format": 1,
           "queryType": "table",
           "pluginVersion": "4.20.0"

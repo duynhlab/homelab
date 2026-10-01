@@ -85,7 +85,9 @@ ClickHouseMetrics_Merge{job="clickhouse-server"}
    settings (`sending_queue`, `timeout`) are the lever — bigger, less frequent
    batches. That change lives in the collector config, not in ClickHouse.
 4. `OPTIMIZE TABLE otel.<table> PARTITION '<day>'` forces a merge pass on one
-   partition; it is safe and reversible, but it treats the symptom.
+   partition. It is the last step, after 1–3: it treats the symptom, spends the
+   merge I/O the backlog lacks, and cannot be undone — conditions in the
+   [correct response order](../../clickhouse/parts-merges-and-ttl.md#correct-response-order).
 5. Do **not** raise `parts_to_throw_insert` to make room. The guard protects
    query performance and merge memory; raising it moves the failure to reads.
 
@@ -102,4 +104,4 @@ insert cadence; one replica points at that replica's merges.
 - [ClickHouseInsertsDelayed](ClickHouseInsertsDelayed.md) → [ClickHouseInsertsRejected](ClickHouseInsertsRejected.md) — the next two links.
 
 ---
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream threshold 100; ours is 300, the value ClickHouse's own metric description calls abnormal)_
+_Last updated: 2026-09-30 — `OPTIMIZE … PARTITION` is the last step and cannot be undone (was "safe and reversible"). Earlier: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream threshold 100; ours is 300, the value ClickHouse's own metric description calls abnormal)_

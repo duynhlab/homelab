@@ -11,7 +11,7 @@ dedicated source tails the proxy pods again for their **runtime lines only**.
 
 | | |
 |---|---|
-| **Deployment** | Helm chart `vector` `0.57.0`, `role: Agent` (DaemonSet), ns `kube-system` |
+| **Deployment** | Helm chart `vector` `0.58.0`, `role: Agent` (DaemonSet), ns `kube-system` |
 | **Sources** | `kubernetes_logs` (`extra_label_selector: platform.duynhlab.dev/otlp-logs!=true`) + `envoy_proxy_logs` (ADR-061: proxy pods only, runtime lines only) |
 | **Sinks** | 3 × VictoriaLogs jsonline (`all`, `pg_plans`, `pg_parse_failures`) + `otel_clickhouse` (OTLP → collector `:4319` → ClickHouse `otel_logs`) + `prometheus_exporter` `:9090` |
 | **Resources** | requests `20m` / `32Mi`, limits `200m` / `256Mi` |
@@ -272,16 +272,19 @@ up{job="vector"}                                                   # agent healt
 rate(vector_events_processed_total[5m])                            # events/sec by component
 rate(vector_component_errors_total[5m])                            # error rate
 rate(vector_component_sent_bytes_total{component_name=~"victorialogs.*"}[5m])  # sink throughput
-vector_buffer_events                                               # buffer depth
+vector_buffer_size_events                                          # buffer depth
 ```
 
 The **Vector dashboard (Grafana.com ID `21954`) is provisioned by GitOps** —
 [`grafana-dashboard-vector.yaml`](../../../kubernetes/infra/configs/observability/grafana/dashboards/grafana-dashboard-vector.yaml),
 folder *Platform / Infrastructure* — covering events/sec, error rates, buffer
-utilization, and throughput. No Vector-specific alert rules are deployed;
+utilization, and throughput. Known gap since Vector 0.58: the board is the
+upstream revision, and its buffer-bytes panel still reads the removed
+`vector_buffer_byte_size` gauge, so it stays empty; the replacement is
+`vector_buffer_size_bytes`. No Vector-specific alert rules are deployed;
 suggested starting points if the pipeline earns them: error rate
 (`rate(vector_component_errors_total[5m]) > 10`), buffer overflow
-(`vector_buffer_events > 10000`), low throughput
+(`vector_buffer_size_events > 10000`), low throughput
 (`rate(vector_events_processed_total[5m]) < 100`).
 
 ## Troubleshooting
@@ -352,7 +355,7 @@ Query-side symptoms (logs ingested but blank in Grafana) are
 
 ---
 
-_Last updated: 2026-09-29 — second log path: the same lines also reach ClickHouse `otel_logs` via `to_otlp` → `otel_clickhouse` → the collector's `otlp/vector` receiver; OpenBao audit fields extracted. Previously 2026-08-25 — ADR-061 adds the edge-runtime carve-out: a second
+_Last updated: 2026-09-30 — chart 0.58.0; buffer gauges renamed (`vector_buffer_size_events`/`_bytes`), upstream board buffer-bytes panel gap noted. Earlier: 2026-09-29 — second log path: the same lines also reach ClickHouse `otel_logs` via `to_otlp` → `otel_clickhouse` → the collector's `otlp/vector` receiver; OpenBao audit fields extracted. Previously 2026-08-25 — ADR-061 adds the edge-runtime carve-out: a second
 `kubernetes_logs` source scoped to the EG proxy pods whose filter keeps only
 non-JSON runtime lines (the access log is ClickHouse-only now). Earlier the same
 day: the PostgreSQL pipeline section was rebuilt hop-by-hop after a live audit

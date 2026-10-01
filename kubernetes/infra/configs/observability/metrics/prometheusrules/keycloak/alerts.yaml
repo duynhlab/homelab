@@ -31,7 +31,15 @@ spec:
 
         - alert: KeycloakRestartLoop
           expr: |
-            increase(kube_pod_container_status_restarts_total{namespace="identity", container="keycloak"}[15m]) > 2
+            # BLIND until 2026-09-30: this selected namespace="identity",
+            # container="keycloak", but on a kube-state-metrics series those
+            # labels name the KSM pod (kube-system/kube-state-metrics; no
+            # honorLabels), so it could never match. Select the exported
+            # identity and copy it back for the annotation.
+            label_replace(label_replace(
+              increase(kube_pod_container_status_restarts_total{exported_namespace="identity", exported_container="keycloak"}[15m]) > 2,
+            "namespace", "$1", "exported_namespace", "(.+)"),
+            "pod", "$1", "exported_pod", "(.+)")
           for: 0m
           labels:
             severity: warning

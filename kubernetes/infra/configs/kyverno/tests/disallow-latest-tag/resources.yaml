@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: schema
-      image: clickhouse/clickhouse-server:26.7
+      image: clickhouse/clickhouse-server:26.8
   volumes:
     - name: sql
       image:
@@ -24,7 +24,7 @@ metadata:
 spec:
   containers:
     - name: schema
-      image: clickhouse/clickhouse-server:26.7
+      image: clickhouse/clickhouse-server:26.8
   volumes:
     - name: sql
       image:
@@ -42,3 +42,40 @@ spec:
   volumes:
     - name: tmp
       emptyDir: {}
+---
+# No tag at all: the first check fails.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: untagged-image
+  namespace: monitoring
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/user-service/user-service
+---
+# `:latest` on the main container.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: latest-container
+  namespace: monitoring
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/user-service/user-service:latest
+---
+# `:latest` hidden in an initContainer: the container list includes init and
+# ephemeral containers, exactly as the legacy =(initContainers) pattern did.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: latest-init-container
+  namespace: monitoring
+spec:
+  initContainers:
+    - name: migrate
+      image: ghcr.io/duynhlab/user-service/user-service:latest
+  containers:
+    - name: app
+      image: ghcr.io/duynhlab/user-service/user-service:2.4.0

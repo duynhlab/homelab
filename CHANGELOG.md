@@ -132,6 +132,15 @@ Skeleton (copy what you need):
   to 1000. Renovate now tracks both plugins' release URL, `GrafanaDatasource`
   and compose pins, one grouped PR per plugin.
 
+#### Services
+- **The fleet runs the 2026-10-01 patch releases**: user 2.4.1, product
+  1.15.1, inventory 0.8.1, cart 2.3.1, order 2.9.1, review 2.3.1, shipping
+  1.8.1, notification 2.3.1, payment 2.5.1, checkout 0.12.1, the two workers
+  on the same tags (#1176), and mockpay on payment 2.5.1. Escaped DSN
+  credentials, pgx 5.11, dbx v0.37.0 and alpine 3.24 reach the cluster. Every
+  tag passed the full local-stack release audit (A/B/C + C22) on its merged
+  SHA before it was cut.
+
 ## [1.0.0] - 2026-10-01
 
 <!-- markdown-link-check-disable -->

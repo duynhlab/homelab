@@ -1127,7 +1127,8 @@ no poller does not fail — it goes quiet, which is why `OrderSagaNotCompleting`
 the backstop. Under ADR-030 a human kept that from happening by reading
 `describe-version` before deleting a file. Under ADR-054 `sunset` keeps it from
 happening on its own: a version is scaled to zero only an hour after the server
-reports it `drained`, and deleted a day after that. It is still reachable by
+reports it `drained`, and deleted on the next reconcile after that
+(`deleteDelay: 0s`, ADR-055). It is still reachable by
 force — deleting the `WorkerDeployment`, or scaling a draining version to zero by
 hand — which is why the shape is worth knowing rather than forgetting.
 
@@ -1198,9 +1199,11 @@ flowchart TD
 > judging it. **Resources removed** was that same human deleting a file. The first is
 > now a policy in the manifest, the second is a field, and the third is a timer.
 >
-> The two delays are the margin for the second answer being wrong: an hour with the
-> pods at zero before anything is deleted, and a day before the resources go — so a
-> version that was called drained too early can still be scaled back up.
+> The margin for the second answer being wrong is the hour between `drained` and zero:
+> the pods keep polling through it, so a version called drained too early still serves
+> what it holds. After that nothing waits — `deleteDelay: 0s` (ADR-055) removes the
+> Deployment and its `ScaledObject` on the next reconcile, because any longer delay
+> would let KEDA raise the zeroed version back to its floor.
 
 ### As-Built Notes and Roadmap
 

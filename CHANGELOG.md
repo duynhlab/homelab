@@ -113,6 +113,19 @@ Skeleton (copy what you need):
   `DB_USER`/`DB_PASSWORD` defaults are gone from the service anchor, so a
   consumer without its own role fails at start instead of borrowing one.
 
+#### Docs
+- **A second Draw.io diagram shows one worker release, and the work-layer
+  diagram matches the manifests again.** `workflows/temporal-worker-versions`
+  draws order-fulfillment mid-ramp: build A Current and build B Ramping, each
+  with its own Deployment and ScaledObject, the Worker Controller setting
+  Ramping and Current on the server, and KEDA scaling each build on its own
+  backlog. Nothing is dashed, because every object in it is deployed.
+  `workflows/temporal-keda` now carries the 2.9.1 / 0.12.1 worker tags,
+  controller 1.9.0, the controller's edges to the server and to KEDA, polls
+  drawn from the worker, and the workers' database writes. `api/temporal.md`
+  no longer says a drained version is deleted a day later; `deleteDelay` is
+  `0s`.
+
 ### Bugfix
 
 #### Databases

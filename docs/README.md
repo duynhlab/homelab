@@ -44,7 +44,7 @@ docs/
 │   ├── databases/topology.ir.yaml # Every Postgres connection + WAL/backup → DR recovery path
 │   ├── secrets/pipeline.ir.yaml  # OpenBao → ESO → Secrets → pods; unseal, rotation, edge TLS, CA bundle
 │   ├── security/network-policies.ir.yaml # NetworkPolicy allows into the data and identity tier
-│   └── workflows/temporal-keda.ir.yaml # Temporal work layer, Worker Controller rollout, KEDA scaling
+│   └── workflows/                # temporal-keda (work layer: starters, queues, workers, controllers) · temporal-worker-versions (one release: builds, rollout, per-build scaling)
 ├── frontend/                     # Browser apps at the platform layer (build, expose, watch)
 │   ├── README.md                 # Area hub: storefront + admin portal, the build-arg contract
 │   └── admin-portal/             # The operator portal in depth

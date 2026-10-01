@@ -1,0 +1,106 @@
+# Source of docs/architecture/workflows/temporal-worker-versions.drawio (companion to
+# workflows/temporal-keda) -- edit this, then regenerate:
+#   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/workflows/temporal-worker-versions.ir.yaml
+# Question: what exists, and who writes what, while one release of the order worker
+# rolls out -- a snapshot taken mid-ramp, with the steps before and after in the notes.
+# Verified on 2026-10-01 against:
+#   kubernetes/apps/order-worker.yaml (WorkerDeployment order-fulfillment: no spec.replicas,
+#     rollout Progressive 10 % / 30 s -> 50 % / 30 s, sunset scaledownDelay 1h deleteDelay 0s,
+#     server-side name order/order-fulfillment, build ID derived from image + pod template)
+#   kubernetes/apps/order-fulfillment-scaler.yaml (WorkerResourceTemplate -> ScaledObject,
+#     min 1, max 3, pollingInterval 15, cooldownPeriod 120, trigger temporal, targetQueueSize 5,
+#     "" sentinels the controller fills with deployment name, build ID and namespace)
+#   kubernetes/infra/controllers/temporal/worker-controller-helmrelease.yaml (allowedResources
+#     ScaledObject; controller 1.9.0), kubernetes/infra/controllers/keda/helmrelease.yaml (2.20.2)
+#   kubernetes/clusters/local/apps.yaml (apps-local: wait true, timeout 10m, after keda-local)
+#   docs/api/temporal.md § Worker Deployment Versioning, docs/platform/worker-autoscaling.md
+# checkout-abandon (checkout-worker.yaml + checkout-abandon-scaler.yaml) has the same shape
+# (ADR-064), so it is named in a note rather than drawn twice.
+diagram:
+  id: temporal-worker-versions
+  title: "duynhlab homelab — One worker release: builds, rollout and per-build scaling"
+  scope: "order-fulfillment mid-rollout: build A is Current, build B is Ramping. Shows which object the release edits, what the Worker Controller and KEDA each write, and how each build reaches the server. Who starts workflows and what activities call is workflows/temporal-keda."
+  question: delivery
+  level: L3
+  animate: [event]
+  pin_order: false
+  legend:
+    roles:
+      external: "Off-cluster source"
+      platform: "Controller / Temporal server"
+      worker: "order-fulfillment's own objects"
+    edges:
+      control: "writes / reconciles"
+      dependency: "reads"
+      event: "task-queue long-poll (worker -> server)"
+
+# oci has its own top tier: on a shared tier generate.py emits the cluster frame
+# before root nodes, so dot always puts an unframed peer to its right.
+# ScaledObject and Deployment share one tier so no controller edge skips a tier.
+# KEDA shares the controller's tier: one control-plane row (builds vs replicas).
+# Unpinned measured 4 crossings; pinned 8 with KEDA on either side.
+layers: [ext, src, decl, ctl, live, server]
+
+boundaries:
+  - {id: f_cluster, label: "Kind cluster · homelab"}
+  - {id: f_flux, label: "flux-system namespace", parent: f_cluster}
+  - {id: f_decl, label: "order namespace — declared in Git", parent: f_cluster}
+  - {id: f_ctl, label: "temporal namespace — controller", parent: f_cluster}
+  - {id: f_keda, label: "keda namespace", parent: f_cluster}
+  - {id: f_live, label: "order namespace — one set per live build", parent: f_cluster}
+  - {id: f_a, label: "build A — Current, then draining", parent: f_live}
+  - {id: f_b, label: "build B — Ramping, then Current", parent: f_live}
+  - {id: f_temporal, label: "temporal namespace", parent: f_cluster}
+
+nodes:
+  - {id: oci, label: "apps-oci artifact (local registry)\nbuilt from kubernetes/apps by make flux-push", role: external, layer: ext}
+  - {id: flux, label: "Flux · apps-local\nwait: true · timeout 10m", role: platform, layer: src, parent: f_flux, icon: flux}
+
+  - {id: wd, label: "WorkerDeployment order-fulfillment\nthe release edits image: only\nProgressive 10 % → 50 % · 30 s each\nsunset 1 h · delete 0 s · no replicas", role: worker, layer: decl, parent: f_decl}
+  - {id: wrt, label: "WorkerResourceTemplate\norder-fulfillment-scaler\nScaledObject: min 1 · max 3 · target 5", role: worker, layer: decl, parent: f_decl}
+
+  - {id: twc, label: "temporal-worker-controller 1.9.0\nowns builds, not replicas", role: platform, layer: ctl, parent: f_ctl, icon: temporal}
+  - {id: keda, label: "KEDA 2.20.2\ntemporal scaler · poll 15 s", role: platform, layer: ctl, parent: f_keda, icon: keda}
+
+  - {id: so_a, label: "ScaledObject + HPA · build A\n1–3 pods = ceil(backlog A / 5)", role: worker, layer: live, parent: f_a}
+  - {id: so_b, label: "ScaledObject + HPA · build B\n1–3 pods = ceil(backlog B / 5)", role: worker, layer: live, parent: f_b}
+
+  - {id: dep_a, label: "Deployment · build A\nnew runs: 90 % → 50 % → none\nkeeps its pinned runs · floor 1 pod", role: worker, layer: live, parent: f_a, icon: go}
+  - {id: dep_b, label: "Deployment · build B\nnew runs: 10 % → 50 % → all\nfloor 1 pod from creation", role: worker, layer: live, parent: f_b, icon: go}
+
+  - {id: server, label: "Temporal server 1.31.2 · namespace mop\nworker deployment order/order-fulfillment\nCurrent · Ramping % · drainage per build", role: platform, layer: server, parent: f_temporal, icon: temporal}
+
+edges:
+  - {id: e_pull, source: oci, target: flux, type: dependency, label: "pulled by Flux"}
+  - {id: e_wd, source: flux, target: wd, type: control, label: "applies"}
+  - {id: e_wrt, source: flux, target: wrt, type: control, label: "applies"}
+
+  - {id: e_watch, source: wd, target: twc, type: dependency, label: "pod template · rollout · sunset"}
+  - {id: e_tpl, source: wrt, target: twc, type: dependency, label: "template"}
+
+  - {id: c_so_a, source: twc, target: so_a, type: control, label: "renders, injects build ID"}
+  - {id: c_so_b, source: twc, target: so_b, type: control, label: "renders, injects build ID"}
+  - {id: c_dep_a, source: twc, target: dep_a, type: control, label: "created at A's release"}
+  - {id: c_dep_b, source: twc, target: dep_b, type: control, label: "creates (ID = image + template hash)"}
+  - {id: c_server, source: twc, target: server, type: control, label: "sets Ramping → Current · reads drainage"}
+
+  - {id: k_a, source: keda, target: so_a, type: control, label: "drives"}
+  - {id: k_b, source: keda, target: so_b, type: control, label: "drives"}
+  - {id: k_backlog, source: keda, target: server, type: dependency, label: "backlog per build ID"}
+
+  - {id: s_a, source: so_a, target: dep_a, type: control, label: "replicas"}
+  - {id: s_b, source: so_b, target: dep_b, type: control, label: "replicas"}
+
+  - {id: p_a, source: dep_a, target: server, type: event, label: "polls as build A"}
+  - {id: p_b, source: dep_b, target: server, type: event, label: "polls as build B"}
+
+notes:
+  - id: note_steps
+    title: "One release, in order"
+    text: "1 The image tag in order-worker.yaml changes and Flux applies it. 2 The controller derives build B and creates its Deployment and ScaledObject; B starts at one pod and polls, but gets no new work yet. 3 The controller ramps new workflow starts onto B through the Temporal API: 10 % for 30 s, 50 % for 30 s, then Current. Pinned runs never move. 4 KEDA scales each build on its own backlog, so B grows with new work while A falls back to its floor of one pod. 5 When the server reports A drained, the controller waits 1 h, sets A to 0 pods and deletes A's Deployment and ScaledObject on the next reconcile."
+  - id: note_style
+    title: "Why nothing here is dashed"
+    text: "Every box exists during every release: build A and build B both run until A drains, and the extra pods KEDA adds are real pods. Dashes in this repo mean planned or optional, so a transient but deployed object is drawn solid and its lifetime is in its label. The sunset is the one replica write the controller keeps after handing replicas to KEDA (step 5), and it is written in the text rather than as an edge. checkout-abandon has the same objects (checkout-worker.yaml, checkout-abandon-scaler.yaml)."
+
+tests:
+  - {rule: gitops-has-reconciler, nodes: [dep_a, dep_b, so_a, so_b, wd, wrt]}

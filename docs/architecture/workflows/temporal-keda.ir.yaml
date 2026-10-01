@@ -1,16 +1,30 @@
 # Source of docs/architecture/workflows/temporal-keda.drawio -- edit this, then regenerate:
 #   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/workflows/temporal-keda.ir.yaml
-# Verified on 2026-09-28 against kubernetes/apps/{order-worker,checkout-worker}.yaml
-# (Connection, WorkerDeployment, TASK_QUEUE, image, rollout, sunset),
-# kubernetes/apps/{order-fulfillment,checkout-abandon}-scaler.yaml (WorkerResourceTemplate
-# → ScaledObject, trigger `temporal`), controllers/temporal/helmrelease.yaml (server 1.31.2,
-# namespace mop, platform-db persistence), controllers/temporal/worker-controller*.yaml,
-# controllers/keda/helmrelease.yaml, configs/envoy-gateway/routes/temporal.yaml and
-# docs/api/temporal.md (who starts which workflow).
+# Re-verified on 2026-10-01 against:
+#   kubernetes/apps/order-worker.yaml (Connection, WorkerDeployment, no spec.replicas, rollout
+#     Progressive 10/30s -> 50/30s, sunset 1h/0s, image order-service:2.9.1, TASK_QUEUE
+#     order-fulfillment, DB_HOST pgdog-product / DB_NAME order, activity targets)
+#   kubernetes/apps/checkout-worker.yaml (same shape, image checkout-service:0.12.1, queue
+#     checkout, DB_NAME checkout via pgdog-product)
+#   kubernetes/apps/{order-fulfillment,checkout-abandon}-scaler.yaml (WorkerResourceTemplate ->
+#     ScaledObject: min 1, max 3, pollingInterval 15, cooldown 120, temporal trigger
+#     targetQueueSize 5, build-id sentinels)
+#   kubernetes/infra/controllers/temporal/{helmrelease,worker-controller*}.yaml (server 1.31.2,
+#     controller chart 0.28.0 = app 1.9.0, allowedResources incl. ScaledObject)
+#   kubernetes/infra/controllers/keda/helmrelease.yaml (2.20.2), clusters/local/{keda,apps}.yaml
+#   docs/api/temporal.md (who starts which workflow; controller sets Current/Ramping)
+# Changes from the 2026-09-28 version, each traced to a manifest:
+#   - worker image tags 2.9.0 -> 2.9.1 and 0.12.0 -> 0.12.1 (#1176/#1177)
+#   - controller -> server edge (it sets Ramping/Current through the Temporal API; the
+#     committed diagram drew the rollout as if it acted on the pods only)
+#   - controller -> KEDA edge (it renders one ScaledObject per build from the template)
+#   - task-queue edges start at the worker (domains.md: the worker long-polls)
+#   - the workers' own database writes (both via PgDog to product-db)
+#   - nothing dashed: every box and edge here is deployed and live in steady state
 diagram:
   id: temporal-keda
   title: "duynhlab homelab — Temporal work layer and KEDA autoscaling"
-  scope: "Who starts each workflow, which task queue carries it, which worker serves it, what rolls each worker out by build and what scales it on backlog. Workflow step behaviour and build routing live in docs/api/temporal.md."
+  scope: "Who starts each workflow, which task queue carries it, which worker serves it, and which controllers own each worker's builds and replicas. How one release moves through its builds is the companion diagram workflows/temporal-worker-versions."
   question: domain-topology
   level: L2
   animate: [traffic, event, data]
@@ -24,12 +38,12 @@ diagram:
       edge: "UI route"
     edges:
       traffic: "request (gRPC / HTTP)"
-      event: "task queue (worker long-polls)"
-      control: "rolls out / scales"
+      event: "task queue long-poll (worker -> server)"
+      control: "rolls out / renders / scales"
       dependency: "reads backlog"
       data: "persistence"
 
-layers: [api, server, run, targets]
+layers: [api, server, ctl, run, targets]
 
 boundaries:
   - {id: f_cluster, label: "Kind cluster · homelab"}
@@ -41,8 +55,6 @@ boundaries:
   - {id: f_targets, label: "Activity targets", parent: f_cluster}
 
 nodes:
-  # pin_order: each layer reads left to right in this order (the fewest
-  # crossings of the orderings measured with validate.py on 2026-09-28).
   - {id: checkout_api, label: "checkout-service API (checkout)\nsession mutations", role: service, layer: api, parent: f_api, icon: go}
   - {id: order_api, label: "order-service API (order)\nCreateOrder · cancel", role: service, layer: api, parent: f_api, icon: go}
 
@@ -50,13 +62,14 @@ nodes:
   - {id: server, label: "Temporal server 1.31.2 · namespace mop\nfrontend :7233 · history · matching · worker", role: platform, layer: server, parent: f_temporal, icon: temporal}
   - {id: db, label: "platform-db\ntemporal · temporal_visibility", role: data, layer: server, parent: f_platform, shape: datastore}
 
-  - {id: controller, label: "temporal-worker-controller 0.28\nWorkerDeployment · WorkerResourceTemplate", role: platform, layer: run, parent: f_temporal, icon: temporal}
-  - {id: keda, label: "KEDA 2.20.2\noperator · metrics apiserver", role: platform, layer: run, parent: f_keda, icon: keda}
-  - {id: wd_checkout, label: "checkout-abandon (checkout)\ncheckout-service 0.12.0 worker\nPinned · 1–3 replicas per version", role: worker, layer: run, parent: f_workers, icon: go}
-  - {id: wd_order, label: "order-fulfillment (order)\norder-worker · order-service 2.9.0\nPinned · 1–3 replicas per version", role: worker, layer: run, parent: f_workers, icon: go}
+  - {id: controller, label: "temporal-worker-controller 1.9.0\nchart 0.28.0 · owns builds, not replicas", role: platform, layer: ctl, parent: f_temporal, icon: temporal}
+  - {id: wd_checkout, label: "checkout-abandon (checkout)\ncheckout-service 0.12.1 worker\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
+  - {id: wd_order, label: "order-fulfillment (order)\norder-worker · order-service 2.9.1\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
+  - {id: keda, label: "KEDA 2.20.2\noperator · metrics apiserver", role: platform, layer: ctl, parent: f_keda, icon: keda}
 
   - {id: grpc_targets, label: "inventory · shipping · notification · payment\ngRPC :9090", role: service, layer: targets, parent: f_targets, icon: go}
   - {id: cart, label: "cart\nREST :8080 (ClearCart)", role: service, layer: targets, parent: f_targets, icon: go}
+  - {id: appdb, label: "product-db via PgDog :6432\norder · checkout databases", role: data, layer: targets, parent: f_targets, shape: datastore}
 
 edges:
   - {id: s_confirm, source: checkout_api, target: order_api, type: traffic, label: "confirm → CreateOrder"}
@@ -65,25 +78,28 @@ edges:
   - {id: s_ui, source: web, target: server, type: traffic, label: ":7233"}
 
   - {id: p_db, source: server, target: db, type: data, label: "direct :5432"}
-  - {id: q_order, source: server, target: wd_order, type: event, label: "queue order-fulfillment"}
-  - {id: q_checkout, source: server, target: wd_checkout, type: event, label: "queue checkout"}
+  - {id: q_order, source: wd_order, target: server, type: event, label: "polls order-fulfillment"}
+  - {id: q_checkout, source: wd_checkout, target: server, type: event, label: "polls checkout"}
 
-  - {id: c_order, source: controller, target: wd_order, type: control, label: "Progressive 10 % → 50 %"}
-  - {id: c_checkout, source: controller, target: wd_checkout, type: control, label: "Progressive 10 % → 50 %"}
-  - {id: k_backlog, source: keda, target: server, type: dependency, label: "backlog per version · gRPC"}
-  - {id: k_order, source: keda, target: wd_order, type: control, label: "HPA · target 5"}
-  - {id: k_checkout, source: keda, target: wd_checkout, type: control, label: "HPA · target 5"}
+  - {id: c_server, source: controller, target: server, type: control, label: "sets Ramping 10 → 50 % · Current"}
+  - {id: c_order, source: controller, target: wd_order, type: control, label: "one Deployment per build"}
+  - {id: c_checkout, source: controller, target: wd_checkout, type: control, label: "one Deployment per build"}
+  - {id: c_keda, source: controller, target: keda, type: control, label: "renders 1 ScaledObject per build"}
+  - {id: k_backlog, source: keda, target: server, type: dependency, label: "backlog per build · 15 s"}
+  - {id: k_workers, source: keda, target: f_workers, type: control, label: "HPA per build · 1–3 pods · ceil(backlog / 5)"}
 
   - {id: a_grpc, source: wd_order, target: grpc_targets, type: traffic, label: "activities"}
   - {id: a_cart, source: wd_order, target: cart, type: traffic, label: "ClearCart"}
+  - {id: a_odb, source: wd_order, target: appdb, type: data, label: "order rows"}
+  - {id: a_cdb, source: wd_checkout, target: appdb, type: data, label: "expire session"}
 
 notes:
   - id: note_scale
-    title: "How a version scales"
-    text: "Each WorkerResourceTemplate (order-fulfillment-scaler, checkout-abandon-scaler) is rendered by the controller into one KEDA ScaledObject per running build, so a ramping and a current build scale independently. KEDA's temporal trigger asks the frontend for that build's backlog every 15 s and sets replicas to ceil(backlog / 5) between 1 and 3; the floor of 1 keeps a draining build serving its pinned workflows. A drained build is scaled down after 1 h and deleted immediately after (deleteDelay 0 s)."
+    title: "Who owns what"
+    text: "The controller owns builds: it derives a build ID from the pod template, creates one Deployment per build, ramps new workflows onto it through the Temporal API and deletes it once drained. KEDA owns replicas: spec.replicas is absent from both WorkerDeployments, and each build's ScaledObject (rendered from order-fulfillment-scaler / checkout-abandon-scaler) sets 1–3 pods from that build's own backlog. The only replica write the controller keeps is the sunset: drained + 1 h → 0, then delete."
   - id: note_scope
     title: "Out of this picture"
-    text: "checkout-abandon writes only its own checkout database and calls no service. Both workers and the server export telemetry: worker SDK metrics go OTLP to the collector and on to vmagent; the server's four ServiceMonitors are scraped by vmagent. Workflow IDs, retries and the saga steps are in docs/api/temporal.md."
+    text: "The order worker also runs the start-outbox dispatcher, which retries a workflow start the API could not make inline (docs/api/temporal.md § How the Saga Gets Started). Both workers and the server export telemetry: worker SDK metrics go OTLP to the collector and on to vmagent; the server's ServiceMonitors are scraped by vmagent. The KEDA board (Grafana uid keda) graphs backlog, desired vs current replicas per build."
 
 tests:
   - {rule: gitops-has-reconciler, nodes: [wd_order, wd_checkout]}

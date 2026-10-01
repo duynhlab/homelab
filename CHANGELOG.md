@@ -198,6 +198,20 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **The six ClickHouse datasource-plugin dashboards are fetched by URL
+  instead of copied into the repo.**
+  - Each `GrafanaDashboard` sets `spec.url` to the plugin repo's
+    `src/dashboards/<board>.json` at the plugin's own tag (`v4.22.0`), with
+    `contentCacheDuration: 24h`, and maps the OTel boards'
+    `DS_GRAFANA_CLICKHOUSE_DATASOURCE` input to `ClickHouse`.
+  - A Renovate regex manager groups the plugin pin (`grafana.yaml`,
+    local-stack) and the URL tag into one PR, so the boards follow the
+    plugin with no copy step.
+  - Trade-off accepted: the upstream boards lack the
+    `toStartOfFiveMinutes` sort-key bound that #1142 added to the
+    `otel_logs` queries, so those panels scan the whole time range again.
+  - The operator now fetches from GitHub at most once a day per board.
+
 - **The ClickHouse schema ships as a digest-pinned image volume (RFC-0032
   Phase 2, ADR-077 Accepted, Adoption Complete).**
   - **The image.** The five DDL files moved from the `clickhouse-schema`

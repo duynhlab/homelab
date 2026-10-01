@@ -124,6 +124,19 @@ Skeleton (copy what you need):
   clusters, and the 30d/7d recovery windows never deleted an object. The paths
   lose the trailing slash; object keys do not change.
 
+#### Local-stack
+- **Every Phase C row of the E2E release audit prints a verdict.** C2–C4,
+  C8–C10 and C12–C15 printed raw rows and left the pass bar to the reader.
+  VictoriaLogs' `stream_field_values` answer ends without a newline, so the
+  next row's result was glued onto the end of that JSON line, and C13 and C15
+  read as blank on two runs. They had passed; nobody could see it. Each row
+  now parses its answer and prints `Cn OK` or `Cn FAIL`. C9 checks that the
+  three saga counters agree instead of printing them. The C13 notes and pass
+  criteria describe the OTLP access log that ADR-060 introduced, which
+  delivers `host` and no longer shares the Vector-leg cause with C14. The
+  evidence table names A22 and C22. Phase B and C may run during A13's
+  30-minute wait.
+
 #### Docs
 - **The ClickHouse docs name the deployed plugin 4.22.0**; three places still
   said 4.20.0 after the bump.

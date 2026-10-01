@@ -243,6 +243,9 @@ TCLI="docker compose exec -T temporal-admintools temporal"
 #      runnable top-to-bottom: the timer needs the session's full TTL (30 min by
 #      default) to fire, and A13's read is the LAST thing Phase A does. Arming it
 #      in place would read a timer three minutes old and report a false 200.
+#      The wait need not be idle: Phase B and C0–C21 may run inside it (they
+#      never touch bob), then A13/A14/A16, then C22 last. C10's server rates
+#      then read before A14's `restart temporal` rather than across it.
 #
 #      It needs its OWN user. One active session per user is a partial unique
 #      index, so A9/A10 would adopt this session and every mutation re-arms it.
@@ -1584,7 +1587,9 @@ curl -s -o /dev/null -w "C0 tagged request: %{http_code} (want 200)\n" \
 sleep 45
 
 # C1. Pipeline health — the collector must not be dropping data
-#     (compose service name — there is no `otel-collector` container_name)
+#     (compose service name — there is no `otel-collector` container_name).
+#     Read it BEFORE C22: once C22 stops Weaver, every batch the `otlp/weaver`
+#     exporter sends fails, and a rerun of this row counts those lines.
 docker compose logs --since 10m otel-collector 2>&1 \
   | grep -ciE 'export.*fail|"level":"error"|\terror\t' \
   | xargs -I{} sh -c '[ {} -eq 0 ] && echo "C1 OK collector clean" || echo "C1 FAIL: {} error lines"'
@@ -1627,7 +1632,11 @@ curl -s "$CH" -u default:otel --data-binary "
   SELECT ServiceName, SpanName, SpanKind, ParentSpanId = '' AS is_root
   FROM otel.otel_traces
   WHERE SpanAttributes['http.url'] LIKE '%audit=$TAG%'
-  FORMAT TSV"
+  FORMAT TSV" | python3 -c "
+import sys
+rows = [l.split('\t') for l in sys.stdin.read().splitlines() if l]
+ok = rows == [['$EDGE', 'ingress', 'Server', '1']]
+print('C2 root span:', 'OK edge ingress Server is_root=1' if ok else 'FAIL %r' % rows)"
 # want exactly one row: the value of $EDGE, then `ingress`, `Server`, `1`
 # A service name here, or is_root=0, means the trace no longer starts at the edge.
 
@@ -1638,8 +1647,10 @@ curl -s "$CH" -u default:otel --data-binary "
   SELECT count() FROM otel.otel_traces
   WHERE Timestamp > now() - INTERVAL 45 MINUTE
     AND SpanAttributes['deployment.environment.name'] = 'local'
-  FORMAT TSV"
-# want > 0
+  FORMAT TSV" | python3 -c "
+import sys
+n = int(sys.stdin.read().strip() or 0)
+print('C2 customTag spans:', 'OK %d' % n if n > 0 else 'FAIL 0')"
 
 # ISOLATION when C2 is empty, in this order:
 #   1. docker compose logs gateway 2>&1 | grep 'failed to find envoyproxy'
@@ -1660,7 +1671,17 @@ curl -s "$CH" -u default:otel --data-binary "
   WHERE TraceId = (SELECT TraceId FROM otel.otel_traces
                    WHERE SpanAttributes['http.url'] LIKE '%audit=$TAG%' LIMIT 1)
   ORDER BY Timestamp
-  FORMAT TSV"
+  FORMAT TSV" | python3 -c "
+import sys
+rows = [l.split('\t') for l in sys.stdin.read().splitlines() if l]
+roots = [r for r in rows if r[3] == '0']
+svc_server = [r for r in rows if r[0] != '$EDGE' and r[2] == 'Server']
+problems = []
+if [r[:3] for r in roots] != [['$EDGE', 'ingress', 'Server']]: problems.append('roots=%r' % roots)
+if not svc_server: problems.append('no service Server span')
+if any(r[3] != '1' for r in svc_server): problems.append('orphan service Server span')
+print('C3 continuity:', 'OK %d spans, services %s' % (len(rows), sorted({r[0] for r in rows}))
+      if not problems else 'FAIL ' + '; '.join(problems))"
 # want: the edge's `ingress` (has_parent 0) then its `router ... egress` client
 # span, then the service's Server span with has_parent 1, then that service's
 # internal/client spans. Two roots, or a service Server span with has_parent 0,
@@ -1674,7 +1695,14 @@ curl -s "$CH" -u default:otel --data-binary "
   FROM otel.otel_traces
   WHERE Timestamp > now() - INTERVAL 45 MINUTE
   GROUP BY ServiceName ORDER BY spans DESC
-  FORMAT TSV"
+  FORMAT TSV" | python3 -c "
+import sys
+server = {l.split('\t')[0]: int(l.split('\t')[2]) for l in sys.stdin.read().splitlines() if l}
+required = ['user','product','inventory','cart','order','review','shipping',
+            'notification','payment','checkout','$EDGE']
+bad = [s for s in required if server.get(s, 0) == 0]
+print('C4 server spans:', 'OK all 10 services + edge (min %d)' % min(server[s] for s in required)
+      if not bad else 'FAIL no Server span: ' + ','.join(bad))"
 # want every service driven by Phase A present with server_spans > 0, plus $EDGE.
 
 # C5. ClickHouse (RFC-0019 Phase B) ingested OTLP logs AND traces.
@@ -1735,7 +1763,9 @@ for q in 'sum(http_server_request_duration_seconds_count)' \
          'count(go_goroutine_count)'; do
   curl -s "$VM" --data-urlencode "query=$q" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
-      print('C8', '$q', '=>', r[0]['value'][1] if r else 'NO SERIES — FAIL')"
+      v=float(r[0]['value'][1]) if r else 0; \
+      ok = v == 13 if '$q'.startswith('count(go_') else v > 0; \
+      print('C8', '$q', '=>', ('OK %g' if ok else 'FAIL %g') % v)"
 done
 # The `inventory` row carries weight beyond itself: inventory is gRPC-only with no
 # edge route, so `rpc_server_call_duration_seconds_count` is the ONLY metrics
@@ -1763,12 +1793,18 @@ done
 #     before A14/A15, or settle it with the durable evidence: every
 #     `OrderFulfillmentWorkflow` execution `Completed` and every confirmed order
 #     reaching `completed`.
+C9=""
 for m in checkout_sessions_confirmed_total 'order_saga_outcome_total{outcome="confirmed"}' \
          'payment_authorization_total{result="authorized"}'; do
-  curl -s "$VM" --data-urlencode "query=sum($m)" \
+  v=$(curl -s "$VM" --data-urlencode "query=sum($m)" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
-      print('C9', '$m'.split('{')[0], '=', r[0]['value'][1] if r else 'NO SERIES')"
+      print('%g' % float(r[0]['value'][1]) if r else 'none')")
+  echo "C9 ${m%%\{*} = $v"; C9="$C9 $v"
 done
+python3 -c "
+v = '$C9'.split()
+print('C9 saga agreement:', 'OK all %s' % v[0] if len(set(v)) == 1 and v[0] not in ('none', '0')
+      else 'FAIL %s (a restart since the flow? see the note above)' % v)"
 # Do NOT extend this loop with `auth_*` counters. Since the identity cutover the
 # realm performs authentication, so those series may legitimately never exist;
 # asserting them would fail a healthy stack.
@@ -1790,7 +1826,8 @@ for q in 'count(temporal_workflow_endtoend_latency_seconds_bucket)' \
          'sum(temporal_num_pollers)'; do
   curl -s "$VM" --data-urlencode "query=$q" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
-      print('C10', '$q', '=>', r[0]['value'][1] if r else 'NO SERIES — FAIL')"
+      v=float(r[0]['value'][1]) if r else 0; \
+      print('C10', '$q', '=>', ('OK %g' if v > 0 else 'FAIL %g') % v)"
 done
 # ... then the SERVER half — the :8000 listener PROMETHEUS_ENDPOINT enables,
 # scraped by vmagent's `temporal` job. The error counter is
@@ -1800,7 +1837,9 @@ for q in 'up{job="temporal"}' \
          'sum(rate(persistence_requests[5m]))'; do
   curl -s "$VM" --data-urlencode "query=$q" \
     | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; \
-      print('C10 server', '$q', '=>', r[0]['value'][1] if r else 'NO SERIES — FAIL')"
+      v=float(r[0]['value'][1]) if r else 0; \
+      ok = v == 1 if '$q'.startswith('up') else v > 0; \
+      print('C10 server', '$q', '=>', ('OK %g' if ok else 'FAIL %g') % v)"
 done
 
 # C11. DB client telemetry sane (RFC-0017 W4 — needs pkg >= v0.24.0 in the
@@ -1827,10 +1866,19 @@ curl -s "$VM" --data-urlencode \
 # fields. That duplication is by design; it is not a regression to chase.
 
 # C12. App logs, OTLP leg.
-curl -s "$VL" --data-urlencode 'query=_time:45m _stream:{"service.name"="cart"} | count()'
-# want a non-zero count(*). Enumerate the whole leg with:
+#      Every LogsQL answer below is parsed rather than echoed: stream_field_values
+#      ends WITHOUT a newline, so a bare `curl` glued the next row's output onto
+#      the end of its JSON line and C13/C15 read as blank on the 2026-10-01 runs.
+curl -s "$VL" --data-urlencode 'query=_time:45m _stream:{"service.name"="cart"} | count()' \
+  | python3 -c "import json,sys; n=int(json.load(sys.stdin)['count(*)']); \
+    print('C12 cart OTLP logs:', 'OK %d' % n if n > 0 else 'FAIL 0')"
 curl -s http://localhost:9428/select/logsql/stream_field_values \
-  --data-urlencode 'query=_time:45m' --data-urlencode 'field=service.name'
+  --data-urlencode 'query=_time:45m' --data-urlencode 'field=service.name' | python3 -c "
+import json,sys
+got = {v['value'] for v in json.load(sys.stdin)['values']}
+missing = sorted({'user','product','inventory','cart','order','review','shipping',
+                  'notification','payment','checkout'} - got)
+print('C12 OTLP log streams:', 'OK all 10 services' if not missing else 'FAIL missing=' + ','.join(missing))"
 # want every service Phase A drove.
 
 # C13. EDGE ACCESS LOGS, OTLP leg. The second-most important row in this phase:
@@ -1849,19 +1897,29 @@ curl -s http://localhost:9428/select/logsql/stream_field_values \
 #      `upstream_cluster` and `route_name` exist only on access-log lines, so
 #      requiring both still discriminates them from the control plane's own logs.
 curl -s "$VL" --data-urlencode \
-  'query=_time:45m _stream:{"service.name"="platform.envoy-gateway"} upstream_cluster:* route_name:* | count()'
-# want a non-zero count(*). Then pin the specific request driven in C0:
+  'query=_time:45m _stream:{"service.name"="platform.envoy-gateway"} upstream_cluster:* route_name:* | count()' \
+  | python3 -c "import json,sys; n=int(json.load(sys.stdin)['count(*)']); \
+    print('C13 edge access logs:', 'OK %d' % n if n > 0 else 'FAIL 0')"
+# Then pin the specific request driven in C0:
 curl -s "$VL" --data-urlencode \
   "query=_time:45m _stream:{\"service.name\"=\"platform.envoy-gateway\"} upstream_cluster:* uri:\"audit=$TAG\"" \
-  --data-urlencode 'limit=1'
+  --data-urlencode 'limit=1' | python3 -c "
+import json,sys
+lines = [json.loads(l) for l in sys.stdin.read().splitlines() if l]
+d = lines[0] if lines else {}
+want = ['uri','status','method','upstream','upstream_cluster','route_name','duration','request_id']
+missing = [k for k in want if k not in d]
+ok = lines and not missing and d['status'] == '200' and d['method'] == 'GET' \
+     and d['upstream_cluster'].endswith('/api-product/rule/0')
+print('C13 tagged access log:', 'OK CR field set, %s %s -> %s' % (d.get('method'), d.get('status'), d.get('upstream_cluster'))
+      if ok else 'FAIL lines=%d missing=%s' % (len(lines), missing))"
 # want ONE line whose parsed fields are the CR's contract:
 #   uri=/product/v1/public/products?audit=$TAG  status=200  method=GET
 #   upstream_cluster=httproute/envoy-gateway-system/api-product/rule/0
 #   route_name=.../match/0/*  upstream=<ip:8080>  duration=<ms>  request_id=<uuid>
-# `host` is in the CR's JSON but never reaches VictoriaLogs: the Vector
-# transform's `del(.host)` (aimed at docker_logs' machine-hostname field) runs
-# after the JSON parse and takes the access log's authority with it. As-built
-# quirk, not a regression — do not assert on `host`.
+# `host` (the authority, `localhost:8080`) and `trace_id` arrive too since the
+# OTLP move; the Vector-era note that `del(.host)` ate the authority no longer
+# applies. Neither is asserted — they are not part of what this row guards.
 # Read those FIELD NAMES, not just the values: with the EnvoyProxy CR unattached
 # Envoy falls back to its built-in JSON, which reports the same facts as
 # `x-envoy-origin-path`, `response_code` and `upstream_host` — every Vector-parsed
@@ -1871,16 +1929,20 @@ curl -s "$VL" --data-urlencode \
 #      has no OTel SDK at all. `frontend` is the right witness: it is the SPA's
 #      web server, so Phase B guarantees it produced lines, and nothing but Vector
 #      can carry them.
-curl -s "$VL" --data-urlencode 'query=_time:45m _stream:{service="frontend"} | count()'
-# want a non-zero count(*). Enumerate the whole leg to see who else is covered:
+curl -s "$VL" --data-urlencode 'query=_time:45m _stream:{service="frontend"} | count()' \
+  | python3 -c "import json,sys; n=int(json.load(sys.stdin)['count(*)']); \
+    print('C14 frontend via Vector:', 'OK %d' % n if n > 0 else 'FAIL 0')"
+# Enumerate the whole leg to see who else is covered (read, not asserted):
 curl -s http://localhost:9428/select/logsql/stream_field_values \
-  --data-urlencode 'query=_time:45m' --data-urlencode 'field=service'
+  --data-urlencode 'query=_time:45m' --data-urlencode 'field=service' \
+  | python3 -c "import json,sys; print('C14 Vector streams:', sorted(v['value'] for v in json.load(sys.stdin)['values']))"
 # expect the chatty infra containers (otel-collector, pyroscope, grafana, postgres)
 # plus gateway, frontend, and the double-shipped app containers. A QUIET container
 # is a bad witness, not a failure: `temporal` logs almost nothing once it is up, so
 # an empty `_stream:{service="temporal"}` proves nothing either way.
-# C13 + C14 both empty, with `service.name` streams healthy, is ONE failure, not
-# two: the Vector leg is down. `docker compose logs vector` names the cause; under
+# C14 empty while C12 and C13 are healthy means the Vector leg is down — C13
+# no longer shares that cause, because the access log moved to OTLP with
+# ADR-060. `docker compose logs vector` names the cause; under
 # podman `Socket not found: /var/run/docker.sock` means the stack was brought up
 # WITHOUT compose.podman.yaml, and the fix is a re-bring-up with the overlay, not
 # a restart (see the container-runtime note in Preconditions).
@@ -1891,7 +1953,10 @@ curl -s http://localhost:9428/select/logsql/stream_field_values \
 curl -s "$CH" -u default:otel --data-binary "
   SELECT count() AS logs, countIf(TraceId != '') AS correlated
   FROM otel.otel_logs WHERE Timestamp > now() - INTERVAL 45 MINUTE
-  FORMAT TSV"
+  FORMAT TSV" | python3 -c "
+import sys
+logs, corr = (int(x) for x in sys.stdin.read().split())
+print('C15 log<->trace:', ('OK %d of %d logs carry a TraceId' if corr > 0 else 'FAIL %d of %d') % (corr, logs))"
 # want correlated > 0. The same field is queryable on the VictoriaLogs side as a
 # regular (non-stream) field: `_time:45m _stream:{"service.name"="cart"} trace_id:*`
 
@@ -2160,8 +2225,8 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | C10 | Temporal metrics, both halves | SDK: latency histograms + `temporal_workflow_completed_total`, worker slots, pollers have series (`_total` on the SDK counters since ADR-063 — the cluster rules and the Temporal dashboard query that name); server: `up{job="temporal"}` is 1 and `service_requests` / `persistence_requests` rate — the :8000 listener `PROMETHEUS_ENDPOINT` enables |
 | C11 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
 | C12 | App logs (OTLP leg) | `_stream:{"service.name"="cart"}` non-empty in VictoriaLogs, and the stream-field enumeration lists every service Phase A drove |
-| C13 | Edge access logs (Vector leg) | `_stream:{service="gateway"}` filtered on `upstream_cluster:*` + `route_name:*` (the discriminator against the control plane's debug logs in the same stream) is non-empty, and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` (`host` never reaches VL — Vector's `del(.host)` cleanup eats it; as-built quirk) — not Envoy's built-in fallback names |
-| C14 | Vector infra tailing | a non-application container's logs are present, e.g. `_stream:{service="frontend"}`, and the stream enumeration covers the infra containers. C13 + C14 both empty = one failure (the Vector leg), not two |
+| C13 | Edge access logs (OTLP leg, ADR-060) | `_stream:{"service.name"="platform.envoy-gateway"}` filtered on `upstream_cluster:*` + `route_name:*` (the discriminator against the control plane's own logs) is non-empty, and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` — with `GET 200` to the `api-product` cluster, not Envoy's built-in fallback names |
+| C14 | Vector infra tailing | a non-application container's logs are present, e.g. `_stream:{service="frontend"}`, and the stream enumeration covers the infra containers. C14 empty while C12 and C13 are healthy = the Vector leg is down |
 | C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
 | C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
 | C17 | Grafana datasources | `/api/datasources` returns exactly the five expected uid/type pairs (VictoriaLogs included) and each `/api/datasources/uid/<uid>/health` answers `OK` |
@@ -2171,10 +2236,15 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | C21 | Alert rules loaded, none firing | vmalert (`:8880/api/v1/rules`) reports exactly **18 alerting** rules (8 ClickHouse engine + 2 collector + 3 inventory + 4 keycloak + Watchdog) plus **15 recording** rules (RFC-0021 + inventory) and zero `firing` on a healthy stack — the counts are the tripwire for a silently unmounted rule file |
 | C22 | Names conform to the registry | `make e2e-conformance` (Weaver `registry live-check` on the gate's OTLP, `--fail-on violation`) exits 0: every attribute, metric and event the fleet emitted is declared in `duynhlab/pkg` `semconv/registry`, with the declared unit and instrument, and no deprecated upstream key — `improvement`/`information` advice is allowed |
 
-Any failed row blocks the release tag. Two rows share one root cause and must be
-reported as such: **C13 + C14** both empty while C12 is healthy means the Vector
-leg is down, not that two log paths regressed — check `vector` per the
-container-runtime note in Preconditions, recreate the stack, and rerun.
+Any failed row blocks the release tag. **C14** empty while C12 and C13 are
+healthy means the Vector leg is down, not that the services' logging regressed —
+check `vector` per the container-runtime note in Preconditions, recreate the
+stack, and rerun. (C13 used to share that cause; it reads the OTLP leg since
+ADR-060.)
+
+Phase C rows print one `Cn OK …` or `Cn FAIL …` verdict each, except the
+enumerations marked "read, not asserted". A row that prints raw data and no
+verdict is a defect in this runbook: fix the row, do not judge the data by eye.
 
 When a change touches the order-fulfillment path, additionally run the saga
 (checkout in the SPA) and watch it complete in the Temporal UI.
@@ -2204,10 +2274,11 @@ evidence table too, not just service and `pkg` changes.
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A14 + A16–A21 API contract | PASS / FAIL | |
+| A | A1–A14 + A16–A22 API contract | PASS / FAIL | |
 | A | A15 versioning drill | PASS / FAIL / N/A | |
 | B | B1–B10 real browser | PASS / FAIL | |
 | C | C1–C21 telemetry + engine-health loop | PASS / FAIL | |
+| C | C22 registry conformance (Weaver) | PASS / FAIL | |
 
 Decision: ELIGIBLE FOR TAG / BLOCKED
 ```
@@ -2250,7 +2321,7 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
+_Last updated: 2026-10-01 — every Phase C row prints an `OK`/`FAIL` verdict; C13 and C15 had been hidden by VictoriaLogs answers that end without a newline, and C13's notes now describe the OTLP access log. Previously 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
 RFC-0025: the header's "Sign in" is a link to
 `/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
 storage assertion now names the legitimate residents (`theme`, and a

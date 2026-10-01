@@ -23,7 +23,7 @@ details in the skill, not duplicated here).
 
 - **`duynhlab` microservices platform** — **10 deployed Go microservices** + a React storefront + a back-office portal, with Keycloak as the identity provider (auth-service retired, RFC-0024 P5). All 10 run in local-stack and the cluster; checkout P5 shipped (API + checkout-worker).
 - **This repo (`homelab`):** GitOps (Flux Operator + Kustomize + OCI), observability, databases/secrets infra, and docs. No application source here.
-- **Service repos:** `user-service`, `product-service`, `inventory-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend` (`auth-service` is archived — Keycloak replaced it); shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`.
+- **Service repos:** `user-service`, `product-service`, `inventory-service`, `cart-service`, `order-service`, `review-service`, `shipping-service`, `notification-service`, `payment-service`, `checkout-service`, and `frontend` (`auth-service` is archived — Keycloak replaced it); shared Go library `duynhlab/pkg`; chart `duynhlab/helm-charts` (the `mop` chart). Reusable CI in `duynhlab/gha-workflows`. Platform-built images (the ClickHouse DDL image volume) in `duynhlab/images`, pinned `ghcr.io/duynhlab/images/<image>:<semver>@sha256:…` and signature-checked by `.github/workflows/platform-images.yml`.
 - Full index: [`docs/README.md` § Repositories](docs/README.md#repositories), [`docs/api/README.md`](docs/api/README.md).
 
 ## Repository layout

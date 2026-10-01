@@ -89,6 +89,14 @@ only and never the published image. The
 Job mounts the image as a volume, referenced by tag **and** digest with
 `pullPolicy: IfNotPresent`.
 
+> **Update 2026-10-01:** source, build and release moved to the
+> [`duynhlab/images`](https://github.com/duynhlab/images) repository. The image
+> is now `ghcr.io/duynhlab/images/clickhouse-ddl:X.Y.Z` (semver, released by tag
+> `clickhouse-ddl/vX.Y.Z`), still reproducible, cosign-signed and attested;
+> homelab pins `:X.Y.Z@sha256:…`, Renovate proposes bumps, and
+> `.github/workflows/platform-images.yml` verifies tag, digest and signature.
+> The decision above (image volume, digest pin, `force` re-run) is unchanged.
+
 Bumping the DDL means publishing a new image and bumping the digest in the
 Job, which changes the Job's pod template. Because `spec.template` of a Job is
 immutable, the Job carries `kustomize.toolkit.fluxcd.io/force: enabled`, so
@@ -239,7 +247,8 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-28 | Proposed / Not started | Created when RFC-0032 moved to `Accepted`. The build tool narrowed to `FROM scratch` (apko needs a package per file set), and the Job-immutability mechanism named explicitly (`force: enabled` on this Job) |
 | 2026-09-29 | Accepted / Complete | Implemented and gated on Kind 1.35.8 (see Adoption). Owner chose one PR per schema change with a reproducible build, checked by CI. Mount, reproducibility and local-testing rules added from what the gate measured |
+| 2026-10-01 | Accepted / Complete | Build and release moved to `duynhlab/images` (semver tags, Renovate pin, signature verified in homelab CI); same image-volume mechanism, verified on Kind (Job re-created, schema unchanged on 3 replicas) |
 | 2026-09-28 | Proposed / Not started | Owner choices: build in homelab under `images/clickhouse-ddl/`; re-run by `force` plus a digest bump; CI publish required before merge; `flux push` ruled out |
 
 ---
-_Last updated: 2026-09-29 — Accepted, Adoption Complete_
+_Last updated: 2026-10-01 — build and release moved to duynhlab/images. Earlier: 2026-09-29 — Accepted, Adoption Complete_

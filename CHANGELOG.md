@@ -90,6 +90,19 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### GitOps
+- **The ClickHouse DDL image lives in the new `duynhlab/images` repository**
+  ([duynhlab/images](https://github.com/duynhlab/images)). It is released by
+  tag as `ghcr.io/duynhlab/images/clickhouse-ddl:1.0.0` — reproducible, cosign
+  signed, provenance attested — and `job.yaml` pins `:1.0.0@sha256:…`. The
+  in-repo copy, the `ddl-*` make targets and the build workflow are gone;
+  `.github/workflows/platform-images.yml` now verifies that every
+  `ghcr.io/duynhlab/images/*` reference resolves to its pinned digest and
+  carries that repository's release signature, and Renovate tracks those
+  references. A new platform image needs no change on this side. SQL
+  unchanged: on Kind the Job re-ran from the new image and `SHOW CREATE TABLE`
+  was byte-identical on all three replicas.
+
 #### Local-stack
 - **Local-stack databases are owned by per-service roles, as on the cluster.**
   Every service, its migrate and seed jobs, the two workers, Keycloak and

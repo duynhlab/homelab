@@ -82,7 +82,7 @@ replicated system whose availability is governed by quorum arithmetic.
 ### What lives in the tree
 
 For this deployment, two families of paths (Repository fact for the roots —
-[`00-database.sql`](../../../../images/clickhouse-ddl/sql/00-database.sql);
+[`00-database.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/00-database.sql);
 upstream for their contents —
 [replication](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/replication),
 [Replicated database](https://clickhouse.com/docs/engines/database-engines/replicated)):
@@ -351,6 +351,6 @@ Before continuing, explain these without rereading the chapter:
 - [`system.zookeeper`](https://clickhouse.com/docs/reference/system-tables/zookeeper) and [`system.zookeeper_connection`](https://clickhouse.com/docs/reference/system-tables/zookeeper_connection)
 
 ---
-_Last updated: 2026-09-30 — live lab verified: one leader and two synced followers, 2,409 znodes; database vs table znode paths distinguished. Earlier: 2026-09-29 — first draft: quorum mental model, znode inventory,
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: one leader and two synced followers, 2,409 znodes; database vs table znode paths distinguished. Earlier: 2026-09-29 — first draft: quorum mental model, znode inventory,
 session→read-only lifecycle, outage capability matrix, and the deployed
 3-member CHK; live lab pending verification._

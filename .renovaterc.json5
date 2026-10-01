@@ -79,6 +79,16 @@
       extractVersionTemplate: "^v(?<version>.*)$",
     },
     {
+      // Images released by duynhlab/images, pinned <image>:<semver>@<digest>.
+      // depName is the full path, so a new image is tracked with no change here.
+      customType: "regex",
+      managerFilePatterns: ["/^kubernetes/.+\\.yaml$/"],
+      matchStrings: [
+        "(?<depName>ghcr\\.io/duynhlab/images/[a-z0-9-]+):(?<currentValue>\\d+\\.\\d+\\.\\d+)@(?<currentDigest>sha256:[a-f0-9]{64})",
+      ],
+      datasourceTemplate: "docker",
+    },
+    {
       // The Kind node image in scripts/kind-up.sh, pinned by tag and digest
       // (RFC-0032). The regex takes the line after the `# renovate:` comment.
       customType: "regex",

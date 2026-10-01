@@ -125,7 +125,7 @@ in the lab show the real structure better than a drawn approximation.
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
 | Which server plans and executes | The one replica behind `clickhouse-clickhouse:9000` that accepted the connection; no distributed step (1 shard) | [Chapter 01](01-architecture.md); [ADR-065](../../../proposals/adr/ADR-065-clickhouse-replicated-topology/README.md) | Repository fact |
-| Partition pruning input | `PARTITION BY toDate(Timestamp)` on both tables | [otel_logs DDL](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql), [otel_traces DDL](../../../../images/clickhouse-ddl/sql/20-otel_traces.sql) | Repository fact |
+| Partition pruning input | `PARTITION BY toDate(Timestamp)` on both tables | [otel_logs DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql), [otel_traces DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/20-otel_traces.sql) | Repository fact |
 | Primary-index pruning input | `ORDER BY (toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp)` (logs); `(ServiceName, SpanName, toDateTime(Timestamp))` (traces) | Same DDL | Repository fact |
 | Pruning quality in practice | A bare `ServiceName` filter on `otel_logs` prunes poorly because the 5-minute bucket precedes it; measured walk-through | [Schema and queries](../schema-and-queries.md), [platform hub query examples](../README.md#query-examples) | Repository fact (measured there) |
 | Main query producers | Grafana panels (ClickHouse datasource, native protocol) and ad-hoc `clickhouse-client` | [Platform hub](../README.md#how-it-works-in-this-platform) | Repository fact |
@@ -346,4 +346,4 @@ Before continuing, explain these without rereading the chapter:
 - [Architecture overview](https://clickhouse.com/docs/resources/develop-contribute/introduction/architecture)
 
 ---
-_Last updated: 2026-09-30 — live lab verified; example value `cart-service` (no rows in pod logs) replaced by `clickhouse`, query_log read-back excludes itself. Earlier: 2026-09-29 — first published version of the query-pipeline chapter; live lab pending verification._
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified; example value `cart-service` (no rows in pod logs) replaced by `clickhouse`, query_log read-back excludes itself. Earlier: 2026-09-29 — first published version of the query-pipeline chapter; live lab pending verification._

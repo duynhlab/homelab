@@ -151,7 +151,7 @@ deliberately observed only naturally occurring behavior.
 | Read-only detection | `ClickHouseReadonlyReplica` on `ReadonlyReplica > 0` for 5m | Same rules file | Repository fact |
 | Lag detection | `ClickHouseReplicationLag` on max absolute delay > 300s for 10m | Same rules file | Repository fact |
 | Parts-pressure detection | `ClickHouseTooManyParts*` at 300 — a tenth of the upstream delay threshold, so the alert leads the engine's own throttle by design | Same rules file; [upstream defaults](https://clickhouse.com/docs/reference/settings/merge-tree-settings/parts-to) | Repository fact + upstream invariant |
-| Schema as code | DDL ships as a digest-pinned image; drift is a diff between `SHOW CREATE TABLE` and the [SQL files](../../../../images/clickhouse-ddl/sql/00-database.sql) | [Schema Job](../../../../kubernetes/infra/configs/clickhouse-schema/job.yaml) | Repository fact |
+| Schema as code | DDL ships as a digest-pinned image; drift is a diff between `SHOW CREATE TABLE` and the [SQL files](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/00-database.sql) | [Schema Job](../../../../kubernetes/infra/configs/clickhouse-schema/job.yaml) | Repository fact |
 | Data-loss signal | `ClickHouseReplicatedDataLoss` (critical, 1m) watches lost-part counters | Same rules file | Repository fact |
 | No restore path | No `clickhouse-backup`; durability = 3 replicas + per-replica cold objects | Absence across `kubernetes/`; [chapter 10](10-storage-s3.md#how-homelab-uses-it) | Repository fact |
 
@@ -376,5 +376,5 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse: MergeTree settings — `parts_to_delay_insert`, `parts_to_throw_insert`](https://clickhouse.com/docs/reference/settings/merge-tree-settings/parts-to)
 
 ---
-_Last updated: 2026-09-30 — live lab verified: healthy replicas, bring-up authentication errors bounded to the first minutes. Earlier: 2026-09-29 — first draft of the failure-reasoning chapter; live
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: healthy replicas, bring-up authentication errors bounded to the first minutes. Earlier: 2026-09-29 — first draft of the failure-reasoning chapter; live
 observation pending verification on the Ubuntu Kind cluster._

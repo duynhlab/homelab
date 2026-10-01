@@ -188,7 +188,7 @@ study:
   moment the partition held 3.25 M rows across seven active parts. Merges keep
   only surviving rows, and delete-TTL drops whole expired parts
   (`ttl_only_drop_parts = 1` in the
-  [DDL](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql)). Rows in
+  [DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql)). Rows in
   active parts are a floor for "visible at this moment", not a counter of "ever
   written".
 - **The name says nothing about which replica created it.** On a replicated
@@ -226,8 +226,8 @@ you can recognize a five-field part name if one ever shows up in evidence.
 |---|---|---|---|
 | Async-insert buffering before block formation | The ClickHouse exporter sets `async_insert: true` on its connection; batching upstream of it is 512–1024 items or 5 s | [`otel-collector.yaml`](../../../../kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml) | Repository fact |
 | Acknowledgement mode `wait_for_async_insert` | Not set in the exporter config, so the server default applies: acknowledge only after the buffer flushes to a part | [Async inserts](https://clickhouse.com/docs/optimize/asynchronous-inserts); live `system.settings`: `wait_for_async_insert = 1`, `changed = 0` (2026-09-30) | Observed |
-| One part per flushed block, per partition | Daily partitions (`PARTITION BY toDate(...)`) mean a flush spanning midnight writes at least two parts | [`10-otel_logs.sql`](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql) | Repository fact |
-| Whole-part TTL drops | `ttl_only_drop_parts = 1` on all three `otel` tables — expired data leaves as `RemovePart` of whole parts, never as row rewrites | [`10-otel_logs.sql`](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql), [`30-otel_traces_trace_id_ts.sql`](../../../../images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql) | Repository fact |
+| One part per flushed block, per partition | Daily partitions (`PARTITION BY toDate(...)`) mean a flush spanning midnight writes at least two parts | [`10-otel_logs.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql) | Repository fact |
+| Whole-part TTL drops | `ttl_only_drop_parts = 1` on all three `otel` tables — expired data leaves as `RemovePart` of whole parts, never as row rewrites | [`10-otel_logs.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql), [`30-otel_traces_trace_id_ts.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql) | Repository fact |
 | Part-count guardrails | Alerts fire at 300 active parts (total and per partition) | [Part pressure](../parts-merges-and-ttl.md#part-pressure-and-the-two-guard-dimensions), [`ClickHouseTooManyParts` runbook](../../runbooks/clickhouse/ClickHouseTooManyParts.md) | Repository fact |
 | `part_log` retention | The operator-owned `system.part_log` keeps 30 days in daily partitions, so lineage evidence is available that far back | [Engine log tables](../README.md#the-engines-own-log-tables) | Repository fact |
 
@@ -468,7 +468,7 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse 2026 OSS changelog — merge selector, insert deduplication](https://clickhouse.com/docs/resources/changelogs/oss/2026)
 
 ---
-_Last updated: 2026-09-30 — case study re-anchored on live parts
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — case study re-anchored on live parts
 `20260930_0_2977_18` / `20260930_7093_7093_0` with their full `part_log`
 lineage across two replicas and a second snapshot; the issue's 2026-09-29 parts
 were lost with the cluster rebuild. Earlier: 2026-09-29 — first draft._

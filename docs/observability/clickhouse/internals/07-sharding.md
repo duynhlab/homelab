@@ -45,7 +45,7 @@ This platform runs one shard with three replicas ([Repository fact —
 CHI](../../../../kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml)),
 so there is nothing to route: every replica holds everything, and no
 `Distributed` table exists in the
-[committed DDL](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql).
+[committed DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql).
 
 ### Essential terms
 
@@ -145,10 +145,10 @@ flowchart LR
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
 | Cluster topology | `shardsCount: 1`, `replicasCount: 3` for cluster `otel` | [CHI manifest](../../../../kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml) | Repository fact |
-| Distributed table engine | Absent — no DDL file creates one | [Committed DDL directory](../../../../images/clickhouse-ddl/sql/00-database.sql) | Repository fact |
+| Distributed table engine | Absent — no DDL file creates one | [Committed DDL directory](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/00-database.sql) | Repository fact |
 | Sharding decision | Deliberately not built; re-evaluation triggers documented | [ADR-065 non-goals](../../../proposals/adr/ADR-065-clickhouse-replicated-topology/README.md); [RFC-0028 trigger analysis](../../../proposals/rfc/RFC-0028/research.md#integration-paths) | Repository fact |
 | `optimize_skip_unused_shards` | Not applicable without a Distributed table | [Session settings](https://clickhouse.com/docs/reference/settings/session-settings/optimize-skip) | Reference — not deployed |
-| DDL fan-out across replicas | Owned by the `Replicated` database engine, not `ON CLUSTER` | [Database DDL](../../../../images/clickhouse-ddl/sql/00-database.sql) | Repository fact |
+| DDL fan-out across replicas | Owned by the `Replicated` database engine, not `ON CLUSTER` | [Database DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/00-database.sql) | Repository fact |
 
 The one-shard choice is why this platform's write path
 ([chapter 08](08-ingestion-pipeline.md)) has no routing step and why every
@@ -283,5 +283,5 @@ Before continuing, explain these without rereading the chapter:
 - [`SYSTEM` statements for managing distributed tables](https://clickhouse.com/docs/sql-reference/statements/system)
 
 ---
-_Last updated: 2026-09-30 — live lab verified: one shard, three replicas. Earlier: 2026-09-29 — first published version; live observation pending
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: one shard, three replicas. Earlier: 2026-09-29 — first published version; live observation pending
 verification on the Ubuntu Kind cluster._

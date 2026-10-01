@@ -8,7 +8,7 @@ breaks ingest.
 | | |
 |---|---|
 | **Skill** | `ORDER BY` prefix → `EXPLAIN indexes = 1` → codecs last |
-| **Tables** | `otel.otel_logs`, `otel.otel_traces` (DDL in `images/clickhouse-ddl/sql/`, shipped to the schema Job as an image volume) |
+| **Tables** | `otel.otel_logs`, `otel.otel_traces` (DDL in `images/clickhouse-ddl/sql/` (duynhlab/images), shipped to the schema Job as an image volume) |
 | **Why ClickHouse exists next to VictoriaLogs** | LogsQL finds a line. This store is for **GROUP BY**, percentiles, and `TraceId` correlation over 90 days — [fundamentals](fundamentals.md) |
 | **Hands-on** | Hub [Playground §3](README.md#3-see-the-sparse-index-prune-granules) |
 
@@ -32,7 +32,7 @@ count is not.
 
 Do **not** invent replacement OTel tables. The exporter contract is the
 column list in the DDL image source,
-[`images/clickhouse-ddl/sql/`](../../../images/clickhouse-ddl/).
+[`images/clickhouse-ddl/sql/` (duynhlab/images)](https://github.com/duynhlab/images/tree/main/images/clickhouse-ddl/).
 
 ---
 
@@ -234,9 +234,9 @@ Full connect + `system.parts` recipes: [Playground](README.md#playground--merget
 - [EXPLAIN](https://clickhouse.com/docs/sql-reference/statements/explain)
 - [Column compression codecs](https://clickhouse.com/docs/sql-reference/statements/create/table#column-compression-codecs)
 - [Observability schema design](https://clickhouse.com/docs/use-cases/observability/schema-design)
-- DDL: [`images/clickhouse-ddl/sql/`](../../../images/clickhouse-ddl/)
+- DDL: [`images/clickhouse-ddl/sql/` (duynhlab/images)](https://github.com/duynhlab/images/tree/main/images/clickhouse-ddl/)
 - [Fundamentals](fundamentals.md) · [Materialized views](materialized-views.md) · [Hub](README.md)
 
 ---
 
-_Last updated: 2026-09-30 — exporter 0.161.0 (INSERT columns unchanged from 0.159.0); the exporter contract points at the DDL image source, not a ConfigMap. Earlier: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — exporter 0.161.0 (INSERT columns unchanged from 0.159.0); the exporter contract points at the DDL image source, not a ConfigMap. Earlier: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_

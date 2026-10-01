@@ -2,6 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # The DDL is no longer a ConfigMap here: it ships as the clickhouse-ddl image
-# (images/clickhouse-ddl/), mounted by the Job as an image volume (ADR-077).
+# (built in the duynhlab/images repo), mounted by the Job as an image volume (ADR-077).
 resources:
   - job.yaml

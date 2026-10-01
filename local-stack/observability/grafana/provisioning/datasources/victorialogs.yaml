@@ -1,6 +1,6 @@
 # Grafana datasource for the local stack — VictoriaLogs through the official
 # victoriametrics-logs-datasource plugin (installed via GF_INSTALL_PLUGINS in
-# compose.yaml, same 0.29.0 the cluster pins). Mirrors the in-cluster datasource
+# compose.yaml, the same version the cluster pins). Mirrors the in-cluster datasource
 # (kubernetes/infra/configs/observability/grafana/datasource-victorialogs.yaml)
 # including the uid, so panels port between stacks unchanged. Before this file
 # existed, local logs were reachable only through VictoriaLogs' own vmui.
@@ -11,3 +11,5 @@ datasources:
     uid: victorialogs
     access: proxy
     url: http://victoria-logs:9428
+    jsonData:
+      maxLines: "50" # same limit as the cluster

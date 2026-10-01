@@ -133,7 +133,7 @@ Keycloak alert set.
 | Edge scrape (`envoy_*` + control plane) | ✅ ServiceMonitor + PodMonitor | ✅ vmagent jobs `envoy-gateway` + `envoy` | data plane via the bootstrap-merged `:19005` listener |
 | Temporal server metrics (`service_*`, `persistence_*`) | ✅ 4 chart ServiceMonitors | ✅ vmagent job `temporal` (`:8000`) | enabled by `PROMETHEUS_ENDPOINT` in compose; validates the 3 server alerts |
 | Temporal SDK metrics (`temporal_*`) | ✅ OTLP push | ✅ OTLP push | same pipeline as every app metric |
-| VictoriaLogs Grafana datasource | ✅ | ✅ | `victoriametrics-logs-datasource` 0.29.0 both stacks, uid `victorialogs` |
+| VictoriaLogs Grafana datasource | ✅ | ✅ | `victoriametrics-logs-datasource` 0.32.0 both stacks, uid `victorialogs` |
 | ClickHouse alerts | ✅ `clickhouse-alerts.yaml` (12 rules) | ✅ ported subset (11 rules) | same names; two operator rules have no local counterpart |
 | `clickhouse-server-engine` dashboard | ✅ | ✅ | **one dual-target JSON serves both** |
 | 5 OTel data-plane CH dashboards | ✅ | ✅ | — |
@@ -359,7 +359,7 @@ The pinned tag is in
   [`ADR-023`](../../docs/proposals/adr/ADR-023-clickhouse-observability-olap/)
 - [`local-stack/README.md`](../README.md) · [`e2e-audit.md`](e2e-audit.md)
 
-_Last updated: 2026-08-18 — temporal server scrape, VictoriaLogs datasource,
+_Last updated: 2026-10-01 — VictoriaLogs datasource 0.32.0 with the line limit pinned to 50. Earlier: 2026-08-18 — temporal server scrape, VictoriaLogs datasource,
 collector-health + RFC-0021 boards, Gateway-board divergences recorded;
 previously 2026-08-13 — engine-health slice shipped (metrics.xml, vmagent,
 vmalert, ported rules, dual-target dashboard, audit rows C20/C21)._

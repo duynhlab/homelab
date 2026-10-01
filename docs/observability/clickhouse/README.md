@@ -15,7 +15,7 @@ LogsQL/TraceQL-only ops primaries can't, plus the `otel_logs`↔`otel_traces`
 | **Tables** | `otel.otel_logs`, `otel.otel_traces` (+ `otel_traces_trace_id_ts` MV), created by the **`clickhouse-schema` Job** from DDL committed in git; the exporter only INSERTs |
 | **Retention** | `otel.*`: **TTL 90 days** (`ttl_only_drop_parts`) vs 7d on the ops primaries — the long-retention payoff; `otel_logs` / `otel_traces` parts older than **7 days move to the RustFS cold tier** first ([details](#cold-tier-on-rustfs)). The engine's own `system.*` log tables run [7–30 days from three different owners](#the-engines-own-log-tables) |
 | **Storage** | hot: local PVC `standard` `10Gi` **per replica** (cluster) + small keeper PVCs; cold: RustFS bucket `clickhouse-otel/{replica}/` behind a 1Gi local cache (policy `hot_cold`); a named `clickhouse-data` volume and no tier (local-stack, which stays single-node) |
-| **Query** | Grafana `grafana-clickhouse-datasource` **4.20.0** (`uid: clickhouse`, native `:9000`) + 5 provisioned dashboards in the **ClickHouse** folder (suite Overview→Logs→Traces, service deep dive, platform SQL) |
+| **Query** | Grafana `grafana-clickhouse-datasource` **4.22.0** (`uid: clickhouse`, native `:9000`) + 5 provisioned dashboards in the **ClickHouse** folder (suite Overview→Logs→Traces, service deep dive, platform SQL) |
 | **App code** | **Unchanged** — `pkg/obsx` / `pkg/grpcx` untouched; adding ClickHouse is a Collector-exporter change |
 | **Deep learning** | [ClickHouse internals curriculum](internals/README.md) — explanation-first chapters grounded in read-only evidence from this deployment |
 | **Design** | [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/) · [RFC-0028](../../proposals/rfc/RFC-0028/) · [ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/) |
@@ -576,7 +576,7 @@ dashboard surface. Two ideas carry everything below:
 
 ### The datasource, as deployed
 
-Plugin `grafana-clickhouse-datasource` **4.20.0** (pinned in the cluster
+Plugin `grafana-clickhouse-datasource` **4.22.0** (pinned in the cluster
 `GF_INSTALL_PLUGINS` and the local-stack compose). Both environments provision
 the same shape (cluster: [`datasource-clickhouse.yaml`](../../../kubernetes/infra/configs/observability/grafana/datasource-clickhouse.yaml),
 password from the ESO-managed `clickhouse-credentials` Secret; local-stack:
@@ -760,7 +760,7 @@ sync. Do not import them from the UI there.
    (`ResourceAttributes['k8s.pod.name']`).
 
 Integration checks: plugin version via `GET /api/plugins/grafana-clickhouse-datasource`
-(→ `4.20.0`); datasource health via *Save & test* or `SELECT 1` in Explore; data
+(→ `4.22.0`); datasource health via *Save & test* or `SELECT 1` in Explore; data
 not appearing → [Runbook](#runbook--data-not-appearing).
 
 ---
@@ -1161,6 +1161,6 @@ dev password in local-stack.
 
 ---
 
-_Last updated: 2026-10-01 — plugin-bundled dashboards fetched by URL at the plugin tag (no local patch; the #1142 sort-key bound is dropped). Earlier the same day: vendored on the cluster from v4.22.0 (the old "manual import" text was stale). Earlier: 2026-09-30 — server 26.8 LTS with asynchronous_metrics_key_values_mode=both (Keeper follows separately); operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
+_Last updated: 2026-10-01 — plugin version references updated to 4.22.0. Earlier: 2026-10-01 — plugin-bundled dashboards fetched by URL at the plugin tag (no local patch; the #1142 sort-key bound is dropped). Earlier the same day: vendored on the cluster from v4.22.0 (the old "manual import" text was stale). Earlier: 2026-09-30 — server 26.8 LTS with asynchronous_metrics_key_values_mode=both (Keeper follows separately); operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
 credential-safe query examples, and current runtime evidence for parts, TTL,
 cold storage, and the 22-rule ClickHouse alert group._

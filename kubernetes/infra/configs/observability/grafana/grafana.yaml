@@ -86,7 +86,7 @@ spec:
                   name: grafana-oidc-client
                   key: grafana_client_secret
             - name: GF_INSTALL_PLUGINS
-              value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.25.2/victoriametrics-metrics-datasource-v0.25.2.zip;victoriametrics-metrics-datasource,https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v0.29.0/victoriametrics-logs-datasource-v0.29.0.zip;victoriametrics-logs-datasource,grafana-clickhouse-datasource 4.22.0"
+              value: "https://github.com/VictoriaMetrics/victoriametrics-datasource/releases/download/v0.26.1/victoriametrics-metrics-datasource-v0.26.1.zip;victoriametrics-metrics-datasource,https://github.com/VictoriaMetrics/victorialogs-datasource/releases/download/v0.32.0/victoriametrics-logs-datasource-v0.32.0.zip;victoriametrics-logs-datasource,grafana-clickhouse-datasource 4.22.0"
             resources:
               limits:
                 # NO cpu limit. This read `cpu: 300m`, itself a raise from 100m

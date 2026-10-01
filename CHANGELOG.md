@@ -88,6 +88,18 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Feature
+
+#### Local-stack
+- **Local-stack databases are owned by per-service roles, as on the cluster.**
+  Every service, its migrate and seed jobs, the two workers, Keycloak and
+  Temporal now connect as their own non-superuser role (`<name>` /
+  `<name>-local`), and each database is owned by that role with `CONNECT`
+  revoked from `PUBLIC` — the cluster's per-service triplet (RFC-0012,
+  ADR-013) instead of one shared `postgres` superuser. The shared
+  `DB_USER`/`DB_PASSWORD` defaults are gone from the service anchor, so a
+  consumer without its own role fails at start instead of borrowing one.
+
 ### Bugfix
 
 #### Databases

@@ -18,7 +18,7 @@
 > | Audit | ✅ declarative `audit "file" "to-stdout"` (active node only) → Vector → VictoriaLogs **and** ClickHouse `otel_logs`; still stdout-only, no durable `auditStorage` | durable, fail-closed |
 > | **Database secrets engine** | ✅ **enabled — pattern-A pilot** ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/)): static role `notification` on `platform-db` (`rotation_period` 720h), read through the dedicated `openbao-db` ClusterSecretStore. Per-request dynamic roles and other services: §5.2, §6, §10 — still *planned* | per-request dynamic roles, more services |
 > | Unseal | ⚠️ **awskms auto-unseal via the floci KMS emulator** (RFC-0008 / ADR-024) — pods self-unseal at boot; `openbao-init-keys` holds only a break-glass recovery key; **root token revoked**. floci is a loose, zero-auth emulator (parity/rehearsal, not real crypto) | Real cloud KMS (`awskms`/`gcpckms`, IRSA/Workload Identity) |
-> | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager |
+> | TLS | ❌ disabled (`tlsDisable: true`; plaintext HTTP in-cluster) | TLS via cert-manager — planned, [RFC-0020](../proposals/rfc/RFC-0020/) Slice 1 |
 > | Credentials | ❌ dev passwords **seeded from Git** (e.g. `*-K1nd-2026!`) | generated / dynamic, none in Git |
 > | Root token | ✅ **revoked** after bootstrap (verified by exit code, node-pinned); inert copy left in `openbao-init-keys` (BusyBox `wget` can't PATCH it out). Break-glass **recovery key** remains = full admin via `generate-root`, so a Secret read is still high-value. **Human access no longer depends on it** — OIDC login is live (ADR-062) | revoked; OIDC / AppRole; recovery key sharded offline |
 >
@@ -735,11 +735,12 @@ flowchart LR
 
 ## 7. ESO Integration
 
-### ClusterSecretStore (target shape — TLS is planned, RFC-0008)
+### ClusterSecretStore (target shape — TLS is planned, RFC-0020 Slice 1)
 
 > **Deployed reality:** the local store uses `server: "http://openbao.openbao.svc.cluster.local:8200"`
 > with no `caBundle` (`kubernetes/infra/configs/secrets/cluster-secret-store.yaml` — OpenBAO runs
-> `tlsDisable: true` locally). The `https` + `caBundle` shape below is the RFC-0008 target.
+> `tlsDisable: true` locally). The `https` + `caBundle` shape below is the
+> [RFC-0020](../proposals/rfc/RFC-0020/) Slice 1 target (listener TLS from `homelab-ca`; RFC-0008 owns the rest of the hardening).
 > Multi-env isolation is by **KV path prefix** (`secret/local/…`), not an OpenBAO namespace —
 > OpenBAO (OSS) has no Enterprise-style namespaces feature.
 
@@ -751,7 +752,7 @@ metadata:
 spec:
   provider:
     vault:
-      server: "https://openbao.openbao.svc.cluster.local:8200"  # planned (RFC-0008); http:// today
+      server: "https://openbao.openbao.svc.cluster.local:8200"  # planned (RFC-0020 Slice 1); http:// today
       path: "secret"
       version: "v2"
       caBundle: <base64-ca-cert>   # cert-manager issued CA (planned with TLS)
@@ -1164,4 +1165,4 @@ gantt
 
 ---
 
-_Last updated: 2026-09-30 — § 11 `db-strong` marked reference, not deployed, with a warning that its symbol set breaks unescaped DSNs. Earlier the same day: which dashboard panels stay empty and why (Consul on Raft; lazily registered policy and route counters). Earlier: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_
+_Last updated: 2026-10-01 — listener TLS and the ESO `https` + `caBundle` target now name their owner, RFC-0020 Slice 1 (was RFC-0008). Earlier: 2026-09-30 — § 11 `db-strong` marked reference, not deployed, with a warning that its symbol set breaks unescaped DSNs. Earlier the same day: which dashboard panels stay empty and why (Consul on Raft; lazily registered policy and route counters). Earlier: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

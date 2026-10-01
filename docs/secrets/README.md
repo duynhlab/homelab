@@ -14,9 +14,9 @@ Secrets — they never call OpenBAO directly.
 |---|---|---|
 | Secret store | OpenBAO HA, 3 Raft pods, PVC-backed | Same HA shape, production seal/TLS hardening |
 | App secret delivery | ESO reads OpenBAO KV v2; the notification service reads the **database engine static role** instead ([ADR-025](../proposals/adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) pilot) | Extend database-engine credentials beyond the pilot |
-| OpenBAO endpoint | Plain HTTP in-cluster (`tlsDisable: true`) | TLS via cert-manager |
+| OpenBAO endpoint | Plain HTTP in-cluster (`tlsDisable: true`) | TLS via cert-manager (planned — RFC-0020 Slice 1) |
 | OpenBAO unseal | `awskms` auto-unseal via the floci KMS emulator (pods self-unseal at boot); `openbao-init-keys` holds only a break-glass recovery key; root token revoked ([ADR-024](../proposals/adr/ADR-024-floci-kms-emulator-auto-unseal/)) | Real cloud KMS (swap floci `endpoint`) |
-| TLS issuer split | Local `platform-edge-tls` is signed by `homelab-ca` (reconciled on Kind — RFC-0024 bring-up; K-row gate pass pending) | Prod `platform-edge-tls` is Let's Encrypt via Cloudflare DNS-01 |
+| TLS issuer split | Local `platform-edge-tls` is signed by `homelab-ca` (reconciled on Kind — RFC-0024 bring-up; K-row gate pass pending) | Prod `platform-edge-tls` from Let's Encrypt via Cloudflare DNS-01 (planned — no production cluster deploys the edge yet) |
 | Trust distribution | trust-manager distributes `homelab-ca-bundle` to labeled namespaces | Same, with rotation runbooks |
 | Unsafe local choices | Dev placeholders, root token persistence, plaintext listener | Remove before production; tracked by RFC-0008 |
 
@@ -339,7 +339,7 @@ so inline passwords remain in the HelmRelease/ConfigMap (dev-only); see
 
 | Workstream | Why it matters | Source of truth |
 |---|---|---|
-| TLS for OpenBAO | Prevent plaintext OpenBAO traffic and allow ESO `caBundle` validation | [RFC-0008](../proposals/rfc/RFC-0008/) |
+| TLS for OpenBAO | Prevent plaintext OpenBAO traffic and allow ESO `caBundle` validation | [RFC-0020](../proposals/rfc/RFC-0020/) Slice 1 (planned) |
 | Real cloud KMS | Swap the floci emulator's `endpoint` for a managed KMS (auto-unseal itself shipped — ADR-024) | [RFC-0008](../proposals/rfc/RFC-0008/) |
 | Database-engine credentials fleet-wide | Replace the remaining long-lived KV passwords with rotated/leased users (pilot shipped — ADR-025) | [OpenBAO §5.2](./openbao.md#52-database-secrets-engine--dynamic-credentials) |
 | ~~OIDC human access~~ **shipped** (ADR-062) — day-to-day ceremony use is gone; ceremony is the issuer-down fallback | Remove day-to-day break-glass ceremony use | [OpenBAO Architecture](./openbao.md) |
@@ -368,10 +368,10 @@ present as active).
 
 - [OpenBAO Architecture](./openbao.md) — OpenBAO internals and learning notes.
 - [Runbooks](./runbooks/) — add, rotate, bootstrap, and troubleshoot secrets.
-- [cert-manager + Let's Encrypt + trust-manager](./cert-manager.md) — TLS issuance for `platform-edge-tls` and CA bundle distribution (§11).
+- [cert-manager + Let's Encrypt + trust-manager](./cert-manager.md) — TLS issuance for `platform-edge-tls` and CA bundle distribution (§11); [§12 TLS topology](./cert-manager.md#12-tls-topology--which-hops-are-encrypted-today) — which hops are TLS today and whether they are verified.
 - [OpenBAO file reference](./openbao.md#16-file-reference) — canonical manifest paths.
 - [RFC-0008](../proposals/rfc/RFC-0008/) — production secrets hardening and parity matrix.
 
 ---
 
-_Last updated: 2026-09-29 — the pipeline map no longer draws a consumer for homelab-ca-bundle (none mounts it). Earlier: 2026-09-29 — the backup label lives only in namespaces.yaml (ResourceSets no longer render Namespaces). Previously 2026-09-28 — Draw.io view of the secrets, TLS and trust pipeline. 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._
+_Last updated: 2026-10-01 — OpenBAO listener TLS now points at its owner, RFC-0020 Slice 1 (was RFC-0008); the prod Let's Encrypt cell is labelled planned; Related links cert-manager § 12 (TLS topology). Earlier: 2026-09-29 — the pipeline map no longer draws a consumer for homelab-ca-bundle (none mounts it). Earlier: 2026-09-29 — the backup label lives only in namespaces.yaml (ResourceSets no longer render Namespaces). Previously 2026-09-28 — Draw.io view of the secrets, TLS and trust pipeline. 2026-08-27 — ADR-062 shipped: staff OIDC login added to the flow (step 2b + diagram), the 'OIDC for humans' hardening row closed, ceremony references demoted to fallback. 2026-08-19: production-hardening.md dissolved into § Current boundaries (corrected to ADR-024/ADR-025 reality); catalog completed against the deployed ExternalSecrets (keycloak, checkout/inventory, rustfs, 3 shared CES); fictional pooler secret dropped; auth-service rows removed._

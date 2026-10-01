@@ -114,6 +114,15 @@ Skeleton (copy what you need):
   consumer without its own role fails at start instead of borrowing one.
 
 #### Docs
+- **A Draw.io TLS topology shows which hops are encrypted today, who issues
+  their certificates, and whether each is verified.** `security/tls-topology`
+  is embedded as the new `docs/secrets/cert-manager.md` § 12, alongside a
+  quick-facts table, a per-hop inventory with file:line evidence and the
+  live-cluster checks. Only three hops carry verified TLS: browser → edge and
+  the two `id.duynh.me` hairpins (OpenBao OIDC config, Flux web UI).
+  payment → `product-db-rw` is TLS, unverified (`sslmode=require`). Every
+  other in-cluster hop is plaintext: app → pooler, gRPC, Temporal, OpenBao
+  `:8200`, Keycloak `:8080`, Valkey, telemetry and RustFS.
 - **A second Draw.io diagram shows one worker release, and the work-layer
   diagram matches the manifests again.** `workflows/temporal-worker-versions`
   draws order-fulfillment mid-ramp: build A Current and build B Ramping, each
@@ -125,6 +134,26 @@ Skeleton (copy what you need):
   drawn from the worker, and the workers' database writes. `api/temporal.md`
   no longer says a drained version is deleted a day later; `deleteDelay` is
   `0s`.
+
+#### Proposals
+- **RFC-0020 amended with slices 7–14 and decisions 9–12 (proposed; status
+  stays `provisional`).** The new slices cover the gaps the TLS review found
+  outside slices 0–6, each with its scope, its order relative to 0–6, and the
+  finding it closes:
+  - an intermediate CA and a root `renewBefore`;
+  - Keycloak HTTPS in-cluster (JWKS, Grafana OAuth);
+  - `verify-full` for the platform-db clients (Temporal, the OpenBao DB
+    engine, Keycloak JDBC);
+  - an Envoy `BackendTLSPolicy` per backend;
+  - RustFS TLS for Barman, DR, the ClickHouse cold tier and Pyroscope;
+  - Valkey auth, then TLS;
+  - OCI registry TLS with Flux cosign `verify`;
+  - the KMS link over HTTPS.
+
+  The RFC's own drift is corrected in the same change: "exactly one
+  certificate (the Kong edge wildcard)"; the expiry alert it planned to add,
+  which already exists at 7d; and research's PgDog-upstream row, which said
+  "plaintext" against its own `tls_verify` default of `prefer`.
 
 ### Bugfix
 
@@ -151,6 +180,17 @@ Skeleton (copy what you need):
   30-minute wait.
 
 #### Docs
+- **The TLS docs match the manifests.** OpenBAO listener TLS and the ESO
+  `https` + `caBundle` target name their owner, RFC-0020 Slice 1; they named
+  RFC-0008. The prod Let's Encrypt path is labelled planned, since no
+  production cluster deploys cert-manager or the edge. `homelab-ca` no longer
+  claims to sign webhook certs; each chart runs its own self-signed Issuer.
+  cert-manager § 11.3 names both bundle mount shapes, so it agrees with the
+  Bundle manifest. payment's direct database hop reads "TLS, unverified" in
+  `databases/architecture.md` and `poolers.md`, not "direct TLS". Three
+  manifest comments are corrected, with no behaviour change: the Temporal
+  Worker Controller webhook's issuer, a dead path in the edge Certificate, and
+  product-db's `pg_hba` note on the PgDog hop.
 - **The ClickHouse docs name the deployed plugin 4.22.0**; three places still
   said 4.20.0 after the bump.
 - **Database docs no longer describe a three-instance DR replica**

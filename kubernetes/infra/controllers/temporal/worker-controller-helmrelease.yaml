@@ -57,9 +57,8 @@ spec:
     # has repeatedly had to reclaim. Revisit on multi-node (RFC-0011).
     replicas: 1
 
-    # cert-manager is already deployed and issues from the homelab-ca root, so the
-    # bundled subchart stays off while the chart still creates the Issuer +
-    # Certificate the webhook needs.
+    # cert-manager is already deployed, so the bundled subchart stays off while
+    # the chart still creates its own self-signed Issuer + webhook Certificate.
     certmanager:
       install: false
       enabled: true

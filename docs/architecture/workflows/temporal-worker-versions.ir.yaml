@@ -37,6 +37,8 @@ diagram:
 # oci has its own top tier: on a shared tier generate.py emits the cluster frame
 # before root nodes, so dot always puts an unframed peer to its right.
 # ScaledObject and Deployment share one tier so no controller edge skips a tier.
+# KEDA shares the controller's tier: one control-plane row (builds vs replicas).
+# Unpinned measured 4 crossings; pinned 8 with KEDA on either side.
 layers: [ext, src, decl, ctl, live, server]
 
 boundaries:
@@ -58,7 +60,7 @@ nodes:
   - {id: wrt, label: "WorkerResourceTemplate\norder-fulfillment-scaler\nScaledObject: min 1 · max 3 · target 5", role: worker, layer: decl, parent: f_decl}
 
   - {id: twc, label: "temporal-worker-controller 1.9.0\nowns builds, not replicas", role: platform, layer: ctl, parent: f_ctl, icon: temporal}
-  - {id: keda, label: "KEDA 2.20.2\ntemporal scaler · poll 15 s", role: platform, layer: live, parent: f_keda, icon: keda}
+  - {id: keda, label: "KEDA 2.20.2\ntemporal scaler · poll 15 s", role: platform, layer: ctl, parent: f_keda, icon: keda}
 
   - {id: so_a, label: "ScaledObject + HPA · build A\n1–3 pods = ceil(backlog A / 5)", role: worker, layer: live, parent: f_a}
   - {id: so_b, label: "ScaledObject + HPA · build B\n1–3 pods = ceil(backlog B / 5)", role: worker, layer: live, parent: f_b}

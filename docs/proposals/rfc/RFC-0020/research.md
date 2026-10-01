@@ -8,7 +8,7 @@
 | **Status** | researching → gate passed with README |
 | **Scope** | platform-wide |
 | **Created** | 2026-07-21 |
-| **Last updated** | 2026-07-22 |
+| **Last updated** | 2026-10-01 (PgDog upstream row corrected) |
 
 > **Plain-language research.** Write like a careful blog post, not an RFC. After jargon,
 > add **"In plain terms"** blockquotes. Facts must still be verified (Context7 + manifests).
@@ -198,7 +198,7 @@ Verified against manifests on 2026-07-21. Marks **deployed** vs **planned**.
 | Edge (Kong) | `kong-proxy-tls` wildcard; **prod** `letsencrypt-prod` (Cloudflare DNS-01), **local** patched to `homelab-ca` | base default → `homelab-ca`; **prod overlay** re-adds `letsencrypt-prod` (Cloudflare/ACME dropped from base) |
 | DB replication | CNPG uses TLS `cert` auth for `streaming_replica` — but from **CNPG's own auto-CA**, not `homelab-ca` | keep CNPG-managed (owner decision 2026-07-22) |
 | App → DB | 9 services `sslmode=disable` via poolers; only `payment` is `hostssl`+`require` direct to CNPG | T2 `verify-full` against `homelab-ca`; then T3 cert-auth (ADR-025) — **all via pooler** (owner decision 2026-07-22; `payment`'s direct hop is transitional) |
-| Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream plaintext; PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — PgDog confirmed TLS-capable up to `verify_full` + mTLS (audit log) |
+| Pooler (PgBouncer / PgDog) | No client-facing TLS; PgDog upstream sets no `tls_verify`, so its default `prefer` applies (encrypted when CNPG offers TLS, never verified — corrected 2026-10-01, was "plaintext"; confirm with `pg_stat_ssl`); PgBouncer only uses CNPG auto client-cert for `auth_query` | client + upstream TLS — PgDog confirmed TLS-capable up to `verify_full` + mTLS (audit log) |
 | East-west gRPC | plaintext `insecure.NewCredentials()`; Temporal link no TLS | in-process mTLS — **this RFC's east-west tier** (formerly RFC-0002) |
 | Secrets (OpenBAO) | listener `tls_disable = 1`, plaintext `:8200` | `tls_disable = 0`, cert-manager cert (ADR-005 prod target) |
 

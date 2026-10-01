@@ -95,7 +95,8 @@ it shares the same Kubernetes environment and object-storage failure domain.
   semantics are outside the pilot.
 - Product, cart, order, checkout, and inventory use PgDog. PgDog routes writes
   to `product-db-rw` and eligible reads to `product-db-r`.
-- Payment currently connects directly to `product-db-rw` with TLS.
+- Payment currently connects directly to `product-db-rw` with TLS, unverified
+  (`sslmode=require`: encrypted, but the server certificate is not checked).
 - Migration jobs connect directly to the primary so schema changes are not
   multiplexed or read-routed.
 
@@ -136,4 +137,4 @@ services, not by the infrastructure manifests.
 - [CloudNativePG 1.30 service management](https://cloudnative-pg.io/docs/1.30/service_management/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 
-_Last updated: 2026-10-01 — inventory table shows the DR cluster's single instance. Earlier: 2026-09-29 — DR cluster `product-db-replica` down to 1 instance (3 on promotion). Earlier: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._
+_Last updated: 2026-10-01 — payment's direct hop is described as TLS, unverified (`sslmode=require`). Earlier the same day: inventory table shows the DR cluster's single instance. Earlier: 2026-09-29 — DR cluster `product-db-replica` down to 1 instance (3 on promotion). Earlier: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._

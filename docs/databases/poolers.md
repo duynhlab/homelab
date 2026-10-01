@@ -36,7 +36,7 @@ flowchart LR
     ProductClients["product / cart / order<br/>checkout / inventory"] --> PgDog["PgDog :6432"]
     PgDog -->|"writes"| ProductRW["product-db-rw :5432"]
     PgDog -->|"reads"| ProductR["product-db-r :5432"]
-    Payment["payment"] -->|"direct TLS"| ProductRW
+    Payment["payment"] -->|"direct · TLS, unverified<br/>sslmode=require"| ProductRW
 
     PlatformClients["user / notification<br/>shipping / review"] --> PgBouncer["PgBouncer :5432"]
     PgBouncer --> PlatformRW["platform-db-rw :5432"]
@@ -54,7 +54,8 @@ recent primary commit.
 
 PgDog declares the six product-cluster database/user pairs and receives their
 passwords through Flux `valuesFrom`. Current application manifests intentionally
-keep payment on direct TLS.
+keep payment on a direct connection with TLS, unverified (`sslmode=require`:
+encrypted, but the server certificate is not checked — RFC-0020 Slice 4).
 
 CNPG generates PgBouncer authentication support through `auth_query`; it does
 not store a second application password set. Temporal and Keycloak bypass the
@@ -92,4 +93,4 @@ the owning service contract and deployment manifest before changing a DSN.
 - [PgBouncer features](https://www.pgbouncer.org/features.html)
 - [PgDog documentation](https://docs.pgdog.dev/)
 
-_Last updated: 2026-08-31._
+_Last updated: 2026-10-01 — payment's direct hop labelled TLS, unverified (`sslmode=require`). Earlier: 2026-08-31._

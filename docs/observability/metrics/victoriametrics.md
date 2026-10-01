@@ -850,22 +850,17 @@ curl -s 'http://localhost:8428/api/v1/query' \
 
 Log queries and VLSingle verification: [logging/victorialogs.md#verification](../logging/victorialogs.md#verification).
 
-### Quick Access (all port-forwards)
+### Quick Access
 
-```bash
-# Run the helper script to set up all port-forwards at once
-make flux-ui
-# Or: ./scripts/flux-ui.sh
-```
-
-Access URLs after running the script:
+Every UI is an HTTPRoute on the edge; `make hosts` maps the names (fallback
+port-forwards: [setup.md § Prerequisites](../../platform/setup.md#prerequisites)).
 
 | Component | URL |
 |-----------|-----|
-| Grafana | http://localhost:3000 |
-| VictoriaMetrics VMUI | http://localhost:8428/vmui |
-| VictoriaLogs | http://localhost:9428 — query/ops: [logging/victorialogs.md](../logging/victorialogs.md) |
-| VictoriaTraces | http://localhost:10428 — Jaeger query API under `/select/jaeger` |
+| Grafana | https://grafana.duynh.me |
+| VictoriaMetrics VMUI | https://vmui.duynh.me |
+| VictoriaLogs | https://logs.duynh.me — query/ops: [logging/victorialogs.md](../logging/victorialogs.md) |
+| VictoriaTraces | https://victoriatraces.duynh.me — Jaeger query API under `/select/jaeger` |
 
 ---
 
@@ -975,4 +970,4 @@ kubectl get helmreleases -A -o wide
 
 ---
 
-_Last updated: 2026-08-13 — edge scrape objects corrected to the envoy-gateway-controller ServiceMonitor + envoy-gateway-proxy PodMonitor; merged vmauth into this page; trim duplicated VLSingle/logs content (see logging/victorialogs.md)._
+_Last updated: 2026-10-01 — Quick Access lists the `*.duynh.me` routes instead of `make flux-ui` port-forwards (the script is gone). Previously 2026-08-13 — edge scrape objects corrected to the envoy-gateway-controller ServiceMonitor + envoy-gateway-proxy PodMonitor; merged vmauth into this page; trim duplicated VLSingle/logs content (see logging/victorialogs.md)._

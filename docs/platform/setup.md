@@ -15,8 +15,9 @@ Comprehensive guide to deploying the microservices platform using **GitOps**, **
 
 ### Detailed Commands (Makefile)
 
-- **Cluster Management**: `make cluster-up`, `make cluster-down`
-- **Flux Operations**: `make flux-up`, `make flux-push`, `make flux-sync`, `make flux-status`, `make flux-logs`, `make flux-ui`
+- **Cluster Management**: `make cluster-up`, `make cluster-down`, `make hosts`, `make seed`
+- **Flux Operations**: `make flux-up`, `make flux-push`, `make flux-sync`, `make flux-status`, `make flux-logs`
+- **Audit sweeps**: `make db-isolation`, `make edge-isolation` (`ARGS=--live`)
 - **OpenTofu (Flux bootstrap)**: `make tf-init`, `make tf-plan`, `make tf-apply`, `make tf-destroy`
 - **Utilities**: `make prereqs`, `make help`
 
@@ -66,8 +67,26 @@ Before the first `make up`, one host-side prerequisite must be in place:
 
 1. **`/etc/hosts` entries for `*.duynh.me`** — the Envoy Gateway edge Service is a NodePort and Kind maps host ports 80/443. Use the helper:
    ```bash
-   sudo ./scripts/setup-hosts.sh           # adds the marker block
-   sudo ./scripts/setup-hosts.sh remove    # cleans it up
+   make hosts               # sudo scripts/setup-hosts.sh — adds the marker block
+   make hosts ARGS=remove   # cleans it up
+   ```
+
+   **Fallback: port-forward.** Every UI has an HTTPRoute, so the hosts file is
+   the whole access story; `kubectl port-forward` covers the three cases it does
+   not:
+   ```bash
+   # No hosts file or no 80/443 mapping: forward the edge itself. The Host
+   # header must still be a *.duynh.me name — localhost:PORT never matched a route.
+   EDGE=$(kubectl -n envoy-gateway get svc -l gateway.envoyproxy.io/owning-gateway-name=platform -o name | head -1)
+   kubectl -n envoy-gateway port-forward "$EDGE" 8443:443 &
+   curl -k --resolve grafana.duynh.me:8443:127.0.0.1 https://grafana.duynh.me:8443/api/health
+
+   # Past the gateway (no CIDR SecurityPolicy, no TLS): any Service directly.
+   kubectl -n frontend port-forward svc/frontend 3001:80
+
+   # The RustFS S3 API. Only the console has a route (source.duynh.me);
+   # every in-cluster S3 client uses the Service DNS, so :9000 stays off the edge.
+   kubectl -n rustfs port-forward svc/rustfs-svc 9000:9000
    ```
 
 2. **Podman instead of Docker (macOS)** — `kind-up.sh` speaks the Docker CLI, so
@@ -557,12 +576,11 @@ homelab/
 15b. `policy-reporter-local`: Policy Reporter UI for Kyverno's PolicyReports (depends on `kyverno-policies-local`).
 16. `apps-local`: Business logic — ResourceSets + workers (`dependsOn` `databases-local`, `monitoring-local`, `temporal-config-local`, `keda-local`; workers dial Temporal at startup, and services stamp Search Attributes that must be registered first — the config half's Job, which its `wait: true` covers).
 
-> **`make flux-sync` caveat:** `scripts/flux-sync.sh` reconciles only six Kustomizations
-> (`flux-system`, `controllers-local`, `databases-local`, `monitoring-local`,
-> `secrets-local`, `apps-local`). It does **not** force the edge, Keycloak, Temporal, ClickHouse,
-> tracing, or cert-manager. After changes to those layers, run
-> `flux reconcile kustomization <name>-local --with-source` or `make sync` after
-> `make flux-push` and reconcile the specific Kustomization manually.
+> **`make flux-sync`** reconciles the three OCI sources `make flux-push` publishes
+> (`flux-system`, `infrastructure-oci`, `apps-oci`) and then every Kustomization
+> that is not suspended — about 80 s on an idle cluster (29 Kustomizations,
+> measured 2026-10-01). Reconcile one layer alone with
+> `flux reconcile kustomization <name>-local --with-source`.
 
 ---
 
@@ -571,4 +589,4 @@ For persistence layer details, refer to [architecture.md](../databases/architect
 
 ---
 
-_Last updated: 2026-10-01 — infra drift pass: `checkout-worker` is a `WorkerDeployment` (expected state, tree, Phase 4); cluster tree and dependency graph list the `clickhouse-keeper`, `clickhouse-schema`, `flux-web`, `keda`, `policy-reporter` and Grafana dashboards-as-code waves; `policy-reporter`/`keda` namespaces; 24 hostnames; `controllers/logging` is Vector; the Kind gate has passed (K4.5). Previously 2026-09-17 — `admin-service` added to the clone list; `local-stack/compose.yaml` builds the Backoffice portal from `../../admin-service`, so a checkout without it fails at `docker compose up --build`. Previously 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._
+_Last updated: 2026-10-01 (later) — `make hosts` replaces the bare script call and `make flux-ui` is gone (the fallback port-forwards live under Prerequisites); `make seed`, `make db-isolation`, `make edge-isolation` listed; `make flux-sync` covers every Kustomization. Earlier the same day — infra drift pass: `checkout-worker` is a `WorkerDeployment` (expected state, tree, Phase 4); cluster tree and dependency graph list the `clickhouse-keeper`, `clickhouse-schema`, `flux-web`, `keda`, `policy-reporter` and Grafana dashboards-as-code waves; `policy-reporter`/`keda` namespaces; 24 hostnames; `controllers/logging` is Vector; the Kind gate has passed (K4.5). Previously 2026-09-17 — `admin-service` added to the clone list; `local-stack/compose.yaml` builds the Backoffice portal from `../../admin-service`, so a checkout without it fails at `docker compose up --build`. Previously 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

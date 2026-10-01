@@ -91,7 +91,7 @@ flowchart LR
 
 ```bash
 make prereqs                  # check kind, kubectl, flux, helm, docker, tofu
-sudo scripts/setup-hosts.sh   # *.duynh.me → 127.0.0.1
+make hosts                    # *.duynh.me → 127.0.0.1 (sudo scripts/setup-hosts.sh)
 make up                       # Kind + OCI push + Flux bootstrap
 make flux-status              # watch reconciliation (~5–10 min first time)
 ```

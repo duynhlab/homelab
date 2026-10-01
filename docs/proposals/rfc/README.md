@@ -134,7 +134,7 @@ for its own sake.
 | [RFC-0030](RFC-0030/) | Backoffice commerce analytics on ClickHouse | platform-wide | P2 | **Accepted** 2026-09-09 — [ADR-066](../adr/ADR-066-adopt-peerdb-for-commerce-cdc/) through [ADR-069](../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) are `Accepted / Not started`; mandatory Phase 0 qualification gates block rollout and no component is installed |
 | [RFC-0031](RFC-0031/) | Cross-signal telemetry standard and ClickHouse operations | platform-wide | P1 | **Implemented** 2026-09-25 (Accepted 2026-09-17) — [ADR-070](../adr/ADR-070-logging-facade-and-event-catalog/) through [ADR-076](../adr/ADR-076-semantic-convention-registry/) all `Accepted / Complete`; facade `pkg/logger/slogx` on the whole fleet in one train (2026-09-24), Weaver registry + live-check gate, fleet lint policy blocking with a version floor, both final gates passed on the final pins (compose #1095, Kind 2026-09-25) |
 | [RFC-0032](RFC-0032/) | Move the Kind baseline to Kubernetes 1.36 — **closed at 1.35.8** (feature evaluation for 1.35/1.36; OCI image volumes adopted for schema delivery) | infra | P1 | **implemented** 2026-09-30 — closed at `v1.35.8`: 1.36/1.37 kubelets crash on this ZFS host until a release vendors cAdvisor ≥ v0.60.6 ([amendment](RFC-0032/README.md#amendment-2026-09-30--close-at-1358)); Phase 1 (1.35.8 baseline) and Phase 2 ([ADR-077](../adr/ADR-077-image-volume-schema-delivery/) Complete) landed |
-| [RFC-0033](RFC-0033/) | Claude-native autonomous engineering organization | platform-wide | P1 | **provisional** 2026-09-28 — research gate PASSED and owner approved RFC authoring; proposes a human-gated GitHub ledger, bounded isolated workers, independent proof, phased routine qualification, and a Documentation Steward. Architecture review and five resulting ADRs remain pending; no runtime component is installed |
+| [RFC-0033](RFC-0033/) | Claude-native autonomous engineering organization | platform-wide | P1 | **Accepted** 2026-10-01 — bounded jobs + GitHub ledger selected; [ADR-079](../adr/ADR-079-version-agent-task-contracts/) through [ADR-083](../adr/ADR-083-documentation-steward/) are `Accepted / Not started`. Publishing stays human-operated in Phases 0–1; no runtime, workflow, schema, App, routine, hook, or agent definition is installed |
 
 ## Backlog — candidate RFCs
 
@@ -162,7 +162,10 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
 
 ---
-_Last updated: 2026-09-30 — **RFC-0032** closed at 1.35.8 (implemented). Earlier: 2026-09-29 — **RFC-0033** → `provisional` (2026-09-28): the research
+_Last updated: 2026-10-01 — **RFC-0033** → `Accepted`: bounded jobs plus the GitHub
+ledger selected, publishing human-operated in Phases 0–1, and ADR-079 through ADR-083
+accepted at Adoption `Not started`; no runtime component is installed. Previously
+2026-09-30 — **RFC-0032** closed at 1.35.8 (implemented). Earlier: 2026-09-29 — **RFC-0033** → `provisional` (2026-09-28): the research
 gate passed with owner-confirmed directions, including a schema-normalized GitHub task
 contract, App-scoped unattended identity, external heartbeat, measurable promotion bars,
 and documentation page/example contracts. The architecture choice remains undecided

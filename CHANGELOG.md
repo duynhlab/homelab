@@ -88,9 +88,25 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Breaking Change
+
+#### GitOps
+- **`make flux-ui` and `scripts/flux-ui.sh` are gone.** Every UI it forwarded
+  is served by an HTTPRoute on `*.duynh.me` (`make hosts`), three of its
+  targets (Jaeger, Tempo, the Zalando operator UI) no longer exist, and its
+  `pkill -f "kubectl port-forward"` killed every port-forward on the host.
+  The three uses the routes do not cover (the RustFS S3 API on `:9000`,
+  reaching a Service past the gateway, a host without `/etc/hosts`) are
+  one-line `kubectl port-forward` snippets under setup.md § Prerequisites.
+
 ### Feature
 
 #### GitOps
+- **Every script has a Makefile entry point:** `make hosts` (setup-hosts.sh,
+  `ARGS=remove`), `make seed` (kind-seed.sh), `make db-isolation` and
+  `make edge-isolation` (`ARGS=--live`). `make flux-sync` reconciles the three
+  pushed OCI sources and then every Kustomization that is not suspended,
+  instead of six hard-coded names.
 - **The ClickHouse DDL image lives in the new `duynhlab/images` repository**
   ([duynhlab/images](https://github.com/duynhlab/images)). It is released by
   tag as `ghcr.io/duynhlab/images/clickhouse-ddl:1.0.0` — reproducible, cosign
@@ -157,6 +173,13 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Gateway
+- **`scripts/setup-hosts.sh` lists only the 17 hosts an enabled HTTPRoute
+  serves.** Gone: the bare `duynh.me` (the listeners match `*.duynh.me` only),
+  `jaeger` and `tempo` (retired with RFC-0027), and the four MCP hosts
+  (`routes/mcp.yaml` is commented out since 2026-08-21). The K0.6 audit row
+  reads the enabled route list out of the kustomization instead of a glob.
+
 #### Databases
 - **Barman retention runs again; it had failed on every run since the
   clusters were created.** Each ObjectStore's `destinationPath` ended in `/`,
@@ -165,6 +188,17 @@ Skeleton (copy what you need):
   and `barman-cloud-backup-list` exited 4 every five minutes on all three
   clusters, and the 30d/7d recovery windows never deleted an object. The paths
   lose the trailing slash; object keys do not change.
+
+#### Security
+- **The Kyverno "Emergency disable" runbook works now.** It told the operator
+  to annotate a `ClusterPolicy` with `kyverno.io/disabled=true`; Kyverno has no
+  such annotation, and no `ClusterPolicy` has existed since ADR-078. The
+  section gives the Git path (`validationActions: [Audit]`, or
+  `evaluation.admission.enabled: false`, then `make flux-push`) and the
+  `flux suspend` → `kubectl patch validatingpolicy` → `flux resume`
+  break-glass, both measured on Kind. The legacy `validationFailureAction:
+  Enforce` wording in the two Kyverno runbooks and the alerts comment now says
+  `validationActions: [Deny]`.
 
 #### Local-stack
 - **Every Phase C row of the E2E release audit prints a verdict.** C2–C4,
@@ -180,6 +214,8 @@ Skeleton (copy what you need):
   30-minute wait.
 
 #### Docs
+- **`docs/testing/k6.md` lists `restock.js`**, which `make e2e-restock` has run
+  since 2026-08-24.
 - **The database TLS hops are measured, not guessed.** `pg_stat_ssl` on
   both Kind primaries (2026-10-01) settles the rows #1181 left
   "unconfirmed": PgDog → product-db, Keycloak JDBC, the CNPG PgBouncer server

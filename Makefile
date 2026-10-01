@@ -39,6 +39,14 @@ kind-floor: ## Fail if the Kind CLI is older than KIND_MIN_VERSION
 cluster-down: ## Delete Kind cluster and registry
 	./scripts/kind-down.sh
 
+.PHONY: hosts
+hosts: ## Map *.duynh.me to 127.0.0.1 in /etc/hosts (sudo; ARGS=remove undoes it)
+	sudo ./scripts/setup-hosts.sh $(ARGS)
+
+.PHONY: seed
+seed: ## Seed demo data into the Kind cluster (ARGS=<service ...> for a subset)
+	./scripts/kind-seed.sh $(ARGS)
+
 ##@ Flux Operations
 
 .PHONY: flux-up
@@ -68,10 +76,6 @@ flux-push: ## Push manifests to OCI registry
 .PHONY: flux-sync
 flux-sync: ## Trigger Flux reconciliation
 	./scripts/flux-sync.sh
-
-.PHONY: flux-ui
-flux-ui: ## Port-forward Flux UI, Grafana, VictoriaMetrics, VMAlert, Karma, Jaeger, Tempo, …
-	./scripts/flux-ui.sh
 
 .PHONY: flux-logs
 flux-logs: ## Show Flux logs (last 10 minutes)
@@ -155,8 +159,16 @@ e2e-load: ## Order load; reports the Temporal backlog it built
 	GATE=$(or $(GATE),kind) k6 run scripts/k6/load.js
 
 .PHONY: e2e-restock
-e2e-restock: ## Top demo stock back up to the seed baseline (kind-seed.sh cannot -- ON CONFLICT DO NOTHING)
+e2e-restock: ## Top demo stock back up to the seed baseline (make seed cannot -- ON CONFLICT DO NOTHING)
 	GATE=$(or $(GATE),kind) k6 run scripts/k6/restock.js
+
+.PHONY: db-isolation
+db-isolation: ## pg_hba isolation sweep against the live databases (RFC-0012 P4)
+	./scripts/db-isolation-sweep.sh
+
+.PHONY: edge-isolation
+edge-isolation: ## Edge NetworkPolicy allow-list sweep (ARGS=--live probes the cluster)
+	./scripts/edge-isolation-sweep.sh $(ARGS)
 
 ##@ Utilities
 

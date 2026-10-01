@@ -177,10 +177,12 @@ the tag exists; running it earlier audits the previous release.
   ```bash
   sudo scripts/setup-hosts.sh
   getent hosts $(awk '/^HOSTS=\(/,/^\)/' scripts/setup-hosts.sh \
-    | grep -oE '[a-z0-9.-]+\.duynh\.me|^  duynh\.me' | tr -d ' ') | wc -l
-  # compare with:
-  grep -rhoE '^ *- [a-z0-9.-]+\.duynh\.me' kubernetes/infra/configs/envoy-gateway/routes/*.yaml \
-    | sed 's/^ *- //' | sort -u | wc -l
+    | grep -oE '[a-z0-9.-]+\.duynh\.me') | awk '{print $2}' | sort -u | wc -l
+  # compare with the routes the kustomization ENABLES (routes/mcp.yaml is
+  # commented out, so a bare glob over routes/*.yaml over-counts by four):
+  sed -n 's|^  - \(routes/.*\.yaml\)|kubernetes/infra/configs/envoy-gateway/\1|p' \
+      kubernetes/infra/configs/envoy-gateway/kustomization.yaml \
+    | xargs grep -hoE '^ *- [a-z0-9.-]+\.duynh\.me' | sed 's/^ *- //' | sort -u | wc -l
   ```
   `getent` does not exist on macOS — use `dscacheutil -q host -a name <host>` or
   a `for h in …; do ping -c1 -W1 $h; done` loop there.
@@ -1930,4 +1932,4 @@ Measured on 2026-09-29 (`endpoints/v1`, Kubernetes 1.35.8):
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-09-30 — K3.1: no exceptions remain (both removed as inert, ADR-078 step 3); K5.7/K5.8 notes refreshed. Earlier: 2026-09-29 — Diagnostics: "Who calls a deprecated API" (scoped apiserver audit) with the measured `endpoints/v1` clients and fixes. Earlier the same day — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_
+_Last updated: 2026-10-01 — K0.6 compares the hosts file against the routes the kustomization enables, not a glob that counts the disabled mcp.yaml. Previously 2026-09-30 — K3.1: no exceptions remain (both removed as inert, ADR-078 step 3); K5.7/K5.8 notes refreshed. Earlier: 2026-09-29 — Diagnostics: "Who calls a deprecated API" (scoped apiserver audit) with the measured `endpoints/v1` clients and fixes. Earlier the same day — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

@@ -6,7 +6,7 @@
 # indistinguishable from a healthy alert.
 #
 # Why this domain matters more than its size suggests: `disallow-default-namespace`
-# runs with validationFailureAction Enforce AND failurePolicy Fail, so a dead
+# runs with validationActions [Deny] AND failurePolicy Fail, so a dead
 # admission controller does not merely stop policing -- it can refuse admission.
 # The 2026-08-21 disk incident showed the shape of that failure: webhook calls
 # timing out at 5s turned into Flux dry-run InternalErrors and a chain of 14

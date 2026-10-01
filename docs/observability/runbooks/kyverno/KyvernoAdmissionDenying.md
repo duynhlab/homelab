@@ -17,8 +17,8 @@ cluster every series of `kyverno_admission_requests_total` carries
 `request_allowed="true"` — verified on 2026-08-21, where all 448 series did.
 
 **Firing is not automatically a defect.** Only one policy can deny:
-`disallow-default-namespace`, the sole rule with `validationFailureAction:
-Enforce`. A denial can mean the policy is doing exactly its job on a genuinely
+`disallow-default-namespace`, the sole policy with `validationActions:
+[Deny]`. A denial can mean the policy is doing exactly its job on a genuinely
 bad manifest. The 10-minute `for` is what separates the two cases: a human
 applying something wrong fixes it and moves on, while a **controller** retrying
 a rejected manifest denies forever.

@@ -103,9 +103,9 @@ kubernetes/
     controllers/kyverno/          # HelmRelease (Kyverno chart 3.9.1)
     controllers/policy-reporter/  # HelmRelease (policy-reporter 3.10.0) — the reports UI
     configs/kyverno/
-      cluster-policies/           # 8 active + 1 disabled — see Policy inventory
+      cluster-policies/           # 16 CEL policies (14 Validating, 1 Generating, 1 Deleting) + 1 disabled legacy file
       exceptions/                 # PolicyException resources (none active; CEL form documented in kustomization.yaml)
-      tests/                      # Kyverno CLI fixtures (3), run by `make validate`
+      tests/                      # Kyverno CLI fixtures (5), run by `make validate`
   clusters/local/
     kyverno.yaml                  # Kustomization kyverno-policies-local
     policy-reporter.yaml          # Kustomization policy-reporter-local
@@ -251,7 +251,7 @@ kubectl describe policyreport -n product
    validate` runs them and fails the PR if any expectation moves
 4. PR with `validationActions: [Audit]`
 5. Merge → wait 7 days → review reports
-6. Second PR flips to `Enforce`
+6. Second PR flips `validationActions` to `[Deny]`
 
 ### Add a PolicyException
 
@@ -265,11 +265,52 @@ is active today (see [Exceptions](#exceptions) above).
 
 ### Emergency disable
 
-Don't delete the policy — disable it for audit trail:
+The advice that used to live here — `kubectl annotate clusterpolicy <name>
+kyverno.io/disabled=true` — never worked. Kyverno has no such annotation (the
+nearest thing, the `reports.kyverno.io/disabled` label, silences **reports**,
+not enforcement), and since ADR-078 there is no `ClusterPolicy` to annotate.
+Two facts shape what "disable" means on this cluster:
+
+- Only `disallow-default-namespace` can block an apply today
+  (`validationActions: [Deny]`, `failurePolicy: Fail`). The other thirteen are
+  Audit/Ignore, so disabling one of them changes reports, not admission.
+- Flux owns the policy objects (`kyverno-policies-local`, server-side apply,
+  `interval: 10m`, `prune: true`). Any field the manifest sets is put back on
+  the next reconcile. On Kind the source is the OCI artifact `make flux-push`
+  builds, so there is no Git source to race.
+
+**Normal path** — minutes, and the change is in the history: edit the policy
+under `cluster-policies/`, then push.
+
+| Edit | Effect |
+|---|---|
+| `validationActions: [Audit]` | Keeps evaluating and reporting; stops blocking. The usual choice |
+| `spec.evaluation.admission.enabled: false` | No admission evaluation at all; background scans and reports continue |
+| `failurePolicy: Ignore` | Only changes what happens when the **webhook** fails; a healthy webhook still denies |
 
 ```bash
-kubectl annotate clusterpolicy <name> kyverno.io/disabled=true --overwrite
+make validate && make flux-push
+flux reconcile kustomization kyverno-policies-local --with-source
 ```
+
+**Break-glass** — when Flux must not win for a while:
+
+```bash
+flux suspend kustomization kyverno-policies-local
+kubectl patch validatingpolicy disallow-default-namespace --type=merge \
+  -p '{"spec":{"validationActions":["Audit"]}}'
+# fix forward in Git (the same edit as above), make flux-push, then:
+flux resume kustomization kyverno-policies-local
+```
+
+Resume is what ends the break-glass: Flux re-applies the manifest, so if Git
+still says `[Deny]`, resume re-enforces. Measured 2026-10-01 on Kind: the
+patched policy admitted a `default`-namespace pod, and the resume put `[Deny]`
+back within one reconcile. Do not delete the policy — Flux recreates it and
+the PolicyReports lose their history.
+
+An exemption that is not an emergency goes through a `PolicyException`
+([Add a PolicyException](#add-a-policyexception)).
 
 ### Debug blocked admission
 
@@ -304,9 +345,8 @@ kubectl get validatingwebhookconfigurations | grep kyverno
 kubectl get validatingpolicy
 ```
 
-**Expected**: Kyverno's validating webhook configurations exist, and
-`kubectl get clusterpolicy,clustercleanuppolicy` lists **nothing** — since
-ADR-078 every policy is a CEL type. `pss-restricted-apps` stays commented out of
+**Expected**: Kyverno's validating webhook configurations exist; every policy
+is a CEL type since ADR-078, and `pss-restricted-apps` stays commented out of
 the kustomization.
 
 ```bash
@@ -324,10 +364,10 @@ kubectl get validatingpolicy -o custom-columns='NAME:.metadata.name,ACTION:.spec
 
 **Expected**: `disallow-default-namespace` is `[Deny]`/`Fail` (a ValidatingPolicy
 since ADR-078 step 2); every other row is `Audit`/`Ignore`. The migration is
-complete, so there is no `ClusterPolicy` list to check. A second `Enforce` row that nobody planned is a regression —
+complete, so there is no `ClusterPolicy` list to check. A second `[Deny]` row that nobody planned is a regression —
 compare against [Policy inventory](#policy-inventory).
 
-### Step 4: The Enforce policy actually blocks
+### Step 4: The Deny policy actually blocks
 
 ```bash
 kubectl run kyverno-probe --image=nginx:1.29-alpine -n default --dry-run=server
@@ -436,7 +476,7 @@ allowed source. Enforcement is unaffected — see the Reports bullet under
 | Symptom | Cause | Signal |
 |---------|-------|--------|
 | Applies succeed but nothing is validated | Admission controller down; every policy except `disallow-default-namespace` is `failurePolicy: Ignore` and fails open | `KyvernoControllerDown`; `kubectl -n kyverno get deploy` |
-| A legitimate manifest is blocked | It landed in `default` — the one Enforce policy | Rejection message names `disallow-default-namespace` |
+| A legitimate manifest is blocked | It landed in `default` — the one Deny policy | Rejection message names `disallow-default-namespace` |
 | Zero `kyverno_*` series in VictoriaMetrics | `serviceMonitor` set at the top level of Helm values instead of per controller; chart 3.8.2 ignores it silently | `kubectl -n kyverno get servicemonitor` returns nothing |
 | Audit findings nobody can action | A policy the platform structurally cannot satisfy — what took `pss-restricted-apps` out | Rising `FAIL` counts with no owner |
 | A new app namespace has no default-deny | Missing `platform.duynhlab.dev/tier: app` label, so the generate rule never matched | [Step 6](#step-6-the-generate-rule-produced-its-networkpolicy) counts disagree |
@@ -558,7 +598,7 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-10-01 — the legacy-type paragraph, row 18, the add-a-policy steps and the Step 3 check no longer describe `ClusterPolicy` as current (ADR-078 Adoption Complete). Earlier: 2026-09-30 — ADR-078 complete: default-deny-networkpolicy is a GeneratingPolicy (sole owner of app-tier deny-all-ingress) and cleanup-completed-pods a DeletingPolicy. Earlier: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3); both exceptions removed as inert. Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
+_Last updated: 2026-10-01 (later) — Emergency disable rewritten for the CEL kinds: the `kyverno.io/disabled` annotation never existed, so the section now gives the Git path (`validationActions: [Audit]` / `evaluation.admission.enabled: false`) and the `flux suspend` → patch → `flux resume` break-glass, both measured on Kind; `Enforce` wording and the tree counts corrected. Earlier the same day — the legacy-type paragraph, row 18, the add-a-policy steps and the Step 3 check no longer describe `ClusterPolicy` as current (ADR-078 Adoption Complete). Earlier: 2026-09-30 — ADR-078 complete: default-deny-networkpolicy is a GeneratingPolicy (sole owner of app-tier deny-all-ingress) and cleanup-completed-pods a DeletingPolicy. Earlier: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3); both exceptions removed as inert. Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
 
 _2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
 

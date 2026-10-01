@@ -21,15 +21,16 @@ make flux-push
 # 4. Verify deployment
 make flux-status
 
-# 5. Open Flux Web UI
-make flux-ui
+# 5. Map *.duynh.me to the edge (sudo)
+make hosts
 ```
 
-**Access Points** (port-forward fallback from `make flux-ui`):
-- Flux UI: http://localhost:9080
-- Grafana: http://localhost:3000
-- VictoriaMetrics: http://localhost:8428/vmui
-- Frontend: http://localhost:3001
+**Access Points** (through the Envoy Gateway edge; the full table is in
+[setup.md § Accessing Services](../../../docs/platform/setup.md#accessing-services)):
+- Flux UI: https://ui.duynh.me
+- Grafana: https://grafana.duynh.me
+- VictoriaMetrics: https://vmui.duynh.me
+- Storefront: https://local.duynh.me
 
 ---
 

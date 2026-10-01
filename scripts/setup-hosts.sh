@@ -23,8 +23,10 @@ HOSTS_FILE="/etc/hosts"
 # file. Keep the two in step:
 #
 #   grep -rho 'hostnames:' -A2 kubernetes/infra/configs/envoy-gateway/routes/
+#
+# Only routes the kustomization enables count: the four MCP hosts (vm-mcp,
+# vl-mcp, flux-mcp, grafana-mcp) return together with routes/mcp.yaml.
 HOSTS=(
-  duynh.me
   local.duynh.me            # storefront SPA
   backoffice.duynh.me       # Backoffice portal (RFC-0023)
   gateway.duynh.me          # the API edge
@@ -35,18 +37,12 @@ HOSTS=(
   vmui.duynh.me
   vmalert.duynh.me
   karma.duynh.me
-  jaeger.duynh.me
   victoriatraces.duynh.me
-  tempo.duynh.me
   pyroscope.duynh.me
   logs.duynh.me
   ui.duynh.me
   source.duynh.me
   openbao.duynh.me
-  vm-mcp.duynh.me
-  vl-mcp.duynh.me
-  flux-mcp.duynh.me
-  grafana-mcp.duynh.me
   slo.duynh.me
 )
 

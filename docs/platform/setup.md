@@ -266,7 +266,7 @@ All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on 
 | Flux UI | https://ui.duynh.me | Keycloak SSO (`duynhlab-staff`; infra-team → flux-web-admin, sre/dev-team → flux-web-user) |
 | OpenBAO UI | https://openbao.duynh.me | Method **OIDC** → Keycloak `duyne` / `p@ss1234` (policy `infra-team` via group, ADR-062); CLI: `bao login -method=oidc` |
 
-This table is a selection — the full host inventory (24 hostnames, including the leftover `jaeger` and `tempo` entries from retired backends) lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
+This table is a selection — the full host inventory (17 hostnames, one per HTTPRoute the envoy-gateway kustomization enables) lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
 
 ---
 

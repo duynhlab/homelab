@@ -177,10 +177,12 @@ the tag exists; running it earlier audits the previous release.
   ```bash
   sudo scripts/setup-hosts.sh
   getent hosts $(awk '/^HOSTS=\(/,/^\)/' scripts/setup-hosts.sh \
-    | grep -oE '[a-z0-9.-]+\.duynh\.me|^  duynh\.me' | tr -d ' ') | wc -l
-  # compare with:
-  grep -rhoE '^ *- [a-z0-9.-]+\.duynh\.me' kubernetes/infra/configs/envoy-gateway/routes/*.yaml \
-    | sed 's/^ *- //' | sort -u | wc -l
+    | grep -oE '[a-z0-9.-]+\.duynh\.me') | wc -l
+  # compare with the routes the kustomization ENABLES (routes/mcp.yaml is
+  # commented out, so a bare glob over routes/*.yaml over-counts by four):
+  sed -n 's|^  - \(routes/.*\.yaml\)|kubernetes/infra/configs/envoy-gateway/\1|p' \
+      kubernetes/infra/configs/envoy-gateway/kustomization.yaml \
+    | xargs grep -hoE '^ *- [a-z0-9.-]+\.duynh\.me' | sed 's/^ *- //' | sort -u | wc -l
   ```
   `getent` does not exist on macOS — use `dscacheutil -q host -a name <host>` or
   a `for h in …; do ping -c1 -W1 $h; done` loop there.

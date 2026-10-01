@@ -31,7 +31,8 @@ resources:
   - network-policies.yaml   # Ingress NetworkPolicies (inert on kindnet; depends on controllers)
   # - mcp.yaml           # DISABLED 2026-08-21 — owner: the MCP servers are not in use, and they were
   # the biggest idle consumers on the Kind host (victoria-metrics-mcp alone held
-  # 662Mi). Re-enable by uncommenting this line; nothing else is needed.
+  # 662Mi). Re-enable by uncommenting this line, routes/mcp.yaml in
+  # configs/envoy-gateway, and the four MCP hosts in scripts/setup-hosts.sh.
   - keda.yaml            # KEDA autoscaler (controllers/keda; ADR-055) — before temporal-local and apps-local
   - temporal.yaml        # Temporal server chart (controllers/temporal)
   - temporal-config.yaml # its ingress + alerts (configs/temporal, after temporal-local)

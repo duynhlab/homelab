@@ -19,6 +19,7 @@ resources:
   - routes/infra.yaml
   # - routes/mcp.yaml    # DISABLED with mcp-local (2026-08-21): the backends are
   #   gone, so these HTTPRoutes would resolve and then 503.
+  #   Re-enabling also re-adds the four MCP hosts to scripts/setup-hosts.sh.
   - routes/frontend.yaml
   - routes/backoffice.yaml
   - routes/temporal.yaml

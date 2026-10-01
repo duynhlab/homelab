@@ -1063,6 +1063,13 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0033 is `Accepted`; its five architecture decisions are explicit.**
+  Bounded jobs plus the GitHub ledger are the selected initial path. ADR-079
+  through ADR-083 fix the versioned task/proof contract, tokenless workers with
+  human publishing in Phases 0–1, lease and reconciliation semantics, measured
+  promotion gates, and the Documentation Steward contract. All five ADRs have
+  Adoption `Not started`; no schema, workflow, App, routine, hook, agent
+  definition, or runtime component is installed. Phase 0 is now eligible.
 - **RFC-0032 closed at 1.35.8 (implemented).** A re-audit found that the
   cAdvisor ZFS fix shipped in v0.60.6, but no Kubernetes release vendors it:
   1.36.5 carries v0.56.2 and 1.37.1 carries v0.60.5. On this ZFS host 1.36 and

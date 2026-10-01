@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-09-28 | 2026-09-28 | 2026-09-28 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-09-28 | 2026-09-28 | 2026-10-01 |
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@
 - [x] Context7 audit complete; exceptions and official-document checks are recorded in the research
 - [x] Owner approved **ready for RFC** on 2026-09-28
 - [x] This RFC summarizes the target and links the mechanism deep dive instead of repeating it
-- [ ] At `Accepted`, create the resulting ADRs listed below; `docs/api/` is N/A until a later implementation changes an application contract
+- [x] Architecture review accepted the five resulting ADRs on 2026-10-01; `docs/api/` is N/A until a later implementation changes an application contract
 
 ## Summary
 
@@ -76,7 +76,7 @@ trusted publisher, and disposable workers:
 | Delivery | Select repository-local procedures and launch a scoped worker | Launch only within the validated task envelope |
 | Assurance and agent ops | Re-run proof from independent context, classify failures, and propose guardrail changes | Verdict and request-changes only |
 | Documentation Steward | Protect technical truth, reader contracts, learning paths, examples, navigation, and accessibility | Draft and review; technical owner approves truth |
-| Trusted publisher | Validate the complete patch against the authorized lease before using a short-lived GitHub App token | Assigned repository, branch, and paths only |
+| Trusted publisher | Validate the complete patch against the authorized lease before publishing | Human-operated in Phases 0–1; a later qualified GitHub App is limited to the assigned repository, branch, and paths |
 | Worker | Implement one leased task in one repository/worktree | Read checkout and produce a local patch; no GitHub write token |
 
 The topology stays flat. The coordinator may launch workers; workers cannot launch more
@@ -100,7 +100,7 @@ fail closed.
 
 | Alternative | Benefit | Cost | RFC position |
 |-------------|---------|------|--------------|
-| Bounded jobs + GitHub ledger + optional qualified routines | Smallest new operational surface; reuses existing truth and CI | Requires reconstruction on every run; routine events may be dropped and routine identity is the owner's | Proposed initial path |
+| Bounded jobs + GitHub ledger + optional qualified routines | Smallest new operational surface; reuses existing truth and CI | Requires reconstruction on every run; routine events may be dropped and routine identity is the owner's | **Selected** |
 | Thin Agent SDK coordinator + GitHub ledger | Explicit queueing, budgets, recovery, and identity integration | New production service, persistence, secrets, telemetry, upgrades, and on-call ownership | Defer until Phase 4 evidence |
 
 ## Other solutions considered
@@ -114,13 +114,13 @@ fail closed.
 
 ## Decision outcome
 
-**Chosen option:** undecided — architecture review pending
+**Chosen option:** bounded jobs + GitHub ledger + optional qualified routines
 
-**Rationale:** the RFC proposes bounded jobs plus the GitHub ledger as the lowest-risk
-candidate and treats routines as optional triggers. Architecture review must confirm the
-task contract, automation identity, recovery model, promotion gates, and documentation
-governance before the option can become `Accepted`. The Agent SDK path remains the
-runner-up when configuration cannot close a measured durability, identity, or concurrency
+**Rationale:** bounded jobs plus the GitHub ledger provide the lowest-risk path to test
+task contracts, isolated work, independent proof, and recovery using systems Homelab
+already operates. Phases 0–1 keep publishing human-operated, and routines remain optional
+trigger surfaces until qualified. The Agent SDK path remains the runner-up when measured
+evidence shows that configuration cannot close a durability, identity, or concurrency
 gap.
 
 ## Architecture & Diagrams
@@ -134,7 +134,7 @@ sequenceDiagram
     participant Ledger as GitHub ledger
     participant Coord as Planned coordinator
     participant Worker as Planned isolated worker
-    participant Publish as Planned trusted publisher
+    participant Publish as Planned publishing boundary
     participant CI as CI and deterministic gates
     participant Verify as Planned independent verifier
 
@@ -192,7 +192,8 @@ A missing, contradictory, or ambiguous rule blocks the task.
 Phases 0–2 use human-started Claude sessions or bounded GitHub Actions jobs. Each worker
 uses one repository and isolated worktree. The worker and verifier have separate context;
 that is a quality boundary, not an identity boundary. Workers receive a read-only checkout
-and no GitHub write token. They return a patch plus evidence to a trusted publisher.
+and no GitHub write token. They return a patch plus evidence. In Phases 0–1 a human
+reviews that complete output, pushes the branch, and opens the draft pull request.
 
 Unattended repository writes require a dedicated GitHub App installed only on the target
 repository. Installation tokens are short-lived and available only to the publisher,
@@ -393,19 +394,23 @@ or evidence history. A later phase cannot inherit broader authority automaticall
 
 ## Resulting decisions
 
-ADRs are intentionally not created while this RFC is `provisional`. Architecture review
-must split and number these independent decisions before acceptance:
+Architecture review accepted these independent decisions on 2026-10-01. Adoption remains
+`Not started`; these records authorize Phase 0 design constraints, not runtime installation:
 
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Versioned task/proof contract and GitHub ledger representation | To assign during architecture review | Pending |
-| GitHub App identity, repository scope, and permission envelope | To assign during architecture review | Pending |
-| Trigger, lease, reconciliation, heartbeat, and dead-letter semantics | To assign during architecture review | Pending |
-| Evaluation metrics and trust-ladder promotion gates | To assign during architecture review | Pending |
-| Documentation Steward contracts and executable-example policy | To assign during architecture review | Pending |
+| Versioned task/proof contract and GitHub ledger representation | [ADR-079](../../adr/ADR-079-version-agent-task-contracts/) | Accepted / Not started |
+| Tokenless workers, human-first publishing, and the future GitHub App boundary | [ADR-080](../../adr/ADR-080-tokenless-agent-workers/) | Accepted / Not started |
+| Trigger, lease, reconciliation, heartbeat, and dead-letter semantics | [ADR-081](../../adr/ADR-081-agent-leases-and-reconciliation/) | Accepted / Not started |
+| Evaluation metrics and trust-ladder promotion gates | [ADR-082](../../adr/ADR-082-agent-evaluation-gates/) | Accepted / Not started |
+| Documentation Steward contracts and executable-example policy | [ADR-083](../../adr/ADR-083-documentation-steward/) | Accepted / Not started |
 
 ## Implementation History
 
+- **2026-10-01 — Accepted:** architecture review selected bounded jobs plus the
+  GitHub ledger, accepted ADR-079 through ADR-083 at Adoption `Not started`, and
+  kept publishing human-operated for Phases 0–1. No runtime, workflow, schema,
+  App, routine, hook, or agent definition is installed. Phase 0 is eligible.
 - **2026-09-28 — Provisional:** research gate passed and owner approved RFC authoring.
   No runtime, workflow, schema, App, routine, hook, or agent definition is installed.
 
@@ -420,4 +425,4 @@ must split and number these independent decisions before acceptance:
 - [GitHub App permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
 
 ---
-_Last updated: 2026-09-28_
+_Last updated: 2026-10-01 — Accepted; ADR-079 through ADR-083 Adoption Not started_

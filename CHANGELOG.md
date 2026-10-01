@@ -88,6 +88,18 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Bugfix
+
+#### Docs
+- **Database docs no longer describe a three-instance DR replica**
+  ([#1137](https://github.com/duynhlab/homelab/issues/1137) follow-up). The
+  architecture inventory, the backup-target reasoning, and the replica's
+  backup manifest comment now match the single-instance `product-db-replica`
+  (three only after promotion). The `product-db` and `platform-db` headers
+  list every hosted database and say quorum `ANY 1` instead of "1 sync, 1
+  async". The CNPG chart rules README marks the physical-lag files as not
+  applied, since `replication-health.yaml` replaced them.
+
 ## [1.0.0] - 2026-10-01
 
 <!-- markdown-link-check-disable -->

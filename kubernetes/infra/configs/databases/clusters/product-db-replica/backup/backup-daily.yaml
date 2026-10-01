@@ -7,7 +7,7 @@
 # object. This anchors the chain and lets retention actually run.
 #
 # target: primary is deliberate. The cluster-level default is prefer-standby,
-# which on a 3-instance replica cluster elects a cascading standby; the
+# which elects a cascading standby once promotion raises instances to 3; the
 # designated primary (Status.TargetPrimary) is the instance upstream documents
 # for replica-cluster backups, and backing up from a standby does not force a WAL
 # switch on the source -- unhelpful on a low-write DR follower.

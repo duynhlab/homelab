@@ -7,7 +7,7 @@ cluster provides a co-located DR copy of product data.
 |---|---|---:|---:|---|
 | `platform-db` | `platform` | 18.1 | 3 | Platform and supporting-service databases |
 | `product-db` | `product` | 18.1 | 3 | Catalog and checkout-domain databases |
-| `product-db-replica` | `product` | 18.1 | 3 | Object-store-fed recovery copy of `product-db` |
+| `product-db-replica` | `product` | 18.1 | 1 (3 on promotion) | Object-store-fed recovery copy of `product-db` |
 
 ## Current topology
 
@@ -136,4 +136,4 @@ services, not by the infrastructure manifests.
 - [CloudNativePG 1.30 service management](https://cloudnative-pg.io/docs/1.30/service_management/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 
-_Last updated: 2026-09-29 — DR cluster `product-db-replica` down to 1 instance (3 on promotion). Earlier: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._
+_Last updated: 2026-10-01 — inventory table shows the DR cluster's single instance. Earlier: 2026-09-29 — DR cluster `product-db-replica` down to 1 instance (3 on promotion). Earlier: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._

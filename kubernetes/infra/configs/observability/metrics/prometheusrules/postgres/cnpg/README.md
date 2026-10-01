@@ -14,15 +14,15 @@ helm template x cnpg/cluster --version 0.6.0 -n product \
   | yq eval 'select(.kind == "PrometheusRule")' -
 ```
 
-`fullnameOverride=product-db` must match the CloudNativePG `Cluster` name [`product-db`](../../../../databases/clusters/product-db/instance.yaml) so `pod=~"product-db-([1-9][0-9]*)$"` is correct.
+`fullnameOverride=product-db` must match the CloudNativePG `Cluster` name [`product-db`](../../../../../databases/clusters/product-db/instance.yaml) so `pod=~"product-db-([1-9][0-9]*)$"` is correct.
 
 ## File ↔ upstream map
 
 | File | Alert (first rule) |
 |------|-------------------|
 | `cluster-offline.yaml` | `CNPGClusterOffline` |
-| `cluster-high_replication_lag.yaml` | `CNPGClusterHighReplicationLag` |
-| `cluster-physical_replication_lag-*.yaml` | Physical replication lag warning/critical |
+| `cluster-high_replication_lag.yaml` | `CNPGClusterHighReplicationLag` — **not applied**; replaced by [`replication-health.yaml`](../replication-health.yaml) |
+| `cluster-physical_replication_lag-*.yaml` | Physical replication lag warning/critical — **not applied**; replaced by [`replication-health.yaml`](../replication-health.yaml) |
 | `cluster-high_connection-*.yaml` | High connections warning/critical |
 | `cluster-ha-*.yaml` | HA warning/critical |
 | `cluster-low_disk_space-*.yaml` | Low disk (kubelet volume metrics) |
@@ -42,7 +42,7 @@ Before enabling rules that depend on **kube-state-metrics / kubelet volume stats
 
 **Label names (KSM + VMAgent)** — Series `kube_pod_info` use **`exported_namespace`** and **`exported_pod`** for the workload (the `pod` label names the kube-state-metrics scrape target). Rules `cluster-instances_on_same_node` and `cluster-zone_spread-warning` use those labels in PromQL (chart upstream uses `namespace`/`pod`, which do not match this setup). Their entries in [`../kustomization.yaml`](../kustomization.yaml) are **commented by default** in homelab; uncomment to deploy the rules when ready (checklist below).
 
-**Zone spread** — Needs `kube_node_labels` with `label_topology_kubernetes_io_zone`, enabled by uncommenting `metricLabelsAllowlist` in [`kube-state-metrics`](../../../../../controllers/metrics/kube-state-metrics.yaml). In this repo that block is **commented by default** (Kind/homelab has no real zone labels). **Production-ready:** after nodes are labeled per AZ (e.g. `topology.kubernetes.io/zone`), uncomment the allowlist, reconcile Flux, and confirm `kube_node_labels{label_topology_kubernetes_io_zone!=""} > 0` in VictoriaMetrics before relying on `CNPGClusterZoneSpreadWarning`.
+**Zone spread** — Needs `kube_node_labels` with `label_topology_kubernetes_io_zone`, enabled by uncommenting `metricLabelsAllowlist` in [`kube-state-metrics`](../../../../../../controllers/metrics/kube-state-metrics.yaml). In this repo that block is **commented by default** (Kind/homelab has no real zone labels). **Production-ready:** after nodes are labeled per AZ (e.g. `topology.kubernetes.io/zone`), uncomment the allowlist, reconcile Flux, and confirm `kube_node_labels{label_topology_kubernetes_io_zone!=""} > 0` in VictoriaMetrics before relying on `CNPGClusterZoneSpreadWarning`.
 
 **Low disk (`cluster-low_disk_space-*.yaml`)** — `kubelet_volume_stats_*` are emitted on the kubelet **`/metrics`** endpoint (volume stats collector), not on `/metrics/cadvisor`. VMAgent must scrape kubelet via `VMNodeScrape` (see [`vmnodescrape-kubelet.yaml`](../../../victoriametrics/vmnodescrape-kubelet.yaml): jobs `kubelet-volume-stats` and `kubelet-cadvisor`). If `count(kubelet_volume_stats_available_bytes)` is still zero, the kubelet may not be publishing per-PVC volume stats (for example when the stats summary has no `pvcRef` for volumes — driver / environment dependent).
 
@@ -72,4 +72,4 @@ find cnpg cnpg-platform-db -name 'cluster-logical_replication_stopped-critical.y
 
 Homelab-only rules (`cluster-fenced`, `cluster-wal-size-high`, `operator-health`) and
 [`deep-signals-alerts.yaml`](../deep-signals-alerts.yaml) are maintained manually.
-Runbook index: [`docs/observability/runbooks/postgresql/README.md`](../../../../../../../docs/observability/runbooks/postgresql/README.md).
+Runbook index: [`docs/observability/runbooks/postgresql/README.md`](../../../../../../../../docs/observability/runbooks/postgresql/README.md).

@@ -64,9 +64,10 @@ and no base backup therefore has its retention pass run on schedule and delete
 nothing, growing without bound while remaining unrestorable.
 
 **Backup target.** The DR schedule pins `target: primary`. The cluster-level
-default is `prefer-standby`, which on a three-instance replica cluster elects a
-cascading standby; the designated primary is the instance upstream documents for
-replica-cluster backups, and a standby backup does not force a WAL switch on its
+default is `prefer-standby`. The replica cluster runs one instance today, so there
+is no standby to pick, but promotion raises it to three and `prefer-standby` would
+then elect a cascading standby. The designated primary is the instance upstream
+documents for replica-cluster backups, and a standby backup does not force a WAL switch on its
 source — unhelpful on a low-write follower.
 
 ## Policy consequences
@@ -109,4 +110,4 @@ acceptance gate.
 - [CloudNativePG 1.30 backup](https://cloudnative-pg.io/docs/1.30/backup/)
 - [Barman Cloud plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
 
-_Last updated: 2026-09-01 — DR replica gained a daily `ScheduledBackup` (`target: primary`); the sidecar retention timer and its backup-driven WAL deletion are spelled out. Earlier the same day — `30d`/`7d` described as Barman recovery windows rather than plain retention._
+_Last updated: 2026-10-01 — backup-target reasoning updated for the single-instance DR replica. Earlier: 2026-09-01 — DR replica gained a daily `ScheduledBackup` (`target: primary`); the sidecar retention timer and its backup-driven WAL deletion are spelled out. Earlier the same day — `30d`/`7d` described as Barman recovery windows rather than plain retention._

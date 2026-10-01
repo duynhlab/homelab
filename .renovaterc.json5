@@ -45,6 +45,40 @@
       extractVersionTemplate: "^v(?<version>.*)$",
     },
     {
+      // victoriametrics-metrics-datasource: release-zip URL and the
+      // GrafanaDatasource pin (cluster only).
+      customType: "regex",
+      managerFilePatterns: [
+        "/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/",
+        "/^kubernetes/infra/configs/observability/grafana/datasource-victoriametrics\\.yaml$/",
+      ],
+      matchStrings: [
+        "victoriametrics-datasource/releases/download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/victoriametrics-metrics-datasource-v\\d+\\.\\d+\\.\\d+\\.zip",
+        "name: victoriametrics-metrics-datasource\\n\\s+version: \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\"",
+      ],
+      depNameTemplate: "VictoriaMetrics/victoriametrics-datasource",
+      datasourceTemplate: "github-releases",
+      extractVersionTemplate: "^v(?<version>.*)$",
+    },
+    {
+      // victoriametrics-logs-datasource: release-zip URL, the
+      // GrafanaDatasource pin and the compose pin.
+      customType: "regex",
+      managerFilePatterns: [
+        "/^kubernetes/infra/configs/observability/grafana/grafana\\.yaml$/",
+        "/^kubernetes/infra/configs/observability/grafana/datasource-victorialogs\\.yaml$/",
+        "/^local-stack/compose\\.yaml$/",
+      ],
+      matchStrings: [
+        "victorialogs-datasource/releases/download/v(?<currentValue>\\d+\\.\\d+\\.\\d+)/victoriametrics-logs-datasource-v\\d+\\.\\d+\\.\\d+\\.zip",
+        "name: victoriametrics-logs-datasource\\n\\s+version: \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\"",
+        "victoriametrics-logs-datasource (?<currentValue>\\d+\\.\\d+\\.\\d+)",
+      ],
+      depNameTemplate: "VictoriaMetrics/victorialogs-datasource",
+      datasourceTemplate: "github-releases",
+      extractVersionTemplate: "^v(?<version>.*)$",
+    },
+    {
       // The Kind node image in scripts/kind-up.sh, pinned by tag and digest
       // (RFC-0032). The regex takes the line after the `# renovate:` comment.
       customType: "regex",
@@ -58,6 +92,14 @@
     {
       matchPackageNames: ["grafana/clickhouse-datasource"],
       groupName: "grafana-clickhouse-datasource",
+    },
+    {
+      matchPackageNames: ["VictoriaMetrics/victoriametrics-datasource"],
+      groupName: "grafana-victoriametrics-datasource",
+    },
+    {
+      matchPackageNames: ["VictoriaMetrics/victorialogs-datasource"],
+      groupName: "grafana-victorialogs-datasource",
     },
     {
       // Patch and digest bumps only. A Kubernetes minor is a cluster

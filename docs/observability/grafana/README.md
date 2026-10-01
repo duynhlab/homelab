@@ -59,12 +59,15 @@ Plugins are installed via the `GF_INSTALL_PLUGINS` environment variable in the G
 
 | Plugin | Version | Purpose |
 |--------|---------|---------|
-| `victoriametrics-metrics-datasource` | 0.25.2 | Native VictoriaMetrics datasource with MetricsQL support |
-| `victoriametrics-logs-datasource` | 0.29.0 | VictoriaLogs datasource with LogsQL in Explore and dashboards |
+| `victoriametrics-metrics-datasource` | 0.26.1 | Native VictoriaMetrics datasource with MetricsQL support |
+| `victoriametrics-logs-datasource` | 0.32.0 | VictoriaLogs datasource with LogsQL in Explore and dashboards |
 
 The metrics plugin includes its Grafana 13 variable-editor fix. The logs plugin
-now defaults to 50 result lines instead of 1000 to prevent heavy Explore
-queries from freezing the browser; datasource owners can still raise the limit.
+went back to a default of 1000 result lines in 0.31, so both stacks set
+`jsonData.maxLines: "50"` on the VictoriaLogs datasource to keep heavy Explore
+queries from freezing the browser; a panel or user can still raise the limit.
+Renovate tracks all three plugins (`.renovaterc.json5`), so each bump arrives as
+one PR covering every pin.
 
 Both plugins must be listed in `allow_loading_unsigned_plugins` (comma-separated) since they are not signed by Grafana:
 
@@ -203,4 +206,4 @@ kubernetes/infra/configs/observability/grafana/
 - [Metrics](../metrics/README.md) -- RED methodology and metric definitions
 
 ---
-_Last updated: 2026-10-01 — the ClickHouse suite includes six boards vendored from the datasource plugin. Earlier: 2026-09-28 — § Plugins: why the bundled Prometheus/Pyroscope plugins are not self-updated, how the failure looks, and the distinct-refId rule. Previously 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._
+_Last updated: 2026-10-01 — VictoriaMetrics/VictoriaLogs plugins 0.26.1 / 0.32.0, VictoriaLogs line limit pinned to 50, and Renovate tracks all three plugins. Earlier: 2026-10-01 — the ClickHouse suite includes six boards vendored from the datasource plugin. Earlier: 2026-09-28 — § Plugins: why the bundled Prometheus/Pyroscope plugins are not self-updated, how the failure looks, and the distinct-refId rule. Previously 2026-09-25 — remaining boards join the artifact's folders by `folderUID` (no duplicate folder titles). Previously 2026-09-21 — added the `spec.oci` and `GrafanaManifest` delivery paths and the As-Code (V2 canary) folder; see [dashboards-v2.md](dashboards-v2.md). Previously 2026-09-05 — KEDA — Worker Autoscaling board added (ADR-055, Workflows / Async); the headline re-derived to 42 CRs / 12 folders — the 31 / 9 it had carried since 2026-08-18 was already stale. Previously 2026-08-27 — access rewritten to staff SSO (ADR-062: anonymous Admin is gone, Keycloak button is the human door, port-forward = Viewer only); retired Jaeger dropped from the intro. Previous sync 2026-08-18 (dashboard inventory)._

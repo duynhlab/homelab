@@ -91,6 +91,8 @@ Skeleton (copy what you need):
 ### Bugfix
 
 #### Docs
+- **The ClickHouse docs name the deployed plugin 4.22.0**; three places still
+  said 4.20.0 after the bump.
 - **Database docs no longer describe a three-instance DR replica**
   ([#1137](https://github.com/duynhlab/homelab/issues/1137) follow-up). The
   architecture inventory, the backup-target reasoning, and the replica's
@@ -99,6 +101,15 @@ Skeleton (copy what you need):
   list every hosted database and say quorum `ANY 1` instead of "1 sync, 1
   async". The CNPG chart rules README marks the physical-lag files as not
   applied, since `replication-health.yaml` replaced them.
+
+### Dependency
+
+#### Observability
+- Grafana VictoriaMetrics datasource 0.25.2 → 0.26.1 and VictoriaLogs
+  datasource 0.29.0 → 0.32.0 (cluster; VictoriaLogs also local-stack). The
+  VictoriaLogs line limit is pinned to 50, since 0.31 raised the plugin default
+  to 1000. Renovate now tracks both plugins' release URL, `GrafanaDatasource`
+  and compose pins, one grouped PR per plugin.
 
 ## [1.0.0] - 2026-10-01
 

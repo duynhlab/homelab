@@ -384,7 +384,7 @@ trace pilot remains explicit so a future operator bump cannot move it silently.
 | VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.148.0`, local-stack `v1.150.0` | operator defaults on the cluster; the three compose images are pinned explicitly and still run **ahead** — see the skew note below |
 | VictoriaLogs (`VLSingle`) | `v1.52.0` in both places | operator default on the cluster now matches the explicit compose image |
 | VictoriaTraces (`VTSingle`) | `v0.11.0` | explicit CR and local-stack image |
-| Grafana VM / VL datasources | `v0.25.2` / `v0.29.0` | Grafana CR and datasource CRs |
+| Grafana VM / VL datasources | `v0.26.1` / `v0.32.0` | Grafana CR and datasource CRs |
 | VM / VL MCP charts | `0.3.0` / `0.1.0` | Flux `OCIRepository` |
 
 **The local-stack VM images run ahead of the cluster on purpose.** The compose
@@ -519,6 +519,6 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 
 ---
 
-_Last updated: 2026-09-29 — the ClickHouse internals curriculum now lists its twelve authored chapters; earlier the same day, added the curriculum and authoring contract, and the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
+_Last updated: 2026-10-01 — Grafana VM / VL datasource versions bumped to 0.26.1 / 0.32.0. Earlier: 2026-09-29 — the ClickHouse internals curriculum now lists its twelve authored chapters; earlier the same day, added the curriculum and authoring contract, and the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
 Deployment (Flux waves + the gate that releases each one, and why the two
 ClickHouse waves omit `wait`)._

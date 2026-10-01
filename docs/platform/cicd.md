@@ -1,6 +1,6 @@
 # CI/CD Pipeline Documentation
 
-This document describes the CI/CD pipeline for all microservices (`user`, `product`, `inventory`, `cart`, `checkout`, `order`, `review`, `notification`, `shipping`, `payment`) and the `frontend` in a **polyrepo** setup. Services use **Go 1.26** (`GOTOOLCHAIN=auto` in CI).
+This document describes the CI/CD pipeline for all microservices (`user`, `product`, `inventory`, `cart`, `checkout`, `order`, `review`, `notification`, `shipping`, `payment`) and the `frontend` in a **polyrepo** setup. Services use **Go 1.27** (`go 1.27.1` in each `go.mod`; `GOTOOLCHAIN=auto` in CI).
 
 > This page covers **both** the pipeline *how-to* (below) and the org-wide *standard/policy* —
 > action SHA-pinning, least-privilege permissions, image signing/verification, the required-checks
@@ -646,7 +646,7 @@ sonar:
 
 ### Linting (`golangci-lint`)
 
-CI's lint job runs **`golangci-lint` v2.6.0** with the repo's `.golangci.yml` —
+CI's lint job runs **`golangci-lint` v2.14.0** (the `go-check.yml` `lint-version` fallback; a repo that pins it in `tools/go.mod` gets that version instead) with the repo's `.golangci.yml` —
 much stricter than `go vet`. It MUST pass. Verify locally before pushing:
 
 ```bash
@@ -1112,4 +1112,4 @@ VictoriaMetrics (see [observability](../observability/README.md)).
 
 ---
 
-_Last updated: 2026-08-19 — synced to the fixed workflows/template (SHA pins, CRITICAL-only gate, no -init image), auth-service examples replaced, homelab required-checks corrected, dev/uat marked target; previously 2026-07-22._
+_Last updated: 2026-10-01 — Go 1.27 (`go 1.27.1`) and golangci-lint v2.14.0, the fallback in `go-check.yml` at the SHA the services pin. Previously 2026-08-19 — synced to the fixed workflows/template (SHA pins, CRITICAL-only gate, no -init image), auth-service examples replaced, homelab required-checks corrected, dev/uat marked target; previously 2026-07-22._

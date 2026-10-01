@@ -49,7 +49,7 @@ so the highest-value Kyverno features are:
 | 15 | `kyverno-policies` Helm chart | ❌ | — | Forked rules into repo, no chart |
 | 16 | Kyverno CLI `test` | ✅ | 3 | Gate in this repo — `make validate` + the `validate` CI job; CLI pinned to the engine (v1.19.1) |
 | 17 | Reports server | ❌ | — | KinD scale doesn't need it |
-| 18 | Namespaced `Policy` | ✅ when needed | — | Most rules are ClusterPolicy |
+| 18 | Namespaced `Policy` | ✅ when needed | — | Every rule is cluster-scoped (`ValidatingPolicy`, `GeneratingPolicy`, `DeletingPolicy` — ADR-078) |
 | 19 | Tracing (OTLP) | ❌ not adopted — blocked upstream of Kyverno | 3 | Metrics already answer "which policy is slow"; spans would arrive as orphan roots until **API server tracing** is enabled. [Full reasoning](#why-tracing-is-not-adopted) |
 
 **Skipped on purpose**: full `kyverno-policies` chart (avoid implicit policies),
@@ -59,12 +59,11 @@ VAP is no longer version-blocked (row 7) — unadopted by choice, not constraint
 **Legacy policy types warn from 1.19.** Engine v1.19 marks `kyverno.io/v1`
 `ClusterPolicy` and `kyverno.io/v2` `PolicyException` as deprecated in favour of
 the CEL types in `policies.kyverno.io` (`ValidatingPolicy`, `GeneratingPolicy`,
-…). Every policy and exception here is a legacy type, so `kyverno test` and
-admission print a deprecation warning per file. They still load and enforce
-unchanged, but Kyverno's migration guide says they are **removed in v1.20**
-(upstream milestone due 2026-10-23). The move to the CEL types is decided in
+…), and Kyverno's migration guide says they are **removed in v1.20**
+(upstream milestone due 2026-10-23). The move to the CEL types is
 [ADR-078](../proposals/adr/ADR-078-migrate-kyverno-policies-to-cel-types/)
-(Proposed); until it is complete, do not take Kyverno 1.20.
+(Accepted, Adoption **Complete** 2026-09-30): no legacy Kyverno object is
+rendered any more, so nothing here blocks Kyverno 1.20.
 Only row 4 (Cosign) remains **⏳ planned**: it describes intent, and nothing for
 it is deployed.
 
@@ -245,12 +244,12 @@ kubectl describe policyreport -n product
 ### Add a new policy
 
 1. Branch off main
-2. Add `ClusterPolicy` to `kubernetes/infra/configs/kyverno/cluster-policies/`
+2. Add a `ValidatingPolicy` (or another `policies.kyverno.io` type) to `kubernetes/infra/configs/kyverno/cluster-policies/`
 3. Add unit tests at `kubernetes/infra/configs/kyverno/tests/<policy>/` — a
    `kyverno-test.yaml` plus a `resources.yaml`. Cover a **pass** case, a **fail**
    case, and, where a `PolicyException` applies, the **skip** case; `make
    validate` runs them and fails the PR if any expectation moves
-4. PR with `validationFailureAction: Audit`
+4. PR with `validationActions: [Audit]`
 5. Merge → wait 7 days → review reports
 6. Second PR flips to `Enforce`
 
@@ -321,12 +320,11 @@ and `cleanup-completed-pods`.
 
 ```bash
 kubectl get validatingpolicy -o custom-columns='NAME:.metadata.name,ACTION:.spec.validationActions,FAILPOL:.spec.failurePolicy'
-kubectl get clusterpolicy -o custom-columns='NAME:.metadata.name,ACTION:.spec.validationFailureAction,FAILPOL:.spec.failurePolicy'
 ```
 
 **Expected**: `disallow-default-namespace` is `[Deny]`/`Fail` (a ValidatingPolicy
-since ADR-078 step 2); every other row is `Audit`/`Ignore`. Until the migration
-finishes, validating policies live in both kinds, so check both lists. A second `Enforce` row that nobody planned is a regression —
+since ADR-078 step 2); every other row is `Audit`/`Ignore`. The migration is
+complete, so there is no `ClusterPolicy` list to check. A second `Enforce` row that nobody planned is a regression —
 compare against [Policy inventory](#policy-inventory).
 
 ### Step 4: The Enforce policy actually blocks
@@ -560,7 +558,7 @@ Deployment, never the values file.
 
 ---
 
-_Last updated: 2026-09-30 — ADR-078 complete: default-deny-networkpolicy is a GeneratingPolicy (sole owner of app-tier deny-all-ingress) and cleanup-completed-pods a DeletingPolicy. Earlier: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3); both exceptions removed as inert. Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
+_Last updated: 2026-10-01 — the legacy-type paragraph, row 18, the add-a-policy steps and the Step 3 check no longer describe `ClusterPolicy` as current (ADR-078 Adoption Complete). Earlier: 2026-09-30 — ADR-078 complete: default-deny-networkpolicy is a GeneratingPolicy (sole owner of app-tier deny-all-ingress) and cleanup-completed-pods a DeletingPolicy. Earlier: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3); both exceptions removed as inert. Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace are ValidatingPolicy (ADR-078 step 2); Step 3 checks both kinds. Earlier: 2026-09-30 — require-probes and require-resources are ValidatingPolicy (ADR-078 step 1); postgres-operators no longer waives require-resources (it was inert). Earlier: 2026-09-30 — ADR-078 (CEL migration, legacy APIs removed in 1.20) linked; fixture count 4 and Policy Reporter 3.10.0 corrected. Earlier: 2026-09-29 — `require-probes` asserts probes (`periodSeconds: ">0"`) instead of skipping every compliant pod through a global anchor; the fixture gate now fails on any `Excluded` result; new troubleshooting entry for a policy that reports nothing._
 
 _2026-09-28 — Kyverno chart 3.8.2 → 3.9.1 (engine v1.19.1) and the CLI pin with it, the prerequisite [RFC-0032](../proposals/rfc/RFC-0032/) gates on; records the legacy-type deprecation warnings 1.19 prints for every `ClusterPolicy` and `PolicyException` here._
 

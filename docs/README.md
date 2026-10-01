@@ -54,7 +54,7 @@ docs/
 │   ├── adr/                      # Architecture Decision Records
 │   │   ├── README.md             # ADR conventions + index
 │   │   ├── ADR-0000-template/    # template
-│   │   └── ADR-001 … ADR-076     # 76 records; status per record in the ADR index
+│   │   └── ADR-001 … ADR-083     # 83 records; status per record in the ADR index
 │   ├── rfc/                      # Requests for Comments
 │   │   ├── README.md             # process + index + backlog
 │   │   ├── RFC-0000/             # template (research.md + README.md)
@@ -96,7 +96,7 @@ docs/
 │   │   ├── architecture.md       # Trace topology: VictoriaTraces + ClickHouse
 │   │   ├── jaeger.md             # Jaeger — archived (retired, RFC-0027)
 │   │   ├── backends-comparison.md # Why VictoriaTraces + ClickHouse won
-│   │   └── victoriatraces.md     # VictoriaTraces pilot (3rd backend)
+│   │   └── victoriatraces.md     # VictoriaTraces — the fast trace path (7d)
 │   ├── logging/                  # Pillar 3: Structured Logging
 │   │   └── README.md             # Platform pipeline (VictoriaLogs + Vector)
 │   ├── profiling/                # Pillar 4: Continuous Profiling
@@ -148,7 +148,7 @@ docs/
 │   ├── keycloak.md               # Identity provider — deployment, realm import, database, reset, signals, gaps
 │   ├── kong-gateway.md           # Archived — the platform's previous API gateway
 │   ├── kyverno.md                # Kyverno admission-policy platform guide
-│   ├── mcp-servers.md            # 4 MCP servers wired into the platform
+│   ├── mcp-servers.md            # 4 MCP servers — not deployed since 2026-08-21
 │   └── ruleset-automation.md     # GitHub ruleset automation
 ├── secrets/                      # Secrets, TLS & trust distribution (one chain)
 │   ├── README.md                 # Homelab secrets/TLS/trust hub
@@ -242,7 +242,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 
 3. **[PostgreSQL metrics hub](./observability/metrics/postgresql/README.md)** - CNPG custom queries, workflows, signal guides
 
-4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (33 files)
+4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (36 alert files + a plan-regression guide)
 
 4b. **[Microservices alert runbooks](./observability/runbooks/microservices/README.md)** - Per-alert RED/Golden investigation (50 files) + cross-signal workflows and threshold tuning
 
@@ -289,7 +289,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 4. **[Jaeger (archived)](./observability/tracing/jaeger.md)** - Frozen history: the in-memory store, and why the Jaeger *query API* outlived the deployment ([RFC-0027](./proposals/rfc/RFC-0027/README.md))
 5. **[Tempo (archived)](./observability/tracing/tempo.md)** - Frozen history: why Tempo ran twice, what its metrics-generator did, and why it was retired ([RFC-0027](./proposals/rfc/RFC-0027/README.md))
 6. **[Backend Comparison](./observability/tracing/backends-comparison.md)** - why VictoriaTraces + ClickHouse won, and what retiring Tempo cost
-7. **[VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md)** - 3rd backend via the VM operator
+7. **[VictoriaTraces](./observability/tracing/victoriatraces.md)** - the fast trace path (7d), via the VM operator
 8. **[Continuous Profiling](./observability/profiling/README.md)** - Pyroscope setup
 9. **[ClickHouse OTel OLAP](./observability/clickhouse/README.md)** - Deployed supplementary OLAP; OTel logs/traces SQL + [Grafana chapter](./observability/clickhouse/README.md#grafana) (dashboard suite, Explore, linking) ([RFC-0019](./proposals/rfc/RFC-0019/))
     - [Internals learning path](./observability/clickhouse/internals/README.md) - twelve explanation-first chapters, architecture through scaling, each with a read-only evidence lab
@@ -381,7 +381,7 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 - [Tracing Architecture](./observability/tracing/architecture.md) - Trace topology: VictoriaTraces (7d) + ClickHouse (90d)
 - [Jaeger (archived)](./observability/tracing/jaeger.md) - Frozen history; the Jaeger query API is now VictoriaTraces' interface
 - [Backend Comparison](./observability/tracing/backends-comparison.md) - why VictoriaTraces + ClickHouse won
-- [VictoriaTraces (pilot)](./observability/tracing/victoriatraces.md) - 3rd backend via the VM operator
+- [VictoriaTraces](./observability/tracing/victoriatraces.md) - the fast trace path (7d), via the VM operator
 - [Continuous Profiling](./observability/profiling/README.md) - Pyroscope setup
 - [ClickHouse OTel OLAP](./observability/clickhouse/README.md) - Deployed supplementary OLAP; OTel logs/traces SQL ([RFC-0019](./proposals/rfc/RFC-0019/))
 - [ClickHouse internals learning path](./observability/clickhouse/internals/README.md) · [fundamentals](./observability/clickhouse/fundamentals.md) · [parts/merges/TTL](./observability/clickhouse/parts-merges-and-ttl.md) · [schema and queries](./observability/clickhouse/schema-and-queries.md) · [materialized views](./observability/clickhouse/materialized-views.md) · [operations](./observability/clickhouse/operations.md)
@@ -415,7 +415,7 @@ The **owning indexes are complete and are the only place a record's status is
 maintained.** This page deliberately does not duplicate them — a partial copy
 here is how an index starts disagreeing with the records it points at.
 
-- [**ADR index**](./proposals/adr/README.md) — all **77** decisions, each with
+- [**ADR index**](./proposals/adr/README.md) — all **83** decisions, each with
   its `Status` and `Adoption`. The *why* behind significant choices.
 - [**RFC index**](./proposals/rfc/README.md) — all **31** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.
@@ -474,7 +474,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Keycloak](./platform/keycloak.md) - The platform identity provider: deployment shape, realm import and its one-shot limitation, the bypassed pooler, reset procedure, signals, and known gaps
 - [Graceful Shutdown](./api/graceful-shutdown.md) - Cross-service shutdown contract: readiness drain + signal handling (moved to `docs/api/`)
 - [GKE internal & private DNS](./platform/gke-internal-dns.md) - In-cluster DNS and Cloud DNS private zones
-- [MCP Servers](./platform/mcp-servers.md) - In-cluster MCP servers (VictoriaMetrics, VictoriaLogs, Flux Operator, Grafana) behind the edge
+- [MCP Servers](./platform/mcp-servers.md) - MCP servers (VictoriaMetrics, VictoriaLogs, Flux Operator, Grafana) behind the edge — **not deployed since 2026-08-21** (`mcp.yaml` commented out)
 - [Ruleset Automation](./platform/ruleset-automation.md) - GitHub repo ruleset provisioning
 
 ### Secrets
@@ -513,7 +513,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **Flux Operator** - Kubernetes-native GitOps reconciliation engine
 - **Kustomize** - Simplified structure (direct manifests in infra/ + apps/, refactored 2026-01-12)
 - **OCI Registry** - `localhost:5050` (local), stores Kubernetes manifests as artifacts
-- **Helm Chart** - Generic chart for all microservices (`charts/`)
+- **Helm Chart** - Generic `mop` chart for all microservices ([duynhlab/helm-charts](https://github.com/duynhlab/helm-charts), OCI `ghcr.io/duynhlab/helm-charts/mop`)
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively
 - **40 Data Panels + 6 Row Groups** - Complete monitoring dashboard
 - **4 Custom Metrics** - Application-level metrics (RED method)
@@ -522,7 +522,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **SLO System** - Sloth Operator with PrometheusServiceLevel CRDs
 - **APM Stack** - VictoriaTraces + ClickHouse (tracing), OTel Collector (fan-out), Pyroscope (profiling), VictoriaLogs + Vector (logging)
 - **Secrets Stack** - OpenBAO (HA Raft) + External Secrets Operator for centralized secret management
-- **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for browser-facing `*.duynh.me`; self-signed `homelab-ca` for future internal mTLS, distributed via trust-manager `homelab-ca-bundle`
+- **TLS / PKI** - cert-manager with **dual issuers**: Let's Encrypt (DNS-01 via Cloudflare) for the production edge (**planned** — no production cluster yet); self-signed `homelab-ca` signs the local (Kind) edge certificate and is distributed via trust-manager `homelab-ca-bundle`; internal TLS on it is **planned** (RFC-0020)
 - **Bootstrap-only secrets** - Cloudflare API token (`secret/local/infra/cloudflare/api-token`) is operator-supplied (not in Git, not seeded by `openbao-bootstrap`); re-seed after every fresh cluster
 
 ---
@@ -534,7 +534,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-10-01 — added the duynhlab/images repository. Earlier: 2026-10-01 — the PostgreSQL internals chapters are live-verified on Kind. Earlier: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
+_Last updated: 2026-10-01 — infra drift pass: ADR count re-derived (83), VictoriaTraces is the fast path not a pilot, MCP servers marked not deployed, the `mop` chart lives in helm-charts, TLS issuer split matches the manifests. Earlier: 2026-10-01 — added the duynhlab/images repository. Earlier: 2026-10-01 — the PostgreSQL internals chapters are live-verified on Kind. Earlier: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
 authored chapters) from the observability section. Earlier the same day —
 **RFC-0033** is provisional: its human-gated control-loop
 proposal and Documentation Steward design are linked from the learning path; no runtime

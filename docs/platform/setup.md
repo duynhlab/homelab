@@ -178,7 +178,7 @@ make flux-up
   - **Phase 1: Foundation** — `controllers-local`: namespaces + operators (cert-manager, CNPG, VictoriaMetrics/Grafana operators, OpenBAO + ESO, Kyverno, ClickHouse operator).
   - **Phase 2: Security & configs** — `secrets-local` (bootstrap Job + ClusterSecretStore + ExternalSecrets), `cert-manager-local`, `monitoring-local` (observability configs + Sloth SLO CRs).
   - **Phase 3: Platform services** — Envoy Gateway, Keycloak, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
-  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workloads (`order-worker` — a `Connection` + `WorkerDeployment` — plus `checkout-worker` and `mockpay`).
+  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workloads (`order-worker` and `checkout-worker` — each a `Connection` + `WorkerDeployment` — plus `mockpay`).
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
 > with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
@@ -214,10 +214,10 @@ kubectl get prometheusservicelevel -n monitoring
 ```
 
 **Expected State:**
-- Namespaces for every domain provisioned (user, product, **inventory**, cart, **checkout**, order, review, notification, shipping, payment, frontend, **backoffice**, **identity**, **platform**, **cache-system**, **rustfs**, envoy-gateway, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, **temporal** — source of truth: `kubernetes/infra/controllers/namespaces.yaml`; `flux-system` is created by the bootstrap).
+- Namespaces for every domain provisioned (user, product, **inventory**, cart, **checkout**, order, review, notification, shipping, payment, frontend, **backoffice**, **identity**, **platform**, **cache-system**, **rustfs**, envoy-gateway, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, **policy-reporter**, **temporal**, **keda** — source of truth: `kubernetes/infra/controllers/namespaces.yaml`; `flux-system` is created by the bootstrap).
 - 7 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-fulfillment`, `rs-comms`, `rs-frontend`, `rs-backoffice`) successfully reconciled.
-- HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`** and **`checkout-worker`** (in the `payment` / `checkout` namespaces), in `Ready` state. Also in `temporal`: **`temporal-worker-controller-crds`** then **`temporal-worker-controller`** (ADR-054).
-- In `order`: a **`Connection`** and a **`WorkerDeployment`** (`order-fulfillment`) — *not* a HelmRelease. `kubectl -n order get wd order-fulfillment` must show `CURRENT` populated.
+- HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`** (in the `payment` namespace), in `Ready` state. Also in `temporal`: **`temporal-worker-controller-crds`** then **`temporal-worker-controller`** (ADR-054).
+- In `order`: a **`Connection`** and a **`WorkerDeployment`** (`order-fulfillment`) — *not* a HelmRelease. `kubectl -n order get wd order-fulfillment` must show `CURRENT` populated. `checkout` carries the same pair for `checkout-worker` (`checkout-abandon`, ADR-064).
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `platform-edge-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
@@ -266,7 +266,7 @@ All user-facing endpoints go through the Envoy Gateway edge on `*.duynh.me` (on 
 | Flux UI | https://ui.duynh.me | Keycloak SSO (`duynhlab-staff`; infra-team → flux-web-admin, sre/dev-team → flux-web-user) |
 | OpenBAO UI | https://openbao.duynh.me | Method **OIDC** → Keycloak `duyne` / `p@ss1234` (policy `infra-team` via group, ADR-062); CLI: `bao login -method=oidc` |
 
-This table is a selection — the full host inventory (22 hostnames) lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
+This table is a selection — the full host inventory (24 hostnames, including the leftover `jaeger` and `tempo` entries from retired backends) lives in `scripts/setup-hosts.sh`; the per-host HTTPRoutes live in `kubernetes/infra/configs/envoy-gateway/routes/` (edge guide: [envoy-gateway.md](./envoy-gateway.md)).
 
 ---
 
@@ -299,9 +299,11 @@ KC_URL=https://id.duynh.me USERNAME=alice PASSWORD=password123 \
   ./local-stack/scripts/keycloak-token.sh
 ```
 
-> The edge layer has reconciled on Kind during the RFC-0024 bring-up (#791);
-> the full end-to-end Kind gate pass is still pending. On local-stack the same
-> flow is verified end to end (`KC_URL` defaults to `http://localhost:8081`).
+> On Kind this flow is a row of the cluster gate (K4.5), which has passed end to
+> end since the RFC-0024 bring-up — see
+> [kind-e2e-audit.md § Previous runs](kind-e2e-audit.md#previous-runs). On
+> local-stack the same flow is verified end to end (`KC_URL` defaults to
+> `http://localhost:8081`).
 
 ### Seeded Data Summary
 
@@ -442,14 +444,14 @@ homelab/
 │   │   ├── controllers/                # Operators and CRD definitions (Flux wave 1)
 │   │   │   ├── namespaces.yaml         # Cluster-wide namespace definitions
 │   │   │   ├── metrics/                # VictoriaMetrics + Grafana + Sloth operators
-│   │   │   ├── logging/                # VictoriaLogs operator
+│   │   │   ├── logging/                # Vector DaemonSet HelmRelease (VictoriaLogs comes from the VM operator)
 │   │   │   ├── databases/              # CloudNativePG operator
 │   │   │   ├── secrets/                # OpenBAO + External Secrets Operator HelmReleases
 │   │   │   ├── cert-manager/
 │   │   │   ├── clickhouse-operator/    # Altinity ClickHouse operator (CRDs)
 │   │   │   ├── temporal/               # Temporal server + Worker Controller HelmReleases
 │   │   │   └── kyverno/
-│   │   │   # tracing/, profiling/, caching/, storage/, envoy-gateway/, keycloak/ — separate Flux Kustomizations
+│   │   │   # tracing/, profiling/, caching/, storage/, gateway-api-crds/, envoy-gateway/, keycloak/, keda/, policy-reporter/, mcp/ — separate Flux Kustomizations
 │   │   ├── configs/                    # Component instances and configurations
 │   │   │   ├── observability/          # Metrics, logging, tracing, Grafana, Sloth SLO CRs
 │   │   │   ├── databases/              # PostgreSQL clusters and PgDog poolers
@@ -480,7 +482,8 @@ homelab/
 │   │   ├── order-worker.yaml          # Connection + WorkerDeployment (order ns) — ONE file
 │   │   │                                # forever; the controller creates one Deployment
 │   │   │                                # per derived build id (ADR-054)
-│   │   ├── checkout-worker.yaml        # checkout-worker HelmRelease (checkout ns)
+│   │   ├── checkout-worker.yaml        # Connection + WorkerDeployment checkout-abandon (checkout ns)
+│   │   ├── order-fulfillment-scaler.yaml / checkout-abandon-scaler.yaml  # WorkerResourceTemplates → KEDA ScaledObject per version (ADR-055)
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
 │   └── clusters/                       # Environment-specific Flux configurations
@@ -492,12 +495,14 @@ homelab/
 │           ├── openbao-oidc-config.yaml # OpenBAO staff OIDC configurator (ADR-062)
 │           ├── cert-manager-config.yaml / cnpg-barman-plugin.yaml
 │           ├── gateway-api-crds.yaml / envoy-gateway.yaml / envoy-gateway-config.yaml
-│           ├── keycloak.yaml
+│           ├── flux-web.yaml / keycloak.yaml
 │           ├── caching.yaml / storage.yaml
-│           ├── clickhouse.yaml / tracing.yaml / profiling.yaml
+│           ├── clickhouse-keeper.yaml / clickhouse.yaml / clickhouse-schema.yaml
+│           ├── tracing.yaml / profiling.yaml
 │           ├── databases.yaml / databases-cnpg-dr.yaml
-│           ├── monitoring.yaml / kyverno.yaml / network-policies.yaml
-│           ├── mcp.yaml / temporal.yaml / temporal-config.yaml / apps.yaml
+│           ├── monitoring.yaml / grafana-dashboards-as-code-folders.yaml / grafana-dashboards-as-code-dashboards.yaml
+│           ├── kyverno.yaml / policy-reporter.yaml / network-policies.yaml
+│           ├── mcp.yaml (commented out) / keda.yaml / temporal.yaml / temporal-config.yaml / apps.yaml
 │           └── kustomization.yaml
 ├── Makefile                            # Centralized automation entrypoint
 └── scripts/                            # Implementation logic for automation tasks
@@ -514,6 +519,7 @@ homelab/
 5b. `openbao-oidc-config-local`: the OpenBAO staff-OIDC configurator Job (ADR-062) — writes `auth/oidc/config` + the team external groups via the `oidc-configurator` k8s-auth role, no root token. Depends on `secrets-local` (role + KV client secret) and `envoy-gateway-config-local` (the discovery fetch hairpins `id.duynh.me` through the edge, with Keycloak behind it).
 5c. `flux-web-local`: the Flux web UI SSO objects (`configs/flux-web` — rendered Web Config Secret, `flux-web-idp-trust` live-CA trust Certificate, group→role ClusterRoleBindings). Depends on `secrets-local` (ESO) and `cert-manager-local` (ClusterIssuer). The operator consumes the Secret via `--web-config-secret-name`, wired in `terraform/main.tf`.
 6. `monitoring-local`: Observability **configs** — Grafana dashboards, VMAlert rules, Sloth **PrometheusServiceLevel** CRs (depends on `controllers-local`; Sloth **operator** is in `controllers-local`).
+6a. `grafana-dashboards-as-code-folders-local` → `grafana-dashboards-as-code-dashboards-local`: the Grafana folders, then the dashboards, from the `duynhlab/grafana-dashboards` OCI artifact (both depend on `monitoring-local`; the dashboards wave also waits on the folders).
 7. `storage-local`: Provisions RustFS (S3) object storage (depends on `controllers-local`, `secrets-local`).
 7a. `caching-local`: Valkey (product cache-aside, db 0 — the edge does not use it) (depends on `controllers-local`, `monitoring-local`).
 8. `network-policies-local`: Per-namespace NetworkPolicies (depends on `controllers-local`).
@@ -547,7 +553,8 @@ homelab/
 14. `temporal-local`: Temporal server via the official `temporalio` HelmRelease (server 1.31.2 — ADR-030), `mop` namespace created by the chart's namespace Job, persistence on `platform-db-rw.platform:5432` (depends on `controllers-local`, `databases-local`, `monitoring-local`, `keda-local`). **Also ships the Temporal Worker Controller** — CRDs chart first via `dependsOn`, then the manager (ADR-054). That placement is load-bearing: `apps-local` `dependsOn: temporal-config-local`, which in turn depends on `temporal-local` — and that chain is the only thing ordering the CRDs and manager before any `WorkerDeployment` is applied. Note the `healthChecks` list names only the Temporal HelmRelease and frontend Deployment, so `wait: true` — not a health check — is what covers the manager.
 14a. `temporal-config-local`: the Temporal config half (`./configs/temporal` — server alerts + the `temporal-search-attributes` Job registering the custom Search Attributes `OrderId`/`SessionId` on namespace `mop`; the Web UI HTTPRoute lives in `configs/envoy-gateway/routes/temporal.yaml`) (depends on `temporal-local`).
 15. `kyverno-policies-local`: Admission policies (depends on `controllers-local`, `monitoring-local`). See [kyverno.md](kyverno.md).
-15a. `mcp-local`: MCP servers (depends on `monitoring-local`). See [mcp-servers.md](mcp-servers.md).
+15a. `mcp-local`: MCP servers (depends on `monitoring-local`) — **not applied**: commented out of `kustomization.yaml` since 2026-08-21. See [mcp-servers.md](mcp-servers.md).
+15b. `policy-reporter-local`: Policy Reporter UI for Kyverno's PolicyReports (depends on `kyverno-policies-local`).
 16. `apps-local`: Business logic — ResourceSets + workers (`dependsOn` `databases-local`, `monitoring-local`, `temporal-config-local`, `keda-local`; workers dial Temporal at startup, and services stamp Search Attributes that must be registered first — the config half's Job, which its `wait: true` covers).
 
 > **`make flux-sync` caveat:** `scripts/flux-sync.sh` reconciles only six Kustomizations
@@ -564,4 +571,4 @@ For persistence layer details, refer to [architecture.md](../databases/architect
 
 ---
 
-_Last updated: 2026-09-17 — `admin-service` added to the clone list; `local-stack/compose.yaml` builds the Backoffice portal from `../../admin-service`, so a checkout without it fails at `docker compose up --build`. Previously 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._
+_Last updated: 2026-10-01 — infra drift pass: `checkout-worker` is a `WorkerDeployment` (expected state, tree, Phase 4); cluster tree and dependency graph list the `clickhouse-keeper`, `clickhouse-schema`, `flux-web`, `keda`, `policy-reporter` and Grafana dashboards-as-code waves; `policy-reporter`/`keda` namespaces; 24 hostnames; `controllers/logging` is Vector; the Kind gate has passed (K4.5). Previously 2026-09-17 — `admin-service` added to the clone list; `local-stack/compose.yaml` builds the Backoffice portal from `../../admin-service`, so a checkout without it fails at `docker compose up --build`. Previously 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

@@ -101,7 +101,10 @@ kubernetes/apps/
 ├── order-worker.yaml              # standalone Connection + WorkerDeployment — versioned Temporal
 │                                  # saga worker (order ns). ONE file forever; the Temporal Worker
 │                                  # Controller creates one Deployment per build id (ADR-054)
-└── checkout-worker.yaml           # standalone HelmRelease — checkout abandonment worker (checkout ns)
+├── checkout-worker.yaml           # standalone Connection + WorkerDeployment — checkout abandonment
+│                                  # worker (checkout ns), same lifecycle as order-worker (ADR-064)
+├── order-fulfillment-scaler.yaml  # WorkerResourceTemplate — one KEDA ScaledObject per order-worker
+└── checkout-abandon-scaler.yaml   # WorkerResourceTemplate — one per checkout-worker version (ADR-055)
 ```
 
 Flux Kustomization with `path: ./` auto-discovers all YAML files recursively.
@@ -227,7 +230,7 @@ All 5 domain ResourceSets share the same `resourcesTemplate`. This is duplicated
 
 ### Pinned Tags (Current Default)
 
-Each service's `ResourceSetInputProvider` supplies an explicit `image_tag` input that the domain ResourceSet renders into the HelmRelease (`tag: "<< inputs.image_tag >>"`). Tags are pinned to a specific `sha` or `vX.Y.Z` per service — `:latest` is banned as a **platform rule** (AGENTS.md admission rules) and never used. Note the Kyverno `disallow-latest-tag` ClusterPolicy currently runs in **Audit** mode (`validationFailureAction: Audit`): a `:latest` tag would be reported in PolicyReports, not blocked at admission. Flipping it to Enforce is planned per the [Kyverno rollout strategy](kyverno.md#rollout-strategy).
+Each service's `ResourceSetInputProvider` supplies an explicit `image_tag` input that the domain ResourceSet renders into the HelmRelease (`tag: "<< inputs.image_tag >>"`). Tags are pinned to a specific `sha` or `vX.Y.Z` per service — `:latest` is banned as a **platform rule** (AGENTS.md admission rules) and never used. Note the Kyverno `disallow-latest-tag` policy (a `ValidatingPolicy` since ADR-078) currently runs in **Audit** mode (`validationActions: [Audit]`): a `:latest` tag would be reported in PolicyReports, not blocked at admission. Flipping it to Enforce is planned per the [Kyverno rollout strategy](kyverno.md#rollout-strategy).
 
 ### Promote a validated release to local Kind
 
@@ -414,7 +417,7 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
 | **Blast radius** | One domain: 10–40% of the 10 backend services. `rs-checkout` carries 4 of 10 (40%) — a known concentration above the < 30% target (see §8.3) |
 | **Merge conflicts** | None (1 file per service) |
 | **Onboarding time** | < 5 min (create InputProvider + push) |
-| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay` and `checkout-worker` are standalone HelmReleases, and `order-worker` is a standalone `WorkerDeployment`, all outside the ResourceSet checks |
+| **Health granularity** | 1 check per domain (5 domains) + `rs-frontend` + `rs-backoffice` = 7 ResourceSet checks; `mockpay` is a standalone HelmRelease, and `order-worker` and `checkout-worker` are standalone `WorkerDeployment`s, all outside the ResourceSet checks |
 | **Team autonomy** | Full (each service owns its InputProvider) |
 
 ### Beyond 50 Services: Further Scaling
@@ -482,4 +485,4 @@ flux reconcile kustomization apps-local -n flux-system
 
 ---
 
-_Last updated: 2026-09-29 — namespaces are owned by `namespaces.yaml` alone (the domain templates render no Namespace); onboarding step 0 declares it. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._
+_Last updated: 2026-10-01 — `checkout-worker` is a `Connection` + `WorkerDeployment`, not a HelmRelease; the two `WorkerResourceTemplate` scaler files are in the tree; `disallow-latest-tag` is a `ValidatingPolicy` (ADR-078). Previously 2026-09-29 — namespaces are owned by `namespaces.yaml` alone (the domain templates render no Namespace); onboarding step 0 declares it. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._

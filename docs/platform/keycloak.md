@@ -7,7 +7,7 @@ bypassing the connection pooler that every application service goes through.
 
 | | |
 |---|---|
-| **Image** | `quay.io/keycloak/keycloak:26.7.2`, digest-pinned |
+| **Image** | `quay.io/keycloak/keycloak:26.7.4`, digest-pinned (same digest in the cluster and local-stack) |
 | **Shape** | Raw `Deployment`, `replicas: 1` — no Helm chart, no Keycloak Operator |
 | **Namespace** | `identity` — a platform component, not an app-tier service |
 | **Realms** | `duynhlab` (customers) · `duynhlab-staff` (workforce, [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) |
@@ -412,4 +412,4 @@ Stated plainly, because none of these are hidden by the manifests:
 
 ---
 
-_Last updated: 2026-08-27 — live-realm client procedure (kcadm, exercised for flux-web) + the four-owner chain diagram + the two scope rules. Previously: added the ADR-062 staff-SSO consumers (groups, confidential clients, realm events). First version 2026-08-24 closed the deliverable named by ADR-041 and RFC-0022 and absorbed the retired `identity-cutover-runbook.md` as the realm reset procedure._
+_Last updated: 2026-10-01 — image 26.7.2 → 26.7.4 to match `controllers/keycloak/deployment.yaml` and `compose.yaml`. Previously 2026-08-27 — live-realm client procedure (kcadm, exercised for flux-web) + the four-owner chain diagram + the two scope rules. Previously: added the ADR-062 staff-SSO consumers (groups, confidential clients, realm events). First version 2026-08-24 closed the deliverable named by ADR-041 and RFC-0022 and absorbed the retired `identity-cutover-runbook.md` as the realm reset procedure._

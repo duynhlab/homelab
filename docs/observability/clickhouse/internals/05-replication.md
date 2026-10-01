@@ -180,8 +180,8 @@ Two bounded exceptions:
 
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
-| ReplicatedMergeTree per table | All three `otel` tables; engine takes no explicit path arguments — the `Replicated` database supplies them | [`10-otel_logs.sql`](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql), [`00-database.sql`](../../../../images/clickhouse-ddl/sql/00-database.sql) | Repository fact |
-| DDL replication (no `ON CLUSTER`) | Database `otel` is `ENGINE = Replicated('/clickhouse/databases/otel','{shard}','{replica}')`; table DDL propagates through the database's own Keeper log, so a replaced replica recreates its tables itself | [`00-database.sql`](../../../../images/clickhouse-ddl/sql/00-database.sql); [Replicated database engine](https://clickhouse.com/docs/engines/database-engines/replicated) | Repository fact |
+| ReplicatedMergeTree per table | All three `otel` tables; engine takes no explicit path arguments — the `Replicated` database supplies them | [`10-otel_logs.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql), [`00-database.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/00-database.sql) | Repository fact |
+| DDL replication (no `ON CLUSTER`) | Database `otel` is `ENGINE = Replicated('/clickhouse/databases/otel','{shard}','{replica}')`; table DDL propagates through the database's own Keeper log, so a replaced replica recreates its tables itself | [`00-database.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/00-database.sql); [Replicated database engine](https://clickhouse.com/docs/engines/database-engines/replicated) | Repository fact |
 | Replica identity via macros | `{shard}`/`{replica}` come from operator-supplied macros per StatefulSet pod | [ADR-065 — Decision](../../../proposals/adr/ADR-065-clickhouse-replicated-topology/README.md#decision) | Repository fact |
 | Quorum writes | Not configured — acknowledgement is single-replica; the schema job instead gates on `system.replicas` health (`total_replicas`, `active_replicas`, `is_readonly`) at bootstrap | [`job.yaml`](../../../../kubernetes/infra/configs/clickhouse-schema/job.yaml) | Repository fact |
 | Interserver part exchange | Three replicas forced onto distinct nodes by required anti-affinity, so a fetch always crosses nodes | [CHI pod template](../../../../kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml) | Repository fact |
@@ -373,6 +373,6 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse 2026 OSS changelog — insert deduplication defaults](https://clickhouse.com/docs/resources/changelogs/oss/2026)
 
 ---
-_Last updated: 2026-09-30 — live lab verified: every replica a leader, inserts on one replica, level-0 parts fetched, merges computed locally on all three. Earlier: 2026-09-29 — first draft: log/queue mechanism, dedup window,
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: every replica a leader, inserts on one replica, level-0 parts fetched, merges computed locally on all three. Earlier: 2026-09-29 — first draft: log/queue mechanism, dedup window,
 merge fetch-vs-execute, offline catch-up, and the single-replica durability
 window; live lab pending verification._

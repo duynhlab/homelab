@@ -554,6 +554,11 @@ choice.
   1.36 and 1.37 still crash on this host. Status → `implemented`. PRs: #1116
   (Kyverno 1.19.1), #1118 (OpenBao 2.7 KMS plugin, found by the gate), #1119
   (Phase 1), #1124 (`endpoints/v1` callers), #1126 (Phase 2).
+- 2026-10-01 — follow-up: the Phase 2 DDL image moved to the
+  [`duynhlab/images`](https://github.com/duynhlab/images) repository as
+  `ghcr.io/duynhlab/images/clickhouse-ddl:1.0.0`, released by tag, signed and
+  pinned by digest; homelab CI now verifies the signature instead of rebuilding
+  ([ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) update).
 
 ## Related
 
@@ -566,4 +571,4 @@ choice.
 - [`docs/platform/setup.md`](../../../platform/setup.md) — the Flux dependency chain the rebuild walks
 
 ---
-_Last updated: 2026-09-30 — closed at 1.35.8 (status implemented): re-audit shows cAdvisor v0.60.6 carries the ZFS fix but no Kubernetes release vendors it yet. Earlier: 2026-09-29 — Phase 2 landed (ADR-077 Accepted/Complete); only the 1.36 recreation remains. Earlier the same day — Phase 1 landed on 1.35.8 after the ZFS kubelet blocker on 1.36 (amendment + Implementation History); Kind gate ELIGIBLE. Previously 2026-09-28 — **Accepted** by the owner; [ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) created at `Proposed`, stating two things this RFC left implicit: the image is built `FROM scratch` (apko assembles from packages, not local files), and the Job carries `kustomize.toolkit.fluxcd.io/force: enabled` because a Job's pod template is immutable. The Kyverno 1.19 prerequisite ships in the same PR as this status change. Previously 2026-09-22 — opened at `provisional`: baseline to `kindest/node:v1.36.4` by digest, the Kyverno 1.36 gap accepted explicitly rather than waited out, every 1.35/1.36 feature given a verdict, and OCI image volumes adopted for the ClickHouse DDL as the single Phase 2 deliverable (`ADR-077` at review)._
+_Last updated: 2026-10-01 — the DDL image moved to duynhlab/images (follow-up in Implementation History). Earlier: 2026-09-30 — closed at 1.35.8 (status implemented): re-audit shows cAdvisor v0.60.6 carries the ZFS fix but no Kubernetes release vendors it yet. Earlier: 2026-09-29 — Phase 2 landed (ADR-077 Accepted/Complete); only the 1.36 recreation remains. Earlier the same day — Phase 1 landed on 1.35.8 after the ZFS kubelet blocker on 1.36 (amendment + Implementation History); Kind gate ELIGIBLE. Previously 2026-09-28 — **Accepted** by the owner; [ADR-077](../../adr/ADR-077-image-volume-schema-delivery/) created at `Proposed`, stating two things this RFC left implicit: the image is built `FROM scratch` (apko assembles from packages, not local files), and the Job carries `kustomize.toolkit.fluxcd.io/force: enabled` because a Job's pod template is immutable. The Kyverno 1.19 prerequisite ships in the same PR as this status change. Previously 2026-09-22 — opened at `provisional`: baseline to `kindest/node:v1.36.4` by digest, the Kyverno 1.36 gap accepted explicitly rather than waited out, every 1.35/1.36 feature given a verdict, and OCI image volumes adopted for the ClickHouse DDL as the single Phase 2 deliverable (`ADR-077` at review)._

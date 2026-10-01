@@ -61,7 +61,7 @@ Common codes on this platform and where they lead:
 | 252 | `TOO_MANY_PARTS` | [ClickHouseInsertsRejected](ClickHouseInsertsRejected.md) |
 | 242 | `TABLE_IS_READ_ONLY` | [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md) |
 | 241 | `MEMORY_LIMIT_EXCEEDED` | README → *Merge memory pressure*; the insert itself is over budget |
-| 16 / 47 / 53 | `NO_SUCH_COLUMN_IN_TABLE` / `UNKNOWN_IDENTIFIER` / `TYPE_MISMATCH` | schema drift — compare the collector's exporter version with `images/clickhouse-ddl/sql/` |
+| 16 / 47 / 53 | `NO_SUCH_COLUMN_IN_TABLE` / `UNKNOWN_IDENTIFIER` / `TYPE_MISMATCH` | schema drift — compare the collector's exporter version with `images/clickhouse-ddl/sql/` (duynhlab/images) |
 | 516 | `AUTHENTICATION_FAILED` | the collector's credential Secret vs `clickhouse-credentials` |
 | 499 | `S3_ERROR` | [ClickHouseS3Errors](ClickHouseS3Errors.md) — an insert landing on a cold-tier part |
 
@@ -79,7 +79,7 @@ Follow the code. Two cases have no sibling runbook:
 
 1. **Schema drift**: the collector's `clickhouse` exporter writes a fixed
    column set per version. After a collector image bump, diff the exporter's
-   expected DDL against [`images/clickhouse-ddl/sql/`](../../../../images/clickhouse-ddl/)
+   expected DDL against [`images/clickhouse-ddl/sql/` (duynhlab/images)](https://github.com/duynhlab/images/tree/main/images/clickhouse-ddl/)
    (shipped to the schema Job as an image volume, ADR-077) and ship the schema change first
    (Flux chain: `clickhouse-schema` before `tracing`). Do not let the collector
    create tables (`create_schema: false` is deliberate, ADR-065).
@@ -100,4 +100,4 @@ queue, which is the data you were trying to save.
 - [ClickHouseExporterUnhealthy](ClickHouseExporterUnhealthy.md) — the consumer side.
 
 ---
-_Last updated: 2026-09-30 — schema drift diffs against the DDL image source (ADR-077), not a ConfigMap. Earlier: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — schema drift diffs against the DDL image source (ADR-077), not a ConfigMap. Earlier: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_

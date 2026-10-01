@@ -1,0 +1,49 @@
+# Every ghcr.io/duynhlab/images/* reference in kubernetes/ is pinned
+# <image>:<semver>@sha256:<digest> (scripts/flux-validate.sh) and must be the
+# image duynhlab/images released: the tag resolves to that digest and the digest
+# carries a keyless signature from that repo's release workflow for that image.
+# References are discovered, so a new image needs no change here.
+name: platform-images
+
+on:
+  pull_request:
+    paths:
+      - kubernetes/**
+      - .github/workflows/platform-images.yml
+  push:
+    branches: [main]
+    paths:
+      - kubernetes/**
+      - .github/workflows/platform-images.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Verify every reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t refs < <(grep -rhoE --exclude-dir=tests 'ghcr\.io/duynhlab/images/[a-z0-9-]+:[0-9]+\.[0-9]+\.[0-9]+@sha256:[a-f0-9]{64}' kubernetes | sort -u)
+          [[ ${#refs[@]} -gt 0 ]] || { echo "no duynhlab/images references"; exit 0; }
+          for ref in "${refs[@]}"; do
+            repo=${ref%%:*}; name=${repo##*/}; tag=${ref#*:}; tag=${tag%@*}; digest=${ref#*@}
+            echo "::group::${ref}"
+            got="sha256:$(skopeo inspect --raw "docker://${repo}:${tag}" | sha256sum | cut -d' ' -f1)"
+            [[ "${got}" == "${digest}" ]] || { echo "::error::${repo}:${tag} resolves to ${got}, pinned ${digest}"; exit 1; }
+            cosign verify \
+              --certificate-identity-regexp "^https://github\.com/duynhlab/images/\.github/workflows/release\.yml@refs/tags/${name}/v" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "${repo}@${digest}" >/dev/null
+            echo "OK ${ref}"
+            echo "::endgroup::"
+          done

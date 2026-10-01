@@ -94,7 +94,7 @@ For one Collector insert into `otel_traces` (the write path of
    dropping empty trace IDs (`WHERE TraceId != ''`).
 3. The declared `DateTime64(9)` output is cast to the target's `DateTime`
    columns on insert — a deliberate, reproduced-from-as-built asymmetry
-   ([Repository fact — MV DDL](../../../../images/clickhouse-ddl/sql/40-otel_traces_trace_id_ts_mv.sql)).
+   ([Repository fact — MV DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/40-otel_traces_trace_id_ts_mv.sql)).
 4. The result rows are inserted into `otel_traces_trace_id_ts` **on the same
    replica**, forming a part in the target table.
 5. Both new parts — source and target — replicate to the other two replicas
@@ -144,9 +144,9 @@ owned by [the platform page](../materialized-views.md#3-lookup-then-explain-both
 
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
-| `TO`-style view (no inner storage) | Required here: keeps the view legal inside the `Replicated` database `otel` | [MV DDL](../../../../images/clickhouse-ddl/sql/40-otel_traces_trace_id_ts_mv.sql) | Repository fact |
+| `TO`-style view (no inner storage) | Required here: keeps the view legal inside the `Replicated` database `otel` | [MV DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/40-otel_traces_trace_id_ts_mv.sql) | Repository fact |
 | Per-block trigger | Fires on every async-insert flush of `otel_traces`, on the receiving replica | MV DDL; [Collector exporter config](../../../../kubernetes/infra/controllers/tracing/otel-collector/otel-collector.yaml) | Repository fact |
-| Target table lifecycle | `ReplicatedMergeTree`, `ORDER BY (TraceId, Start)`, bloom-filter index, delete-only TTL at 90 days, **default storage policy — no cold tier** | [Target DDL](../../../../images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql) | Repository fact |
+| Target table lifecycle | `ReplicatedMergeTree`, `ORDER BY (TraceId, Start)`, bloom-filter index, delete-only TTL at 90 days, **default storage policy — no cold tier** | [Target DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql) | Repository fact |
 | Creation order dependency | The view must be created after both tables; a missing view silently loses trace-ID lookups | [Schema bootstrap Job](../../../../kubernetes/infra/configs/clickhouse-schema/job.yaml); MV DDL header | Repository fact |
 | Refreshable materialized views | Absent — no `REFRESH EVERY` view exists | [Refreshable views](https://clickhouse.com/docs/concepts/features/materialized-views/refreshable-materialized-view) | Reference — not deployed |
 
@@ -315,5 +315,5 @@ Before continuing, explain these without rereading the chapter:
 - [Refreshable materialized views](https://clickhouse.com/docs/concepts/features/materialized-views/refreshable-materialized-view)
 
 ---
-_Last updated: 2026-09-30 — live lab verified: per-block executions; at low traffic written = read, paired executions left as a knowledge gap. Earlier: 2026-09-29 — first published version; live observation pending
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: per-block executions; at low traffic written = read, paired executions left as a knowledge gap. Earlier: 2026-09-29 — first published version; live observation pending
 verification on the Ubuntu Kind cluster._

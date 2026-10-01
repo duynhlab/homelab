@@ -200,6 +200,7 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | **Infrastructure** | [duynhlab/homelab](https://github.com/duynhlab/homelab) | GitOps, K8s manifests, docs | [![CI](https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/homelab/actions) |
 | **Helm Charts** | [duynhlab/helm-charts](https://github.com/duynhlab/helm-charts) | `mop` chart — OCI `ghcr.io/duynhlab/helm-charts/mop` | [![CI](https://github.com/duynhlab/helm-charts/actions/workflows/e2e.yml/badge.svg)](https://github.com/duynhlab/helm-charts/actions) |
 | **Shared Workflows** | [duynhlab/gha-workflows](https://github.com/duynhlab/gha-workflows) | Reusable GitHub Actions | [![CI](https://github.com/duynhlab/gha-workflows/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/duynhlab/gha-workflows/actions) |
+| **Platform Images** | [duynhlab/images](https://github.com/duynhlab/images) | Platform-built OCI images (e.g. `clickhouse-ddl`) — `ghcr.io/duynhlab/images/<image>`, signed, pinned by digest | [![CI](https://github.com/duynhlab/images/actions/workflows/release.yml/badge.svg)](https://github.com/duynhlab/images/actions) |
 | **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go packages — summary + bump ledger in [docs/api/pkg.md](./api/pkg.md) | [![CI](https://github.com/duynhlab/pkg/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
 
 ### Microservices and frontend
@@ -533,7 +534,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 
 ---
 
-_Last updated: 2026-10-01 — the PostgreSQL internals chapters are live-verified on Kind. Earlier: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
+_Last updated: 2026-10-01 — added the duynhlab/images repository. Earlier: 2026-10-01 — the PostgreSQL internals chapters are live-verified on Kind. Earlier: 2026-09-29 — the PostgreSQL internals learning path is authored (fourteen chapters absorbing the nine fundamentals pages). Also — linked the ClickHouse internals learning path (twelve
 authored chapters) from the observability section. Earlier the same day —
 **RFC-0033** is provisional: its human-gated control-loop
 proposal and Documentation Steward design are linked from the learning path; no runtime

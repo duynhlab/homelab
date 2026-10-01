@@ -122,8 +122,8 @@ filter columns first.
 ### Binary search vs generic exclusion — the deployed keys as the worked example
 
 The sorting keys in the deployed DDL *(Repository facts —
-[otel_logs](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql),
-[otel_traces](../../../../images/clickhouse-ddl/sql/20-otel_traces.sql))*:
+[otel_logs](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql),
+[otel_traces](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/20-otel_traces.sql))*:
 
 ```sql
 -- otel_logs
@@ -176,13 +176,13 @@ The deployed choices *(Repository facts — DDL above)*:
 
 | Upstream mechanism | Homelab setting or behavior | Evidence | Class/status |
 |---|---|---|---|
-| Granule size | `index_granularity = 8192` on both tables | [DDL](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql) `SETTINGS` | Repository fact |
+| Granule size | `index_granularity = 8192` on both tables | [DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql) `SETTINGS` | Repository fact |
 | Sorting keys | Logs: 5-minute bucket → service → time; traces: service → span → time | DDL `ORDER BY` | Repository fact |
 | Why these keys | Time-window dashboards prune logs by prefix; per-service trace search prunes traces by prefix; trade-offs analyzed | [Schema and queries](../schema-and-queries.md) | Repository fact |
 | Part-level skipping before the index | `PARTITION BY toDate(Timestamp)` — daily parts, min/max checked first | DDL; lifecycle owned by [chapter 04](04-parts-and-merges.md) | Repository fact |
 | Compression in `.bin` files | `ZSTD(1)` everywhere; `Delta(8), ZSTD(1)` on `Timestamp` | DDL codecs; sizing discussion in [platform hub](../README.md#retention--compression) | Repository fact |
 | Skip indexes | Traces: bloom + minmax, `GRANULARITY 1`; logs: 8 × `text`, part-level | DDL `INDEX` clauses | Repository fact |
-| Wide vs compact threshold | Not set in DDL — server default (`min_bytes_for_wide_part` = 10,485,760) applies | Absence in [DDL](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql); [MergeTree reference](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree) | Inference — the default is upstream-documented; confirm live via `system.parts.part_type` |
+| Wide vs compact threshold | Not set in DDL — server default (`min_bytes_for_wide_part` = 10,485,760) applies | Absence in [DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql); [MergeTree reference](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree) | Inference — the default is upstream-documented; confirm live via `system.parts.part_type` |
 
 Note what is *absent*: no projections, no sampling key, no explicit
 `min_bytes_for_wide_part`. The schema leans on the two mechanisms this page
@@ -362,4 +362,4 @@ Before continuing, explain these without rereading the chapter:
 - [Architecture overview — MergeTree](https://clickhouse.com/docs/resources/develop-contribute/introduction/architecture)
 
 ---
-_Last updated: 2026-09-30 — live lab verified: part anatomy (~7,600 rows per granule) and skip-index granularities. Earlier: 2026-09-29 — first published version of the MergeTree layout chapter; live lab pending verification._
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: part anatomy (~7,600 rows per granule) and skip-index granularities. Earlier: 2026-09-29 — first published version of the MergeTree layout chapter; live lab pending verification._

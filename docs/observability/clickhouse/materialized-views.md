@@ -79,7 +79,7 @@ SHOW CREATE TABLE otel.otel_traces_trace_id_ts_mv;
 ```
 
 You should see `TO otel.otel_traces_trace_id_ts` and the `SELECT` above.
-Full DDL: [`images/clickhouse-ddl/sql/`](../../../images/clickhouse-ddl/).
+Full DDL: [`images/clickhouse-ddl/sql/` (duynhlab/images)](https://github.com/duynhlab/images/tree/main/images/clickhouse-ddl/).
 
 ### 2. Health lives on the **target** table
 
@@ -142,4 +142,4 @@ observability **lookup**, not a metrics rollup.
 
 ---
 
-_Last updated: 2026-09-04_
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-04_

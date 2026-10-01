@@ -1,6 +1,6 @@
 # Schema bootstrap for the ClickHouse OTel store (RFC-0028 / ADR-065).
 #
-# Runs the DDL shipped in the clickhouse-ddl image (images/clickhouse-ddl/,
+# Runs the DDL shipped in the clickhouse-ddl image (duynhlab/images repo,
 # mounted read-only at /sql as an image volume, ADR-077) so the otel-collector
 # can run with create_schema: false. Why that matters is in that image's
 # README; what matters here is the shape of the work:
@@ -31,9 +31,9 @@
 # reconciles kept rustfs-setup-buckets-init's UID, 2026-09-28).
 #
 # Image volume, not a ConfigMap (ADR-077): pinned by tag AND digest (Kyverno
-# disallow-latest-tag requires the digest on image volumes), built reproducibly
-# so the digest is what the SQL builds to (`make ddl-digest`; CI checks it on
-# every pull request). Never pair an image volume with hostUsers: false --
+# disallow-latest-tag requires the digest on image volumes), released signed by
+# duynhlab/images; platform-images.yml verifies tag, digest and signature on
+# every pull request. Never pair an image volume with hostUsers: false --
 # containerd cannot idmap the mount and the pod does not start.
 #
 # No ttlSecondsAfterFinished on purpose: clickhouse-schema-local gates on this
@@ -272,7 +272,7 @@ spec:
       volumes:
         - name: sql
           image:
-            reference: ghcr.io/duynhlab/homelab/clickhouse-ddl:sql-6589f616b41c@sha256:395ef6ff69d20be22f62b13a4996b5b487532dacab065bcd3b247e6191c21e5e
+            reference: ghcr.io/duynhlab/images/clickhouse-ddl:1.0.0@sha256:f2e3635227bbf7681de9b2378b9b3c16852f96c7ffc2f7b23229cd82f6eec573
             pullPolicy: IfNotPresent
         - name: tmp
           emptyDir: {}

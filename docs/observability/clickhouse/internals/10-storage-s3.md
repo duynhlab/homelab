@@ -91,8 +91,8 @@ The shared meanings of *part*, *partition*, and *merge* are in the
 2. **Move at seven days.** The table TTL
    `toDateTime(Timestamp) + toIntervalDay(7) TO VOLUME 'cold'` marks the part
    for relocation (repository fact —
-   [`10-otel_logs.sql`](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql),
-   [`20-otel_traces.sql`](../../../../images/clickhouse-ddl/sql/20-otel_traces.sql)).
+   [`10-otel_logs.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql),
+   [`20-otel_traces.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/20-otel_traces.sql)).
    A background move uploads the part's column files as blobs under the
    replica's bucket prefix, writes local metadata files under
    `/var/lib/clickhouse/disks/s3/`, switches the part to the `cold` volume, and
@@ -114,7 +114,7 @@ The shared meanings of *part*, *partition*, and *merge* are in the
 5. **The exception.** `otel.otel_traces_trace_id_ts` names no storage policy,
    so it uses the default policy and never moves: its parts live their whole
    90-day life on the PVC (repository fact —
-   [`30-otel_traces_trace_id_ts.sql`](../../../../images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql)).
+   [`30-otel_traces_trace_id_ts.sql`](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql)).
 
 ```mermaid
 flowchart LR
@@ -162,8 +162,8 @@ flowchart LR
 | `{replica}` macro in a disk endpoint | Intended to give each replica its own bucket prefix; the manifest itself flags macro expansion in a disk endpoint as **unverified** | CHI comment above `03-storage-rustfs.xml` | Repository fact about intent; expansion is a verification item for the live lab below |
 | Cache disk over object storage | `s3_cache`, `max_size` 1Gi on the PVC path | Same CHI file | Repository fact |
 | Storage policy volumes and `move_factor` | Policy `hot_cold`: `hot` = disk `default`, `cold` = disk `s3_cache`, `move_factor: 0`, `perform_ttl_move_on_insert: false` | Same CHI file | Repository fact |
-| Move TTL and delete TTL | `+7d TO VOLUME 'cold'`, `+90d` delete, `ttl_only_drop_parts = 1` on `otel_logs` and `otel_traces` | [DDL](../../../../images/clickhouse-ddl/sql/10-otel_logs.sql) | Repository fact |
-| Default policy (no tiering) | `otel_traces_trace_id_ts`: delete-only TTL at 90d, local disk for life | [DDL](../../../../images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql) | Repository fact |
+| Move TTL and delete TTL | `+7d TO VOLUME 'cold'`, `+90d` delete, `ttl_only_drop_parts = 1` on `otel_logs` and `otel_traces` | [DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/10-otel_logs.sql) | Repository fact |
+| Default policy (no tiering) | `otel_traces_trace_id_ts`: delete-only TTL at 90d, local disk for life | [DDL](https://github.com/duynhlab/images/blob/main/images/clickhouse-ddl/sql/30-otel_traces_trace_id_ts.sql) | Repository fact |
 | Zero-copy replication | `allow_remote_fs_zero_copy_replication: 0` — each replica uploads and deletes its own blobs | Same CHI file; [upstream default and DR advice](https://clickhouse.com/docs/concepts/features/configuration/server-config/storing-data) | Repository fact |
 | Object store capacity | RustFS runs standalone with `dataStorageSize: 1Gi` | [RustFS HelmRelease](../../../../kubernetes/infra/controllers/storage/rustfs/helmrelease.yaml) | Repository fact |
 
@@ -415,5 +415,5 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse: `system.remote_data_paths`](https://clickhouse.com/docs/reference/system-tables/remote_data_paths)
 
 ---
-_Last updated: 2026-09-30 — live lab verified: disks and `hot_cold` policy live, cold tier still empty so the `{replica}` expansion stays unverified. Earlier: 2026-09-29 — first draft of the tiered-storage chapter; live
+_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: disks and `hot_cold` policy live, cold tier still empty so the `{replica}` expansion stays unverified. Earlier: 2026-09-29 — first draft of the tiered-storage chapter; live
 observation pending verification on the Ubuntu Kind cluster._

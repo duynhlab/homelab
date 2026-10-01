@@ -440,7 +440,7 @@ metadata:
 spec:
   retentionPolicy: "30d"
   configuration:
-    destinationPath: s3://pg-backups-cnpg/product-db/
+    destinationPath: s3://pg-backups-cnpg/product-db
     endpointURL: http://rustfs-svc.rustfs.svc.cluster.local:9000
     s3Credentials:
       accessKeyId:

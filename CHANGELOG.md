@@ -90,6 +90,15 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Databases
+- **Barman retention runs again; it had failed on every run since the
+  clusters were created.** Each ObjectStore's `destinationPath` ended in `/`,
+  and Barman builds one listing prefix by joining it with another `/`. RustFS
+  answers a `//` prefix with `InvalidArgument`, so `barman-cloud-backup-delete`
+  and `barman-cloud-backup-list` exited 4 every five minutes on all three
+  clusters, and the 30d/7d recovery windows never deleted an object. The paths
+  lose the trailing slash; object keys do not change.
+
 #### Docs
 - **The ClickHouse docs name the deployed plugin 4.22.0**; three places still
   said 4.20.0 after the bump.

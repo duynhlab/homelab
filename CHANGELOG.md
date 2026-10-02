@@ -119,6 +119,19 @@ Skeleton (copy what you need):
   unchanged: on Kind the Job re-ran from the new image and `SHOW CREATE TABLE`
   was byte-identical on all three replicas.
 
+#### Observability
+- **Every as-code dashboard renders all of its panels**
+  (grafana-dashboards `0.3.0`). The generator had left every panel id at 0,
+  and Grafana's v2 renderer keys panels by id, so each grid row showed its
+  first panel in every slot: on Kind `business-otel` showed 2 distinct
+  panels of 11, `kubernetes-cluster-overview` 4 of 24, `pgdog` 8 of 30.
+  The same release ports `microservices-monitoring-001-otel` 1:1 from the
+  helm-charts source: 40 panels in 7 rows instead of 28, including the
+  missing success-RPS, total-request, requests-by-endpoint and gRPC
+  per-callee panels, with the source's legends and descriptions. Verified on
+  Kind: every board renders as many distinct panels as it has, and the OTel
+  board shows data in all 40 under load.
+
 #### Local-stack
 - **Local-stack databases are owned by per-service roles, as on the cluster.**
   Every service, its migrate and seed jobs, the two workers, Keycloak and

@@ -180,6 +180,13 @@ Skeleton (copy what you need):
   (`routes/mcp.yaml` is commented out since 2026-08-21). The K0.6 audit row
   reads the enabled route list out of the kustomization instead of a glob.
 
+#### Observability
+- **VictoriaMetrics gets 1Gi.** `vmsingle` held about 184k active series at
+  ~7.3k samples/s, and its anon RSS sat at 453Mi of a 512Mi limit (88%), so
+  the critical `VMTooHighMemoryUsage` alert (anon RSS over 80% of available
+  memory for 10 minutes) was firing and the Kind smoke gate's K5.8 row failed.
+  Limit 512Mi → 1Gi, request 256Mi → 512Mi.
+
 #### Databases
 - **Barman retention runs again; it had failed on every run since the
   clusters were created.** Each ObjectStore's `destinationPath` ended in `/`,

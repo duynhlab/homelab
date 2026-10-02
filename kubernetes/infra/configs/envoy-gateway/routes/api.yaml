@@ -621,7 +621,7 @@ spec:
 ---
 # Payment webhooks — public, anonymous: the HMAC signature over the raw body
 # is the credential (mockpay signs, payment verifies). Rate/size limits still
-# apply (btp-api.yaml). Both webhook paths are matched by one route.
+# apply (btp-api.yaml).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -639,11 +639,6 @@ spec:
         - path:
             type: PathPrefix
             value: /payment/v1/public/payments/webhooks
-        # Deprecated pre-v3 path — kept during the v3 rollout so in-flight
-        # mockpay retries keep landing. Remove at contract (ADR-017).
-        - path:
-            type: PathPrefix
-            value: /payment/v1/public/webhooks
       filters:
         - type: ResponseHeaderModifier
           responseHeaderModifier:

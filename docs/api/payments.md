@@ -16,7 +16,7 @@ reconciliation loop that proves the books match the provider.
 | **Temporal** | Money-step gRPC participant | Implemented | [Temporal participation](#temporal-participation) |
 | **Events** | Transactional outbox + signed inbound mockpay webhooks | Implemented | [Ledger + outbox](#ledger--outbox-settle-once-tell-everyone-at-least-once) · [Webhook HMAC](#mockpay--webhook-hmac) |
 
-Known gaps: [aliases, pooler, and reconciliation limits](#known-gaps).
+Known gaps: [pooler and reconciliation limits](#known-gaps).
 
 | Attribute | Value |
 |-----------|-------|
@@ -116,9 +116,9 @@ Private responses are owner-scoped by the JWT `user_id`. Internal routes are
 never given an `HTTPRoute` at the edge; NetworkPolicy is the cluster boundary. The
 public webhook is not anonymous in practice: its HMAC signature is the
 credential (the edge's rate/size limits still apply — `BackendTrafficPolicy`).
-The deprecated pre-v3 alias
-`/payment/v1/public/webhooks/mockpay` stays mounted during the ADR-017 window
-([Known gaps](#known-gaps)); shared conventions live in [api.md](./api.md).
+Shared conventions live in [api.md](./api.md). The pre-v3 aliases
+`/payment/v1/public/webhooks/mockpay` and `/payment/v1/internal/reconciliation/runs`
+were removed in v2.8.0 (ADR-017 contract) and now answer 404.
 
 ## gRPC API
 
@@ -398,11 +398,9 @@ Read-only: refunds and recon triggers stay `internal`.
 | `GET` | `/payment/v1/protected/payments/reconciliation/runs` | Run headers, newest first — the detect-only recon records' first reader |
 | `GET` | `/payment/v1/protected/payments/reconciliation/runs/:id` | Run + its discrepancies (`{run, discrepancies}`) — the triage view |
 
-**Deprecated aliases (ADR-017 expand phase, payment-service v2.7.0).** The
-pre-canonical `GET /payment/v1/protected/attempts/open` and
-`GET /payment/v1/protected/reconciliations/runs[/:id]` still answer on the same
-handlers. They are removed in the contract release, after the Backoffice has
-shipped on the canonical paths.
+The pre-canonical `GET /payment/v1/protected/attempts/open` and
+`GET /payment/v1/protected/reconciliations/runs[/:id]` served as aliases in v2.7.0
+while the Backoffice moved over, and were removed in v2.8.0 (ADR-017 contract).
 
 ### mockpay provider API
 
@@ -436,10 +434,6 @@ mockpay posts its events back to payment's signed webhook,
 
 ## Known gaps
 
-- **Deprecated webhook alias** `/payment/v1/public/webhooks/mockpay` — pre-v3
-  path kept at both edges during the ADR-017 window so in-flight mockpay
-  retries keep landing; remove at contract end. A matching deprecated internal
-  alias `/payment/v1/internal/reconciliation/runs` remains mounted in-service.
 - **No pooler for payment DB** — direct CNPG connection with `sslmode=require`
   because PgDog does not terminate TLS yet (RFC-0020 research).
 - **Reconciliation limits (deliberate, tracked):** refund *amounts* aren't
@@ -545,4 +539,4 @@ Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-servic
 - [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 
-_Last updated: 2026-10-02 — protected attempt and reconciliation reads move under `payments/` (ADR-017 expand; old paths are deprecated aliases); mockpay provider API table added. Previously 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._
+_Last updated: 2026-10-02 — the ADR-017 aliases (protected, internal reconciliation, webhook) are removed in v2.8.0. Previously 2026-10-02 — protected attempt and reconciliation reads move under `payments/` (ADR-017 expand; old paths are deprecated aliases); mockpay provider API table added. Previously 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

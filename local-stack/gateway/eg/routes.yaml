@@ -367,12 +367,9 @@ spec:
           kind: Backend
           name: payment
 ---
-# payment — provider webhooks, anonymous. TWO path matches in ONE rule, which is
-# how Gateway API expresses "either of these paths, same backend": `matches` is a
-# list and its entries are ORed. The second path is the deprecated pre-v3 alias,
-# kept during the expand phase so an in-flight provider retry aimed at the old
-# URL still lands (removed at contract, ADR-017). `mockpay` posts to the first
-# at http://gateway:8000/payment/v1/public/payments/webhooks/mockpay.
+# payment — provider webhooks, anonymous. `mockpay` posts to
+# http://gateway:8000/payment/v1/public/payments/webhooks/mockpay. The pre-v3
+# alias /payment/v1/public/webhooks was removed at the ADR-017 contract step.
 #
 # Anonymous on purpose, and it is the one route where that is a security
 # decision rather than an absence of one: the credential is the provider's HMAC
@@ -393,9 +390,6 @@ spec:
         - path:
             type: PathPrefix
             value: /payment/v1/public/payments/webhooks
-        - path:
-            type: PathPrefix
-            value: /payment/v1/public/webhooks
       backendRefs:
         - group: gateway.envoyproxy.io
           kind: Backend

@@ -385,9 +385,9 @@ docker compose exec -T postgres psql -U postgres -lqt </dev/null \
   && echo "A6 FAIL: the auth database still exists" \
   || echo "A6 OK: no auth database"
 
-# A7. v3 collection-noun paths (ADR-017): new canonical 200 + deprecated
-#     aliases still answering during the expand phase (removed at contract).
-#     Shipping only. The `POST /auth/v1/public/login` alias that used to be
+# A7. v3 collection-noun paths (ADR-017): the canonical paths answer 200 and
+#     the pre-v3 alias answers 404 — the contract step removed it, and a 200
+#     here would mean a forgotten alias is still serving. Shipping only. The `POST /auth/v1/public/login` alias that used to be
 #     checked here is not "deprecated but serving" — it certified the retired
 #     token layer, and with auth-service gone from local-stack there is no
 #     backend and no route behind it. Nothing to expand-phase.
@@ -395,7 +395,7 @@ audit_curl -s -o /dev/null -w "A7 shipments/track:     %{http_code} (want 200)\n
   "$BASE/shipping/v1/public/shipments/track?tracking_number=1Z999AA10123456784"
 audit_curl -s -o /dev/null -w "A7 shipments/estimate:  %{http_code} (want 200)\n" \
   "$BASE/shipping/v1/public/shipments/estimate?origin=HN&destination=SG&weight=1"
-audit_curl -s -o /dev/null -w "A7 alias track:         %{http_code} (want 200 — deprecated)\n" \
+audit_curl -s -o /dev/null -w "A7 alias track:         %{http_code} (want 404 — removed at contract)\n" \
   "$BASE/shipping/v1/public/track?tracking_number=1Z999AA10123456784"
 
 # A8. Renamed zero-caller internal paths are gone (no aliases kept):
@@ -2189,7 +2189,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A4 | Refresh reuse (realm) | refresh rotates; replaying the consumed token 400 `invalid_grant` / `Maximum allowed refresh token reuse exceeded`; the replay revokes the family, so the rotated token also 400s (`Session doesn't have required client`) |
 | A5 | Logout (realm) | end-session 204, replay **also 204** (idempotent); refresh afterwards 400 `Session not active` |
 | A6 | Removed surfaces | `/auth/v1/private/*` 404 (no HTTPRoute matches) **and the `auth` database does not exist** — auth-service is removed from local-stack, and RFC-0024 P5 retired its cluster surface |
-| A7 | v3 paths (ADR-017) | new `shipments/*` paths 200 and the deprecated `shipping/v1/public/track` alias still 200 (expand phase). The old `auth/v1/public/login` alias is **not** checked — it certified the retired token layer and has no backend |
+| A7 | v3 paths (ADR-017) | new `shipments/*` paths 200 and the removed `shipping/v1/public/track` alias 404 (ADR-017 contract). The old `auth/v1/public/login` alias is **not** checked — it certified the retired token layer and has no backend |
 | A8 | Internal audience sealed | renamed `notify/*` + `internal/orders/*` 404 in-container (no aliases); and the two `/internal/` paths that DO exist — product create, cart clear — 404 **at the edge** because every HTTPRoute is audience-scoped, so no audience leaks |
 | A9 | Checkout sessions (RFC-0015) | lifecycle **201**→200→200→200 through edge-JWT, with the create's 201 asserted (not just used for its id); no-token 401; `/api/v1/checkout` 404; price bump flags `price_changed` |
 | A10 | Confirm + abandonment (RFC-0015 P2–P4) | fee/tax/promo composition asserted; `Idempotency-Key` required; replay = same order; order reaches `confirmed` or `completed`; order total == session total; lazy-410 past `expires_at` |
@@ -2200,7 +2200,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A16 | String subject persisted (ADR-042) | a cart write made with a realm token lands in `cart.cart_items.user_id` as the caller's realm UUID — the edge, `pkg/authmw`, the handler, and the column all agree |
 | A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` order-fulfillment workflow behind (A10's lazy-410 abandonment watch runs until its TTL) |
 | A17 | Protected surface (RFC-0023 + ADR-050) | tokenless 401 **at the edge**; bare `/inventory/v1/private/*` 404 (only `/protected` is routed); a valid **customer-realm** token 401 **wrong-issuer at the edge** (the ADR-050 fence — stronger than the old in-service 403); staff operator `duyne` (realm `duynhlab-staff`) lists real balances with derived `atp`; receipt 201 `applied:true`, exact replay 200 `applied:false`, invariant-violating adjustment 409 `STOCK_UNAVAILABLE`; the movement row's `actor` is duyne's staff-realm `sub` (`d0e00000-…-001`) |
-| A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
+| A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `payments/reconciliation/runs` pages 200 |
 | A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
 | A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |

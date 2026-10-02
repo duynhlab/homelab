@@ -194,6 +194,13 @@ Skeleton (copy what you need):
   reads the enabled route list out of the kustomization instead of a glob.
 
 #### Observability
+- **Grafana-managed alerts leave NoData, OTel pies show their legends**
+  (grafana-dashboards `0.3.1`). On a healthy cluster every as-code alert
+  rule sat in NoData: the Postgres rule queried a dashboard variable that
+  alerts never resolve, and the three Kubernetes count rules returned an
+  empty vector. They now group by `cnpg_io_cluster` or fall back to
+  `vector(0)`. The two OTel pies hid their legends and counted only the last
+  rate sample; they now count over the board's time range without `/health`.
 - **VictoriaMetrics gets 1Gi.** `vmsingle` held about 184k active series at
   ~7.3k samples/s, and its anon RSS sat at 453Mi of a 512Mi limit (88%), so
   the critical `VMTooHighMemoryUsage` alert (anon RSS over 80% of available

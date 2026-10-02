@@ -43,20 +43,22 @@ spec:
             description: "Temporal server target {{ $labels.instance }} (job {{ $labels.job }}) has been down for >5m — durable workflow execution is impaired."
 
         - alert: TemporalServiceErrorRateHigh
-          # service_error_with_type is the real counter — `service_errors` does
-          # not exist on temporal server 1.31.2 (verified against a live
-          # :8000/metrics dump on 2026-08-18; the bare name left this alert
-          # unable to fire since it landed).
+          # Client-facing server faults only: the frontend's RPCs (internal
+          # history/matching hops are not double-counted) and an allowlist of
+          # server-side error types, so control-flow NotFound and caller errors
+          # (InvalidArgument, AlreadyStarted, ...) never count. Runbook has the
+          # measurements. service_errors does not exist; service_error_with_type does.
           expr: |
-            sum(rate(service_error_with_type[5m])) / clamp_min(sum(rate(service_requests[5m])), 1) > 0.05
+            (sum(rate(service_error_with_type{service_name="frontend", error_type=~"serviceerror_(Internal|Unavailable|DeadlineExceeded|DataLoss|ResourceExhausted)"}[5m])) or vector(0))
+              / clamp_min(sum(rate(service_requests{service_name="frontend"}[5m])), 1) > 0.02
           for: 10m
           labels:
             severity: warning
             category: platform
           annotations:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/temporal/TemporalServiceErrorRateHigh.md"
-            summary: "Temporal service error rate high (>5%)"
-            description: "Temporal frontend/service error ratio has exceeded 5% for >10m — RPCs into the cluster are failing; check the history/matching/frontend services and persistence."
+            summary: "Temporal frontend server-fault rate high (>2%)"
+            description: "More than 2% of Temporal frontend RPCs have failed with a server-side error (Internal/Unavailable/DeadlineExceeded/DataLoss/ResourceExhausted) for >10m — clients cannot reliably start, signal or query workflows; check history, matching and persistence."
 
         # NotFound is control flow, not failure. The server asks persistence
         # "does this execution exist?" before starting one, and "does this task

@@ -57,10 +57,9 @@ spec:
     # has repeatedly had to reclaim. Revisit on multi-node (RFC-0011).
     replicas: 1
 
-    # cert-manager is already deployed, so the bundled subchart stays off while
-    # the chart still creates its own self-signed Issuer + webhook Certificate.
+    # The platform's cert-manager issues the webhook cert: the chart creates its
+    # own self-signed Issuer + Certificate (chart 0.30.0 dropped the subchart).
     certmanager:
-      install: false
       enabled: true
 
     # The namespace comes from controllers/namespaces.yaml, the single source of

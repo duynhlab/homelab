@@ -338,6 +338,13 @@ Skeleton (copy what you need):
   SHA before it was cut.
 
 #### Temporal
+- **Temporal Worker Controller 1.12.0** (both charts 0.28.0 → 0.31.0). It
+  prunes superseded inactive versions, reports poller and gate-workflow
+  health as conditions, scales draining versions back up from zero, and
+  no longer treats an already-current version as a rollback. Chart 0.30.0
+  dropped the cert-manager subchart; ours was never installed
+  (`certmanager.install: false`), so the dead key is removed and the
+  webhook certificate is still issued by the platform's cert-manager.
 - **Temporal UI 2.55.0 on the cluster**, pinned over chart 1.7.0's 2.54.1 so
   the cluster matches local-stack. It adds the Scheduled system view,
   worker-deployment connection status by default and resizable table

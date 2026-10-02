@@ -22,6 +22,6 @@ spec:
   url: oci://docker.io/temporalio/temporal-worker-controller-crds
   ref:
     # Pinned, not a range: the CRDs and the controller are versioned in lockstep
-    # (both charts are 0.28.0) and a CRD schema that moves ahead of the manager is
+    # (both charts are 0.31.0) and a CRD schema that moves ahead of the manager is
     # how a WorkerDeployment starts failing validation on a reconcile nobody ran.
-    semver: "0.28.0"
+    semver: "0.31.0"

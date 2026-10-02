@@ -32,12 +32,13 @@ spec:
   # cap). Memory is left at 512Mi: it was not the constraint here and has not
   # been measured under a real query load.
   resources:
+    # ~184k active series held 453Mi anon RSS of 512Mi (VMTooHighMemoryUsage).
     requests:
       cpu: 200m
-      memory: 256Mi
+      memory: 512Mi
     limits:
       cpu: 1000m
-      memory: 512Mi
+      memory: 1Gi
 
   extraArgs:
     dedup.minScrapeInterval: "15s"

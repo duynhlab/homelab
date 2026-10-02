@@ -46,6 +46,11 @@ kubeconform_config=(
   "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-source-{{.ResourceAPIVersion}}.json"
   "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-image-{{.ResourceAPIVersion}}.json"
   "-schema-location" "/tmp/flux-crd-schemas/{{.ResourceKind}}-notification-{{.ResourceAPIVersion}}.json"
+  # Vendored CRD schemas, read BEFORE the community catalog: the catalog's
+  # temporal.io/workerdeployment_v1alpha1 predates connectionRef.objectRef and
+  # would reject a correct ClusterConnection reference. Regenerated from the
+  # pinned temporal-worker-controller-crds chart (scripts/kubeconform-schemas/README.md).
+  "-schema-location" "$(dirname "$0")/kubeconform-schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
   # Community CRD schemas (datree CRDs-catalog): validates ExternalSecret,
   # DatabaseRole/Database, ServiceMonitor/PrometheusRule and — next train —
   # Gateway API CRs, which -ignore-missing-schemas used to wave through.
@@ -215,19 +220,22 @@ validate_worker_versioning() {
     exit 1
   fi
 
-  # --- The WorkerDeployment and its Connection must both be there, and the
-  # connectionRef must resolve. A dangling ref leaves the controller unable to
-  # reach Temporal, which surfaces as a version that is never registered.
-  local kinds conn_name ref_name
+  # --- The WorkerDeployment must reference the cluster-wide ClusterConnection,
+  # and that object must exist. A dangling ref leaves the controller unable to
+  # reach Temporal, which surfaces as a version that is never registered. A
+  # namespaced Connection beside it would be a second, unused address.
+  local kinds conn_name ref_kind ref_name
+  local cluster_conn=kubernetes/infra/configs/temporal/clusterconnection.yaml
   kinds=$(yq eval-all '[.kind] | join(",")' "${wd}")
-  if [[ "${kinds}" != *"WorkerDeployment"* || "${kinds}" != *"Connection"* ]]; then
-    echo "ERROR - ${wd}: expected both a Connection and a WorkerDeployment, found kinds [${kinds}]" >&2
+  if [[ ",${kinds}," != *",WorkerDeployment,"* || ",${kinds}," == *",Connection,"* ]]; then
+    echo "ERROR - ${wd}: expected a WorkerDeployment and no namespaced Connection, found kinds [${kinds}]" >&2
     exit 1
   fi
-  conn_name=$(yq eval-all 'select(.kind == "Connection") | .metadata.name' "${wd}")
-  ref_name=$(yq eval-all 'select(.kind == "WorkerDeployment") | .spec.workerOptions.connectionRef.name' "${wd}")
-  if [[ -z "${conn_name}" || "${conn_name}" == "null" || "${ref_name}" != "${conn_name}" ]]; then
-    echo "ERROR - ${wd}: workerOptions.connectionRef.name (${ref_name}) does not name the Connection in this file (${conn_name})" >&2
+  conn_name=$(yq eval-all 'select(.kind == "ClusterConnection") | .metadata.name' "${cluster_conn}")
+  ref_kind=$(yq eval-all 'select(.kind == "WorkerDeployment") | .spec.workerOptions.connectionRef.objectRef.kind' "${wd}")
+  ref_name=$(yq eval-all 'select(.kind == "WorkerDeployment") | .spec.workerOptions.connectionRef.objectRef.name' "${wd}")
+  if [[ -z "${conn_name}" || "${conn_name}" == "null" || "${ref_kind}" != "ClusterConnection" || "${ref_name}" != "${conn_name}" ]]; then
+    echo "ERROR - ${wd}: connectionRef.objectRef (${ref_kind}/${ref_name}) does not name the ClusterConnection in ${cluster_conn} (${conn_name})" >&2
     exit 1
   fi
 
@@ -256,7 +264,7 @@ validate_worker_versioning() {
     exit 1
   fi
 
-  echo "INFO - $(basename "${wd}" .yaml) versioning: single WorkerDeployment wired to Connection '${conn_name}', no per-build manifests, no hand-set version identity, replicas left to the autoscaler"
+  echo "INFO - $(basename "${wd}" .yaml) versioning: single WorkerDeployment wired to ClusterConnection '${conn_name}', no per-build manifests, no hand-set version identity, replicas left to the autoscaler"
 
   done
 }

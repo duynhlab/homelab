@@ -3,5 +3,6 @@ kind: Kustomization
 
 # Config half of Temporal — the chart is controllers/temporal.
 resources:
+  - clusterconnection.yaml
   - prometheusrule.yaml
   - search-attributes-job.yaml

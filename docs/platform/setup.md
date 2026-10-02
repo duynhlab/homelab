@@ -197,7 +197,7 @@ make flux-up
   - **Phase 1: Foundation** — `controllers-local`: namespaces + operators (cert-manager, CNPG, VictoriaMetrics/Grafana operators, OpenBAO + ESO, Kyverno, ClickHouse operator).
   - **Phase 2: Security & configs** — `secrets-local` (bootstrap Job + ClusterSecretStore + ExternalSecrets), `cert-manager-local`, `monitoring-local` (observability configs + Sloth SLO CRs).
   - **Phase 3: Platform services** — Envoy Gateway, Keycloak, Valkey, RustFS, tracing/profiling, ClickHouse, databases, Temporal.
-  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workloads (`order-worker` and `checkout-worker` — each a `Connection` + `WorkerDeployment` — plus `mockpay`).
+  - **Phase 4: Applications** — `apps-local`: ResourceSets + standalone workloads (`order-worker` and `checkout-worker` — each a `WorkerDeployment` on the cluster-wide `ClusterConnection` `temporal-mop` — plus `mockpay`).
 
 > OpenTofu owns only the ephemeral bootstrap mechanism; re-running `make flux-up`
 > with unchanged manifests is a no-op (`make tf-plan` shows zero diff). See
@@ -236,7 +236,7 @@ kubectl get prometheusservicelevel -n monitoring
 - Namespaces for every domain provisioned (user, product, **inventory**, cart, **checkout**, order, review, notification, shipping, payment, frontend, **backoffice**, **identity**, **platform**, **cache-system**, **rustfs**, envoy-gateway, cert-manager, openbao, external-secrets-system, monitoring, cloudnative-pg, database, kyverno, **policy-reporter**, **temporal**, **keda** — source of truth: `kubernetes/infra/controllers/namespaces.yaml`; `flux-system` is created by the bootstrap).
 - 7 ResourceSets (`rs-identity`, `rs-catalog`, `rs-checkout`, `rs-fulfillment`, `rs-comms`, `rs-frontend`, `rs-backoffice`) successfully reconciled.
 - HelmReleases for the **10 microservices** + frontend + back-office portal, plus **`mockpay`** (in the `payment` namespace), in `Ready` state. Also in `temporal`: **`temporal-worker-controller-crds`** then **`temporal-worker-controller`** (ADR-054).
-- In `order`: a **`Connection`** and a **`WorkerDeployment`** (`order-fulfillment`) — *not* a HelmRelease. `kubectl -n order get wd order-fulfillment` must show `CURRENT` populated. `checkout` carries the same pair for `checkout-worker` (`checkout-abandon`, ADR-064).
+- In `order`: a **`WorkerDeployment`** (`order-fulfillment`) — *not* a HelmRelease — on the cluster-scoped **`ClusterConnection`** `temporal-mop` (`kubectl get clusterconnection`). `kubectl -n order get wd order-fulfillment` must show `CURRENT` populated. `checkout` carries the same for `checkout-worker` (`checkout-abandon`, ADR-064).
 - 3 CloudNativePG clusters (`platform-db`, `product-db`, `product-db-replica`) operational.
 - ClusterIssuers `selfsigned-bootstrap`, `homelab-ca`, `letsencrypt-staging`, `letsencrypt-prod` Ready; `platform-edge-tls` Certificate Ready — signed by `homelab-ca` on local Kind (`letsencrypt-prod` on prod).
 
@@ -262,7 +262,7 @@ kubectl get prometheusservicelevel -n monitoring
 >
 > `CURRENT` populated with no human step is the whole point, and it is what audit
 > row [K1.7](kind-e2e-audit.md#k1--bring-up) now proves. If it is empty, suspect
-> the controller or the `Connection` before the saga —
+> the controller or the `ClusterConnection` before the saga —
 > [`OrderSagaNotCompleting`](../observability/runbooks/microservices/OrderSagaNotCompleting.md).
 
 ---
@@ -498,10 +498,10 @@ homelab/
 │   │   │   ├── notification.yaml       # domain=comms
 │   │   │   └── shipping.yaml           # domain=comms
 │   │   ├── mockpay.yaml                # mockpay HelmRelease (payment ns)
-│   │   ├── order-worker.yaml          # Connection + WorkerDeployment (order ns) — ONE file
+│   │   ├── order-worker.yaml          # WorkerDeployment (order ns) — ONE file
 │   │   │                                # forever; the controller creates one Deployment
 │   │   │                                # per derived build id (ADR-054)
-│   │   ├── checkout-worker.yaml        # Connection + WorkerDeployment checkout-abandon (checkout ns)
+│   │   ├── checkout-worker.yaml        # WorkerDeployment checkout-abandon (checkout ns)
 │   │   ├── order-fulfillment-scaler.yaml / checkout-abandon-scaler.yaml  # WorkerResourceTemplates → KEDA ScaledObject per version (ADR-055)
 │   │   ├── frontend-rs.yaml            # rs-frontend (standalone, namespace: frontend)
 │   │   └── backoffice-rs.yaml          # rs-backoffice (back-office portal, namespace: backoffice)
@@ -589,4 +589,4 @@ For persistence layer details, refer to [architecture.md](../databases/architect
 
 ---
 
-_Last updated: 2026-10-01 (later) — `make hosts` replaces the bare script call and `make flux-ui` is gone (the fallback port-forwards live under Prerequisites); `make seed`, `make db-isolation`, `make edge-isolation` listed; `make flux-sync` covers every Kustomization. Earlier the same day — infra drift pass: `checkout-worker` is a `WorkerDeployment` (expected state, tree, Phase 4); cluster tree and dependency graph list the `clickhouse-keeper`, `clickhouse-schema`, `flux-web`, `keda`, `policy-reporter` and Grafana dashboards-as-code waves; `policy-reporter`/`keda` namespaces; 24 hostnames; `controllers/logging` is Vector; the Kind gate has passed (K4.5). Previously 2026-09-17 — `admin-service` added to the clone list; `local-stack/compose.yaml` builds the Backoffice portal from `../../admin-service`, so a checkout without it fails at `docker compose up --build`. Previously 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._
+_Last updated: 2026-10-02 — worker namespaces no longer carry a `Connection`; the cluster-wide `ClusterConnection` `temporal-mop` replaces both. Previously 2026-10-01 (later) — `make hosts` replaces the bare script call and `make flux-ui` is gone (the fallback port-forwards live under Prerequisites); `make seed`, `make db-isolation`, `make edge-isolation` listed; `make flux-sync` covers every Kustomization. Earlier the same day — infra drift pass: `checkout-worker` is a `WorkerDeployment` (expected state, tree, Phase 4); cluster tree and dependency graph list the `clickhouse-keeper`, `clickhouse-schema`, `flux-web`, `keda`, `policy-reporter` and Grafana dashboards-as-code waves; `policy-reporter`/`keda` namespaces; 24 hostnames; `controllers/logging` is Vector; the Kind gate has passed (K4.5). Previously 2026-09-17 — `admin-service` added to the clone list; `local-stack/compose.yaml` builds the Backoffice portal from `../../admin-service`, so a checkout without it fails at `docker compose up --build`. Previously 2026-09-05 — `keda-local` wave added (ADR-055), Kustomization count **30 declared / 29 applied / 30 reported** by a cluster. Re-counted rather than incremented: every figure recorded here since 2026-08-27 had been two low, because each was derived by adding one to a baseline that was itself already behind `flux-web`, `clickhouse-schema` and `clickhouse-keeper`. 2026-08-27 — access table rewritten to ADR-062 (Grafana SSO, OpenBAO OIDC — the root-token row had been inert since ADR-024), Kustomization count 24. 2026-08-22 — RFC-0026/ADR-054 worker lifecycle. 2026-08-19 — synced to the deployed platform._

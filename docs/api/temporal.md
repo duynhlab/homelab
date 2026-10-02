@@ -1149,8 +1149,10 @@ hand — which is why the shape is worth knowing rather than forgetting.
   versioned Deployment, registers the version, ramps `10% → 50%` with 30-second
   pauses, and promotes it to Current — no CronJob, no `kubectl create job`, and
   nothing to run on a freshly built cluster. `make validate` checks what is still
-  checkable: one `WorkerDeployment` wired to a `Connection` in the same file, no
-  leftover per-build manifests, and no hand-set version identity.
+  checkable: one `WorkerDeployment` whose `connectionRef.objectRef` names the
+  cluster-wide `ClusterConnection` `temporal-mop`
+  (`configs/temporal/clusterconnection.yaml`), no namespaced `Connection` beside
+  it, no leftover per-build manifests, and no hand-set version identity.
 - Retirement is declarative: `sunset.scaledownDelay 1h` then `deleteDelay 0s` (24h until ADR-055 — a drained version is deleted on the reconcile after it is zeroed, so its KEDA `ScaledObject` cannot raise it back),
   keyed off the server's own `status.deprecatedVersions[].drainedSince` — the
   machine-checkable gate ADR-030 recorded as follow-up 2 and nothing checked.
@@ -1246,7 +1248,8 @@ How to deploy the worker, run the saga locally, and watch it in production.
   serves `/health` and `/ready` (the process has no application HTTP API, but
   still needs liveness and readiness probes). Worker metrics export over OTLP.
 - **In-cluster.** Since [ADR-054](../proposals/adr/ADR-054-temporal-worker-controller/)
-  the worker is **not chart-rendered at all**: it is a `WorkerDeployment` + `Connection`
+  the worker is **not chart-rendered at all**: it is a `WorkerDeployment` (wired to the
+  cluster-wide `ClusterConnection` `temporal-mop`, Worker Controller ≥ 1.10)
   in [`kubernetes/apps/order-worker.yaml`](../../kubernetes/apps/order-worker.yaml)
   (namespace `order`), whose `spec.template` is a raw pod spec. The `mop` chart is
   deliberately out of the path — the accepted cost is that nothing keeps that template
@@ -1343,4 +1346,4 @@ ADR-063/064; SDK ≥ 1.47):
 - [ADR-010](../proposals/adr/ADR-010-shared-idempotency-library/) — shared idempotency state machine
 - [RFC-0010](../proposals/rfc/RFC-0010/) — payment and fulfillment design
 
-_Last updated: 2026-10-02 — Temporal server 1.32.0 (chart 1.7.0) on the cluster and in local-stack; the namespace Job keeps Helm hooks off through its own new switch. Previously 2026-10-01 — infra drift: the KEDA bullet records the Kind audit result instead of "verification pending", `platform-db` lists the databases it hosts today (no `auth`), `temporal-local` also depends on `keda-local`, and the `temporal.duynh.me` route is no longer called planned (the Kind k6 saga suite uses it). Previously 2026-09-24 — RFC-0031 as-built (Task 4.3): Design record marked as-built; the `pkg/temporalx` bullet documents SDK logs through the service's slog logger (`WithLogger`: lifted TraceID/SpanID, `Error` → `error.type`/`error.message`, `temporal.workflow.started`), `WorkflowEvent` and `WorkflowFailed`; Operations gains Logs and Profiles bullets. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-071 and ADR-073 for the planned telemetry rules that bind workflow and activity code (replay-safe logger only, named activity records, no identifier labels, replay never increments a metric). Previously 2026-08-27 — Phase-4 conformance wave: § Finding and Reading Executions added (Search Attributes OrderId/SessionId + StaticSummary + SetCurrentDetails), CommitInventory heartbeat, SDK logs through zap. Previous: 2026-08-27 — ADR-063: `pkg/temporalx` bullet rewritten for the OTel v2 plugin (monotonic `_total` counters, replay-safe workflow spans); ADR-064 puts checkout-worker under the controller (see workflows.md). 2026-08-21: ADR-054 lifecycle move._
+_Last updated: 2026-10-02 — both workers reference one cluster-wide `ClusterConnection` instead of a `Connection` per namespace. Previously 2026-10-02 — Temporal server 1.32.0 (chart 1.7.0) on the cluster and in local-stack; the namespace Job keeps Helm hooks off through its own new switch. Previously 2026-10-01 — infra drift: the KEDA bullet records the Kind audit result instead of "verification pending", `platform-db` lists the databases it hosts today (no `auth`), `temporal-local` also depends on `keda-local`, and the `temporal.duynh.me` route is no longer called planned (the Kind k6 saga suite uses it). Previously 2026-09-24 — RFC-0031 as-built (Task 4.3): Design record marked as-built; the `pkg/temporalx` bullet documents SDK logs through the service's slog logger (`WithLogger`: lifted TraceID/SpanID, `Error` → `error.type`/`error.message`, `temporal.workflow.started`), `WorkflowEvent` and `WorkflowFailed`; Operations gains Logs and Profiles bullets. Previously 2026-09-18 — RFC-0031 accepted: Design record links ADR-071 and ADR-073 for the planned telemetry rules that bind workflow and activity code (replay-safe logger only, named activity records, no identifier labels, replay never increments a metric). Previously 2026-08-27 — Phase-4 conformance wave: § Finding and Reading Executions added (Search Attributes OrderId/SessionId + StaticSummary + SetCurrentDetails), CommitInventory heartbeat, SDK logs through zap. Previous: 2026-08-27 — ADR-063: `pkg/temporalx` bullet rewritten for the OTel v2 plugin (monotonic `_total` counters, replay-safe workflow spans); ADR-064 puts checkout-worker under the controller (see workflows.md). 2026-08-21: ADR-054 lifecycle move._

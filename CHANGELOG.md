@@ -99,6 +99,15 @@ Skeleton (copy what you need):
   reaching a Service past the gateway, a host without `/etc/hosts`) are
   one-line `kubectl port-forward` snippets under setup.md § Prerequisites.
 
+#### Services
+- **The ADR-017 expand-phase aliases are gone** (payment-service v2.8.0,
+  shipping-service v1.10.0). These now answer 404: payment's
+  `/protected/attempts/open`, `/protected/reconciliations/runs[/:id]`,
+  `/internal/reconciliation/runs[/:id]` and `/public/webhooks/mockpay`, and
+  shipping's `/public/track` and `/public/estimate`. Both edges drop the
+  webhook alias match; e2e-audit A7 and the k6 smoke suite now expect the
+  shipping alias to be 404.
+
 ### Feature
 
 #### GitOps
@@ -333,6 +342,10 @@ Skeleton (copy what you need):
   and compose pins, one grouped PR per plugin.
 
 #### Services
+- **payment v2.8.0 (and mockpay) and shipping v1.10.0 on Kind** — the
+  ADR-017 contract releases that remove the expand-phase aliases. Both passed
+  the full local-stack release audit (A/B/C + C22) from scratch, with A7
+  asserting the shipping alias is 404.
 - **payment v2.7.0 (and mockpay) and admin-service v0.4.3 on Kind.** payment
   serves the canonical protected paths beside their deprecated aliases;
   the Backoffice calls the canonical ones and its runtime image carries

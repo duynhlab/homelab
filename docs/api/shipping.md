@@ -14,7 +14,7 @@ Shipping turns "an order that must move" into a tracked shipment — and turns "
 | **Temporal** | Shipment-step gRPC participant | Implemented | [Temporal participation](#temporal-participation) |
 | **Events** | None | None | — |
 
-Known gaps: [no-caller route, aliases, and unpersisted address](#known-gaps).
+Known gaps: [no-caller route and unpersisted address](#known-gaps).
 
 | Attribute | Value |
 |-----------|-------|
@@ -166,8 +166,8 @@ accepted for compatibility.
 | estimate | `400` | `VALIDATION_ERROR` | Missing params, or weight not a positive finite number |
 | both | `500` | `INTERNAL_ERROR` | Repository/infrastructure failure |
 
-The deprecated pre-v3 paths `/shipping/v1/public/{track,estimate}` remain
-temporary aliases during the ADR-017 expand phase (see [Known gaps](#known-gaps)).
+The pre-v3 paths `/shipping/v1/public/{track,estimate}` were removed in v1.10.0
+(ADR-017 contract) and answer 404.
 
 ## gRPC API
 
@@ -247,8 +247,6 @@ east-west gRPC surface is unauthenticated by design — the policy is the fence.
 - **Internal HTTP twin — No caller.** `GET /shipping/v1/internal/shipments/orders/:orderId`
   mirrors the gRPC lookup; order migrated to gRPC, so the route is kept documented
   but has no live consumer.
-- **Pre-v3 aliases.** `/shipping/v1/public/track` and `/shipping/v1/public/estimate`
-  are deprecated ADR-017 expand-phase aliases; removal lands with the contract phase.
 - **`CreateShipmentRequest.address` not persisted.** Accepted for forward
   compatibility; the shipment row stores no destination yet.
 - **Estimate is demo math.** The public estimate is a deterministic formula, not a
@@ -302,4 +300,4 @@ Paths in [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-serv
 - [checkout.md](./checkout.md) · [order.md](./order.md) — quote and enrichment callers
 - [Service contracts](./README.md#service-contracts)
 
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._
+_Last updated: 2026-10-02 — the pre-v3 `/public/track` and `/public/estimate` aliases are removed in v1.10.0. Previously 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

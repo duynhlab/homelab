@@ -222,21 +222,21 @@ const UNITS = [
     },
   },
   {
-    name: 'the collection-noun shipping paths serve, and the old alias still does',
+    name: 'the collection-noun shipping paths serve, and the removed alias is gone',
     rows: { compose: 'A7' },
     run(id) {
-      // Expand phase: the v3 paths and the deprecated alias must both answer.
-      // The retired auth alias is deliberately not probed -- it certified a
-      // token layer that no longer has a backend.
+      // ADR-017 contract: the v3 paths answer and the pre-v3 alias is gone
+      // (404). The retired auth alias is deliberately not probed -- it
+      // certified a token layer that no longer has a backend.
       const trk = '1Z999AA10123456784';
       const cases = [
-        [`/shipping/v1/public/shipments/track?tracking_number=${trk}`, 'shipments/track'],
-        ['/shipping/v1/public/shipments/estimate?origin=HN&destination=SG&weight=1', 'shipments/estimate'],
-        [`/shipping/v1/public/track?tracking_number=${trk}`, 'deprecated alias'],
+        [`/shipping/v1/public/shipments/track?tracking_number=${trk}`, 'shipments/track', 200],
+        ['/shipping/v1/public/shipments/estimate?origin=HN&destination=SG&weight=1', 'shipments/estimate', 200],
+        [`/shipping/v1/public/track?tracking_number=${trk}`, 'removed alias', 404],
       ];
-      for (const [path, label] of cases) {
+      for (const [path, label, want] of cases) {
         const res = http.get(`${target.base}${path}`);
-        rowCheck(id, res, { [`${label} is 200`]: (r) => r.status === 200 });
+        rowCheck(id, res, { [`${label} is ${want}`]: (r) => r.status === want });
       }
     },
   },

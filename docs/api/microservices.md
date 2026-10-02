@@ -86,8 +86,8 @@ availability vocabulary used by service At-a-glance tables.
 | Promo contention, asymmetric upstream errors, and parked confirm recovery | checkout | Accepted operational trade-offs | [checkout known gaps](./checkout.md#known-gaps) |
 | Committed-stock cancellation and workflow-start terminal failures | order | Accepted or alerted trade-offs | [order known gaps](./order.md#known-gaps) |
 | Real provider delivery, send idempotency, and unused SMS/HTTP twins | notification | Current limitations and no-caller surfaces | [notification known gaps](./notification.md#known-gaps) |
-| Deprecated aliases, unpersisted destination, and demo quote math | shipping | Migration debt and accepted limitations | [shipping known gaps](./shipping.md#known-gaps) |
-| Deprecated aliases, direct DB connection, reconciliation limits, and single-replica constraint | payment | Migration and scaling constraints | [payment known gaps](./payments.md#known-gaps) |
+| Unpersisted destination and demo quote math | shipping | Migration debt and accepted limitations | [shipping known gaps](./shipping.md#known-gaps) |
+| Direct DB connection, reconciliation limits, and single-replica constraint | payment | Migration and scaling constraints | [payment known gaps](./payments.md#known-gaps) |
 | Bounded review feed and write-once reviews | review | Accepted design limits | [review known gaps](./review.md#known-gaps) |
 | Backoffice availability and static-delivery hardening | Backoffice | Current platform gaps | [Backoffice known gaps](../frontend/admin-portal/README.md#known-gaps) |
 
@@ -101,4 +101,4 @@ contracts; they are not ongoing-work rows here.
 - [Workflow registry](./workflows.md)
 - [Repository index](../README.md#repositories)
 
-_Last updated: 2026-08-26 — removes duplicated deployment, route, RPC, and technique inventories; restores the catalog to feature ownership and current known-gap rollup._
+_Last updated: 2026-10-02 — deprecated aliases are no longer a known gap for shipping or payment (ADR-017 contract). Previously 2026-08-26 — removes duplicated deployment, route, RPC, and technique inventories; restores the catalog to feature ownership and current known-gap rollup._

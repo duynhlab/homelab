@@ -316,6 +316,11 @@ Skeleton (copy what you need):
   and compose pins, one grouped PR per plugin.
 
 #### Services
+- **order v2.10.2 and checkout v0.13.2 on Kind** (Temporal Go SDK 1.49.0;
+  order-worker and checkout-worker too). Both tags passed the full
+  local-stack release audit (A/B/C + C22) from scratch on their merged SHAs;
+  the first run's C22 found the SDK's new `failure_reason` attribute missing
+  from the semconv registry, which pkg#117 declared before the rerun.
 - **The fleet runs on Go 1.27.1** ([#1107](https://github.com/duynhlab/homelab/issues/1107)
   G2): user 2.5.1, product 1.16.1, inventory 0.9.1, cart 2.4.1, order 2.10.1,
   review 2.4.1, shipping 1.9.1, notification 2.4.1, payment 2.6.1, checkout

@@ -147,6 +147,16 @@ Skeleton (copy what you need):
   Kind: every board renders as many distinct panels as it has, and the OTel
   board shows data in all 40 under load.
 
+#### Temporal
+- **One cluster-wide Temporal connection.** The two identical namespaced
+  `Connection`s (`order`, `checkout`) are replaced by a single
+  `ClusterConnection` `temporal-mop` in `configs/temporal`, which both
+  `WorkerDeployment`s reference through `connectionRef.objectRef` (Worker
+  Controller >= 1.10). `make validate` now checks that reference, rejects a
+  namespaced `Connection` beside a worker, and validates the two CRs against
+  vendored schemas generated from the pinned CRDs chart, because the community
+  catalog's `WorkerDeployment` schema predates `objectRef`.
+
 #### Local-stack
 - **Local-stack databases are owned by per-service roles, as on the cluster.**
   Every service, its migrate and seed jobs, the two workers, Keycloak and

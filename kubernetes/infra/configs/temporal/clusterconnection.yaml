@@ -1,0 +1,13 @@
+# One cluster-wide Temporal connection for every worker namespace (Worker
+# Controller >= 1.10). WorkerDeployments reference it through
+# workerOptions.connectionRef.objectRef; scripts/flux-validate.sh checks the ref.
+# Plaintext east-west like every in-cluster hop; when RFC-0020 adds mTLS, the
+# client Secret still lives in each worker namespace (a pod mounts only its own).
+apiVersion: temporal.io/v1alpha1
+kind: ClusterConnection
+metadata:
+  name: temporal-mop
+  labels:
+    app.kubernetes.io/component: workflow-engine
+spec:
+  hostPort: temporal-frontend.temporal.svc.cluster.local:7233

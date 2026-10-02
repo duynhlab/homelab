@@ -40,20 +40,6 @@
 # whether a workflow may be moved.
 ---
 apiVersion: temporal.io/v1alpha1
-kind: Connection
-metadata:
-  name: temporal-mop
-  namespace: order
-  labels:
-    app.kubernetes.io/component: workflow-engine
-    platform.duynhlab.dev/rfc: "0026"
-spec:
-  # The frontend Service name survived the RFC-0021 re-platform, so this is the
-  # same address the worker has always dialled. Plaintext east-west, same posture
-  # as every other in-cluster hop; mTLS is RFC-0020's scope, not this file's.
-  hostPort: temporal-frontend.temporal.svc.cluster.local:7233
----
-apiVersion: temporal.io/v1alpha1
 kind: WorkerDeployment
 metadata:
   name: order-fulfillment
@@ -75,8 +61,12 @@ spec:
   # The floor now lives in order-fulfillment-scaler.yaml (`minReplicaCount: 1`).
 
   workerOptions:
+    # The cluster-wide connection (configs/temporal/clusterconnection.yaml).
     connectionRef:
-      name: temporal-mop
+      objectRef:
+        apiGroup: temporal.io
+        kind: ClusterConnection
+        name: temporal-mop
     temporalNamespace: mop
 
   # Progressive, and the step schedule is bounded on purpose. apps-local runs

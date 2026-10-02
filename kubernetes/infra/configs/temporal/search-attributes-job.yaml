@@ -9,18 +9,19 @@
 # waits for this Job to complete).
 #
 # The chart cannot do this: its namespace job only runs `namespace create`
-# (verified against temporal-1.6.0/templates/server-namespace-job.yaml), so the
+# (verified against temporal-1.7.0/templates/server-namespace-job.yaml), so the
 # attributes get their own run-once Job in the config half.
 #
 # Idempotent: `search-attribute create` reports an already-registered name and
-# exits 0, so re-running is safe. Jobs are immutable — to re-run after editing:
+# exits 0, so re-running is safe. A Job's template is immutable, so
+# kustomize.toolkit.fluxcd.io/force is set: when an apply fails on an immutable
+# field (a template edit such as the admin-tools bump Renovate opens with every
+# Temporal release), Flux deletes and re-creates the Job instead of failing
+# temporal-config-local and, through dependsOn, apps-local. An unchanged
+# reconcile leaves the completed Job alone. To re-run it without an edit:
 #   kubectl delete job temporal-search-attributes -n temporal
 #   flux reconcile kustomization temporal-config-local -n flux-system
-# kustomize.toolkit.fluxcd.io/force is not set. It would be safe (the Job is
-# idempotent), but it only re-creates a Job when an apply fails on an immutable
-# field — a template edit — never on an unchanged reconcile; the delete above is
-# the documented re-run. No ttlSecondsAfterFinished either, so the completed Job
-# stays put and is never re-run on its own.
+# No ttlSecondsAfterFinished, so the completed Job stays put.
 ---
 apiVersion: batch/v1
 kind: Job
@@ -29,6 +30,8 @@ metadata:
   namespace: temporal
   labels:
     app.kubernetes.io/component: workflow-engine
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: enabled
 spec:
   backoffLimit: 6
   template:
@@ -39,9 +42,9 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: create
-          # Tracks the cluster's admin-tools pin (helmrelease.yaml admintools),
-          # so the CLI is never older than the server it talks to.
-          image: temporalio/admin-tools:1.31.2
+          # Matches the chart's appVersion (helmrelease.yaml), so the CLI is
+          # never older than the server it talks to.
+          image: temporalio/admin-tools:1.32.0
           env:
             - name: TEMPORAL_ADDRESS
               value: temporal-frontend.temporal.svc.cluster.local:7233

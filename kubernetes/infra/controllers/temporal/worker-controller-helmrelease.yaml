@@ -12,7 +12,7 @@
 # CRDs and this manager are Ready before any WorkerDeployment is applied. No new
 # Kustomization and no new ordering rule were needed.
 #
-# Requires Temporal server >= 1.29.1 (we run 1.31.2 — see helmrelease.yaml) and
+# Requires Temporal server >= 1.29.1 (we run 1.32.0 — see helmrelease.yaml) and
 # cert-manager, for the WorkerResourceTemplate validating webhook that is always
 # on regardless of `webhook.enabled`.
 #

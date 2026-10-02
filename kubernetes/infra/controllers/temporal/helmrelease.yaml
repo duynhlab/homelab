@@ -4,8 +4,8 @@
 # TemporalNamespace CRs, kept beside their replacements as .bak): the operator caps
 # at server 1.28.x, while **Worker Versioning** — the workflow-versioning
 # mechanism RFC-0021 phase 3 uses for the stock-write migration — requires
-# server >= 1.29.1 (Go SDK >= 1.35, CLI >= 1.4.1). Chart 1.6.0 ships server
-# 1.31.2.
+# server >= 1.29.1 (Go SDK >= 1.35, CLI >= 1.4.1). Chart 1.7.0 ships server
+# 1.32.0.
 #
 # What carries over unchanged:
 #   * Persistence stays the CNPG `platform-db` cluster — databases `temporal` and
@@ -25,9 +25,9 @@
 # What changed: the Web UI Service is `temporal-web` (was `temporal-ui`) — see
 # ingress.yaml.
 #
-# schema.useHelmHooks MUST stay false: Helm hooks are not reconciled by Flux
-# (the chart documents this), so the schema/namespace jobs are applied as normal
-# resources instead.
+# schema.useHelmHooks and server.config.namespaces.useHelmHooks MUST stay
+# false: Helm hooks are not reconciled by Flux (the chart documents this), so
+# the schema/namespace jobs are applied as normal resources instead.
 #
 # Resources are set on every component: Kind is small, and the platform keeps
 # every pod bounded even where the Kyverno resource policy does not reach (it
@@ -67,7 +67,7 @@ spec:
   chart:
     spec:
       chart: temporal
-      version: "1.6.0" # appVersion 1.31.2 (>= 1.29.1 → Worker Versioning capable)
+      version: "1.7.0" # appVersion 1.32.0 (>= 1.29.1 → Worker Versioning capable)
       sourceRef:
         kind: HelmRepository
         name: temporalio
@@ -94,7 +94,7 @@ spec:
       # server-deployment.yaml renders
       #   default $.Values.server.resources $serviceValues.resources
       # so a non-empty server.history.resources wins over the block above
-      # (verified in chart 1.6.0, not assumed).
+      # (verified in chart 1.7.0, not assumed).
       #
       # Measured, not guessed. On this platform history steadily used **337m
       # CPU** against a 50m request -- 6.7x over -- and its RSS reached
@@ -181,7 +181,7 @@ spec:
                 # 160 idle connections on a shared database is not.
                 #
                 # NOT a chart or server defect. The chart documents these keys
-                # and renders them correctly (verified against chart 1.6.0); it
+                # and renders them correctly (verified against chart 1.7.0); it
                 # simply has no default, and nothing warns when shards greatly
                 # exceed the pool.
                 maxConns: 20
@@ -207,6 +207,8 @@ spec:
         # registers `mop` with the same 7-day retention the platform ran before.
         namespaces:
           create: true
+          # Chart 1.7.0 split this from schema.useHelmHooks and defaults it true.
+          useHelmHooks: false
           namespace:
             - name: mop
               retention: 168h

@@ -337,6 +337,18 @@ Skeleton (copy what you need):
   tag passed the full local-stack release audit (A/B/C + C22) on its merged
   SHA before it was cut.
 
+#### Temporal
+- **Temporal server 1.32.0** (chart 1.6.0 → 1.7.0, admin-tools and the
+  local-stack server 1.32.0, local-stack UI 2.55.0). No schema change: the
+  Postgres stores stay at temporal 1.19 / visibility 1.14. The 1.32
+  visibility query converter now type-checks search-attribute filters; our
+  only attributes are the Keyword `OrderId` and `SessionId`, and no service
+  issues a visibility query. Chart 1.7.0 gives the namespace Job its own
+  `useHelmHooks` switch, defaulting to true, so it is set false beside the
+  schema one. The search-attributes Job now carries
+  `kustomize.toolkit.fluxcd.io/force`, so an admin-tools bump re-creates it
+  instead of failing `temporal-config-local` on an immutable template.
+
 ## [1.0.0] - 2026-10-01
 
 <!-- markdown-link-check-disable -->

@@ -1,7 +1,7 @@
 # Local end-to-end test stack for the duynhlab e-commerce platform.
 #
 # Brings up: Postgres (13 DBs) + Valkey cache + per-service golang-migrate migrations
-# + 10 Go services + Temporal (server 1.31.2 on Postgres, as in the cluster)
+# + 10 Go services + Temporal (server 1.32.0 on Postgres, as in the cluster)
 # + Keycloak (realm `duynhlab`, RFC-0024 P3 identity cutover) + the
 # order-fulfillment worker + an Envoy Gateway standalone edge (same Gateway API
 # resources as the cluster edge) + the React frontend.
@@ -158,7 +158,7 @@ services:
       postgres: { condition: service_healthy }
 
   # ---- Temporal (drives the order-fulfillment saga) ----
-  # Server and storage engine match the cluster: server 1.31.2 (chart 1.6.0's
+  # Server and storage engine match the cluster: server 1.32.0 (chart 1.7.0's
   # appVersion) on Postgres through the `postgres12` plugin, databases `temporal`
   # and `temporal_visibility`. That is what makes Temporal testable end to end
   # here — workflow history, timers and Worker Deployment Versioning state all
@@ -178,7 +178,7 @@ services:
   # `docker compose down` still wipes this: `postgres` has no data volume, by
   # design. Use `restart` to exercise durability.
   temporal-schema:
-    image: temporalio/admin-tools:1.31.2
+    image: temporalio/admin-tools:1.32.0
     # A healthy postgres can still refuse the first connection during bring-up;
     # retry rather than failing every Temporal-dependent service behind it.
     restart: on-failure:5
@@ -205,7 +205,7 @@ services:
       postgres: { condition: service_healthy }
 
   temporal:
-    image: temporalio/server:1.31.2
+    image: temporalio/server:1.32.0
     # on-failure: a restart dies FATALLY after ~50s roughly half the time, when
     # ringpop cannot bootstrap ("join duration of 50.6s exceeded max 30s"). Seen
     # first in the 2026-08-13 audit: `restart temporal` (A14) answered the row,
@@ -274,7 +274,7 @@ services:
   # Registers `mop` with the cluster's retention (168h). Gate Temporal-dependent
   # services on this completing, not on the server being healthy.
   temporal-bootstrap:
-    image: temporalio/admin-tools:1.31.2
+    image: temporalio/admin-tools:1.32.0
     restart: on-failure:5 # the frontend can accept a TCP probe just before it serves the API
     environment:
       TEMPORAL_ADDRESS: temporal:7233
@@ -309,7 +309,7 @@ services:
   # tag tracks the cluster's admin-tools pin so the client is never older than the
   # server it talks to.
   temporal-admintools:
-    image: temporalio/admin-tools:1.31.2 # default entrypoint sleeps; nothing to run
+    image: temporalio/admin-tools:1.32.0 # default entrypoint sleeps; nothing to run
     environment:
       TEMPORAL_ADDRESS: temporal:7233
       # `mop` is the only namespace here, so default to it. Without this the CLI
@@ -320,7 +320,7 @@ services:
       temporal: { condition: service_healthy }
 
   temporal-ui:
-    image: temporalio/ui:2.53.3
+    image: temporalio/ui:2.55.0
     environment:
       TEMPORAL_ADDRESS: temporal:7233
     ports:

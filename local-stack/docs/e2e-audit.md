@@ -701,24 +701,25 @@ docker compose exec -T postgres psql -U postgres -d cart -t -A -c \
          "SELECT user_id, product_id FROM cart_items ORDER BY id DESC LIMIT 5" </dev/null; }
 
 # A15. Worker Deployment Versioning drill (ADR-030, mechanism now ADR-054).
-#      *** NOT RUNNABLE ON COMPOSE AS THE STACK IS WIRED TODAY. ***
-#      Measured 2026-08-25: the drill needs a registered Worker Deployment, and
-#      compose.yaml's order-worker sets NEITHER `TEMPORAL_DEPLOYMENT_NAME` nor a
-#      build id. `git log -S` finds no history for either name, under the current
-#      name or the retired `TEMPORAL_WORKER_DEPLOYMENT_NAME` — so this row has
-#      never passed here. Every `temporal worker-deployment` call answers
-#      `no Worker Deployment found with name 'order-fulfillment'`.
+#      Runnable on compose: compose's own order-worker stays unversioned, and the
+#      drill starts its two versioned workers with `docker compose run -e
+#      TEMPORAL_DEPLOYMENT_NAME=… -e TEMPORAL_WORKER_BUILD_ID=…`, so the
+#      deployment registers and every `temporal worker deployment` call below
+#      answers. Last passed 2026-10-02 on server 1.32.0: the new order is Pinned
+#      on v1, v1 reads `draining` after v2 becomes Current, and the order
+#      completes on v1. (A 2026-08-25 run recorded it as not runnable here: every
+#      call answered `no Worker Deployment found`.)
 #
-#      The versioning proof therefore lives on the CLUSTER, not here: K1.7 (the
-#      Current version activates with no human step) and SG.4 (a workflow reports
-#      `Pinned` on the Current build id, no half-finished ramp) both passed on the
-#      2026-08-25 Kind gate. The sentence that used to sit here — "the only place
-#      the ENV CONTRACT can be gated before Kind" — was not true.
+#      The cluster proves the controller's half: K1.7 (the Current version
+#      activates with no human step) and SG.4 (a workflow reports `Pinned` on the
+#      Current build id, no half-finished ramp).
 #
-#      To make this row real, compose's order-worker needs the versioning env; that
-#      is a compose change, not an audit change, and is deliberately not made here.
+#      The one step that is not a command: after setting v1 Current, drive one
+#      checkout through A10's funnel to get a fresh $OID. Describing an order that
+#      finished before the drill shows no versioning info at all.
+#
 #      CONDITIONAL: run it when a change touches worker versioning, the saga's
-#      activity set, or the rollout runbook.
+#      activity set, the Temporal server, or the rollout runbook.
 #
 #      The variable is TEMPORAL_DEPLOYMENT_NAME, Temporal's own name: the Worker
 #      Controller injects it, Temporal's reference worker reads it, and
@@ -773,7 +774,9 @@ $TCLI worker deployment set-current-version \
   --deployment-name order-fulfillment --unversioned --namespace mop --yes
 docker rm -f ow-v1 ow-v2
 docker compose start order-worker
-$TCLI workflow list --namespace mop | awk 'NR>1 && $1=="Running"'   # want: no output
+$TCLI workflow list --namespace mop | awk 'NR>1 && $1=="Running"'
+# want: no order-fulfillment workflow. A10's lazy-410 session leaves one
+# AbandonedCheckoutWorkflow Running until its 30m TTL; that one is expected.
 ```
 
 ```bash
@@ -2195,7 +2198,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A13 | Abandonment timer (ADR-019) | on a **dedicated user** (`bob`, after clearing any leftover session), an untouched session past its TTL reads 410 and the row is `expired \| timer`. `lazy` is inconclusive, not a pass — it proves only the backstop |
 | A14 | Temporal durability | execution count is unchanged and non-zero across `restart temporal`; the driven workflow's history is still readable |
 | A16 | String subject persisted (ADR-042) | a cart write made with a realm token lands in `cart.cart_items.user_id` as the caller's realm UUID — the edge, `pkg/authmw`, the handler, and the column all agree |
-| A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` workflow behind |
+| A15 | Versioning drill (conditional) | deployment registers, workflow reports `Pinned` on the current build, the superseded version reports `draining`, and the teardown leaves no `Running` order-fulfillment workflow behind (A10's lazy-410 abandonment watch runs until its TTL) |
 | A17 | Protected surface (RFC-0023 + ADR-050) | tokenless 401 **at the edge**; bare `/inventory/v1/private/*` 404 (only `/protected` is routed); a valid **customer-realm** token 401 **wrong-issuer at the edge** (the ADR-050 fence — stronger than the old in-service 403); staff operator `duyne` (realm `duynhlab-staff`) lists real balances with derived `atp`; receipt 201 `applied:true`, exact replay 200 `applied:false`, invariant-violating adjustment 409 `STOCK_UNAVAILABLE`; the movement row's `actor` is duyne's staff-realm `sub` (`d0e00000-…-001`) |
 | A18 | Protected read fan-out (Train 3) | order/payment/shipping/user each answer the staff operator's list 200 **and** reject a customer-realm token 401 at the edge; payment's `reconciliations/runs` pages 200 |
 | A19 | Protected catalog writes (slice B) | staff list 200 / customer token 401 at the edge; create lands **DRAFT** (v1) and 404s publicly; duplicate name 409; publish makes it public and a second publish is **409 `INVALID_TRANSITION`**; an edit at v2 succeeds and the same version again is **409 `VERSION_CONFLICT`**; archive 404s the page; the audit trail's newest action is `ARCHIVE` and every row's `actor_sub` is duyne's staff subject — a body-supplied actor is ignored; categories page 200 |
@@ -2320,7 +2323,7 @@ a passing decision, continue with the
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
 
-_Last updated: 2026-10-01 — A6 no longer calls the auth-service cluster retirement pending: RFC-0024 P5 removed it. Earlier the same day — every Phase C row prints an `OK`/`FAIL` verdict; C13 and C15 had been hidden by VictoriaLogs answers that end without a newline, and C13's notes now describe the OTLP access log. Previously 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
+_Last updated: 2026-10-02 — A15 is runnable on compose and passed on Temporal 1.32.0; its header now says so, names the manual fresh-checkout step, and its teardown check expects A10's abandonment watch. Previously 2026-10-01 — A6 no longer calls the auth-service cluster retirement pending: RFC-0024 P5 removed it. Earlier the same day — every Phase C row prints an `OK`/`FAIL` verdict; C13 and C15 had been hidden by VictoriaLogs answers that end without a newline, and C13's notes now describe the OTLP access log. Previously 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
 RFC-0025: the header's "Sign in" is a link to
 `/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
 storage assertion now names the legitimate residents (`theme`, and a

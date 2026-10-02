@@ -236,6 +236,9 @@ spec:
     web:
       enabled: true
       replicaCount: 1
+      # Chart 1.7.0 defaults to 2.54.1; pinned to match local-stack.
+      image:
+        tag: 2.55.0
       resources:
         requests:
           cpu: 25m

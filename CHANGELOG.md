@@ -338,6 +338,10 @@ Skeleton (copy what you need):
   SHA before it was cut.
 
 #### Temporal
+- **Temporal UI 2.55.0 on the cluster**, pinned over chart 1.7.0's 2.54.1 so
+  the cluster matches local-stack. It adds the Scheduled system view,
+  worker-deployment connection status by default and resizable table
+  columns; the k6 saga suite's reads of the UI JSON API (SG.3, SG.4) pass.
 - **Temporal server 1.32.0** (chart 1.6.0 → 1.7.0, admin-tools and the
   local-stack server 1.32.0, local-stack UI 2.55.0). No schema change: the
   Postgres stores stay at temporal 1.19 / visibility 1.14. The 1.32

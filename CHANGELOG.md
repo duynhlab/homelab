@@ -214,6 +214,9 @@ Skeleton (copy what you need):
   30-minute wait.
 
 #### Docs
+- **`dashboards-v2.md` See also links the live dashboards-as-code wiring**
+  (`grafana-dashboards-as-code-{folders,dashboards}.yaml` and its OCI
+  source); it pointed at the `obs-as-code-*` files #1085 deleted.
 - **`docs/testing/k6.md` lists `restock.js`**, which `make e2e-restock` has run
   since 2026-08-24.
 - **The database TLS hops are measured, not guessed.** `pg_stat_ssl` on

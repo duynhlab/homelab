@@ -478,10 +478,11 @@ Failure signatures and where they show up:
 
 - [README.md](README.md) — the dashboard inventory and the other delivery mechanisms
 - [datasources.md](datasources.md) — the three prometheus-flavoured datasources and their uids
-- `kubernetes/clusters/local/obs-as-code-{folders,dashboards}.yaml` — the Flux wiring
-  this canary will eventually adopt, including the `healthCheckExprs` block
+- `kubernetes/clusters/local/grafana-dashboards-as-code-{folders,dashboards}.yaml` and
+  `sources/oci/grafana-dashboards-as-code-oci.yaml` — the Flux wiring that replaced
+  the `obs-as-code-*` files (deleted in #1085), including the `healthCheckExprs` block
 
-_Last updated: 2026-09-23 — the cutover in §9 is done: all 18 boards ship as
+_Last updated: 2026-10-02 — See also points at the live `grafana-dashboards-as-code-*` wiring instead of the deleted `obs-as-code-*` files. Previously 2026-09-23 — the cutover in §9 is done: all 18 boards ship as
 GrafanaManifest from `duynhlab/grafana-dashboards`, the canaries and the `spec.oci` pair
 are deleted, and §7/§8 are rewritten as history rather than open work. Previously
 2026-09-21 — first version. All measurements from a Kind run against

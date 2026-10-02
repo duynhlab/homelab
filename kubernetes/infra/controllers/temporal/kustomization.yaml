@@ -5,9 +5,6 @@ kind: Kustomization
 # configs/temporal (temporal-config-local), the same split
 # envoy-gateway-local/envoy-gateway-config-local uses; the temporal-ui route
 # lives in configs/envoy-gateway/routes/temporal.yaml.
-#
-# helmrelease.yaml.bak is the retired operator: the `.bak` suffix keeps it out of
-# here and out of `make validate` without commenting the file into unreadability.
 resources:
   - helmrelease.yaml
   # RFC-0026 / ADR-054: the Worker Controller. CRDs chart first — the manager's

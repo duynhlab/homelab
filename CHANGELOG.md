@@ -348,6 +348,9 @@ Skeleton (copy what you need):
   schema one. The search-attributes Job now carries
   `kustomize.toolkit.fluxcd.io/force`, so an admin-tools bump re-creates it
   instead of failing `temporal-config-local` on an immutable template.
+  The retired operator's four `*.yaml.bak` manifests (HelmRelease, the
+  TemporalCluster/TemporalNamespace CRs and its HelmRepository) are
+  deleted; git history keeps them.
 
 ## [1.0.0] - 2026-10-01
 

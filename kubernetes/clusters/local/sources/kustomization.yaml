@@ -38,8 +38,7 @@ resources:
   - helm/policy-reporter.yaml
   # KEDA — task-queue autoscaling for the Temporal workers (ADR-055).
   - helm/keda.yaml
-  # temporal-operator source retired with the operator; kept as
-  # helm/temporal-operator.yaml.bak (ADR-030).
+  # The temporal-operator source retired with the operator (ADR-030).
   - helm/temporalio.yaml
   - helm/altinity.yaml
 # RFC-0027 / ADR-058: the jaegertracing Helm repository retired with Jaeger

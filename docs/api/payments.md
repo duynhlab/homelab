@@ -394,9 +394,35 @@ Read-only: refunds and recon triggers stay `internal`.
 |--------|------|---------|
 | `GET` | `/payment/v1/protected/payments?status=` | Cross-customer list (FSM-vocabulary filter) |
 | `GET` | `/payment/v1/protected/payments/:id` | Case view: payment + **full attempt history** + append-only **ledger lineage summary** (`{payment, attempts, ledger}`) |
-| `GET` | `/payment/v1/protected/attempts/open` | The doubt worklist: every attempt still `UNKNOWN` and unresolved, across customers, oldest first. Paginated total is the dashboard's count; the reconciler still owns resolving them |
-| `GET` | `/payment/v1/protected/reconciliations/runs` | Run headers, newest first — the detect-only recon records' first reader |
-| `GET` | `/payment/v1/protected/reconciliations/runs/:id` | Run + its discrepancies (`{run, discrepancies}`) — the triage view |
+| `GET` | `/payment/v1/protected/payments/attempts?status=open` | The doubt worklist: every attempt still `UNKNOWN` and unresolved, across customers, oldest first. `status` is required and `open` is the only accepted value (anything else is 400). Paginated total is the dashboard's count; the reconciler still owns resolving them |
+| `GET` | `/payment/v1/protected/payments/reconciliation/runs` | Run headers, newest first — the detect-only recon records' first reader |
+| `GET` | `/payment/v1/protected/payments/reconciliation/runs/:id` | Run + its discrepancies (`{run, discrepancies}`) — the triage view |
+
+**Deprecated aliases (ADR-017 expand phase, payment-service v2.7.0).** The
+pre-canonical `GET /payment/v1/protected/attempts/open` and
+`GET /payment/v1/protected/reconciliations/runs[/:id]` still answer on the same
+handlers. They are removed in the contract release, after the Backoffice has
+shipped on the canonical paths.
+
+### mockpay provider API
+
+mockpay (the `mockpay` subcommand of the payment binary) plays an external
+payment provider, so its routes copy a provider's shape instead of the
+platform's `/{service}/v1/{audience}/…` one. They are an explicit exception to
+the [collection noun rule](./api.md#collection-noun-rule). Nothing outside
+payment-service calls them, and no `HTTPRoute` exposes them.
+
+| Method | Path | Caller | Purpose |
+|--------|------|--------|---------|
+| `POST` | `/charges` | payment provider client | Authorize a charge |
+| `POST` | `/charges/{id}/capture` | payment provider client | Capture an authorized charge |
+| `POST` | `/charges/{id}/void` | payment provider client | Void an authorized charge |
+| `POST` | `/refunds` | payment provider client | Refund a captured charge |
+| `GET` | `/transactions?from&to` | reconciler (every 5 min) | Page the provider ledger for reconciliation |
+| `GET` | `/health` | probes | Liveness |
+
+mockpay posts its events back to payment's signed webhook,
+`/payment/v1/public/payments/webhooks/mockpay`.
 
 ## Callers & dependencies
 
@@ -406,7 +432,7 @@ Read-only: refunds and recon triggers stay `internal`.
 | Inbound | order API (details enrichment) | gRPC `GetPayment(order_id)`, soft-fail |
 | Inbound | mockpay | Signed webhook → `/payment/v1/public/payments/webhooks/mockpay` |
 | Inbound | Browser via the edge | `/payment/v1/private/payments…` (edge JWT + `pkg/authmw`) |
-| Outbound | mockpay | Provider HTTP port (charge/capture/void/refund, `GET /transactions`) — payment is not a gRPC client of any service |
+| Outbound | mockpay | Provider HTTP port (charge/capture/void/refund, `GET /transactions`) — payment is not a gRPC client of any service; see [mockpay provider API](#mockpay-provider-api) |
 
 ## Known gaps
 
@@ -519,4 +545,4 @@ Paths in [`duynhlab/payment-service`](https://github.com/duynhlab/payment-servic
 - [workflows.md](./workflows.md) · [Service contracts](./README.md#service-contracts)
 - [RFC-0010](../proposals/rfc/RFC-0010/) — full design; ADRs [007](../proposals/adr/ADR-007-double-entry-payment-ledger/) ledger · [008](../proposals/adr/ADR-008-mockpay-standalone-provider/) mockpay · [009](../proposals/adr/ADR-009-saga-authorize-early-capture-late/) auth-early/capture-late · [010](../proposals/adr/ADR-010-shared-idempotency-library/) idempotency · [011](../proposals/adr/ADR-011-detect-only-reconciliation/) detect-only · [012](../proposals/adr/ADR-012-reconciliation-auto-heal/) auto-heal
 
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._
+_Last updated: 2026-10-02 — protected attempt and reconciliation reads move under `payments/` (ADR-017 expand; old paths are deprecated aliases); mockpay provider API table added. Previously 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

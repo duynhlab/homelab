@@ -271,6 +271,12 @@ Resources use plural nouns after the audience segment.
 Auth and checkout are deliberate process-oriented exceptions. Do not copy
 those exceptions into ordinary CRUD services.
 
+mockpay is the third exception, and a different kind. It plays an external
+payment provider, so its `/charges…`, `/refunds`, `/transactions` and
+`/health` routes copy a provider's shape and carry no service, version or
+audience segment. Nothing outside payment-service calls them and no edge route
+exposes them ([payments.md § mockpay provider API](./payments.md#mockpay-provider-api)).
+
 ### Hostnames
 
 | Environment | Browser entry point | In-cluster service name |
@@ -883,4 +889,4 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
 
-_Last updated: 2026-09-29 — topology map: mockpay drawn in-cluster (webhook straight to payment; the edge leg is local-stack only). Earlier: 2026-09-28 — Draw.io view of the platform API topology. 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._
+_Last updated: 2026-10-02 — mockpay declared as an explicit exception to the collection noun rule. Previously 2026-09-29 — topology map: mockpay drawn in-cluster (webhook straight to payment; the edge leg is local-stack only). Earlier: 2026-09-28 — Draw.io view of the platform API topology. 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._

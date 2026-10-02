@@ -852,7 +852,7 @@ for svc in order payment shipping user; do
 done
 # The recon triage view exists and pages (payment's first recon reader):
 audit_curl -s -o /dev/null -w "A18 recon runs: %{http_code} (want 200)\n" \
-  -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/payment/v1/protected/reconciliations/runs?page_size=1"
+  -H "Authorization: Bearer $KCT_STAFF" "http://localhost:8080/payment/v1/protected/payments/reconciliation/runs?page_size=1"
 
 # A19. The protected CATALOG (RFC-0023 slice B) — the first protected surface
 #      that WRITES. Reads prove the fence; the lifecycle proves the guards.
@@ -1137,8 +1137,8 @@ for q in \
   "inventory/v1/protected/balances?page=1&page_size=1&low_stock=true" \
   "order/v1/protected/orders?page=1&page_size=1&status=manual_review" \
   "order/v1/protected/orders?page=1&page_size=1&status=cancelling" \
-  "payment/v1/protected/attempts/open?page=1&page_size=1" \
-  "payment/v1/protected/reconciliations/runs?page=1&page_size=1"; do
+  "payment/v1/protected/payments/attempts?status=open&page=1&page_size=1" \
+  "payment/v1/protected/payments/reconciliation/runs?page=1&page_size=1"; do
   audit_curl -s "$BASE/$q" -H "Authorization: Bearer $KCT_STAFF" \
     | python3 -c "import json,sys;d=json.load(sys.stdin);print(type(d.get('total_items')).__name__, d.get('total_items'))"
 done

@@ -103,6 +103,28 @@ the per-service route inventories live in the
   matches ([ADR-044](../ADR-044-envoy-gateway-platform-edge/)). The path shape
   this ADR decides is unchanged by that move.
 
+## Amendment 2026-10-02 — mockpay is an exception; two protected payment paths conform
+
+The rule is unchanged. Two things are recorded against it.
+
+- **mockpay joins the exceptions list.** It plays an external payment provider,
+  so its `POST /charges`, `/charges/{id}/capture|void`, `/refunds`,
+  `GET /transactions` and `/health` copy a provider's shape and carry no service,
+  version or audience segment. Nothing outside payment-service calls them and no
+  `HTTPRoute` exposes them. The list in the Decision section is therefore `auth`,
+  `cart` and mockpay; [api.md](../../../api/api.md#collection-noun-rule) also
+  names checkout's confirm/promo transitions as process exceptions.
+- **Two Backoffice reads added after this ADR broke it**, and conform now through
+  the same expand → migrate → contract sequence:
+  `/payment/v1/protected/attempts/open` →
+  `/payment/v1/protected/payments/attempts?status=open`, and
+  `/payment/v1/protected/reconciliations/runs[/:id]` →
+  `/payment/v1/protected/payments/reconciliation/runs[/:id]`
+  (payment-service v2.7.0 expands, the Backoffice moves, a later release
+  contracts). The contract release also removes the expand-phase aliases this
+  ADR left mounted: shipping `/public/track|estimate`, payment
+  `/public/webhooks/mockpay` and `/internal/reconciliation/runs`.
+
 ## References
 
 - [Shared API collection noun rule](../../../api/api.md#collection-noun-rule)

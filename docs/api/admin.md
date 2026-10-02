@@ -120,9 +120,9 @@ Read-only. The portal never moves money.
 |--------|------|--------|
 | `GET` | `/payment/v1/protected/payments` | Payments |
 | `GET` | `/payment/v1/protected/payments/:id` | Payment detail |
-| `GET` | `/payment/v1/protected/attempts/open` | Payments — the doubt worklist |
-| `GET` | `/payment/v1/protected/reconciliations/runs` | Payments — run headers |
-| `GET` | `/payment/v1/protected/reconciliations/runs/:id` | Reconciliation run detail |
+| `GET` | `/payment/v1/protected/payments/attempts?status=open` | Payments — the doubt worklist |
+| `GET` | `/payment/v1/protected/payments/reconciliation/runs` | Payments — run headers |
+| `GET` | `/payment/v1/protected/payments/reconciliation/runs/:id` | Reconciliation run detail |
 
 ### order — [order.md](./order.md)
 
@@ -190,4 +190,4 @@ matched their owning file on method *and* path.
 - [RFC-0023](../proposals/rfc/RFC-0023/README.md) — the RFC that introduced the portal and `/protected/`
 
 ---
-_Last updated: 2026-08-26 — recognizes `admin-service` as the deployed Backoffice application service while preserving its no-BFF consumer boundary._
+_Last updated: 2026-10-02 — the payment reads call the canonical `payments/attempts?status=open` and `payments/reconciliation/runs` paths. Previously 2026-08-26 — recognizes `admin-service` as the deployed Backoffice application service while preserving its no-BFF consumer boundary._

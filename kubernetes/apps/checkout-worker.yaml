@@ -24,19 +24,6 @@
 # `checkout/checkout-abandon`. A release edits ONE line: image below.
 ---
 apiVersion: temporal.io/v1alpha1
-kind: Connection
-metadata:
-  name: temporal-mop
-  namespace: checkout
-  labels:
-    app.kubernetes.io/component: workflow-engine
-    platform.duynhlab.dev/adr: "064"
-spec:
-  # Same frontend the worker has always dialled; Connection is
-  # namespace-scoped, so each worker namespace carries its own copy.
-  hostPort: temporal-frontend.temporal.svc.cluster.local:7233
----
-apiVersion: temporal.io/v1alpha1
 kind: WorkerDeployment
 metadata:
   name: checkout-abandon
@@ -52,8 +39,12 @@ spec:
   # the same number. The floor lives in checkout-abandon-scaler.yaml.
 
   workerOptions:
+    # The cluster-wide connection (configs/temporal/clusterconnection.yaml).
     connectionRef:
-      name: temporal-mop
+      objectRef:
+        apiGroup: temporal.io
+        kind: ClusterConnection
+        name: temporal-mop
     temporalNamespace: mop
 
   # Same bounded Progressive schedule as order-worker.yaml, for the same

@@ -120,6 +120,12 @@ Skeleton (copy what you need):
   was byte-identical on all three replicas.
 
 #### Observability
+- **The OTel microservices board marks deploys and links to traces and logs**
+  (grafana-dashboards `0.4.0`). A Deploys annotation marks the first sample
+  of each new `service_version`, a Running versions table lists the version
+  every service's instances report, and the per-service error, gRPC
+  per-callee and DB panels link to that service's traces in VictoriaTraces
+  and logs in VictoriaLogs over the board's time range.
 - **Every as-code dashboard renders all of its panels**
   (grafana-dashboards `0.3.0`). The generator had left every panel id at 0,
   and Grafana's v2 renderer keys panels by id, so each grid row showed its

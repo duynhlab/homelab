@@ -247,6 +247,13 @@ Skeleton (copy what you need):
   30-minute wait.
 
 #### Docs
+- **docs/api matches the served routes again.** The retired
+  `POST /product/v1/internal/products` (RFC-0023 slice B, ADR-047) is gone
+  from product.md and caching.md, whose create section now describes the
+  protected catalog writes that replaced it. mockpay's provider routes
+  (`/charges…`, `/refunds`, `/transactions`, `/health`) are declared as an
+  explicit exception to the collection-noun rule, with their own table in
+  payments.md and a dated amendment to ADR-017.
 - **`dashboards-v2.md` See also links the live dashboards-as-code wiring**
   (`grafana-dashboards-as-code-{folders,dashboards}.yaml` and its OCI
   source); it pointed at the `obs-as-code-*` files #1085 deleted.
@@ -355,6 +362,17 @@ Skeleton (copy what you need):
   The retired operator's four `*.yaml.bak` manifests (HelmRelease, the
   TemporalCluster/TemporalNamespace CRs and its HelmRepository) are
   deleted; git history keeps them.
+
+### Deprecation
+
+#### Services
+- **Two payment Backoffice paths move under `payments/` (ADR-017).**
+  `GET /payment/v1/protected/attempts/open` becomes
+  `/payments/attempts?status=open`, and
+  `/reconciliations/runs[/:id]` becomes `/payments/reconciliation/runs[/:id]`
+  (payment-service v2.7.0). The old paths stay as aliases until the
+  Backoffice ships on the new ones; the k6 staff suite and the e2e-audit A18
+  and A22 probes already call the canonical paths.
 
 ## [1.0.0] - 2026-10-01
 

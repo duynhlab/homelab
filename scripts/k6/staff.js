@@ -142,7 +142,7 @@ function a18(B, staff, customer) {
       [`${svc} customer token is 401 wrong-issuer`]: (r) => r.status === 401,
     });
   }
-  rowCheck('A18', http.get(`${B}/payment/v1/protected/reconciliations/runs?page_size=1`, staff), {
+  rowCheck('A18', http.get(`${B}/payment/v1/protected/payments/reconciliation/runs?page_size=1`, staff), {
     'reconciliation runs list is 200': (r) => r.status === 200,
   });
 }
@@ -334,8 +334,8 @@ function a22(B, staff) {
     ['low / out of stock', `${B}/inventory/v1/protected/balances?page=1&page_size=1&low_stock=true`],
     ['manual review', `${B}/order/v1/protected/orders?page=1&page_size=1&status=manual_review`],
     ['cancelling', `${B}/order/v1/protected/orders?page=1&page_size=1&status=cancelling`],
-    ['unresolved attempts', `${B}/payment/v1/protected/attempts/open?page=1&page_size=1`],
-    ['recon discrepancies', `${B}/payment/v1/protected/reconciliations/runs?page=1&page_size=1`],
+    ['unresolved attempts', `${B}/payment/v1/protected/payments/attempts?status=open&page=1&page_size=1`],
+    ['recon discrepancies', `${B}/payment/v1/protected/payments/reconciliation/runs?page=1&page_size=1`],
   ];
 
   for (const [label, url] of cards) {

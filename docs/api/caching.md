@@ -119,7 +119,6 @@ The product service mounts caching only on **read** endpoints below. Routes are 
 | `GET` | `/product/v1/public/products` | public | list cache (`product:list:…`) |
 | `GET` | `/product/v1/public/products/:id` | public | detail cache (`product:{id}`) + stampede lock |
 | `GET` | `/product/v1/public/products/:id/details` | public | reuses detail cache (aggregates reviews) |
-| `POST` | `/product/v1/internal/products` | **internal** (service-to-service only — not on gateway) | invalidates list cache |
 
 ### `GET /product/v1/public/products` — list products
 
@@ -187,13 +186,19 @@ sequenceDiagram
 
 Reuses the same single-product cache path (calls `ProductService.GetProduct` internally) and then aggregates review data from the review service. The product portion benefits from the detail cache and stampede lock; review aggregation is not cached at this layer.
 
-### `POST /product/v1/internal/products` — create product (internal only)
+### Protected catalog writes — invalidation
 
-> This route is on the **internal** audience and is **not exposed on the gateway**. It is reachable only via in-cluster service DNS. The boundary is the edge carrying no `HTTPRoute` for it plus in-app controls; ingress NetworkPolicies are authored (`kubernetes/infra/configs/network-policies/`) and enforced by kindnet (Kind K8s 1.34+). See the [API audience model](./api.md#audience-segments).
+The Backoffice writes under `/product/v1/protected/` are the only writers of the
+catalog. The internal `POST /product/v1/internal/products` they replaced was
+retired with RFC-0023 slice B (ADR-047). Invalidation is best-effort: the write
+is already committed, so a failed delete never fails the response, and a stale
+entry expires on its own TTL.
 
-1. Validate price, persist via `productRepo.Create(ctx, product)`.
-2. **Cache invalidation**: call `productCache.InvalidateProductList(ctx)` to delete list cache keys so the new product appears in subsequent list queries.
-3. Single-product detail cache is **not** invalidated here (a newly created `:id` cannot already exist in the detail cache).
+| Write | Invalidates |
+|-------|-------------|
+| Create a product (lands `DRAFT`) | the list cache |
+| Update, publish, archive or restore a product | that product's detail key and the list cache |
+| Update a category | the list cache |
 
 ## Resilience & Failure Modes
 
@@ -328,4 +333,4 @@ Server-side Valkey metrics and hit-rate queries: [Caching (platform) § Observab
 - [Redis Go Client](https://github.com/redis/go-redis)
 - [Cache-Aside Pattern](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Strategies.html)
 
-_Last updated: 2026-08-11 — `product-db` holds six databases, not three — the stale-cache blast radius is wider than stated._
+_Last updated: 2026-10-02 — the retired internal product create is replaced by the protected catalog writes and what each invalidates. Previously 2026-08-11 — `product-db` holds six databases, not three — the stale-cache blast radius is wider than stated._

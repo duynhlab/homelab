@@ -113,7 +113,6 @@ Money units differ by transport on purpose:
 | `GET` | `/product/v1/public/products` | Public | Paginated catalog with category, search, sort, order filters |
 | `GET` | `/product/v1/public/products/:id` | Public | Get one product |
 | `GET` | `/product/v1/public/products/:id/details` | Public | Aggregate product + inventory-sourced availability + reviews + summary + related products |
-| `POST` | `/product/v1/internal/products` | Internal | Create a product (admin/seed) — **never exposed at either edge**; NetworkPolicy is the fence. Retirement pending: the protected create below is its governed replacement |
 | `GET` | `/product/v1/protected/products?status=&page=&page_size=` | Backoffice | Operator catalog list — the only read that shows `DRAFT` and `ARCHIVED` |
 | `GET` | `/product/v1/protected/products/:id` | Backoffice | Operator detail in any lifecycle state |
 | `POST` | `/product/v1/protected/products` | Backoffice | Create — lands in **`DRAFT`**; a duplicate name is `409` (which is what makes a retry safe) |
@@ -362,4 +361,4 @@ Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-servic
 - [Caching (platform)](../caching/README.md) — Valkey deployment and ops
 - [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics
 
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-11 — product left the saga and the public edge surface was recorded._
+_Last updated: 2026-10-02 — the retired `POST /product/v1/internal/products` row is removed. Previously 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-11 — product left the saga and the public edge surface was recorded._

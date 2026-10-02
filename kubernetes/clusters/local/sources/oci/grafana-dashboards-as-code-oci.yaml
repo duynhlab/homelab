@@ -51,4 +51,5 @@ spec:
     # 0.2.2: KSM queries filter on exported_namespace (KSM has no honorLabels).
     # 0.3.0: distinct panel ids (rows rendered panel 1 in every slot); OTel 1:1.
     # 0.3.1: alert rules leave NoData; OTel pies show their legends.
-    semver: "0.3.1"
+    # 0.4.0: OTel board deploy markers, running versions, traces/logs links.
+    semver: "0.4.0"

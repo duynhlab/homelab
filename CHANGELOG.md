@@ -342,6 +342,10 @@ Skeleton (copy what you need):
   and compose pins, one grouped PR per plugin.
 
 #### Services
+- **payment v2.8.0 (and mockpay) and shipping v1.10.0 on Kind** — the
+  ADR-017 contract releases that remove the expand-phase aliases. Both passed
+  the full local-stack release audit (A/B/C + C22) from scratch, with A7
+  asserting the shipping alias is 404.
 - **payment v2.7.0 (and mockpay) and admin-service v0.4.3 on Kind.** payment
   serves the canonical protected paths beside their deprecated aliases;
   the Backoffice calls the canonical ones and its runtime image carries

@@ -323,6 +323,11 @@ Skeleton (copy what you need):
   and compose pins, one grouped PR per plugin.
 
 #### Services
+- **payment v2.7.0 (and mockpay) and admin-service v0.4.3 on Kind.** payment
+  serves the canonical protected paths beside their deprecated aliases;
+  the Backoffice calls the canonical ones and its runtime image carries
+  pcre2 10.49-r0 (CVE-2026-103111). Both passed the full local-stack release
+  audit (A/B/C + C22) from scratch.
 - **order v2.10.2 and checkout v0.13.2 on Kind** (Temporal Go SDK 1.49.0;
   order-worker and checkout-worker too). Both tags passed the full
   local-stack release audit (A/B/C + C22) from scratch on their merged SHAs;

@@ -252,6 +252,16 @@ Skeleton (copy what you need):
   Enforce` wording in the two Kyverno runbooks and the alerts comment now says
   `validationActions: [Deny]`.
 
+#### Temporal
+- **`TemporalServiceErrorRateHigh` measures what a client sees.** It summed
+  every service's errors over every service's requests, so 99% of its
+  numerator was control-flow `NotFound` (on Kind, 26,551 of 26,774 errors in
+  24 h were history→matching `QueryWorkflow` lookups) and internal hops were
+  counted twice; the ratio peaked at 27%. It now divides the frontend's
+  server faults (`Internal`, `Unavailable`, `DeadlineExceeded`, `DataLoss`,
+  `ResourceExhausted`) by the frontend's requests, alerting above 2% for
+  10 minutes; over the same 24 h it reads 0.
+
 #### Local-stack
 - **Every Phase C row of the E2E release audit prints a verdict.** C2–C4,
   C8–C10 and C12–C15 printed raw rows and left the pass bar to the reader.

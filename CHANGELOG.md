@@ -99,22 +99,6 @@ Skeleton (copy what you need):
   reaching a Service past the gateway, a host without `/etc/hosts`) are
   one-line `kubectl port-forward` snippets under setup.md § Prerequisites.
 
-#### Databases
-- **PostgreSQL 18.1 → 18.6** on `platform-db`, `product-db` and the DR
-  replica (`ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`). 18.6 fixes
-  28 CVEs. Local-stack had already drifted to 18.6 through the floating
-  `postgres:18-alpine`, and is now pinned to `postgres:18.6-alpine`. None of
-  the post-upgrade actions in the 18.2–18.6 release notes apply here: there are
-  no `ltree`/`btree_gist` indexes, no logical slots (`output_plugin_libraries`
-  keeps the built-in plugins), no `pgp_*` callers, and
-  `temporal_visibility`'s GIN-indexed table reports a sane `reltuples`.
-  Renovate never proposed this bump, because it does not read a CNPG
-  `imageName:`; a regex manager now tracks it. On Kind CNPG updated both
-  clusters in about 10 minutes, restarting the primaries in place, and
-  `make e2e GATE=kind` passed. The primary restarts caused one ~2-minute burst
-  of Temporal persistence `Unavailable` errors, and `CNPGWALArchiveFailing`
-  stayed quiet.
-
 #### Services
 - **The ADR-017 expand-phase aliases are gone** (payment-service v2.8.0,
   shipping-service v1.10.0). These now answer 404: payment's
@@ -293,6 +277,16 @@ Skeleton (copy what you need):
   10 minutes; over the same 24 h it reads 0.
 
 #### Local-stack
+- **Migrations no longer race Postgres's init restart.** The healthcheck ran
+  `pg_isready` over the unix socket. The image's init sequence first runs a
+  temporary server that listens on the socket only, then stops it and starts
+  the real one, so the check could report healthy during that window and
+  release the migrate jobs into the restart. One fresh `up` lost product, cart,
+  payment and notification migrations that way. The check now goes over TCP
+  (`-h 127.0.0.1`), which the temporary server never answers. With a 0.5s probe
+  interval, the old check turned healthy 3–5s before the real server in 3 of 3
+  runs, and the new one turned healthy after it in 3 of 3. Three
+  `down -v && up` cycles then finished all 18 migrate/seed jobs with exit 0.
 - **Every Phase C row of the E2E release audit prints a verdict.** C2–C4,
   C8–C10 and C12–C15 printed raw rows and left the pass bar to the reader.
   VictoriaLogs' `stream_field_values` answer ends without a newline, so the
@@ -380,6 +374,22 @@ Skeleton (copy what you need):
   VictoriaLogs line limit is pinned to 50, since 0.31 raised the plugin default
   to 1000. Renovate now tracks both plugins' release URL, `GrafanaDatasource`
   and compose pins, one grouped PR per plugin.
+
+#### Databases
+- **PostgreSQL 18.1 → 18.6** on `platform-db`, `product-db` and the DR
+  replica (`ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`). 18.6 fixes
+  28 CVEs. Local-stack had already drifted to 18.6 through the floating
+  `postgres:18-alpine`, and is now pinned to `postgres:18.6-alpine`. None of
+  the post-upgrade actions in the 18.2–18.6 release notes apply here: there are
+  no `ltree`/`btree_gist` indexes, no logical slots (`output_plugin_libraries`
+  keeps the built-in plugins), no `pgp_*` callers, and
+  `temporal_visibility`'s GIN-indexed table reports a sane `reltuples`.
+  Renovate never proposed this bump, because it does not read a CNPG
+  `imageName:`; a regex manager now tracks it. On Kind CNPG updated both
+  clusters in about 10 minutes, restarting the primaries in place, and
+  `make e2e GATE=kind` passed. The primary restarts caused one ~2-minute burst
+  of Temporal persistence `Unavailable` errors, and `CNPGWALArchiveFailing`
+  stayed quiet.
 
 #### Services
 - **frontend v3.2.2 and admin-service v0.4.4 on Kind.** Both build and test

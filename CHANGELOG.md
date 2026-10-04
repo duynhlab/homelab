@@ -293,6 +293,16 @@ Skeleton (copy what you need):
   10 minutes; over the same 24 h it reads 0.
 
 #### Local-stack
+- **Migrations no longer race Postgres's init restart.** The healthcheck ran
+  `pg_isready` over the unix socket. The image's init sequence first runs a
+  temporary server that listens on the socket only, then stops it and starts
+  the real one, so the check could report healthy during that window and
+  release the migrate jobs into the restart. One fresh `up` lost product, cart,
+  payment and notification migrations that way. The check now goes over TCP
+  (`-h 127.0.0.1`), which the temporary server never answers. With a 0.5s probe
+  interval, the old check turned healthy 3–5s before the real server in 3 of 3
+  runs, and the new one turned healthy after it in 3 of 3. Three
+  `down -v && up` cycles then finished all 18 migrate/seed jobs with exit 0.
 - **Every Phase C row of the E2E release audit prints a verdict.** C2–C4,
   C8–C10 and C12–C15 printed raw rows and left the pass bar to the reader.
   VictoriaLogs' `stream_field_values` answer ends without a newline, so the

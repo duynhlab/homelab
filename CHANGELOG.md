@@ -219,6 +219,16 @@ Skeleton (copy what you need):
   reads the enabled route list out of the kustomization instead of a glob.
 
 #### Observability
+- **`CNPGWALArchiveFailing` no longer pages after a Postgres pod restart.**
+  The rule was two `increase()` arms. A restarted pod's series is re-born with
+  its old `failed_count`, and VictoriaMetrics counts a small re-born counter
+  from 0, so a two-day-old failure paged `platform-db` after the CNPG 1.30.1
+  upgrade. The rule is now `last_failed_time > last_archived_time` for 5m: the
+  last attempt failed and nothing has been archived since. It is immune to
+  re-born series, and it pages about 5 minutes after archiving stops instead of
+  about 18. vmalert-tool unit tests replayed the restart (the old rule fires,
+  the new one stays quiet), a stuck archiver (both fire) and a one-off failure
+  (neither fires).
 - **Grafana gets 1Gi.** On Kind its container had been OOMKilled 43 times:
   every restart climbed to ~510Mi against the 512Mi limit and died again, so
   the real working set was hidden by the cap. At 1Gi it settles at ~434Mi

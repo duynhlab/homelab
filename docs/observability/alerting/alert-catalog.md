@@ -253,7 +253,7 @@ ignore (locks, deadlocks, autovacuum, cache, temp, checkpoints, wraparound, WAL 
 | CNPGCheckpointPressure | warning | `rate(checkpoints_req) > rate(checkpoints_timed)` | Checkpoints forced by WAL pressure | 30m | [CNPGCheckpointPressure](../runbooks/postgresql/CNPGCheckpointPressure.md) |
 | CNPGTransactionIDWraparoundWarning | warning | `cnpg_pg_database_xid_age` >1e9 (~47%) | Freezing stalled; wraparound risk building | 30m | [CNPGTransactionIDWraparoundWarning](../runbooks/postgresql/CNPGTransactionIDWraparoundWarning.md) |
 | CNPGTransactionIDWraparoundCritical | critical | `cnpg_pg_database_xid_age` >1.5e9 | Writes will stop near 2^31 | 10m | [CNPGTransactionIDWraparoundCritical](../runbooks/postgresql/CNPGTransactionIDWraparoundCritical.md) |
-| CNPGWALArchiveFailing | critical | `increase(cnpg_pg_stat_archiver_failed_count[30m])` >0 | PITR/backup recovery broken; WAL piling up | 5m | [CNPGWALArchiveFailing](../runbooks/postgresql/CNPGWALArchiveFailing.md) |
+| CNPGWALArchiveFailing | critical | `cnpg_pg_stat_archiver_last_failed_time > …_last_archived_time` (last attempt failed, nothing archived since) | PITR/backup recovery broken; WAL piling up | 5m | [CNPGWALArchiveFailing](../runbooks/postgresql/CNPGWALArchiveFailing.md) |
 | CNPGInactiveSlotRetainingWAL | warning | inactive slot with `pg_wal_lsn_diff` >1 GiB, primary's view only | The **cause** the lag alerts report as a symptom: WAL pinned on the primary's disk, growing until the standby rejoins or the slot is dropped | 15m | [CNPGInactiveSlotRetainingWAL](../runbooks/postgresql/CNPGInactiveSlotRetainingWAL.md) |
 | CNPGLongRunningTransaction | warning | `cnpg_pg_long_running_transactions_oldest_transaction_seconds` >300 | Pins dead tuples; blocks VACUUM / freezing | 5m | [CNPGLongRunningTransaction](../runbooks/postgresql/CNPGLongRunningTransaction.md) |
 | CNPGIdleInTransaction | warning | `cnpg_pg_long_running_transactions_oldest_idle_in_transaction_seconds` >300 | Idle-in-transaction stalls autovacuum | 5m | [CNPGIdleInTransaction](../runbooks/postgresql/CNPGIdleInTransaction.md) |
@@ -847,6 +847,16 @@ this alert is a confirmation that archiving is stuck, never an early warning. Th
 idle-cluster arm also held: the second cluster paged only because it genuinely had
 36 failures on a segment that was in flight, not merely because it was quiet. Full
 timeline in the [runbook](../runbooks/postgresql/CNPGWALArchiveFailing.md).
+
+**`CNPGWALArchiveFailing` rewritten (2026-10-04).** The rule above was a pair of
+`increase()` arms. After the CNPG 1.30.1 upgrade restarted every Postgres pod, it
+paged on `platform-db` over a failure two days old. The new pod's series is
+re-born with `failed_count = 1`, and VictoriaMetrics' `increase()` counts a small
+re-born counter from 0. The no-progress arm also held, because the new series was
+younger than its `[15m]` window. The rule now compares `pg_stat_archiver`'s two
+timestamps instead (failed after the last success, for 5m). A re-born series leaves
+those values unchanged. Expect the page about 5 minutes after archiving stops, not
+18.
 
 Runbooks: one per alert under
 [`runbooks/microservices/`](../runbooks/microservices/).

@@ -23,7 +23,7 @@ metadata:
     cnpg.io/skipEmptyWalArchiveCheck: "enabled"
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
   # WAL segment size is baked into the RESTORED data directory (product-db is
   # initdb'd with walSegmentSize: 64), but postgresql.parameters come from THIS
   # manifest — so a restore that omits them gets CNPG's default min_wal_size

@@ -89,6 +89,15 @@
       datasourceTemplate: "docker",
     },
     {
+      // CNPG Cluster `imageName:` — the kubernetes manager only reads `image:`.
+      customType: "regex",
+      managerFilePatterns: ["/^kubernetes/.+\\.yaml$/"],
+      matchStrings: [
+        "imageName: (?<depName>ghcr\\.io/cloudnative-pg/postgresql):(?<currentValue>\\S+)",
+      ],
+      datasourceTemplate: "docker",
+    },
+    {
       // The Kind node image in scripts/kind-up.sh, pinned by tag and digest
       // (RFC-0032). The regex takes the line after the `# renovate:` comment.
       customType: "regex",

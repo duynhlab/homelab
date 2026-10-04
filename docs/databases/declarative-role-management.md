@@ -151,7 +151,7 @@ Replica behavior: roles and databases replicate through WAL to
       -o jsonpath='{.data.password}' | base64 -d)
     for d in product cart order payment; do
       kubectl run hba-$u-$d --rm --restart=Never -n product --quiet -it \
-        --image=ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie -- \
+        --image=ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie -- \
         psql "host=product-db-rw.product user=$u dbname=$d password=$pw connect_timeout=5" \
         -tAc 'select 1' >/dev/null 2>&1 && echo "$u->$d ALLOW" || echo "$u->$d reject"
     done

@@ -219,6 +219,10 @@ Skeleton (copy what you need):
   reads the enabled route list out of the kustomization instead of a glob.
 
 #### Observability
+- **Grafana gets 1Gi.** On Kind its container had been OOMKilled 43 times:
+  every restart climbed to ~510Mi against the 512Mi limit and died again, so
+  the real working set was hidden by the cap. At 1Gi it settles at ~434Mi
+  after 20 minutes with no restart. Limit 512Mi → 1Gi, request 128Mi → 256Mi.
 - **Grafana-managed alerts leave NoData, OTel pies show their legends**
   (grafana-dashboards `0.3.1`). On a healthy cluster every as-code alert
   rule sat in NoData: the Postgres rule queried a dashboard variable that

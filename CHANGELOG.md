@@ -356,6 +356,13 @@ Skeleton (copy what you need):
   and compose pins, one grouped PR per plugin.
 
 #### Services
+- **frontend v3.2.2 and admin-service v0.4.4 on Kind.** Both build and test
+  on Node 26, pin their node and nginx base images by digest, and move to
+  TypeScript 7; no behaviour or API change. Both passed the full local-stack
+  release audit (A/B/C + C22) from scratch. The first run's C22 found the
+  Temporal SDK's `temporal_request_resource_exhausted` counter and its
+  `cause` attribute missing from the semconv registry, which pkg#119
+  declared before the rerun.
 - **payment v2.8.0 (and mockpay) and shipping v1.10.0 on Kind** — the
   ADR-017 contract releases that remove the expand-phase aliases. Both passed
   the full local-stack release audit (A/B/C + C22) from scratch, with A7

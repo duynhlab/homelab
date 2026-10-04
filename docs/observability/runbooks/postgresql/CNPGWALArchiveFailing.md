@@ -8,31 +8,32 @@
 | **Custom queries** | — (built-in `cnpg_pg_stat_archiver_*`) |
 | **Grafana** | CloudNativePG Cluster Overview |
 
-> **The rule now requires no progress, not just a failure.** As of 2026-08-07
-> the expression is
-> `increase(failed_count[30m]) > 0 and increase(archived_count[15m]) == 0`, so
-> the single `.history` archive failure that every planned promotion produces no
-> longer holds this critical alert for 30 minutes: archiving keeps advancing
-> through it (`archive_timeout: 5min` gives ~3 archived WAL per 15m window on
-> both clusters). If this alert fires now, archiving is genuinely stuck.
+> **The rule compares timestamps, not counts.** As of 2026-10-04 the expression
+> is `cnpg_pg_stat_archiver_last_failed_time > cnpg_pg_stat_archiver_last_archived_time`.
+> The previous `increase(failed_count[30m]) > 0 and increase(archived_count[15m]) == 0`
+> paged after a pod restart over a failure two days old: the restarted pod's series
+> is re-born at `failed_count = 1`, and VictoriaMetrics' `increase()` counts a small
+> re-born counter from 0. Timestamps carry no such history. If this alert fires,
+> archiving is stuck now.
 
 ## Meaning
 
-Both arms must hold for **5 minutes**: `archive_command` (Barman/cloud plugin)
-failed at least once in the last 30 minutes **and** not one WAL segment has been
-archived in the last 15. A single failure alone does not page — a planned
-promotion produces one and keeps advancing. Silence alone does not page either:
-a quiescent cluster with nothing pending never raises `failed_count`.
+For **5 minutes**, the archiver's most recent `archive_command` attempt
+(Barman/cloud plugin) has failed and nothing has been archived since. Postgres
+retries the same segment until it succeeds. A one-off failure is therefore
+followed within seconds by a success that moves `last_archived_time` past
+`last_failed_time`, and clears the alert long before the 5 minutes run out. A
+quiet cluster never pages: both timestamps read `-1` until the first archive or
+failure, and silence changes neither.
 
-**Expect a delay.** The `[15m]` no-progress window plus the 5-minute debounce
-means the page arrives roughly **15–20 minutes after archiving stops**, not
-immediately. That is deliberate — anything shorter pages on every switchover —
-but it means `pg_wal` has already been growing for a quarter of an hour by the
-time you read this. Check free space early (Diagnosis step 3).
+**Expect a delay of about 5 minutes** (the debounce, plus a scrape) after
+archiving stops. `pg_wal` is already growing by then, so check free space early
+(Diagnosis step 3).
 
-### Verified at runtime (2026-08-07)
+### Verified at runtime (2026-08-07, previous rule)
 
-Injected by scaling the RustFS object store to zero replicas for 19 minutes and
+This drill exercised the `increase()` expression that the timestamp rule replaced;
+the latency it measured belongs to that rule. Injected by scaling the RustFS object store to zero replicas for 19 minutes and
 forcing two WAL switches, then restoring it. The full cycle behaved as designed:
 
 | Time (UTC) | Observation |
@@ -66,10 +67,11 @@ alert closes that gap.
 
 ## Rule out a switchover first
 
-**A planned promotion always fires this alert.** The newly promoted primary fails
-to archive its timeline history file exactly once, and because the expression is
-`increase(…[30m]) > 0`, that single artefact holds a **critical** alert for half
-an hour on a cluster whose archiving is fine.
+**A planned promotion makes exactly one archive fail.** The newly promoted primary
+fails to archive its timeline history file once. Archiving then succeeds and moves
+`last_archived_time` past the failure, so the alert should not fire. If it does
+fire around a switchover, confirm it is not that artefact before treating it as
+breakage.
 
 ```bash
 kubectl exec -n "$NAMESPACE" "${CLUSTER}-<primary>" -c postgres -- psql -U postgres -tAc \
@@ -97,7 +99,8 @@ Real archive breakage looks different — `failed_count` keeps climbing and
 ### PromQL
 
 ```promql
-increase(cnpg_pg_stat_archiver_failed_count[30m])
+cnpg_pg_stat_archiver_last_failed_time > cnpg_pg_stat_archiver_last_archived_time
+cnpg_pg_stat_archiver_seconds_since_last_archival
 cnpg_collector_pg_wal_archive_status{status="ready"}
 ```
 

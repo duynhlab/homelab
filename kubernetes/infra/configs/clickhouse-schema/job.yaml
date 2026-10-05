@@ -75,7 +75,7 @@ spec:
         - name: schema
           # Same tag as the CHI: the server image ships clickhouse-client, so
           # the client is never older than the server it talks to, and the
-          # text(tokenizer = ...) index syntax in the logs DDL is 26.x-only.
+          # logs DDL's keyValuePairs text index needs 26.9+.
           image: clickhouse/clickhouse-server:26.9
           env:
             # Must equal spec.configuration.clusters[0].layout.replicasCount in
@@ -272,7 +272,7 @@ spec:
       volumes:
         - name: sql
           image:
-            reference: ghcr.io/duynhlab/images/clickhouse-ddl:1.0.0@sha256:f2e3635227bbf7681de9b2378b9b3c16852f96c7ffc2f7b23229cd82f6eec573
+            reference: ghcr.io/duynhlab/images/clickhouse-ddl:1.1.0@sha256:7f7f68bd76e07b27c24668f14822804df5f576c8381bbadca0ad5f68d0f94778
             pullPolicy: IfNotPresent
         - name: tmp
           emptyDir: {}

@@ -93,7 +93,11 @@ bloom_filter(0.001)` and the compact
 ### Skip indexes vs projections
 
 Skip indexes (bloom, minmax, `text()` on logs) prune extra columns without a
-second sort. **Projections** would store another `ORDER BY`; this cluster
+second sort. On `otel_logs`, `idx_log_attr_kv` (a `keyValuePairs` text index,
+ClickHouse 26.9+) answers `LogAttributes['k'] = 'v'` from one index. Write
+attribute filters in exactly that form: `!=`, `IN`, `LIKE` and `mapContainsKey`
+fall back to the separate key and value indexes, and `mapContainsKeyValue`
+does not exist in 26.9. **Projections** would store another `ORDER BY`; this cluster
 does not use them.
 
 ---

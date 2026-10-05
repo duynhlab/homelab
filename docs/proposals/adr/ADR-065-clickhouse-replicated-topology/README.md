@@ -347,6 +347,7 @@ a new ADR that supersedes this one.
 | 2026-08-28 | Accepted / Not started | Created at Accepted with the RFC-0028 architecture review |
 | 2026-08-28 | Accepted / Complete | Adoption closed on the Kind gate above, after an external audit of PR #952 forced a documentation pass: the rollout procedure still described the reversed design and could not have worked against an existing `Atomic` database, several sources still presented Option B as as-built, and a CHK-by-name version claim had been changed to 0.27.1 against the Altinity release notes, which say 0.27.0 |
 | 2026-08-28 | Accepted / Not started | **Decision reversed before it ever shipped.** Two Kind bring-ups showed exporter-owned `ON CLUSTER` DDL reaching only 1 of 3 and then 2 of 3 replicas, and the exporter's README recommends `create_schema: false` for production to prevent exactly that startup race. Schema ownership moves to a bootstrap Job in git and the `otel` database becomes `ENGINE = Replicated`. Option B is demoted to a rejected alternative with the measurements. Amended rather than superseded: this record had not landed on `main` and had never reached `Adoption: Complete`, so a superseding ADR would leave two records describing one never-deployed design |
+| 2026-10-05 | Accepted / Complete | `otel_logs` gains `idx_log_attr_kv`, a `keyValuePairs` text index on `LogAttributes` (clickhouse-ddl 1.1.0; the server moved to 26.9 for it). Kind was migrated by hand with `ADD INDEX` + `MATERIALIZE INDEX`; the DDL stays fresh-only. Procedure in the ClickHouse README, "Adding an index to a live table" |
 
 ---
-_Last updated: 2026-08-28_
+_Last updated: 2026-10-05_

@@ -141,6 +141,16 @@ Skeleton (copy what you need):
   was byte-identical on all three replicas.
 
 #### Observability
+- **Log attribute lookups use a key-value index** (clickhouse-ddl 1.1.0).
+  `otel_logs` gains `idx_log_attr_kv`, a `keyValuePairs` text index on
+  `LogAttributes` that answers `LogAttributes['k'] = 'v'` from one index. The
+  existing `mapKeys`/`mapValues` pair cannot tell which key a value sat
+  under. On Kind, rare pairs whose value also appears under other keys
+  (`refund.id`, `payment.id`, `outbox_id`) read 7–8k rows instead of
+  80–175k. The DDL stays fresh-only, so Kind was migrated by hand
+  (`ADD INDEX`, then `MATERIALIZE INDEX`: about 17s for 42 parts, a 3.0 MiB
+  index). The procedure is in the ClickHouse README. The schema Job pins
+  `clickhouse-ddl:1.1.0`, and the DDL now needs ClickHouse 26.9+.
 - **The OTel microservices board marks deploys and links to traces and logs**
   (grafana-dashboards `0.4.0`). A Deploys annotation marks the first sample
   of each new `service_version`, a Running versions table lists the version

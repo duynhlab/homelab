@@ -61,6 +61,10 @@ carry meaning (label the state too).
   For an untitled, invisible grouping, Draw.io's own mechanism is the `group;`
   style instead — use it only when the group needs no label.
 - **Datastore**: `shape=cylinder3` (`shapes.datastore`), always the `data` role.
+  A datastore with an `icon` keeps the cylinder and gets its logo as a child
+  `shape=image` cell named `<id>__logo` (draw.io ignores `image=` on
+  `cylinder3`); the label moves right to clear it. The validators treat that
+  cell as part of the cylinder, not as a node or a frame.
 
 Fonts: **Helvetica** everywhere (web-safe, resolves locally, so SVG export needs
 no embedded font). Titles use `fontSize=13; fontStyle=1`. macOS ships Helvetica;

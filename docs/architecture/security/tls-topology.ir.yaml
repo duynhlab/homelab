@@ -75,8 +75,8 @@ nodes:
   - {id: valkey, label: "Valkey :6379\nauth disabled", role: data, layer: pooling, parent: f_data, shape: datastore}
   - {id: opca, label: "CNPG auto-CA\noperator-managed, not homelab-ca", role: platform, layer: pooling, parent: f_data, icon: cloudnativepg}
 
-  - {id: proddb, label: "product-db\nCNPG · ssl on", role: data, layer: data, parent: f_data, shape: datastore}
-  - {id: platdb, label: "platform-db\nCNPG · ssl on", role: data, layer: data, parent: f_data, shape: datastore}
+  - {id: proddb, label: "product-db\nCNPG · ssl on", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
+  - {id: platdb, label: "platform-db\nCNPG · ssl on", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
   - {id: obsdb, label: "Telemetry stores\nVictoriaMetrics · Logs · Traces\nClickHouse :9000 · Pyroscope", role: data, layer: data, parent: f_data, shape: datastore}
 
   - {id: rustfs, label: "RustFS S3\n:9000 HTTP", role: data, layer: objects, parent: f_data, shape: datastore}

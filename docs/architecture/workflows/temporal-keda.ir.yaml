@@ -60,7 +60,7 @@ nodes:
 
   - {id: web, label: "temporal-web UI\ntemporal.duynh.me", role: edge, layer: server, parent: f_temporal, icon: temporal}
   - {id: server, label: "Temporal server 1.31.2 · namespace mop\nfrontend :7233 · history · matching · worker", role: platform, layer: server, parent: f_temporal, icon: temporal}
-  - {id: db, label: "platform-db\ntemporal · temporal_visibility", role: data, layer: server, parent: f_platform, shape: datastore}
+  - {id: db, label: "platform-db\ntemporal · temporal_visibility", role: data, layer: server, parent: f_platform, shape: datastore, icon: postgresql}
 
   - {id: controller, label: "temporal-worker-controller 1.9.0\nchart 0.28.0 · owns builds, not replicas", role: platform, layer: ctl, parent: f_temporal, icon: temporal}
   - {id: wd_checkout, label: "checkout-abandon (checkout)\ncheckout-service 0.13.1 worker\nPinned · 1–3 pods per live build", role: worker, layer: run, parent: f_workers, icon: go}
@@ -69,7 +69,7 @@ nodes:
 
   - {id: grpc_targets, label: "inventory · shipping · notification · payment\ngRPC :9090", role: service, layer: targets, parent: f_targets, icon: go}
   - {id: cart, label: "cart\nREST :8080 (ClearCart)", role: service, layer: targets, parent: f_targets, icon: go}
-  - {id: appdb, label: "product-db via PgDog :6432\norder · checkout databases", role: data, layer: targets, parent: f_targets, shape: datastore}
+  - {id: appdb, label: "product-db via PgDog :6432\norder · checkout databases", role: data, layer: targets, parent: f_targets, shape: datastore, icon: postgresql}
 
 edges:
   - {id: s_confirm, source: checkout_api, target: order_api, type: traffic, label: "confirm → CreateOrder"}

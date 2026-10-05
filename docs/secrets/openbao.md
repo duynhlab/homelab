@@ -475,14 +475,21 @@ role instead of minting per-request users:
 
 ```mermaid
 flowchart LR
+    kv[("KV secret/local/databases/<br/>platform-db/vault-rotator<br/>(random per cluster)")]:::data
+    adm["ExternalSecret → Secret<br/>platform-db-vault-rotator-secret<br/>(store openbao, ns platform)"]:::platform
+    dbrole["DatabaseRole vault_rotator<br/>(CNPG sets its password)"]:::platform
     job["openbao-db-config Job<br/>(databases wave, k8s auth<br/>db-configurator — no root)"]:::platform
     eng["database/config/platform-db<br/>static role notification<br/>rotation_period 720h"]:::platform
-    pg[("platform-db (CNPG)<br/>role notification")]:::data
+    pg[("platform-db (CNPG)<br/>roles notification · vault_rotator")]:::data
     store["ClusterSecretStore openbao-db<br/>(v1 — raw engine paths)"]:::platform
     es["ExternalSecret<br/>platform-db-notification-secret<br/>(ns notification, 1m)"]:::service
 
+    kv --> adm
+    adm -->|"passwordSecret"| dbrole
+    dbrole --> pg
+    adm -->|"admin credential (stdin)"| job
     job -->|"enable + configure"| eng
-    eng -->|"ALTER ROLE ... PASSWORD (720h)"| pg
+    eng -->|"as vault_rotator (ADMIN on notification):<br/>ALTER ROLE ... PASSWORD (720h)"| pg
     store -->|"read database/static-creds/notification"| eng
     es --> store
 
@@ -1169,4 +1176,4 @@ gantt
 
 ---
 
-_Last updated: 2026-10-05 — `vault_rotator` is backed by a random per-cluster OpenBAO value shared by CNPG and the database configurator. Earlier: 2026-10-01 — listener TLS and the ESO `https` + `caBundle` target now name their owner, RFC-0020 Slice 1 (was RFC-0008). Earlier: 2026-09-30 — § 11 `db-strong` marked reference, not deployed, with a warning that its symbol set breaks unescaped DSNs. Earlier the same day: which dashboard panels stay empty and why (Consul on Raft; lazily registered policy and route counters). Earlier: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_
+_Last updated: 2026-10-05 — `vault_rotator` is backed by a random per-cluster OpenBAO value shared by CNPG and the database configurator. The database-engine diagram now draws that credential path. Earlier: 2026-10-01 — listener TLS and the ESO `https` + `caBundle` target now name their owner, RFC-0020 Slice 1 (was RFC-0008). Earlier: 2026-09-30 — § 11 `db-strong` marked reference, not deployed, with a warning that its symbol set breaks unescaped DSNs. Earlier the same day: which dashboard panels stay empty and why (Consul on Raft; lazily registered policy and route counters). Earlier: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

@@ -134,12 +134,38 @@ class TestGenerate(unittest.TestCase):
             generate.build(ir)
         self.assertEqual(cm.exception.problems[0][0], "ir.schema")
 
-    def test_rejects_icon_on_datastore(self):
-        ir = _ir()
+    def test_datastore_logo_is_a_child_image(self):
+        # draw.io paints no image= on cylinder3, so the logo is its own cell
+        long_label = "product-db ×3 · sync any 1"  # wider than the 120 px floor
+        base = _ir()
+        base["nodes"][4]["label"] = long_label
+        plain = _cells(generate.build(base))
+        ir = copy.deepcopy(base)
         ir["nodes"][4]["icon"] = "postgresql"
-        with self.assertRaises(generate.IRError) as cm:
-            generate.build(ir)
-        self.assertIn("structural.icon_on_datastore", [p[0] for p in cm.exception.problems])
+        cells = _cells(generate.build(ir))
+        logo, db = cells["db__logo"], cells["db"]
+        self.assertEqual(logo.get("parent"), "db")
+        self.assertTrue(logo.get("style").startswith("shape=image;"))
+        self.assertIn("image=data:image/png,", logo.get("style"))
+        self.assertIn("shape=cylinder3", db.get("style"))
+        self.assertNotIn("image=", db.get("style"))
+        self.assertIn("spacingLeft=42", db.get("style"))
+        width = lambda c: float(c.find("mxGeometry").get("width"))
+        self.assertGreater(width(db), width(plain["db"]))
+        self.assertNotIn("db__logo", plain)
+
+    def test_datastore_logo_passes_the_gates(self):
+        # the logo is part of its cylinder: no orphan, overlap or frame finding
+        ir = _ir()
+        ir["boundaries"] = [{"id": "f_cluster", "label": "Kind cluster · homelab"},
+                            {"id": "f_apps", "label": "Applications", "parent": "f_cluster"}]
+        for n in ir["nodes"]:
+            if n["id"] in ("gw", "db"):
+                n["parent"] = "f_cluster"
+        ir["nodes"][4]["icon"] = "postgresql"
+        f = self._validate(ir)
+        self.assertEqual([x for x in f if x["severity"] == "ERROR"], [])
+        self.assertFalse([x for x in f if any(o.endswith("__logo") for o in x["objects"])])
 
     def test_rejects_duplicate_ids_across_kinds(self):
         ir = _ir()

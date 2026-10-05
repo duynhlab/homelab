@@ -34,6 +34,7 @@ import xml.etree.ElementTree as ET
 import yaml
 
 from _common import (
+    LOGO_SUFFIX,
     SCHEMA,
     load_manifest,
     load_preset,
@@ -51,6 +52,8 @@ FRAME_PAD = 18         # points of cluster margin around its children
 FRAME_TITLE_H = 24     # px Draw.io needs for a frame title
 PAD_TEXT = 14          # px of horizontal padding inside a card
 ICON_PAD = 44          # px the logo takes on the left of a card
+ICON_SIZE = 24         # px of the logo itself
+CYLINDER_CAP = 8       # px of the cylinder's top ellipse (`size=8`)
 LINE_H = 1.3           # line height, in em
 LANE_MIN = 10          # px between two lanes in a channel
 EDGE_FONT = 10
@@ -147,8 +150,6 @@ def ir_problems(ir: dict) -> list[tuple[str, list[str], str]]:
             out.append(("structural.broken_parent", [n["id"]], f"node '{n['id']}' parent '{n['parent']}' is not a boundary"))
         if n.get("icon") and n["icon"] not in icons:
             out.append(("structural.unknown_icon", [n["id"]], f"node '{n['id']}' icon '{n['icon']}' is not in the catalogue"))
-        if n.get("icon") and n.get("shape") == "datastore":
-            out.append(("structural.icon_on_datastore", [n["id"]], f"node '{n['id']}': a logo needs a card, not a cylinder"))
         planned = n.get("status") == "planned" or n["role"] == "planned"
         if planned and "planned" not in n["label"].lower():
             out.append(("house.planned_label", [n["id"]], f"node '{n['id']}' is planned but its label omits the word 'planned'"))
@@ -605,12 +606,25 @@ def node_style(n: dict, P: dict) -> str:
     dashed = n.get("status") == "planned" or n["role"] == "planned"
     if n.get("shape") == "datastore":
         rs = role_style(n["role"])
-        return (P["shapes"]["datastore"] + ("dashed=1;" if dashed else "") +
-                f"size=8;fillColor={rs['fillColor']};strokeColor={rs['strokeColor']};strokeWidth=1.5;"
+        # A logo is a child cell (logo_cell); the text moves right to clear it.
+        logo = "align=left;spacingLeft=42;" if n.get("icon") else ""
+        return (P["shapes"]["datastore"] + ("dashed=1;" if dashed else "") + logo +
+                f"size={CYLINDER_CAP};fillColor={rs['fillColor']};strokeColor={rs['strokeColor']};strokeWidth=1.5;"
                 f"fontColor={rs['fontColor']};fontFamily={font['fontFamily']};fontSize={font['fontSize']};")
     if n.get("icon"):
         return _style(P["label_style"], n["role"], dashed, n["icon"], font)
     return _style(P["plain_style"].replace("rounded=1;", "rounded=1;{dashed}", 1), n["role"], dashed, None, font)
+
+
+def logo_cell(n: dict, h: float) -> tuple[str, tuple[float, float, float, float]]:
+    """(style, geometry) of a datastore's logo, drawn as an image cell inside
+    the cylinder: draw.io paints no `image=` on `cylinder3`. Centred on the
+    body, i.e. below the top cap."""
+    path, _ = resolve_icon(n["icon"])
+    with open(path, "rb") as fh:
+        payload = base64.b64encode(fh.read()).decode()
+    y = (h - ICON_SIZE + CYLINDER_CAP) / 2
+    return f"shape=image;html=1;imageAspect=1;image=data:image/png,{payload};", (10, _snap(y, 1), ICON_SIZE, ICON_SIZE)
 
 
 def animated(e: dict, ir: dict) -> bool:
@@ -771,6 +785,9 @@ def build(ir: dict) -> str:
         x, y, w, h = lay.box[n["id"]]
         ox, oy = origin(n.get("parent"))
         _cell(root, n["id"], label_html(n["label"]), node_style(n, P), n.get("parent") or "1", (x - ox, y - oy, w, h))
+        if n.get("shape") == "datastore" and n.get("icon"):
+            style, geo = logo_cell(n, h)
+            _cell(root, n["id"] + LOGO_SUFFIX, "", style, n["id"], geo)
 
     for e in ir["edges"]:
         r = routes[e["id"]]

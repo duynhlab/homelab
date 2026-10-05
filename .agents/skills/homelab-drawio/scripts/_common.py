@@ -105,9 +105,20 @@ def role_dashed(role: str) -> str:
     return "dashed=1;" if role_style(role).get("dashed") else ""
 
 
+LOGO_SUFFIX = "__logo"
+
+
+def is_logo(cell) -> bool:
+    """A datastore's logo: an image cell drawn inside its cylinder, because
+    draw.io paints no `image=` on `cylinder3`. It is part of its parent, not a
+    node of its own, and it does not make the cylinder a frame."""
+    return (cell.get("id") or "").endswith(LOGO_SUFFIX) and (cell.get("style") or "").startswith("shape=image;")
+
+
 def parent_ids(cells) -> set:
-    """Ids that some other cell names as its `parent` -- i.e. cells owning children."""
-    return {c.get("parent") for c in cells if c.get("parent")}
+    """Ids that some other cell names as its `parent` -- i.e. cells owning children.
+    A datastore logo does not count: the cylinder carrying it is still a thing."""
+    return {c.get("parent") for c in cells if c.get("parent") and not is_logo(c)}
 
 
 def is_frame(style: str, cell_id, parents: set) -> bool:

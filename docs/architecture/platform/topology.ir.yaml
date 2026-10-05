@@ -49,8 +49,8 @@ nodes:
   - {id: pyro, label: "Pyroscope\nprofiles · 7 d", role: profile, layer: data, parent: f_obs, icon: pyroscope}
   - {id: vm, label: "VictoriaMetrics · VictoriaLogs · VictoriaTraces\nvmagent ingest · 7 d", role: metric, layer: data, parent: f_obs, icon: victoriametrics}
   - {id: ch, label: "ClickHouse\notel_logs · otel_traces · 90 d", role: data, layer: data, parent: f_obs, icon: clickhouse}
-  - {id: productdb, label: "product-db\nHA + DR replica", role: data, layer: data, parent: f_data, shape: datastore}
-  - {id: platformdb, label: "platform-db\nHA", role: data, layer: data, parent: f_data, shape: datastore}
+  - {id: productdb, label: "product-db\nHA + DR replica", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
+  - {id: platformdb, label: "platform-db\nHA", role: data, layer: data, parent: f_data, shape: datastore, icon: postgresql}
 
   - {id: grafana, label: "Grafana\none datasource per backend", role: platform, layer: view, parent: f_obs, icon: grafana}
 

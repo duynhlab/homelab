@@ -102,6 +102,16 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0029 research refreshed; it is still not ready for its README.** The
+  research now records the 2026-10-05 re-check (PostgreSQL 18.6 / CNPG 1.30.1,
+  local-stack's per-service non-superuser logins, Phase 0 merged in #989 but not
+  applied), adds pgroles v0.13.0 as a third object-authorization alternative —
+  useful for default privileges and drift review, unable to own the
+  `vault_rotator` edge because it does not manage membership `SET` — and adds
+  the unwatched `vault_rotator → notification` membership as a negative
+  invariant, with a monitoring-query guard as Phase 0 step 6. The gate stays at
+  9/11: live Phase 0 rotation and owner sign-off.
+
 - **RFC-0029 opens at `researching`: PostgreSQL authorization and access
   governance.** The research maps ten authorization layers and exactly 25
   production scenarios, with ownership/default privileges as the deep-dive

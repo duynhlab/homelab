@@ -48,18 +48,17 @@ spec:
         equal: ['job']
       # One incident, one page. Checkout fails CLOSED when inventory cannot
       # answer: every affected basket gets a real 503, so the Sloth
-      # availability/error-rate budgets keep burning (correct — a failed
-      # request is a failed request) and CheckoutHighErrorRate /
-      # CheckoutHighOverallErrorRate go to page. But the two rules below
-      # already page with the SKU ids and the actual fix, so on-call was
+      # availability budget keeps burning (correct — a failed request is a
+      # failed request) and CheckoutHighErrorRate goes to page. But the two
+      # rules below already page with the SKU ids and the actual fix, so on-call was
       # woken twice for one cause. The precise alert wins; the generic
       # burn-rate page is inhibited while it fires.
       #
       # Scoped deliberately, NOT by severity alone:
       #   - source: the two named checkout-availability alerts only
       #   - target: sloth_severity="page" (never the ticket alert — the
-      #     business-hours budget record must survive) AND only the two SLOs a
-      #     503 can burn. Latency is untouched: a fast 503 burns no latency
+      #     business-hours budget record must survive) AND only the
+      #     availability SLO, the one a 503 burns. Latency is untouched: a fast 503 burns no latency
       #     budget, so a latency page during this incident is a DIFFERENT
       #     problem and must still reach someone.
       #   - equal: ['service'] — Sloth stamps service=<name> on every
@@ -71,7 +70,7 @@ spec:
           - alertname=~"CheckoutAvailabilityErrors|CheckoutAvailabilityUnknownSKU"
         target_matchers:
           - sloth_severity="page"
-          - sloth_slo=~"availability|error-rate"
+          - sloth_slo="availability"
         equal: ['service']
 
     receivers:

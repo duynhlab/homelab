@@ -86,7 +86,6 @@ Each HTTP service has **3 SLOs** with default targets (overridable per-service v
 |---|---|---|---|
 | **Availability** | 99.5% | Non-5xx request ratio | `{Service}HighErrorRate` |
 | **Latency** | 95.0% | Requests < 500ms ratio | `{Service}HighLatency` |
-| **Error Rate** | 99.0% | Non-4xx/5xx request ratio | `{Service}HighOverallErrorRate` |
 
 inventory is gRPC-only and has its own two, on `rpc_server_call_duration_seconds`:
 

@@ -99,6 +99,18 @@ Skeleton (copy what you need):
   reaching a Service past the gateway, a host without `/etc/hosts`) are
   one-line `kubectl port-forward` snippets under setup.md § Prerequisites.
 
+#### Observability
+- **The `{Service}HighOverallErrorRate` alerts are gone** (mop chart 0.19.0,
+  picked up through the `>=0.13.0` semver source). The chart's third SLO
+  counted every 4xx as a failure against 99%, with page-severity burn arms.
+  A 4xx is the service answering correctly (a duplicate name, a stale
+  version, an unknown id). On Kind the E2E gate's deliberate negative rows
+  made product 25% and order 32% "errors" with zero 5xx, so every run paged
+  for about 6h. Server faults still page through the availability SLO (5xx),
+  and slow answers through latency. `slo.errorRate` is no longer a chart
+  value. The checkout inhibition now targets `sloth_slo="availability"`
+  only.
+
 #### Services
 - **The ADR-017 expand-phase aliases are gone** (payment-service v2.8.0,
   shipping-service v1.10.0). These now answer 404: payment's
@@ -219,6 +231,14 @@ Skeleton (copy what you need):
   reads the enabled route list out of the kustomization instead of a glob.
 
 #### Observability
+- **K5.8 no longer fails a Kind gate re-run on the gate's own trap.** A21
+  publishes an untracked `Untracked Widget <epoch>` product on purpose, and
+  `CheckoutAvailabilityUnknownSKU` (critical, 15m count-once) fires on it.
+  K5.8 now counts the `unknown_sku` events in that window and A21's trap
+  products from the last 20m. When every event is matched it prints
+  `attributed to the gate` and does not count the alert; one unmatched SKU
+  still fails the row. On Kind, two back-to-back `make e2e` runs both passed
+  25/25. A manual untracked SKU (3 events, 2 traps) failed K5.8 as intended.
 - **The inventory gRPC SLO stops counting business refusals as faults.** Its
   exclusion list was spelled the grpc-go way (`NotFound`,
   `FailedPrecondition`), but otelgrpc writes the spec names (`NOT_FOUND`,

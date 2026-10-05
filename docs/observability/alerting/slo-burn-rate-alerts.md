@@ -117,7 +117,6 @@ The alert name is reused for the SLO category (the SLI determines the meaning):
 |---|---|---|
 | Availability | `<svc>HighErrorRate` | 5xx fraction is burning the availability budget |
 | Latency | `<svc>HighLatency` | Fraction of requests slower than 500 ms is burning the latency budget |
-| Error rate | `<svc>HighOverallErrorRate` | 4xx + 5xx fraction is burning the error-rate budget |
 
 (Names are configurable in the `mop` chart values; defaults above match the chart at the time of writing.)
 
@@ -150,8 +149,6 @@ slo:
   latency:
     objective: 95.0
     threshold: "0.5"          # 500 ms — the bucket le="..."
-  errorRate:
-    objective: 99.0
 ```
 
 **Tightening the SLO** (e.g. `99.5 → 99.9`) **automatically tightens the alerts** — the burn-rate maths is anchored on `1 - objective`, so 14.4× of a smaller error budget triggers on a smaller absolute error rate. You don't (and shouldn't) hand-edit the burn-rate thresholds.

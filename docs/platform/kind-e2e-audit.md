@@ -1260,6 +1260,15 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
   no `critical` firing**, and `Watchdog` **present** — it is the dead-man's
   switch, so its absence is the failure, not its presence.
   **Expected on Kind, not a finding:**
+  - `CheckoutAvailabilityUnknownSKU` (critical) within 15 minutes of a gate run.
+    A21 trips it on purpose with an `Untracked Widget <epoch>` product. Since
+    2026-10-05, K5.8 counts the `unknown_sku` events in the alert's 15m window
+    and the A21 trap products created in the last 20m. When every event is
+    matched by a trap, it prints `attributed to the gate` and does not count
+    the alert. One more event than there are traps keeps it urgent and fails
+    the row. Before this, every re-run inside the window failed K5.8. Together
+    with the 4xx `error-rate` SLO, which mop 0.19.0 removed, that made a second
+    run within about 6h fail.
   - Sloth **`severity: ticket`** alerts (the slow-burn variants, 2h/1d and 6h/3d
     windows) firing while the cluster is younger than the window. On 2026-08-21 a
     cluster **1h51m** old had `CheckoutHighLatency`, `KeycloakLoginHighErrorRate`

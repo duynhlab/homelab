@@ -140,12 +140,12 @@ spec:
             runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/microservices/CheckoutAvailabilityRefusingEverything.md"
 
         # A SKU with no balance row anywhere. Not a ratio and no `for` grace at
-        # all: every one of these is a customer who got a 503 on a basket
-        # that may well be fulfillable, and the condition is PERSISTENT — it
-        # lasts until someone puts the row there. Nothing else fires on it:
-        # checkout fails closed so the shopper sees a 503, but the error ratio
-        # above deliberately excludes this value, and inventory itself answers
-        # successfully.
+        # all: every one of these is a customer refused a basket with
+        # 409 ITEM_NOT_ORDERABLE (ADR-053), and the condition is PERSISTENT — it
+        # lasts until someone puts the row there. Nothing else fires on it: the
+        # error ratio above deliberately excludes this value, and inventory
+        # itself answers successfully. The E2E gate's A21 row trips it on
+        # purpose; K5.8 attributes that firing to the gate.
         - alert: CheckoutAvailabilityUnknownSKU
           # COUNT-ONCE, so increase() not rate(). Measured on a live cluster
           # 2026-08-07: after exactly one event the raw counter read 1,
@@ -167,10 +167,10 @@ spec:
           annotations:
             summary: "Checkout is refusing baskets because inventory does not track a SKU (missing balance row)"
             description: >-
-              inventory.v1/CheckAvailability reported unknown_sku_ids for 5m.
-              Checkout fails closed on it — a 503, never "out of stock" — so
-              affected shoppers cannot check out at all, and the condition will
-              not clear on its own.
+              inventory.v1/CheckAvailability reported unknown_sku_ids in the
+              last 15m. Checkout refuses the basket with 409 ITEM_NOT_ORDERABLE
+              (never "out of stock"), so affected shoppers cannot check out at
+              all, and the condition will not clear on its own.
             runbook: >-
               The SKU ids are in checkout's logs and on the span
               (checkout.unknown_sku_ids) — they are deliberately NOT in the

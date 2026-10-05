@@ -83,15 +83,16 @@ spec:
           # error query to nothing and this SLO would go blind the same way the
           # HTTP one did. Unrecognised => counted. Fails loud.
           #
-          # Codes are the Go `codes.Code.String()` names, e.g. "OK",
-          # "FailedPrecondition" — NOT the numeric semconv form. Confirmed live:
-          # rpc_server_call_duration_seconds_count{app="inventory"} carries
-          # rpc_response_status_code="OK".
+          # Codes are the spec names otelgrpc writes ("NOT_FOUND", "CANCELLED"),
+          # not grpc-go's Code.String() ("NotFound", "Canceled"). The CamelCase
+          # list used here until 2026-10-05 matched only "OK", so every
+          # NOT_FOUND and FAILED_PRECONDITION burned this budget. Check a label
+          # value that differs between the two spellings, never "OK".
           errorQuery: |
             sum(rate(rpc_server_call_duration_seconds_count{
               app="inventory",
               namespace="inventory",
-              rpc_response_status_code!~"OK|NotFound|InvalidArgument|FailedPrecondition|AlreadyExists|Aborted|Canceled"
+              rpc_response_status_code!~"OK|NOT_FOUND|INVALID_ARGUMENT|FAILED_PRECONDITION|ALREADY_EXISTS|ABORTED|CANCELLED"
             }[{{.window}}]))
           totalQuery: |
             sum(rate(rpc_server_call_duration_seconds_count{

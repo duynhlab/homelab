@@ -219,6 +219,17 @@ Skeleton (copy what you need):
   reads the enabled route list out of the kustomization instead of a glob.
 
 #### Observability
+- **The inventory gRPC SLO stops counting business refusals as faults.** Its
+  exclusion list was spelled the grpc-go way (`NotFound`,
+  `FailedPrecondition`), but otelgrpc writes the spec names (`NOT_FOUND`,
+  `FAILED_PRECONDITION`), and only `OK` is spelled the same in both. So every
+  untracked-SKU lookup and every stock refusal burned a 99.9% budget:
+  `InventoryGrpcHighErrorRate` paged after each Kind E2E run (A21's one
+  `NOT_FOUND` out of ~84 calls a day) and after every `make e2e-load`. With
+  the spec spelling, the same 26h of Kind data counts 0 errors, and the alert
+  went from firing to inactive. `CheckoutAvailabilityUnknownSKU`'s text now
+  says 409 `ITEM_NOT_ORDERABLE` (ADR-053) instead of the 503 checkout stopped
+  returning in 0.9.0.
 - **`CNPGWALArchiveFailing` no longer pages after a Postgres pod restart.**
   The rule was two `increase()` arms. A restarted pod's series is re-born with
   its old `failed_count`, and VictoriaMetrics counts a small re-born counter

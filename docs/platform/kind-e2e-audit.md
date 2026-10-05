@@ -1277,12 +1277,12 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
     nothing in this repo sets its limits. Record it and move on.
   - **After running `make e2e-load`**, expect `InventoryGrpcHighErrorRate` on
     `page`. Sustained order load exhausts a SKU's seeded stock, inventory then
-    answers `FailedPrecondition: insufficient stock to reserve`, and the saga
-    fails — which is inventory *working*, refusing to oversell. The alert counts
-    that business rejection as a gRPC error, so a correct refusal inflates an
-    error-rate SLO. Worth a decision of its own (should `FailedPrecondition` be
-    excluded from the error ratio?); until then it is drill fallout, not a
-    defect. `MicroserviceNoSuccessfulRequests` firing alongside it usually means
+    answers `FAILED_PRECONDITION: insufficient stock to reserve`, and the saga
+    fails — which is inventory *working*, refusing to oversell. The SLO was
+    always meant to exclude that refusal, but until 2026-10-05 its exclusion
+    list was spelled `FailedPrecondition` while the label reads
+    `FAILED_PRECONDITION`, so it never matched. With the spelling fixed this
+    alert should no longer follow a load run; if it does, it is a real fault. `MicroserviceNoSuccessfulRequests` firing alongside it usually means
     a worker was scaled to zero for the backlog drill and never scaled back.
   > The row used to read *"nothing is firing on a healthy stack"*, which is
   > **unachievable by construction** here: `Watchdog` fires by design, and the

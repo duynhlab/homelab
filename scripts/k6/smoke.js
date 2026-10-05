@@ -424,9 +424,22 @@ const UNITS = [
       const rules = [];
       for (const g of groups) for (const r of g.rules || []) rules.push(r);
       const firing = rules.filter((r) => r.state === 'firing');
+      const gateTrap = firing.some((r) => r.name === 'CheckoutAvailabilityUnknownSKU')
+        ? unknownSkuFromGateTrap()
+        : null;
       const urgent = firing.filter(
-        (r) => r.labels && (r.labels.severity === 'page' || r.labels.severity === 'critical')
+        (r) =>
+          r.labels &&
+          (r.labels.severity === 'page' || r.labels.severity === 'critical') &&
+          !(gateTrap && gateTrap.attributed && r.name === 'CheckoutAvailabilityUnknownSKU')
       );
+      if (gateTrap) {
+        console.log(
+          `${id} CheckoutAvailabilityUnknownSKU: ${gateTrap.events} unknown_sku event(s) in 15m, ` +
+            `${gateTrap.traps} A21 trap product(s) in 20m -> ` +
+            (gateTrap.attributed ? 'attributed to the gate' : 'NOT the gate: counted as urgent')
+        );
+      }
       // Deliberately no total-rule count: the alert catalog marks a subset
       // inactive on Kind, so a number here would fail for platform reasons.
       // `ticket` severity firing on a young cluster is expected, not a finding.
@@ -442,6 +455,32 @@ const UNITS = [
     },
   },
 ];
+
+// A21 (staff.js) trips CheckoutAvailabilityUnknownSKU on purpose: it publishes
+// "Untracked Widget <epoch>" with no balance row, is refused 409, then receives
+// stock for it. The alert's 15m increase() outlives the row, so a gate re-run
+// inside that window read the gate's own trap as an incident and failed K5.8.
+// The firing is attributed to the gate only when every unknown_sku event in the
+// window is matched by a trap created in it (20m, for scrape lag); one more
+// untracked SKU than there are traps keeps it urgent.
+function unknownSkuFromGateTrap() {
+  const raw = promqlScalar(
+    target.vm,
+    'sum(increase(checkout_availability_check_total{result="unknown_sku"}[15m]))'
+  );
+  const events = raw === null ? null : Math.round(raw);
+  const res = http.get(
+    `${target.base}/product/v1/protected/products?status=ACTIVE&page=1&page_size=50`,
+    bearer('staff', identityFor('staff', 0))
+  );
+  const since = Math.floor(Date.now() / 1000) - 20 * 60;
+  const items = (res.status === 200 && (res.json() || {}).items) || [];
+  const traps = items.filter((p) => {
+    const m = /^Untracked Widget (\d+)$/.exec(p.name || '');
+    return m && Number(m[1]) >= since;
+  }).length;
+  return { events, traps, attributed: events !== null && traps > 0 && events <= traps };
+}
 
 // --- wiring ----------------------------------------------------------------
 

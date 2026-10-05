@@ -37,8 +37,6 @@ This uses the default SLO targets (99.5% availability, 95% latency, 99% error ra
       latency:
         objective: 99.0    # stricter latency
         threshold: "0.3"   # 300ms instead of 500ms
-      errorRate:
-        objective: 99.5    # stricter error rate
 ```
 
 ### Step 2: Deploy
@@ -82,8 +80,6 @@ slo:
   latency:
     objective: 95.0       # 95% < 500ms
     threshold: "0.5"      # 500ms threshold
-  errorRate:
-    objective: 99.0       # 99% non-4xx/5xx
 ```
 
 ## How Metric Discovery Works (OTLP push)

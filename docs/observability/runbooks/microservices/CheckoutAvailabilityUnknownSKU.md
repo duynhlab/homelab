@@ -23,7 +23,7 @@ somebody puts the row there.
 ## Why this is its own alert
 Nothing else fires on it, by design:
 
-- the shopper's 503 is not an error at inventory — the RPC **succeeded**;
+- the shopper's 409 is not an error at inventory — the RPC **succeeded**;
 - [`CheckoutAvailabilityErrors`](CheckoutAvailabilityErrors.md) counts `result="error"`
   only, and deliberately excludes this value from its denominator so a data gap
   cannot dilute the error ratio and suppress that page;

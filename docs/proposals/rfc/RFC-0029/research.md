@@ -120,9 +120,10 @@
    2026-10-05) and replaced with a per-cluster OpenBAO value. The 2026-09-04
    audit ran the prior committed tree and measured `INHERIT`, membership
    `INHERIT`, and `SET` all true; Phase 0 changes those targets to false. The
-   old value stays in public Git history, so no existing cluster is fixed until
-   the merged manifests are applied and the live rotation runbook rejects the
-   old credential.
+   old value stays in public Git history, so a cluster is fixed only once the
+   merged manifests are applied and the live rotation runbook rejects the old
+   credential — done on the Kind cluster on 2026-10-05 (see the Phase 0
+   execution record).
 
 ## Evidence model
 
@@ -509,8 +510,8 @@ changed or were re-read since:
 |---|---|
 | PostgreSQL / CNPG | 18.6 / 1.30.1. Patch releases: the 14 experiments were not re-run; CNPG-04 is repeated on every CNPG minor or major change |
 | Local-stack | One non-superuser login per service, worker, Keycloak and Temporal, owning its database and used by both runtime and migrations (`local-stack/postgres/init.sql`, CHANGELOG 2.0.0). Same single-credential shape as the cluster; no three-role parity |
-| Phase 0 manifests | Merged in #989; the Kind cluster has neither the `platform-db-vault-rotator-secret` ExternalSecret nor the `vault-rotator` DatabaseRole yet |
-| `vault_rotator` | Unchanged live: `rolinherit = t`; notification membership `admin/inherit/set = t/t/t` |
+| Phase 0 manifests | Merged in #989 and applied to the Kind cluster at 14:25 UTC (OCI `local@sha256:71d0a53b`); see the Phase 0 execution record |
+| `vault_rotator` | Before Phase 0: `rolinherit = t`, notification membership `admin/inherit/set = t/t/t`. After: `rolinherit = f`, `t/f/f` |
 | PUBLIC CONNECT | Unchanged: `datacl IS NULL` on every `platform-db` database |
 
 ### Existing decisions this work would extend or supersede
@@ -748,8 +749,8 @@ rollback/revoke step.
   indexes; all three research/runbook Mermaid diagrams render and were visually
   checked for clipping and ambiguous flow.
 - The live catalog audit and 13-allow/59-reject HBA sweep passed on the Linux
-  Kind cluster. Old-password rejection remains pending until the merged
-  Phase 0 manifests are applied and the live rotation is executed.
+  Kind cluster. Old-password rejection was proven on 2026-10-05 after the
+  merged Phase 0 manifests were applied (Phase 0 execution record).
 
 ## Integration paths
 
@@ -826,6 +827,28 @@ A fresh Kind cluster can rehearse convergence and the eight-column target, but
 it cannot prove revocation of a compromised password that was never seeded.
 That final proof must run against the existing cluster after the merged
 manifests are applied, with the KV path pre-seeded before Flux reconciles them.
+
+#### Phase 0 execution record (Kind, 2026-10-05)
+
+Run by the rotation runbook on the long-lived `kind-homelab` cluster
+(PostgreSQL 18.6, CNPG 1.30.1, OpenBAO 2.7.0), as the `infra-team` OIDC
+identity. No password value was printed or placed in a process argument.
+
+| Step | Time (UTC) | Result |
+|---|---|---|
+| Before | 14:05 | `vault_rotator`: `f · t · t · f · notification · t · t · t` |
+| Suspend `databases-local`, seed KV (version 1) | 14:24 | ok |
+| `flux-push` from `main` (`a13183e6`) + apply `vault-rotator.yaml` | 14:25 | OCI `local@sha256:71d0a53b`; ExternalSecret `SecretSynced` |
+| DatabaseRole converges | 14:25 | `PasswordSecretChange` = the new Secret version, `applied=true` (first attempt was `forbidden` until the operator added the Secret to the instance Role — see the runbook) |
+| `GRANT … WITH INHERIT FALSE, SET FALSE, ADMIN TRUE` | 14:26 | `f · t · f · f · notification · t · f · f` — all eight columns match |
+| Recreate `openbao-db-config`, resume Flux | 14:26 | Job Complete with the new credential; 29/29 Kustomizations Ready; `platform-db` 3/3 |
+| Force `database/rotate-role/notification` | 14:27 | both notification Secret copies changed version; restarted workload Ready; a fresh login as `notification` through the pooler with the rotated password succeeds |
+| Old administrator password | 14:28 | `FATAL: password authentication failed for user "vault_rotator"` |
+| New administrator password (control) | 14:28 | login succeeds over the same HBA path |
+| Kind E2E smoke | ≈14:30 | 15/15 rows, 50/50 assertions, including K5.8 (no alert fired) |
+
+Step 6 (the membership guard) is not done yet and is tracked separately; the
+edge is correct now but nothing alerts if it drifts again.
 
 ### Phase 1 — lab and policy contract
 
@@ -964,8 +987,9 @@ integration separate lets the self-managed lab prove that portable core first.
 
 ## Research review gate
 
-**Current result: 9/11.** Only the existing-cluster Phase 0 execution and owner
-sign-off remain open.
+**Current result: 10/11.** Only owner sign-off remains open. The Phase 0
+membership guard (step 6) is still to be built, but it is a rollout item, not a
+research gate item.
 
 - [x] Answers a real-world platform/security problem rather than generic vendor marketing
 - [x] Problem statement names situation, affected roles, and cost of doing nothing
@@ -973,9 +997,9 @@ sign-off remain open.
 - [x] Platform as-built section filled from manifests and clearly labeled as manifest evidence
 - [x] Primary use-case direction stated as a research conclusion
 - [x] PostgreSQL 18 and CNPG 1.30 disposable experiments completed (14/14 pass)
-- [ ] Existing-cluster Phase 0 rotation completed; catalog audit is complete
-      and the remediation is merged (#989), but it is not applied to the
-      cluster and the old password has not been rejected
+- [x] Existing-cluster Phase 0 rotation completed on 2026-10-05: remediation
+      applied, eight-column invariant met, notification rotation proven, and the
+      old password rejected (Phase 0 execution record)
 - [x] Context7/source-tree and live-CRD audit complete
 - [x] Mermaid diagrams distinguish the current and conceptual paths
 - [x] No fleet authorization rollout is smuggled into this research file
@@ -984,5 +1008,5 @@ sign-off remain open.
 ---
 _Last verified: 2026-10-05 (re-check on PostgreSQL 18.6 / CNPG 1.30.1 and
 pgroles v0.13.0 docs; disposable labs, catalog/HBA audit and Context7/source
-audit from 2026-09-04 on 18.1 / 1.30.0; Phase 0 live credential rotation and
-owner gate remain open)._
+audit from 2026-09-04 on 18.1 / 1.30.0; Phase 0 live credential rotation
+executed and verified on Kind 2026-10-05; owner gate remains open)._

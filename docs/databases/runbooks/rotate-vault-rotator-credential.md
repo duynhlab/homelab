@@ -31,10 +31,10 @@ flowchart LR
     Role --> PG[("platform-db")]
     Engine -->|"rotate notification"| PG
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Operator,Secret service;
     class Job worker;
     class Bao,Engine platform;
@@ -72,7 +72,7 @@ run once and cannot add this path to an existing OpenBAO installation.
 
    ```bash
    export BAO_ADDR=http://127.0.0.1:8200
-   bao login -method=oidc
+   bao login -method=oidc   # no browser on this host: add skip_browser=true
    OLD_SECRET_RV="$(kubectl get secret -n platform \
      platform-db-vault-rotator-secret \
      -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || true)"
@@ -133,6 +133,9 @@ run once and cannot add this path to an existing OpenBAO installation.
      sleep 2
    done
    test "$OBSERVED_RV" = "$NEW_SECRET_RV"
+   # On the first rollout `applied` can read false with "cannot get resource
+   # secrets" for a few seconds, until the operator adds the new Secret to the
+   # instance Role. Re-read it; do not continue while it stays false.
    test "$(kubectl get databaserole -n platform \
      platform-db-role-vault-rotator \
      -o jsonpath='{.status.applied}')" = true
@@ -272,6 +275,18 @@ configurator then reads that same Secret.
        WHERE usename = 'notification' AND datname = 'notification';")" = t
    ```
 
+   Behind PgBouncer those sessions can be server connections opened before the
+   rotation, so also log in once through the pooler with the rotated value. The
+   password travels on stdin and is never printed:
+
+   ```bash
+   kubectl get secret -n notification platform-db-notification-secret \
+     -o jsonpath='{.data.password}' | base64 -d |
+     kubectl exec -i -n platform "$PRIMARY" -c postgres -- sh -c \
+       'IFS= read -r PGPASSWORD; export PGPASSWORD
+        psql "host=platform-db-pooler-rw user=notification dbname=notification" -Atc "select current_user"'
+   ```
+
 4. Attempt an HBA-valid connection and enter the compromised password only at
    `psql`'s silent prompt. It must fail with `password authentication failed`:
 
@@ -282,6 +297,12 @@ configurator then reads that same Secret.
      psql -W -h platform-db-rw.platform.svc -U vault_rotator \
      -d notification -c 'select 1'
    ```
+
+   Without a terminal, run the same check from the primary and feed the value
+   on stdin (`IFS= read -r PGPASSWORD` as above, `host=platform-db-rw
+   user=vault_rotator`). Repeat it with the new value from
+   `platform-db-vault-rotator-secret`: that login must succeed, which proves the
+   failure is the password and not HBA or the network.
 
    Never copy the compromised value back into this runbook, a manifest, shell
    history, or incident ticket.
@@ -315,4 +336,4 @@ configurator then reads that same Secret.
 - [Revoke a compromised credential](../../secrets/runbooks/revoke-compromised-credential.md)
 
 ---
-_Last updated: 2026-09-05._
+_Last updated: 2026-10-05 — notes from the first live run on Kind: headless OIDC login, the transient `applied=false` after the first apply, a pooler login as rotation evidence, and a non-interactive old-password check. 2026-09-05: first version._

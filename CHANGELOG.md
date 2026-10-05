@@ -102,6 +102,17 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0029 Phase 0 ran on the Kind cluster, and the leaked `vault_rotator`
+  password is now rejected.** The runbook pre-seeded KV, applied the #989
+  manifests, repaired the membership to `ADMIN TRUE, INHERIT FALSE, SET FALSE`,
+  forced a notification rotation through the new credential and proved the old
+  value fails with `password authentication failed` while the new one logs in.
+  The research records the run step by step; its gate moves to 10/11, leaving
+  only owner sign-off. The membership drift guard is still to be built. The
+  rotation runbook gains what the run taught: headless OIDC login, a transient
+  `applied=false` after the first apply, a pooler login as rotation evidence,
+  and a non-interactive old-password check.
+
 - **RFC-0029 research refreshed; it is still not ready for its README.** The
   research now records the 2026-10-05 re-check (PostgreSQL 18.6 / CNPG 1.30.1,
   local-stack's per-service non-superuser logins, Phase 0 merged in #989 but not

@@ -6,12 +6,13 @@
 | **Status** | researching |
 | **Scope** | platform-wide |
 | **Created** | 2026-09-03 |
-| **Last updated** | 2026-09-05 |
+| **Last updated** | 2026-10-05 |
 
 > **Plain-language research.** This is the evidence and teaching record before
 > an authorization architecture is proposed. It covers self-managed PostgreSQL
-> 18.1 on CloudNativePG 1.30. Cloud database IAM is reference material only and
-> is not a v1 rollout target.
+> 18 on CloudNativePG 1.30 (labs measured on 18.1 / 1.30.0; the cluster runs
+> 18.6 / 1.30.1 since 2026-10-05). Cloud database IAM is reference material only
+> and is not a v1 rollout target.
 >
 > **Scope fence:** the companion Vietnamese deep dive and the RFC proposal do
 > not exist yet. Repository process requires this research to pass its source,
@@ -114,13 +115,14 @@
    API and migration Job, differing only by direct-primary versus pooled
    endpoint. The live audit measured 147/147 application tables across 11
    audited application databases owned by that same service login.
-6. **The first security fix is operational, not educational.** A committed
-   `vault_rotator` password is removed by the current working-tree manifests and
-   replaced with a per-cluster OpenBAO value. The 2026-09-04 audit ran the prior
-   committed tree and measured `INHERIT`, membership `INHERIT`, and `SET` all
-   true; Phase 0 changes those targets to false. No existing cluster is fixed
-   until these manifests land and the live rotation runbook rejects the old
-   credential.
+6. **The first security fix is operational, not educational.** The committed
+   `vault_rotator` password was removed from the manifests by #989 (merged
+   2026-10-05) and replaced with a per-cluster OpenBAO value. The 2026-09-04
+   audit ran the prior committed tree and measured `INHERIT`, membership
+   `INHERIT`, and `SET` all true; Phase 0 changes those targets to false. The
+   old value stays in public Git history, so no existing cluster is fixed until
+   the merged manifests are applied and the live rotation runbook rejects the
+   old credential.
 
 ## Evidence model
 
@@ -162,10 +164,10 @@ flowchart LR
     Search["search_path + CREATE on schema"] --> Function
     Policy --> Decision{"Operation allowed?"}
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef platform fill:#7c3aed,color:#fff,stroke:#5b21b6;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
-    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class Identity external;
     class Login,Membership,Capability platform;
     class ACL,Owner,Policy,Function,Search data;
@@ -482,8 +484,8 @@ experiment for every CNPG minor/major change.
 | PostgreSQL | 18.1 on operational `platform-db` and `product-db` |
 | CNPG | 1.30.0 |
 | Service databases | 13 (`temporal` and `temporal_visibility` share one role) |
-| Standalone DatabaseRoles | Live committed-tree audit: 12 applied service/platform roles. Current working-tree target: 13 after adding the standalone `vault_rotator` role |
-| Service role membership | Twelve service/platform role manifests declare `inRoles: []`; the working-tree `vault_rotator` target declares membership by name and repairs its PG18 options with SQL |
+| Standalone DatabaseRoles | Live committed-tree audit: 12 applied service/platform roles. Phase 0 target (merged in #989): 13 after adding the standalone `vault_rotator` role |
+| Service role membership | Twelve service/platform role manifests declare `inRoles: []`; the Phase 0 `vault_rotator` target declares membership by name and repairs its PG18 options with SQL |
 | Database ownership | Each application database is owned by the same login role used by the service; Temporal owns two databases |
 | Workload credential split | None: each ResourceSet feeds the same `db_secret` and role name to runtime and migrations |
 | Local-stack parity | None: all application and migration connections use PostgreSQL superuser `postgres` |
@@ -497,6 +499,19 @@ experiment for every CNPG minor/major change.
 The 2026-09-04 verification run supplies the catalog evidence summarized here.
 It used the committed tree at `b6659b04`, not these Phase 0 manifests; that
 distinction prevents a target state from being mislabeled as deployed.
+
+#### Re-check 2026-10-05
+
+The counts above are 2026-09-04 measurements and were not re-taken. These rows
+changed or were re-read since:
+
+| Item | 2026-10-05 |
+|---|---|
+| PostgreSQL / CNPG | 18.6 / 1.30.1. Patch releases: the 14 experiments were not re-run; CNPG-04 is repeated on every CNPG minor or major change |
+| Local-stack | One non-superuser login per service, worker, Keycloak and Temporal, owning its database and used by both runtime and migrations (`local-stack/postgres/init.sql`, CHANGELOG 2.0.0). Same single-credential shape as the cluster; no three-role parity |
+| Phase 0 manifests | Merged in #989; the Kind cluster has neither the `platform-db-vault-rotator-secret` ExternalSecret nor the `vault-rotator` DatabaseRole yet |
+| `vault_rotator` | Unchanged live: `rolinherit = t`; notification membership `admin/inherit/set = t/t/t` |
+| PUBLIC CONNECT | Unchanged: `datacl IS NULL` on every `platform-db` database |
 
 ### Existing decisions this work would extend or supersede
 
@@ -525,9 +540,9 @@ flowchart LR
     Migration --> Role
     Role --> DB[("svc database and objects")]
 
-    classDef service fill:#06b6d4,color:#082f49,stroke:#0e7490;
-    classDef worker fill:#f59e0b,color:#451a03,stroke:#b45309;
-    classDef data fill:#22c55e,color:#052e16,stroke:#15803d;
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     class Secret,Runtime service;
     class Migration worker;
     class Role,DB data;
@@ -546,7 +561,7 @@ the exact HBA pair admits it to the `notification` database and that login owns
 the database objects, the leaked credential was also a direct notification-data
 authority, not only password-rotation authority.
 
-The current working tree is the Phase 0 target and now:
+The Phase 0 change, merged in #989 on 2026-10-05:
 
 - removes the committed `vault_rotator` password from CNPG bootstrap SQL and the
   OpenBAO configurator Job;
@@ -560,7 +575,7 @@ The current working tree is the Phase 0 target and now:
 
 It also changes the role to `NOINHERIT` and the grant to `INHERIT FALSE, SET
 FALSE, ADMIN TRUE`. This is not live proof. The credential remains compromised
-on any already running cluster until the working tree lands, the runbook repairs
+on any already running cluster until the merged manifests are applied, the runbook repairs
 the existing membership options, and the old password is rejected.
 
 ## Candidate target architecture
@@ -693,6 +708,7 @@ rollback/revoke step.
 | New application functions are not executable by PUBLIC by default | **False today** — `pg_default_acl` is empty; no application definer function currently exists |
 | Manual privilege drift is captured or revoked within the incident window | **Planned** — CNPG-06 measured drift surviving at least 600 seconds and repairing only after a trigger |
 | Deleting a CR cannot silently drop an object-owning production role | **Measured true** in CNPG-05; `retain` preserves it and `delete` finalization blocks while ownership remains |
+| `vault_rotator → notification` keeps `ADMIN TRUE, INHERIT FALSE, SET FALSE`, and drift on that edge raises an alert | **False on 2026-10-05** — the edge is `t/t/t` and nothing watches it; a membership recreated from `inRoles` (CNPG-04) or restored from backup loses `ADMIN` and breaks notification rotation without a signal |
 
 ## Experiment plan and evidence
 
@@ -732,8 +748,8 @@ rollback/revoke step.
   indexes; all three research/runbook Mermaid diagrams render and were visually
   checked for clipping and ambiguous flow.
 - The live catalog audit and 13-allow/59-reject HBA sweep passed on the Linux
-  Kind cluster. Old-password rejection remains pending until the Phase 0
-  working-tree manifests land and the live rotation is executed.
+  Kind cluster. Old-password rejection remains pending until the merged
+  Phase 0 manifests are applied and the live rotation is executed.
 
 ## Integration paths
 
@@ -781,6 +797,7 @@ Two independent choices must not be collapsed into one comparison.
 |---|---|---|
 | **Service-owned authorization migrations** | Authorization changes with schema; no second migration engine; clear schema ownership | Requires cross-repo migration and chart/ResourceSet coordination |
 | **Central platform authorization Job** | One policy surface and rollout controller | Homelab couples to every service schema; ordering and rollback duplicate application migrations |
+| **Declarative policy controller** (pgroles v0.13.0, evaluated 2026-10-05) | Converges grants, default privileges (global and per-schema, so the PG-05 global revoke becomes declarative), schema owners and membership `inherit`/`admin`; polls for drift; `diff --review-out` records a reviewable plan with a fingerprint, which fits scenario 25 and the drift-collector question | Does not inspect or manage membership `SET` (its docs forbid a `SET FALSE` boundary on a managed edge, so it cannot own `vault_rotator → notification`), RLS, column grants or `MAINTAIN`; the operator is `v1alpha1`; needs its own privileged executor (CREATEROLE plus INHERIT on each owner) with the same credential problem Phase 0 solves; a second controller on roles CNPG already manages |
 
 The leading hypothesis is owner/migrator/runtime identities with service-owned
 authorization migrations, plus capability roles where multiple identities
@@ -800,10 +817,15 @@ owner gate passes. The PG18/CNPG experiments now support the mechanism.
    `inherit_option=false`, and `set_option=false`.
 4. Force one notification rotation and prove the static credential still flows.
 5. Prove the compromised administrator password is rejected.
+6. Add the accepted stopgap for the membership gap: a custom query in
+   `platform-db/configmaps/monitoring-queries.yaml` that reads the edge's three
+   options from `pg_auth_members` (readable by PUBLIC, so the exporter needs no
+   new grant), and an alert when they differ from `t/f/f`.
 
 A fresh Kind cluster can rehearse convergence and the eight-column target, but
 it cannot prove revocation of a compromised password that was never seeded.
-That final proof must run against the existing cluster after the manifests land.
+That final proof must run against the existing cluster after the merged
+manifests are applied, with the KV path pre-seeded before Flux reconciles them.
 
 ### Phase 1 — lab and policy contract
 
@@ -811,8 +833,9 @@ That final proof must run against the existing cluster after the manifests land.
   first recorded run passed 14/14 experiments.
 - Define catalog queries for effective access and drift.
 - Define role naming, ownership, Secret, HBA, and reclaim conventions.
-- Decide whether local-stack adopts non-superuser owner/migrator/runtime roles
-  or authorization remains an explicitly Kind-only release gate.
+- Local-stack already runs one non-superuser login per service (CHANGELOG
+  2.0.0); decide whether it adopts owner/migrator/runtime or authorization
+  remains an explicitly Kind-only release gate.
 - Pass research review; then author the RFC and Vietnamese deep dive.
 
 ### Phase 2 — one service canary
@@ -829,8 +852,8 @@ That final proof must run against the existing cluster after the manifests land.
 
 - Roll by domain, never all databases at once.
 - Require positive CRUD/migration tests and negative privilege tests per service.
-- Make local-stack stop using `postgres` so the release gate exercises the same
-  authorization failure modes.
+- Give local-stack the same owner/migrator/runtime roles so the release gate
+  exercises the same authorization failure modes.
 - Add scheduled drift/access-review evidence and expiring exception inventory.
 
 ### Phase 4 — advanced mechanisms
@@ -851,7 +874,8 @@ That final proof must run against the existing cluster after the manifests land.
 - [ ] What is the maximum compatibility window before the legacy `<svc>` login
       must be removed?
 - [ ] Which catalog collector owns periodic drift evidence: a read-only CronJob,
-      an existing monitoring path, or an on-demand CI/access-review command?
+      an existing monitoring path, an on-demand CI/access-review command, or a
+      read-only `pgroles diff --review-out` (see Alternatives)?
 - [ ] Which PG18 membership options are platform defaults, and how are
       non-default options reconciled outside `DatabaseRole`?
 - [ ] Does the initial ownership transfer use an operator runbook or a
@@ -862,9 +886,12 @@ That final proof must run against the existing cluster after the manifests land.
       are summarized in this research document.
 - [x] Live Kind catalog inventory and HBA sweep completed on 2026-09-04; the
       Phase 0 credential rotation itself remains open.
-- [ ] Which E2E gate protects authorization while local-stack runs every
-      service and migration as superuser `postgres`: add three-role parity or
-      declare and automate a Kind-only authorization gate?
+- [ ] Which E2E gate protects authorization while local-stack runs each
+      service's runtime and migrations as one login that owns its database:
+      add three-role parity or declare and automate a Kind-only authorization
+      gate?
+- [ ] Where does the `vault_rotator` membership guard run (the Phase 0 step 6
+      query and alert), and does it gate the Kind E2E or only page?
 
 ## FAQ
 
@@ -932,6 +959,8 @@ integration separate lets the self-managed lab prove that portable core first.
 | Context7 CNPG API, reconciler, and declarative-role docs | Context7 source tree audit, 2026-09-04 | confirmed; versioned docs snippets were incomplete, so source and live CRD are load-bearing |
 | Live CRD immutability and reserved-name rules | Kind CNPG 1.30.0 CRD | confirmed |
 | Live catalog vs manifests | Kind `platform-db` and `product-db`, PostgreSQL 18.1 | confirmed; measured results are summarized in the as-built audit and experiment tables above |
+| Re-check: versions, local-stack roles, `vault_rotator` membership, PUBLIC CONNECT | Kind on PostgreSQL 18.6 / CNPG 1.30.1 and `main`, 2026-10-05 | confirmed; see the 2026-10-05 re-check table |
+| pgroles limitations, memberships, recorded reviews | pgroles documentation at tag `v0.13.0`, 2026-10-05 (not a Context7 source) | confirmed; summarized in the Alternatives row |
 
 ## Research review gate
 
@@ -944,15 +973,16 @@ sign-off remain open.
 - [x] Platform as-built section filled from manifests and clearly labeled as manifest evidence
 - [x] Primary use-case direction stated as a research conclusion
 - [x] PostgreSQL 18 and CNPG 1.30 disposable experiments completed (14/14 pass)
-- [ ] Existing-cluster Phase 0 rotation completed; catalog audit is complete,
-      but the working-tree remediation has not landed and the old password has
-      not been rejected
+- [ ] Existing-cluster Phase 0 rotation completed; catalog audit is complete
+      and the remediation is merged (#989), but it is not applied to the
+      cluster and the old password has not been rejected
 - [x] Context7/source-tree and live-CRD audit complete
 - [x] Mermaid diagrams distinguish the current and conceptual paths
 - [x] No fleet authorization rollout is smuggled into this research file
 - [ ] Owner sign-off: **ready for RFC**
 
 ---
-_Last verified: 2026-09-04 (PostgreSQL 18.1 and CNPG 1.30.0 disposable labs,
-live Kind catalog/HBA audit, Context7/source-tree and live-CRD audit; Phase 0
-live credential rotation and owner gate remain open)._
+_Last verified: 2026-10-05 (re-check on PostgreSQL 18.6 / CNPG 1.30.1 and
+pgroles v0.13.0 docs; disposable labs, catalog/HBA audit and Context7/source
+audit from 2026-09-04 on 18.1 / 1.30.0; Phase 0 live credential rotation and
+owner gate remain open)._

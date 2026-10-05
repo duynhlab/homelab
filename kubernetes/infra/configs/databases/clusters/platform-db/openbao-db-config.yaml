@@ -20,12 +20,19 @@ kind: Job
 metadata:
   name: openbao-db-config
   namespace: platform
+  annotations:
+    # The Pod template is immutable. Phase 0 replaces the committed credential
+    # with a Secret reference, so Flux must recreate the completed Job once.
+    kustomize.toolkit.fluxcd.io/force: enabled
   labels:
     app.kubernetes.io/name: openbao-db-config
     app.kubernetes.io/component: database
 spec:
   backoffLimit: 5
-  ttlSecondsAfterFinished: 3600
+  # Deliberately retain the completed Job. If TTL deletes it, Flux recreates it
+  # every reconciliation; during an administrator rotation that can race ESO
+  # and write the previous Secret version back into OpenBAO. The rotation
+  # runbook deletes this Job only after CNPG observes the new Secret version.
   template:
     metadata:
       labels:
@@ -46,6 +53,16 @@ spec:
           env:
             - name: HOME
               value: /tmp
+            - name: DB_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: platform-db-vault-rotator-secret
+                  key: username
+            - name: DB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-db-vault-rotator-secret
+                  key: password
             # MUST be the active node, not the round-robin `openbao` Service.
             # This Job WRITES; `openbao` selects all three pods (no
             # `openbao-active` label in its selector), so two requests in three
@@ -79,12 +96,14 @@ spec:
 
               echo "Configuring database/config/platform-db (retry until platform-db-rw is reachable)..."
               n=0
-              until bao write database/config/platform-db \
+              # `password=-` keeps the credential out of the process argument
+              # list and OpenBAO command logs; bao reads it from stdin.
+              until printf '%s' "$DB_ADMIN_PASSWORD" | bao write database/config/platform-db \
                   plugin_name=postgresql-database-plugin \
                   allowed_roles="notification" \
                   connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=disable" \
-                  username="vault_rotator" \
-                  password="V4ult-R0t8-2026!" 2>/dev/null; do
+                  username="$DB_ADMIN_USERNAME" \
+                  password=- 2>/dev/null; do
                 n=$((n + 1)); [ "$n" -ge 60 ] && { echo "ERROR: database/config failed after 300s (platform-db unreachable / vault_rotator?)"; exit 1; }
                 echo "  platform-db not reachable yet, retry 5s..."; sleep 5
               done

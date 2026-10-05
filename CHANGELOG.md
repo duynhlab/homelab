@@ -88,6 +88,36 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Feature
+
+#### Proposals
+
+- **RFC-0029 opens at `researching`: PostgreSQL authorization and access
+  governance.** The research maps ten authorization layers and exactly 25
+  production scenarios, with ownership/default privileges as the deep-dive
+  center. Its verification record proves 14/14 PostgreSQL 18.1/CNPG 1.30
+  experiments, catalogs 147 service-owned tables, and passes the live HBA and
+  Context7/source audits. It records owner/migrator/runtime as a hypothesis and
+  keeps Phase 0 live rotation plus owner approval visibly open; no RFC README or
+  Vietnamese domain guide is created before those gates pass.
+
+### Bugfix
+
+#### Databases
+
+- **The committed `vault_rotator` database password is removed from current
+  manifests and replaced with one random value per cluster.** Fresh OpenBAO
+  bootstrap writes the value to KV; ESO projects one reload-labelled
+  basic-auth Secret; a full CNPG `DatabaseRole` applies it to PostgreSQL; and
+  the OpenBAO database configurator reads the same Secret with the password on
+  stdin instead of its process arguments. The new rotation runbook makes the
+  existing-cluster pre-seed mandatory, stages rollout behind a suspended Flux
+  database wave, enforces all three unmodeled PG18 membership options, exercises
+  an actual notification workload reconnect, and requires the historical
+  credential to fail. The retained Job is force-replaced only after CNPG
+  observes the new Secret revision; repository state alone does not claim that
+  live revocation has happened.
+
 ## [2.0.0] - 2026-10-05
 
 <!-- markdown-link-check-disable -->

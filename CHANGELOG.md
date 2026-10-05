@@ -88,429 +88,96 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-05
+
+<!-- markdown-link-check-disable -->
+<!-- Condensed at release time; the full entries are in Git history before this cut. -->
+
+The hold-clearing release: every group from the 2026-09-28 bot sweep closed
+([#1107](https://github.com/duynhlab/homelab/issues/1107)) — Go 1.27.1 across
+the fleet, Temporal 1.32 with Worker Controller 1.12, ClickHouse 26.9 for the
+`keyValuePairs` log index, PostgreSQL 18.6, RustFS 1.0 — and the Kind E2E gate
+stopped tripping its own alerts, which surfaced a real inventory SLO bug.
+
 ### Breaking Change
 
 #### GitOps
-- **`make flux-ui` and `scripts/flux-ui.sh` are gone.** Every UI it forwarded
-  is served by an HTTPRoute on `*.duynh.me` (`make hosts`), three of its
-  targets (Jaeger, Tempo, the Zalando operator UI) no longer exist, and its
-  `pkill -f "kubectl port-forward"` killed every port-forward on the host.
-  The three uses the routes do not cover (the RustFS S3 API on `:9000`,
-  reaching a Service past the gateway, a host without `/etc/hosts`) are
-  one-line `kubectl port-forward` snippets under setup.md § Prerequisites.
+- `make flux-ui` and `scripts/flux-ui.sh` are removed; every UI is an HTTPRoute on `*.duynh.me` (`make hosts`).
 
 #### Observability
-- **The `{Service}HighOverallErrorRate` alerts are gone** (mop chart 0.19.0,
-  picked up through the `>=0.13.0` semver source). The chart's third SLO
-  counted every 4xx as a failure against 99%, with page-severity burn arms.
-  A 4xx is the service answering correctly (a duplicate name, a stale
-  version, an unknown id). On Kind the E2E gate's deliberate negative rows
-  made product 25% and order 32% "errors" with zero 5xx, so every run paged
-  for about 6h. Server faults still page through the availability SLO (5xx),
-  and slow answers through latency. `slo.errorRate` is no longer a chart
-  value. The checkout inhibition now targets `sloth_slo="availability"`
-  only.
+- The `{Service}HighOverallErrorRate` alerts and the mop chart's 4xx `error-rate` SLO are removed (mop 0.19.0); `slo.errorRate` is no longer a chart value.
 
 #### Services
-- **The ADR-017 expand-phase aliases are gone** (payment-service v2.8.0,
-  shipping-service v1.10.0). These now answer 404: payment's
-  `/protected/attempts/open`, `/protected/reconciliations/runs[/:id]`,
-  `/internal/reconciliation/runs[/:id]` and `/public/webhooks/mockpay`, and
-  shipping's `/public/track` and `/public/estimate`. Both edges drop the
-  webhook alias match; e2e-audit A7 and the k6 smoke suite now expect the
-  shipping alias to be 404.
+- The ADR-017 aliases answer 404: payment's `/protected/attempts/open`, `/protected/reconciliations/runs[/:id]`, `/internal/reconciliation/runs[/:id]` and `/public/webhooks/mockpay` (deprecated in v2.7.0, removed in v2.8.0), and shipping's `/public/track` and `/public/estimate` (v1.10.0).
 
 ### Feature
 
 #### GitOps
-- **Every script has a Makefile entry point:** `make hosts` (setup-hosts.sh,
-  `ARGS=remove`), `make seed` (kind-seed.sh), `make db-isolation` and
-  `make edge-isolation` (`ARGS=--live`). `make flux-sync` reconciles the three
-  pushed OCI sources and then every Kustomization that is not suspended,
-  instead of six hard-coded names.
-- **The ClickHouse DDL image lives in the new `duynhlab/images` repository**
-  ([duynhlab/images](https://github.com/duynhlab/images)). It is released by
-  tag as `ghcr.io/duynhlab/images/clickhouse-ddl:1.0.0` — reproducible, cosign
-  signed, provenance attested — and `job.yaml` pins `:1.0.0@sha256:…`. The
-  in-repo copy, the `ddl-*` make targets and the build workflow are gone;
-  `.github/workflows/platform-images.yml` now verifies that every
-  `ghcr.io/duynhlab/images/*` reference resolves to its pinned digest and
-  carries that repository's release signature, and Renovate tracks those
-  references. A new platform image needs no change on this side. SQL
-  unchanged: on Kind the Job re-ran from the new image and `SHOW CREATE TABLE`
-  was byte-identical on all three replicas.
+- Every script has a Makefile entry point (`make hosts`, `seed`, `db-isolation`, `edge-isolation`); `make flux-sync` reconciles every unsuspended Kustomization.
+- Platform images move to `duynhlab/images`; `platform-images.yml` verifies each pinned digest and its cosign signature.
 
 #### Observability
-- **Log attribute lookups use a key-value index** (clickhouse-ddl 1.1.0).
-  `otel_logs` gains `idx_log_attr_kv`, a `keyValuePairs` text index on
-  `LogAttributes` that answers `LogAttributes['k'] = 'v'` from one index. The
-  existing `mapKeys`/`mapValues` pair cannot tell which key a value sat
-  under. On Kind, rare pairs whose value also appears under other keys
-  (`refund.id`, `payment.id`, `outbox_id`) read 7–8k rows instead of
-  80–175k. The DDL stays fresh-only, so Kind was migrated by hand
-  (`ADD INDEX`, then `MATERIALIZE INDEX`: about 17s for 42 parts, a 3.0 MiB
-  index). The procedure is in the ClickHouse README. The schema Job pins
-  `clickhouse-ddl:1.1.0`, and the DDL now needs ClickHouse 26.9+.
-- **The OTel microservices board marks deploys and links to traces and logs**
-  (grafana-dashboards `0.4.0`). A Deploys annotation marks the first sample
-  of each new `service_version`, a Running versions table lists the version
-  every service's instances report, and the per-service error, gRPC
-  per-callee and DB panels link to that service's traces in VictoriaTraces
-  and logs in VictoriaLogs over the board's time range.
-- **Every as-code dashboard renders all of its panels**
-  (grafana-dashboards `0.3.0`). The generator had left every panel id at 0,
-  and Grafana's v2 renderer keys panels by id, so each grid row showed its
-  first panel in every slot: on Kind `business-otel` showed 2 distinct
-  panels of 11, `kubernetes-cluster-overview` 4 of 24, `pgdog` 8 of 30.
-  The same release ports `microservices-monitoring-001-otel` 1:1 from the
-  helm-charts source: 40 panels in 7 rows instead of 28, including the
-  missing success-RPS, total-request, requests-by-endpoint and gRPC
-  per-callee panels, with the source's legends and descriptions. Verified on
-  Kind: every board renders as many distinct panels as it has, and the OTel
-  board shows data in all 40 under load.
+- `otel_logs` gains `idx_log_attr_kv`, a `keyValuePairs` index for `LogAttributes['k'] = 'v'` (clickhouse-ddl 1.1.0, ClickHouse 26.9+); Kind was migrated by hand.
+- The OTel microservices board marks deploys, lists running versions and links to traces and logs (grafana-dashboards 0.4.0).
+- Every as-code dashboard renders all of its panels, and the OTel board is ported 1:1 (grafana-dashboards 0.3.0).
 
 #### Temporal
-- **One cluster-wide Temporal connection.** The two identical namespaced
-  `Connection`s (`order`, `checkout`) are replaced by a single
-  `ClusterConnection` `temporal-mop` in `configs/temporal`, which both
-  `WorkerDeployment`s reference through `connectionRef.objectRef` (Worker
-  Controller >= 1.10). `make validate` now checks that reference, rejects a
-  namespaced `Connection` beside a worker, and validates the two CRs against
-  vendored schemas generated from the pinned CRDs chart, because the community
-  catalog's `WorkerDeployment` schema predates `objectRef`.
+- One `ClusterConnection` (`temporal-mop`) replaces the two namespaced `Connection`s; `make validate` checks the reference.
 
 #### Local-stack
-- **Local-stack databases are owned by per-service roles, as on the cluster.**
-  Every service, its migrate and seed jobs, the two workers, Keycloak and
-  Temporal now connect as their own non-superuser role (`<name>` /
-  `<name>-local`), and each database is owned by that role with `CONNECT`
-  revoked from `PUBLIC` — the cluster's per-service triplet (RFC-0012,
-  ADR-013) instead of one shared `postgres` superuser. The shared
-  `DB_USER`/`DB_PASSWORD` defaults are gone from the service anchor, so a
-  consumer without its own role fails at start instead of borrowing one.
+- Each service, worker, Keycloak and Temporal connects as its own non-superuser role, as on the cluster.
 
 #### Docs
-- **A Draw.io TLS topology shows which hops are encrypted today, who issues
-  their certificates, and whether each is verified.** `security/tls-topology`
-  is embedded as the new `docs/secrets/cert-manager.md` § 12, alongside a
-  quick-facts table, a per-hop inventory with file:line evidence and the
-  live-cluster checks. Only three hops carry verified TLS: browser → edge and
-  the two `id.duynh.me` hairpins (OpenBao OIDC config, Flux web UI).
-  payment → `product-db-rw` is TLS, unverified (`sslmode=require`). Every
-  other in-cluster hop is plaintext: app → pooler, gRPC, Temporal, OpenBao
-  `:8200`, Keycloak `:8080`, Valkey, telemetry and RustFS.
-- **A second Draw.io diagram shows one worker release, and the work-layer
-  diagram matches the manifests again.** `workflows/temporal-worker-versions`
-  draws order-fulfillment mid-ramp: build A Current and build B Ramping, each
-  with its own Deployment and ScaledObject, the Worker Controller setting
-  Ramping and Current on the server, and KEDA scaling each build on its own
-  backlog. Nothing is dashed, because every object in it is deployed.
-  `workflows/temporal-keda` now carries the 2.9.1 / 0.12.1 worker tags,
-  controller 1.9.0, the controller's edges to the server and to KEDA, polls
-  drawn from the worker, and the workers' database writes. `api/temporal.md`
-  no longer says a drained version is deleted a day later; `deleteDelay` is
-  `0s`.
+- Draw.io views of the TLS topology and of one worker release; the work-layer diagram matches the manifests.
 
 #### Proposals
-- **RFC-0020 amended with slices 7–14 and decisions 9–12 (proposed; status
-  stays `provisional`).** The new slices cover the gaps the TLS review found
-  outside slices 0–6, each with its scope, its order relative to 0–6, and the
-  finding it closes:
-  - an intermediate CA and a root `renewBefore`;
-  - Keycloak HTTPS in-cluster (JWKS, Grafana OAuth);
-  - `verify-full` for the platform-db clients (Temporal, the OpenBao DB
-    engine, Keycloak JDBC);
-  - an Envoy `BackendTLSPolicy` per backend;
-  - RustFS TLS for Barman, DR, the ClickHouse cold tier and Pyroscope;
-  - Valkey auth, then TLS;
-  - OCI registry TLS with Flux cosign `verify`;
-  - the KMS link over HTTPS.
-
-  The RFC's own drift is corrected in the same change: "exactly one
-  certificate (the Kong edge wildcard)"; the expiry alert it planned to add,
-  which already exists at 7d; and research's PgDog-upstream row, which said
-  "plaintext" against its own `tls_verify` default of `prefer`.
+- RFC-0020 gains slices 7–14 and decisions 9–12 (proposed).
 
 ### Bugfix
 
 #### Gateway
-- **`scripts/setup-hosts.sh` lists only the 17 hosts an enabled HTTPRoute
-  serves.** Gone: the bare `duynh.me` (the listeners match `*.duynh.me` only),
-  `jaeger` and `tempo` (retired with RFC-0027), and the four MCP hosts
-  (`routes/mcp.yaml` is commented out since 2026-08-21). The K0.6 audit row
-  reads the enabled route list out of the kustomization instead of a glob.
+- `scripts/setup-hosts.sh` lists only the 17 hosts an enabled HTTPRoute serves.
 
 #### Observability
-- **K5.8 no longer fails a Kind gate re-run on the gate's own trap.** A21
-  publishes an untracked `Untracked Widget <epoch>` product on purpose, and
-  `CheckoutAvailabilityUnknownSKU` (critical, 15m count-once) fires on it.
-  K5.8 now counts the `unknown_sku` events in that window and A21's trap
-  products from the last 20m. When every event is matched it prints
-  `attributed to the gate` and does not count the alert; one unmatched SKU
-  still fails the row. On Kind, two back-to-back `make e2e` runs both passed
-  25/25. A manual untracked SKU (3 events, 2 traps) failed K5.8 as intended.
-- **The inventory gRPC SLO stops counting business refusals as faults.** Its
-  exclusion list was spelled the grpc-go way (`NotFound`,
-  `FailedPrecondition`), but otelgrpc writes the spec names (`NOT_FOUND`,
-  `FAILED_PRECONDITION`), and only `OK` is spelled the same in both. So every
-  untracked-SKU lookup and every stock refusal burned a 99.9% budget:
-  `InventoryGrpcHighErrorRate` paged after each Kind E2E run (A21's one
-  `NOT_FOUND` out of ~84 calls a day) and after every `make e2e-load`. With
-  the spec spelling, the same 26h of Kind data counts 0 errors, and the alert
-  went from firing to inactive. `CheckoutAvailabilityUnknownSKU`'s text now
-  says 409 `ITEM_NOT_ORDERABLE` (ADR-053) instead of the 503 checkout stopped
-  returning in 0.9.0.
-- **`CNPGWALArchiveFailing` no longer pages after a Postgres pod restart.**
-  The rule was two `increase()` arms. A restarted pod's series is re-born with
-  its old `failed_count`, and VictoriaMetrics counts a small re-born counter
-  from 0, so a two-day-old failure paged `platform-db` after the CNPG 1.30.1
-  upgrade. The rule is now `last_failed_time > last_archived_time` for 5m: the
-  last attempt failed and nothing has been archived since. It is immune to
-  re-born series, and it pages about 5 minutes after archiving stops instead of
-  about 18. vmalert-tool unit tests replayed the restart (the old rule fires,
-  the new one stays quiet), a stuck archiver (both fire) and a one-off failure
-  (neither fires).
-- **Grafana gets 1Gi.** On Kind its container had been OOMKilled 43 times:
-  every restart climbed to ~510Mi against the 512Mi limit and died again, so
-  the real working set was hidden by the cap. At 1Gi it settles at ~434Mi
-  after 20 minutes with no restart. Limit 512Mi → 1Gi, request 128Mi → 256Mi.
-- **Grafana-managed alerts leave NoData, OTel pies show their legends**
-  (grafana-dashboards `0.3.1`). On a healthy cluster every as-code alert
-  rule sat in NoData: the Postgres rule queried a dashboard variable that
-  alerts never resolve, and the three Kubernetes count rules returned an
-  empty vector. They now group by `cnpg_io_cluster` or fall back to
-  `vector(0)`. The two OTel pies hid their legends and counted only the last
-  rate sample; they now count over the board's time range without `/health`.
-- **VictoriaMetrics gets 1Gi.** `vmsingle` held about 184k active series at
-  ~7.3k samples/s, and its anon RSS sat at 453Mi of a 512Mi limit (88%), so
-  the critical `VMTooHighMemoryUsage` alert (anon RSS over 80% of available
-  memory for 10 minutes) was firing and the Kind smoke gate's K5.8 row failed.
-  Limit 512Mi → 1Gi, request 256Mi → 512Mi.
+- The inventory gRPC SLO excluded business refusals under grpc-go spellings that never matched the spec names otelgrpc writes; it now matches `NOT_FOUND` / `FAILED_PRECONDITION`.
+- K5.8 attributes A21's own `CheckoutAvailabilityUnknownSKU` firing to the gate, so a Kind re-run passes.
+- `CNPGWALArchiveFailing` compares archiver timestamps and no longer pages after a pod restart.
+- Grafana and VictoriaMetrics get 1Gi (OOM loop, and the critical memory alert).
+- Grafana-managed alerts leave NoData; the OTel pies show their legends (grafana-dashboards 0.3.1).
 
 #### Databases
-- **Barman retention runs again; it had failed on every run since the
-  clusters were created.** Each ObjectStore's `destinationPath` ended in `/`,
-  and Barman builds one listing prefix by joining it with another `/`. RustFS
-  answers a `//` prefix with `InvalidArgument`, so `barman-cloud-backup-delete`
-  and `barman-cloud-backup-list` exited 4 every five minutes on all three
-  clusters, and the 30d/7d recovery windows never deleted an object. The paths
-  lose the trailing slash; object keys do not change.
+- Barman retention runs again: `destinationPath` lost the trailing slash that RustFS rejected.
 
 #### Security
-- **The Kyverno "Emergency disable" runbook works now.** It told the operator
-  to annotate a `ClusterPolicy` with `kyverno.io/disabled=true`; Kyverno has no
-  such annotation, and no `ClusterPolicy` has existed since ADR-078. The
-  section gives the Git path (`validationActions: [Audit]`, or
-  `evaluation.admission.enabled: false`, then `make flux-push`) and the
-  `flux suspend` → `kubectl patch validatingpolicy` → `flux resume`
-  break-glass, both measured on Kind. The legacy `validationFailureAction:
-  Enforce` wording in the two Kyverno runbooks and the alerts comment now says
-  `validationActions: [Deny]`.
+- The Kyverno emergency-disable runbook describes a procedure that works with `ValidatingPolicy`.
 
 #### Temporal
-- **`TemporalServiceErrorRateHigh` measures what a client sees.** It summed
-  every service's errors over every service's requests, so 99% of its
-  numerator was control-flow `NotFound` (on Kind, 26,551 of 26,774 errors in
-  24 h were history→matching `QueryWorkflow` lookups) and internal hops were
-  counted twice; the ratio peaked at 27%. It now divides the frontend's
-  server faults (`Internal`, `Unavailable`, `DeadlineExceeded`, `DataLoss`,
-  `ResourceExhausted`) by the frontend's requests, alerting above 2% for
-  10 minutes; over the same 24 h it reads 0.
+- `TemporalServiceErrorRateHigh` counts frontend server faults only.
 
 #### Local-stack
-- **Migrations no longer race Postgres's init restart.** The healthcheck ran
-  `pg_isready` over the unix socket. The image's init sequence first runs a
-  temporary server that listens on the socket only, then stops it and starts
-  the real one, so the check could report healthy during that window and
-  release the migrate jobs into the restart. One fresh `up` lost product, cart,
-  payment and notification migrations that way. The check now goes over TCP
-  (`-h 127.0.0.1`), which the temporary server never answers. With a 0.5s probe
-  interval, the old check turned healthy 3–5s before the real server in 3 of 3
-  runs, and the new one turned healthy after it in 3 of 3. Three
-  `down -v && up` cycles then finished all 18 migrate/seed jobs with exit 0.
-- **Every Phase C row of the E2E release audit prints a verdict.** C2–C4,
-  C8–C10 and C12–C15 printed raw rows and left the pass bar to the reader.
-  VictoriaLogs' `stream_field_values` answer ends without a newline, so the
-  next row's result was glued onto the end of that JSON line, and C13 and C15
-  read as blank on two runs. They had passed; nobody could see it. Each row
-  now parses its answer and prints `Cn OK` or `Cn FAIL`. C9 checks that the
-  three saga counters agree instead of printing them. The C13 notes and pass
-  criteria describe the OTLP access log that ADR-060 introduced, which
-  delivers `host` and no longer shares the Vector-leg cause with C14. The
-  evidence table names A22 and C22. Phase B and C may run during A13's
-  30-minute wait.
+- The Postgres healthcheck probes TCP, so migrations no longer race the init restart.
+- Every Phase C row of the E2E release audit prints a verdict.
 
 #### Docs
-- **docs/api matches the served routes again.** The retired
-  `POST /product/v1/internal/products` (RFC-0023 slice B, ADR-047) is gone
-  from product.md and caching.md, whose create section now describes the
-  protected catalog writes that replaced it. mockpay's provider routes
-  (`/charges…`, `/refunds`, `/transactions`, `/health`) are declared as an
-  explicit exception to the collection-noun rule, with their own table in
-  payments.md and a dated amendment to ADR-017.
-- **`dashboards-v2.md` See also links the live dashboards-as-code wiring**
-  (`grafana-dashboards-as-code-{folders,dashboards}.yaml` and its OCI
-  source); it pointed at the `obs-as-code-*` files #1085 deleted.
-- **`docs/testing/k6.md` lists `restock.js`**, which `make e2e-restock` has run
-  since 2026-08-24.
-- **The database TLS hops are measured, not guessed.** `pg_stat_ssl` on
-  both Kind primaries (2026-10-01) settles the rows #1181 left
-  "unconfirmed": PgDog → product-db, Keycloak JDBC, the CNPG PgBouncer server
-  connections and replication run TLS 1.3, still unverified because the
-  clients use `prefer`/`require`; Temporal and the OpenBao DB engine →
-  platform-db are plaintext. cert-manager § 12, the `security/tls-topology`
-  Draw.io view (regenerated), RFC-0020 research and product-db's `pg_hba`
-  comment say so. The edge Certificate notes no longer call the Kind gate
-  "pending" (it has passed since), and the inline cert-manager chart copy
-  reads v1.21.2.
-- **Platform docs match the deployed cluster.** The Kustomization count is
-  re-counted (30 declared, 29 applied; the platform hub said 24). setup.md's
-  tree and dependency graph gain the Keeper, schema, flux-web, KEDA,
-  Policy Reporter and dashboards-as-code waves, and the hub graph gains
-  `keda-local`. `checkout-worker` is a `Connection` + `WorkerDeployment`
-  (ADR-064), not a HelmRelease. Kyverno docs stop describing `ClusterPolicy`
-  as current (ADR-078 is complete). Keycloak's image reads 26.7.4, CI's Go
-  1.27 and golangci-lint v2.14.0, and the docs index's ADR count 83.
-  VictoriaTraces is the fast trace path, not a pilot, and the MCP servers
-  are marked not deployed.
-- **Versions and counts across the area docs match the manifests.**
-  Grafana 13.2.2, VTSingle v0.11.1, ClickHouse and Keeper 26.8, local VM
-  v1.152.0, Barman plugin 0.8.1 (with `destinationPath` shown without its
-  trailing slash), OpenBAO 2.7.0 and ESO v2.11.0. Runbook, dashboard,
-  database and alert counts are re-derived. The KEDA board links point at
-  the dashboards-as-code artifact, not the deleted `keda.json`. Retired Tempo
-  and auth-service no longer read as live in the local-stack parity matrix
-  and the E2E audit's A6 row. The Kyverno exception count is zero.
-  `docs/api/temporal.md` and `observability.md` drop "pending" and "planned"
-  claims that have since landed. The local cluster README describes the
-  OpenTofu bootstrap, the `homelab` cluster and registry, and the real
-  `apps-local` dependencies.
-- **The TLS docs match the manifests.** OpenBAO listener TLS and the ESO
-  `https` + `caBundle` target name their owner, RFC-0020 Slice 1; they named
-  RFC-0008. The prod Let's Encrypt path is labelled planned, since no
-  production cluster deploys cert-manager or the edge. `homelab-ca` no longer
-  claims to sign webhook certs; each chart runs its own self-signed Issuer.
-  cert-manager § 11.3 names both bundle mount shapes, so it agrees with the
-  Bundle manifest. payment's direct database hop reads "TLS, unverified" in
-  `databases/architecture.md` and `poolers.md`, not "direct TLS". Three
-  manifest comments are corrected, with no behaviour change: the Temporal
-  Worker Controller webhook's issuer, a dead path in the edge Certificate, and
-  product-db's `pg_hba` note on the PgDog hop.
-- **The ClickHouse docs name the deployed plugin 4.22.0**; three places still
-  said 4.20.0 after the bump.
-- **Database docs no longer describe a three-instance DR replica**
-  ([#1137](https://github.com/duynhlab/homelab/issues/1137) follow-up). The
-  architecture inventory, the backup-target reasoning, and the replica's
-  backup manifest comment now match the single-instance `product-db-replica`
-  (three only after promotion). The `product-db` and `platform-db` headers
-  list every hosted database and say quorum `ANY 1` instead of "1 sync, 1
-  async". The CNPG chart rules README marks the physical-lag files as not
-  applied, since `replication-health.yaml` replaced them.
+- docs/api matches the served routes; mockpay's provider routes are a declared ADR-017 exception.
+- Platform, database, TLS, ClickHouse and version/count docs re-checked against the manifests.
 
 ### Dependency
 
+#### GitOps
+- KEDA chart 2.21.0, aws-cli 2.37.7, renovatebot/github-action 46.3.6.
+
 #### Observability
-- Grafana VictoriaMetrics datasource 0.25.2 → 0.26.1 and VictoriaLogs
-  datasource 0.29.0 → 0.32.0 (cluster; VictoriaLogs also local-stack). The
-  VictoriaLogs line limit is pinned to 50, since 0.31 raised the plugin default
-  to 1000. Renovate now tracks both plugins' release URL, `GrafanaDatasource`
-  and compose pins, one grouped PR per plugin.
+- ClickHouse server and Keeper 26.9 (from the 26.8 LTS, by choice); Grafana 13.2.3; VictoriaMetrics datasource 0.26.1, VictoriaLogs datasource 0.32.0.
 
 #### Databases
-- **PostgreSQL 18.1 → 18.6** on `platform-db`, `product-db` and the DR
-  replica (`ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie`). 18.6 fixes
-  28 CVEs. Local-stack had already drifted to 18.6 through the floating
-  `postgres:18-alpine`, and is now pinned to `postgres:18.6-alpine`. None of
-  the post-upgrade actions in the 18.2–18.6 release notes apply here: there are
-  no `ltree`/`btree_gist` indexes, no logical slots (`output_plugin_libraries`
-  keeps the built-in plugins), no `pgp_*` callers, and
-  `temporal_visibility`'s GIN-indexed table reports a sane `reltuples`.
-  Renovate never proposed this bump, because it does not read a CNPG
-  `imageName:`; a regex manager now tracks it. On Kind CNPG updated both
-  clusters in about 10 minutes, restarting the primaries in place, and
-  `make e2e GATE=kind` passed. The primary restarts caused one ~2-minute burst
-  of Temporal persistence `Unavailable` errors, and `CNPGWALArchiveFailing`
-  stayed quiet.
+- PostgreSQL 18.1 → 18.6 (28 CVEs), with Renovate now tracking CNPG `imageName:`; CNPG operator 1.30.1; Barman Cloud plugin chart 0.8.1; RustFS 1.0.1.
 
 #### Services
-- **frontend v3.2.2 and admin-service v0.4.4 on Kind.** Both build and test
-  on Node 26, pin their node and nginx base images by digest, and move to
-  TypeScript 7; no behaviour or API change. Both passed the full local-stack
-  release audit (A/B/C + C22) from scratch. The first run's C22 found the
-  Temporal SDK's `temporal_request_resource_exhausted` counter and its
-  `cause` attribute missing from the semconv registry, which pkg#119
-  declared before the rerun.
-- **payment v2.8.0 (and mockpay) and shipping v1.10.0 on Kind** — the
-  ADR-017 contract releases that remove the expand-phase aliases. Both passed
-  the full local-stack release audit (A/B/C + C22) from scratch, with A7
-  asserting the shipping alias is 404.
-- **payment v2.7.0 (and mockpay) and admin-service v0.4.3 on Kind.** payment
-  serves the canonical protected paths beside their deprecated aliases;
-  the Backoffice calls the canonical ones and its runtime image carries
-  pcre2 10.49-r0 (CVE-2026-103111). Both passed the full local-stack release
-  audit (A/B/C + C22) from scratch.
-- **order v2.10.2 and checkout v0.13.2 on Kind** (Temporal Go SDK 1.49.0;
-  order-worker and checkout-worker too). Both tags passed the full
-  local-stack release audit (A/B/C + C22) from scratch on their merged SHAs;
-  the first run's C22 found the SDK's new `failure_reason` attribute missing
-  from the semconv registry, which pkg#117 declared before the rerun.
-- **The fleet runs on Go 1.27.1** ([#1107](https://github.com/duynhlab/homelab/issues/1107)
-  G2): user 2.5.1, product 1.16.1, inventory 0.9.1, cart 2.4.1, order 2.10.1,
-  review 2.4.1, shipping 1.9.1, notification 2.4.1, payment 2.6.1, checkout
-  0.13.1, the two workers on the same tags (#1182, ramped to Current by the
-  Worker Controller), and mockpay on payment 2.6.1. The builder, the `go`
-  directive and every `duynhlab/pkg` module move together (pkg's Go 1.27.1
-  line: `obsx` v0.48.0, `httpmw` v0.4.0, `logger/slogx` v0.4.0, the rest
-  `v0.38.0`/`v0.37.0`/`v0.45.0`). The `.0` tags carry the same code but cut no
-  GitHub Release, because GoReleaser still pinned Go 1.26. gha-workflows#137
-  makes it read `go.mod`, and the `.1` tags carry the release. Integration
-  tests now wait the way the postgres module prescribes and run on
-  PostgreSQL 18. Every tag passed the full local-stack release audit
-  (A/B/C + C22) on its merged commit.
-- **The fleet runs the 2026-10-01 patch releases**: user 2.4.1, product
-  1.15.1, inventory 0.8.1, cart 2.3.1, order 2.9.1, review 2.3.1, shipping
-  1.8.1, notification 2.3.1, payment 2.5.1, checkout 0.12.1, the two workers
-  on the same tags (#1176), and mockpay on payment 2.5.1. Escaped DSN
-  credentials, pgx 5.11, dbx v0.37.0 and alpine 3.24 reach the cluster. Every
-  tag passed the full local-stack release audit (A/B/C + C22) on its merged
-  SHA before it was cut.
+- Fleet on Go 1.27.1 and the 2026-10-01 patch releases; order 2.10.2 and checkout 0.13.2 (Temporal SDK 1.49); payment 2.8.0, shipping 1.10.0, frontend 3.2.2, admin-service 0.4.4. Every tag passed the full local-stack release audit.
 
 #### Temporal
-- **Temporal Worker Controller 1.12.0** (both charts 0.28.0 → 0.31.0). It
-  prunes superseded inactive versions, reports poller and gate-workflow
-  health as conditions, scales draining versions back up from zero, and
-  no longer treats an already-current version as a rollback. Chart 0.30.0
-  dropped the cert-manager subchart; ours was never installed
-  (`certmanager.install: false`), so the dead key is removed and the
-  webhook certificate is still issued by the platform's cert-manager.
-- **Temporal UI 2.55.0 on the cluster**, pinned over chart 1.7.0's 2.54.1 so
-  the cluster matches local-stack. It adds the Scheduled system view,
-  worker-deployment connection status by default and resizable table
-  columns; the k6 saga suite's reads of the UI JSON API (SG.3, SG.4) pass.
-- **Temporal server 1.32.0** (chart 1.6.0 → 1.7.0, admin-tools and the
-  local-stack server 1.32.0, local-stack UI 2.55.0). No schema change: the
-  Postgres stores stay at temporal 1.19 / visibility 1.14. The 1.32
-  visibility query converter now type-checks search-attribute filters; our
-  only attributes are the Keyword `OrderId` and `SessionId`, and no service
-  issues a visibility query. Chart 1.7.0 gives the namespace Job its own
-  `useHelmHooks` switch, defaulting to true, so it is set false beside the
-  schema one. The search-attributes Job now carries
-  `kustomize.toolkit.fluxcd.io/force`, so an admin-tools bump re-creates it
-  instead of failing `temporal-config-local` on an immutable template.
-  The retired operator's four `*.yaml.bak` manifests (HelmRelease, the
-  TemporalCluster/TemporalNamespace CRs and its HelmRepository) are
-  deleted; git history keeps them.
-
-### Deprecation
-
-#### Services
-- **Two payment Backoffice paths move under `payments/` (ADR-017).**
-  `GET /payment/v1/protected/attempts/open` becomes
-  `/payments/attempts?status=open`, and
-  `/reconciliations/runs[/:id]` becomes `/payments/reconciliation/runs[/:id]`
-  (payment-service v2.7.0). The old paths stay as aliases until the
-  Backoffice ships on the new ones; the k6 staff suite and the e2e-audit A18
-  and A22 probes already call the canonical paths.
+- Temporal server 1.32.0 (chart 1.7.0), UI 2.55.0, Worker Controller 1.12.0.
 
 ## [1.0.0] - 2026-10-01
 

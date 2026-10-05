@@ -17,7 +17,7 @@ services:
       weaver: { condition: service_started }
 
   weaver:
-    image: otel/weaver:v0.26.1
+    image: otel/weaver:v0.27.0
     environment:
       HOME: /tmp
     command:

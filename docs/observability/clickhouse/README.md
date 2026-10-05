@@ -155,7 +155,7 @@ and is the counting workhorse. Traces are exemplars joined back on `trace_id`.
 | **Storage** | PVC `standard` `10Gi` per replica (`volumeClaimTemplates`) + keeper data `2Gi` (no log PVC — the operator's keeper logs to console); S3 disk `s3` on RustFS + cache disk `s3_cache` + policy `hot_cold` from `03-storage-rustfs.xml` on the CHI, credentials via `from_env` from `clickhouse-rustfs-credentials`; local-stack uses a named `clickhouse-data` volume |
 | **Credentials** | `default` user password from OpenBAO `secret/local/infra/clickhouse/admin` via the `clickhouse-credentials` `ClusterExternalSecret` → Secret in `monitoring` (selector label `platform.duynhlab/clickhouse`); local-stack uses an inline dev password |
 | **Ingest** | Collector contrib `clickhouse` exporter on the `traces`, `logs/clickhouse` and `logs/vector` pipelines (the last fed only by Vector's pod logs on the `otlp/vector` receiver, `:4319`; rows carry `LogAttributes['log.source']='vector'`), **INSERT-only** (`create_schema: false`); `async_insert`, `sending_queue`, `retry_on_failure`; password via `${env:CLICKHOUSE_PASSWORD}` (`extraEnvs` secretKeyRef) |
-| **Schema owner** | The `clickhouse-schema` **Job**, SQL committed in `kubernetes/infra/configs/clickhouse-schema/` ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). It creates the `otel` database with `ENGINE = Replicated` on each replica, then the tables once; the database's Keeper log propagates them. TTL 90d and the 7-day `TO VOLUME 'cold'` move live in that DDL. Fresh-only: there is no migration path, a pre-tier cluster is rebuilt by `make up` |
+| **Schema owner** | The `clickhouse-schema` **Job**, SQL in `images/clickhouse-ddl/sql/` (duynhlab/images), mounted as an image volume ([ADR-065](../../proposals/adr/ADR-065-clickhouse-replicated-topology/)). It creates the `otel` database with `ENGINE = Replicated` on each replica, then the tables once; the database's Keeper log propagates them. TTL 90d and the 7-day `TO VOLUME 'cold'` move live in that DDL. Fresh-only: there is no migration path, a pre-tier cluster is rebuilt by `make up`; a new index on a live table is added by hand ([below](#adding-an-index-to-a-live-table)) |
 | **Security** | `runAsNonRoot`, `runAsUser: 101`, `fsGroup: 101`, `allowPrivilegeEscalation: false`, drop `ALL` caps, `seccompProfile: RuntimeDefault`; `/ping` liveness+readiness; pinned image (PSS-baseline + no-latest) |
 | **Access** | Grafana datasource `uid: clickhouse` (`clickhouse-clickhouse.monitoring.svc.cluster.local:9000`, native, password via `valuesFrom`); **not** on any public Ingress; the `default` password is the access control (no NetworkPolicy — `monitoring` has no default-deny and netpol is inert on kindnet; a `:9000`/`:8123` NetworkPolicy is a follow-up for an enforcing CNI) |
 | **Startup ordering** | `clickhouse-local` → `clickhouse-schema-local` (the Job, `wait: true`) → `tracing-local`. The collector runs no DDL, so it must not start before the schema exists — it can no longer create what it is missing. In local-stack, which is single-node, the exporter still creates its own schema via `depends_on: service_healthy` |
@@ -232,6 +232,43 @@ SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1, storage_policy = 'ho
 - **The database is created per replica** (`00-database.sql`, applied by the Job
   to each host in turn), which is the one statement that cannot be replicated by
   the thing it creates.
+
+### Adding an index to a live table
+
+The DDL image is fresh-only, so a new index in `10-otel_logs.sql` reaches a
+fresh cluster only. A running cluster gets it by hand, once, from any replica.
+The `Replicated` database propagates both statements to the others.
+
+1. `ALTER TABLE otel.otel_logs ADD INDEX <name> <expr> TYPE … GRANULARITY 100000000`.
+   This changes metadata only and returns at once. New parts get the index on
+   insert.
+2. `ALTER TABLE otel.otel_logs MATERIALIZE INDEX <name>`. This is one replicated
+   mutation that builds the index for the parts that already exist. Watch
+   `system.mutations` on every replica until `is_done = 1` and
+   `parts_to_do = 0`.
+3. Diff `SHOW CREATE TABLE otel.otel_logs` against the file. The only expected
+   difference is the engine line, where the server fills in
+   ReplicatedMergeTree's default arguments. This is why a new index goes
+   **last** in the CREATE: `ADD INDEX` appends.
+
+Rollback is `ALTER TABLE … DROP INDEX <name>`, which is instant.
+
+`idx_log_attr_kv` was added this way on Kind on 2026-10-05 (clickhouse-ddl
+1.1.0). The materialize finished in about 17s for 42 parts and 34M rows, the
+index is 3.0 MiB, and memory stayed near 350 MiB per replica. It answers only
+`LogAttributes['k'] = 'v'`; `!=`, `IN`, `LIKE` and `mapContainsKey` still use
+the key/value indexes or a scan. Its gain shows when the value also appears
+under other keys. Measured on Kind with the index ignored vs used:
+
+| Predicate | Rows read without | Rows read with |
+|---|---|---|
+| `LogAttributes['refund.id'] = '3'` | 80,169 | 8,109 |
+| `LogAttributes['payment.id'] = '1'` | 174,767 | 7,219 |
+| `LogAttributes['outbox_id'] = '2'` | 166,575 | 7,219 |
+
+When the key and value always occur together (`http.route` + `409`), the
+existing pair already prunes to the same granules, and the new index adds
+nothing.
 
 ### Retention & compression
 

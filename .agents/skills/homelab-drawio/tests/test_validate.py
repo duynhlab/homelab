@@ -150,6 +150,19 @@ class TestGates(unittest.TestCase):
         self.assertIn("house.one_box_many_products", rules(mixed, "WARN"))
         self.assertNotIn("house.one_box_many_products", rules(family))  # same family; a mention is not a part
 
+    def test_datastore_logo_counts_for_its_cylinder(self):
+        import base64
+        with open(os.path.join(SKILL, "assets", "icons", "postgresql.png"), "rb") as fh:
+            logo = base64.b64encode(fh.read()).decode()
+        cyl = CARD + "shape=cylinder3;"
+        img = (f'<mxCell id="db__logo" value="" style="shape=image;html=1;image=data:image/png,{logo};" '
+               'vertex="1" parent="db"><mxGeometry x="10" y="12" width="24" height="24" as="geometry"/></mxCell>')
+        f = run(box("db", 0, 100, w=300, h=60, value="PostgreSQL · ClickHouse", style=cyl), img,
+                box("g", 0, 300), edge("e", "g", "db"))
+        self.assertIn("house.one_box_many_products", rules(f, "WARN"))  # the cylinder owns the logo
+        self.assertFalse([x for x in f if "db__logo" in x["objects"]])  # the logo is not a node
+        self.assertNotIn("geometry.child_overflow", rules(f))
+
     def test_legend_is_exempt(self):
         # an arrow sample inside the legend frame is not a dangling edge
         cell = ('<mxCell id="lg" value="" style="endArrow=classic;" edge="1" parent="legend">'

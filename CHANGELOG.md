@@ -90,6 +90,16 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### Docs
+
+- **Every PostgreSQL cluster in the Draw.io diagrams carries the PostgreSQL
+  logo, and keeps its cylinder.** The `homelab-drawio` generator used to refuse
+  a logo on a datastore; it now draws one as a child image cell inside the
+  cylinder, because draw.io paints no `image=` on `cylinder3`, and the
+  validators treat that cell as part of its store. product-db, platform-db and
+  the DR replica gain the logo in the databases, platform, TLS, Temporal and
+  secrets diagrams.
+
 #### Proposals
 
 - **RFC-0029 opens at `researching`: PostgreSQL authorization and access
@@ -117,6 +127,13 @@ Skeleton (copy what you need):
   credential to fail. The retained Job is force-replaced only after CNPG
   observes the new Secret revision; repository state alone does not claim that
   live revocation has happened.
+
+#### Docs
+
+- **The OpenBAO database-engine diagram now draws where `vault_rotator`'s
+  credential comes from** (`docs/secrets/openbao.md`): the per-cluster KV value,
+  its ESO Secret, the CNPG `DatabaseRole` and the configurator Job that reads it
+  — the path #989 introduced, which the prose already described.
 
 ## [2.0.0] - 2026-10-05
 

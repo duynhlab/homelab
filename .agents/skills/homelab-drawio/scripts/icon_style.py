@@ -29,6 +29,7 @@ from collections import defaultdict
 from _common import (
     ICONS,
     is_frame,
+    is_logo,
     load_manifest,
     load_preset,
     parent_ids,
@@ -127,6 +128,8 @@ def cmd_audit(args: argparse.Namespace) -> int:
             print(f"audit: {diagram}: unparseable ({exc})", file=sys.stderr)
             continue
         parents = parent_ids(cells)
+        # A datastore carries its logo in a child cell (generate.logo_cell).
+        logo_owners = {c.get("parent") for c in cells if is_logo(c)}
         # A title, a caption and a legend row all NAME products without being one.
         # Auditing them turns the advisory into noise, so they are exempt the same
         # way validate_house.py exempts them.
@@ -136,7 +139,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
         for c in cells:
             style = c.get("style") or ""
             first = _first_line(c.get("value") or "")
-            has_icon = "image=data:image/png" in style
+            has_icon = "image=data:image/png" in style or c.get("id") in logo_owners
             if has_icon and is_frame(style, c.get("id"), parents):
                 misplaced.append(f"{diagram}: icon on a grouping frame -- {first[:48]!r}")
                 continue

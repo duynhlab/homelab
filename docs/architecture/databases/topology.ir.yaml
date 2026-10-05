@@ -1,9 +1,9 @@
 # Source of docs/architecture/databases/topology.drawio -- edit this, then regenerate:
 #   python3 .agents/skills/homelab-drawio/scripts/generate.py docs/architecture/databases/topology.ir.yaml
-# Verified on 2026-09-28 against kubernetes/apps/services/*.yaml (db_host,
+# Verified on 2026-10-05 against kubernetes/apps/services/*.yaml (db_host,
 # db_migration_host, db_sslmode), configs/databases/clusters/*/{instance,objectstore}.yaml,
 # the PgDog HelmRelease and PgBouncer Pooler, controllers/keycloak/deployment.yaml,
-# controllers/temporal/helmrelease.yaml and platform-db/openbao-db-config.yaml.
+# controllers/temporal/helmrelease.yaml and platform-db/{openbao-db-config,vault-rotator}.yaml.
 diagram:
   id: databases
   title: "duynhlab homelab — Database connection and recovery paths"
@@ -48,12 +48,12 @@ nodes:
   - {id: cnpg, label: "CloudNativePG operator\n+ barman-cloud plugin", role: platform, layer: poolers, parent: f_cnpg, icon: cloudnativepg}
   - {id: pgdog, label: "pgdog-product ×3 :6432\nwrites -rw · reads -r", role: data, layer: poolers, parent: f_product, icon: pgdog}
 
-  - {id: productdb, label: "product-db ×3 · sync any 1\nproduct · cart · order · payment\ncheckout · inventory", role: data, layer: clusters, parent: f_product, shape: datastore}
-  - {id: platformdb, label: "platform-db ×3 · sync any 1\nuser · notification · shipping · review\nkeycloak · temporal · temporal_visibility", role: data, layer: clusters, parent: f_platform, shape: datastore}
+  - {id: productdb, label: "product-db ×3 · sync any 1\nproduct · cart · order · payment\ncheckout · inventory", role: data, layer: clusters, parent: f_product, shape: datastore, icon: postgresql}
+  - {id: platformdb, label: "platform-db ×3 · sync any 1\nuser · notification · shipping · review\nkeycloak · temporal · temporal_visibility", role: data, layer: clusters, parent: f_platform, shape: datastore, icon: postgresql}
 
   - {id: rustfs, label: "RustFS bucket pg-backups-cnpg\nplatform-db/ · product-db/ (30 d)\nproduct-db-replica/ (7 d)", role: data, layer: storage, parent: f_rustfs, shape: datastore}
 
-  - {id: replica, label: "product-db-replica ×1\nDR: designated primary\n(3 on promotion)", role: data, layer: dr, parent: f_product, shape: datastore}
+  - {id: replica, label: "product-db-replica ×1\nDR: designated primary\n(3 on promotion)", role: data, layer: dr, parent: f_product, shape: datastore, icon: postgresql}
 
 edges:
   - {id: e_platform, source: c_platform, target: pgbouncer, type: data, label: ":5432"}

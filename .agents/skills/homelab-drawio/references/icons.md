@@ -109,6 +109,12 @@ catalog. Never put a Redis logo on Valkey: it would assert Redis is deployed.)
   - it ignores a product name inside a compound such as `logs/clickhouse`.
 - **Icon the box's subject, not its prose.** A box titled *Leaf certificates*
   whose second line says "cert-manager-issued" gets no cert-manager logo.
+- **A cylinder takes its engine's logo.** A datastore box gets the logo of the
+  engine that stores the data (`postgresql` on a CNPG cluster), never of the
+  operator around it or of a bucket. A cylinder that groups several stores
+  ("Telemetry stores") stays plain, by the rule above. Database *names* in its
+  label (`keycloak · temporal`) can trip `house.one_box_many_products`; that WARN
+  is expected there, because they name databases, not products.
 - **Never on a grouping frame.** A logo on a frame labels the grouping, not a
   thing, and floats over the border. `validate_house.py` errors on this.
 - **Adding one:** rasterise to PNG at 64px, drop it in `assets/icons/`, then

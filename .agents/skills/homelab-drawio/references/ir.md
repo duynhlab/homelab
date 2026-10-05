@@ -61,7 +61,7 @@ tests:                            # architecture rules to enforce
 | `role` | One of the twelve palette roles ([house-style.md](house-style.md#semantic-palette)). |
 | `layer` | Every node sits in one tier. Peers in a tier share a row. |
 | `parent` | A boundary id. The frame owns the box (`container=1`), so moving it moves them. Every platform node has one: the canvas root is only for `external` nodes, and the outermost boundary is the cluster. |
-| `icon` | A catalogue name ([icons.md](icons.md)). A logo needs a card; a `datastore` cylinder takes none. |
+| `icon` | A catalogue name ([icons.md](icons.md)). On a card the logo sits in the style; on a `datastore` cylinder the generator draws it as a child image cell (`<id>__logo`), because draw.io paints no `image=` on `cylinder3`. |
 | `status: planned` | Drawn dashed; the label must contain the word `planned` (AGENTS.md step 5). |
 | edge `type` | One of eight relationship types ([house-style.md](house-style.md#relationship-types)). |
 | edge `status` | `planned` or `optional` draws it dashed, and it must then carry a label. |

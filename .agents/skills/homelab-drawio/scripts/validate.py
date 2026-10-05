@@ -40,7 +40,7 @@ import base64
 import hashlib
 
 import validate_house
-from _common import load_manifest, text_width
+from _common import is_logo, load_manifest, text_width
 
 SEV_ORDER = {"ERROR": 0, "WARN": 1, "INFO": 2}
 DATA_ROLES = {"data", "metric", "log", "trace", "profile"}
@@ -74,7 +74,11 @@ class Diagram:
         with open(path, encoding="utf-8") as fh:
             self.text = fh.read()
         root = ET.fromstring(self.text)
-        self.cells = list(root.iter("mxCell"))
+        cells = list(root.iter("mxCell"))
+        # A datastore's logo is part of its cylinder, not a node: keep it out
+        # of every gate and read it back through `logo_style`.
+        self.logos = {c.get("parent"): c for c in cells if is_logo(c)}
+        self.cells = [c for c in cells if not is_logo(c)]
         self.by_id: dict[str, ET.Element] = {}
         self.dupes: list[str] = []
         for c in self.cells:
@@ -83,6 +87,10 @@ class Diagram:
                 self.dupes.append(cid)
             self.by_id[cid] = c
         self.parents = {c.get("parent") for c in self.cells if c.get("parent")}
+
+    def logo_style(self, cid: str) -> str:
+        logo = self.logos.get(cid)
+        return (logo.get("style") or "") if logo is not None else ""
 
     def is_edge(self, c) -> bool:
         return c.get("edge") == "1"
@@ -551,7 +559,7 @@ def gate_products(d: "Diagram") -> list[dict]:
     names, by_sha = _catalogue()
     out = []
     for c in d.cells:
-        st = c.get("style") or ""
+        st = (c.get("style") or "") + d.logo_style(c.get("id"))
         m = re.search(r"image=data:image/png,([A-Za-z0-9+/=]+)", st)
         if not m or d.in_legend(c.get("id")):
             continue

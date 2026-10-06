@@ -28,10 +28,6 @@ spec:
   values:
     nameOverride: mockpay
     containerName: mockpay
-    # Keep the selector mop used (`app` included): it is immutable, and the
-    # NetworkPolicies, dashboards and relabelling read these labels.
-    extraSelectorLabels:
-      app: mockpay
     podLabels:
       app.kubernetes.io/component: api
     replicaCount: 1

@@ -213,19 +213,34 @@ initContainers:
     image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
     args: ["migrate"]
 
-# The Deployment selector is immutable. Keep nameOverride and
-# extraSelectorLabels exactly as the domain templates set them; changing either
-# makes the next upgrade fail on "field is immutable".
+# The Deployment selector is the chart's own pair, app.kubernetes.io/name and
+# app.kubernetes.io/instance. It is immutable: changing nameOverride or the
+# release name makes the next upgrade fail on "field is immutable".
 nameOverride: << inputs.name >>
-extraSelectorLabels:
-  app: << inputs.name >>
 ```
 
-Changing which chart a HelmRelease uses (as the move from `mop` to `duynh`
-did) is not an upgrade: Flux sees a new chart name as a new release target,
-uninstalls the old release and installs the new one. On Kind that meant about
-10–15 s of downtime per service and recreated Services. Plan a chart swap as a
-short outage, or as a new release name with traffic moved over.
+**Changing a selector without downtime.** If a selector has to change (the
+`app` label kept from `mop` was removed this way), suspend the HelmRelease, push
+the new values, then orphan the Deployment so Helm can create it again:
+
+```bash
+flux suspend hr <name> -n <ns>
+# push + reconcile the new values, then:
+kubectl delete deploy <name> -n <ns> --cascade=orphan
+flux resume hr <name> -n <ns>
+```
+
+The ReplicaSet and its pods keep running. The recreated Deployment adopts the
+orphaned ReplicaSet because its pods carry the new, smaller selector, and then
+rolls it. The Service selector shrinks the same way, so it keeps matching the
+old pods throughout.
+
+**Changing which chart a HelmRelease uses** (as the move from `mop` to `duynh`
+did) is not an upgrade by default: helm-controller treats a new chart name as a
+new release target, uninstalls the old release and installs the new one. On
+Kind that meant about 10–15 s of downtime per service and recreated Services.
+Set `spec.upgrade.chartNameChangeStrategy: InPlaceUpdate` on the HelmRelease for
+the swap to upgrade in place instead.
 
 ### 4.4 InputProvider Concatenation Behavior
 

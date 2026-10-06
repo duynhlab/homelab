@@ -53,7 +53,7 @@ kubectl get endpoints -n $NAMESPACE $APP
 kubectl get svc -n $NAMESPACE $APP
 
 # Check if pods are ready
-kubectl get pods -n $NAMESPACE -l app=$APP -o wide
+kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=$APP -o wide
 
 # Check Ingress/route
 kubectl get ingress -n $NAMESPACE

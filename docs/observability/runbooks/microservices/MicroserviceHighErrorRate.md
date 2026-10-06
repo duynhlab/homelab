@@ -32,7 +32,7 @@ kube_pod_container_status_restarts_total{namespace="$NAMESPACE"}
 
 ```bash
 # Check application logs for errors
-kubectl logs -n $NAMESPACE -l app=$APP --tail=200 | grep -i error
+kubectl logs -n $NAMESPACE -l app.kubernetes.io/name=$APP --tail=200 | grep -i error
 
 # Check recent deployments
 kubectl rollout history deployment/$APP -n $NAMESPACE

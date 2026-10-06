@@ -65,8 +65,8 @@ go_memory_used_bytes{app="$APP"} / go_memory_gc_goal_bytes{app="$APP"}
 
 ```bash
 APP=<app label>; NS=<namespace label>
-kubectl -n "$NS" get pods -l app="$APP"    # one restarted pod = cold-start tail
-kubectl top pod -n "$NS" -l app="$APP"     # CPU near limit = throttling tail
+kubectl -n "$NS" get pods -l app.kubernetes.io/name="$APP"    # one restarted pod = cold-start tail
+kubectl top pod -n "$NS" -l app.kubernetes.io/name="$APP"     # CPU near limit = throttling tail
 ```
 
 ### VictoriaLogs / traces

@@ -109,12 +109,14 @@ spec:
           type: remap
           inputs:
             - kubernetes_logs
-            # ADR-061: edge runtime lines get the same stream fields; their
-            # `service` falls back to pod_name (proxy pods carry no `app` label).
+            # ADR-061: edge runtime lines get the same stream fields (`service`
+            # is `envoy`, from the proxy pods' name label).
             - filter_envoy_runtime
           source: |
-            # Extract service from kubernetes.pod_labels.app
-            if exists(.kubernetes.pod_labels."app") {
+            # Same order as to_otlp: the standard name label, then legacy `app`.
+            if exists(.kubernetes.pod_labels."app.kubernetes.io/name") {
+              .service = to_string!(.kubernetes.pod_labels."app.kubernetes.io/name")
+            } else if exists(.kubernetes.pod_labels."app") {
               .service = to_string!(.kubernetes.pod_labels."app")
             } else if exists(.kubernetes.pod_name) {
               .service = to_string!(.kubernetes.pod_name)

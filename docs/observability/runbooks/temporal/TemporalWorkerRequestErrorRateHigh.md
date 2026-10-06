@@ -34,8 +34,8 @@ sum by (service_name) (rate(temporal_request_total[5m]))
 ```
 
 ```bash
-kubectl logs -n order    -l app=order-fulfillment --tail=100 | grep -i 'fail\|error'
-kubectl logs -n checkout -l app=checkout-abandon  --tail=100 | grep -i 'fail\|error'
+kubectl logs -n order    -l app.kubernetes.io/name=order-worker --tail=100 | grep -i 'fail\|error'
+kubectl logs -n checkout -l app.kubernetes.io/name=checkout-worker  --tail=100 | grep -i 'fail\|error'
 ```
 
 ### The failure mode this platform has actually seen

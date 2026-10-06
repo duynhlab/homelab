@@ -52,8 +52,8 @@ sum by (service_name) (rate(temporal_workflow_completed_total[10m]))
 Then the worker's own logs:
 
 ```bash
-kubectl logs -n order   -l app=order-fulfillment    --tail=100 | grep -i error
-kubectl logs -n checkout -l app=checkout-abandon    --tail=100 | grep -i error
+kubectl logs -n order   -l app.kubernetes.io/name=order-worker --tail=100 | grep -i error
+kubectl logs -n checkout -l app.kubernetes.io/name=checkout-worker --tail=100 | grep -i error
 ```
 
 ## Mitigation

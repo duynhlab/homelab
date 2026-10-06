@@ -191,7 +191,7 @@ See [**Application tracing**](../../api/tracing.md) for:
    the single fan-out point:
    ```bash
    kubectl logs -n monitoring -l app.kubernetes.io/name=opentelemetry-collector | grep -i error
-   kubectl logs -n checkout -l app=checkout | grep -i trace
+   kubectl logs -n checkout -l app.kubernetes.io/name=checkout | grep -i trace
    ```
 
 ### Problem: Trace volume too low
@@ -245,7 +245,7 @@ kubectl port-forward -n monitoring svc/vtsingle-victoria-traces 10428:10428
 curl -s http://localhost:10428/select/jaeger/api/services
 
 # View service logs with trace IDs
-kubectl logs -n checkout -l app=checkout | jq '.trace_id'
+kubectl logs -n checkout -l app.kubernetes.io/name=checkout | jq '.trace_id'
 
 # Check sampling config
 kubectl describe deployment auth -n auth | grep -A 5 "Environment"

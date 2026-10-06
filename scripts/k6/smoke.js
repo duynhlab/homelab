@@ -280,8 +280,8 @@ const UNITS = [
       // platform.duynhlab.dev/otlp-logs=true, so Vector no longer tails the edge
       // at all -- it is now an example of the OTLP leg, not the Vector one.
       // CloudNativePG has no OTel SDK, which is exactly what this leg is for.
-      // Selected by namespace + container_name because Vector sets `service`
-      // from pod_labels.app and falls back to the pod name.
+      // Selected by namespace + container_name, which do not depend on how
+      // Vector derives `service` from the pod labels.
       const otlp = logsqlCount(target.logs, '_time:45m _stream:{"service.name"="product"} | count()');
       const vector = logsqlCount(
         target.logs,

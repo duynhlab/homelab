@@ -56,7 +56,7 @@ sum by (app) (rate(db_client_operation_errors_total{app!=""}[5m]))
 APP=<app label>; NS=<namespace label>
 kubectl -n "$NS" logs deploy/"$APP" --since=10m | grep -i "sqlstate\|timeout\|conn"
 kubectl get cluster -A            # CNPG cluster status — primary healthy?
-kubectl -n "$NS" get pods -l app="$APP"
+kubectl -n "$NS" get pods -l app.kubernetes.io/name="$APP"
 ```
 
 ### VictoriaLogs / traces

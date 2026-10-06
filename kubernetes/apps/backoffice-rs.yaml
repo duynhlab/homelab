@@ -44,10 +44,6 @@ spec:
         values:
           nameOverride: << inputs.name >>
           containerName: << inputs.name >>
-          # Keep the selector mop used (`app` included): it is immutable, and
-          # the NetworkPolicies, dashboards and relabelling read these labels.
-          extraSelectorLabels:
-            app: << inputs.name >>
           podLabels:
             app.kubernetes.io/component: api
           replicaCount: << inputs.replicaCount | int >>

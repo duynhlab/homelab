@@ -92,6 +92,18 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **Service Deployments select on the chart's own labels only.** The `app`
+  label kept from `mop` (`extraSelectorLabels`) is dropped from the five domain
+  ResourceSets, `rs-frontend`, `rs-backoffice` and `mockpay`; the selector is
+  now `app.kubernetes.io/name` + `app.kubernetes.io/instance`. Nothing selected
+  on `app` except Vector (below); the `app` label on metrics comes from OTel
+  `service_name` through vmagent and is unchanged. Because the selector is
+  immutable, each Deployment was orphaned (`--cascade=orphan`) and recreated by
+  Helm, which adopted the running ReplicaSet and rolled it — no downtime.
+  `application-delivery.md` documents the procedure and the
+  `chartNameChangeStrategy: InPlaceUpdate` knob the `mop` → `duynh` swap could
+  have used; the runbooks select pods with `-l app.kubernetes.io/name=`.
+
 - **Every service now deploys with the `duynh` chart, and the `mop` chart is
   gone.** The five domain ResourceSets, `rs-backoffice`, `rs-frontend` and
   `mockpay` render their HelmReleases on `duynh-chart-oci` (`>=0.3.1 <0.4.0`);
@@ -108,6 +120,15 @@ Skeleton (copy what you need):
   (no token mounted) and `maxUnavailable: 0` rollouts.
 
 #### Observability
+
+- **Vector takes a pod's `service` stream field from
+  `app.kubernetes.io/name` first**, then `app`, then the pod name: the same
+  order the OTLP leg already used. frontend, backoffice and mockpay keep their
+  values after losing `app`; platform pods that carried only the standard label
+  (Postgres, OpenBAO, Temporal, the VictoriaMetrics stack, …) now get one
+  stable stream per workload instead of one per pod name, and Envoy runtime
+  lines get `service="envoy"`. Queries in the guides select by `namespace`,
+  `container_name` or `pod_name` and are unaffected.
 
 - **Service SLOs come from the new `slo` chart** — one `<service>-slo`
   HelmRelease per service, emitted by the domain ResourceSets and skipped with
@@ -199,6 +220,12 @@ Skeleton (copy what you need):
   live revocation has happened.
 
 #### Docs
+
+- **The two Temporal worker runbooks select the worker pods again.**
+  `TemporalWorkflowFailureRateHigh` and `TemporalWorkerRequestErrorRateHigh`
+  used `-l app=order-fulfillment` / `-l app=checkout-abandon`, labels the
+  worker pods never had; they now use `app.kubernetes.io/name=order-worker` /
+  `checkout-worker`.
 
 - **The SLO docs counted a retired service and a dropped SLO.** They listed
   `auth` and three SLOs per service (31 SLOs, 62 alerts); the cluster runs nine

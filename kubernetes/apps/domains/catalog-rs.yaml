@@ -32,10 +32,6 @@ spec:
       values:
         nameOverride: << inputs.name >>
         containerName: << inputs.name >>
-        # Keep the selector mop used (`app` included): it is immutable, and the
-        # NetworkPolicies, dashboards and relabelling read these labels.
-        extraSelectorLabels:
-          app: << inputs.name >>
         replicaCount: << inputs.replicaCount | int >>
         image:
           repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-service

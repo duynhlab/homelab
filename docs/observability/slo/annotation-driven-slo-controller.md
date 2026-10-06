@@ -89,7 +89,7 @@ metadata:
 | `slo.platform/error-rate-objective` | No | `99.0` | Error rate target (%) |
 | `slo.platform/team` | No | `platform` | Team label on PrometheusServiceLevel |
 | `slo.platform/metric-name` | No | `http_server_request_duration_seconds` | Base metric name |
-| `slo.platform/app-label` | No | pod's `app` label | Value of the `app` selector on the SLI. **There is no `job` label to key on**: the services push OTLP, so vmagent maps `service_name`→`app` and `k8s_namespace_name`→`namespace` and never synthesises a scrape `job`. An earlier draft of this table specified `slo.platform/job-label: microservices`, which would produce SLIs that select nothing |
+| `slo.platform/app-label` | No | pod's `app.kubernetes.io/name` label | Value of the `app` selector on the SLI. **There is no `job` label to key on**: the services push OTLP, so vmagent maps `service_name`→`app` and `k8s_namespace_name`→`namespace` and never synthesises a scrape `job`. An earlier draft of this table specified `slo.platform/job-label: microservices`, which would produce SLIs that select nothing |
 
 ## Implementation Outline
 

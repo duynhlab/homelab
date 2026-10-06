@@ -61,8 +61,8 @@ histogram_quantile(0.95, sum by (app, le)
 
 ```bash
 APP=<app label>; NS=<namespace label>
-kubectl -n "$NS" get pods -l app="$APP"
-kubectl top pod -n "$NS" -l app="$APP"     # CPU throttling slows every RPC
+kubectl -n "$NS" get pods -l app.kubernetes.io/name="$APP"
+kubectl top pod -n "$NS" -l app.kubernetes.io/name="$APP"     # CPU throttling slows every RPC
 ```
 
 ### VictoriaLogs / traces

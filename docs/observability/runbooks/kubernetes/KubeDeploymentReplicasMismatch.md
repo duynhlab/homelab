@@ -32,8 +32,8 @@ kubectl get deployment -n $NAMESPACE $DEPLOYMENT
 kubectl describe deployment -n $NAMESPACE $DEPLOYMENT
 
 # Check replica set events
-kubectl get rs -n $NAMESPACE -l app=$DEPLOYMENT
-kubectl describe rs -n $NAMESPACE $(kubectl get rs -n $NAMESPACE -l app=$DEPLOYMENT --sort-by=.metadata.creationTimestamp -o name | tail -1)
+kubectl get rs -n $NAMESPACE -l app.kubernetes.io/name=$DEPLOYMENT
+kubectl describe rs -n $NAMESPACE $(kubectl get rs -n $NAMESPACE -l app.kubernetes.io/name=$DEPLOYMENT --sort-by=.metadata.creationTimestamp -o name | tail -1)
 ```
 
 ### PromQL

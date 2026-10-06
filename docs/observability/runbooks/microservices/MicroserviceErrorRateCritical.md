@@ -54,7 +54,7 @@ sum by (http_response_status_code) (rate(http_server_request_duration_seconds_co
 
 ```bash
 APP=<app label>; NS=<namespace label>
-kubectl -n "$NS" get pods -l app="$APP"          # crash-looping? partial rollout?
+kubectl -n "$NS" get pods -l app.kubernetes.io/name="$APP"          # crash-looping? partial rollout?
 kubectl -n "$NS" rollout history deploy/"$APP"   # did a deploy just land?
 kubectl -n "$NS" logs deploy/"$APP" --since=10m | grep -iE "error|panic" | head -50
 ```

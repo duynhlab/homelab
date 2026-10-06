@@ -57,3 +57,5 @@ resources:
   # - cnpg-platform-db/cluster-zone_spread-warning.yaml
   - cnpg-platform-db/cluster-low_disk_space-critical.yaml
   - cnpg-platform-db/cluster-low_disk_space-warning.yaml
+  # ADR-086 membership guard (homelab-authored, ns monitoring).
+  - role-membership-alerts.yaml

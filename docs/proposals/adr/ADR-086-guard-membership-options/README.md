@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029 Phase 0 step 6, then each ADR-084 cutover |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -184,6 +184,7 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-10-06 | Proposed / Not started | Drafted from RFC-0029 |
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 (owner chose query + alert over CronJob and pgroles) |
+| 2026-10-06 | Accepted / Partial | First edge guarded: `pg_role_membership` query on `platform-db`, `CNPGRoleMembershipDrift` + `CNPGRoleMembershipGuardMissing`, runbooks and alert-catalog §4c. On Kind the alert fired for a flipped `INHERIT` and for a revoked edge and resolved after the repair `GRANT`. Still open: the `product-db` twin and each `migrator → owner` edge at its ADR-084 cutover |
 
 ---
-_Last updated: 2026-10-06_
+_Last updated: 2026-10-06 — Adoption Partial (first edge guarded)._

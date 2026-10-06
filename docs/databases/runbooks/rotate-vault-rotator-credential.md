@@ -319,7 +319,7 @@ configurator then reads that same Secret.
 - **Membership options drifted:** restore them from the primary as `postgres`
   with `GRANT notification TO vault_rotator WITH INHERIT FALSE, SET FALSE,
   ADMIN TRUE`. The CR cannot encode these options, so catalog verification is
-  the guardrail.
+  the guardrail; `CNPGRoleMembershipDrift` (ADR-086) alerts when they drift.
 - **Rollback:** write another newly generated value to the same KV path and
   repeat the procedure. A compromised historical value is never a valid
   rollback target.
@@ -336,4 +336,4 @@ configurator then reads that same Secret.
 - [Revoke a compromised credential](../../secrets/runbooks/revoke-compromised-credential.md)
 
 ---
-_Last updated: 2026-10-05 — notes from the first live run on Kind: headless OIDC login, the transient `applied=false` after the first apply, a pooler login as rotation evidence, and a non-interactive old-password check. 2026-09-05: first version._
+_Last updated: 2026-10-06 — the membership drift alert is referenced. 2026-10-05 — notes from the first live run on Kind: headless OIDC login, the transient `applied=false` after the first apply, a pooler login as rotation evidence, and a non-interactive old-password check. 2026-09-05: first version._

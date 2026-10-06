@@ -365,3 +365,47 @@ data:
         - active_backends:
             usage: "GAUGE"
             description: "Active backends currently in this wait class (sampled at scrape time)"
+
+    # ADR-086: PG18 membership options on guarded edges. CNPG declares only the
+    # membership name and recreates it with defaults, so drift is detected
+    # here. One row per expected edge (VALUES), so a revoked edge reads
+    # present=0 / drift=1 instead of vanishing. bool_or: PG16+ keeps one row
+    # per grantor. A PR that creates a guarded edge adds it here and to
+    # role-membership-alerts.yaml.
+    pg_role_membership:
+      query: "SELECT e.member, e.parent, (count(m.roleid) > 0)::int AS present,
+               COALESCE(bool_or(m.admin_option), false)::int AS admin_option,
+               COALESCE(bool_or(m.inherit_option), false)::int AS inherit_option,
+               COALESCE(bool_or(m.set_option), false)::int AS set_option,
+               (count(m.roleid) = 0
+                OR COALESCE(bool_or(m.admin_option), false) <> e.want_admin
+                OR COALESCE(bool_or(m.inherit_option), false) <> e.want_inherit
+                OR COALESCE(bool_or(m.set_option), false) <> e.want_set)::int AS drift
+               FROM (VALUES ('vault_rotator', 'notification', true, false, false))
+                 AS e(member, parent, want_admin, want_inherit, want_set)
+               LEFT JOIN pg_roles mr ON mr.rolname = e.member
+               LEFT JOIN pg_roles pr ON pr.rolname = e.parent
+               LEFT JOIN pg_auth_members m ON m.member = mr.oid AND m.roleid = pr.oid
+               GROUP BY e.member, e.parent, e.want_admin, e.want_inherit, e.want_set"
+      metrics:
+        - member:
+            usage: "LABEL"
+            description: "Role that holds the membership"
+        - parent:
+            usage: "LABEL"
+            description: "Role the membership grants"
+        - present:
+            usage: "GAUGE"
+            description: "1 if the membership exists"
+        - admin_option:
+            usage: "GAUGE"
+            description: "1 if any grant of the membership carries ADMIN"
+        - inherit_option:
+            usage: "GAUGE"
+            description: "1 if any grant of the membership carries INHERIT"
+        - set_option:
+            usage: "GAUGE"
+            description: "1 if any grant of the membership carries SET"
+        - drift:
+            usage: "GAUGE"
+            description: "1 if the membership is missing or its options differ from the specified shape"

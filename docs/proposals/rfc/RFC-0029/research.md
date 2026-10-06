@@ -868,7 +868,8 @@ edge is correct now but nothing alerts if it drifts again.
 - Add exact runtime/database and migrator/database HBA entries before either
   new login is used; retain the legacy pair only for the bounded cutover.
 - Apply default ACL and existing-object backfill as a service migration.
-- Split migration/runtime Secret inputs in the chart/ResourceSet.
+- Split migration/runtime Secret inputs in the domain ResourceSets (new inputs;
+  the `duynh` chart needs no change).
 - Cut runtime to `<svc>_runtime`; observe connections; retire `<svc>`.
 
 ### Phase 3 — fleet rollout
@@ -888,31 +889,40 @@ edge is correct now but nothing alerts if it drifts again.
 
 ## Open questions
 
-- [ ] Which service is the canary after measuring schema/migration complexity?
+Resolved items below were decided on 2026-10-06; the RFC README records them.
+
+- [x] Which service is the canary after measuring schema/migration complexity?
+      **`review`.**
       Keycloak owns 100 of the 147 audited tables and its migrations are not
       homelab-authored, so it is a poor first canary.
-- [ ] Does the shared `mop` chart add separate `runtimeSecretRef` and
+- [x] Does the shared `mop` chart add separate `runtimeSecretRef` and
       `migrationSecretRef`, or can current values express this without a breaking
-      chart interface?
+      chart interface? **Neither chart change is needed: the services moved to
+      `duynh`, and the `migrate` init container is declared in the domain
+      ResourceSets, which gain separate Secret inputs.**
 - [ ] What is the maximum compatibility window before the legacy `<svc>` login
       must be removed?
-- [ ] Which catalog collector owns periodic drift evidence: a read-only CronJob,
+- [x] Which catalog collector owns periodic drift evidence: a read-only CronJob,
       an existing monitoring path, an on-demand CI/access-review command, or a
-      read-only `pgroles diff --review-out` (see Alternatives)?
-- [ ] Which PG18 membership options are platform defaults, and how are
-      non-default options reconciled outside `DatabaseRole`?
-- [ ] Does the initial ownership transfer use an operator runbook or a
+      read-only `pgroles diff --review-out` (see Alternatives)? **A CNPG
+      monitoring query plus an alert (ADR-086).**
+- [x] Which PG18 membership options are platform defaults, and how are
+      non-default options reconciled outside `DatabaseRole`? **Detected, not
+      reconciled: ADR-086 alerts on drift and a runbook repairs it.**
+- [x] Does the initial ownership transfer use an operator runbook or a
       one-shot bootstrap Job, and what proves that privileged executor is gone?
+      **An operator runbook once per existing database; new clusters need none
+      (ADR-084).**
 - [ ] Which identity system and network boundary issue, expire, and audit human
       production logins before cloud IAM is considered?
 - [x] Context7/source-tree and live-CRD audit completed on 2026-09-04; findings
       are summarized in this research document.
 - [x] Live Kind catalog inventory and HBA sweep completed on 2026-09-04; the
-      Phase 0 credential rotation itself remains open.
-- [ ] Which E2E gate protects authorization while local-stack runs each
+      Phase 0 credential rotation ran on 2026-10-05 (execution record above).
+- [x] Which E2E gate protects authorization while local-stack runs each
       service's runtime and migrations as one login that owns its database:
       add three-role parity or declare and automate a Kind-only authorization
-      gate?
+      gate? **Three-role parity in local-stack for every converted service.**
 - [ ] Where does the `vault_rotator` membership guard run (the Phase 0 step 6
       query and alert), and does it gate the Kind E2E or only page?
 

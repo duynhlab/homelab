@@ -55,6 +55,8 @@ alerts, and operator health. One file per alert name — each file covers both
 | CNPGWALArchiveFailing | critical | deep-signal | active | [CNPGWALArchiveFailing.md](CNPGWALArchiveFailing.md) |
 | CNPGLongRunningTransaction | warning | deep-signal | active | [CNPGLongRunningTransaction.md](CNPGLongRunningTransaction.md) |
 | CNPGIdleInTransaction | warning | deep-signal | active | [CNPGIdleInTransaction.md](CNPGIdleInTransaction.md) |
+| CNPGRoleMembershipDrift | critical | role-membership | active | [CNPGRoleMembershipDrift.md](CNPGRoleMembershipDrift.md) |
+| CNPGRoleMembershipGuardMissing | warning | role-membership | active | [CNPGRoleMembershipGuardMissing.md](CNPGRoleMembershipGuardMissing.md) |
 | CNPGInstanceMetricsAbsent | — | chart upstream | not deployed | — |
 
 ## Validation levels
@@ -87,4 +89,4 @@ domain's additions.
 - **Dashboards:** Databases folder (CloudNativePG board per cluster).
 
 ---
-_Last updated: 2026-09-09 — linked the symptom map and made safe validation levels explicit._
+_Last updated: 2026-10-06 — added the ADR-086 role-membership runbooks. Previously 2026-09-09 — linked the symptom map and made safe validation levels explicit._

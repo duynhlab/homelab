@@ -1,0 +1,46 @@
+# ADR-086: alert when a guarded membership edge drifts from its specified PG18
+# options, or when the guard itself stops reporting. The edge list and the
+# expected options live in the pg_role_membership query
+# (platform-db/configmaps/monitoring-queries.yaml).
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: postgres-role-membership
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: postgres-role-membership
+    platform.duynhlab.dev/source: homelab-authored
+spec:
+  groups:
+  - name: postgres-role-membership
+    rules:
+    - alert: CNPGRoleMembershipDrift
+      # max across instances: the catalog is shared, every instance reports it.
+      expr: max by (cnpg_io_cluster, member, parent) (cnpg_pg_role_membership_drift) > 0
+      for: 5m
+      labels:
+        severity: critical
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: Role membership {{ $labels.member }} → {{ $labels.parent }} drifted ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          The membership of {{ $labels.member }} in {{ $labels.parent }} on
+          {{ $labels.cnpg_io_cluster }} is missing or its ADMIN / INHERIT / SET
+          options differ from the shape ADR-086 specifies. Missing ADMIN breaks
+          credential rotation; extra INHERIT or SET hands over the parent's data.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGRoleMembershipDrift.md"
+    - alert: CNPGRoleMembershipGuardMissing
+      # The query returns a row for every guarded edge even when it is revoked,
+      # so no series means the query, the ConfigMap or the exporter is broken.
+      expr: absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="notification"})
+      for: 15m
+      labels:
+        severity: warning
+        cnpg_cluster: platform-db
+      annotations:
+        summary: Role membership guard is not reporting (platform-db)
+        description: >-
+          cnpg_pg_role_membership_drift has no series for vault_rotator →
+          notification on platform-db, so drift on that edge would go unseen.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md"

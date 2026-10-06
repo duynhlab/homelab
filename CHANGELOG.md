@@ -130,6 +130,16 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **PostgreSQL role-membership guard (ADR-086).** A `pg_role_membership`
+  custom query on `platform-db` exports the PG18 `ADMIN` / `INHERIT` / `SET`
+  options of each guarded membership; one row per expected edge, so a revoked
+  edge reads `drift=1` instead of vanishing. `CNPGRoleMembershipDrift`
+  (critical) fires when an edge is missing or its options differ, and
+  `CNPGRoleMembershipGuardMissing` (warning) when the query stops reporting.
+  First edge: `vault_rotator → notification` = `ADMIN TRUE, INHERIT FALSE,
+  SET FALSE`. On Kind both a flipped `INHERIT` and a revoked edge fired after
+  `for: 5m` and resolved within two minutes of the repair `GRANT`.
+
 - **Vector takes a pod's `service` stream field from
   `app.kubernetes.io/name` first**, then `app`, then the pod name: the same
   order the OTLP leg already used. frontend, backoffice and mockpay keep their
@@ -159,6 +169,13 @@ Skeleton (copy what you need):
   secrets diagrams.
 
 #### Proposals
+
+- **RFC-0029 Phase 0 step 6 is done; ADR-086 Adoption `Partial`.** The RFC,
+  ADR-084 and research.md now agree with the decisions taken at acceptance:
+  two Secrets per service (not three), the domain ResourceSets (not the chart)
+  gain the migrator Secret input, the canary is `review`, and the resolved
+  research questions are ticked. The PUBLIC `CONNECT` difference between
+  local-stack and the cluster is recorded as an open parity question.
 
 - **RFC-0029 is `Accepted`, with ADR-084, ADR-085 and ADR-086 created at
   `Accepted`** (Adoption `Not started`).

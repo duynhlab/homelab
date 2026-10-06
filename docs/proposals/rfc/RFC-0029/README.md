@@ -97,7 +97,7 @@ login, not an in-place rename: `DatabaseRole.spec.name` is immutable.
 | HBA admission | `Cluster.spec.postgresql.pg_hba`, exact runtime/migrator pairs (ADR-015) |
 | Object ownership, ACL backfill, default privileges | the service's versioned migrations, run after `SET ROLE <svc>_owner` |
 | Membership options CNPG cannot express | bootstrap/runbook SQL + a catalog guard (query + alert) |
-| Migration vs runtime Secret wiring | domain ResourceSet values (`duynh` chart): the workload `env` and the `migrate` init container each name their own Secret |
+| Migration vs runtime Secret wiring | domain ResourceSet values (`duynh` chart): today the workload `env` and the `migrate` init container both read `inputs.db_secret`; Phase 2 adds separate inputs so each names its own Secret |
 
 ### User Stories
 
@@ -224,8 +224,8 @@ flowchart LR
 - **Is it in use?** Catalog queries: owner of every table is `<svc>_owner`;
   runtime has the ACL; `pg_default_acl` has the owner's rows; the migrator's
   membership in the owner is `ADMIN FALSE, INHERIT FALSE, SET TRUE`.
-- **Drawbacks:** three Secrets/HBA pairs per service instead of one; a chart and
-  ResourceSet interface change; a coordinated cutover per service; one more
+- **Drawbacks:** three roles, two Secrets and two HBA pairs per service instead
+  of one each; a ResourceSet interface change; a coordinated cutover per service; one more
   privileged procedure (ownership transfer); local-stack must follow or the
   release gate stops exercising the same failure modes.
 
@@ -259,7 +259,7 @@ flowchart LR
 |---|---|---|
 | 0 | Revoke the leaked `vault_rotator` credential | **Done 2026-10-05** (research § Phase 0 execution record); step 6 guard still open |
 | 1 | Harness as a repeatable gate; catalog queries; naming/Secret/HBA conventions; local-stack decision | owner review of the conventions |
-| 2 | One canary (review or shipping; not Keycloak) | Goals 1–3 proven on Kind, negative tests in the gate |
+| 2 | One canary (`review`) | Goals 1–3 proven on Kind, negative tests in the gate |
 | 3 | Fleet by domain, never all databases at once | every service passes positive and negative tests |
 | 4 | RLS / definer / IAM | only with a real use case and its own review |
 
@@ -273,7 +273,8 @@ never a rollback target.
   (CNPG-04 in particular).
 - Per service: positive CRUD and migration tests, negative privilege tests
   (runtime `CREATE`/`ALTER`/`DROP`/`GRANT`/`SET ROLE` must fail).
-- Kind E2E gate rows for the canary; local-stack parity is an open question.
+- Kind E2E gate rows for the canary; local-stack mirrors the three roles, so the
+  compose gate exercises the same failures.
 - Catalog evidence (owner, ACL, default ACL, membership options) recorded in the
   PR that cuts each service over.
 
@@ -288,13 +289,16 @@ Resolved 2026-10-06:
 - ~~Local-stack~~ — mirrors the three roles for every converted service.
 - ~~Chart Secret inputs~~ — no chart change needed since the services moved to
   the `duynh` chart: the `migrate` init container is declared in the domain
-  ResourceSets, so each container names its own Secret.
+  ResourceSets, so a separate migrator Secret needs new ResourceSet inputs,
+  not a chart change.
 
 Still open (implementation, settled in the canary PR):
 
 - The length of the compatibility window before the legacy login is dropped.
 - How the migration tool reaches `SET ROLE` (ADR-085 obligation).
 - Whether the membership alert also gates the Kind E2E or only pages.
+- PUBLIC `CONNECT`: local-stack already revokes it (`local-stack/postgres/init.sql`)
+  while the cluster keeps it; parity work picks one.
 
 ## Resulting decisions
 

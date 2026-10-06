@@ -3,7 +3,7 @@
 > **Decision summary:** We will give every application database three roles — a
 > NOLOGIN owner, a migrator that reaches ownership only through `SET ROLE`, and a
 > runtime login that owns nothing — because a runtime compromise must not be a
-> schema compromise. We accept three Secrets, two HBA pairs and a coordinated
+> schema compromise. We accept two Secrets, two HBA pairs and a coordinated
 > cutover per service in exchange for separating data access from DDL and
 > ownership.
 
@@ -14,7 +14,7 @@
 | **Owners** | `platform` |
 | **Deciders** | `owner (duynhlab)` |
 | **Scope** | Identity model of every application database on `platform-db` and `product-db` |
-| **Affected components** | CNPG `DatabaseRole`/`Database`/`pg_hba`, service ResourceSets, the `mop` chart, local-stack Postgres, service migration Jobs |
+| **Affected components** | CNPG `DatabaseRole`/`Database`/`pg_hba`, service ResourceSets (`duynh` chart values), local-stack Postgres, service migration Jobs |
 | **Related RFC** | [RFC-0029](../../rfc/RFC-0029/) |
 | **Related research** | [research.md](../../rfc/RFC-0029/research.md) |
 | **Supersedes** | — (amends [ADR-013](../ADR-013-per-service-db-triplet/): the triplet keeps its shape, its single login/owner role becomes three roles) |
@@ -151,8 +151,9 @@ options that CNPG cannot express and ADR-086 would have to guard.
 ### Negative consequences and accepted trade-offs
 
 - Three `DatabaseRole`s, two ExternalSecrets and two HBA pairs per service.
-- The `mop` chart and the ResourceSets need separate runtime and migration
-  Secret inputs.
+- The domain ResourceSets need separate runtime and migration Secret inputs
+  (today the workload and the `migrate` init container both read
+  `inputs.db_secret`); the `duynh` chart needs no change.
 - Services on `product-db` need their PgDog user list remapped (ADR-014) when
   their turn comes.
 - One privileged, operator-run step per existing database.
@@ -166,7 +167,7 @@ options that CNPG cannot express and ADR-086 would have to guard.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Separate runtime/migration Secret inputs in the `mop` chart and ResourceSets | platform | `duynhlab/helm-charts`, `kubernetes/apps/` | a service renders two Secrets |
+| Separate runtime/migration Secret inputs in the domain ResourceSets | platform | `kubernetes/apps/domains/` | the workload and `migrate` name different Secrets |
 | Ownership-transfer runbook for existing databases | platform | `docs/databases/runbooks/` | runbook exercised on `review` |
 | Canary `review` converted on Kind | platform + review-service | RFC-0029 Phase 2 | negative tests pass in the Kind gate |
 | local-stack parity for converted services | platform | `local-stack/postgres/init.sql`, `compose.yaml` | local-stack gate passes with three roles |
@@ -207,6 +208,7 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Proposed / Not started | Drafted from RFC-0029 |
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 (owner decisions: canary `review`, local-stack parity, runbook transfer for existing data) |
 | 2026-10-06 | Accepted / Not started | The service workloads moved from the `mop` chart to `duynh`. The obligation "separate runtime/migration Secret inputs in the `mop` chart" now needs no chart change: the `migrate` init container is declared in the domain ResourceSets (`initContainers`), so the migrator Secret is a values change there |
+| 2026-10-06 | Accepted / Not started | Correction to the row above: the migrator Secret is not only a values change. The workload and the `migrate` init container both read `inputs.db_secret` / `db_user`, so the domain ResourceSets need new inputs; the chart still needs none. The summary's count is fixed to two Secrets (the owner has no credential) |
 
 ---
 _Last updated: 2026-10-06 (history: chart move to `duynh`)_

@@ -123,9 +123,9 @@ out, CNPG-01) and use `databaseRoleReclaimPolicy: retain`.
 CNPG grants `inRoles` with a plain `GRANT <svc>_owner TO <svc>_migrator`, and
 PostgreSQL 16+ takes an unspecified `INHERIT` option from the member's own
 `INHERIT` attribute; `SET` defaults to true and `ADMIN` to false. A NOINHERIT
-member therefore gets `f/f/t`, which is exactly the specified shape. Measured on
-PostgreSQL 18.6 on 2026-10-06; the lab's CNPG-07 checks that CNPG keeps it when
-it creates or recreates the membership.
+member therefore gets `f/f/t`, which is exactly the specified shape. The lab's
+CNPG-07 measured it on CNPG with PostgreSQL 18.6 on 2026-10-06, for a new edge
+and for one CNPG recreated after a manual revoke.
 
 ### Passwords
 
@@ -265,5 +265,38 @@ Expected for a converted service: every object owned by `<svc>_owner`; the
 runtime has the four table rights and nothing else; `pg_default_acl` has the
 owner's rows; `<svc>_migrator → <svc>_owner` is `f / f / t`.
 
+### The lab
+
+`scripts/pg-authz-lab/run.sh` re-runs the experiments this design rests on.
+Run it after every PostgreSQL major and every CNPG minor or major upgrade, and
+before changing a convention on this page.
+
+```bash
+scripts/pg-authz-lab/run.sh pg     # throwaway postgres:18 container, no cluster
+scripts/pg-authz-lab/run.sh cnpg   # Kind platform-db; lab_* objects only, removed afterwards
+```
+
+| Experiment | Proves | Mode |
+|---|---|---|
+| PG-01 | Each missing layer (database, schema, table, sequence) refuses at that layer | pg |
+| PG-02 | `INHERIT`, `SET` and `ADMIN` behave as the catalog says | pg |
+| PG-03 | The owner's default privileges reach objects created after `SET ROLE`; runtime gets CRUD only | pg |
+| PG-04 | A NOINHERIT migrator that skips `SET ROLE` creates nothing | pg |
+| PG-05 | Only the **global** `REVOKE EXECUTE … FROM PUBLIC` default works | pg |
+| PG-06 | Defaults do not reach existing objects; a backfill does (reference only here) | pg |
+| PG-07 | RLS `USING` / `WITH CHECK`, owner bypass, `FORCE` (Phase 4 material) | pg |
+| PG-08 | A `SECURITY DEFINER` function without a fixed `search_path` can be hijacked | pg |
+| CNPG-01 | Adoption resets attributes the spec leaves out | cnpg |
+| CNPG-02 | A Secret change reaches the role's password | cnpg |
+| CNPG-03 | `spec.name` is immutable | cnpg |
+| CNPG-04 | CNPG ignores membership options and recreates an edge with defaults | cnpg |
+| CNPG-05 | `retain` keeps the role; `delete` waits while the role owns objects | cnpg |
+| CNPG-06 | Manual drift survives until a spec change triggers a reconcile | cnpg |
+| CNPG-07 | With `inherit: false` on the member, CNPG creates and recreates the owner edge as `f/f/t` | cnpg |
+
+The `pg` mode switches identity with `SET SESSION AUTHORIZATION`, which checks
+privileges exactly as a login would but not authentication or `pg_hba`; those
+are the Kind gate's job (K3.4–K3.6), which connects as the real logins.
+
 ---
-_Last updated: 2026-10-06 — first version (RFC-0029 Phase 1 conventions)._
+_Last updated: 2026-10-06 — the lab (`scripts/pg-authz-lab/`) added. First version the same day (RFC-0029 Phase 1 conventions)._

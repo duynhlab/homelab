@@ -736,6 +736,16 @@ rollback/revoke step.
 | CNPG-04 | Preserve then recreate ADMIN membership | Existing option is invisible; recreated grant uses defaults | **pass** — existing options preserved by ignorance; recreate lost ADMIN |
 | CNPG-05 | Delete retained vs deleting role | Retain leaves role; owned delete blocks finalization | **pass** — retain preserved role; owned delete remained finalizer-blocked |
 | CNPG-06 | Manual catalog drift | Drift survives until a spec/Secret trigger | **pass** — drift survived 600 seconds and repaired one second after spec touch |
+| CNPG-07 | Membership shape from `inherit: false` | A NOINHERIT member's `inRoles` edge is created and recreated as ADMIN f / INHERIT f / SET t | **pass 2026-10-06** — created `0/0/1`, recreated after a manual revoke `0/0/1` |
+
+**Re-run 2026-10-06 as a repeatable gate** (`scripts/pg-authz-lab/run.sh`):
+PG-01..08 **8/8** on PostgreSQL 18.6 (`postgres:18-alpine`, throwaway
+container); CNPG-01..07 **7/7** on the Kind `platform-db` (CNPG image
+`postgresql:18.6-system-trixie`, CNPG-06 with a 120 s drift window, repaired 1 s
+after the spec change). A mutated PG-04 (migrator granted `INHERIT TRUE`) fails
+as it should. The scratch scripts of the first run were not kept; these
+experiments replace them, so their assertions are written down rather than
+remembered.
 
 ### Repository validation already performed
 
@@ -853,8 +863,8 @@ edge is correct now but nothing alerts if it drifts again.
 ### Phase 1 — lab and policy contract
 
 Conventions and the migration contract are recorded in
-[`docs/databases/authorization.md`](../../../databases/authorization.md)
-(2026-10-06); the lab harness is the remaining item.
+[`docs/databases/authorization.md`](../../../databases/authorization.md), and
+the harness is `scripts/pg-authz-lab/` (both 2026-10-06).
 
 - Preserve or rebuild the scratch PG18/CNPG harness as a repeatable gate; the
   first recorded run passed 14/14 experiments.

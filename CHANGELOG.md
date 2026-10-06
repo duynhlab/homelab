@@ -158,6 +158,17 @@ Skeleton (copy what you need):
   (`<service>-slo`, `<service>-slo-burn`) so the cutover cannot hit a Helm
   ownership conflict.
 
+#### Databases
+
+- **`scripts/pg-authz-lab/`: the RFC-0029 authorization experiments as a
+  repeatable gate.** `run.sh pg` runs PG-01..08 against a throwaway PostgreSQL
+  container, each experiment asserting its own pass condition; `run.sh cnpg`
+  runs CNPG-01..07 against the Kind `platform-db` with `lab_*` objects only and
+  removes them afterwards. First run 2026-10-06: 8/8 and 7/7. The new CNPG-07
+  confirms that `inherit: false` on a member makes CNPG create (and recreate)
+  its owner edge as `ADMIN f / INHERIT f / SET t`, which the authorization
+  conventions rely on.
+
 #### Docs
 
 - **New `docs/databases/authorization.md`: the owner / migrator / runtime

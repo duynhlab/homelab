@@ -707,6 +707,32 @@ cannot be derived from a single file — they get their own row (K2.3).
   not runnable while this is off.
   Reference: [`mcp-servers.md`](mcp-servers.md).
 
+- [ ] **K3.7** Guarded database memberships have not drifted
+  ([ADR-086](../proposals/adr/ADR-086-guard-membership-options/)). CNPG
+  declares only a membership's name, so the PG18 `ADMIN` / `INHERIT` / `SET`
+  options of security-relevant edges are watched by the `pg_role_membership`
+  custom query. Asserted by `make e2e-smoke` (`smoke.js`, `GUARDED_EDGES`):
+  every guarded edge reports a series, and `max(cnpg_pg_role_membership_drift)`
+  is `0`. Today the only edge is `vault_rotator → notification`; each RFC-0029
+  cutover adds its `<svc>_migrator → <svc>_owner` edge to the query and to
+  `GUARDED_EDGES` in the same PR.
+  **FAIL:** a guarded edge with no series (the query or exporter is broken, see
+  [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md))
+  or a drift of `1` (repair with
+  [`CNPGRoleMembershipDrift`](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md);
+  do not relax the row).
+
+- [ ] **K3.8** — **planned (RFC-0029 Phase 2), not runnable yet.** The runtime
+  login cannot change its schema: as `<svc>_runtime`, `CREATE TABLE`,
+  `ALTER TABLE` and `DROP TABLE` are refused and `SET ROLE <svc>_owner` is
+  refused. Runs as the real login, through `pg_hba`, once a service has the
+  three roles.
+
+- [ ] **K3.9** — **planned (RFC-0029 Phase 2), not runnable yet.** The migrator
+  creates nothing as itself: as `<svc>_migrator`, `CREATE TABLE` is refused
+  until `SET ROLE <svc>_owner`, and succeeds after it; no object in the database
+  is owned by anyone but `<svc>_owner`.
+
 ---
 
 ## K4 — The real edge and identity
@@ -1360,7 +1386,7 @@ Preconditions: Compose gate <link/date> · tags pinned · previous cluster torn 
 | K0 machine | 8 | | tools present; ports free; N/N route hostnames resolve; multi-arch legs |
 | K1 bring-up | 8 | | `make up` <time> exit 0; N/N Kustomizations Ready; seed 8/8; worker version Current |
 | K2 delivery | 7 | | image↔pin table N/N exact; `auth` absent; 7/7 ResourceSets Ready |
-| K3 admission/secrets | 6 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token |
+| K3 admission/secrets | 7 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token; K3.7 guard 2/2 (K3.8–K3.9 planned) |
 | K4 edge/identity | 10 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |
 | K5 signals | 10 | | traces rooted at edge; both log legs; 33/33 dashboards resolve; N VERIFY-AT-KIND markers closed |
 | K6 wrap | 3 | | `make down` removes cluster **and** registry |
@@ -1941,4 +1967,4 @@ Measured on 2026-09-29 (`endpoints/v1`, Kubernetes 1.35.8):
 - [Network policies](../security/network-policies.md) — what the isolation sweeps assert
 - [OpenBAO](../secrets/openbao.md) — break-glass when a secret is missing
 
-_Last updated: 2026-10-01 — K0.6 compares the hosts file against the routes the kustomization enables, not a glob that counts the disabled mcp.yaml. Previously 2026-09-30 — K3.1: no exceptions remain (both removed as inert, ADR-078 step 3); K5.7/K5.8 notes refreshed. Earlier: 2026-09-29 — Diagnostics: "Who calls a deprecated API" (scoped apiserver audit) with the measured `endpoints/v1` clients and fixes. Earlier the same day — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_
+_Last updated: 2026-10-06 — K3.7 (guarded database memberships have not drifted, asserted by `smoke.js`) and the planned K3.8–K3.9 (RFC-0029 negative rows). Previously 2026-10-01 — K0.6 compares the hosts file against the routes the kustomization enables, not a glob that counts the disabled mcp.yaml. Previously 2026-09-30 — K3.1: no exceptions remain (both removed as inert, ADR-078 step 3); K5.7/K5.8 notes refreshed. Earlier: 2026-09-29 — Diagnostics: "Who calls a deprecated API" (scoped apiserver audit) with the measured `endpoints/v1` clients and fixes. Earlier the same day — Previous runs: the 1.35.8 baseline (RFC-0032 Phase 1, ELIGIBLE); K3.5 now records that kindnet enforces NetworkPolicy (re-measured), K2.3 reads the checkout-worker WorkerDeployment, K0.2/K1.3 cover the Kind floor and the digest pin. Previously 2026-09-25 — Previous runs: train #2 and the RFC-0031 final gate (ELIGIBLE; RustFS `mc` image 401, order-worker and mockpay version pins). Previously 2026-09-23 — third complete pass recorded under Previous runs: the obsx v0.44.0 fleet release, 25 k6 rows and 144 assertions green, the RFC-0031 Phase 1 checkpoint read off the cluster, and four findings including a mockpay version literal that disagreed with its own image. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-21_

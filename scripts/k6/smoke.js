@@ -26,6 +26,9 @@ const CATALOG = '/product/v1/public/products';
 
 // The ten deployed services. `auth` is retired (Keycloak replaced it) and its
 // continued absence is an assertion, not an omission.
+// Membership edges the ADR-086 guard must report, as member->parent.
+const GUARDED_EDGES = ['vault_rotator->notification'];
+
 const SERVICES = [
   'cart', 'checkout', 'inventory', 'notification', 'order',
   'payment', 'product', 'review', 'shipping', 'user',
@@ -411,6 +414,28 @@ const UNITS = [
 
       rowCheck(id, http.get(`${target.graf}/api/dashboards/uid/keycloak-identity`), {
         'the identity dashboard loads': (r) => r.status === 200,
+      });
+    },
+  },
+  {
+    // ADR-086 / RFC-0029: CNPG declares only a membership's name, so the PG18
+    // options of guarded edges are watched by the pg_role_membership query.
+    // The row asserts the guard is reporting (a series per guarded edge) and
+    // that nothing has drifted. Phase 2 adds each <svc>_migrator -> <svc>_owner
+    // edge to GUARDED_EDGES in the same PR that adds it to the query.
+    name: 'guarded database memberships have not drifted',
+    rows: { kind: 'K3.7' },
+    group: 'telemetry',
+    run(id) {
+      const perEdge = promqlCountBy(
+        target.vm,
+        'count by (edge) (label_join(cnpg_pg_role_membership_drift, "edge", "->", "member", "parent"))',
+        'edge'
+      );
+      const worst = promqlScalar(target.vm, 'max(cnpg_pg_role_membership_drift)');
+      rowCheck(id, null, {
+        'the guard reports every guarded edge': () => GUARDED_EDGES.every((e) => perEdge[e] > 0),
+        'no guarded edge has drifted': () => worst === 0,
       });
     },
   },

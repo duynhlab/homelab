@@ -130,6 +130,15 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Kind gate row K3.7: guarded database memberships have not drifted.**
+  `smoke.js` asserts that the ADR-086 guard reports a series for every edge in
+  `GUARDED_EDGES` (today `vault_rotator → notification`) and that
+  `max(cnpg_pg_role_membership_drift)` is `0`, so `make e2e GATE=kind` fails on
+  drift instead of leaving it to the page. Passes on Kind (16/16 rows); with a
+  fake edge added the row fails as it should. The RFC-0029 negative rows K3.8
+  (runtime cannot change the schema) and K3.9 (migrator creates nothing as
+  itself) are written into the audit as **planned** for Phase 2.
+
 - **PostgreSQL role-membership guard (ADR-086).** A `pg_role_membership`
   custom query on `platform-db` exports the PG18 `ADMIN` / `INHERIT` / `SET`
   options of each guarded membership; one row per expected edge, so a revoked

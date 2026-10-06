@@ -34,23 +34,27 @@ These are the objectives the design is built to meet once drills are recorded.
 
 ## As-built RPO/RTO today
 
-What the current homelab manifests actually guarantee. The gap between this and
-the target table above is the DR backlog.
+Configuration explains the mechanism; only a dated observation proves an
+outcome for its tested scenario. These records do not certify the current
+versions or untested failure combinations. The gap to the target table is the DR backlog.
 
 | Cluster | RPO driver (as-built) | Effective RPO | RTO posture | Evidence |
 |---------|----------------------|---------------|-------------|----------|
-| `product-db` | 3 instances, sync quorum `ANY 1`; `archive_timeout 5m`; daily + every-6h base backups → `s3://pg-backups-cnpg/product-db/` (30-day retention) | **0** on quorum-ack commits (**measured 0**); **≤ 5 min** to DR replica | Planned switchover **measured 11.4 s** RTO; **PITR measured 2 m 12 s** to a validated throwaway; DR promotion still **not drill-recorded** | ✅ [DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) (switchover, 2026-08-06) · ✅ [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) (PITR, 2026-08-07); ⏳ promotion pending durable hardware |
+| `product-db` | 3 instances, sync quorum `ANY 1`; `archive_timeout 5m`; daily + every-6h base backups → `s3://pg-backups-cnpg/product-db/` (30-day retention) | **Measured 0 in the recorded switchover**; DR loss depends on archive availability and replay/catch-up, not a proven ≤ 5 min ceiling | Planned switchover **measured 11.4 s** RTO; **PITR measured 2 m 12 s** to a validated throwaway; DR promotion still **not drill-recorded** | ✅ [DR-2026-08-B](../proposals/rfc/RFC-0021/gameday.md#0102-evidence-record) (switchover, 2026-08-06) · ✅ [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) (PITR, 2026-08-07); ⏳ promotion pending durable hardware |
 | `product-db-replica` | Follows `product-db` via object-store recovery; 1 instance (raised to 3 on promotion); own daily base backup into a 7-day recovery window | Tracks primary minus replay lag | Promote via `replica.enabled: false` | ⏳ promotion drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)) — on an ephemeral Kind cluster the rehearsal cannot honour the runbook's "never promote the live DR target" rule except by disposability |
-| `platform-db` | 3 instances, sync quorum `ANY 1`; Barman → `s3://pg-backups-cnpg/platform-db/` (30-day retention); includes `temporal` + `temporal_visibility` | **0** on quorum-ack commits | CNPG auto-failover; restore is manual | ⏳ restore drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)); the mechanism itself is proven by [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) on the identical CNPG + Barman plugin path |
+| `platform-db` | 3 instances, sync quorum `ANY 1`; Barman → `s3://pg-backups-cnpg/platform-db/` (30-day retention); includes `temporal` + `temporal_visibility` | Zero-loss objective depends on the surviving promotion candidate containing the acknowledged WAL; not drill-proven here | CNPG auto-failover; restore is manual | ⏳ restore drill deferred to durable hardware ([RFC-0011](../proposals/rfc/RFC-0011/)); the mechanism itself is proven by [DR-2026-08-A](./runbooks/restore-and-failover-drills.md#dr-2026-08-a--drill-a-product-db-pitr-the-barman-acceptance-gate) on the identical CNPG + Barman plugin path |
 
 ## How targets map to backup cadence
 
 RPO and RTO are not free-floating numbers — they are consequences of concrete knobs:
 
 - **RPO is set by the archive/replication lag.** For `product-db` and `platform-db`, synchronous
-  quorum makes acknowledged commits RPO-0 for in-cluster failover. For anything
-  recovered from the object store, RPO is bounded by `archive_timeout` (**5 min**)
-  plus upload time — a WAL segment not yet in RustFS is not recoverable.
+  quorum acknowledges WAL on a standby; zero-loss recovery additionally requires
+  that WAL to survive and reach the promotion candidate. `failoverQuorum` is not
+  enabled in these manifests. For object-store recovery, `archive_timeout`
+  (**5 min**) influences segment-switch cadence; upload failures/retries can
+  extend the gap without a fixed upper bound. A recoverable archived segment
+  still has to be replayed before promotion.
 - **Base-backup frequency sets the PITR floor + the restore baseline.** Daily +
   every-6h base backups keep the WAL-replay distance (and therefore restore time)
   short. Longer gaps between base backups mean more WAL to replay at restore → higher RTO.
@@ -60,14 +64,16 @@ RPO and RTO are not free-floating numbers — they are consequences of concrete 
   cut-over portions cannot be inferred from configuration; the
   [restore drills](./runbooks/restore-and-failover-drills.md) measure the complete path.
 
-For a recovery method `m`, use these planning bounds:
+For a recovery method `m`, separate data availability from elapsed recovery time:
 
 ```text
-RPO(m) >= replication lag or archive lag visible at incident time
+RPO(m) = incident time - latest recoverable commit selected for recovery
 RTO(m) = detect + decide + restore/download + replay + validate + cut-over
 ```
 
-These are bounds, not guarantees. Only a drill using representative data volume,
+These are planning relationships, not guarantees. A replica can catch up from
+available WAL before promotion; instantaneous replay lag is not necessarily the
+final data-loss interval. Only a drill using representative data volume,
 network throughput, and application validation can turn them into evidence.
 
 ## Known gaps
@@ -75,6 +81,9 @@ network throughput, and application validation can turn them into evidence.
 These widen the gap between target and as-built; tracked in
 [disaster-recovery.md → Known Gaps](./disaster-recovery.md#known-gaps-and-next-improvements).
 
+- **Unplanned failover is not the measured switchover.** The 11.4 s result
+  includes a healthy handover; node failure, API isolation and replica loss need
+  their own evidence. The August drill records also predate current pins.
 - **No `platform-db-replica` DR cluster** — platform tier recovery is in-cluster HA + Barman PITR only (RFC-0018 follow-up).
 - **No recorded DR-promotion or `platform-db` restore drill** — those rows stay
   pending until the [drill runbook](./runbooks/restore-and-failover-drills.md)
@@ -88,4 +97,4 @@ These widen the gap between target and as-built; tracked in
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — how the targets get verified.
 
 ---
-_Last updated: 2026-09-29 — DR cluster down to 1 instance, raised to 3 on promotion. Earlier: 2026-09-01 — DR cluster taken to 3 instances with its own daily base backup._
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

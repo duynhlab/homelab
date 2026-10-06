@@ -5,10 +5,10 @@ the storage and query engine inside every operand pod.
 
 | Item | Current state |
 |---|---|
-| **Operator image** | `ghcr.io/cloudnative-pg/cloudnative-pg:1.30.0` |
+| **Operator image** | `ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1` |
 | **Helm chart** | `cloudnative-pg` 0.29.0 |
 | **Controller namespace** | `cloudnative-pg` |
-| **Operand image** | `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Operand image** | `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie` |
 | **Backup plugin** | Barman Cloud plugin (chart `plugin-barman-cloud` 0.8.1) |
 
 ## Control-plane boundary
@@ -20,23 +20,27 @@ participating in lifecycle and role transitions.
 
 ```mermaid
 flowchart LR
-    Git["GitOps manifests"] --> API["Kubernetes API"]
-    API --> Operator["CNPG operator 1.30.0"]
-    Operator --> CRs["Cluster / Database<br/>DatabaseRole / Pooler"]
-    CRs --> Runtime["Pods / Services / PVCs"]
-    Runtime --> PG[("PostgreSQL 18.1")]
-    Barman["Barman plugin 0.8.1"] --> Backup["Backup / ScheduledBackup"]
-    Backup --> CRs
+    Git["GitOps manifests"] -->|"Flux applies"| CRs
+    subgraph Cluster["Kubernetes cluster"]
+        CRs["Desired resources in Kubernetes API<br/>Cluster / Database / DatabaseRole<br/>Pooler / Backup / ScheduledBackup"]
+        CRs -->|"watch"| Operator["CNPG operator"]
+        Operator -->|"reconcile"| Runtime["Pods / Services / PVCs"]
+        Runtime --> Manager["Instance manager"]
+        Manager -->|"supervise"| PG[("PostgreSQL")]
+        Operator -->|"CNPG-I"| Barman["Barman Cloud plugin"]
+        Store["ObjectStore configuration"] --> Barman
+        Barman <-->|"backup / WAL hooks"| Manager
+    end
 
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
     classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
     class Git external;
-    class API,Operator,CRs,Runtime,Barman,Backup platform;
+    class Operator,CRs,Runtime,Manager,Barman,Store platform;
     class PG data;
 ```
 
-The diagram answers which resources CNPG reconciles. It does not imply that the
+The diagram answers how desired resources reach the database runtime. It does not imply that the
 operator owns application schemas, tables, migrations, or disaster-cutover
 decisions.
 
@@ -57,6 +61,65 @@ updates generated services. It does not change application-level DNS outside
 those services or decide whether a separate DR cluster should become the new
 system of record.
 
+## Bootstrap and ownership
+
+CNPG uses its own pod controller, not a StatefulSet. The operator reconciles
+resources and orchestrates transitions; the instance manager starts PostgreSQL,
+reports local health and carries out instance lifecycle work. Running SQL and
+streaming replication are database processes, not work performed by Flux.
+
+`bootstrap.initdb` initializes a new operational cluster. Its database/owner is
+then adopted by the service's declarative resources. Changing bootstrap fields
+later does not rerun initialization or migrate existing data. Recovery bootstrap
+instead starts from a base backup and WAL; `product-db-replica` remains a
+read-only replica cluster after bootstrap. It currently has **one instance**,
+not the operational clusters' three-instance HA layout.
+
+Keep application migrations responsible for tables and data. CNPG owns declared
+roles/databases/extensions, but a restore and a fresh initialization need the
+same ownership checks before applications resume. See
+[declarative management](./declarative-role-management.md).
+
+## Replication and failure behavior
+
+Both operational clusters configure `synchronous.method: any`, `number: 1`,
+and `dataDurability: required`. With synchronous commits enabled, the primary
+waits for one eligible standby to acknowledge the required WAL durability.
+Losing all eligible synchronous standbys can therefore stall commits even when
+the primary is running. This favors durability over write availability; do not
+silently weaken the setting to make an outage disappear.
+
+Commit acknowledgment and promotion safety are separate. The manifests do not
+enable `failoverQuorum`; `ANY 1` alone is not proof that every possible promotion
+candidate contains every acknowledged write under multiple failures. Read
+[replication and slots](./fundamentals/12-replication-and-slots.md) and the
+[reliability evidence](./reliability-targets.md) before promising zero loss.
+
+CNPG 1.30 uses a per-cluster Kubernetes Lease to serialize primary promotion.
+The Lease is a promotion gate, **not a fence**: it does not itself stop an
+isolated old primary from serving writes. Primary isolation handling and the
+shutdown path remain relevant. This is also distinct from explicit operator
+fencing of an instance for maintenance or recovery.
+
+| Failure | What may keep working | What to inspect before acting |
+|---|---|---|
+| Operator/webhook unavailable | Existing SQL and replication may continue | Controller events/probes, webhook endpoints, blocked Flux admission; automated orchestration is impaired |
+| Kubernetes API partition | Database processes may still be running | Lease, instance isolation and network reachability; do not infer a safe primary from a reachable SQL socket alone |
+| Primary failure | Eligible replicas may be promoted | CNPG phase, candidate WAL state, primary isolation and client reconnection |
+| All synchronous standbys unavailable | Reads on a healthy primary may continue | Commit waits, replication state, storage/network health; writes can block |
+| Archive/RustFS failure | Streaming HA may continue | WAL accumulation, stale backups and DR recovery lag; storage can eventually fill |
+
+Use `kubectl get lease product-db -n product` and
+`kubectl cnpg status product-db -n product` for observation, not manual Lease
+editing. A stable `-rw` Service redirects new connections after a role change;
+it does not transfer an existing transaction to the new primary. Clients need
+bounded reconnection and a deliberate policy for ambiguous commit outcomes.
+
+The repository pins 1.30.1. Its release notes include fixes to primary Lease
+startup gating, fencing-related failover stalls and pending failovers. When
+investigating an older incident, record the actual operator version rather
+than applying today's behavior to historical 1.30.0 evidence.
+
 ## Reconciliation behavior
 
 Declarative resources are not continuous SQL migration engines:
@@ -68,6 +131,8 @@ Declarative resources are not continuous SQL migration engines:
 - Application tables and migrations remain outside CNPG database management.
 - Replica clusters are read-only; database-scoped resources cannot be enforced
   until promotion.
+- Applying a role CR is not continuous detection of manual SQL drift. Separate
+  last-apply status from the membership guard described in [authorization](./authorization.md).
 
 Edit source manifests and let Flux and CNPG reconcile. Do not modify generated
 services, pods, credentials, or instance-manager configuration directly.
@@ -100,6 +165,11 @@ plugin form one compatibility surface. Upgrade them as an ordered change:
    rollout.
 5. Keep database major-version upgrades separate from routine operator upgrades.
 
+The exact sequence and stop conditions live in
+[maintenance and upgrades](./runbooks/maintenance-and-upgrades.md).
+Transport/authentication boundaries live in [security and access](./security-and-access.md);
+resource sizing lives in [storage and capacity](./storage-and-capacity.md).
+
 ## Operations
 
 - [Architecture and inventory](./architecture.md)
@@ -117,5 +187,7 @@ plugin form one compatibility surface. Upgrade them as an ordered change:
 - [CloudNativePG 1.30 failure modes](https://cloudnative-pg.io/docs/1.30/failure_modes/)
 - [CloudNativePG 1.30 installation and upgrades](https://cloudnative-pg.io/docs/1.30/installation_upgrade/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
+- [CloudNativePG 1.30 automated failover and Lease](https://cloudnative-pg.io/docs/1.30/failover/)
+- [CloudNativePG 1.30 release notes](https://cloudnative-pg.io/docs/1.30/release_notes/v1.30/)
 
-_Last updated: 2026-10-01 — Barman Cloud plugin chart 0.7.1 → 0.8.1, matching the HelmRelease. Earlier: 2026-08-31._
+_Last updated: 2026-10-06 — reconciled pins with main, expanded bootstrap and failure semantics, and linked day-2 guides._

@@ -5,9 +5,15 @@ cluster provides a co-located DR copy of product data.
 
 | Cluster | Namespace | PostgreSQL | Instances | Purpose |
 |---|---|---:|---:|---|
-| `platform-db` | `platform` | 18.1 | 3 | Platform and supporting-service databases |
-| `product-db` | `product` | 18.1 | 3 | Catalog and checkout-domain databases |
-| `product-db-replica` | `product` | 18.1 | 1 (3 on promotion) | Object-store-fed recovery copy of `product-db` |
+| `platform-db` | `platform` | 18.6 | 3 | Platform and supporting-service databases |
+| `product-db` | `product` | 18.6 | 3 | Catalog and checkout-domain databases |
+| `product-db-replica` | `product` | 18.6 | 1 (3 on promotion) | Object-store-fed recovery copy of `product-db` |
+
+Version inventory comes from repository pins, reviewed at main `d421daf3` on
+2026-10-06: CNPG operator **1.30.1**, chart **0.29.0**, PostgreSQL **18.6** and
+Barman Cloud plugin chart **0.8.1**. Confirm running versions before operations;
+this review did not perform a new live-cluster audit. Historical evidence keeps
+the versions measured on its recorded date.
 
 ## Current topology
 
@@ -17,7 +23,7 @@ cross-region topology.
 
 ```mermaid
 flowchart TB
-    CNPG["CloudNativePG 1.30.0"]
+    CNPG["CloudNativePG 1.30.1"]
 
     subgraph PlatformClients["Platform database clients"]
         PlatformApps["user / notification / shipping / review"]
@@ -81,6 +87,10 @@ services expose these database roles:
 | `-r` | Any instance, including the primary |
 | `-ro` | Standby instances only |
 
+`ANY 1` is a commit acknowledgment rule, not an unconditional zero-loss promise
+for every promotion. The manifests do not enable `failoverQuorum`; see
+[failure behavior and safety boundaries](./cloudnativepg.md#replication-and-failure-behavior).
+
 Applications normally use a pooler or `-rw`. A generated service is stable, but
 individual pod identity and replication role are not.
 
@@ -118,6 +128,9 @@ services, not by the infrastructure manifests.
 ## Operations
 
 - [CloudNativePG control plane](./cloudnativepg.md)
+- [Storage and capacity](./storage-and-capacity.md)
+- [Security and access](./security-and-access.md)
+- [Maintenance and upgrades](./runbooks/maintenance-and-upgrades.md)
 - [Pooler endpoints and behavior](./poolers.md)
 - [Declarative database and role ownership](./declarative-role-management.md)
 - [Backup policy](./backup-policy.md)
@@ -137,4 +150,4 @@ services, not by the infrastructure manifests.
 - [CloudNativePG 1.30 service management](https://cloudnative-pg.io/docs/1.30/service_management/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 
-_Last updated: 2026-10-01 — payment's direct hop is described as TLS, unverified (`sslmode=require`). Earlier the same day: inventory table shows the DR cluster's single instance. Earlier: 2026-09-29 — DR cluster `product-db-replica` down to 1 instance (3 on promotion). Earlier: 2026-09-28 — Draw.io view of every connection and recovery path. 2026-09-01 — DR cluster `product-db-replica` taken to 3 instances (designated primary + 2 cascading standbys)._
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

@@ -6,8 +6,8 @@ database.
 
 | Item | Current state |
 |---|---|
-| **Operator / PostgreSQL** | CloudNativePG 1.30.0 / PostgreSQL 18.1 |
-| **Operand image** | `ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie` |
+| **Operator / PostgreSQL** | CloudNativePG 1.30.1 / PostgreSQL 18.6 |
+| **Operand image** | `ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie` |
 | **Artifact delivery** | Extensions packaged in the system operand image |
 | **Startup loading** | `Cluster.spec.postgresql.shared_preload_libraries` |
 | **Database activation** | `Database.spec.extensions` |
@@ -159,4 +159,4 @@ and `status.message`.
 - [CloudNativePG 1.30 declarative database management](https://cloudnative-pg.io/docs/1.30/declarative_database_management/)
 - [CloudNativePG 1.30 ImageVolume extensions](https://cloudnative-pg.io/docs/1.30/imagevolume_extensions/)
 
-_Last updated: 2026-08-31._
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

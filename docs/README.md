@@ -330,6 +330,13 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 2. **[PostgreSQL learning path](./databases/README.md#learn-postgresql)** -
    Internals, replication and HA, pooling, backup/recovery, and extensions.
 
+   Platform follow-on: [CloudNativePG](./databases/cloudnativepg.md),
+   [storage and capacity](./databases/storage-and-capacity.md),
+   [security and access](./databases/security-and-access.md), and
+   [maintenance and upgrades](./databases/runbooks/maintenance-and-upgrades.md).
+   See the [dated platform review](./databases/reference/platform-review.md)
+   for corrected claims and infrastructure follow-ups.
+
 3. **[PostgreSQL Disaster Recovery](./databases/disaster-recovery.md)** - HA, DR, RPO/RTO, PITR, standby taxonomy, and restore evidence
     - [RPO/RTO Planning](./databases/reliability-targets.md) - per-tier targets vs as-built, mapped to clusters
     - [Restore & Failover Drills](./databases/runbooks/restore-and-failover-drills.md) - drill cadence, roles, and evidence log

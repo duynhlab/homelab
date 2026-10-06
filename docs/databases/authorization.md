@@ -296,7 +296,7 @@ scripts/pg-authz-lab/run.sh cnpg   # Kind platform-db; lab_* objects only, remov
 
 The `pg` mode switches identity with `SET SESSION AUTHORIZATION`, which checks
 privileges exactly as a login would but not authentication or `pg_hba`; those
-are the Kind gate's job (K3.4–K3.6), which connects as the real logins.
+are the Kind gate's job (K3.4, K3.8, K3.9), which connects as the real logins.
 
 ---
 _Last updated: 2026-10-06 — the lab (`scripts/pg-authz-lab/`) added. First version the same day (RFC-0029 Phase 1 conventions)._

@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | **RFC** | RFC-0029 |
-| **Status** | researching |
+| **Status** | provisional — [README.md](./README.md) authored 2026-10-06 |
 | **Scope** | platform-wide |
 | **Created** | 2026-09-03 |
-| **Last updated** | 2026-10-05 |
+| **Last updated** | 2026-10-06 |
 
 > **Plain-language research.** This is the evidence and teaching record before
 > an authorization architecture is proposed. It covers self-managed PostgreSQL
@@ -14,9 +14,9 @@
 > 18.6 / 1.30.1 since 2026-10-05). Cloud database IAM is reference material only
 > and is not a v1 rollout target.
 >
-> **Scope fence:** the companion Vietnamese deep dive and the RFC proposal do
-> not exist yet. Repository process requires this research to pass its source,
-> experiment, and owner gates first.
+> **Scope fence:** the gate passed on 2026-10-06 and the proposal now lives in
+> [README.md](./README.md). This file stays the evidence record; the companion
+> Vietnamese deep dive does not exist yet.
 
 ---
 
@@ -987,9 +987,9 @@ integration separate lets the self-managed lab prove that portable core first.
 
 ## Research review gate
 
-**Current result: 10/11.** Only owner sign-off remains open. The Phase 0
-membership guard (step 6) is still to be built, but it is a rollout item, not a
-research gate item.
+**Current result: 11/11 — passed 2026-10-06.** The owner approved "ready for
+RFC". The Phase 0 membership guard (step 6) is still to be built; it is a
+rollout item, not a research gate item.
 
 - [x] Answers a real-world platform/security problem rather than generic vendor marketing
 - [x] Problem statement names situation, affected roles, and cost of doing nothing
@@ -1003,10 +1003,11 @@ research gate item.
 - [x] Context7/source-tree and live-CRD audit complete
 - [x] Mermaid diagrams distinguish the current and conceptual paths
 - [x] No fleet authorization rollout is smuggled into this research file
-- [ ] Owner sign-off: **ready for RFC**
+- [x] Owner sign-off: **ready for RFC** (2026-10-06)
 
 ---
 _Last verified: 2026-10-05 (re-check on PostgreSQL 18.6 / CNPG 1.30.1 and
 pgroles v0.13.0 docs; disposable labs, catalog/HBA audit and Context7/source
 audit from 2026-09-04 on 18.1 / 1.30.0; Phase 0 live credential rotation
-executed and verified on Kind 2026-10-05; owner gate remains open)._
+executed and verified on Kind 2026-10-05; owner approved "ready for RFC"
+2026-10-06)._

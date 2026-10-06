@@ -221,6 +221,12 @@ extraSelectorLabels:
   app: << inputs.name >>
 ```
 
+Changing which chart a HelmRelease uses (as the move from `mop` to `duynh`
+did) is not an upgrade: Flux sees a new chart name as a new release target,
+uninstalls the old release and installs the new one. On Kind that meant about
+10–15 s of downtime per service and recreated Services. Plan a chart swap as a
+short outage, or as a new release name with traffic moved over.
+
 ### 4.4 InputProvider Concatenation Behavior
 
 `inputsFrom` with label selectors **discovers** all matching `ResourceSetInputProvider` objects in the same namespace. Each provider's `defaultValues` becomes one input set. The ResourceSet iterates the template once per input set.

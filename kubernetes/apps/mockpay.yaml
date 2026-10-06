@@ -28,8 +28,8 @@ spec:
   values:
     nameOverride: mockpay
     containerName: mockpay
-    # The selector is immutable and mop selected on `app` as well; keeping it
-    # lets the release upgrade in place.
+    # Keep the selector mop used (`app` included): it is immutable, and the
+    # NetworkPolicies, dashboards and relabelling read these labels.
     extraSelectorLabels:
       app: mockpay
     podLabels:

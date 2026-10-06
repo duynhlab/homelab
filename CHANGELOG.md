@@ -97,8 +97,11 @@ Skeleton (copy what you need):
   `mockpay` render their HelmReleases on `duynh-chart-oci` (`>=0.3.1 <0.4.0`);
   `mop-chart-oci` is removed. The migration stays an init container (now
   declared in the ResourceSets, so a migrator Secret is a values change), gRPC
-  is an extra Service port with `appProtocol: grpc`, and the selector is kept
-  with `nameOverride` + `extraSelectorLabels`, so each release upgrades in place.
+  is an extra Service port with `appProtocol: grpc`, and the selector and labels
+  are kept with `nameOverride` + `extraSelectorLabels`. Flux treats a chart
+  *name* change as a new release target, so each release was uninstalled and
+  reinstalled rather than upgraded: on Kind every service was down for about
+  10–15 s and its Service was recreated, Helm history restarting at v1.
   Rendered against the cluster's real inputs, all 13 workloads match what `mop`
   rendered — names, selector, ports, `appProtocol`, env, probes, resources, init
   container and volumes; the only differences are a ServiceAccount per release

@@ -164,7 +164,7 @@ flowchart LR
             owner["svc_owner · NOLOGIN<br/>owns schema + objects (planned)"]:::platform
         end
         eso["ExternalSecret ×2<br/>runtime + migration (planned)"]:::platform
-        guard["catalog guard<br/>query + alert (planned)"]:::platform
+        guard["catalog guard<br/>query + alert"]:::platform
     end
 
     eso -. "workload Secret (planned)" .-> api
@@ -173,7 +173,7 @@ flowchart LR
     api -. "CRUD grants only (planned)" .-> pooler
     job -->|"direct -rw (today)"| primary
     job -. "SET ROLE after login (planned)" .-> owner
-    guard -. "reads pg_auth_members (planned)" .-> primary
+    guard -->|"reads pg_auth_members"| primary
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
@@ -181,12 +181,13 @@ flowchart LR
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
-This one answers the order of work. Phase 0 is done; the rest is **planned**.
+This one answers the order of work. Phase 0, including the step 6 guard, is
+done; the rest is **planned**.
 
 ```mermaid
 flowchart LR
     p0["Phase 0 · revoke the leaked credential<br/>done 2026-10-05 on Kind"]:::data
-    p0g["Phase 0 step 6 · membership guard<br/>(planned)"]:::platform
+    p0g["Phase 0 step 6 · membership guard<br/>done 2026-10-06 on Kind"]:::data
     p1["Phase 1 · lab + policy contract<br/>conventions, catalog queries (planned)"]:::platform
     p2["Phase 2 · one canary service<br/>three roles, cutover (planned)"]:::platform
     p3["Phase 3 · fleet by domain<br/>local-stack parity, drift evidence (planned)"]:::platform
@@ -257,7 +258,7 @@ flowchart LR
 
 | Phase | Content | Exit |
 |---|---|---|
-| 0 | Revoke the leaked `vault_rotator` credential | **Done 2026-10-05** (research § Phase 0 execution record); step 6 guard still open |
+| 0 | Revoke the leaked `vault_rotator` credential | **Done 2026-10-05** (research § Phase 0 execution record); step 6 guard done 2026-10-06 (ADR-086) |
 | 1 | Harness as a repeatable gate; catalog queries; naming/Secret/HBA conventions; local-stack decision | owner review of the conventions |
 | 2 | One canary (`review`) | Goals 1–3 proven on Kind, negative tests in the gate |
 | 3 | Fleet by domain, never all databases at once | every service passes positive and negative tests |
@@ -317,6 +318,9 @@ Still open (implementation, settled in the canary PR):
   `provisional` (#1229).
 - 2026-10-06 — **Accepted**; ADR-084, ADR-085 and ADR-086 created at
   `Accepted`, Adoption `Not started`.
+- 2026-10-06 — Phase 0 step 6: the membership guard for `vault_rotator →
+  notification` shipped and was exercised on Kind (flip and revoke both fired
+  and resolved); ADR-086 Adoption `Partial`.
 
 ## Related
 

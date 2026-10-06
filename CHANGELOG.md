@@ -102,6 +102,19 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0029 is `Accepted`, with ADR-084, ADR-085 and ADR-086 created at
+  `Accepted`** (Adoption `Not started`).
+  [ADR-084](docs/proposals/adr/ADR-084-split-service-database-roles/) splits
+  each service database into a NOLOGIN owner, a migrator that reaches it only
+  through `SET ROLE`, and a runtime login that owns nothing, amending ADR-013;
+  [ADR-085](docs/proposals/adr/ADR-085-service-migrations-own-authorization/)
+  puts object ACLs, default privileges (with a global PUBLIC `EXECUTE` revoke)
+  and the backfill in each service's migrations;
+  [ADR-086](docs/proposals/adr/ADR-086-guard-membership-options/) guards PG18
+  membership options with a CNPG monitoring query and alert. Owner decisions:
+  canary `review`, local-stack mirrors the roles, existing data moves to the
+  owner once per service by runbook while new clusters are born correct.
+
 - **RFC-0029 → `provisional`: its README is authored.** The owner approved
   "ready for RFC" with the gate at 11/11. The proposal splits each service's
   login/owner role into a NOLOGIN owner, a migrator that reaches ownership only

@@ -852,6 +852,10 @@ edge is correct now but nothing alerts if it drifts again.
 
 ### Phase 1 — lab and policy contract
 
+Conventions and the migration contract are recorded in
+[`docs/databases/authorization.md`](../../../databases/authorization.md)
+(2026-10-06); the lab harness is the remaining item.
+
 - Preserve or rebuild the scratch PG18/CNPG harness as a repeatable gate; the
   first recorded run passed 14/14 experiments.
 - Define catalog queries for effective access and drift.

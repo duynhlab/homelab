@@ -408,7 +408,10 @@ secret/{environment}/{category}/{service}/{resource}
 | `staging` | `secret/staging/` | Staging environment |
 | `prod` | `secret/prod/` | EKS / GKE production |
 
-**Current KV paths** (seeded at bootstrap):
+**Current KV paths** (seeded at bootstrap). RFC-0029 replaces the per-service
+entries with `secret/local/databases/<cluster>/<svc>-runtime` and
+`…/<svc>-migrator`, random per cluster, as each service is cut over
+([Database authorization](../databases/authorization.md#naming)); **planned**.
 
 | Path | Keys | Consumer |
 |------|------|---------|

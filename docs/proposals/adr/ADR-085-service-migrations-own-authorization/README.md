@@ -70,8 +70,9 @@ converted service carries, in its migrations:
    UPDATE, DELETE`) and sequences (`USAGE, SELECT`), set by the owner;
 2. a **global** `ALTER DEFAULT PRIVILEGES … REVOKE EXECUTE ON FUNCTIONS FROM
    PUBLIC`;
-3. a one-time backfill of the same grants on objects that already exist,
-   including the legacy `<svc>` login for the compatibility window;
+3. on a cluster that already holds data only, a one-time backfill of the same
+   grants on existing objects. This platform converts on fresh clusters
+   (amended 2026-10-06), so its services ship no backfill;
 4. `USAGE` on the application schema for the runtime.
 
 No platform Job applies object ACLs across services.
@@ -132,9 +133,9 @@ removed.
 
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
-| Authorization migration in `review-service` | review-service | canary PR | defaults and backfill present in the catalog |
-| Decide and verify how the migration tool reaches `SET ROLE` (explicit statement or a role-level default) | platform | canary PR | objects created by the Job are owned by `review_owner` |
-| A reusable SQL snippet in the database runbooks | platform | `docs/databases/` | second service copies it |
+| Authorization migration in `review-service` | review-service | canary PR | defaults present in the catalog |
+| Decide and verify how the migration tool reaches `SET ROLE` | platform | decided 2026-10-06: `migratex.WithSetRole` (duynhlab/pkg) fed by `DB_MIGRATION_ROLE`; canary PR verifies | objects created by the Job are owned by `review_owner` |
+| A reusable SQL snippet in the database runbooks | platform | [`authorization.md`](../../../databases/authorization.md#the-migration-contract) | second service copies it |
 | `docs/api` | — | N/A | no route or RPC change |
 
 ## Validation and compliance
@@ -171,6 +172,7 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-10-06 | Proposed / Not started | Drafted from RFC-0029 |
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 |
+| 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): the mechanism is `migratex.WithSetRole` in `duynhlab/pkg` (fails hard when `SET ROLE` is denied or the role is empty), chosen over a catalog `ALTER ROLE … SET role` default and over pgroles; no backfill on this platform (greenfield). The `0001_authorization` snippet is in [`authorization.md`](../../../databases/authorization.md) |
 
 ---
-_Last updated: 2026-10-06_
+_Last updated: 2026-10-06 (amended: `migratex.WithSetRole`, greenfield)_

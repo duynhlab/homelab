@@ -81,10 +81,12 @@ We will give every application database three roles:
 Each role is its own fully specified CNPG `DatabaseRole`; `Database.spec.owner`
 is `<svc>_owner`. Objects are owned by the owner on new and existing clusters
 alike: a **new cluster** is born correct, because migrations run under the
-migrator after `SET ROLE <svc>_owner`. A **cluster that already holds data**
-transfers ownership once per service through an operator runbook on CNPG's local
-peer `postgres` path (`REASSIGN OWNED BY <svc> TO <svc>_owner` plus a grant
-backfill); no Job or credential with that privilege is left behind.
+migrator after `SET ROLE <svc>_owner`. This platform converts each service on a
+**fresh cluster** (amended 2026-10-06), so no ownership transfer runs here. A
+cluster that already holds data would transfer ownership once per service
+through an operator runbook on CNPG's local peer `postgres` path
+(`REASSIGN OWNED BY <svc> TO <svc>_owner` plus a grant backfill); that path is
+reference only and not exercised.
 
 ### Decision rules
 
@@ -95,8 +97,8 @@ backfill); no Job or credential with that privilege is left behind.
 | **Read path** | The API and workers connect as `<svc>_runtime` through the pooler |
 | **Boundary** | `<svc>_owner` has no password and no Secret; no workload ever logs in as it |
 | **Admission** | `pg_hba` carries an exact pair for runtime and for migrator before either login is used (ADR-015) |
-| **Cutover** | `<svc>_runtime` is a new login, not a rename (`DatabaseRole.spec.name` is immutable). The legacy `<svc>` login keeps its grants for a bounded compatibility window, then loses its HBA pair and is dropped |
-| **Existing data** | One operator-run ownership transfer per service, with the transferred objects recorded in the cutover PR |
+| **Cutover** | `<svc>_runtime` is a new login, not a rename (`DatabaseRole.spec.name` is immutable). Greenfield: the legacy `<svc>` login is never created, and there is no compatibility window. Rollback is `git revert` + a fresh `make up` |
+| **Existing data** | Not exercised on this platform. Reference: one operator-run ownership transfer per service, with the transferred objects recorded in the cutover PR |
 | **Parity** | local-stack gives a converted service the same three roles in `postgres/init.sql` and `compose.yaml` |
 
 ### Decision view
@@ -168,10 +170,10 @@ options that CNPG cannot express and ADR-086 would have to guard.
 | Obligation | Owner | Tracking | Completion signal |
 |------------|-------|----------|-------------------|
 | Separate runtime/migration Secret inputs in the domain ResourceSets | platform | `kubernetes/apps/domains/` | the workload and `migrate` name different Secrets |
-| Ownership-transfer runbook for existing databases | platform | `docs/databases/runbooks/` | runbook exercised on `review` |
+| Ownership-transfer procedure for existing databases | platform | [`authorization.md`](../../../databases/authorization.md#rollback-and-existing-data) | described as reference; not exercised (greenfield, amended 2026-10-06) |
 | Canary `review` converted on Kind | platform + review-service | RFC-0029 Phase 2 | negative tests pass in the Kind gate |
 | local-stack parity for converted services | platform | `local-stack/postgres/init.sql`, `compose.yaml` | local-stack gate passes with three roles |
-| Verify how the migration tool reaches `SET ROLE` | platform | canary PR | migration Job creates objects owned by `<svc>_owner` |
+| Verify how the migration tool reaches `SET ROLE` | platform | `migratex.WithSetRole` (duynhlab/pkg) + canary PR | migration Job creates objects owned by `<svc>_owner` |
 
 ## Validation and compliance
 
@@ -209,6 +211,7 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 (owner decisions: canary `review`, local-stack parity, runbook transfer for existing data) |
 | 2026-10-06 | Accepted / Not started | The service workloads moved from the `mop` chart to `duynh`. The obligation "separate runtime/migration Secret inputs in the `mop` chart" now needs no chart change: the `migrate` init container is declared in the domain ResourceSets (`initContainers`), so the migrator Secret is a values change there |
 | 2026-10-06 | Accepted / Not started | Correction to the row above: the migrator Secret is not only a values change. The workload and the `migrate` init container both read `inputs.db_secret` / `db_user`, so the domain ResourceSets need new inputs; the chart still needs none. The summary's count is fixed to two Secrets (the owner has no credential) |
+| 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): greenfield cutover. The legacy `<svc>` login is never created, there is no compatibility window, rollback is `git revert` + a fresh `make up`, and the ownership transfer for existing data is reference only. Conventions in [`authorization.md`](../../../databases/authorization.md) |
 
 ---
-_Last updated: 2026-10-06 (history: chart move to `duynh`)_
+_Last updated: 2026-10-06 (amended: greenfield cutover)_

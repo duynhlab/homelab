@@ -160,6 +160,16 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **New `docs/databases/authorization.md`: the owner / migrator / runtime
+  conventions** (RFC-0029 Phase 1, not deployed). Role, `DatabaseRole`,
+  Secret, KV and `pg_hba` naming with the names considered and rejected; role
+  attributes, including `inherit: false` on the migrator, which gives its
+  membership the `f/f/t` shape with no SQL (measured on PostgreSQL 18.6);
+  ResourceSet wiring; the migration contract and the `0001_authorization`
+  snippet; the gate rows; local-stack parity; catalog queries for effective
+  access. Linked from the docs index, the database hub, the add-a-service
+  runbook and the OpenBAO KV table.
+
 - **Every PostgreSQL cluster in the Draw.io diagrams carries the PostgreSQL
   logo, and keeps its cylinder.** The `homelab-drawio` generator used to refuse
   a logo on a datastore; it now draws one as a child image cell inside the
@@ -169,6 +179,15 @@ Skeleton (copy what you need):
   secrets diagrams.
 
 #### Proposals
+
+- **RFC-0029 Phase 1: open questions resolved, ADR-084/085 amended.** The
+  owner chose a greenfield cutover: the legacy `<svc>` login is never created,
+  there is no compatibility window, and rollback is `git revert` plus a fresh
+  `make up`; the ownership transfer for existing data stays as reference only.
+  Migrations reach the owner through `migratex.WithSetRole` (duynhlab/pkg),
+  chosen over a catalog `ALTER ROLE … SET role` default and over pgroles. The
+  membership alert pages and also gates the Kind run (K3.7). The PUBLIC
+  `CONNECT` difference with local-stack is kept and recorded.
 
 - **RFC-0029 Phase 0 step 6 is done; ADR-086 Adoption `Partial`.** The RFC,
   ADR-084 and research.md now agree with the decisions taken at acceptance:

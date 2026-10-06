@@ -52,6 +52,7 @@ These pages describe current or explicitly planned platform state.
 - [Poolers](./poolers.md)
 - [Extensions](./extensions.md)
 - [Declarative database and role management](./declarative-role-management.md)
+- [Database authorization (owner / migrator / runtime)](./authorization.md) — **conventions accepted, not deployed** (RFC-0029)
 - [Cross-region DR roadmap](./cross-region-dr.md) — **planned, not
   deployed**
 
@@ -117,6 +118,7 @@ flowchart LR
 | Pooler deployment and connection ownership | `poolers.md` |
 | Installed and allowed extension model | `extensions.md` |
 | Database, role, and credential reconciliation | `declarative-role-management.md` |
+| Who owns objects, who migrates, who serves traffic | `authorization.md` |
 | Commands used during operations | [`runbooks/`](./runbooks/README.md) |
 | PostgreSQL internal mechanics | `fundamentals/` |
 | Symptom-to-signal troubleshooting | `observability-and-troubleshooting.md` |

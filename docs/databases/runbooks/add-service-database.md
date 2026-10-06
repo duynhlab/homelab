@@ -10,6 +10,7 @@ change to `instance.yaml`**.
 | **Time** | ~15 minutes + one PR |
 | **Reference triplet** | `kubernetes/infra/configs/databases/clusters/product-db/services/payment.yaml` |
 | **Concepts** | [012 — Declarative Role & Database Management](../declarative-role-management.md) |
+| **Planned change** | RFC-0029 replaces the single login with owner + migrator + runtime roles; a service added after its cutover follows [Database authorization](../authorization.md) |
 
 ## Steps
 

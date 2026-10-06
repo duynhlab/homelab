@@ -57,7 +57,7 @@ For a deeper derivation see the [SRE Workbook chapter on alerting on SLOs](https
 
 ## 2. What Sloth generates per SLO
 
-Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules**; the **2 alerts per SLO** are emitted beside it with a minimum-events guard (see [Minimum-events guard](#minimum-events-guard)). With 9 HTTP services (inventory opts out of the chart SLOs) covered by 3 SLOs each (availability, latency, and error rate), inventory by 2 gRPC SLOs, and Keycloak by 2 hand-written identity SLOs (`login-availability`, `auth-latency` — [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml)), that is **31 SLOs / 62 alerts**.
+Each `PrometheusServiceLevel` produces a `PrometheusRule` containing **recording rules**; the **2 alerts per SLO** are emitted beside it with a minimum-events guard (see [Minimum-events guard](#minimum-events-guard)). With 9 HTTP services (inventory opts out of the chart SLOs) covered by 2 SLOs each (availability and latency), inventory by 2 gRPC SLOs, and Keycloak by 2 hand-written identity SLOs (`login-availability`, `auth-latency` — [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml)), that is **22 SLOs / 44 alerts**.
 
 ### Minimum-events guard
 

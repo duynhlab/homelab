@@ -36,8 +36,8 @@ applied, leaving **241 deployed rules** from this tree.
 
 The tree above does not include the **12 Temporal rules** in
 `configs/temporal/prometheusrule.yaml`. The cluster therefore has **253
-hand-written rule entries**. Sloth adds **62 generated burn-rate entries** for
-31 SLOs, bringing the cluster total to **315**. Of the 241 deployed entries from
+hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
+22 SLOs, bringing the cluster total to **297**. Of the 241 deployed entries from
 the main tree, six are inert on Kind because the local-path/kubelet signals they
 need do not exist; effective Kind coverage for that tree is **235**. The inert
 rules and both gated rules are marked inline rather than presented as working
@@ -65,7 +65,7 @@ error forward a fourth time.
 | [KEDA autoscaling](#8c-keda-autoscaling) | 4 | The autoscaler that sizes the Temporal workers — operator scrape, **external-metrics adapter scrape**, scaler errors, ScaledObject errors (ADR-055) |
 | [Temporal / Pyroscope / Watchdog](#8-temporal--pyroscope--watchdog) | 16 | Tracing, workflows, worker capacity (ADR-055), profiling, dead-man's-switch, OTLP collector |
 | [RFC-0021 order-side stock](#9-rfc-0021-order-side-stock) | 12 | The saga's stock path: start outbox, commit lag, reconciler. Born as migration rules; **steady state** since phase 4 |
-| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 62 (generated) | Error-budget burn: **9** HTTP services × 3 SLOs + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs = 31 SLOs, two burn-rate alerts each. Counted 68 until 2026-09-05, which assumed 10 HTTP services — `inventory` serves **no HTTP** (`rpc_server_*` only), so it has the gRPC pair and nothing more |
+| [SLO burn-rate (Sloth)](#slo-burn-rate-alerts-sloth-generated) | 44 (generated) | Error-budget burn: **9** HTTP services × 2 SLOs (availability, latency; the `slo` chart) + inventory × 2 gRPC SLOs + keycloak × 2 identity SLOs = 22 SLOs, two burn-rate alerts each. Counted 68 until 2026-09-05, which assumed 10 HTTP services — `inventory` serves **no HTTP** (`rpc_server_*` only), so it has the gRPC pair and nothing more |
 
 ---
 

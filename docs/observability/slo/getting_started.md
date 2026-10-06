@@ -71,7 +71,7 @@ kubectl get prometheusservicelevel -n monitoring
 kubectl get prometheusrule -n monitoring | grep sloth
 
 # Describe to see GEN status
-kubectl describe prometheusservicelevel my-service -n monitoring
+kubectl describe prometheusservicelevel my-service-slo -n monitoring
 # Look for: GEN OK=true
 
 # Check SLO metrics in VictoriaMetrics (any of):
@@ -109,7 +109,7 @@ No ServiceMonitor, no namespace registration, and no `app.kubernetes.io/componen
 After enabling SLO for a new service:
 
 - [ ] `kubectl get prometheusservicelevel -n monitoring` shows the service
-- [ ] `kubectl describe prometheusservicelevel <service> -n monitoring` shows `GEN OK=true`
+- [ ] `kubectl describe prometheusservicelevel <service>-slo -n monitoring` shows `GEN OK=true`
 - [ ] `kubectl get prometheusrule -n monitoring | grep sloth` shows generated rules
 - [ ] VictoriaMetrics query `slo:sli_error:ratio_rate5m{sloth_service="<service>"}` returns data (via [vmui.duynh.me](http://vmui.duynh.me/vmui))
 - [ ] The service appears in the **[Sloth Web UI](http://slo.duynh.me)** with both SLOs and a non-empty SLI chart

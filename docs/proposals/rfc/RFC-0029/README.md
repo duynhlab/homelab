@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-06 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-06 |
 
 > **Don't forget: every decision is a tradeoff.** The cost of the leading
 > direction is more Secrets, more HBA pairs and a coordinated consumer cutover
@@ -14,7 +14,7 @@
 - [x] Context7 audit complete; the source-tree, live-CRD and pgroles checks are in the research log
 - [x] Owner approved **ready for RFC** on 2026-10-06
 - [x] This RFC summarizes the target and links the mechanism deep dive instead of repeating it
-- [ ] When Status → **`Accepted`**: create the ADRs listed in § Resulting decisions. `docs/api/` is N/A: no service route or RPC changes; service repos gain migrations only
+- [x] Status **`Accepted`** 2026-10-06: ADR-084, ADR-085 and ADR-086 created (§ Resulting decisions). `docs/api/` is N/A: no service route or RPC changes; service repos gain migrations only
 
 ## Summary
 
@@ -130,16 +130,20 @@ Two independent choices (full analysis: research § Alternatives):
 
 ## Decision outcome
 
-**Chosen option:** undecided — architecture review pending. The leading
-hypothesis is **three service roles** with **service-owned authorization
-migrations**, plus capability roles only where several identities genuinely
-share one permission set.
+**Chosen option:** **three service roles** (owner/migrator/runtime) with
+**service-owned authorization migrations**, and membership options guarded by a
+**CNPG monitoring query plus alert**. Capability roles are kept for people, not
+services.
 
 **Rationale:** it is the only combination that meets Goals 1–3 without a second
-schema-migration system or a controller that cannot express the membership
-options Goal 4 depends on. The review must still settle the canary, the chart's
-Secret inputs and the drift collector (§ Open questions) before this becomes a
-decision.
+schema-migration system, and Goal 4 without a controller that cannot see the
+`SET` option or a new privileged credential. The runner-up for authorization was
+a declarative controller (pgroles); it lost on the membership options it cannot
+manage and the executor it needs.
+
+**Decided:** 2026-10-06, owner — canary `review`; local-stack mirrors the three
+roles; existing data moves to the owner role once per service by an operator
+runbook, while new clusters are born correct.
 
 ## Architecture & Diagrams
 
@@ -275,24 +279,28 @@ never a rollback target.
 
 ## Open questions
 
-- Which service is the canary — review or shipping?
-- Does the `mop` chart gain separate `runtimeSecretRef` / `migrationSecretRef`?
-- How long may the legacy `<svc>` login live after cutover?
-- Which collector owns periodic drift evidence: the monitoring-query path, a
-  CronJob, or a read-only `pgroles diff --review-out`?
-- Ownership transfer by runbook or by a one-shot Job?
-- Does local-stack adopt the three roles, or is authorization a Kind-only gate?
-- Where does the membership guard alert route, and does it gate the Kind E2E?
+Resolved 2026-10-06:
+
+- ~~Canary~~ — `review`.
+- ~~Drift collector~~ — CNPG monitoring query plus alert (ADR-086).
+- ~~Ownership transfer~~ — new clusters need none; existing data moves once per
+  service by an operator runbook (ADR-084).
+- ~~Local-stack~~ — mirrors the three roles for every converted service.
+
+Still open (implementation, settled in the canary PR):
+
+- The `mop` chart's runtime/migration Secret inputs.
+- The length of the compatibility window before the legacy login is dropped.
+- How the migration tool reaches `SET ROLE` (ADR-085 obligation).
+- Whether the membership alert also gates the Kind E2E or only pages.
 
 ## Resulting decisions
 
-To be created at `Proposed` during architecture review:
-
 | Decision | ADR | Status |
 |----------|-----|--------|
-| Three service roles (owner/migrator/runtime) replace the single login/owner role; supersedes that part of ADR-013 | to be created | not yet created |
-| Object ACLs and default privileges are owned by service migrations after `SET ROLE <svc>_owner` | to be created | not yet created |
-| PG18 membership options are guarded by a catalog query and alert | to be created | not yet created |
+| Three service roles (owner/migrator/runtime) replace the single login/owner role; amends ADR-013 | [`ADR-084`](../../adr/ADR-084-split-service-database-roles/) | Accepted |
+| Object ACLs and default privileges are owned by service migrations after `SET ROLE <svc>_owner` | [`ADR-085`](../../adr/ADR-085-service-migrations-own-authorization/) | Accepted |
+| PG18 membership options are guarded by a CNPG monitoring query and alert | [`ADR-086`](../../adr/ADR-086-guard-membership-options/) | Accepted |
 
 ## Implementation History
 
@@ -300,7 +308,9 @@ To be created at `Proposed` during architecture review:
 - 2026-10-05 — Phase 0 remediation merged (#989) and executed on Kind; research
   refreshed (#1227) and the run recorded (#1228).
 - 2026-10-06 — owner approved **ready for RFC**; this README authored at
-  `provisional`.
+  `provisional` (#1229).
+- 2026-10-06 — **Accepted**; ADR-084, ADR-085 and ADR-086 created at
+  `Accepted`, Adoption `Not started`.
 
 ## Related
 

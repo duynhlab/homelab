@@ -107,5 +107,11 @@ act.
   reconciliation or an `ensure: absent` equivalent, revisit the drift-handling
   and role-removal notes above.
 
+## History
+
+| Date | Status / adoption | Change |
+|------|-------------------|--------|
+| 2026-10-06 | Accepted | Amended by [ADR-084](../ADR-084-split-service-database-roles/): the triplet file stays the unit, but its single login/owner `DatabaseRole` becomes owner, migrator and runtime roles with two ExternalSecrets, service by service |
+
 ---
-_Last updated: 2026-07-08_
+_Last updated: 2026-10-06_

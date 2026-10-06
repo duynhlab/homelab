@@ -37,8 +37,8 @@ Then compare Envoy's opinion with Kubernetes':
 
 ```bash
 kubectl get endpointslice -n <service-ns> -l kubernetes.io/service-name=<service>
-kubectl get pods -n <service-ns> -l app=<service> -o wide
-kubectl logs -n <service-ns> -l app=<service> --tail=200
+kubectl get pods -n <service-ns> -l app.kubernetes.io/name=<service> -o wide
+kubectl logs -n <service-ns> -l app.kubernetes.io/name=<service> --tail=200
 ```
 
 Two distinct situations look the same in the metric: pods that are genuinely

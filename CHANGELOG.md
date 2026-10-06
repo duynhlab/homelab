@@ -92,13 +92,34 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **Service Deployments select on the chart's own labels only.** The `app`
+  label kept from `mop` (`extraSelectorLabels`) is dropped from the five domain
+  ResourceSets, `rs-frontend`, `rs-backoffice` and `mockpay`; the selector is
+  now `app.kubernetes.io/name` + `app.kubernetes.io/instance`. Nothing selected
+  on `app` except Vector (below); the `app` label on metrics comes from OTel
+  `service_name` through vmagent and is unchanged. Because the selector is
+  immutable, each Deployment was orphaned (`--cascade=orphan`) and recreated by
+  Helm, which adopted the running ReplicaSet and rolled it — no downtime.
+  `application-delivery.md` documents the procedure and the
+  `chartNameChangeStrategy: InPlaceUpdate` knob the `mop` → `duynh` swap could
+  have used; the runbooks select pods with `-l app.kubernetes.io/name=`.
+  Measured on Kind for all 13 workloads: no Service ever dropped to zero ready
+  endpoints, and 222 probe requests through the gateway (review, product) all
+  returned 200.
+- **The five domain ResourceSets render the same SLO block, and the `migrate`
+  init container has resources.** The `slo_disabled` guard existed only in
+  `fulfillment-rs`, so the flag was silently ignored in the other four domains;
+  every template now wraps the `<name>-slo` HelmRelease in it. `migrate` gets
+  requests (50m / 32Mi) and a 128Mi memory limit, like every other container.
+
 - **Every service now deploys with the `duynh` chart, and the `mop` chart is
   gone.** The five domain ResourceSets, `rs-backoffice`, `rs-frontend` and
   `mockpay` render their HelmReleases on `duynh-chart-oci` (`>=0.3.1 <0.4.0`);
   `mop-chart-oci` is removed. The migration stays an init container (now
   declared in the ResourceSets, so a migrator Secret is a values change), gRPC
   is an extra Service port with `appProtocol: grpc`, and the selector and labels
-  are kept with `nameOverride` + `extraSelectorLabels`. Flux treats a chart
+  are kept with `nameOverride` + `extraSelectorLabels` (the `app` selector
+  label was then dropped, see the entry above). Flux treats a chart
   *name* change as a new release target, so each release was uninstalled and
   reinstalled rather than upgraded: on Kind every service was down for about
   10–15 s and its Service was recreated, Helm history restarting at v1.
@@ -108,6 +129,16 @@ Skeleton (copy what you need):
   (no token mounted) and `maxUnavailable: 0` rollouts.
 
 #### Observability
+
+- **Vector takes a pod's `service` stream field from
+  `app.kubernetes.io/name` first**, then `app`, then the pod name: the same
+  order the OTLP leg already used. frontend, backoffice and mockpay keep their
+  values after losing `app`. Platform pods that carried only the standard label
+  now report their workload name instead of their pod name (every CNPG cluster
+  reads `service="postgresql"`, OpenBAO `openbao`, Envoy runtime lines
+  `envoy`); streams stay per pod because `pod_name` is a stream field too.
+  Queries in the guides select by `namespace`, `container_name` or `pod_name`
+  and are unaffected.
 
 - **Service SLOs come from the new `slo` chart** — one `<service>-slo`
   HelmRelease per service, emitted by the domain ResourceSets and skipped with
@@ -183,6 +214,14 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### GitOps
+
+- **mockpay logs are stored once, and its telemetry reports the running
+  release.** It ships logs over OTLP but lacked the
+  `platform.duynhlab.dev/otlp-logs` label, so Vector also tailed its stdout
+  (29 lines each way in 30 minutes on Kind); the label is added.
+  `service.version` said 2.5.0 while the image is 2.8.0.
+
 #### Databases
 
 - **The committed `vault_rotator` database password is removed from current
@@ -200,11 +239,19 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **The two Temporal worker runbooks select the worker pods again.**
+  `TemporalWorkflowFailureRateHigh` and `TemporalWorkerRequestErrorRateHigh`
+  used `-l app=order-fulfillment` / `-l app=checkout-abandon`, labels the
+  worker pods never had; they now use `app.kubernetes.io/name=order-worker` /
+  `checkout-worker`.
+
 - **The SLO docs counted a retired service and a dropped SLO.** They listed
   `auth` and three SLOs per service (31 SLOs, 62 alerts); the cluster runs nine
   chart services with two SLOs each since `mop` 0.19.0, plus inventory's and
   Keycloak's two — 22 SLOs, 44 alerts. Corrected while moving the SLO docs to
-  the `slo` chart.
+  the `slo` chart; the alerting README, the alert catalog and
+  `slo-burn-rate-alerts.md` were missed then and now agree, and
+  `getting_started.md` names the service level `<service>-slo`.
 
 - **The OpenBAO database-engine diagram now draws where `vault_rotator`'s
   credential comes from** (`docs/secrets/openbao.md`): the per-cluster KV value,

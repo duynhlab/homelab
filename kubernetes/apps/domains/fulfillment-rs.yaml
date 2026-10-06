@@ -32,10 +32,6 @@ spec:
       values:
         nameOverride: << inputs.name >>
         containerName: << inputs.name >>
-        # Keep the selector mop used (`app` included): it is immutable, and the
-        # NetworkPolicies, dashboards and relabelling read these labels.
-        extraSelectorLabels:
-          app: << inputs.name >>
         replicaCount: << inputs.replicaCount | int >>
         image:
           repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-service
@@ -284,6 +280,12 @@ spec:
             image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
             imagePullPolicy: IfNotPresent
             args: ["migrate"]
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "32Mi"
+              limits:
+                memory: "128Mi"
             env:
               - name: DB_HOST
                 value: << inputs.db_migration_host >>
@@ -305,7 +307,7 @@ spec:
     # The slo chart is HTTP-only (http_server_request_duration_seconds SLIs).
     # A gRPC-only service sets `slo_disabled` on its RSIP and carries a
     # hand-written PrometheusServiceLevel under infra/configs/observability/sloth/
-    # (services/inventory.yaml). Opt-out on purpose: the guard is truthiness-based,
+    # (inventory-grpc-slo.yaml). Opt-out on purpose: the guard is truthiness-based,
     # so `slo_enabled: "false"` would render as TRUE.
     # Request SLOs: a Sloth PrometheusServiceLevel and the burn-rate alerts,
     # from the slo chart (both land in monitoring, where Sloth watches).

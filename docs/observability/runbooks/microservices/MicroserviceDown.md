@@ -32,13 +32,13 @@ See alert summary in [alert catalog](../../alerting/alert-catalog.md#1-microserv
 ### Investigation
 ```bash
 # Check pod status
-kubectl get pods -n $NAMESPACE -l app=$APP
+kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=$APP
 
 # Check events
 kubectl describe pod -n $NAMESPACE $POD_NAME
 
 # Check recent logs
-kubectl logs -n $NAMESPACE -l app=$APP --tail=100
+kubectl logs -n $NAMESPACE -l app.kubernetes.io/name=$APP --tail=100
 
 # Check if deployment rollout in progress
 kubectl rollout status deployment/$APP -n $NAMESPACE

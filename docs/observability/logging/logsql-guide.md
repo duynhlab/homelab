@@ -45,7 +45,7 @@ record's *shape* differs too:
 |---|---|---|---|
 | A Go service (`product`, `cart`, `checkout`, …) or worker (`order-worker`, `checkout-worker`) | OTLP (otelzap → Collector) | `_stream:{"service.name"="checkout"}` | `severity_text` (`error`, `warn`, …) |
 | The Envoy edge — **runtime lines** (access logs are ClickHouse-only, [ADR-061](../../proposals/adr/ADR-061-edge-log-routing/)) | Vector (dedicated source) | `_stream:{pod_name=~"envoy-envoy-gateway.*"}` | `level` (when the line parses) |
-| A database, the frontend, a system pod | Vector | `_stream:{namespace="product"}` or `_stream:{service="frontend"}` (`service` = the pod's `app` label) | `level` (lifted from the JSON message when present) |
+| A database, the frontend, a system pod | Vector | `_stream:{namespace="product"}` or `_stream:{service="frontend"}` (`service` = the pod's `app.kubernetes.io/name` label, else its `app` label, else the pod name) | `level` (lifted from the JSON message when present) |
 | PostgreSQL `auto_explain` plans | Vector (PG pipeline) | `_stream:{cluster_name="product-db"}` — fields: `cluster_name`, `namespace`, `database`, `query_id` | none — these are plans, not messages |
 
 The names in `"service.name"` are the pods' `OTEL_SERVICE_NAME` — the bare

@@ -45,7 +45,7 @@ this series means the database read failed.
 ### kubectl / logs
 ```bash
 kubectl logs -n order -l app.kubernetes.io/name=order-worker --tail=200 | grep "could not read the reconciler backlog"
-kubectl logs -n order -l app=order --tail=200      | grep "could not read the reconciler backlog"
+kubectl logs -n order -l app.kubernetes.io/name=order --tail=200      | grep "could not read the reconciler backlog"
 ```
 The log line carries the database error verbatim.
 

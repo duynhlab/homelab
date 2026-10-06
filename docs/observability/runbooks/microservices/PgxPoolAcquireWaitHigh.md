@@ -56,7 +56,7 @@ histogram_quantile(0.95, sum by (app, le)
 
 ```bash
 APP=<app label>; NS=<namespace label>
-kubectl -n "$NS" get pods -l app="$APP"          # replica count vs usual
+kubectl -n "$NS" get pods -l app.kubernetes.io/name="$APP"          # replica count vs usual
 kubectl -n "$NS" logs deploy/"$APP" --since=15m | grep -i "acquire\|timeout"
 ```
 

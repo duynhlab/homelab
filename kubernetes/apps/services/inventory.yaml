@@ -61,10 +61,10 @@ spec:
     db_sslmode: "disable"
     pool_max: "25"
     # Internal gRPC server (:9090) — inventory reservations for the checkout
-    # confirm path and the order saga (RFC-0021). The mop chart adds a
+    # confirm path and the order saga (RFC-0021). The domain template adds a
     # grpc:9090 port to the inventory Service.
     grpc_server: true
-    # No chart-rendered SLO: the mop chart only knows how to build HTTP SLIs
+    # No chart-rendered SLO: the slo chart (as mop before it) only builds HTTP SLIs
     # (http_server_request_duration_seconds), and this service serves gRPC
     # only — no HTTP edge route, and the health/ready endpoints are not
     # instrumented. All three rendered SLOs therefore had ZERO series behind

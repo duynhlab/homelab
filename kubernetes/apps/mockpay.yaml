@@ -16,7 +16,7 @@ spec:
   timeout: 10m
   chartRef:
     kind: OCIRepository
-    name: mop-chart-oci
+    name: duynh-chart-oci
     namespace: flux-system
   releaseName: mockpay
   install:
@@ -26,7 +26,14 @@ spec:
     remediation:
       retries: 3
   values:
-    name: mockpay
+    nameOverride: mockpay
+    containerName: mockpay
+    # Keep the selector mop used (`app` included): it is immutable, and the
+    # NetworkPolicies, dashboards and relabelling read these labels.
+    extraSelectorLabels:
+      app: mockpay
+    podLabels:
+      app.kubernetes.io/component: api
     replicaCount: 1
     image:
       # Same image as the payment API — just a different subcommand, so the tag
@@ -58,8 +65,10 @@ spec:
       tag: "2.8.0" # {"$imagepolicy": "flux-system:payment:tag"}
       pullPolicy: IfNotPresent
     args: ["mockpay"]
+    containerPort: 8080
     service:
-      enabled: true
+      port: 8080
+      appProtocol: http
     env:
       - name: SERVICE_NAME
         value: mockpay
@@ -130,16 +139,15 @@ spec:
         memory: "64Mi"
         cpu: "50m"
     livenessProbe:
-      enabled: true
       httpGet:
         path: /health
         port: 8080
       initialDelaySeconds: 10
       periodSeconds: 10
     readinessProbe:
-      enabled: true
       httpGet:
         path: /health
         port: 8080
       initialDelaySeconds: 3
       periodSeconds: 5
+      failureThreshold: 3

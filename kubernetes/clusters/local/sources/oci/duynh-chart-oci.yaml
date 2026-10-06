@@ -1,0 +1,15 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: duynh-chart-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/duynhlab/helm-charts/duynh
+  ref:
+    # >=0.3.1: initContainers, extraPorts, appProtocol and extraSelectorLabels,
+    # which the service HelmReleases rely on to replace mop in place.
+    semver: ">=0.3.1 <0.4.0"

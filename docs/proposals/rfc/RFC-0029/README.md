@@ -97,7 +97,7 @@ login, not an in-place rename: `DatabaseRole.spec.name` is immutable.
 | HBA admission | `Cluster.spec.postgresql.pg_hba`, exact runtime/migrator pairs (ADR-015) |
 | Object ownership, ACL backfill, default privileges | the service's versioned migrations, run after `SET ROLE <svc>_owner` |
 | Membership options CNPG cannot express | bootstrap/runbook SQL + a catalog guard (query + alert) |
-| Migration vs runtime Secret wiring | ResourceSet and `mop` chart, separate inputs |
+| Migration vs runtime Secret wiring | domain ResourceSet values (`duynh` chart): the workload `env` and the `migrate` init container each name their own Secret |
 
 ### User Stories
 
@@ -286,10 +286,12 @@ Resolved 2026-10-06:
 - ~~Ownership transfer~~ — new clusters need none; existing data moves once per
   service by an operator runbook (ADR-084).
 - ~~Local-stack~~ — mirrors the three roles for every converted service.
+- ~~Chart Secret inputs~~ — no chart change needed since the services moved to
+  the `duynh` chart: the `migrate` init container is declared in the domain
+  ResourceSets, so each container names its own Secret.
 
 Still open (implementation, settled in the canary PR):
 
-- The `mop` chart's runtime/migration Secret inputs.
 - The length of the compatibility window before the legacy login is dropped.
 - How the migration tool reaches `SET ROLE` (ADR-085 obligation).
 - Whether the membership alert also gates the Kind E2E or only pages.

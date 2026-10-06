@@ -99,7 +99,7 @@ spec:
     # always on (no feature flag); the worker uses its own PAYMENT_GRPC_ADDR.
     payment_grpc_addr: "dns:///payment.payment.svc.cluster.local:9090"
     # Internal gRPC server (:9090) — checkout's confirm handoff calls
-    # order.v1/CreateOrder (RFC-0015, ADR-018). The mop chart adds a
+    # order.v1/CreateOrder (RFC-0015, ADR-018). The domain template adds a
     # grpc:9090 port to the order Service.
     grpc_server: true
     # MUST stay the string "false": the template guard is truthiness-based,

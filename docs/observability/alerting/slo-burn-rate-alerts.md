@@ -80,7 +80,7 @@ the work:
 
 | SLOs | Where the alerts live | `N` |
 |---|---|---|
-| 9 HTTP services × 3 | mop chart `templates/slo-alerts.yaml` (chart ≥ 0.18.0) | `slo.minEvents` (10) |
+| 9 HTTP services × 2 | `slo` chart `templates/prometheusrule.yaml` (`<service>-slo-burn`) | `minEvents` (10) |
 | inventory × 2, keycloak × 2 | [`sloth/slo-alerts.yaml`](../../../kubernetes/infra/configs/observability/sloth/slo-alerts.yaml) | 10 |
 
 `sloth_id`, `sloth_slo` and `sloth_service` survive on the result series, so the
@@ -118,7 +118,7 @@ The alert name is reused for the SLO category (the SLI determines the meaning):
 | Availability | `<svc>HighErrorRate` | 5xx fraction is burning the availability budget |
 | Latency | `<svc>HighLatency` | Fraction of requests slower than 500 ms is burning the latency budget |
 
-(Names are configurable in the `mop` chart values; defaults above match the chart at the time of writing.)
+(Names are configurable through `alertNames` in the `slo` chart values; defaults above match the chart at the time of writing.)
 
 ### Standard alert labels and annotations
 
@@ -137,18 +137,19 @@ Every Sloth-generated alert carries:
 
 ## 3. Configuration — per-service overrides
 
-SLOs are wired through the [`mop` Helm chart](https://github.com/duynhlab/helm-charts/tree/main/charts/mop) — see [`getting_started.md`](../slo/getting_started.md) for the full flow. Alert behaviour is controlled by these values:
+SLOs are wired through the [`slo` Helm chart](https://github.com/duynhlab/helm-charts/tree/main/charts/slo), one `<service>-slo` HelmRelease per service — see [`getting_started.md`](../slo/getting_started.md) for the full flow. Alert behaviour is controlled by these values:
 
 ```yaml
-slo:
-  enabled: true
+labels:
   team: platform              # propagates as `team` label
   env: monitoring             # propagates as `env` label
-  availability:
-    objective: 99.5           # changes the 14.4×/6× anchors automatically
-  latency:
-    objective: 95.0
-    threshold: "0.5"          # 500 ms — the bucket le="..."
+availability:
+  objective: 99.5             # changes the 14.4×/6× anchors automatically
+latency:
+  objective: 95.0
+  threshold: "0.5"            # 500 ms — the bucket le="..."
+minEvents: 10                 # guard: requests needed in each arm's long window
+tiers: [...]                  # page/ticket arms; Sloth's 30-day defaults
 ```
 
 **Tightening the SLO** (e.g. `99.5 → 99.9`) **automatically tightens the alerts** — the burn-rate maths is anchored on `1 - objective`, so 14.4× of a smaller error budget triggers on a smaller absolute error rate. You don't (and shouldn't) hand-edit the burn-rate thresholds.

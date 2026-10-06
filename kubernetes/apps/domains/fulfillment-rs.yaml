@@ -20,7 +20,7 @@ spec:
       timeout: 10m
       chartRef:
         kind: OCIRepository
-        name: mop-chart-oci
+        name: duynh-chart-oci
         namespace: flux-system
       releaseName: << inputs.name >>
       install:
@@ -30,32 +30,42 @@ spec:
         remediation:
           retries: 3
       values:
-        name: << inputs.name >>
+        nameOverride: << inputs.name >>
+        containerName: << inputs.name >>
+        # Keep the selector mop used (`app` included): it is immutable, and the
+        # NetworkPolicies, dashboards and relabelling read these labels.
+        extraSelectorLabels:
+          app: << inputs.name >>
         replicaCount: << inputs.replicaCount | int >>
         image:
           repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-service
           tag: "<< inputs.image_tag >>"
           pullPolicy: IfNotPresent
+        containerPort: 8080
+        <<- if (index inputs "grpc_server") >>
+        extraPorts:
+          - name: grpc
+            containerPort: 9090
+        <<- end >>
         service:
-          enabled: true
           type: ClusterIP
           # Edge resilience lives at the gateway: the resilience-default
           # BackendTrafficPolicy (configs/envoy-gateway/policies/btp-api.yaml)
           # carries the timeouts, retries, and health checks.
-          http:
-            port: 8080
-            containerPort: 8080
+          port: 8080
+          appProtocol: http
           <<- if (index inputs "grpc_server") >>
-          grpc:
-            enabled: true
-            port: 9090
-            containerPort: 9090
+          extraPorts:
+            - name: grpc
+              port: 9090
+              appProtocol: grpc
           <<- end >>
         # RFC-0014 P4: this pod ships its own logs over OTLP (otelzap tee) —
         # the label tells the Vector DaemonSet to skip its stdout (double-
         # ingest guard). Tied to the same input as OTEL_LOGS_ENABLED so a
         # kill-switch flip also hands the pod back to Vector.
-        labels:
+        podLabels:
+          app.kubernetes.io/component: api
           platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
         env:
           - name: SERVICE_NAME
@@ -254,45 +264,73 @@ spec:
             # throttling; 500m clears it.
             cpu: "500m"
         livenessProbe:
-          enabled: true
           httpGet:
             path: /health
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
-          enabled: true
           httpGet:
             path: /ready
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
-        migrations:
-          enabled: true
-          env:
-            DB_HOST: << inputs.db_migration_host >>
-            DB_PORT: "5432"
-            DB_NAME: << inputs.name >>
-            DB_USER: << index inputs "db_user" | default inputs.name >>
-            DB_SSLMODE: "require"
-          envFrom:
-            secretRef: << inputs.db_secret >>
-        # The chart's SLO block is HTTP-only (it renders
-        # http_server_request_duration_seconds SLIs). A gRPC-only service gets
-        # three SLOs with no series behind them, so this domain needs an
-        # opt-out: `slo_disabled` on the RSIP (see services/inventory.yaml,
-        # which then carries a hand-written gRPC PrometheusServiceLevel under
-        # infra/configs/observability/sloth/).
-        #
-        # OPT-OUT, not a boolean input, on purpose: the template guard is
-        # truthiness-based, so `slo_enabled: "false"` would render as TRUE —
-        # the same trap documented on grpc_reflection in inventory.yaml. An
-        # input that only ever exists to disable cannot be got backwards.
-        # `enabled: false` is rendered explicitly rather than omitting the
-        # block, so the outcome does not depend on the chart's default.
-        slo:
-          <<- if (index inputs "slo_disabled") >>
-          enabled: false
-          <<- else >>
-          enabled: true
-          <<- end >>
+          # The chart defaults readiness to 2 failures; keep the Kubernetes 3.
+          failureThreshold: 3
+        # Schema migrations run in the app image's `migrate` subcommand before
+        # the API starts, straight to the primary (never through a pooler).
+        initContainers:
+          - name: migrate
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            imagePullPolicy: IfNotPresent
+            args: ["migrate"]
+            env:
+              - name: DB_HOST
+                value: << inputs.db_migration_host >>
+              - name: DB_PORT
+                value: "5432"
+              - name: DB_NAME
+                value: << inputs.name >>
+              - name: DB_USER
+                value: << index inputs "db_user" | default inputs.name >>
+              - name: DB_SSLMODE
+                value: "require"
+              - name: DB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: << inputs.db_secret >>
+                    key: password
+    <<- if not (index inputs "slo_disabled") >>
+    ---
+    # The slo chart is HTTP-only (http_server_request_duration_seconds SLIs).
+    # A gRPC-only service sets `slo_disabled` on its RSIP and carries a
+    # hand-written PrometheusServiceLevel under infra/configs/observability/sloth/
+    # (services/inventory.yaml). Opt-out on purpose: the guard is truthiness-based,
+    # so `slo_enabled: "false"` would render as TRUE.
+    # Request SLOs: a Sloth PrometheusServiceLevel and the burn-rate alerts,
+    # from the slo chart (both land in monitoring, where Sloth watches).
+    apiVersion: helm.toolkit.fluxcd.io/v2
+    kind: HelmRelease
+    metadata:
+      name: << inputs.name >>-slo
+      namespace: << inputs.namespace >>
+    spec:
+      interval: 10m
+      chartRef:
+        kind: OCIRepository
+        name: slo-chart-oci
+        namespace: flux-system
+      releaseName: << inputs.name >>-slo
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
+      values:
+        service: << inputs.name >>
+        namespace: monitoring
+        labels:
+          team: platform
+          env: monitoring
+    <<- end >>

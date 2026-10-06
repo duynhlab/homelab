@@ -27,7 +27,7 @@ spec:
     # frontier (ADR-035) and runs under a cross-process lease (ADR-036), and each
     # refund carries a caller-supplied identity (ADR-037).
     #
-    # Migrations 000010-000012 ride the mop chart's init container, which reuses
+    # Migrations 000010-000012 ride the `migrate` init container, which reuses
     # this image and runs `migrate` BEFORE the app container starts — so the
     # schema cannot lag the code. Confirmed the hard way in the local-stack
     # audit: rebuilding the service without its migrator left the reconciler
@@ -80,8 +80,8 @@ spec:
     db_secret: "product-db-payment-secret"
     db_sslmode: "require"
     pool_max: "25"
-    # Internal gRPC server (:9090) — the order saga's money transport. The mop
-    # chart adds a grpc:9090 port to the payment Service.
+    # Internal gRPC server (:9090) — the order saga's money transport. The domain
+    # template adds a grpc:9090 port to the payment Service.
     grpc_server: true
     # Reflection off in the cluster: this API surface moves money (grpcx
     # registers reflection unless told otherwise). MUST stay the string

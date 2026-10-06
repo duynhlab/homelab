@@ -1,10 +1,10 @@
-# Keycloak identity SLOs — hand-written because Keycloak is not a mop-chart
-# service.
+# Keycloak identity SLOs — hand-written because Keycloak is not a
+# chart-rendered service.
 #
 # WHY THIS FILE EXISTS
 #
-# Every Go service gets its PrometheusServiceLevel from the `mop` chart
-# (`slo.enabled: true` in the domain ResourceSets). Keycloak is platform
+# Every Go service gets its PrometheusServiceLevel from the `slo` chart
+# (a `<service>-slo` HelmRelease in the domain ResourceSets). Keycloak is platform
 # infrastructure deployed from kubernetes/infra/controllers/keycloak — no
 # chart, no rendered SLO. The identity observability slice (RFC-0022 signals,
 # shipped as the §2b threshold alerts + the Keycloak Identity dashboard) left

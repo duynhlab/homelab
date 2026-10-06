@@ -14,9 +14,10 @@
 # runAsNonRoot, is not available to this platform yet: the service images
 # declare no non-root USER and their binary is not world-executable, so a pod
 # pinned to a non-root uid dies at exec with "permission denied" and the
-# service CrashLoopBackOffs — measured, not predicted. Two further gaps are in
-# charts this repo does not own: the mop chart's migrate initContainer has no
-# securityContext hook, and the pgdog chart exposes none either.
+# service CrashLoopBackOffs — measured, not predicted. Two further gaps: the
+# migrate initContainer had no securityContext hook in the mop chart (since the
+# move to the duynh chart it is declared in the domain ResourceSets, so that one
+# is now a manifest change here), and the pgdog chart exposes none.
 #
 # So the policy could only ever report a violation nobody could act on from
 # here. It ran in Audit, so it blocked nothing — it produced 63 standing
@@ -26,8 +27,8 @@
 # RE-ENABLE WHEN
 #   1. the service images ship a non-root USER with an executable binary
 #      (Dockerfile change in the service repos / wolfi-images), AND
-#   2. the mop chart templates a securityContext onto the migrate
-#      initContainer (duynhlab/helm-charts).
+#   2. the migrate initContainer in the domain ResourceSets
+#      (kubernetes/apps/domains/) carries the same securityContext.
 # Then uncomment this file and its entry in kustomization.yaml, keep it in
 # Audit until the reports are clean, and only then consider Enforce.
 #

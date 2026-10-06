@@ -2,8 +2,8 @@
 #
 # WHY THIS FILE EXISTS AT ALL (the only one of its kind in this repo)
 #
-# Every other service gets its PrometheusServiceLevel from the `mop` chart
-# (`slo.enabled: true` in the domain ResourceSets). That template builds HTTP
+# Every other service gets its PrometheusServiceLevel from the `slo` chart
+# (a `<service>-slo` HelmRelease in the domain ResourceSets). That template builds HTTP
 # SLIs from http_server_request_duration_seconds. inventory serves gRPC only:
 # no HTTP edge route, no HTTP callers, and the health/ready endpoints are not
 # instrumented. So the three rendered SLOs measured a metric the service never

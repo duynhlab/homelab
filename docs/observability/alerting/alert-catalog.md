@@ -865,23 +865,23 @@ Runbooks: one per alert under
 
 ## SLO burn-rate alerts (Sloth-generated)
 
-Almost never hand-written: the `mop` chart renders a `PrometheusServiceLevel` CR per service
+Almost never hand-written: the `slo` chart renders a `PrometheusServiceLevel` CR per service
 (which is why `grep PrometheusServiceLevel` in this repo finds only inventory's and keycloak's), and the
 **Sloth operator** expands each into recording rules; the **2 burn-rate alerts per SLO** come
 from the chart and `sloth/slo-alerts.yaml` (see the guard below). Detail:
 [slo-burn-rate-alerts.md](./slo-burn-rate-alerts.md), [SLO hub](../slo/README.md).
 
-- **31 SLOs → 62 alerts** = 9 HTTP services × 3 (chart-rendered; inventory opts out) + inventory × 2
+- **22 SLOs → 44 alerts** = 9 HTTP services × 2 (chart-rendered; inventory opts out) + inventory × 2
   (hand-written, gRPC) + keycloak × 2 (hand-written, identity). Chart SLOs:
-  **Availability** (99.5%, non-5xx ratio), **Latency**
-  (95% < 500ms), **Error rate** (99%, non-4xx/5xx) — all from
-  `http_server_request_duration_seconds`, against a **30-day** error budget.
+  **Availability** (99.5%, non-5xx ratio) and **Latency**
+  (95% < 500ms) — both from `http_server_request_duration_seconds`, against a **30-day**
+  error budget. (A third, 4xx+5xx error-rate SLO was dropped in `mop` 0.19.0.)
 - **inventory is the exception** (2026-08-06): gRPC-only, so its three chart SLOs measured a
   metric it never emits — no SLI series, no budget, no alert that could fire. Replaced by
   `grpc-availability` (99.9%, server faults only) and `reserve-latency`
   (`Reserve` p95 < 250 ms, RFC-0021 targets) on `rpc_server_call_duration_seconds`:
   `InventoryGrpcHighErrorRate`, `InventoryReserveHighLatency`.
-- **keycloak joined 2026-08-20**: not a mop-chart service (deployed from
+- **keycloak joined 2026-08-20**: not a chart-rendered service (deployed from
   `kubernetes/infra/controllers/keycloak`), so its SLOs are hand-written too
   (`sloth/keycloak-login-slo.yaml`) — `login-availability` (99.9%, login events with a
   non-empty `error` label; Keycloak has **no** login_error event) and `auth-latency`
@@ -892,8 +892,8 @@ from the chart and `sloth/slo-alerts.yaml` (see the guard below). Detail:
 - **Ticket alert** — slow burn: 3× over 1d confirmed on 2h, or 1× over 3d confirmed on 6h → business hours.
 - **Minimum-events guard (2026-09-30).** Sloth still renders the SLIs and recording rules, but
   its own page/ticket alerts are disabled (`pageAlert/ticketAlert.disable: true`). The alerts
-  above are re-emitted with the same names, labels and annotations by the mop chart
-  (`templates/slo-alerts.yaml`, chart ≥ 0.18.0) and, for inventory and keycloak, by
+  above are re-emitted with the same names, labels and annotations by the `slo` chart
+  (`templates/prometheusrule.yaml`, the `<service>-slo-burn` rule) and, for inventory and keycloak, by
   `sloth/slo-alerts.yaml`. Each arm also requires **≥ 10 events in its long window**, so a
   handful of requests on an idle cluster can no longer page (3 slow of 8 in 6h paged
   `CheckoutHighLatency` and failed gate K5.8). Detail: [slo-burn-rate-alerts.md](./slo-burn-rate-alerts.md#minimum-events-guard).

@@ -119,10 +119,10 @@ is a single `PathPrefix: /` rule on `backoffice.duynh.me` pointing at the
 
 ## Deployment
 
-`rs-backoffice` renders one `HelmRelease` on the `mop` chart into ns
-`backoffice`. The port pair sits under `service.http` (`port: 80`,
-`containerPort: 80`) because the chart default of 8080 would otherwise win
-silently — this is an Nginx image. Probes are `httpGet /health`; requests
+`rs-backoffice` renders one `HelmRelease` on the `duynh` chart into ns
+`backoffice`. `containerPort: 80` and `service.port: 80` are set explicitly
+because a chart default once won silently (the old `mop` chart defaulted to
+8080) — this is an Nginx image. Probes are `httpGet /health`; requests
 `50m` CPU / `64Mi`, limits `100m` / `64Mi`; `migrations.enabled: false`, since a
 browser app has no schema.
 

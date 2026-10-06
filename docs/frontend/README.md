@@ -10,7 +10,7 @@ platform view; the code lives in its own repository per app.
 | **Serving** | Static bundle behind Nginx on port **80**, `/health` for probes |
 | **Config mechanism** | Four build args baked into `VITE_*` at **image-build time** — nothing at runtime |
 | **Identity** | One Keycloak realm each — customers and staff are separate populations ([ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)) |
-| **Delivery** | `mop` chart via a Flux `ResourceSet`, health-checked by `apps-local` |
+| **Delivery** | `duynh` chart via a Flux `ResourceSet`, health-checked by `apps-local` |
 | **Out of scope here** | Components, screens, state management — those belong to the app repos |
 
 ---
@@ -47,7 +47,7 @@ flowchart LR
   ARGS["4 build args<br/>API_BASE_URL · KEYCLOAK_URL<br/>KEYCLOAK_REALM · KEYCLOAK_CLIENT_ID"]
   BUILD["docker build<br/>ARG → VITE_* → vite build"]
   IMG[("Image<br/>bundle + Nginx")]
-  CHART["mop chart<br/>passes NO build args"]
+  CHART["duynh chart<br/>passes NO build args"]
   BROWSER["Operator / customer<br/>browser"]
 
   ARGS --> BUILD --> IMG
@@ -78,10 +78,10 @@ Two consequences follow, and both have bitten this platform:
 ## Serving and delivery
 
 Both images are Nginx serving a static bundle with SPA fallback, listening on
-**port 80** — not 8080. That matters because the `mop` chart's default is 8080
-and would silently win: the port pair belongs under `service.http` (mop ≥ 0.14),
-which is the bug the storefront hit first and the reason both manifests carry a
-comment about it.
+**port 80** — not 8080. Both manifests set `containerPort: 80` and
+`service.port: 80` explicitly: the old `mop` chart defaulted to 8080 and that
+default silently won once (the bug the storefront hit first), so the port is
+stated rather than left to any chart default.
 
 Liveness and readiness both `httpGet /health`. Delivery is a Flux `ResourceSet`
 per app, and `apps-local` health-checks `rs-frontend` and `rs-backoffice`

@@ -6,7 +6,9 @@ resources:
   # OCI Repositories
   - oci/infrastructure-oci.yaml
   - oci/apps-oci.yaml
-  - oci/mop-chart-oci.yaml
+  # Service workloads (duynh) and their request SLOs (slo).
+  - oci/duynh-chart-oci.yaml
+  - oci/slo-chart-oci.yaml
   - oci/grafana-dashboards-as-code-oci.yaml
   - oci/grafana-operator-oci.yaml
   - oci/victoria-metrics-operator-oci.yaml

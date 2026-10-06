@@ -15,7 +15,7 @@
 A `HelmRelease` has reported `Ready=False` for 5 minutes. This cluster runs
 **40 of them** — every controller and most platform components (cert-manager,
 CNPG, Envoy Gateway, Temporal, ClickHouse operator, Keycloak, the observability
-stack, and the `mop` chart per service domain).
+stack, and the `duynh` + `slo` charts per service).
 
 The alert carries `chart_name` and `chart_version`, which is usually enough to
 tell an upgrade failure from a first-install failure at a glance.

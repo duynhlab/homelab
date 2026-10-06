@@ -206,6 +206,7 @@ requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-10-06 | Proposed / Not started | Drafted from RFC-0029 |
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 (owner decisions: canary `review`, local-stack parity, runbook transfer for existing data) |
+| 2026-10-06 | Accepted / Not started | The service workloads moved from the `mop` chart to `duynh`. The obligation "separate runtime/migration Secret inputs in the `mop` chart" now needs no chart change: the `migrate` init container is declared in the domain ResourceSets (`initContainers`), so the migrator Secret is a values change there |
 
 ---
-_Last updated: 2026-10-06_
+_Last updated: 2026-10-06 (history: chart move to `duynh`)_

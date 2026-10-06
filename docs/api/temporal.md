@@ -1251,7 +1251,7 @@ How to deploy the worker, run the saga locally, and watch it in production.
   the worker is **not chart-rendered at all**: it is a `WorkerDeployment` (wired to the
   cluster-wide `ClusterConnection` `temporal-mop`, Worker Controller ≥ 1.10)
   in [`kubernetes/apps/order-worker.yaml`](../../kubernetes/apps/order-worker.yaml)
-  (namespace `order`), whose `spec.template` is a raw pod spec. The `mop` chart is
+  (namespace `order`), whose `spec.template` is a raw pod spec. The service chart is
   deliberately out of the path — the accepted cost is that nothing keeps that template
   in step with the chart's future defaults. The Temporal Worker Controller creates one
   Deployment per version and deletes a drained one on `sunset` timers, so there is no

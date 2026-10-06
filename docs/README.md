@@ -198,7 +198,7 @@ repo (`homelab`) is the Infrastructure & GitOps hub. API contracts:
 | Component | Repository | Description | CI |
 |-----------|------------|-------------|-----|
 | **Infrastructure** | [duynhlab/homelab](https://github.com/duynhlab/homelab) | GitOps, K8s manifests, docs | [![CI](https://github.com/duynhlab/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/duynhlab/homelab/actions) |
-| **Helm Charts** | [duynhlab/helm-charts](https://github.com/duynhlab/helm-charts) | `mop` chart — OCI `ghcr.io/duynhlab/helm-charts/mop` | [![CI](https://github.com/duynhlab/helm-charts/actions/workflows/e2e.yml/badge.svg)](https://github.com/duynhlab/helm-charts/actions) |
+| **Helm Charts** | [duynhlab/helm-charts](https://github.com/duynhlab/helm-charts) | `duynh` (workloads) and `slo` (request SLOs) charts — OCI `ghcr.io/duynhlab/helm-charts/{duynh,slo}` | [![CI](https://github.com/duynhlab/helm-charts/actions/workflows/e2e.yml/badge.svg)](https://github.com/duynhlab/helm-charts/actions) |
 | **Shared Workflows** | [duynhlab/gha-workflows](https://github.com/duynhlab/gha-workflows) | Reusable GitHub Actions | [![CI](https://github.com/duynhlab/gha-workflows/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/duynhlab/gha-workflows/actions) |
 | **Platform Images** | [duynhlab/images](https://github.com/duynhlab/images) | Platform-built OCI images (e.g. `clickhouse-ddl`) — `ghcr.io/duynhlab/images/<image>`, signed, pinned by digest | [![CI](https://github.com/duynhlab/images/actions/workflows/release.yml/badge.svg)](https://github.com/duynhlab/images/actions) |
 | **Common Lib** | [duynhlab/pkg](https://github.com/duynhlab/pkg) | Shared Go packages — summary + bump ledger in [docs/api/pkg.md](./api/pkg.md) | [![CI](https://github.com/duynhlab/pkg/actions/workflows/build.yml/badge.svg)](https://github.com/duynhlab/pkg/actions) |
@@ -514,7 +514,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - **Flux Operator** - Kubernetes-native GitOps reconciliation engine
 - **Kustomize** - Simplified structure (direct manifests in infra/ + apps/, refactored 2026-01-12)
 - **OCI Registry** - `localhost:5050` (local), stores Kubernetes manifests as artifacts
-- **Helm Chart** - Generic `mop` chart for all microservices ([duynhlab/helm-charts](https://github.com/duynhlab/helm-charts), OCI `ghcr.io/duynhlab/helm-charts/mop`)
+- **Helm Charts** - `duynh` for every service workload and `slo` for its request SLOs ([duynhlab/helm-charts](https://github.com/duynhlab/helm-charts), OCI `ghcr.io/duynhlab/helm-charts/{duynh,slo}`)
 - **HelmRelease CRDs** - Flux manages Helm deployments declaratively
 - **40 Data Panels + 6 Row Groups** - Complete monitoring dashboard
 - **4 Custom Metrics** - Application-level metrics (RED method)

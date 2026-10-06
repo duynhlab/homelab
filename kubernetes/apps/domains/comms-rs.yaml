@@ -20,7 +20,7 @@ spec:
       timeout: 10m
       chartRef:
         kind: OCIRepository
-        name: mop-chart-oci
+        name: duynh-chart-oci
         namespace: flux-system
       releaseName: << inputs.name >>
       install:
@@ -30,39 +30,55 @@ spec:
         remediation:
           retries: 3
       values:
-        name: << inputs.name >>
+        nameOverride: << inputs.name >>
+        containerName: << inputs.name >>
+        # The selector is immutable and mop selected on `app` as well; keeping it
+        # lets the release upgrade in place.
+        extraSelectorLabels:
+          app: << inputs.name >>
         replicaCount: << inputs.replicaCount | int >>
         image:
           repository: << index inputs "registry_url" | default "ghcr.io/duynhlab" >>/<< inputs.name >>-service/<< inputs.name >>-service
           tag: "<< inputs.image_tag >>"
           pullPolicy: IfNotPresent
+        containerPort: 8080
+        <<- if (index inputs "grpc_server") >>
+        extraPorts:
+          - name: grpc
+            containerPort: 9090
+        <<- end >>
         service:
-          enabled: true
           type: ClusterIP
           # Edge resilience lives at the gateway: the resilience-default
           # BackendTrafficPolicy (configs/envoy-gateway/policies/btp-api.yaml)
           # carries the timeouts, retries, and health checks.
-          http:
-            port: 8080
-            containerPort: 8080
+          port: 8080
+          appProtocol: http
           <<- if (index inputs "grpc_server") >>
-          grpc:
-            enabled: true
-            port: 9090
-            containerPort: 9090
+          extraPorts:
+            - name: grpc
+              port: 9090
+              appProtocol: grpc
           <<- end >>
         # RFC-0014 P4: this pod ships its own logs over OTLP (otelzap tee) —
         # the label tells the Vector DaemonSet to skip its stdout (double-
         # ingest guard). Tied to the same input as OTEL_LOGS_ENABLED so a
         # kill-switch flip also hands the pod back to Vector.
-        labels:
+        podLabels:
+          app.kubernetes.io/component: api
           platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
         <<- if (index inputs "db_password_file") >>
-        # RFC-0008 / ADR-025 pattern A: mount the DB Secret as a file so the app
-        # reads a rotated password per connection (mop chart adds DB_PASSWORD_FILE).
-        dbCredentials:
-          enabled: true
-          secretName: << inputs.db_secret >>
+        # RFC-0008 / ADR-025 pattern A: mount the DB Secret as a directory (never
+        # subPath, so kubelet refreshes it on rotation) and point DB_PASSWORD_FILE
+        # at it; the app reads the rotated password per connection.
+        volumes:
+          - name: db-credentials
+            secret:
+              secretName: << inputs.db_secret >>
+        volumeMounts:
+          - name: db-credentials
+            mountPath: /etc/db/secret
+            readOnly: true
         <<- end >>
         env:
           - name: SERVICE_NAME
@@ -149,6 +165,10 @@ spec:
               secretKeyRef:
                 name: << inputs.db_secret >>
                 key: password
+          <<- if (index inputs "db_password_file") >>
+          - name: DB_PASSWORD_FILE
+            value: /etc/db/secret/password
+          <<- end >>
           - name: DB_SSLMODE
             value: << index inputs "db_sslmode" | default "require" >>
           - name: DB_POOL_MAX_CONNECTIONS
@@ -230,28 +250,67 @@ spec:
             # throttling; 500m clears it.
             cpu: "500m"
         livenessProbe:
-          enabled: true
           httpGet:
             path: /health
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
-          enabled: true
           httpGet:
             path: /ready
             port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
-        migrations:
-          enabled: true
-          env:
-            DB_HOST: << inputs.db_migration_host >>
-            DB_PORT: "5432"
-            DB_NAME: << inputs.name >>
-            DB_USER: << index inputs "db_user" | default inputs.name >>
-            DB_SSLMODE: "require"
-          envFrom:
-            secretRef: << inputs.db_secret >>
-        slo:
-          enabled: true
+          # The chart defaults readiness to 2 failures; keep the Kubernetes 3.
+          failureThreshold: 3
+        # Schema migrations run in the app image's `migrate` subcommand before
+        # the API starts, straight to the primary (never through a pooler).
+        initContainers:
+          - name: migrate
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            imagePullPolicy: IfNotPresent
+            args: ["migrate"]
+            env:
+              - name: DB_HOST
+                value: << inputs.db_migration_host >>
+              - name: DB_PORT
+                value: "5432"
+              - name: DB_NAME
+                value: << inputs.name >>
+              - name: DB_USER
+                value: << index inputs "db_user" | default inputs.name >>
+              - name: DB_SSLMODE
+                value: "require"
+              - name: DB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: << inputs.db_secret >>
+                    key: password
+
+    ---
+    # Request SLOs: a Sloth PrometheusServiceLevel and the burn-rate alerts,
+    # from the slo chart (both land in monitoring, where Sloth watches).
+    apiVersion: helm.toolkit.fluxcd.io/v2
+    kind: HelmRelease
+    metadata:
+      name: << inputs.name >>-slo
+      namespace: << inputs.namespace >>
+    spec:
+      interval: 10m
+      chartRef:
+        kind: OCIRepository
+        name: slo-chart-oci
+        namespace: flux-system
+      releaseName: << inputs.name >>-slo
+      install:
+        remediation:
+          retries: 3
+      upgrade:
+        remediation:
+          retries: 3
+      values:
+        service: << inputs.name >>
+        namespace: monitoring
+        labels:
+          team: platform
+          env: monitoring

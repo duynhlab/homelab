@@ -4,19 +4,17 @@
 
 The SLO (Service Level Objective) system provides automated monitoring and alerting for all microservices using [Sloth](https://sloth.dev) **v0.16.0**, following Google SRE best practices with multi-window multi-burn-rate alerts.
 
-> **Where are the `PrometheusServiceLevel` manifests?** Almost nowhere in this
-> repo — and that surprises everyone once. The **external `mop` chart** renders
-> one per service from `slo.enabled: true`, which the five domain ResourceSets
-> set for every service they template. So `grep -r PrometheusServiceLevel` in
-> homelab returns a single file
-> ([`inventory-grpc-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml)),
-> while the cluster has eleven. To see the real specs, read them from the
-> cluster: `kubectl get psl -A`, or
-> [`charts/mop/templates/slo.yaml`](https://github.com/duynhlab/helm-charts/blob/main/charts/mop/templates/slo.yaml)
-> in the chart repo.
+> **Where are the `PrometheusServiceLevel` manifests?** Mostly not in this repo
+> — and that surprises everyone once. The **external `slo` chart**
+> ([`duynhlab/helm-charts/charts/slo`](https://github.com/duynhlab/helm-charts/tree/main/charts/slo))
+> renders one per service from a `<service>-slo` HelmRelease, which the five
+> domain ResourceSets emit for every service they template. So
+> `grep -r PrometheusServiceLevel` in homelab finds only the two hand-written
+> ones (inventory, Keycloak) while the cluster has eleven. To see the real specs,
+> read them from the cluster: `kubectl get psl -A`.
 
 **Key Features**:
-- Automated SLO generation via Helm chart (`slo.enabled: true`)
+- Automated SLO generation via the `slo` Helm chart (one `<service>-slo` HelmRelease per service)
 - Kubernetes-native using PrometheusServiceLevel CRDs
 - Automatic PrometheusRule generation via Sloth Operator
 - Multi-window multi-burn-rate alerts (Google SRE pattern)
@@ -31,18 +29,20 @@ Full metrics and alerting topology (converter, VMAgent, VMSingle, VMAlert): see 
 
 ```mermaid
 flowchart TD
-    subgraph helmChart ["mop Helm Chart"]
-        HR["HelmRelease<br/>slo.enabled: true"] -->|render| PSL["PrometheusServiceLevel<br/>10 services x 3 HTTP SLOs<br/>ns: monitoring"]
+    subgraph helmChart ["slo Helm chart"]
+        HR["HelmRelease &lt;service&gt;-slo<br/>(domain ResourceSets)"] -->|render| PSL["PrometheusServiceLevel<br/>9 services x 2 HTTP SLOs<br/>ns: monitoring"]
+        HR -->|render| BURN["PrometheusRule &lt;service&gt;-slo-burn<br/>burn-rate alerts, minEvents guard"]
     end
 
     subgraph handWritten ["homelab manifests (Kustomize)"]
-        GRPC["PrometheusServiceLevel<br/>inventory-grpc: 2 gRPC SLOs<br/>ns: monitoring"]
+        GRPC["PrometheusServiceLevel<br/>inventory-grpc + keycloak-login<br/>2 SLOs each, ns: monitoring"]
     end
 
     PSL -->|watch| Sloth["Sloth Operator v0.16.0"]
     GRPC -->|watch| Sloth
     Sloth -->|generate via<br/>k8s transformer plugin| PR["PrometheusRules<br/>(recording + alerting)"]
     PR -->|convert| VMR["VMRule"]
+    BURN -->|convert| VMR
     VMR --> VMA["VMAlert"]
     VMA -->|queries| VMS["VMSingle"]
     VMA -->|notifies| VMAM["VMAlertmanager"]
@@ -59,16 +59,17 @@ flowchart TD
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class App service;
     class OC collector;
-    class PSL,GRPC,PR,VMR data;
+    class PSL,GRPC,PR,VMR,BURN data;
     class VMS,VMAgent metric;
     class HR,Sloth,VMA,VMAM,Grafana,SlothUI platform;
 ```
 
 **How it works**:
-1. Each service HelmRelease sets `slo.enabled: true` (set in the five domain
-   ResourceSets, not per HelmRelease by hand)
-2. The `mop` Helm chart renders a `PrometheusServiceLevel` CRD **into the
-   `monitoring` namespace**. That namespace is load-bearing: the Sloth
+1. Each domain ResourceSet emits a `<service>-slo` HelmRelease next to the
+   service's workload HelmRelease (not written per service by hand; a gRPC-only
+   service opts out with `slo_disabled`)
+2. The `slo` Helm chart renders a `PrometheusServiceLevel` CRD **into the
+   `monitoring` namespace**, plus a `PrometheusRule` of burn-rate alerts. That namespace is load-bearing: the Sloth
    controller runs with `values.sloth.namespace: "monitoring"`, so a
    `PrometheusServiceLevel` anywhere else is **silently ignored** — no error
    event, no rules, no SLO. inventory's gRPC SLOs are hand-written into the same
@@ -80,7 +81,7 @@ flowchart TD
 
 ## SLO Definitions
 
-Each HTTP service has **3 SLOs** with default targets (overridable per-service via Helm values):
+Each HTTP service has **2 SLOs** with default targets (overridable per service through the `slo` chart values):
 
 | SLO | Objective | SLI | Alert |
 |---|---|---|---|
@@ -114,31 +115,22 @@ sum(rate(http_server_request_duration_seconds_count{...}[{{.window}}])) - sum(ra
 sum(rate(http_server_request_duration_seconds_count{...}[{{.window}}]))
 ```
 
-**Error Rate** (4xx + 5xx):
-```promql
-# errorQuery
-sum(rate(http_server_request_duration_seconds_count{..., http_response_status_code=~"4..|5.."}[{{.window}}]))
-# totalQuery
-sum(rate(http_server_request_duration_seconds_count{...}[{{.window}}]))
-```
-
 ### Query Labels
 
 | Label | Source | Example |
 |---|---|---|
-| `app` | OTLP resource attr `service_name`, VMAgent relabel → `app` | `auth` |
-| `namespace` | OTLP resource attr `k8s_namespace_name`, VMAgent relabel → `namespace` | `auth` |
+| `app` | OTLP resource attr `service_name`, VMAgent relabel → `app` | `user` |
+| `namespace` | OTLP resource attr `k8s_namespace_name`, VMAgent relabel → `namespace` | `user` |
 | `http_response_status_code` | Application metric (OTel semconv) | `200`, `404`, `500` |
 
 ## SLO Targets
 
-The ten HTTP services use the same default targets for consistency:
+The nine HTTP services use the same default targets for consistency:
 
 | SLO Type | 30-day Target | Error Budget | Rationale |
 |---|---|---|---|
 | Availability | 99.5% | 3.6 hours/month | Industry standard for production APIs |
 | Latency | 95% < 500ms | 5% slow requests | Users notice delays > 500ms |
-| Error Rate | 99% success | 1% errors acceptable | Includes client (4xx) + server (5xx) |
 
 inventory is stricter, from RFC-0021's own numbers rather than the chart defaults:
 
@@ -147,38 +139,37 @@ inventory is stricter, from RFC-0021's own numbers rather than the chart default
 | grpc-availability | 99.9% | ~43 min/month | It is the synchronous dependency inside the 99.9% checkout confirm handoff, so it cannot have a looser target than the flow it gates. Checkout fails **closed**: one server fault is one 503 to a shopper |
 | reserve-latency | 95% < 250ms | 5% slow `Reserve` calls | East-west budget, not an edge one — `Reserve` runs inside a shopper's confirm request and composes with its timeout |
 
-Per-service overrides are supported via Helm values:
+Per-service overrides go in that service's `<service>-slo` HelmRelease values
+(`slo` chart):
 ```yaml
-slo:
-  enabled: true
-  availability:
-    objective: 99.9  # stricter for critical service
+availability:
+  objective: 99.9  # stricter for critical service
 ```
 
 ## Services
 
-All eleven services are SLO-enabled, plus Keycloak. Ten services take the
-chart's HTTP SLOs; inventory and Keycloak are the exceptions, and the reasons
-are in their rows.
+All ten services are SLO-enabled, plus Keycloak. Nine services take the
+`slo` chart's HTTP SLOs; inventory and Keycloak are the exceptions, and the
+reasons are in their rows.
 
 | Service | Namespace | SLOs | SLI metric | Source |
 |---|---|---|---|---|
-| auth | auth | 3 | HTTP | chart, `slo.enabled: true` |
-| user | user | 3 | HTTP | chart, `slo.enabled: true` |
-| product | product | 3 | HTTP | chart, `slo.enabled: true` |
-| cart | cart | 3 | HTTP | chart, `slo.enabled: true` |
-| order | order | 3 | HTTP | chart, `slo.enabled: true` |
-| review | review | 3 | HTTP | chart, `slo.enabled: true` |
-| notification | notification | 3 | HTTP | chart, `slo.enabled: true` |
-| shipping | shipping | 3 | HTTP | chart, `slo.enabled: true` |
-| checkout | checkout | 3 | HTTP | chart, `slo.enabled: true` |
-| payment | payment | 3 | HTTP | chart, `slo.enabled: true` |
+| user | user | 2 | HTTP | `slo` chart, `user-slo` HelmRelease |
+| product | product | 2 | HTTP | `slo` chart, `product-slo` HelmRelease |
+| cart | cart | 2 | HTTP | `slo` chart, `cart-slo` HelmRelease |
+| order | order | 2 | HTTP | `slo` chart, `order-slo` HelmRelease |
+| review | review | 2 | HTTP | `slo` chart, `review-slo` HelmRelease |
+| notification | notification | 2 | HTTP | `slo` chart, `notification-slo` HelmRelease |
+| shipping | shipping | 2 | HTTP | `slo` chart, `shipping-slo` HelmRelease |
+| checkout | checkout | 2 | HTTP | `slo` chart, `checkout-slo` HelmRelease |
+| payment | payment | 2 | HTTP | `slo` chart, `payment-slo` HelmRelease |
 | **inventory** | inventory | **2** | **gRPC** | hand-written [`inventory-grpc-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml); chart SLO off via `slo_disabled` |
-| **keycloak** | identity | **2** | **Keycloak events + HTTP** | hand-written [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml); Keycloak is platform infra, not a mop-chart service |
+| **keycloak** | identity | **2** | **Keycloak events + HTTP** | hand-written [`keycloak-login-slo.yaml`](../../../kubernetes/infra/configs/observability/sloth/keycloak-login-slo.yaml); Keycloak is platform infra, not a chart-rendered service |
 
-**Total: 31 SLOs → 62 burn-rate alerts** — 27 chart-rendered (9 services × 3)
+**Total: 22 SLOs → 44 burn-rate alerts** — 18 chart-rendered (9 services × 2)
 through the five domain ResourceSets, plus inventory's 2 and Keycloak's 2
-hand-written ones.
+hand-written ones. (The chart's third SLO, a 4xx+5xx error rate, was dropped in
+`mop` 0.19.0 and is not part of the `slo` chart.)
 
 Until 2026-08-06 the count was 33 (11 × 3), but inventory's three were **dead**:
 the chart builds HTTP SLIs and inventory serves gRPC only (no Kong route,
@@ -255,8 +246,8 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 
 ### Manifests
 
-- SLO Template: [`duynhlab/helm-charts` repo](https://github.com/duynhlab/helm-charts/blob/main/charts/mop/templates/slo.yaml)
-- inventory gRPC SLOs (the only `PrometheusServiceLevel` in this repo): `kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml`
+- SLO chart: [`duynhlab/helm-charts/charts/slo`](https://github.com/duynhlab/helm-charts/tree/main/charts/slo) (`PrometheusServiceLevel` + burn-rate `PrometheusRule`)
+- Hand-written SLOs (the only `PrometheusServiceLevel`s in this repo): `kubernetes/infra/configs/observability/sloth/inventory-grpc-slo.yaml`, `keycloak-login-slo.yaml`
 - Sloth Operator (controller): `kubernetes/infra/controllers/metrics/sloth-operator.yaml`
 - Sloth Web UI (Deployment + Service + PodMonitor): `kubernetes/infra/configs/observability/sloth/sloth-ui.yaml`
 - Sloth UI HTTPRoute: `kubernetes/infra/configs/envoy-gateway/routes/monitoring.yaml` (`slo.duynh.me`)
@@ -271,4 +262,4 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - [Google SRE Workbook -- Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)
 
 ---
-_Last updated: 2026-09-30 — counts corrected to 31 SLOs / 62 alerts (9 chart services). Earlier: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (34 SLOs / 68 burn-rate alerts)_
+_Last updated: 2026-10-06 — SLOs come from the `slo` chart (`<service>-slo` HelmReleases) instead of `mop`; counts corrected to 22 SLOs / 44 alerts (two chart SLOs per service since `mop` 0.19.0), and the retired `auth` row removed. Earlier: 2026-09-30 — counts corrected to 31 SLOs / 62 alerts (9 chart services). Earlier: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (34 SLOs / 68 burn-rate alerts)_

@@ -199,21 +199,26 @@ value: << index inputs "db_port" | default "5432" | quote >>
 
 **Rule of thumb**: if the default/input value looks like a bare number or `true`/`false`, pipe through `quote`.
 
-### 4.3 Chart-Specific Value Shapes
+### 4.3 Chart Value Shapes
 
-The `mop` Helm chart expects specific value structures. Mismatches cause Helm install failures:
+The `duynh` chart takes plain Kubernetes shapes: `env`, `volumes`,
+`volumeMounts` and `initContainers` are passed through as written, and
+`initContainers` is rendered through `tpl`. Two things trip people up:
 
 ```yaml
-# CORRECT - mop chart expects envFrom as object with string secretRef
-migrations:
-  envFrom:
-    secretRef: << inputs.db_secret >>
+# The migrate init container refers to the chart's own values with {{ }}.
+# ResourceSet templating uses << >>, so {{ }} passes through to Helm untouched.
+initContainers:
+  - name: migrate
+    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+    args: ["migrate"]
 
-# WRONG - Kubernetes-style list, but mop chart template accesses .envFrom.secretRef
-migrations:
-  envFrom:
-    - secretRef:
-        name: << inputs.db_secret >>
+# The Deployment selector is immutable. Keep nameOverride and
+# extraSelectorLabels exactly as the domain templates set them; changing either
+# makes the next upgrade fail on "field is immutable".
+nameOverride: << inputs.name >>
+extraSelectorLabels:
+  app: << inputs.name >>
 ```
 
 ### 4.4 InputProvider Concatenation Behavior
@@ -442,7 +447,7 @@ kubectl describe resourceset <name> -n default | grep -A5 "Message:"
 # 3. Common errors and fixes:
 #    "map has no entry for key X"   -> Use: index inputs "X" | default "val"
 #    "expected string, got bool"    -> Add: | quote
-#    "can't evaluate field X"       -> Check mop chart value shape
+#    "can't evaluate field X"       -> Check the chart value shape (section 4.3)
 
 # 4. Is the HelmRelease itself failing?
 flux get hr -A | grep False

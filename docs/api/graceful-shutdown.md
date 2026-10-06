@@ -9,7 +9,7 @@ lives in the service repos; this page owns the shared behavior.
 |-----------|-------|
 | **Applies to** | The 10 Go HTTP services (workers follow a Temporal-specific lifecycle — a recorded gap below) |
 | **Contract env vars** | `READINESS_DRAIN_DELAY` (default 5s) · `SHUTDOWN_TIMEOUT` (default 10s) |
-| **Pod budget** | `terminationGracePeriodSeconds` — defaults come from the `mop` chart (`duynhlab/helm-charts`); homelab pins none per-service |
+| **Pod budget** | `terminationGracePeriodSeconds` — 30s, the `duynh` chart default (`duynhlab/helm-charts`); homelab pins none per-service |
 | **Ordering** | fail `/ready` → drain delay → HTTP server → gRPC server → DB → `process.stopped` → OTel SDK flush |
 
 ---
@@ -255,12 +255,12 @@ spec:
 
 The contract values are **uniform defaults, not per-service pins**:
 `READINESS_DRAIN_DELAY=5s` and `SHUTDOWN_TIMEOUT=10s` are the services' own
-defaults, and `terminationGracePeriodSeconds` comes from the `mop` chart in
+defaults, and `terminationGracePeriodSeconds` is the `duynh` chart default (30s) in
 `duynhlab/helm-charts` — **no homelab manifest overrides any of the three**
 (the order worker is the one exception to the *provenance*, not the value: since
 ADR-054 it is a raw pod template rather than a chart render, so its budget is the
-Kubernetes 30s default. Same number — `charts/mop` sets no
-`terminationGracePeriodSeconds` key either — different source)
+Kubernetes 30s default. Same number as the `duynh` chart's explicit 30s —
+different source)
 (nothing in `kubernetes/apps/` or `local-stack/compose.yaml` sets them; a
 service that needs different numbers owns that override in its repo/chart
 values). The budget rule above is what a reviewer checks, not a table.

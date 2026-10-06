@@ -61,8 +61,10 @@ Any manifest produced by AI agents for this repo MUST satisfy:
 the platform cannot satisfy it: three of the four restricted requirements are
 manifest changes, but `runAsNonRoot` fails structurally — the service images
 declare no non-root `USER` and the binary is not world-executable, so a pod
-pinned to a non-root uid dies at exec. Two further gaps sit in charts this
-repo does not own (the `mop` chart's `migrate` initContainer, and `pgdog`).
+pinned to a non-root uid dies at exec. Two further gaps: the `migrate`
+initContainer has no `securityContext` (under `mop` it was chart-owned; since
+the move to `duynh` it is declared in the domain ResourceSets, so this one is now
+a manifest change here), and the `pgdog` chart exposes none.
 In Audit mode it blocked nothing and produced 63 standing findings that were
 unactionable from this repo — noise that trains readers to ignore the policy
 report. The policy is commented out verbatim in

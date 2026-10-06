@@ -249,7 +249,7 @@ Cluster gRPC address: `dns:///notification.notification.svc.cluster.local:9090`
 
 - **Ports & probes:** HTTP `:8080` (`/health`, `/ready`; readiness drains for
   `READINESS_DRAIN_DELAY`, default 5s); gRPC `:9090` — a second port on the
-  same `notification` Service (the mop chart renders one multi-port Service;
+  same `notification` Service (the `duynh` chart renders one multi-port Service;
   the old headless `notification-grpc` twin was removed). The gRPC port is
   unauthenticated by design and fenced by the namespace NetworkPolicy;
   east-west mTLS is **Planned** (see

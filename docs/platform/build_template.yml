@@ -138,7 +138,7 @@ jobs:
 
   # NOTE: there is deliberately NO separate migration image job. Migrations
   # ship inside the app image (golang-migrate via the `migrate` subcommand,
-  # run as an init container by the mop chart) — one image per service
+  # run as an init container declared in the domain ResourceSets) — one image per service
   # (AGENTS.md § image naming; cicd.md § migrations).
 
   # ──────────────────────────────────────────────────

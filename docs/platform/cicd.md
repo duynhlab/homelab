@@ -459,7 +459,7 @@ act push -W .github/workflows/build.yml --detect-event
 
 ## Docker Image Naming Convention
 
-Images are **multi-level**: `ghcr.io/duynhlab/<repo>/<image>` — the builder workflow publishes under the repository path (`ghcr.io/${{ github.repository }}/<image>`), and the `mop` chart consumes `<name>-service/<name>-service`. Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image. The reference [`build_template.yml`](build_template.yml) agrees: its former `docker-db-init` job was removed (2026-08-19); a comment in the template records that migrations ship in the app image.
+Images are **multi-level**: `ghcr.io/duynhlab/<repo>/<image>` — the builder workflow publishes under the repository path (`ghcr.io/${{ github.repository }}/<image>`), and the `duynh` chart consumes `<name>-service/<name>-service`. Migrations ship inside the app image (golang-migrate, run via the `migrate` subcommand in an init container) — there is no separate migration image. The reference [`build_template.yml`](build_template.yml) agrees: its former `docker-db-init` job was removed (2026-08-19); a comment in the template records that migrations ship in the app image.
 
 | GitHub Repo | GHCR Image (app) |
 |---|---|

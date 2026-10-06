@@ -260,8 +260,8 @@ When the time comes to migrate:
 1. Deploy the SLO controller alongside Sloth Operator
 2. Add annotations to Deployments (can coexist with Helm-generated SLOs initially)
 3. Verify controller-generated `PrometheusServiceLevel` matches Helm-generated ones
-4. Remove `slo.enabled: true` from Helm values
-5. Remove the SLO template from the mop chart
+4. Remove the `<service>-slo` HelmReleases from the domain ResourceSets
+5. Retire the `slo` chart
 
 The migration is safe because:
 - Both approaches generate the same `PrometheusServiceLevel` CRDs

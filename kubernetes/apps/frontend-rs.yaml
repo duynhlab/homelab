@@ -20,7 +20,7 @@ spec:
     # KEYCLOAK_CLIENT_ID → VITE_*). The cluster image pinned below MUST be
     # built with KEYCLOAK_URL=https://id.duynh.me, KEYCLOAK_REALM=duynhlab,
     # KEYCLOAK_CLIENT_ID=customer-spa — homelab does not build this image and
-    # the mop chart passes no build args, so there is nothing to set here;
+    # the chart passes no build args, so there is nothing to set here;
     # this comment records the CI contract the tag must satisfy.
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease
@@ -32,7 +32,7 @@ spec:
         timeout: 10m
         chartRef:
           kind: OCIRepository
-          name: mop-chart-oci
+          name: duynh-chart-oci
           namespace: flux-system
         releaseName: << inputs.name >>
         install:
@@ -42,7 +42,14 @@ spec:
           remediation:
             retries: 3
         values:
-          name: << inputs.name >>
+          nameOverride: << inputs.name >>
+          containerName: << inputs.name >>
+          # The selector is immutable and mop selected on `app` as well;
+          # keeping it lets the release upgrade in place.
+          extraSelectorLabels:
+            app: << inputs.name >>
+          podLabels:
+            app.kubernetes.io/component: api
           replicaCount: << inputs.replicaCount | int >>
           image:
             repository: ghcr.io/duynhlab/frontend/frontend
@@ -67,16 +74,13 @@ spec:
             # build args, same HTTPRoute PathPrefix: /.
             # Rollback: repin 2.0.0; nothing else moves with it.
             pullPolicy: IfNotPresent
-          # mop >=0.14 values schema: the HTTP port pair lives under
-          # service.http (the old top-level port/targetPort/containerPort keys
-          # are silently ignored and the chart default 8080 wins — which broke
-          # this SPA behind the edge gateway, since nginx listens on 80).
+          # Nginx listens on 80; the chart default containerPort is also 80,
+          # but state it so a chart default change cannot move it silently.
+          containerPort: 80
           service:
-            enabled: true
             type: ClusterIP
-            http:
-              port: 80
-              containerPort: 80
+            port: 80
+            appProtocol: http
           resources:
             requests:
               cpu: 50m
@@ -85,18 +89,15 @@ spec:
               cpu: 100m
               memory: 64Mi
           livenessProbe:
-            enabled: true
             httpGet:
               path: /health
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
-            enabled: true
             httpGet:
               path: /health
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
-          migrations:
-            enabled: false
+            failureThreshold: 3

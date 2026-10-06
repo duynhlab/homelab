@@ -172,8 +172,9 @@ live with the [OpenTelemetry](../opentelemetry/README.md) setup. There is no app
 - **Alerts + recording rules** — see
   [Alert Catalog → Microservices](../alerting/alert-catalog.md#1-microservices-red-metrics)
   and [Alerting Strategy](../alerting/README.md#layer-1-threshold-alerts-immediate-detection).
-- **SLOs** — rendered per service by the `mop` chart (not a repo path) and
-  expanded by Sloth into burn-rate alerts. See [SLO docs](../slo/README.md).
+- **SLOs** — rendered per service by the `slo` chart (a `<service>-slo`
+  HelmRelease, not a repo path) and expanded by Sloth into recording rules; the
+  chart's own `PrometheusRule` carries the burn-rate alerts. See [SLO docs](../slo/README.md).
 
 Runbooks: [`runbooks/microservices/README.md`](../runbooks/microservices/README.md) (per alert, plus workflows & tuning).
 

@@ -27,8 +27,8 @@
 #     empty on a cluster rebuilt from zero, so no history is stranded by the
 #     rename. On a cluster holding live order history, drain first.
 #
-# THE POD TEMPLATE IS A RAW PodSpec, so the `mop` chart does not render it any
-# more. Everything below was transplanted from what `helm template` proved the
+# THE POD TEMPLATE IS A RAW PodSpec, so no chart renders it (the `mop` chart did
+# before ADR-054). Everything below was transplanted from what `helm template` proved the
 # chart emitted for order-worker-2-4-0 — a Deployment and nothing else, no
 # ServiceAccount and no securityContext. Accepted cost: nothing keeps this in step
 # with the chart's future defaults (ADR-054 § Negative consequences).

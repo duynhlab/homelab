@@ -101,9 +101,9 @@ spec:
     # No grpc_server: checkout is a gRPC CLIENT only (cart/product/order/
     # shipping); its own API surface is HTTP behind Envoy Gateway.
     # All four upstream addresses are explicit: the service's config defaults
-    # still say `<svc>-grpc.<ns>` but mop chart >=0.14 renders a single
-    # multi-port Service named `<svc>` (the headless `<svc>-grpc` twin was
-    # removed) — the defaults are wrong on the cluster until the service
+    # still say `<svc>-grpc.<ns>` but the cluster has a single multi-port
+    # Service named `<svc>` (the headless `<svc>-grpc` twin was removed in
+    # mop 0.14 and the duynh chart renders none) — the defaults are wrong on the cluster until the service
     # repo catches up.
     cart_grpc_addr: "dns:///cart.cart.svc.cluster.local:9090"
     product_grpc_addr: "dns:///product.product.svc.cluster.local:9090"

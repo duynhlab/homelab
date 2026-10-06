@@ -90,6 +90,30 @@ Skeleton (copy what you need):
 
 ### Feature
 
+#### GitOps
+
+- **Every service now deploys with the `duynh` chart, and the `mop` chart is
+  gone.** The five domain ResourceSets, `rs-backoffice`, `rs-frontend` and
+  `mockpay` render their HelmReleases on `duynh-chart-oci` (`>=0.3.1 <0.4.0`);
+  `mop-chart-oci` is removed. The migration stays an init container (now
+  declared in the ResourceSets, so a migrator Secret is a values change), gRPC
+  is an extra Service port with `appProtocol: grpc`, and the selector is kept
+  with `nameOverride` + `extraSelectorLabels`, so each release upgrades in place.
+  Rendered against the cluster's real inputs, all 13 workloads match what `mop`
+  rendered — names, selector, ports, `appProtocol`, env, probes, resources, init
+  container and volumes; the only differences are a ServiceAccount per release
+  (no token mounted) and `maxUnavailable: 0` rollouts.
+
+#### Observability
+
+- **Service SLOs come from the new `slo` chart** — one `<service>-slo`
+  HelmRelease per service, emitted by the domain ResourceSets and skipped with
+  `slo_disabled` (inventory). It renders the same `PrometheusServiceLevel`
+  (spec identical, so the Sloth ids and recording rules do not change) and the
+  same minimum-events burn-rate rule as `mop`, under new names
+  (`<service>-slo`, `<service>-slo-burn`) so the cutover cannot hit a Helm
+  ownership conflict.
+
 #### Docs
 
 - **Every PostgreSQL cluster in the Draw.io diagrams carries the PostgreSQL
@@ -172,6 +196,12 @@ Skeleton (copy what you need):
   live revocation has happened.
 
 #### Docs
+
+- **The SLO docs counted a retired service and a dropped SLO.** They listed
+  `auth` and three SLOs per service (31 SLOs, 62 alerts); the cluster runs nine
+  chart services with two SLOs each since `mop` 0.19.0, plus inventory's and
+  Keycloak's two — 22 SLOs, 44 alerts. Corrected while moving the SLO docs to
+  the `slo` chart.
 
 - **The OpenBAO database-engine diagram now draws where `vault_rotator`'s
   credential comes from** (`docs/secrets/openbao.md`): the per-cluster KV value,

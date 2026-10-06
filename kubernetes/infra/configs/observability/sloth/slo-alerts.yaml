@@ -1,7 +1,7 @@
 # Burn-rate alerts for the SLOs in inventory-grpc-slo.yaml and
 # keycloak-login-slo.yaml, emitted here instead of by Sloth. The same pattern
-# for the nine HTTP services lives in the mop chart (templates/slo-alerts.yaml,
-# chart >= 0.18.0).
+# for the nine HTTP services lives in the slo chart (templates/prometheusrule.yaml,
+# the <service>-slo-burn rule).
 #
 # Sloth keeps the SLIs and every recording rule, so the error budget and the SLO
 # dashboards are unchanged; the two PSL files only set pageAlert/ticketAlert

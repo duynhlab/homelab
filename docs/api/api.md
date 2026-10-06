@@ -731,8 +731,8 @@ flowchart TB
 The current deployment is:
 
 1. Each service exposes gRPC as a second port on its single multi-port
-   Service `<service>` (the mop chart removed the separate headless
-   `<service>-grpc` twin in 0.14).
+   Service `<service>` (rendered by the `duynh` chart's `service.extraPorts`;
+   the separate headless `<service>-grpc` twin was removed in `mop` 0.14).
 2. Clients dial `dns:///<service>.<namespace>.svc.cluster.local:9090`.
 3. `pkg/grpcx` configures client-side `round_robin`.
 4. Because a ClusterIP Service resolves to one virtual IP, `round_robin`

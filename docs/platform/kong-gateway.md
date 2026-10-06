@@ -460,7 +460,7 @@ The gateway fails fast and sheds unhealthy backends instead of hanging on a dead
 or slow upstream (RFC-0009 roadmap #5). Two layers, both plain Kong OSS:
 
 **1. Bounded timeouts + retries** — per-service, set as `konghq.com/*` annotations
-on each app Service (rendered by the `mop` chart's `service.annotations`, ≥ 0.13.0):
+on each app Service (rendered by the service chart's `service.annotations`):
 
 | Setting | Value | Why |
 |---------|-------|-----|

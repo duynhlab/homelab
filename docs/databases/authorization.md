@@ -198,13 +198,13 @@ sequence inherits these grants without another line of SQL (PG-03).
 |---|---|---|
 | `CNPGRoleMembershipDrift` (critical) | [ADR-086 guard](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md) | Every guarded edge, including each `<svc>_migrator → <svc>_owner`, still has its specified options |
 | Kind gate K3.4 | `scripts/db-isolation-sweep.sh` | Each login reaches only its own database |
-| Kind gate K3.5 (planned) | as `<svc>_runtime` | The runtime cannot `CREATE`, `ALTER` or `DROP` |
-| Kind gate K3.6 (planned) | as `<svc>_migrator` | The migrator cannot `CREATE` until it runs `SET ROLE`, and can afterwards |
-| Kind gate K3.7 | VictoriaMetrics | `max(cnpg_pg_role_membership_drift) == 0` for every guarded edge |
+| Kind gate K3.7 | `smoke.js` against VictoriaMetrics | Every guarded edge reports a series and `max(cnpg_pg_role_membership_drift) == 0` |
+| Kind gate K3.8 (planned) | as `<svc>_runtime` | The runtime cannot `CREATE`, `ALTER` or `DROP` |
+| Kind gate K3.9 (planned) | as `<svc>_migrator` | The migrator cannot `CREATE` until it runs `SET ROLE`, and can afterwards |
 
 A PR that adds a service, or cuts one over, adds its `migrator → owner` edge to
-the `pg_role_membership` query and to the guard's `absent()` selector in the same
-PR (ADR-086 write-path rule).
+the `pg_role_membership` query, the guard's `absent()` selector and `smoke.js`
+`GUARDED_EDGES` in the same PR (ADR-086 write-path rule).
 
 ### local-stack
 

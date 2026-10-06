@@ -102,6 +102,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0029 → `provisional`: its README is authored.** The owner approved
+  "ready for RFC" with the gate at 11/11. The proposal splits each service's
+  login/owner role into a NOLOGIN owner, a migrator that reaches ownership only
+  through `SET ROLE`, and a runtime login that owns nothing; service migrations
+  carry object ACLs, default privileges and backfill; a catalog query plus alert
+  guards the membership options CNPG cannot express. The decision stays open for
+  architecture review (canary, chart Secret inputs, drift collector), and three
+  ADRs are listed to be created there.
+
 - **RFC-0029 Phase 0 ran on the Kind cluster, and the leaked `vault_rotator`
   password is now rejected.** The runbook pre-seeded KV, applied the #989
   manifests, repaired the membership to `ADMIN TRUE, INHERIT FALSE, SET FALSE`,

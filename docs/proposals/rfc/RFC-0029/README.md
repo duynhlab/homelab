@@ -1,0 +1,313 @@
+# RFC-0029 PostgreSQL authorization and access governance
+
+| Status | Scope | Research | Created | Last updated |
+|--------|-------|----------|---------|--------------|
+| provisional | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-06 |
+
+> **Don't forget: every decision is a tradeoff.** The cost of the leading
+> direction is more Secrets, more HBA pairs and a coordinated consumer cutover
+> per service; § Design Details → drawbacks and § Rollout & rollback spell it out.
+
+## Prerequisites
+
+- [x] [`research.md`](./research.md) merged; [research review gate](./research.md#research-review-gate) passed (11/11)
+- [x] Context7 audit complete; the source-tree, live-CRD and pgroles checks are in the research log
+- [x] Owner approved **ready for RFC** on 2026-10-06
+- [x] This RFC summarizes the target and links the mechanism deep dive instead of repeating it
+- [ ] When Status → **`Accepted`**: create the ADRs listed in § Resulting decisions. `docs/api/` is N/A: no service route or RPC changes; service repos gain migrations only
+
+## Summary
+
+Split every application database's single login/owner role into three
+identities — a NOLOGIN **owner** that holds the objects, a **migrator** login
+that only reaches ownership through `SET ROLE`, and a **runtime** login that
+owns nothing — and make each service's own migrations carry its object ACLs,
+default privileges and backfill. CNPG `DatabaseRole` keeps owning identity,
+passwords and membership names; a catalog query plus alert guards the PG18
+membership options CNPG cannot express. Roll out to one canary service before
+any fleet change. Phase 0 (revoking the leaked `vault_rotator` credential) is
+already done on the Kind cluster.
+
+## Motivation
+
+Facts from the research (as-built audit 2026-09-04, re-check 2026-10-05):
+
+- **Runtime and migration share one authority.** Each service ResourceSet hands
+  the same `db_secret` and role to the API and the migration Job; that login
+  owns 147/147 audited application tables. A runtime compromise (SQL injection,
+  leaked pod env) is therefore a schema and ownership compromise.
+- **Nothing declares object privileges.** `pg_default_acl` is empty in every
+  audited database, so new functions are executable by PUBLIC (PG-05) and any
+  future split would leave legacy tables without runtime grants (PG-06).
+- **CNPG stops at identity.** `DatabaseRole` cannot express object ACLs,
+  default privileges or the PG18 `ADMIN`/`INHERIT`/`SET` membership options, and
+  it does not poll for drift (CNPG-04, CNPG-06).
+- **The gap has already cost us.** `vault_rotator`'s password was committed and
+  its membership was `t/t/t`; Phase 0 fixed both on 2026-10-05, but the edge is
+  correct only because a human re-ran a `GRANT`, and nothing alerts if it drifts.
+
+### Goals
+
+1. On the canary service, the runtime login owns no object and every negative
+   invariant in research § High-value negative invariants holds (no DDL, no
+   grant, no `SET ROLE` to owner/migrator), proven by a negative test in the
+   Kind gate.
+2. A table, sequence or function created by a migration after cutover gets the
+   runtime ACL with no extra `GRANT` in that migration (creator-scoped default
+   privileges, PG-03), and legacy objects are backfilled (PG-06).
+3. `PUBLIC` loses default `EXECUTE` on new functions through a **global**
+   default-privilege revoke (PG-05 showed the per-schema form is a no-op).
+4. A drifted membership option on a guarded edge raises an alert within one
+   scrape interval; `vault_rotator → notification` is the first guarded edge.
+5. The pattern is written down well enough that a second service adopts it by
+   following a runbook, not by reverse-engineering the canary.
+
+### Non-Goals
+
+- Row-level security and `SECURITY DEFINER` functions: Phase 4, only for a real
+  shared-table or limited-operation use case (research § RLS and SECURITY
+  DEFINER scope).
+- Cloud IAM, certificate mapping or dynamic per-session database credentials —
+  those are authentication mechanisms; they reuse this capability model in a
+  later, cloud-specific RFC.
+- A human-access system (issuing, expiring and auditing people's logins). The
+  capability-role shape is designed for it; the workflow is not part of v1.
+- Converting Keycloak and Temporal: they run their own schema tooling and need
+  separate integration experiments before adopting or diverging.
+- Replacing ADR-015's `pg_hba` isolation or revoking `PUBLIC CONNECT` as a
+  second fence.
+
+## Proposal
+
+| Role | LOGIN | Owns | Reaches | Credential |
+|---|---:|---|---|---|
+| `<svc>_owner` | no | database, application schema, objects | — | none in Kubernetes |
+| `<svc>_migrator` | yes | nothing | `<svc>_owner` via `SET ROLE` (membership `INHERIT FALSE, SET TRUE, ADMIN FALSE`) | short-lived migration Job Secret, primary endpoint |
+| `<svc>_runtime` | yes | nothing | object grants only | workload Secret, pooler endpoint |
+
+`<svc>_runtime` is a new login and a consumer cutover from today's `<svc>`
+login, not an in-place rename: `DatabaseRole.spec.name` is immutable.
+
+**Who owns what** (research § Responsibility split):
+
+| Layer | Source of truth |
+|---|---|
+| Role existence, attributes, password, membership names | CNPG `DatabaseRole` (one per role) |
+| Database owner | CNPG `Database` → `<svc>_owner` |
+| HBA admission | `Cluster.spec.postgresql.pg_hba`, exact runtime/migrator pairs (ADR-015) |
+| Object ownership, ACL backfill, default privileges | the service's versioned migrations, run after `SET ROLE <svc>_owner` |
+| Membership options CNPG cannot express | bootstrap/runbook SQL + a catalog guard (query + alert) |
+| Migration vs runtime Secret wiring | ResourceSet and `mop` chart, separate inputs |
+
+### User Stories
+
+- *As an on-call engineer*, when the notification API leaks its credential, I
+  rotate one runtime login and know the attacker could not have altered or
+  dropped tables.
+- *As a service developer*, I add a table in a migration and the API can read
+  it on the next deploy without a hand-written `GRANT`.
+- *As a platform engineer*, a membership option changed by a restore or a
+  hotfix pages me instead of silently breaking password rotation.
+
+### Alternatives
+
+Two independent choices (full analysis: research § Alternatives):
+
+| Choice | Leading option | Main alternative and its cost |
+|---|---|---|
+| Identity topology | **Three service roles** (owner/migrator/runtime) | Capability roles + separate logins — composable for people, but more membership edges whose options CNPG cannot express |
+| Object-authorization vehicle | **Service-owned authorization migrations** | Declarative policy controller (pgroles) — converges default privileges and polls drift, but cannot manage membership `SET`, is `v1alpha1`, and adds a privileged executor and a second controller on CNPG's roles |
+
+## Other solutions considered
+
+| Option | Shape | Why not chosen |
+|--------|-------|----------------|
+| Keep one owner/login per service | Today's ADR-013 triplet | Fails the least-privilege goal: runtime compromise stays schema compromise |
+| Central platform authorization Job | One homelab Job applies every service's ACL | Couples homelab to every service schema; ordering and rollback duplicate the service's own migrations |
+| pgroles as the authorization controller | `PostgresPolicy` per database, operator in `apply` mode | Cannot own `SET FALSE` edges; `v1alpha1`; needs its own CREATEROLE executor; kept as a candidate **read-only drift reviewer** (`diff --review-out`) instead |
+| OpenBAO dynamic/static credentials for every service | Extend the ADR-025 notification pilot | An authentication change, not an authorization model; the owner kept the pilot at one service |
+| Revoke `PUBLIC CONNECT` instead of separate roles | SQL fence per database | ADR-015 chose `pg_hba` as the single fence; does nothing about ownership |
+
+## Decision outcome
+
+**Chosen option:** undecided — architecture review pending. The leading
+hypothesis is **three service roles** with **service-owned authorization
+migrations**, plus capability roles only where several identities genuinely
+share one permission set.
+
+**Rationale:** it is the only combination that meets Goals 1–3 without a second
+schema-migration system or a controller that cannot express the membership
+options Goal 4 depends on. The review must still settle the canary, the chart's
+Secret inputs and the drift collector (§ Open questions) before this becomes a
+decision.
+
+## Architecture & Diagrams
+
+This diagram answers who connects as which identity for one service once the
+split is in place. Everything inside the service frame is **planned**; the
+cluster, poolers and OpenBAO path exist today.
+
+```mermaid
+flowchart LR
+    subgraph cluster["Kind cluster · homelab"]
+        subgraph svc["one service namespace (planned split)"]
+            job["migration Job<br/>LOGIN svc_migrator (planned)"]:::worker
+            api["API / worker pods<br/>LOGIN svc_runtime (planned)"]:::service
+        end
+        subgraph data["platform-db / product-db (CNPG)"]
+            pooler["pooler<br/>PgBouncer / PgDog"]:::data
+            primary[("primary -rw")]:::data
+            owner["svc_owner · NOLOGIN<br/>owns schema + objects (planned)"]:::platform
+        end
+        eso["ExternalSecret ×2<br/>runtime + migration (planned)"]:::platform
+        guard["catalog guard<br/>query + alert (planned)"]:::platform
+    end
+
+    eso -. "workload Secret (planned)" .-> api
+    eso -. "migration Secret (planned)" .-> job
+    api -->|"pooled SQL (today)"| pooler --> primary
+    api -. "CRUD grants only (planned)" .-> pooler
+    job -->|"direct -rw (today)"| primary
+    job -. "SET ROLE after login (planned)" .-> owner
+    guard -. "reads pg_auth_members (planned)" .-> primary
+
+    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
+    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+```
+
+This one answers the order of work. Phase 0 is done; the rest is **planned**.
+
+```mermaid
+flowchart LR
+    p0["Phase 0 · revoke the leaked credential<br/>done 2026-10-05 on Kind"]:::data
+    p0g["Phase 0 step 6 · membership guard<br/>(planned)"]:::platform
+    p1["Phase 1 · lab + policy contract<br/>conventions, catalog queries (planned)"]:::platform
+    p2["Phase 2 · one canary service<br/>three roles, cutover (planned)"]:::platform
+    p3["Phase 3 · fleet by domain<br/>local-stack parity, drift evidence (planned)"]:::platform
+    p4["Phase 4 · RLS / definer / IAM<br/>only on a real use case (planned)"]:::platform
+
+    p0 --> p0g --> p1 --> p2 --> p3 -. "only if needed" .-> p4
+
+    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
+    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
+```
+
+## Design Details
+
+- **Enable per service:** add `<svc>_owner`, `<svc>_migrator` and
+  `<svc>_runtime` `DatabaseRole`s (full specs — adoption resets omitted fields,
+  CNPG-01), two ExternalSecrets, and HBA pairs for runtime and migrator *before*
+  either login is used; point `Database.spec.owner` at `<svc>_owner`.
+- **Ownership transfer** is a privileged one-time step: a migrator cannot take
+  objects it does not own. Either an operator runbook through CNPG's local
+  peer `postgres` path or a narrowly scoped bootstrap Job does it, records every
+  transferred object, and is removed afterwards (open question).
+- **Authorization SQL** ships in the service repo as a normal migration after
+  `SET ROLE <svc>_owner`: `ALTER DEFAULT PRIVILEGES` for runtime on tables and
+  sequences, a **global** `REVOKE EXECUTE … FROM PUBLIC` default, and a backfill
+  `GRANT` on existing objects.
+- **Cutover:** switch the workload Secret to `<svc>_runtime`, watch connections
+  and errors, keep `<svc>` only for a bounded compatibility window, then drop
+  its HBA pair and role.
+- **Default behaviour** of other services does not change; a service is opted in
+  by its own manifests and migration.
+- **Disable / roll back:** during the compatibility window the legacy `<svc>`
+  login keeps object grants (the backfill covers it too), so repointing the
+  workload Secret back to it restores service; ownership stays with
+  `<svc>_owner`. The canary must prove this rollback before the window closes.
+- **Is it in use?** Catalog queries: owner of every table is `<svc>_owner`;
+  runtime has the ACL; `pg_default_acl` has the owner's rows; the migrator's
+  membership in the owner is `ADMIN FALSE, INHERIT FALSE, SET TRUE`.
+- **Drawbacks:** three Secrets/HBA pairs per service instead of one; a chart and
+  ResourceSet interface change; a coordinated cutover per service; one more
+  privileged procedure (ownership transfer); local-stack must follow or the
+  release gate stops exercising the same failure modes.
+
+## Security considerations
+
+- Trust boundaries are unchanged in kind and narrower in effect: Git → Flux →
+  CNPG for identity, OpenBAO → ESO for credentials, migrations for object
+  authority (research § Trust boundaries and assets).
+- `vault_rotator` remains standing privileged infrastructure: `ADMIN` on
+  `notification` still lets it set that role's password. This is containment,
+  not non-impersonation; `pg_hba`, Secret RBAC and audit logging stay the fence.
+- The ownership-transfer executor is the most privileged new actor and must be
+  time-boxed and removed.
+- `PUBLIC CONNECT` stays as ADR-015 decided; `pg_hba` remains the only
+  connection fence.
+
+## Observability & SLO impact
+
+- **New:** a CNPG custom query (`platform-db/configmaps/monitoring-queries.yaml`)
+  exposing the options of each guarded membership edge, and an alert when they
+  differ from the specified shape. `pg_auth_members` is readable by PUBLIC, so
+  the exporter needs no new grant.
+- **During a cutover:** connection counts per login, authentication failures in
+  the PostgreSQL log, and the service's own error-rate SLO; a cutover that moves
+  the error budget is rolled back.
+- No SLO definition changes.
+
+## Rollout & rollback
+
+| Phase | Content | Exit |
+|---|---|---|
+| 0 | Revoke the leaked `vault_rotator` credential | **Done 2026-10-05** (research § Phase 0 execution record); step 6 guard still open |
+| 1 | Harness as a repeatable gate; catalog queries; naming/Secret/HBA conventions; local-stack decision | owner review of the conventions |
+| 2 | One canary (review or shipping; not Keycloak) | Goals 1–3 proven on Kind, negative tests in the gate |
+| 3 | Fleet by domain, never all databases at once | every service passes positive and negative tests |
+| 4 | RLS / definer / IAM | only with a real use case and its own review |
+
+Rollback is per service and only inside the compatibility window: repoint the
+workload Secret to the legacy login. A compromised or rotated-away credential is
+never a rollback target.
+
+## Testing / verification
+
+- Re-run the 14 PG18/CNPG experiments on every CNPG minor or major upgrade
+  (CNPG-04 in particular).
+- Per service: positive CRUD and migration tests, negative privilege tests
+  (runtime `CREATE`/`ALTER`/`DROP`/`GRANT`/`SET ROLE` must fail).
+- Kind E2E gate rows for the canary; local-stack parity is an open question.
+- Catalog evidence (owner, ACL, default ACL, membership options) recorded in the
+  PR that cuts each service over.
+
+## Open questions
+
+- Which service is the canary — review or shipping?
+- Does the `mop` chart gain separate `runtimeSecretRef` / `migrationSecretRef`?
+- How long may the legacy `<svc>` login live after cutover?
+- Which collector owns periodic drift evidence: the monitoring-query path, a
+  CronJob, or a read-only `pgroles diff --review-out`?
+- Ownership transfer by runbook or by a one-shot Job?
+- Does local-stack adopt the three roles, or is authorization a Kind-only gate?
+- Where does the membership guard alert route, and does it gate the Kind E2E?
+
+## Resulting decisions
+
+To be created at `Proposed` during architecture review:
+
+| Decision | ADR | Status |
+|----------|-----|--------|
+| Three service roles (owner/migrator/runtime) replace the single login/owner role; supersedes that part of ADR-013 | to be created | not yet created |
+| Object ACLs and default privileges are owned by service migrations after `SET ROLE <svc>_owner` | to be created | not yet created |
+| PG18 membership options are guarded by a catalog query and alert | to be created | not yet created |
+
+## Implementation History
+
+- 2026-09-03 — research opened (`researching`).
+- 2026-10-05 — Phase 0 remediation merged (#989) and executed on Kind; research
+  refreshed (#1227) and the run recorded (#1228).
+- 2026-10-06 — owner approved **ready for RFC**; this README authored at
+  `provisional`.
+
+## Related
+
+- [./research.md](./research.md) — mechanism deep dive, experiments, as-built audit, Phase 0 record
+- [Rotate the `vault_rotator` credential](../../../databases/runbooks/rotate-vault-rotator-credential.md)
+- [ADR-013](../../adr/ADR-013-per-service-db-triplet/), [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/), [ADR-025](../../adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) — records this RFC extends or partly supersedes
+- [RFC-0020](../RFC-0020/) — internal TLS (an authentication concern, kept separate)
+
+---
+_Last updated: 2026-10-06_

@@ -21,8 +21,8 @@
 Split every application database's single login/owner role into three
 identities — a NOLOGIN **owner** that holds the objects, a **migrator** login
 that only reaches ownership through `SET ROLE`, and a **runtime** login that
-owns nothing — and make each service's own migrations carry its object ACLs,
-default privileges and backfill. CNPG `DatabaseRole` keeps owning identity,
+owns nothing — and make each service's own migrations carry its object ACLs and
+default privileges. CNPG `DatabaseRole` keeps owning identity,
 passwords and membership names; a catalog query plus alert guards the PG18
 membership options CNPG cannot express. Roll out to one canary service before
 any fleet change. Phase 0 (revoking the leaked `vault_rotator` credential) is
@@ -54,7 +54,9 @@ Facts from the research (as-built audit 2026-09-04, re-check 2026-10-05):
    Kind gate.
 2. A table, sequence or function created by a migration after cutover gets the
    runtime ACL with no extra `GRANT` in that migration (creator-scoped default
-   privileges, PG-03), and legacy objects are backfilled (PG-06).
+   privileges, PG-03). Each service is cut over on a fresh cluster, so there are
+   no legacy objects to backfill (PG-06 stays as the reference for a cluster
+   with data).
 3. `PUBLIC` loses default `EXECUTE` on new functions through a **global**
    default-privilege revoke (PG-05 showed the per-schema form is a no-op).
 4. A drifted membership option on a guarded edge raises an alert within one
@@ -95,7 +97,7 @@ login, not an in-place rename: `DatabaseRole.spec.name` is immutable.
 | Role existence, attributes, password, membership names | CNPG `DatabaseRole` (one per role) |
 | Database owner | CNPG `Database` → `<svc>_owner` |
 | HBA admission | `Cluster.spec.postgresql.pg_hba`, exact runtime/migrator pairs (ADR-015) |
-| Object ownership, ACL backfill, default privileges | the service's versioned migrations, run after `SET ROLE <svc>_owner` |
+| Object ownership, ACLs, default privileges | the service's versioned migrations, run after `SET ROLE <svc>_owner` |
 | Membership options CNPG cannot express | bootstrap/runbook SQL + a catalog guard (query + alert) |
 | Migration vs runtime Secret wiring | domain ResourceSet values (`duynh` chart): today the workload `env` and the `migrate` init container both read `inputs.db_secret`; Phase 2 adds separate inputs so each names its own Secret |
 
@@ -205,23 +207,24 @@ flowchart LR
   `<svc>_runtime` `DatabaseRole`s (full specs — adoption resets omitted fields,
   CNPG-01), two ExternalSecrets, and HBA pairs for runtime and migrator *before*
   either login is used; point `Database.spec.owner` at `<svc>_owner`.
-- **Ownership transfer** is a privileged one-time step: a migrator cannot take
-  objects it does not own. Either an operator runbook through CNPG's local
-  peer `postgres` path or a narrowly scoped bootstrap Job does it, records every
-  transferred object, and is removed afterwards (open question).
+- **Greenfield cutover:** each service is converted on a fresh cluster, so its
+  objects are created by `<svc>_owner` from the first migration and no ownership
+  transfer runs. A cluster that already holds data would need a one-time,
+  operator-run transfer; it is described in
+  [`docs/databases/authorization.md`](../../../databases/authorization.md#rollback-and-existing-data)
+  for reference and **not exercised here**.
 - **Authorization SQL** ships in the service repo as a normal migration after
   `SET ROLE <svc>_owner`: `ALTER DEFAULT PRIVILEGES` for runtime on tables and
-  sequences, a **global** `REVOKE EXECUTE … FROM PUBLIC` default, and a backfill
-  `GRANT` on existing objects.
-- **Cutover:** switch the workload Secret to `<svc>_runtime`, watch connections
-  and errors, keep `<svc>` only for a bounded compatibility window, then drop
-  its HBA pair and role.
+  sequences and a **global** `REVOKE EXECUTE … FROM PUBLIC` default. The
+  migration reaches the owner through `migratex.WithSetRole`
+  (`DB_MIGRATION_ROLE`), which fails the run when `SET ROLE` is denied.
+- **Cutover:** the service's manifests, migration and local-stack change in one
+  release; the legacy `<svc>` login is never created. There is no
+  compatibility window.
 - **Default behaviour** of other services does not change; a service is opted in
   by its own manifests and migration.
-- **Disable / roll back:** during the compatibility window the legacy `<svc>`
-  login keeps object grants (the backfill covers it too), so repointing the
-  workload Secret back to it restores service; ownership stays with
-  `<svc>_owner`. The canary must prove this rollback before the window closes.
+- **Disable / roll back:** `git revert` of the cutover plus a fresh `make up`.
+  No legacy login exists to repoint to.
 - **Is it in use?** Catalog queries: owner of every table is `<svc>_owner`;
   runtime has the ACL; `pg_default_acl` has the owner's rows; the migrator's
   membership in the owner is `ADMIN FALSE, INHERIT FALSE, SET TRUE`.
@@ -259,14 +262,13 @@ flowchart LR
 | Phase | Content | Exit |
 |---|---|---|
 | 0 | Revoke the leaked `vault_rotator` credential | **Done 2026-10-05** (research § Phase 0 execution record); step 6 guard done 2026-10-06 (ADR-086) |
-| 1 | Harness as a repeatable gate; catalog queries; naming/Secret/HBA conventions; local-stack decision | owner review of the conventions |
+| 1 | Harness as a repeatable gate; catalog queries; naming/Secret/HBA conventions; local-stack decision; `migratex.WithSetRole` | owner review of the conventions ([`authorization.md`](../../../databases/authorization.md)) |
 | 2 | One canary (`review`) | Goals 1–3 proven on Kind, negative tests in the gate |
 | 3 | Fleet by domain, never all databases at once | every service passes positive and negative tests |
 | 4 | RLS / definer / IAM | only with a real use case and its own review |
 
-Rollback is per service and only inside the compatibility window: repoint the
-workload Secret to the legacy login. A compromised or rotated-away credential is
-never a rollback target.
+Rollback is per service: revert its cutover and bring the cluster up again. A
+compromised or rotated-away credential is never a rollback target.
 
 ## Testing / verification
 
@@ -293,13 +295,19 @@ Resolved 2026-10-06:
   ResourceSets, so a separate migrator Secret needs new ResourceSet inputs,
   not a chart change.
 
-Still open (implementation, settled in the canary PR):
+Resolved in Phase 1 (2026-10-06, owner):
 
-- The length of the compatibility window before the legacy login is dropped.
-- How the migration tool reaches `SET ROLE` (ADR-085 obligation).
-- Whether the membership alert also gates the Kind E2E or only pages.
-- PUBLIC `CONNECT`: local-stack already revokes it (`local-stack/postgres/init.sql`)
-  while the cluster keeps it; parity work picks one.
+- ~~Compatibility window~~ — none. Greenfield: the legacy login is never
+  created, rollback is `git revert` + a fresh `make up`.
+- ~~How migrations reach `SET ROLE`~~ — `migratex.WithSetRole` in
+  `duynhlab/pkg`, fed by `DB_MIGRATION_ROLE`; fails hard when denied or empty.
+  Rejected: a catalog `ALTER ROLE … SET role` default (invisible in Git, not
+  modeled by CNPG) and pgroles (cannot act inside the migration session).
+- ~~Alert vs gate~~ — both: `CNPGRoleMembershipDrift` pages, and the Kind gate
+  asserts `drift == 0` plus negative rows run as the real logins.
+- ~~PUBLIC `CONNECT`~~ — kept on the cluster (ADR-015, `pg_hba` is the fence);
+  local-stack keeps revoking it because it has no other fence. A deliberate
+  difference, recorded in `authorization.md`.
 
 ## Resulting decisions
 
@@ -321,6 +329,9 @@ Still open (implementation, settled in the canary PR):
 - 2026-10-06 — Phase 0 step 6: the membership guard for `vault_rotator →
   notification` shipped and was exercised on Kind (flip and revoke both fired
   and resolved); ADR-086 Adoption `Partial`.
+- 2026-10-06 — Phase 1 conventions authored
+  ([`authorization.md`](../../../databases/authorization.md)); the open questions
+  resolved as greenfield, `migratex.WithSetRole`, alert plus gate.
 
 ## Related
 

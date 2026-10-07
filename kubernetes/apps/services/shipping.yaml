@@ -10,23 +10,6 @@ spec:
   type: Static
   defaultValues:
     name: shipping
-    # 1.4.1: pkg v0.35.0 wave (2026-08-07): dependency-only patch release, fleet aligned on one shared-library version.
-    # 1.4.2: telemetry-audit fix for the HTTP access log (F-1/F-2) on top of the
-    # per-module pkg v0.36.1 migration and the dependency CVE round. The access
-    # log now emits from the trace-carrying logger, skips routine successful
-    # probes while keeping failing ones, logs the span trace id or none rather
-    # than a fabricated one, and treats 4xx as warn. Local-stack E2E #2: probe
-    # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
-    # 1.4.3: RFC-0024 wave (2026-08-13): pkg/proto v0.37.0 pin alignment
-    # (string user_id in the notification/payment protos); no behaviour
-    # change in this service beyond the shared-contract bump.
-    # 1.6.0: ADR-038 shared HTTP middleware. The per-service middleware/ package is
-    # gone; tracing and logging come from pkg/httpmw and the span helpers from
-    # pkg/obsx. One DefaultSkipRoutes map now feeds both, and matching is EXACT on
-    # the Gin route pattern instead of a prefix — a probe on a path nobody
-    # registered is traced and logged as an ordinary 404 rather than vanishing.
-    # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
-    # for /metrics and 0 for /health and /ready, unchanged.
     image_tag: "1.10.0" # {"$imagepolicy": "flux-system:shipping:tag"}
     namespace: shipping
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm

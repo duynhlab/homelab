@@ -240,6 +240,12 @@ tracing→logging order stops being a per-repo convention.
 
 ## History
 
+Historical local-stack results retained from service release comments (the
+observation dates were not recorded): E2E audit #2 found native trace IDs on
+51/51 HTTP access records. The ADR-038 adoption audit recorded `/metrics`
+spans increasing from 0 to 15, with `/health` and `/ready` remaining at 0.
+These are original audit observations, not a rerun during comment cleanup.
+
 | Date | Status | Note |
 |------|--------|------|
 | 2026-08-08 | Proposed | Written from the telemetry audit's F-1/F-2 findings. Direction only — the F-1/F-2 fix lands as eleven in-place patches first, so this decision is not on the critical path for stopping the log noise. |

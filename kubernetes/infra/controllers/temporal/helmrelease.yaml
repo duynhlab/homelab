@@ -1,47 +1,7 @@
-# Temporal server — OFFICIAL temporalio/helm-charts release (ADR-030 revision).
-#
-# Replaces the alexandrevilain temporal-operator (TemporalCluster/
-# TemporalNamespace CRs, kept beside their replacements as .bak): the operator caps
-# at server 1.28.x, while **Worker Versioning** — the workflow-versioning
-# mechanism RFC-0021 phase 3 uses for the stock-write migration — requires
-# server >= 1.29.1 (Go SDK >= 1.35, CLI >= 1.4.1). Chart 1.7.0 ships server
-# 1.32.0.
-#
-# What carries over unchanged:
-#   * Persistence stays the CNPG `platform-db` cluster — databases `temporal` and
-#     `temporal_visibility` are pre-created by its postInitSQL, owned by the
-#     `temporal` role, and reachable per its pg_hba allow lines. The password
-#     comes from the ESO secret `platform-db-temporal-secret` (temporal ns).
-#     createDatabase: false because the `temporal` role has no CREATEDB (the same
-#     reason the operator needed skipCreate); manageSchema: true lets the chart's
-#     schema job create/upgrade tables inside the databases it owns.
-#   * numHistoryShards stays 512 — it cannot change after the first deployment.
-#   * The frontend Service keeps the name `temporal-frontend`, so every service's
-#     `TEMPORAL_HOSTPORT=temporal-frontend.temporal.svc.cluster.local:7233` is
-#     untouched by the re-platform.
-#   * The `mop` namespace is now created by the chart's namespace job
-#     (server.config.namespaces) instead of the TemporalNamespace CRD.
-#
-# What changed: the Web UI Service is `temporal-web` (was `temporal-ui`) — see
-# ingress.yaml.
-#
-# schema.useHelmHooks and server.config.namespaces.useHelmHooks MUST stay
-# false: Helm hooks are not reconciled by Flux (the chart documents this), so
-# the schema/namespace jobs are applied as normal resources instead.
-#
-# Resources are set on every component: Kind is small, and the platform keeps
-# every pod bounded even where the Kyverno resource policy does not reach (it
-# scopes to app namespaces, Audit-only).
-#
-# Probe gaps the chart imposes (no values knob): `temporal-worker` declares
-# NEITHER probe, `temporal-admintools` has no readinessProbe, and the
-# schema/namespace Jobs have none. require-probes does not match the `temporal`
-# namespace today (it lists app namespaces only, Audit), so nothing is blocked —
-# but if that policy is widened or flipped to Enforce, this release needs a
-# PolicyException. Practical consequence now: because the worker has no
-# readinessProbe it counts Available as soon as the container starts, so
-# "HelmRelease Ready" is a slightly weaker signal than the retired
-# TemporalCluster Ready condition.
+# Official Temporal chart; persistence is CNPG platform-db (ADR-030).
+# The chart lacks worker probes and admintools readiness: HelmRelease Ready
+# does not prove those processes are ready. Recheck before widening admission.
+# Operations: docs/api/temporal.md#temporal-infrastructure.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -52,14 +12,8 @@ metadata:
     app.kubernetes.io/component: workflow-engine
 spec:
   interval: 30m
-  # Explicit timeout (repo convention — every other heavy HelmRelease sets one).
-  # helm-controller's 5m default cannot cover this install: it waits for 6
-  # Deployments AND both Jobs (install.disableWaitForJobs defaults false), and the
-  # namespace Job is serially dependent on the schema Job + a serving frontend —
-  # with OnFailure backoff climbing to 160s+ — on top of cold image pulls. A 5m
-  # budget would time out, remediate, and eventually Stall, which would block
-  # temporal-local and therefore apps-local. retries stays low so the worst case
-  # (timeout × (retries+1)) stays within the Kustomization's retry cadence.
+  # Allow cold pulls and the serial schema -> frontend -> namespace startup.
+  # A 5m timeout can stall temporal-local and block the app dependency wave.
   timeout: 15m
   # Release name `temporal` + chart name `temporal` ⇒ fullname `temporal`, which
   # is what keeps the Service names (temporal-frontend, …) stable.
@@ -90,36 +44,10 @@ spec:
           memory: 128Mi
         limits:
           memory: 512Mi
-      # history-only sizing. The chart takes a per-service override:
-      # server-deployment.yaml renders
-      #   default $.Values.server.resources $serviceValues.resources
-      # so a non-empty server.history.resources wins over the block above
-      # (verified in chart 1.7.0, not assumed).
-      #
-      # Measured, not guessed. On this platform history steadily used **337m
-      # CPU** against a 50m request -- 6.7x over -- and its RSS reached
-      # **363Mi of the shared 512Mi limit (71%)** while acquiring shards, versus
-      # 16-20Mi for frontend, matching and worker. The old block was one profile
-      # copied across four services with very different jobs.
-      #
-      # Headroom here is 2.8x the observed 363Mi rather than this repo's usual
-      # ~1.75x, for two reasons. First, that 363Mi is a floor and not a steady
-      # state: it was recorded on a cluster where shard acquisition never
-      # finished, so history had not yet reached its working set. Second, cgroup
-      # v2 charges **socket buffers** to the same limit, and history holds
-      # connections for every shard -- measured on that cluster,
-      # `memory.events` reported `sock_throttled` climbing 189 -> 243 in 40s
-      # with no OOM at all, which is memory pressure that never shows up as a
-      # kill.
-      #
-      # Deliberately no CPU limit: throttling the service that owns the shards
-      # is worse than letting it burst on an idle node.
-      #
-      # This does NOT address the restarts seen on every cold bring-up. Those
-      # are a startup race, not memory -- the services boot before the
-      # `temporal-schema` Job has run and exit 1 on
-      # `relation "schema_version" does not exist`, with `oom_kill 0`. Raising
-      # memory cannot fix an ordering problem.
+      # History owns 512 shards and needs more headroom than the other services.
+      # Observed 363Mi RSS was during incomplete shard acquisition, not steady state;
+      # socket-buffer pressure also counts toward the memory limit. No CPU cap.
+      # Missing schema_version on cold start is an ordering failure, not an OOM.
       history:
         resources:
           requests:
@@ -136,11 +64,8 @@ spec:
           interval: 30s
       config:
         persistence:
-          # The chart reads numHistoryShards HERE (server.config.persistence),
-          # not at server.config — putting it one level up is a silent no-op that
-          # only looks right while the chart default happens to match. Immutable
-          # after the first deployment; pinned to the retired operator's value so
-          # the existing databases stay usable across a chart bump.
+          # Immutable after first deployment. The chart reads this under persistence;
+          # placing it at server.config is a silent no-op.
           numHistoryShards: 512
           datastores:
             default:
@@ -154,36 +79,9 @@ spec:
                 secretKey: password
                 createDatabase: false # pre-created by CNPG postInitSQL; role has no CREATEDB
                 manageSchema: true
-                # Persistence pool, sized against numHistoryShards above.
-                #
-                # A History Shard is, in the vendor's words, "a unit of
-                # scalability that maps to a single persistence partition,
-                # representing the number of concurrent database operations
-                # possible". This platform declares 512 of them and, until this
-                # landed, left the pool at the server default -- measured on the
-                # cluster, history held FOUR connections. The two halves of the
-                # same setting were two orders of magnitude apart.
-                #
-                # 20 rather than anything near 512, because this config file is
-                # shared: ONE `temporal-config` ConfigMap is mounted by
-                # frontend, history, matching AND worker (verified on the
-                # cluster), and each opens its own pool per datastore. So the
-                # ceiling is 4 services x 2 datastores x maxConns = 8 x 20 = 160
-                # against `platform-db`'s 197 usable connections
-                # (max_connections 200 - superuser_reserved 3), which is shared
-                # with Keycloak and the app fleet (~12 in use). Raising
-                # max_connections is the lever if this ever binds; the worst
-                # case does not materialise at homelab load.
-                #
-                # maxIdleConns is half maxConns deliberately: the pool was
-                # observed churning (8 connections in `starting` state at one
-                # sample), so some warm capacity is worth holding, but holding
-                # 160 idle connections on a shared database is not.
-                #
-                # NOT a chart or server defect. The chart documents these keys
-                # and renders them correctly (verified against chart 1.7.0); it
-                # simply has no default, and nothing warns when shards greatly
-                # exceed the pool.
+                # Shared by four services and two datastores: up to 8 x 20 = 160
+                # connections against platform-db's 197 usable slots, shared with other clients.
+                # Keep some idle capacity without reserving all 160 connections.
                 maxConns: 20
                 maxIdleConns: 10
                 maxConnLifetime: 1h

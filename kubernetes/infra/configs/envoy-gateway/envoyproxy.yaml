@@ -1,11 +1,5 @@
-# EnvoyProxy — data-plane shape for the `platform` GatewayClass (RFC-0024 P2).
-# Configures the managed Envoy fleet in one place:
-#   replicas 2 + PDB minAvailable 1   -- HA sizing for a stateless edge proxy
-#   resources                         -- CPU/memory requests and limits
-#   NodePort 30080/30443              -- fixed node ports for the Kind cluster
-#   JSON access log to stdout         -- structured request logging
-#   OTLP tracing, 50% sampling        -- distributed tracing export
-#   Prometheus metrics endpoint       -- proxy fleet metrics scrape target
+# Data-plane settings for the platform GatewayClass.
+# Routing and telemetry: docs/platform/envoy-gateway.md.
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
@@ -29,15 +23,8 @@ spec:
             maxUnavailable: 0
         pod:
           labels:
-            # LOAD-BEARING (ADR-060). Vector's kubernetes_logs source excludes
-            # this selector -- extra_label_selector:
-            # "platform.duynhlab.dev/otlp-logs!=true" in
-            # controllers/logging/vector/vector.yaml. Since the accessLog below
-            # now ALSO ships over OTLP, without this label VictoriaLogs would
-            # hold every edge line twice: once from Vector tailing stdout, once
-            # from the collector. Vector stops TAILING; stdout keeps being
-            # WRITTEN, so `kubectl logs` on the edge pod is unaffected -- which
-            # is the whole reason the File sink stays.
+            # Exclude stdout access logs from Vector's general pod source to avoid
+            # duplicating OTLP delivery. The File sink remains for kubectl logs.
             platform.duynhlab.dev/otlp-logs: "true"
         container:
           resources:
@@ -52,14 +39,8 @@ spec:
       envoyService:
         # NodePort for the Kind extraPortMappings — no LoadBalancer here.
         type: NodePort
-        # Pin the nodePorts the Kind config forwards (30080/30443). This
-        # Service is their sole owner.
-        # A pinned nodePort is an exclusive claim: if any other Service in the
-        # cluster already holds 30080 or 30443, the API server rejects the
-        # allocation and this Kustomization stays not-ready until the port is
-        # free. The symptom is a reconciliation failure, not a traffic failure.
-        # Strategic merge key for Service.spec.ports is `port`; the live
-        # merge behavior of this patch gets verified on the P0/Kind spike.
+        # Own the fixed ports forwarded by Kind; another Service claiming them
+        # blocks reconciliation. Service port patches merge by port.
         patch:
           type: StrategicMerge
           value:
@@ -72,9 +53,7 @@ spec:
                   protocol: TCP
                   nodePort: 30443
   telemetry:
-    # Prometheus metrics endpoint on the proxy fleet (enabled by default; the
-    # empty block records intent). envoy_* scrape objects + rules + dashboards
-    # land with the P4 telemetry train — this only guarantees the endpoint.
+    # Keep the proxy Prometheus endpoint enabled for the fleet PodMonitor.
     metrics:
       prometheus: {}
     accessLog:
@@ -84,11 +63,7 @@ spec:
       # source instead. spec.logging below pins the runtime level now that
       # those lines are actually stored.
       settings:
-        # Structured JSON access log to stdout — Vector's DaemonSet tails pod
-        # stdout to ship these lines. Field names cover the standard request
-        # shape (time/client/method/uri/status/...) plus the RFC's extras
-        # (response_flags, upstream_cluster, route_name) for edge-level
-        # debugging.
+        # Keep JSON stdout for kubectl logs; access-log ingestion uses OTLP.
         - format:
             type: JSON
             json:

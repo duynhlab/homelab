@@ -278,6 +278,10 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- Trim release diaries and repeated explanations in service, worker, CNPG,
+  Temporal and edge manifests without changing configuration. Preserve sizing
+  evidence in the owning docs and keep rollback constraints and Flux markers.
+
 - **mockpay logs are stored once, and its telemetry reports the running
   release.** It ships logs over OTLP but lacked the
   `platform.duynhlab.dev/otlp-logs` label, so Vector also tailed its stdout

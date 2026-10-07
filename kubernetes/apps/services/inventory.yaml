@@ -10,40 +10,8 @@ spec:
   type: Static
   defaultValues:
     name: inventory
-    # 0.4.0 stops reporting an untracked SKU as a shortage. A requested SKU with no
-    # balance row in ANY warehouse now comes back in `unknown_sku_ids` instead of as
-    # a Shortage at available_to_promise 0 — a quantity claim this service cannot
-    # make about a SKU it has never heard of, and the reason a missing row used to
-    # reach the shopper as "no longer available".
-    #
-    # Pin this BEFORE checkout 0.6.0: checkout fails closed on the new field, and it
-    # can only do that once inventory sends it. The reverse order is harmless but
-    # pointless — checkout would keep blocking the lines instead.
-    #
-    # 0.3.0 RETIRED the phase-2 `backfill` subcommand (RFC-0021 phase 4) together
-    # with its PRODUCT_DB_* config surface. It read products.stock_quantity through
-    # a cross-service grant, and phase 4 removes both — so the subcommand had
-    # nothing to read and no way to connect.
-    #
-    # THIS PIN MUST LAND BEFORE product 1.10.0, which carries the migration that
-    # drops the column and revokes the grant: remove the reader, then the read.
-    # Running the retired verb now refuses loudly instead of falling through to
-    # serving the app inside a one-shot Job.
-    #
-    # 0.2.3 carried the subcommand-config fix: the init container runs `migrate`
-    # with only DB_* env (the contract every service here runs under) and 0.1.0
-    # validated the full config first, so this Deployment sat in
-    # Init:CrashLoopBackOff on the cluster with "SERVICE_NAME is required".
-    # 0.4.1: 0.4.1: Reserve answers SKU_NOT_FOUND for a SKU with no balance row anywhere, instead of a fabricated INSUFFICIENT_STOCK at ATP 0 (inventory#23).
-    # 0.4.2: telemetry-audit fix for the HTTP access log (F-1/F-2) on top of the
-    # per-module pkg v0.36.1 migration and the dependency CVE round. The access
-    # log now emits from the trace-carrying logger, skips routine successful
-    # probes while keeping failing ones, logs the span trace id or none rather
-    # than a fabricated one, and treats 4xx as warn. Local-stack E2E #2: probe
-    # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
-    # 0.4.3: RFC-0024 wave (2026-08-13): pkg/proto v0.37.0 pin alignment
-    # (string user_id in the notification/payment protos); no behaviour
-    # change in this service beyond the shared-contract bump.
+    # Do not restore the retired product-stock backfill reader: product migration
+    # 000006 removes its source and grant. See RFC-0021/cutover-rollback.md.
     image_tag: "0.9.1" # {"$imagepolicy": "flux-system:inventory:tag"}
     namespace: inventory
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm

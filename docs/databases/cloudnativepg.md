@@ -155,6 +155,13 @@ capabilities. Admission webhooks use `failurePolicy: Fail`; an unhealthy
 controller can therefore block database-resource admission and Flux dry-runs.
 Controller CPU and probe behavior are part of database availability.
 
+Historical sizing evidence (2026-08-21): a 100m CPU limit caused four startup
+and five liveness-probe failures in 57 minutes. The operator restarted nine
+times; exit 137 followed a clean shutdown, not an OOM. The unavailable webhook
+blocked database admission, leaving eight dependent Kustomizations not ready
+and ten services crash-looping. This motivates CPU headroom, not a universal
+500m sizing guarantee.
+
 Operator, chart, CRDs, operand images, PostgreSQL major version, and backup
 plugin form one compatibility surface. Upgrade them as an ordered change:
 

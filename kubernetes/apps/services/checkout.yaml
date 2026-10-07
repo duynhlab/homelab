@@ -10,79 +10,9 @@ spec:
   type: Static
   defaultValues:
     name: checkout
-    # 0.5.0 makes inventory the ONLY availability authority (RFC-0021 phase 4).
-    # Price from product, availability from inventory, concurrently — and no
-    # fallback, because the fallback read product's stock column, which was frozen
-    # at the W7 write cutover and removed from the contract in product 1.8.0.
-    #
-    # The CHECKOUT_AVAILABILITY_* inputs are GONE as of the commit after this
-    # pin, and the two-step was the point: 0.4.x defaulted
-    # CHECKOUT_AVAILABILITY_SOURCE to `product`, so removing them while a 0.4.x
-    # pod still served would have moved the availability authority back onto the
-    # frozen column. Same trap ORDER_STOCK_PARTICIPANT set, and the inverse of the
-    # W8 one (an env the process silently ignored). A default is not a safe
-    # fallback when the default is the thing being removed.
-    #
-    # 0.5.0 also fixes a dead end found in adversarial review: an unsellable or
-    # wrong-currency line used to answer 503 "retry with the same key" for a
-    # condition that could never change, wedging the session at `confirming` with
-    # no FSM edge out. A definite answer now requotes.
-    #
-    # 0.6.0 fails CLOSED when inventory reports a SKU it does not track. That answer
-    # used to arrive as a zero-ATP shortage and the shopper was told the item was
-    # gone; it is now a 503 + Retry-After, because a missing balance row says nothing
-    # about whether the item is buyable.
-    #
-    # On the CONFIRM path the session is requoted out of `confirming` first, and that
-    # detail is the whole reason this is a release rather than a one-line map: the
-    # condition is PERSISTENT (it lasts until someone adds the row), `confirming` has
-    # no FSM edge to `cancelled`, `lazyExpire` skips the state, and
-    # FindActiveByUserID keeps handing the session back — so parking there left the
-    # shopper unable to confirm, cancel, OR start a new checkout.
-    #
-    # Requires inventory 0.4.0 (pinned above) to be sending `unknown_sku_ids`, and
-    # CheckoutAvailabilityUnknownSKU to be loaded (homelab #669) — otherwise the
-    # 503s are invisible to alerting.
-    #
-    # 0.5.1 makes POST /sessions answer 503 + Retry-After: 2 when a dependency is
-    # down, instead of the 500 it shared with an unhandled error. Found by the
-    # phase-4 e2e, and it mattered: confirm already answered 503 for the same
-    # condition, so a shopper hitting a momentary inventory outage at the START of
-    # checkout was told the server was broken while the same outage one step later
-    # told them to retry.
-    # 0.6.1: 0.6.1: datastore-unavailable answers 503 + Retry-After: 2 on every session endpoint (repository-boundary classifier, checkout-service PR #47).
-    # 0.6.2: promo lock queues answer 55P03 (contention, 500) instead of a
-    # fake-failover 503; ExpireDue propagates infra errors on the confirm-
-    # binding read so the abandonment activity retries (checkout PR #48).
-    # 0.6.3: telemetry-audit fix for the HTTP access log (F-1/F-2) on top of the
-    # per-module pkg v0.36.1 migration and the dependency CVE round. The access
-    # log now emits from the trace-carrying logger, skips routine successful
-    # probes while keeping failing ones, logs the span trace id or none rather
-    # than a fabricated one, and treats 4xx as warn. Local-stack E2E #2: probe
-    # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
-    # 0.7.0: RFC-0024 identity cutover (2026-08-13). Verifies Keycloak realm
-    # tokens via OIDC_* (pkg authmw v0.37.1, preferred_username), user_id is
-    # the token sub as a string UUID end to end (ADR-042), greenfield DB
-    # reset per the identity-cutover runbook. Compose E2E audit passed on
-    # this code before merge; first fleet deploy goes through the Kind gate.
-    # 0.8.0: ADR-038 shared HTTP middleware. The per-service middleware/ package is
-    # gone; tracing and logging come from pkg/httpmw and the span helpers from
-    # pkg/obsx. One DefaultSkipRoutes map now feeds both, and matching is EXACT on
-    # the Gin route pattern instead of a prefix — a probe on a path nobody
-    # registered is traced and logged as an ordinary 404 rather than vanishing.
-    # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
-    # for /metrics and 0 for /health and /ready, unchanged.
-    # 0.9.0: ADR-053 — an untracked SKU answers 409 ITEM_NOT_ORDERABLE instead
-    # of a retryable 503 (flat at create, requoted session at confirm, key
-    # released, no Retry-After); transient 503 arms unchanged; httpx v0.37.0.
-    # Lands in the same train as frontend 3.2.0 — the SPA must never meet a
-    # code it cannot word. Compose gate 2026-08-19 (A21 asserts the new wire).
+    # Inventory is the sole availability authority; do not restore product fallback.
+    # Keep storefront error handling compatible with docs/api/checkout.md.
     image_tag: "0.13.2" # {"$imagepolicy": "flux-system:checkout:tag"}
-    # 0.7.1: a promo code whose cap is already spent answers 409 PROMO_EXHAUSTED
-    # at apply, matching the confirm gate; it answered 500 before, which the
-    # storefront could only render as "Service temporarily unavailable"
-    # (checkout-service#66). The local-stack audit's A10 promo-spent row asserts
-    # this, so it FAILS against 0.7.0.
     namespace: checkout
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -98,13 +28,8 @@ spec:
     db_secret: "product-db-checkout-secret"
     db_sslmode: "disable"
     pool_max: "25"
-    # No grpc_server: checkout is a gRPC CLIENT only (cart/product/order/
-    # shipping); its own API surface is HTTP behind Envoy Gateway.
-    # All four upstream addresses are explicit: the service's config defaults
-    # still say `<svc>-grpc.<ns>` but the cluster has a single multi-port
-    # Service named `<svc>` (the headless `<svc>-grpc` twin was removed in
-    # mop 0.14 and the duynh chart renders none) — the defaults are wrong on the cluster until the service
-    # repo catches up.
+    # Client-only gRPC: use the multi-port Services below, not the absent
+    # <service>-grpc Services assumed by old application defaults.
     cart_grpc_addr: "dns:///cart.cart.svc.cluster.local:9090"
     product_grpc_addr: "dns:///product.product.svc.cluster.local:9090"
     order_grpc_addr: "dns:///order.order.svc.cluster.local:9090"

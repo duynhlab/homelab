@@ -10,70 +10,9 @@ spec:
   type: Static
   defaultValues:
     name: product
-    # 1.7.0 removes the stock write RPCs (RFC-0021 phase 4): ReserveStock and
-    # ReleaseStock are gone from the gRPC surface, and so is the removal-gate
-    # instrument product_stock_surface_calls_total that watched them.
-    #
-    # The two-week-zero gate on that instrument was WAIVED by the owner on
-    # 2026-08-05 in favour of code evidence. Read the waiver in
-    # docs/proposals/rfc/RFC-0021/cutover-rollback.md § Contract removal before
-    # inferring anything from an empty panel — the query cannot be re-run now,
-    # and empty reads exactly like zero.
-    #
-    # A straggler caller gets Unimplemented, which grpcx logs at ERROR level.
-    # That is the only detection channel left, and it only fires after
-    # something has already broken. There is no rollback for this removal.
-    #
-    # 1.8.0 takes the frozen column OUT of the read contract: /details has no
-    # `stock` block and product payloads no longer publish stock_quantity. Both
-    # reported a value last written at the W7 write cutover — a number that could
-    # not change. Availability comes from inventory-service on the same response
-    # (product_availability_source below) and is the only stock answer.
-    #
-    # ORDER MATTERED: the SPA moved to the `availability` block first
-    # (frontend #81), because removing the old fields before that would have
-    # blanked the product page.
-    #
-    # 1.9.0 stops READING products.stock_quantity anywhere: GetProducts and its
-    # available_qty field left the contract, so the column had no reader left.
-    #
-    # 1.10.0 DROPS IT. Migration 000006 revokes the migration-000005 cross-service
-    # grant, drops stock_reservations, then drops products.stock_quantity. This is
-    # the irreversible step of RFC-0021 phase 4 and the ordering around it is not
-    # cosmetic:
-    #
-    #   * inventory 0.3.0 must already be deployed — it retired the `backfill`
-    #     subcommand, the last thing that SELECTed this column, through the grant
-    #     this migration revokes. Remove the reader, then the read.
-    #   * a data-bearing cluster needs a MANUAL backup first. The paired
-    #     down-migration restores the SHAPE only (every row at 0), so the backup is
-    #     the data rollback:
-    #       kubectl -n product exec product-db-1 -c postgres --     #         pg_dump -U postgres -d product -Fc > product-pre-000006.dump
-    #     Then RESTORE-TEST it. A backup nobody has restored is a hypothesis.
-    #     Evidence for the completed test: RFC-0021 cutover-rollback.md gate 3.
-    #
-    # The migration refuses to run while any undocumented role still holds SELECT
-    # on products, and fails fast on a lock (lock_timeout 3s) rather than queueing
-    # every catalog read behind an ACCESS EXCLUSIVE waiter. A refusal leaves the
-    # schema intact but marks the version dirty — recovery is in the migration
-    # header.
-    # 1.11.1: pkg v0.35.0 wave (2026-08-07): dependency-only patch release, fleet aligned on one shared-library version.
-    # 1.11.2: telemetry-audit fix for the HTTP access log (F-1/F-2) on top of the
-    # per-module pkg v0.36.1 migration and the dependency CVE round. The access
-    # log now emits from the trace-carrying logger, skips routine successful
-    # probes while keeping failing ones, logs the span trace id or none rather
-    # than a fabricated one, and treats 4xx as warn. Local-stack E2E #2: probe
-    # access logs 513664 -> 0, native trace id on 51/51 HTTP access records.
-    # 1.11.3: RFC-0024 wave (2026-08-13): pkg/proto v0.37.0 pin alignment
-    # (string user_id in the notification/payment protos); no behaviour
-    # change in this service beyond the shared-contract bump.
-    # 1.13.0: ADR-038 shared HTTP middleware. The per-service middleware/ package is
-    # gone; tracing and logging come from pkg/httpmw and the span helpers from
-    # pkg/obsx. One DefaultSkipRoutes map now feeds both, and matching is EXACT on
-    # the Gin route pattern instead of a prefix — a probe on a path nobody
-    # registered is traced and logged as an ordinary 404 rather than vanishing.
-    # Compose E2E audit passed on this code before the tag; measured 0 -> 15 spans
-    # for /metrics and 0 for /health and /ready, unchanged.
+    # Migration 000006 drops stock data; rollback requires a restore-tested backup,
+    # not just a down-migration. Retire inventory backfill before that migration.
+    # See docs/proposals/rfc/RFC-0021/cutover-rollback.md for gates and recovery.
     image_tag: "1.16.1" # {"$imagepolicy": "flux-system:product:tag"}
     namespace: product
     # Runs pkg/authmw (cmd/main.go) and serves /protected/, so both realm

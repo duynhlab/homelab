@@ -1,43 +1,8 @@
-# Order-fulfillment Temporal worker — ONE file, forever (RFC-0026 / ADR-054).
-#
-# This replaces order-worker-<build>.yaml. There is no longer a file per build and
-# no activation Job: the controller derives the Build ID, creates one Deployment
-# per Worker Deployment Version, moves the Current version through the Temporal
-# API according to spec.rollout, and deletes a version once the server reports it
-# drained. A release edits ONE line here — image.tag below — and nothing else.
-#
-# WHAT IS NO LONGER WRITTEN DOWN, on purpose:
-#   - the Build ID. The controller composes it from the image reference plus a
-#     hash of this pod template (internal/k8s/deployments.go ComputeBuildID), so a
-#     resources or env edit also mints a version. Stricter than the old
-#     tag-only rule, and the reason a release is one line. Read the live value
-#     with `kubectl -n order get wd order-fulfillment` — Current, Target and
-#     Ramp % are printer columns.
-#   - TEMPORAL_DEPLOYMENT_NAME / TEMPORAL_WORKER_BUILD_ID. The controller injects
-#     both into every container of every version it creates. Hand-setting either
-#     gives the pod two identities. The guard is scripts/flux-validate.sh, and
-#     it is the ONLY guard: temporalx reads one name per variable, so it cannot
-#     see a hand-set value disagree with an injected one. What it does refuse is
-#     HALF a config -- one of the two variables present -- which is why the
-#     retired TEMPORAL_WORKER_DEPLOYMENT_NAME is a crash rather than a silent
-#     downgrade (pkg/temporalx >= temporalx/v0.37.0).
-#   - the server-side deployment name. It is "<k8s-namespace>/<resource-name>",
-#     so this resource registers as `order/order-fulfillment` — NOT the bare
-#     `order-fulfillment` ADR-030 used. Deliberate and verified: the drain set is
-#     empty on a cluster rebuilt from zero, so no history is stranded by the
-#     rename. On a cluster holding live order history, drain first.
-#
-# THE POD TEMPLATE IS A RAW PodSpec, so no chart renders it (the `mop` chart did
-# before ADR-054). Everything below was transplanted from what `helm template` proved the
-# chart emitted for order-worker-2-4-0 — a Deployment and nothing else, no
-# ServiceAccount and no securityContext. Accepted cost: nothing keeps this in step
-# with the chart's future defaults (ADR-054 § Negative consequences).
-#
-# WHAT DID NOT CHANGE: TEMPORAL_HOSTPORT stays, because order-service reads that
-# name and not the controller's TEMPORAL_ADDRESS; the Vector double-ingest guard
-# label stays; and VersioningBehaviorPinned stays registered in order-service
-# (cmd/main.go registerWorkflows) — this file changes who moves traffic, not
-# whether a workflow may be moved.
+# Order worker: the controller derives Build IDs, injects worker identity,
+# and owns rollout/draining. Do not set TEMPORAL_DEPLOYMENT_NAME or
+# TEMPORAL_WORKER_BUILD_ID by hand. Drain live histories before renaming.
+# This is a raw PodSpec; chart-default changes do not propagate here.
+# Operations and ownership: docs/api/temporal.md (ADR-054/ADR-055).
 ---
 apiVersion: temporal.io/v1alpha1
 kind: WorkerDeployment
@@ -49,16 +14,9 @@ metadata:
     app.kubernetes.io/component: worker
     platform.duynhlab.dev/rfc: "0026"
 spec:
-  # NO `replicas`. That absence is the ADR-055 hand-off, not an omission.
-  # The controller reads this field as its own mode switch
-  # (api/v1alpha1/workerdeployment_types.go): "When set, the controller manages
-  # replicas for all active worker versions. When omitted (nil), the controller
-  # creates versioned Deployments with nil replicas and never calls UpdateScale
-  # on active versions -- following the Kubernetes-recommended pattern for HPA
-  # and other external autoscalers." Setting it back to 1 does not just pin the
-  # floor: it makes every reconcile Scale-subresource the current version back
-  # down while KEDA pushes it up, which is a two-writer fight, not autoscaling.
-  # The floor now lives in order-fulfillment-scaler.yaml (`minReplicaCount: 1`).
+  # Omit replicas so KEDA owns active-version scaling (ADR-055). Setting it
+  # makes the controller fight the autoscaler; the minimum belongs in
+  # order-fulfillment-scaler.yaml, not here.
 
   workerOptions:
     # The cluster-wide connection (configs/temporal/clusterconnection.yaml).
@@ -69,15 +27,9 @@ spec:
         name: temporal-mop
     temporalNamespace: mop
 
-  # Progressive, and the step schedule is bounded on purpose. apps-local runs
-  # `wait: true` with `timeout: 10m`, and WorkerDeployment reports a standard
-  # Ready condition that Flux's kstatus waits on — so a rollout longer than that
-  # timeout does not just take a while, it fails the whole app wave. Two steps at
-  # 30s (the CEL-enforced floor for pauseDuration) land near one minute.
-  #
-  # No `gate.workflowType`: a pre-deployment gate workflow has to exist in
-  # order-service first, and inventing one here would gate on a business workflow
-  # with real side effects. Recorded as follow-up work in RFC-0026.
+  # Keep rollout within apps-local's 10m timeout; pauseDuration has a 30s floor.
+  # No gate.workflowType: an explicit side-effect-free gate must exist in the
+  # service first (RFC-0026); a business workflow is not a safe substitute.
   rollout:
     strategy: Progressive
     steps:
@@ -86,27 +38,9 @@ spec:
       - rampPercentage: 50
         pauseDuration: 30s
 
-  # The retirement policy this platform used to run by hand: a drained version is
-  # zeroed an hour after Temporal reports it drained -- the window to notice that
-  # "drained" was wrong -- and deleted on the very next reconcile. Watch it with
-  #   kubectl -n order get wd order-fulfillment -o yaml | yq .status.deprecatedVersions
-  #
-  # deleteDelay is 0s, and that is the ADR-055 change from the 1h/24h chart default.
-  # Scaling a drained version to zero is the ONE replica write the controller keeps
-  # even when an autoscaler owns replicas -- the API comment quoted above ends "The
-  # controller still scales drained versions ... to zero regardless." Its drained
-  # branch re-fires on any non-zero value (`if !(replicas == 0) { -> 0 }`), while
-  # KEDA's executor raises an inactive target back to minReplicaCount on every poll
-  # (scale_scaledobjects.go RequestScale, 2.20.2) and the version's ScaledObject
-  # stays attached until the Deployment is deleted. Any window between the zero
-  # and the delete is therefore a 0<->1 flap. The delete happens only once
-  # drainedSince > scaledownDelay + deleteDelay AND the observed replicas are 0
-  # (planner.go:733, v1.9.0) -- the delays ADD, so setting them equal (24h/24h)
-  # does not collapse the window, it moves it to [24h, 48h]. With deleteDelay 0s
-  # the reconcile that first observes the zero deletes the Deployment, and the
-  # WorkerResourceTemplate copy goes with it: the flap is at most one KEDA poll.
-  # What is given up is ADR-054's 24h retention of a drained version; it has no
-  # pinned work left, so rollback to it was only ever meaningful before it drained.
+  # A drained version scales to zero after 1h; deleteDelay 0s bounds the fight
+  # with KEDA minReplicaCount to at most one poll before deletion. Delays add,
+  # so equal nonzero delays do not remove that window (ADR-055).
   sunset:
     scaledownDelay: 1h
     deleteDelay: 0s
@@ -122,18 +56,8 @@ spec:
     spec:
       containers:
         - name: worker
-          # Same REPOSITORY as the order API, different subcommand — and
-          # deliberately NOT in lockstep with services/order.yaml. The API is on
-          # its own pin (2.3.1 as of 2026-08-22) because a worker build exists to
-          # freeze workflow code, not to track the API.
-          #
-          # THE ONE LINE a release edits.
-          #
-          # No migration init container: the API's applies the schema. That means
-          # the schema this worker expects is the one the API's pin ships, so the
-          # skew is a real (if narrow) coupling -- widen it only when the replay
-          # corpus and the migrations both say it is safe. The retired per-build
-          # manifest carried this caveat and it was worth keeping.
+          # Worker and API pins may differ to freeze workflow code. The API owns schema
+          # migrations; widen version skew only after replay and migration checks.
           image: ghcr.io/duynhlab/order-service/order-service:2.10.2
           imagePullPolicy: IfNotPresent
           args: ["worker"]

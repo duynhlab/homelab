@@ -1075,6 +1075,27 @@ Deployed via the **official `temporalio/helm-charts`** release (see **[ADR-030](
 - **Edge & alerts** — the edge `HTTPRoute temporal-ui` (`configs/envoy-gateway/routes/temporal.yaml`, hostname `temporal.duynh.me`; the Kind gate's k6 saga suite reads the UI's JSON API through it — [k6](../testing/k6.md)) plus `TemporalServerDown` and service/persistence error-rate `PrometheusRule`s in `configs/temporal/` (applied by `temporal-config-local`, after the chart).
 - **Flux order** — `controllers` (namespace only — no operator, and the cert-manager dependency retired with the webhook); `databases → platform-db`; a `temporal` Kustomization (`dependsOn` controllers, databases, monitoring, keda) before `apps`, health-checked on the `HelmRelease` + `temporal-frontend` Deployment (helm-controller waits for release resources, so Ready also means the `mop` namespace Job completed — the ordering guarantee `apps-local` needs); the order worker `dependsOn` temporal. Since ADR-054 that ordering is load-bearing in a second way: the worker **CRDs and manager ride inside `temporal-local`** precisely so `apps-local`'s existing `dependsOn` covers them before it applies any `WorkerDeployment`. Note the `healthChecks` list still names only `temporal` + `temporal-frontend`, so a Ready `temporal-local` does not by itself prove the controller is up — `wait: true` is what covers it.
 
+#### History sizing and persistence pools
+
+The manifest's historical sizing investigation (chart 1.7.0; no observation
+date recorded) measured History at 337m CPU against a 50m request and 363Mi RSS
+against a 512Mi limit while shard acquisition was still incomplete. Other
+services used 16–20Mi. The same investigation saw cgroup `sock_throttled`
+increase from 189 to 243 in 40 seconds without an OOM; socket buffers also
+consume the memory budget. History therefore has a separate resource profile
+and no CPU limit. These are historical observations, not a fresh runtime test.
+
+All four server services share the persistence configuration and open pools
+for both datastores. `maxConns: 20` bounds that topology to 160 connections;
+`platform-db` has 197 usable slots shared with other clients. The investigation
+found only four History connections before explicit sizing and eight
+connections in `starting` state in one sample. `maxIdleConns: 10` retains warm
+capacity without reserving the entire ceiling. Recalculate it when scaling
+replicas or changing the database connection budget.
+
+Cold-start `relation "schema_version" does not exist` failures with
+`oom_kill 0` are schema-job ordering failures; more memory does not fix them.
+
 ### Worker Deployment Versioning (as-built)
 
 ADR-030's second half, **live since 2026-07-30**: the saga is versioned with

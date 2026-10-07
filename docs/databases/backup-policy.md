@@ -75,10 +75,13 @@ source — unhelpful on a low-write follower.
 
 ## Policy consequences
 
-- Synchronous in-cluster replication protects acknowledged commits from an
-  ordinary primary failure; it is not a backup against corruption or deletion.
-- Object-store recovery RPO is bounded by WAL archive delay, including
-  `archive_timeout: 5min`, upload time, and detection time.
+- Synchronous replication can preserve acknowledged commits when the required
+  WAL survives and the promotion candidate has it; it does not protect against
+  corruption or deletion. See [HA conditions](./cloudnativepg.md#replication-and-failure-behavior).
+- Object-store recovery RPO depends on the last recoverable archived WAL.
+  `archive_timeout: 5min` is not a five-minute loss guarantee: upload failures
+  can extend the gap. Detection/decision time contributes to RTO; any ongoing
+  data loss during that delay must be assessed separately.
 - Base-backup cadence affects how much data and WAL recovery must download and
   replay. It does not replace measured restore duration.
 - The recovery window must exceed the expected incident-detection window. A
@@ -113,4 +116,4 @@ acceptance gate.
 - [CloudNativePG 1.30 backup](https://cloudnative-pg.io/docs/1.30/backup/)
 - [Barman Cloud plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
 
-_Last updated: 2026-10-01 — Barman Cloud plugin chart 0.8.1; the inventory lists each `destinationPath` exactly as declared (no trailing slash, #1174). Earlier the same day — backup-target reasoning updated for the single-instance DR replica. Earlier: 2026-09-01 — DR replica gained a daily `ScheduledBackup` (`target: primary`); the sidecar retention timer and its backup-driven WAL deletion are spelled out. Earlier the same day — `30d`/`7d` described as Barman recovery windows rather than plain retention._
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

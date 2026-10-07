@@ -15,12 +15,12 @@ feature details:
 
 | Dimension | CloudNativePG | Zalando Postgres Operator |
 |-----------|---------------|---------------------------|
-| Repository status | Operator image `1.30.0`, deployed | Last recorded operator `v1.15.1`, retired |
+| Repository status | Operator image `1.30.1`, repository pin | Last recorded operator `v1.15.1`, retired |
 | HA model | CNPG operator + instance manager | Patroni inside Spilo pods |
 | Pod model | Custom pod controller, no StatefulSets | StatefulSet-managed Spilo pods |
 | Coordination | Kubernetes API | Patroni DCS via Kubernetes Endpoints/ConfigMaps |
 | Backup model | Barman Cloud Plugin + `ObjectStore` CRs; `Backup` / `ScheduledBackup` use `method: plugin` | WAL-G built into Spilo |
-| Best fit | Kubernetes-native, security-sensitive, DR-heavy deployments | Patroni-oriented teams, quick setup, auto secrets, in-place major upgrades |
+| Best fit | Kubernetes-native, security-sensitive, DR-heavy deployments | Patroni-oriented teams, quick setup, auto secrets, established Spilo upgrade workflows |
 
 The short version:
 
@@ -39,7 +39,7 @@ All clusters run on **CloudNativePG**:
 | Cluster | Operator | Why |
 |---------|----------|-----|
 | `platform-db` | CloudNativePG | Consolidated platform cluster (auth, user, notification, shipping, review, temporal); 3-node HA (sync quorum `ANY 1`); CNPG PgBouncer `Pooler` (`platform-db-pooler-rw`, ADR-026); Barman backups |
-| `product-db` | CloudNativePG | Primary cluster for product, cart, order, checkout, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog (`pgdog-product`); backup/PITR; DR replica |
+| `product-db` | CloudNativePG | Primary cluster for product, cart, order, checkout, inventory, and payment; PostgreSQL 18; sync quorum `ANY 1`; PgDog (`pgdog-product`); backup/PITR; DR replica |
 | `product-db-replica` | CloudNativePG | DR replica cluster following the `product-db` object-store backup/WAL path |
 
 ## Architecture Difference
@@ -94,7 +94,7 @@ temporarily unavailable.
 | Auto-generated database user secrets | | Yes |
 | Cross-namespace secret convenience | | Yes |
 | Built-in PgBouncer sidecar workflow | | Yes |
-| In-place major version upgrade scripts | | Yes |
+| Offline in-place major version upgrades | Yes (`pg_upgrade`) | Yes |
 | Operator UI | | Yes |
 
 ## Production Guidance
@@ -115,18 +115,23 @@ temporarily unavailable.
 - You value autonomous pod-level HA even when the operator is unavailable.
 - Auto-generated secrets and cross-namespace secret delivery reduce platform
   complexity.
-- In-place major version upgrade workflows are more important than CNPG's
-  clone-based upgrade posture.
+- Your existing in-place upgrade rehearsals and recovery procedures are
+  built around Spilo. CNPG also supports offline in-place `pg_upgrade`; the
+  difference is the operating procedure, not absence of the capability.
 - Existing runbooks, dashboards, and team muscle memory are Patroni/Spilo based.
 
 ## Trade-Off Summary
 
 | Operator | Strengths | Watch-outs |
 |----------|-----------|------------|
-| CloudNativePG | Kubernetes-native design, strong security posture, replica clusters, quorum failover, declarative resource model | Operator availability matters for failover orchestration; no in-place major upgrade; backup plugin migration should be planned |
+| CloudNativePG | Kubernetes-native design, strong security posture, replica clusters, quorum failover, declarative resource model | Operator availability matters for failover orchestration; offline major upgrades require outage, extension compatibility and recovery rehearsal |
 | Zalando | Mature Patroni/Spilo stack, autonomous failover, WAL-G, PgBouncer, auto secrets, in-place upgrades | Heavier/rootful Spilo container, StatefulSet constraints, no CNPG-style quorum failover or native replica-cluster model |
 
 ## Related Documentation
+
+For CNPG's offline `pg_upgrade` and alternative migration methods, use the
+[maintenance guide](../runbooks/maintenance-and-upgrades.md#postgresql-major-release--reference-not-a-scheduled-rollout).
+Upstream source: [CloudNativePG 1.30 PostgreSQL upgrades](https://cloudnative-pg.io/docs/1.30/postgres_upgrades/).
 
 - [cloudnativepg.md](../cloudnativepg.md) - CloudNativePG feature and operations deep dive.
 - [reference/zalando/operator.md](./zalando/operator.md) - Zalando operator feature and operations deep dive.
@@ -135,4 +140,4 @@ temporarily unavailable.
 - [disaster-recovery.md](../disaster-recovery.md) - Production-ready DRP model for this homelab.
 
 ---
-_Last updated: 2026-07-17 (RFC-0018: 3-cluster inventory)_
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

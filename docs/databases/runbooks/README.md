@@ -7,6 +7,7 @@ poolers, backups, and RFC-0012 service-database lifecycle.
 
 | When to use | Runbook |
 |---|---|
+| Restart, upgrade, scale, expand storage or maintain a node | [maintenance-and-upgrades.md](./maintenance-and-upgrades.md) |
 | Add a service database to `product-db` (RFC-0012 triplet) | [add-service-database.md](./add-service-database.md) |
 | Rotate a `product-db` service password end-to-end | [rotate-cnpg-service-password.md](./rotate-cnpg-service-password.md) |
 | Rotate the privileged `platform-db` OpenBAO database administrator | [rotate-vault-rotator-credential.md](./rotate-vault-rotator-credential.md) |
@@ -33,4 +34,4 @@ poolers, backups, and RFC-0012 service-database lifecycle.
 
 ---
 
-_Last updated: 2026-09-05._
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

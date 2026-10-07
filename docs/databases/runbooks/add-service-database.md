@@ -1,8 +1,8 @@
 # Runbook: Add a Service Database on product-db
 
 Give a new service its own database, role, and credentials on the shared
-`product-db` cluster — one triplet file plus three registrations, and **never a
-change to `instance.yaml`**.
+`product-db` cluster — a service triplet, client/pooler registrations, and an
+HBA allow rule in `instance.yaml` before its terminal reject.
 
 | | |
 |---|---|
@@ -16,18 +16,16 @@ change to `instance.yaml`**.
 
 `<svc>` is the new service name throughout.
 
-1. **Seed the credential in OpenBAO** — add to
-   `kubernetes/infra/configs/secrets/openbao-bootstrap/configmap.yaml`:
+1. **Seed the credential in OpenBAO** at
+   `secret/local/databases/product-db/<svc>` with `username` and `password`.
+   For an existing cluster, follow [Add a secret to a live cluster](../../secrets/runbooks/add-secret-live-cluster.md)
+   using an authorized session. Do not commit the password or embed it in a
+   client DSN. Fresh-cluster provisioning belongs in the bootstrap workflow,
+   with runtime-generated credentials rather than a new committed literal.
 
-   ```bash
-   bao kv put secret/local/databases/product-db/<svc> \
-     username="<svc>" \
-     password="<generated>"
-   ```
-
-   On a live cluster the run-once Job must be re-run to pick it up:
-   `kubectl delete job openbao-bootstrap -n openbao && flux reconcile
-   kustomization secrets-local --with-source`.
+   Re-running `openbao-bootstrap` does not seed a live cluster: it has already
+   revoked its root token and exits as already bootstrapped. Use the day-2
+   procedure, then sync ESO.
 
 2. **Create the triplet** —
    `kubernetes/infra/configs/databases/clusters/product-db/services/<svc>.yaml`,
@@ -73,8 +71,8 @@ change to `instance.yaml`**.
    ```bash
    kubectl get databaserole,database -n product | grep <svc>   # applied: true
    kubectl run psql-check --rm -it --restart=Never -n product \
-     --image=ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie -- \
-     psql "host=product-db-rw.product user=<svc> dbname=<svc> password=<from OpenBAO>" -c 'select 1'
+     --image=ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie -- \
+     psql -W "host=product-db-rw.product user=<svc> dbname=<svc>" -c 'select 1'
    ```
 
 ## What you never do
@@ -88,4 +86,4 @@ change to `instance.yaml`**.
 
 ---
 
-_Last updated: 2026-07-08 (RFC-0012 P3)_
+_Last updated: 2026-10-06 — corrected day-2 seeding, HBA exception and diagnostic client pin._

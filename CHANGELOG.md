@@ -180,6 +180,12 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Database platform learning and operations:** add storage/capacity,
+  security/access and maintenance/upgrade guides; connect the hub's reading
+  order to task runbooks. Reconcile current CNPG/PostgreSQL pins, qualify
+  RPO/failover claims, correct major-upgrade capabilities and record remaining
+  infrastructure follow-ups without changing manifests or historical drills.
+
 - **New `docs/databases/authorization.md`: the owner / migrator / runtime
   conventions** (RFC-0029 Phase 1, not deployed). Role, `DatabaseRole`,
   Secret, KV and `pg_hba` naming with the names considered and rejected; role

@@ -8,7 +8,7 @@ manifest.
 |---|---|
 | **Status** | Current: 12 service files reconcile 13 databases across the two operational clusters |
 | **Decision record** | [ADR-013 — per-service database triplet](../proposals/adr/ADR-013-per-service-db-triplet/) |
-| **Operator** | CloudNativePG v1.30.0 (`DatabaseRole` CRD since 1.30) |
+| **Operator** | CloudNativePG v1.30.1 (`DatabaseRole` CRD since 1.30) |
 | **Clusters** | `product-db` and `platform-db`; `product-db-replica` receives roles/databases through recovery, with no service CRs of its own |
 | **Triplet locations** | `kubernetes/infra/configs/databases/clusters/{product-db,platform-db}/services/<name>.yaml` |
 | **Credential flow** | OpenBAO → ESO → `kubernetes.io/basic-auth` Secret (`cnpg.io/reload: "true"`) |
@@ -89,8 +89,8 @@ The `product-db` files demonstrate the common pattern in this order:
 3. **`Database` `<svc>-database`** — `owner: <svc>`, the extension list
    (`pgaudit`, `pg_stat_statements`, plus per-service extras), reclaim `retain`.
    Role first in the file: CNPG has no ordering guarantee between the two (a
-   `Database` with a missing owner just retries), role-first makes the happy
-   path deterministic.
+   `Database` with a missing owner just retries). File order aids reading;
+   it does not serialize reconciliation.
 
 The `Cluster` spec (`instance.yaml`) keeps only infrastructure plus a minimal
 `bootstrap.initdb` — its `database`/`owner`/`secret` fields are structural
@@ -122,8 +122,9 @@ Replica behavior: roles and databases replicate through WAL to
 
 - **Add a service database:** one new file in `services/` + an OpenBAO seed
   entry + the app-namespace secret copy + a PgDog `users[]` entry.
-  Recipe: [add-service-database](./runbooks/add-service-database.md). Never
-  edit `instance.yaml`.
+  Recipe: [add-service-database](./runbooks/add-service-database.md). Keep
+  roles out of `instance.yaml`; adding the matching HBA allow rule there is
+  still required before the terminal reject rule.
 - **Adopt an existing role (migration):** snapshot first —
   `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb,
   rolcanlogin, rolreplication, rolconnlimit, rolvaliduntil, rolbypassrls FROM
@@ -143,7 +144,11 @@ Replica behavior: roles and databases replicate through WAL to
   takes precedence immediately; the `DatabaseRole` drops to `applied: false`
   and can be deleted later (`retain` leaves the catalog untouched).
 - **Verify connection isolation (P4, [ADR-015](../proposals/adr/ADR-015-pg-hba-connection-isolation/)):**
-  the 4×4 matrix must be 4 allows + 12 `pg_hba.conf rejects connection`:
+  the historical P4 example below covers four roles only. The current
+  product cluster has six service databases; use `scripts/db-isolation-sweep.sh`
+  (Kind gate K3.4) for the current complete matrix. A non-zero client exit can
+  also be a network or authentication failure, so inspect the error before
+  treating it as proof of HBA isolation:
 
   ```bash
   for u in product cart order payment; do
@@ -172,4 +177,4 @@ Replica behavior: roles and databases replicate through WAL to
 
 ---
 
-_Last updated: 2026-07-08 (RFC-0012 P4)_
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

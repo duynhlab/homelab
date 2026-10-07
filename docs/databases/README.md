@@ -5,10 +5,10 @@ or find the right recovery procedure without mixing those three concerns.
 
 | Item | Current state |
 |---|---|
-| **Operator** | CloudNativePG 1.30.0 |
-| **PostgreSQL** | 18.1 |
+| **Operator** | CloudNativePG 1.30.1 |
+| **PostgreSQL** | 18.6 |
 | **Operational clusters** | `platform-db`, `product-db` |
-| **DR cluster** | `product-db-replica` |
+| **DR cluster** | `product-db-replica` — one instance, co-located recovery copy |
 | **Poolers** | CNPG PgBouncer for `platform-db`; PgDog for `product-db` |
 | **Backup** | Barman Cloud plugin to RustFS-compatible object storage |
 | **Historical operator** | Zalando Postgres Operator — reference only, not deployed |
@@ -41,17 +41,23 @@ evidence vocabulary, glossary, and safety boundary.
 
 ### Understand this homelab
 
-These pages describe current or explicitly planned platform state.
+Follow this order after the relevant fundamentals chapter. Configuration claims
+are checked against Git at `d421daf3` (2026-10-06); they are not a fresh live-cluster
+audit. Historical lab/drill records retain the versions they actually measured.
 
-- [Database architecture and integration](./architecture.md)
-- [Observability and troubleshooting](./observability-and-troubleshooting.md)
-- [CloudNativePG](./cloudnativepg.md)
-- [Backup policy](./backup-policy.md)
-- [HA and disaster recovery](./disaster-recovery.md)
-- [RPO/RTO targets and evidence](./reliability-targets.md)
-- [Poolers](./poolers.md)
+| Order | Question | Canonical guide |
+|---|---|---|
+| 1 | What runs, and where do applications connect? | [Architecture](./architecture.md) |
+| 2 | How does CNPG bootstrap, reconcile and handle failure? | [CloudNativePG](./cloudnativepg.md) |
+| 3 | What limits concurrency, storage and recovery headroom? | [Storage and capacity](./storage-and-capacity.md) |
+| 4 | Which connections, identities and privileges are allowed? | [Security and access](./security-and-access.md), then [role management](./declarative-role-management.md) |
+| 5 | What changes when connections are pooled? | [Poolers](./poolers.md) |
+| 6 | What must survive to recover data? | [Backup policy](./backup-policy.md), [DR](./disaster-recovery.md), then [targets and evidence](./reliability-targets.md) |
+| 7 | How do we diagnose and change the platform? | [Troubleshooting](./observability-and-troubleshooting.md), then [maintenance](./runbooks/maintenance-and-upgrades.md) |
+
+Additional platform topics:
+
 - [Extensions](./extensions.md)
-- [Declarative database and role management](./declarative-role-management.md)
 - [Database authorization (owner / migrator / runtime)](./authorization.md) — **conventions accepted, not deployed** (RFC-0029)
 - [Cross-region DR roadmap](./cross-region-dr.md) — **planned, not
   deployed**
@@ -63,6 +69,14 @@ mode is not yet known. Task-specific procedures live in the
 [runbook index](./runbooks/README.md), including backup/restore, DR replica
 bootstrap, pooler operations, credential rotation, and adding a service
 database.
+
+| Need | Start here |
+|---|---|
+| Database is unavailable; cause unknown | [Emergency recovery](./runbooks/emergency-recovery.md) |
+| Restart, upgrade, scale, expand storage or maintain a node | [Maintenance and upgrades](./runbooks/maintenance-and-upgrades.md) |
+| Restore a backup or prove recovery | [Backup/restore](./runbooks/backup-restore.md), then [drills](./runbooks/restore-and-failover-drills.md) |
+| Login breaks after a credential change | [Pooler operations](./runbooks/pooler-operations.md), then the owning [rotation runbook](./runbooks/README.md) |
+| Assess remaining platform risks | [Review findings and follow-ups](./reference/platform-review.md) |
 
 ### Reference and history
 
@@ -106,12 +120,16 @@ flowchart LR
     class Reference external;
 ```
 
+Legend: cyan = learning, purple = platform, amber = operations, slate = reference.
+
 ## Document ownership
 
 | Fact or concern | Canonical owner |
 |---|---|
 | Cluster inventory, namespaces, PostgreSQL/operator versions | `architecture.md` |
 | CloudNativePG control plane and operand behavior | `cloudnativepg.md` |
+| Storage, memory/concurrency budgets and placement | `storage-and-capacity.md` |
+| TLS, HBA, authentication and access boundaries | `security-and-access.md` |
 | Backup schedules, retention, and object paths | `backup-policy.md` |
 | Recovery paths and DR topology | `disaster-recovery.md` |
 | RPO/RTO objectives and measured evidence | `reliability-targets.md` |
@@ -129,7 +147,7 @@ this area documents the resulting platform and its operation.
 ## References
 
 - [PostgreSQL documentation](https://www.postgresql.org/docs/current/)
-- [CloudNativePG documentation](https://cloudnative-pg.io/documentation/current/)
+- [CloudNativePG 1.30 documentation](https://cloudnative-pg.io/docs/1.30/)
 - [PgDog documentation](https://docs.pgdog.dev/)
 
-_Last updated: 2026-09-29 — the Learn path lists the fourteen authored internals chapters; earlier the same day it pointed at the curriculum contract for issue #1137. Previously 2026-09-09 — added the SRE learning and symptom-first troubleshooting paths._
+_Last updated: 2026-10-06 — added the platform learning sequence, task routing and evidence boundary; fundamentals preserved._

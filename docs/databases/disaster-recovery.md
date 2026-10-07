@@ -121,7 +121,7 @@ The correct recovery path is PITR or selective restore, not HA failover.
 
 | Data class | Example | Production baseline |
 |------------|---------|---------------------|
-| Critical transactional | `order`, cart checkout path | RPO 0 for HA failover; DR RPO bounded by WAL archive interval; RTO measured by drills |
+| Critical transactional | `order`, cart checkout path | Zero-loss HA objective subject to surviving WAL and promotion safety; DR RPO depends on recoverable archived WAL, not just archive interval; RTO measured by drills |
 | Important user-facing | identity and user profiles | Small RPO may be acceptable if documented; restore must be tested |
 | Supporting/non-critical | notification, shipping metadata, review | RPO/RTO can be looser, but owner must accept impact |
 | Analytics/reporting | reporting clone | Freshness SLA instead of failover RPO |
@@ -282,13 +282,13 @@ sequenceDiagram
 
 | Scenario | Primary recovery path | Expected RPO | Expected RTO | Verification status |
 |----------|-----------------------|--------------|--------------|---------------------|
-| `product-db` primary pod crash | CNPG HA failover | 0 for commits acknowledged by `ANY 1` quorum | Seconds to under a minute | Estimated, not drill-recorded here |
+| `product-db` primary pod crash | CNPG HA failover | Zero-loss objective if acknowledged WAL survives on the promoted candidate | Seconds to under a minute | Estimated, not drill-recorded here |
 | `product-db` replica failure | CNPG recreates or resyncs replica | 0 for primary writes | No app downtime expected | Estimated |
-| All `product-db` replicas unavailable | Primary may continue degraded or block depending durability state | Depends on sync availability | No failover capacity until repaired | Requires drill |
+| All `product-db` replicas unavailable | With `dataDurability: required`, synchronous commits can block until an eligible standby returns | Depends on sync availability | No failover capacity until repaired | Requires drill |
 | Entire `product-db` cluster lost | Promote `product-db-replica` or restore to new cluster | Bounded by WAL archive/replay lag | Minutes to hours | Requires drill |
 | Accidental `DROP TABLE` | PITR restore to timestamp before change | Depends on chosen target | Restore time plus validation | Requires drill |
 | RustFS outage | Keep local primary running; archive backlog risk grows | Risk grows if WAL cannot archive | Depends on object-store recovery | Requires alerting |
-| `platform-db` primary pod crash | CNPG HA failover | 0 for commits acknowledged by `ANY 1` quorum | Seconds to under a minute | Estimated |
+| `platform-db` primary pod crash | CNPG HA failover | Zero-loss objective if acknowledged WAL survives on the promoted candidate | Seconds to under a minute | Estimated |
 | `platform-db` whole cluster lost | Barman restore-to-new-cluster | Since last WAL archive | Manual restore time | Requires drill |
 
 ```mermaid
@@ -407,7 +407,8 @@ Capture the following for every restore or DR drill:
   (a `product-db` PITR restore, 2026-08-07, measured RTO 2 m 12 s). Still
   missing: a `platform-db` restore, a DR-promotion rehearsal, the cadence, and a
   cross-domain drill log.
-- The `kubectl cnpg` plugin **is** installed (v1.30.0). Note it has no
+- The recorded environment had `kubectl cnpg` v1.30.0; check the installed
+  plugin version before using a procedure. It has no
   `switchover` verb — planned switchovers go through
   `kubectl cnpg promote <cluster> <instance>`.
 - No separate **`platform-db-replica`** DR cluster — platform tier recovery is in-cluster HA + Barman PITR only (RFC-0018 follow-up).
@@ -486,5 +487,4 @@ retire. The hold stays meaningful for a durable store ([RFC-0011](../proposals/r
 
 ---
 
-_Last updated: 2026-09-14 — made the non-empty Barman archive precondition and
-owner-approved DR write-identity rotation part of the canonical rebuild path._
+_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

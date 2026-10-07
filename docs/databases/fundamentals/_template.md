@@ -273,7 +273,7 @@ version-sensitive claims in the body as well as listing the source here.
 - {Official primary source}
 
 ---
-_Last updated: YYYY-MM-DD — {what changed, not only the date}._
+<!-- Keep observation dates with their evidence; use Git/PRs for editorial history. -->
 
 ## Review gate — do not copy into the published chapter
 

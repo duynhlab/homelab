@@ -216,7 +216,7 @@ flowchart LR
 - [ ] At least **two alternatives** documented with tradeoffs
 - [ ] **Platform as-built** section filled from manifests/docs (not boilerplate)
 - [ ] Primary use-case direction stated (may remain "undecided")
-- [ ] **Context7 audit** complete; footer date updated
+- [ ] **Context7 audit** complete; scope, source versions and verification date recorded with the evidence
 - [ ] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [ ] No Kubernetes manifest changes smuggled into this research file
 - [ ] Owner sign-off: **ready for RFC**

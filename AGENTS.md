@@ -160,11 +160,44 @@ Every manifest applied to the cluster must satisfy admission:
 
 Docs are a first-class deliverable in this repo. When writing or refactoring them:
 - **English only**; **Mermaid is the default** for diagrams (never ASCII art — see Platform architecture). Reach for **Draw.io** only when it is asked for by name or an existing `.drawio` is being edited → [`homelab-drawio` skill](.agents/skills/homelab-drawio/SKILL.md).
-- Follow the house shape (model: [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)): one-line hook → status/quick-facts table → overview/concept → architecture (Mermaid) → how-it-works-in-this-platform → operations → references → a `_Last updated: …_` footer.
+- Architecture guides use the house shape (model: [`docs/observability/profiling/README.md`](docs/observability/profiling/README.md)): hook → quick facts → concept → architecture → platform behavior → operations → references. Adapt to the reader's task: hubs prioritize navigation, runbooks prerequisites/actions/expected results/recovery, and references lookup. Include diagrams where they answer a useful question.
 - **Be accurate to the deployed reality.** Mark designed-but-not-yet-deployed things as **planned** (don't describe targets as current); cross-check claims against the manifests.
 - **Synthesize external material in-house** — learn from articles/newsletters, then write it in our own words + Mermaid; **don't embed third-party links** (official product docs already in a References section are fine).
 - One hub per area; link every new doc from [`docs/README.md`](docs/README.md) and the area index.
 - **RFC domain spin-off:** when an owner promotes research to `docs/<area>/<topic>/README.md`, use the house shape above, English only, link `RFC-NNNN/research.md` + `RFC-NNNN/README.md`. Diagrams may repeat research — keep labels accurate to deployed vs **planned** reality.
+
+### Documentation history and evidence
+
+- Use Git history and PRs for editorial change history. Ordinary guides,
+  references and indexes do not need a manually maintained update footer.
+- Update explanations in place to describe the resulting system. Release
+  changes belong in CHANGELOG; design rationale belongs in the owning ADR/RFC.
+- Keep dates that belong to decisions, incidents, releases and measurements,
+  including RFC/ADR lifecycle metadata and historical evidence records.
+- Record verification beside the relevant claim or procedure: scope, date,
+  source or environment/version, and evidence reference. Distinguish repository
+  review from runtime testing; refresh the date only when that check is repeated.
+- Before removing a narrative footer, preserve unique operational knowledge in
+  its owning section and unique evidence in its existing record. Consolidate
+  the useful content instead of relocating the editing diary verbatim.
+
+### Manifest comments
+
+- Explain a current, non-obvious constraint, its reason or the consequence of
+  changing it, beside the relevant field. Prefer 1–3 lines per explanation;
+  retain more when necessary to make an operational warning unambiguous.
+- Keep one explanation per concern. Update or replace comments attached to
+  changed fields so they describe the resulting configuration; omit comments
+  that merely restate YAML. Review within the task's scope.
+- Put long operational guidance in the owning guide/runbook and link it.
+  Release history, incident timelines, logs and validation evidence belong in
+  commits, PRs or the owning record, not accumulated beside a value.
+- Keep disabled configuration when it represents an intentional current state,
+  with a short reason and a reference for re-enabling it. Remove obsolete
+  alternatives only after checking their purpose.
+- Preserve tooling directives (including Flux image-policy markers), license
+  notices and comments inside embedded scripts/configuration with their own
+  semantics. Comment cleanup must preserve parsed and rendered configuration.
 
 ### Diagram workflow
 

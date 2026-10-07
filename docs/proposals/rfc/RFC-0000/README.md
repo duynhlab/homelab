@@ -32,7 +32,7 @@ Created / Last updated: YYYY-MM-DD.
 <!-- Do not publish this RFC until every item below is true. -->
 
 - [](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
-- Context7 audit complete (see research footer)
+- Context7 audit complete (see the research evidence and its dated sources)
 - Owner approved **ready for RFC**
 - **Do not** repeat the mechanism deep-dive here — summarize and link `./research.md`
 - When Status → **`Accepted`**: list expected ADR folder(s) under [`docs/proposals/adr/`](../../adr/) and expected [`docs/api/`](../../../api/README.md) files to touch (or N/A — infra-only)
@@ -193,6 +193,3 @@ When Status → implemented, confirm:
 - <!-- docs/api/{service}.md — as-built contract after implemented -->
 - <!-- ADRs linked in Resulting decisions (Proposed at review, Accepted with RFC) -->
 - <!-- Linked PRs -->
-
----
-_Last updated: YYYY-MM-DD_

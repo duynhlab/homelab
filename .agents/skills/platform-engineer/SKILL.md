@@ -117,6 +117,10 @@ Design **before** building when the change is substantial or contested.
 
 ## Verification and release
 
+- Before completing a change, apply [AGENTS.md's documentation and comment
+  conventions](../../../AGENTS.md#docs-conventions) to the touched sections.
+  Consolidate explanations, keep evidence with its claim, and use Git/PR history
+  for the editing narrative. Preserve operational constraints and tooling directives.
 - Run `make validate` before every push, including documentation-only changes.
 - For changes affecting a service repository, any `pkg` module, gateway config,
   `local-stack/compose.yaml`, or the SPA, the full API/browser/telemetry audit in

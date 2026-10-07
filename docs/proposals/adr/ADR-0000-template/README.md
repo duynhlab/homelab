@@ -281,4 +281,3 @@ A changed architectural decision requires a new ADR.
 | YYYY-MM-DD | Accepted / Complete | Implementation and contract tests completed |
 
 ---
-_Last updated: YYYY-MM-DD_

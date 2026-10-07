@@ -325,7 +325,5 @@ present-tense sentence.
 - [ ] Capability availability uses the hub vocabulary, and Planned is used for
       anything not running
 - [ ] Every link resolves, and each service contract is linked directly
-- [ ] `_Last updated` says what changed, not only when
+- [ ] Current explanations replace stale notes; dated verification identifies its scope and evidence
 -->
-
-_Last updated: YYYY-MM-DD_

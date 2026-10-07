@@ -6,7 +6,8 @@ secrets-related Flux dependencies.
 ## Convention
 
 These are **procedural task runbooks**: one-line hook → optional scope table →
-numbered bash steps → `_Last updated_` footer. The per-alert template at
+prerequisites → numbered steps → expected results and recovery. Keep dated
+verification evidence beside the procedure it verifies. The per-alert template at
 [`../../observability/runbooks/_TEMPLATE.md`](../../observability/runbooks/_TEMPLATE.md)
 governs **alert** runbooks only and does not apply here.
 

@@ -180,6 +180,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Define concise manifest comments and evidence-aware documentation conventions;
+  remove editorial update footers from authoring templates while preserving
+  decision and verification dates.
+
 - **Database platform learning and operations:** add storage/capacity,
   security/access and maintenance/upgrade guides; connect the hub's reading
   order to task runbooks. Reconcile current CNPG/PostgreSQL pins, qualify

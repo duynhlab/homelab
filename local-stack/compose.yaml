@@ -546,7 +546,7 @@ services:
   review-migrate:
     build: { context: ../../review-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review, DB_PASSWORD: review-local }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, DB_MIGRATION_ROLE: review_owner }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   shipping-migrate:
@@ -620,7 +620,7 @@ services:
   review-seed:
     build: { context: ../../review-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review, DB_PASSWORD: review-local }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, DB_MIGRATION_ROLE: review_owner }
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
@@ -699,8 +699,8 @@ services:
       SERVICE_NAME: review
       OTEL_SERVICE_NAME: review
       DB_NAME: review
-      DB_USER: review
-      DB_PASSWORD: review-local
+      DB_USER: review_runtime
+      DB_PASSWORD: review_runtime-local
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }

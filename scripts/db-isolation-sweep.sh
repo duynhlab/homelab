@@ -54,7 +54,9 @@ for r in "${product_roles[@]}"; do
   done
 done
 
-platform_roles=(user notification shipping review temporal vault_rotator)
+# review is split into three roles (RFC-0029); review_owner has no pg_hba line,
+# so every probe of it must be rejected.
+platform_roles=(user notification shipping review_owner review_migrator review_runtime temporal vault_rotator)
 platform_dbs=(user notification shipping review temporal temporal_visibility)
 for r in "${platform_roles[@]}"; do
   for d in "${platform_dbs[@]}"; do
@@ -72,7 +74,8 @@ done
 # a failure. Adding it means deciding its full allow/reject row against every
 # other platform role, which is its own change.
 for p in user/user notification/notification shipping/shipping \
-         review/review temporal/temporal temporal/temporal_visibility \
+         review_runtime/review review_migrator/review \
+         temporal/temporal temporal/temporal_visibility \
          vault_rotator/notification; do
   expect_put "platform/${p%%/*}/${p##*/}" allow
 done
@@ -143,7 +146,7 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
 
 echo "== product-db (6 allow / 30 reject expected)"
 sweep product product "product-db-rw.product.svc.cluster.local"
-echo "== platform-db (7 allow / 29 reject expected)"
+echo "== platform-db (8 allow / 40 reject expected)"
 sweep platform platform "platform-db-rw.platform.svc.cluster.local"
 
 echo

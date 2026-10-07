@@ -238,7 +238,8 @@ OpenBAO-backed secrets. No `-vault` suffix is used.
 | `platform-db-user-secret` | user, platform | `secret/data/local/databases/shared-db/user` (compat) |
 | `platform-db-notification-secret` | notification | `database/static-creds/notification` via store `openbao-db` (ADR-025 static role, 720h rotation) |
 | `platform-db-shipping-secret` | shipping, platform | `secret/data/local/databases/shared-db/shipping` (compat) |
-| `platform-db-review-secret` | review, platform | `secret/data/local/databases/shared-db/review` (compat) |
+| `platform-db-review-runtime-secret` | review, platform | `secret/data/local/databases/platform-db/review-runtime` (random per cluster; `review_runtime`, RFC-0029) |
+| `platform-db-review-migrator-secret` | review, platform | `secret/data/local/databases/platform-db/review-migrator` (random per cluster; `review_migrator`, RFC-0029) |
 | `platform-db-temporal-secret` | temporal, platform | `secret/data/local/databases/platform-db/temporal` |
 | `platform-db-keycloak-secret` | identity | `secret/data/local/databases/platform-db/keycloak` |
 | `platform-db-vault-rotator-secret` | platform | `secret/data/local/databases/platform-db/vault-rotator` (random per cluster; CNPG + OpenBAO database configurator) |

@@ -6,7 +6,7 @@ own rows; it cannot change, drop or take ownership of its own schema.
 
 | | |
 |---|---|
-| **Status** | Conventions **accepted, not deployed**. Phase 2 cuts over `review` on a fresh cluster, Phase 3 the rest of the fleet. Every service today still uses one login that owns its database |
+| **Status** | **Deployed for `review`** (Phase 2 canary). Every other service still uses one login that owns its database until Phase 3 converts it |
 | **Design records** | [RFC-0029](../proposals/rfc/RFC-0029/) · [ADR-084](../proposals/adr/ADR-084-split-service-database-roles/) (three roles) · [ADR-085](../proposals/adr/ADR-085-service-migrations-own-authorization/) (migrations own grants) · [ADR-086](../proposals/adr/ADR-086-guard-membership-options/) (membership guard) |
 | **Roles per service** | `<svc>_owner` (NOLOGIN) · `<svc>_migrator` (LOGIN, NOINHERIT) · `<svc>_runtime` (LOGIN) |
 | **Identity lifecycle** | CNPG `DatabaseRole` + `Database`, passwords from OpenBAO through ESO |
@@ -40,35 +40,35 @@ Three jobs keep that shape, and each has one owner:
 ## Architecture
 
 This diagram answers which identity each path uses on one service database. It
-shows the **planned** shape; no service runs it yet.
+shows the shape `review` runs; the other services are still on one login.
 
 ```mermaid
 flowchart LR
     subgraph cluster["Kind cluster · homelab"]
         subgraph app["service namespace"]
-            pod["service pods<br/>(planned: as svc_runtime)"]:::service
-            mig["migrate init container<br/>(planned: as svc_migrator)"]:::worker
+            pod["service pods<br/>as svc_runtime"]:::service
+            mig["migrate init container<br/>as svc_migrator"]:::worker
         end
-        subgraph secrets["Secrets (planned)"]
+        subgraph secrets["Secrets"]
             rs["&lt;cluster&gt;-&lt;svc&gt;-runtime-secret"]:::platform
             ms["&lt;cluster&gt;-&lt;svc&gt;-migrator-secret"]:::platform
         end
         subgraph db["CNPG cluster"]
             pooler["pooler<br/>PgBouncer / PgDog"]:::data
             rw[("primary -rw")]:::data
-            owner["svc_owner · NOLOGIN<br/>owns every object (planned)"]:::platform
+            owner["svc_owner · NOLOGIN<br/>owns every object"]:::platform
             guard["pg_role_membership query<br/>+ CNPGRoleMembershipDrift"]:::platform
         end
     end
     bao[("OpenBAO KV")]:::external
 
-    bao -. "ESO (planned)" .-> rs
-    bao -. "ESO (planned)" .-> ms
-    rs -. "DB_USER / DB_PASSWORD (planned)" .-> pod
-    ms -. "DB_USER / DB_PASSWORD (planned)" .-> mig
-    pod -. "CRUD only (planned)" .-> pooler --> rw
-    mig -. "direct, then SET ROLE svc_owner (planned)" .-> rw
-    rw -. "objects owned by (planned)" .-> owner
+    bao -->|"ESO"| rs
+    bao -->|"ESO"| ms
+    rs -->|"DB_USER / DB_PASSWORD"| pod
+    ms -->|"DB_USER / DB_PASSWORD"| mig
+    pod -->|"CRUD only"| pooler --> rw
+    mig -->|"direct, then SET ROLE svc_owner"| rw
+    rw -->|"objects owned by"| owner
     guard -->|"reads pg_auth_members"| rw
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
@@ -143,8 +143,15 @@ and for one CNPG recreated after a manual revoke.
 | `migrate` | primary `-rw` (`db_migration_host`), never a pooler | `username` / `password` keys of `inputs.db_migrator_secret` | `DB_MIGRATION_ROLE` = `<< inputs.name >>_owner` |
 
 `DB_USER` comes from the Secret's `username` key, so the username lives in one
-place. The `db_secret` and `db_user` inputs are removed, which also stops the
-`migrate` container from reusing the runtime credential by accident.
+place, and the `migrate` container cannot reuse the runtime credential by
+accident. Today only `catalog-rs.yaml` (product and review) has this branch: a
+service that sets `db_runtime_secret` / `db_migrator_secret` gets it, `product`
+keeps `db_secret` / `db_user`. Phase 3 converts the rest and removes the old
+inputs from all five domain templates.
+
+Seeding follows the migration: `scripts/kind-seed.sh` and the local-stack
+`<svc>-seed` service use the migrator's credentials and `DB_MIGRATION_ROLE`,
+directly against the primary.
 
 Poolers carry only `<svc>_runtime`. PgDog's `users[]` entries on `product-db`
 become `<svc>_runtime`; PgBouncer on `platform-db` authenticates through
@@ -199,8 +206,8 @@ sequence inherits these grants without another line of SQL (PG-03).
 | `CNPGRoleMembershipDrift` (critical) | [ADR-086 guard](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md) | Every guarded edge, including each `<svc>_migrator → <svc>_owner`, still has its specified options |
 | Kind gate K3.4 | `scripts/db-isolation-sweep.sh` | Each login reaches only its own database |
 | Kind gate K3.7 | `smoke.js` against VictoriaMetrics | Every guarded edge reports a series and `max(cnpg_pg_role_membership_drift) == 0` |
-| Kind gate K3.8 (planned) | as `<svc>_runtime` | The runtime cannot `CREATE`, `ALTER` or `DROP` |
-| Kind gate K3.9 (planned) | as `<svc>_migrator` | The migrator cannot `CREATE` until it runs `SET ROLE`, and can afterwards |
+| Kind gate K3.8 | `scripts/db-authz-check.sh`, as `<svc>_runtime` | The runtime cannot `CREATE`, `ALTER` or `DROP` |
+| Kind gate K3.9 | `scripts/db-authz-check.sh`, as `<svc>_migrator` | The migrator cannot `CREATE` until it runs `SET ROLE`, and can afterwards |
 
 A PR that adds a service, or cuts one over, adds its `migrator → owner` edge to
 the `pg_role_membership` query, the guard's `absent()` selector and `smoke.js`

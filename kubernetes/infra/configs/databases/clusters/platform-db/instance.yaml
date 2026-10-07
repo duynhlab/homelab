@@ -35,7 +35,9 @@ spec:
       - host user         user         all scram-sha-256
       - host notification notification all scram-sha-256
       - host shipping     shipping     all scram-sha-256
-      - host review       review       all scram-sha-256
+      # review: runtime and migrator only; review_owner never logs in (RFC-0029).
+      - host review       review_runtime  all scram-sha-256
+      - host review       review_migrator all scram-sha-256
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
       # Keycloak connects direct to :5432 like temporal — its Agroal pool needs

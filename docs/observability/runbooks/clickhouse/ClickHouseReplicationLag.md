@@ -98,6 +98,3 @@ if `last_exception` names data loss. Co-firing `ClickHouseKeeperSessionLost` or
 - [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md) — a readonly replica lags by definition.
 - [ClickHouseKeeperSessionLost](ClickHouseKeeperSessionLost.md) — the usual cause of a readonly replica.
 - [ClickHouseReplicatedDataLoss](ClickHouseReplicatedDataLoss.md) — when the queue is stuck on a part nobody has.
-
----
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `ClickHouseReplicationLag`, threshold 300 s kept; per-replica from `:9363`)_

@@ -61,6 +61,3 @@ Warning, and rarely worth escalating on its own. Fix it during normal hours.
 - [FluxHelmReleaseNotReady](../gitops/FluxHelmReleaseNotReady.md)
 - [VMServiceDown](../victoriametrics/VMServiceDown.md) — same shape, far higher
   stakes.
-
----
-_Last updated: 2026-09-05 — created; this alert had no runbook_

@@ -25,5 +25,3 @@ kubectl get clustersecretstore openbao -o yaml | grep -A10 conditions
 kubectl run -it --rm test --image=curlimages/curl -n external-secrets-system \
   -- curl -s http://openbao.openbao.svc.cluster.local:8200/v1/sys/health
 ```
-
-_Last updated: 2026-07-14 - Split from `docs/secrets/README.md` during the runbook refactor._

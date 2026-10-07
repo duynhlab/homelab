@@ -135,7 +135,3 @@ implementing PR):
    15/15 on re-run (first run 14/15 — `K5.5 Temporal SDK has series`, a
    post-node-restart timing flake unrelated to log routing: 72 `temporal_*`
    series were present on immediate re-check).
-
----
-
-_Last updated: 2026-08-25 — initial decision, shipped with its implementation._

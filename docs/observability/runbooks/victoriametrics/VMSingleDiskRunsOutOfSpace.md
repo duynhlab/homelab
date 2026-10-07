@@ -73,6 +73,3 @@ platform is flying blind, and every other alert's silence becomes meaningless.
   predictive warning that should have fired first.
 - [VMSingleTooHighChurnRate](VMSingleTooHighChurnRate.md) — the usual cause of
   index growth.
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

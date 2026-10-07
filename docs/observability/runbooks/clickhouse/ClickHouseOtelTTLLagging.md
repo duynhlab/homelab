@@ -86,8 +86,3 @@ replicas disagree, RustFS is unavailable, or the oldest partition keeps aging.
 
 - [ClickHouse alert runbooks](README.md)
 - [ClickHouse platform guide](../../clickhouse/README.md)
-
----
-
-_Last updated: 2026-09-14 — added live-signal coverage for stalled OTel TTL
-retention using active per-table partition counts._

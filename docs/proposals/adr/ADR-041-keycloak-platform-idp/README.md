@@ -300,6 +300,3 @@ requires a new ADR that supersedes this one.
 | 2026-08-14 | Accepted / Partial | Amended in effect by [ADR-050](../ADR-050-separate-staff-identity-realm/): the workforce moved to a second realm `duynhlab-staff`, so "realm `duynhlab`" in the decision summary is now one of two |
 | 2026-08-24 | Accepted / Partial | Documentation obligation met: [`docs/platform/keycloak.md`](../../../platform/keycloak.md) created and [`docs/api/identity.md`](../../../api/identity.md) added, both linking this ADR. The sole remaining blocker to `Complete` is the Kind gate |
 | 2026-08-25 | Accepted / **Complete** | Kind gate passed — K4.4/K4.5/K5.9 green on a cluster rebuilt from zero. The last obligation this record named is met. |
-
----
-_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

@@ -260,6 +260,3 @@ Manual workflows without an alert remain valid, but their index row must say
 - [Prometheus alerting rules](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/)
 - [Prometheus alerting practices](https://prometheus.io/docs/practices/alerting/)
 - [Alertmanager concepts](https://prometheus.io/docs/alerting/latest/alertmanager/)
-
----
-_Last updated: 2026-09-09 — validation levels and the alert-to-runbook contract were made explicit._

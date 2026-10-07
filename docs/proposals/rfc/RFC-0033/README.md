@@ -423,6 +423,3 @@ Architecture review accepted these independent decisions on 2026-10-01. Adoption
 - [Claude Code routines](https://code.claude.com/docs/en/routines)
 - [GitHub issue form syntax](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms)
 - [GitHub App permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
-
----
-_Last updated: 2026-10-01 — Accepted; ADR-079 through ADR-083 Adoption Not started_

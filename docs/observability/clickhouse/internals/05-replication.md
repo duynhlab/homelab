@@ -371,8 +371,3 @@ Before continuing, explain these without rereading the chapter:
 - [`system.replicas`](https://clickhouse.com/docs/reference/system-tables/replicas) and [`system.replication_queue`](https://clickhouse.com/docs/reference/system-tables/replication_queue)
 - [Replicated database engine](https://clickhouse.com/docs/engines/database-engines/replicated)
 - [ClickHouse 2026 OSS changelog — insert deduplication defaults](https://clickhouse.com/docs/resources/changelogs/oss/2026)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: every replica a leader, inserts on one replica, level-0 parts fetched, merges computed locally on all three. Earlier: 2026-09-29 — first draft: log/queue mechanism, dedup window,
-merge fetch-vs-execute, offline catch-up, and the single-replica durability
-window; live lab pending verification._

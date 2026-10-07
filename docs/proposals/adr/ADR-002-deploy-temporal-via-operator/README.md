@@ -70,6 +70,3 @@ a `TemporalCluster` CR and the namespace as a `TemporalNamespace` CR (`mop`). Pe
   schema-jobs) in the CR; probes are operator-managed.
 - Manifests live in `kubernetes/infra/{controllers,configs}/temporal/`; see the
   [implementation guide — Temporal Infrastructure](../../../api/temporal.md#temporal-infrastructure).
-
----
-_Last updated: 2026-06-26_

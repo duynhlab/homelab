@@ -248,5 +248,3 @@ Every substantive claim must match the service code, local-stack wiring, and
 GitOps manifests — that evidence is how a claim is verified, not a competing
 source to prefer. Mark designed but undeployed behavior as **planned**, and when
 the two disagree, classify it first: [Resolving a mismatch](#resolving-a-mismatch).
-
-_Last updated: 2026-10-01 — the observability row says RFC-0031 is Implemented rather than pointing at planned target rules. Previously 2026-09-24 — the logging row describes the as-built `logger/slogx` facade (RFC-0031 Task 4.3). Previously 2026-09-18 — RFC-0031 accepted: the observability rollup row points readers at the planned-labelled target rules in the five pillar files; Design records in `observability.md`, `logs.md`, `tracing.md`, `metrics.md`, `profiling.md`, `pkg.md` and `temporal.md` now link ADR-070 through ADR-076. Previously 2026-08-26 — separates capability availability from known-gap lifecycle, adds per-capability evidence, recognizes `admin-service` as the deployed Backoffice application service, and sharpens the `api.md` / `microservices.md` ownership boundary._

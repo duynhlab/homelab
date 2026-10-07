@@ -39,6 +39,3 @@ guard is not running. While this fires,
 
 Fix the query or the ConfigMap in Git and reconcile `databases-local`. The CNPG
 exporter reloads queries without a restart (`cnpg.io/reload`).
-
----
-_Last updated: 2026-10-06 — first version (ADR-086)._

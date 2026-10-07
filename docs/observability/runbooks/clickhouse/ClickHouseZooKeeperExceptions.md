@@ -76,6 +76,3 @@ Warning. Escalate if it is sustained rather than a blip — sustained means the
 - [ClickHouseKeeperQuorumDegraded](ClickHouseKeeperQuorumDegraded.md),
   [ClickHouseKeeperNoLeader](ClickHouseKeeperNoLeader.md) — the escalation path.
 - [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md) — the consequence.
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

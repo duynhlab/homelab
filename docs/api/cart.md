@@ -310,5 +310,3 @@ Paths in [`duynhlab/cart-service`](https://github.com/duynhlab/cart-service). Tr
 - [ADR-020](../proposals/adr/ADR-020-checkout-revalidation-policy/) — checkout re-validation policy
 - [checkout.md](./checkout.md) · [product.md](./product.md) · [order.md](./order.md) — neighbor contracts
 - [temporal.md](./temporal.md) — saga deep dive
-
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved `user_id` and verification to Keycloak._

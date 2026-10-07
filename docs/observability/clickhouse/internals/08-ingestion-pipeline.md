@@ -368,7 +368,3 @@ Before continuing, explain these without rereading the chapter:
 - [Asynchronous inserts](https://clickhouse.com/docs/concepts/features/operations/insert/asyncinserts)
 - [Kafka table engine](https://clickhouse.com/docs/reference/engines/table-engines/integrations/kafka)
 - [Kafka table engine integration guide (delivery semantics, consumer groups)](https://clickhouse.com/docs/integrations/connectors/data-ingestion/kafka/kafka-table-engine)
-
----
-_Last updated: 2026-09-30 — live lab verified: `wait_for_async_insert = 1`; logs and traces each pinned to one replica by long-lived exporter connections. Earlier: 2026-09-29 — first published version; live observation pending
-verification on the Ubuntu Kind cluster._

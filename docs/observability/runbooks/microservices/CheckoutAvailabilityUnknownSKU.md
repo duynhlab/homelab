@@ -95,6 +95,3 @@ outage — inventory is healthy and answering correctly.
 - [`CheckoutAvailabilityRefusingEverything`](CheckoutAvailabilityRefusingEverything.md) — rows present, balances at zero
 - [`docs/api/inventory.md`](../../../api/inventory.md) — the contract, including `unknown_sku_ids`
 - [RFC-0021](../../../proposals/rfc/RFC-0021/)
-
----
-_Last updated: 2026-08-19 — ADR-053 shipped: symptoms are the 409, the portal bootstrap is the mitigation_

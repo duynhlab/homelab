@@ -888,5 +888,3 @@ The gRPC migration is complete for migrated hops, but its lessons remain useful.
 - [ADR-017: collection-noun API migration](../proposals/adr/ADR-017-api-path-collection-noun/)
 - [RFC-0009: authentication hardening](../proposals/rfc/RFC-0009/)
 - [RFC-0014: observability standardization](../proposals/rfc/RFC-0014/)
-
-_Last updated: 2026-10-02 — mockpay declared as an explicit exception to the collection noun rule. Previously 2026-09-29 — topology map: mockpay drawn in-cluster (webhook straight to payment; the edge leg is local-stack only). Earlier: 2026-09-28 — Draw.io view of the platform API topology. 2026-09-17 — the shared-proto rationale counts ten repositories, not eleven (`auth-service` is archived). Previously 2026-08-26 — makes `docs/api/` authority explicit, separates topology from the exact call graph, adds Backoffice and Inventory edge exposure, restores the Product → Inventory edge, and replaces the retired auth journey with the live Keycloak PKCE flow._

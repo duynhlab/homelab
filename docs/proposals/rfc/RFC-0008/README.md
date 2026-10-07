@@ -241,6 +241,3 @@ The parity matrix + testing tiers above are the verification plan. Each overlay 
 - Decisions already shipped: [ADR-004](../../adr/ADR-004-enable-openbao-audit-logging/) (audit), [ADR-005](../../adr/ADR-005-openbao-ha-raft/) (OpenBAO HA).
 - [`docs/secrets/README.md`](../../../secrets/README.md) — current-state-vs-planned banner.
 - RFC backlog items this supersedes/absorbs: secret rotation (dynamic creds remove the need), and is adjacent to split-bootstrap + PushSecret.
-
----
-_Last updated: 2026-08-25_

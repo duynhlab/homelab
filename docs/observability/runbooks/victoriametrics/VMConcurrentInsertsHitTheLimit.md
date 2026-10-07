@@ -52,6 +52,3 @@ Warning. Escalate if the vmagent queue is growing rather than flat.
 
 - [VMSingleTooHighSlowInsertsRate](VMSingleTooHighSlowInsertsRate.md)
 - [VMAgentPersistentQueueIsDroppingData](VMAgentPersistentQueueIsDroppingData.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

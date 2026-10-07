@@ -60,6 +60,3 @@ and the operator, not you, decides when a member is disposable.
 - [KubePodNotReady](KubePodNotReady.md) — unbound PVCs leave the member Pending.
 - [KubePersistentVolumeFillingUp](KubePersistentVolumeFillingUp.md) — full
   volumes are a common way stateful members wedge.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

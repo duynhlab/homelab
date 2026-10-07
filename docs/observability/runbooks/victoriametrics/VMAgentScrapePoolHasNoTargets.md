@@ -67,6 +67,3 @@ of a critical component is effectively a missing alert.
 - [VMAgentTooManyScrapeErrors](VMAgentTooManyScrapeErrors.md) — targets exist but
   fail, which is at least visible.
 - [VMAgentConfigurationReloadFailure](VMAgentConfigurationReloadFailure.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

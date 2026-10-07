@@ -71,6 +71,3 @@ is down — one broken issuer blocks every certificate under it at once.
   consequences if this is not fixed.
 - [FluxKustomizationNotReady](FluxKustomizationNotReady.md) — the `cert-manager`
   wave failing is a common upstream cause.
-
----
-_Last updated: 2026-09-05 — created; the cert-manager alert group had no runbooks_

@@ -256,6 +256,3 @@ Re-open this decision when one or more of the following become true:
 |------|-------------------|--------|
 | 2026-08-22 | Accepted / Partial | Accepted (#872); the Kind rows were converted to k6 units and proven, and the compose rows were written and contract-verified but never run against a live compose stack |
 | 2026-08-25 | Accepted / **Complete** | The last obligation closed: `make e2e GATE=compose` ran green on a live local-stack — smoke 8/8, staff 59/59, operator 26/26, session 11/11, observability 52/52, plus saga and rate-limit. Running it also proved two things the contract check could not: `make e2e` invoked its suites in an order that let a later suite depend on an earlier one's state, and C13 asserted against a log stream the edge no longer writes. Both were fixed in the same pass (#902), which is the argument for this ADR in miniature — a written row is not a verified row |
-
----
-_Last updated: 2026-08-25_

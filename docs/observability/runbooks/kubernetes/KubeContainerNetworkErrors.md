@@ -62,6 +62,3 @@ alerts co-fire on the affected paths. Do not start deleting NetworkPolicies
 to "rule them out": policies drop packets by design, and removing them opens
 east-west traffic the security model depends on — inspect them read-only
 instead.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

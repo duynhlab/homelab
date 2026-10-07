@@ -95,6 +95,3 @@ the one that noticed first.
 - [ClickHouseTooManyParts](ClickHouseTooManyParts.md) — merge starvation inflates
   on-disk size.
 - Hub: [Retention & compression](../../clickhouse/README.md#retention--compression)
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

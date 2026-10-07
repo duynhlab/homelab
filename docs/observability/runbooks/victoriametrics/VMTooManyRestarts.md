@@ -57,6 +57,3 @@ worse than it being cleanly down, because the gaps are invisible.
 
 - [VMServiceDown](VMServiceDown.md)
 - [VMTooHighMemoryUsage](VMTooHighMemoryUsage.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

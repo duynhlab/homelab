@@ -304,7 +304,3 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 — `pg_stat_io`](https://www.postgresql.org/docs/18/monitoring-stats.html)
 - [PostgreSQL 18 — `pg_aios`](https://www.postgresql.org/docs/18/view-pg-aios.html)
 - [PostgreSQL 18 — release notes (AIO subsystem)](https://www.postgresql.org/docs/18/release-18.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: AIO `worker`/3 (reloadable), and zero client-backend evictions on a 28 MB working set. Earlier: 2026-09-29 — new chapter authored for issue #1137 (no
-predecessor page); live lab pending verification._

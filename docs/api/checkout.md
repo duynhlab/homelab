@@ -394,5 +394,3 @@ Paths in [`duynhlab/checkout-service`](https://github.com/duynhlab/checkout-serv
 - [workflows.md](./workflows.md) — workflow registry · [Service contracts](./README.md#service-contracts)
 - [cart.md](./cart.md) · [product.md](./product.md) · [shipping.md](./shipping.md) · [order.md](./order.md) — dependency contracts
 - [microservices.md](./microservices.md) — feature matrix
-
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved session identity and verification to Keycloak._

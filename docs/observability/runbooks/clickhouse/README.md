@@ -209,6 +209,3 @@ and the fix is on the node (or in another workload), not in ClickHouse.
 New runbooks follow [`_TEMPLATE.md`](../_TEMPLATE.md) (Meaning → Impact →
 Diagnosis → Mitigation → Escalation). In this folder the Diagnosis section leads
 with a `clickhouse-client` block, then `### PromQL`.
-
----
-_Last updated: 2026-09-09 — added explicit evidence levels and linked the lifecycle/operations guides; live marker results are recorded in the dated Kind audit._

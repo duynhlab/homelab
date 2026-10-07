@@ -304,6 +304,3 @@ kubectl get cluster -n platform platform-db -o jsonpath='{.spec.monitoring.custo
 - [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) — per-alert runbooks
 - [`docs/databases/architecture.md`](../../../databases/architecture.md) — database integration
 - [`promql-guide.md`](../promql-guide.md) — PromQL functions and examples
-
----
-_Last updated: 2026-07-18 — runbook links, target_databases gaps, runbook authoring checklist_

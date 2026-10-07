@@ -191,6 +191,3 @@ RTO/RPO, and follow-ups. Feed gaps back into the [drill schedule](./restore-and-
 - [disaster-recovery.md](../disaster-recovery.md) — parent DRP, decision flow, ownership, evidence checklist.
 - [Restore and failover drills](./restore-and-failover-drills.md) — rehearsed versions of these procedures.
 - [Backup and restore](./backup-restore.md) — full backup/restore runbook.
-
----
-_Last updated: 2026-09-01 — DR promotion and the PgDog cut-over are now GitOps-safe (commit, or `flux suspend` then reconcile), and the one-way nature of promotion is stated._

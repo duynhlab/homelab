@@ -126,6 +126,3 @@ conditions.
 - [CNPGClusterStandbyNotStreaming](CNPGClusterStandbyNotStreaming.md)
 - [Replication and slots](../../../databases/fundamentals/12-replication-and-slots.md)
 - [Database troubleshooting](../../../databases/observability-and-troubleshooting.md)
-
----
-_Last updated: 2026-09-09 — added because both deployed CNPG profiles referenced a missing runbook; idle-time semantics are called out explicitly._

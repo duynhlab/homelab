@@ -240,7 +240,3 @@ Full connect + `system.parts` recipes: [Playground](README.md#playground--merget
 - [Observability schema design](https://clickhouse.com/docs/use-cases/observability/schema-design)
 - DDL: [`images/clickhouse-ddl/sql/` (duynhlab/images)](https://github.com/duynhlab/images/tree/main/images/clickhouse-ddl/)
 - [Fundamentals](fundamentals.md) · [Materialized views](materialized-views.md) · [Hub](README.md)
-
----
-
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — exporter 0.161.0 (INSERT columns unchanged from 0.159.0); the exporter contract points at the DDL image source, not a ConfigMap. Earlier: 2026-09-30 — the dashboards now bound otel_logs on the sort-key expression (423/423 → 6/423 granules); JOIN panels time-bounded. Earlier: 2026-09-29 — measured caveat: a bare `Timestamp` range does not prune `otel_logs`; repeat the window on `toStartOfFiveMinutes(Timestamp)`. Previously 2026-09-04_

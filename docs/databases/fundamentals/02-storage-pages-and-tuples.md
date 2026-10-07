@@ -291,8 +291,3 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 — TOAST](https://www.postgresql.org/docs/18/storage-toast.html)
 - [PostgreSQL 18 — determining disk usage](https://www.postgresql.org/docs/18/diskusage.html)
 - [PostgreSQL 18 — `pageinspect`](https://www.postgresql.org/docs/18/pageinspect.html) (disposable lab only)
-
----
-_Last updated: 2026-10-01 — live lab verified: one-page tables with `relpages 0` / `reltuples -1` (never analyzed) beside 8 KiB files. Earlier: 2026-09-29 — chapter authored for issue #1137, absorbing the
-storage half of the former storage-and-wal page; live lab pending
-verification._

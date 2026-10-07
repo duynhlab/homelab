@@ -61,6 +61,3 @@ alert name; the schedule-to-start warning/critical pair shares one file.
 
 Every runbook here follows [`_TEMPLATE.md`](../_TEMPLATE.md): quick facts →
 Meaning → Impact → Diagnosis → Mitigation → Escalation (→ Related).
-
----
-_Last updated: 2026-09-05 — created with the two ADR-055 capacity alerts; the seven existing Temporal runbooks (2026-09-05, #993) had no folder index_

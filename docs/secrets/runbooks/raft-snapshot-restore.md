@@ -33,7 +33,3 @@ kubectl exec -n openbao openbao-0 -- env BAO_ADDR=http://127.0.0.1:8200 BAO_TOKE
 kubectl exec -n openbao openbao-0 -- env BAO_ADDR=http://127.0.0.1:8200 BAO_TOKEN="$BAO_TOKEN" \
   bao token revoke -self
 ```
-
----
-
-_Last updated: 2026-08-27 — step 0 is the ADR-062 staff OIDC login; the generate-root ceremony is demoted to the issuer-down fallback. 2026-08-19: ceremony step 0 + final revoke added._

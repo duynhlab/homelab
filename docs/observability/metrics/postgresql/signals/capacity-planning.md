@@ -37,6 +37,3 @@ Per-db table metrics cover platform service DBs and product/cart/order only.
 **payment**, **checkout**, **temporal** databases appear in the built-in
 `cnpg_pg_database_size_bytes` (cluster-wide `pg_database` query) but not in per-db
 top-table lists until added to `target_databases` in the monitoring ConfigMap.
-
----
-_Last updated: 2026-07-18_

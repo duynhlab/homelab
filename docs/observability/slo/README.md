@@ -260,6 +260,3 @@ The Grafana dashboards and the Sloth UI are complementary: Grafana for long-form
 - [Sloth `server` command source](https://github.com/slok/sloth/blob/main/cmd/sloth/commands/server.go) -- all CLI flags for the UI (Prometheus address, basic auth, mTLS, custom headers, cache refresh)
 - [Google SRE Book -- SLOs](https://sre.google/sre-book/service-level-objectives/)
 - [Google SRE Workbook -- Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)
-
----
-_Last updated: 2026-10-06 — SLOs come from the `slo` chart (`<service>-slo` HelmReleases) instead of `mop`; counts corrected to 22 SLOs / 44 alerts (two chart SLOs per service since `mop` 0.19.0), and the retired `auth` row removed. Earlier: 2026-09-30 — counts corrected to 31 SLOs / 62 alerts (9 chart services). Earlier: 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (34 SLOs / 68 burn-rate alerts)_

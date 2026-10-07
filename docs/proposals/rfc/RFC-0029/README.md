@@ -339,6 +339,3 @@ Resolved in Phase 1 (2026-10-06, owner):
 - [Rotate the `vault_rotator` credential](../../../databases/runbooks/rotate-vault-rotator-credential.md)
 - [ADR-013](../../adr/ADR-013-per-service-db-triplet/), [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/), [ADR-025](../../adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) — records this RFC extends or partly supersedes
 - [RFC-0020](../RFC-0020/) — internal TLS (an authentication concern, kept separate)
-
----
-_Last updated: 2026-10-06_

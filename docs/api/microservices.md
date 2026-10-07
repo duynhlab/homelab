@@ -100,5 +100,3 @@ contracts; they are not ongoing-work rows here.
 - [Shared API and service communication guide](./api.md)
 - [Workflow registry](./workflows.md)
 - [Repository index](../README.md#repositories)
-
-_Last updated: 2026-10-02 — deprecated aliases are no longer a known gap for shipping or payment (ADR-017 contract). Previously 2026-08-26 — removes duplicated deployment, route, RPC, and technique inventories; restores the catalog to feature ownership and current known-gap rollup._

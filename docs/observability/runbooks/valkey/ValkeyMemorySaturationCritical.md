@@ -72,6 +72,3 @@ cold at the moment DB load is already elevated.
 - [ValkeyHighEvictionRate](ValkeyHighEvictionRate.md) — confirms evictions are
   active.
 - Cache-miss impact lands on product latency (`MicroserviceHighLatency*`).
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the valkey/ domain folder_

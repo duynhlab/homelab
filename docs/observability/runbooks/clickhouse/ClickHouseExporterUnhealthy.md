@@ -87,6 +87,3 @@ log.
 - [ClickHouseInsertsDelayed](ClickHouseInsertsDelayed.md) — the softer precursor.
 - [ClickHouseAllReplicasUnreachable](ClickHouseAllReplicasUnreachable.md) — if the
   store is down, this alert is a symptom.
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

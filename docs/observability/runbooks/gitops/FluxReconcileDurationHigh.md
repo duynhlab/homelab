@@ -94,6 +94,3 @@ was already struggling or fell over suddenly.
   when it crosses the health-check timeout.
 - [FluxReconciliationFailure](FluxReconciliationFailure.md) — the failure this
   often precedes.
-
----
-_Last updated: 2026-09-05 — created; the flux-alerts group had no runbooks at all_

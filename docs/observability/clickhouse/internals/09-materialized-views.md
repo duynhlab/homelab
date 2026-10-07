@@ -313,7 +313,3 @@ Before continuing, explain these without rereading the chapter:
 - [Are materialized-view inserts atomic? (knowledge base)](https://clickhouse.com/docs/resources/support-center/knowledge-base/materialized-views/are-materialized-views-inserted-asynchronously)
 - [`materialized_views_ignore_errors` setting](https://clickhouse.com/docs/reference/settings/session-settings/materialized-views)
 - [Refreshable materialized views](https://clickhouse.com/docs/concepts/features/materialized-views/refreshable-materialized-view)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: per-block executions; at low traffic written = read, paired executions left as a knowledge gap. Earlier: 2026-09-29 — first published version; live observation pending
-verification on the Ubuntu Kind cluster._

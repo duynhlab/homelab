@@ -67,6 +67,3 @@ would look again.
 
 - [ClickHouseDiskCritical](ClickHouseDiskCritical.md)
 - [ClickHouseTooManyParts](ClickHouseTooManyParts.md)
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

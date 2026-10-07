@@ -31,7 +31,3 @@ poolers, backups, and RFC-0012 service-database lifecycle.
 - [Emergency recovery](./emergency-recovery.md) — start here when a cluster is down
 - [PostgreSQL alert runbooks](../../observability/runbooks/postgresql/README.md) — per-alert on-call guides
 - [Backup policy](../backup-policy.md) — current schedule and retention
-
----
-
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

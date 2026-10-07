@@ -102,6 +102,3 @@ insert cadence; one replica points at that replica's merges.
 
 - [ClickHouseTooManyParts](ClickHouseTooManyParts.md) — the server-wide trend.
 - [ClickHouseInsertsDelayed](ClickHouseInsertsDelayed.md) → [ClickHouseInsertsRejected](ClickHouseInsertsRejected.md) — the next two links.
-
----
-_Last updated: 2026-09-30 — `OPTIMIZE … PARTITION` is the last step and cannot be undone (was "safe and reversible"). Earlier: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream threshold 100; ours is 300, the value ClickHouse's own metric description calls abnormal)_

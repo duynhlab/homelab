@@ -71,7 +71,3 @@ checkout-service's `CHECKOUT_AVAILABILITY_SOURCE` and
   (OpenFeature) for that specific use case.
 - `pkg/flagx` becomes a supported shared package; new flags across services
   should use it rather than re-introducing raw `os.Getenv` parsing for toggles.
-
----
-
-_Last updated: 2026-07-24_

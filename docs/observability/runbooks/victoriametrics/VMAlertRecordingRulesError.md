@@ -59,6 +59,3 @@ Warning. Escalate based on what reads the recorded series.
 
 - [VMAlertAlertingRulesError](VMAlertAlertingRulesError.md)
 - [VMAlertRemoteWriteDroppingData](VMAlertRemoteWriteDroppingData.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

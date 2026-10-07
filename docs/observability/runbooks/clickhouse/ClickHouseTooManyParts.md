@@ -89,6 +89,3 @@ Warning. Escalate if it is climbing rather than flat, or if
 - [ClickHouseInsertsDelayed](ClickHouseInsertsDelayed.md) — the next step.
 - [ClickHouseDiskAlmostFull](ClickHouseDiskAlmostFull.md) — unmerged parts inflate
   disk.
-
----
-_Last updated: 2026-09-30 — forced merge aligned with the correct response order (targeted partition, never `FINAL`). Earlier: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

@@ -516,9 +516,3 @@ kubectl port-forward svc/pyroscope -n monitoring 4040:4040
 - [ClickHouse schema and queries](clickhouse/schema-and-queries.md) -- ORDER BY → EXPLAIN granules → codecs
 - [ClickHouse materialized views](clickhouse/materialized-views.md) -- incremental `TO` trace-id table
 - [Grafana on ClickHouse](clickhouse/README.md#grafana) -- datasource OTel mapping, Explore + trace-log linking, dashboard grammar, and the standard suite (Overview → Logs Explorer → Trace Explorer with in-dashboard waterfall)
-
----
-
-_Last updated: 2026-10-01 — component inventory re-checked against the manifests: VictoriaTraces `v0.11.1`, local-stack VM images `v1.152.0`, 13 edge runbooks, Grafana tree line (25 CRs + 18 as-code boards). Earlier the same day: Grafana VM / VL datasource versions bumped to 0.26.1 / 0.32.0. Earlier: 2026-09-29 — the ClickHouse internals curriculum now lists its twelve authored chapters; earlier the same day, added the curriculum and authoring contract, and the signal-flow diagram gains Vector's ClickHouse path and OpenBao as a scrape target. Previously 2026-09-28 — added the Draw.io signal-flow + retention diagram under Architecture; diagrams recoloured to the v2 soft-tint palette. Previously 2026-09-18 — added the Draw.io delivery-order diagram under
-Deployment (Flux waves + the gate that releases each one, and why the two
-ClickHouse waves omit `wait`)._

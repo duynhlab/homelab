@@ -29,6 +29,3 @@ alone.
 
 - [ClickHouse operations](../operations.md)
 - [ClickHouse alert runbooks](../../runbooks/clickhouse/README.md)
-
----
-_Last updated: 2026-09-10 — linked the first repeatable Kind evidence record._

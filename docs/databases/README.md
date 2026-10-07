@@ -149,5 +149,3 @@ this area documents the resulting platform and its operation.
 - [PostgreSQL documentation](https://www.postgresql.org/docs/current/)
 - [CloudNativePG 1.30 documentation](https://cloudnative-pg.io/docs/1.30/)
 - [PgDog documentation](https://docs.pgdog.dev/)
-
-_Last updated: 2026-10-06 — added the platform learning sequence, task routing and evidence boundary; fundamentals preserved._

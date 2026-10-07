@@ -224,6 +224,3 @@ Re-open this decision when one or more of the following become true:
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-04 | Accepted / Complete | Shipped in payment-service #53 |
-
----
-_Last updated: 2026-08-04_

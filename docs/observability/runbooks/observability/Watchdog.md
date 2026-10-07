@@ -79,6 +79,3 @@ in question.
 
 - [VMAlertAlertmanagerErrors](../victoriametrics/VMAlertAlertmanagerErrors.md)
 - [VMServiceDown](../victoriametrics/VMServiceDown.md)
-
----
-_Last updated: 2026-09-05 — created; this alert had no runbook_

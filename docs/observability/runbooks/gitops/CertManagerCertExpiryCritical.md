@@ -84,6 +84,3 @@ consequence lands at a known time whether or not anyone is looking.
   underneath.
 - [FluxHelmReleaseNotReady](FluxHelmReleaseNotReady.md) — cert-manager runs as a
   HelmRelease.
-
----
-_Last updated: 2026-09-05 — created; the cert-manager alert group had no runbooks_

@@ -372,8 +372,3 @@ Before continuing, explain these without rereading the chapter:
 - [Statistics configuration (`stats_fetch_consistency`, `track_io_timing`)](https://www.postgresql.org/docs/18/runtime-config-statistics.html)
 - [pg_stat_statements](https://www.postgresql.org/docs/18/pgstatstatements.html)
 - [CloudNativePG monitoring](https://cloudnative-pg.io/docs/1.30/monitoring)
-
----
-_Last updated: 2026-10-01 — live lab verified: never-reset database counters, a payment rollback outlier, and the `cnpg_<query>_<column>` naming with its role label. Earlier: 2026-09-29 — first version: statistics mechanics, the deployed
-exporter pipeline, the investigation loop, capacity model, and mitigation
-hierarchy, absorbing the former monitoring-and-performance-investigation page._

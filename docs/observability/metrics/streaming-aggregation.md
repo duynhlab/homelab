@@ -346,6 +346,3 @@ the flux-system/monitoring pipeline):
 - VictoriaMetrics — [vmagent](https://docs.victoriametrics.com/victoriametrics/vmagent/) (`remoteWrite.shardByURL`, `shardByURL.ignoreLabels`)
 - VictoriaMetrics Operator — [API: `StreamAggrConfig` / `StreamAggrRule`](https://docs.victoriametrics.com/operator/api/)
 - In-repo: [metrics hub](README.md) · [metrics-apps.md](metrics-apps.md) · [RFC-0013](../../proposals/rfc/RFC-0013/README.md)
-
----
-_Last updated: 2026-07-14 — re-pointed the pilot to semconv/OTLP metric names (RFC-0014 P3); app path is OTLP push, not scrape._

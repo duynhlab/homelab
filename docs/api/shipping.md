@@ -299,5 +299,3 @@ Paths in [`duynhlab/shipping-service`](https://github.com/duynhlab/shipping-serv
 - [temporal.md](./temporal.md) — saga deep dive
 - [checkout.md](./checkout.md) · [order.md](./order.md) — quote and enrichment callers
 - [Service contracts](./README.md#service-contracts)
-
-_Last updated: 2026-10-02 — the pre-v3 `/public/track` and `/public/estimate` aliases are removed in v1.10.0. Previously 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

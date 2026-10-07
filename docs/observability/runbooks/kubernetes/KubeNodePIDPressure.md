@@ -61,6 +61,3 @@ process table.
 - [KubeNodeNotReady](KubeNodeNotReady.md) — where sustained PID exhaustion ends.
 - `MicroserviceGoroutineLeak` (microservices runbooks) — the usual culprit
   signal on this platform.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

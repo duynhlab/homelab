@@ -466,9 +466,3 @@ Before continuing, explain these without rereading the chapter:
 - [`system.parts`](https://clickhouse.com/docs/reference/system-tables/parts) and [`system.part_log`](https://clickhouse.com/docs/reference/system-tables/part_log)
 - [Server settings — background merges scheduling](https://clickhouse.com/docs/reference/settings/server-settings/settings)
 - [ClickHouse 2026 OSS changelog — merge selector, insert deduplication](https://clickhouse.com/docs/resources/changelogs/oss/2026)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — case study re-anchored on live parts
-`20260930_0_2977_18` / `20260930_7093_7093_0` with their full `part_log`
-lineage across two replicas and a second snapshot; the issue's 2026-09-29 parts
-were lost with the cluster rebuild. Earlier: 2026-09-29 — first draft._

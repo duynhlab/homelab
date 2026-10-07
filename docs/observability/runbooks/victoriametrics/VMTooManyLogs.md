@@ -57,6 +57,3 @@ Warning. Rarely the incident; often the earliest evidence of one.
 - [VMAgentTooManyScrapeErrors](VMAgentTooManyScrapeErrors.md)
 - [VMAlertAlertingRulesError](VMAlertAlertingRulesError.md)
 - [VMSingleRequestErrorsToAPI](VMSingleRequestErrorsToAPI.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

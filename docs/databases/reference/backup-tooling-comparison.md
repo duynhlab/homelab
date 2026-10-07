@@ -54,5 +54,3 @@ plane.
 - [pgBackRest user guide](https://pgbackrest.org/user-guide.html)
 - [Barman documentation](https://docs.pgbarman.org/)
 - [PostgreSQL continuous archiving](https://www.postgresql.org/docs/18/continuous-archiving.html)
-
-_Last updated: 2026-08-31._

@@ -34,6 +34,3 @@ RFC-0020 research gate passes.
   east-west gRPC mTLS tier that was this RFC.
 - **[RFC-0006](../RFC-0006/README.md)** — the future service-mesh evaluation (the alternative
   path to east-west mTLS).
-
----
-_Last updated: 2026-07-21 (superseded; split into RFC-0020 + RFC-0006)._

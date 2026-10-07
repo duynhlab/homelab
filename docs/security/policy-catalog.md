@@ -88,7 +88,3 @@ keeps its static `deny-all-ingress` there).
 **Full reference** — per-service caller matrix, allowed-ingress topology,
 kindnet enforcement status, and GitOps wiring:
 [`network-policies.md`](network-policies.md).
-
----
-
-_Last updated: 2026-09-30 — default-deny-networkpolicy is a GeneratingPolicy (sole owner), cleanup a DeletingPolicy (ADR-078 step 4). Earlier: 2026-09-30 — PSS baseline is ten vendored CEL ValidatingPolicies (ADR-078 step 3). Earlier: 2026-09-30 — disallow-latest-tag and disallow-default-namespace moved to ValidatingPolicy (ADR-078 step 2). Earlier: 2026-09-30 — require-probes and require-resources moved to ValidatingPolicy (ADR-078 step 1). Earlier: 2026-09-29 — disallow-latest-tag gains require-image-volume-digest (ADR-077). Previously 2026-08-19 — table un-split (the pss-restricted note had broken it, hiding the Tier 2/3 rows), scopes corrected against the manifests, prod modes marked planned (production overlay is a stub), cleanup row reflects the restored >24h age gate. Previously updated 2026-08-17 (pss-restricted disabled) without a footer bump._

@@ -967,7 +967,3 @@ kubectl get helmreleases -A -o wide
 - [VLSingle Documentation](https://docs.victoriametrics.com/operator/resources/vlsingle/)
 - [MetricsQL (PromQL superset)](https://docs.victoriametrics.com/metricsql/)
 - [LogsQL (VictoriaLogs query language)](https://docs.victoriametrics.com/victorialogs/logsql/)
-
----
-
-_Last updated: 2026-10-01 — Quick Access lists the `*.duynh.me` routes instead of `make flux-ui` port-forwards (the script is gone). Previously 2026-08-13 — edge scrape objects corrected to the envoy-gateway-controller ServiceMonitor + envoy-gateway-proxy PodMonitor; merged vmauth into this page; trim duplicated VLSingle/logs content (see logging/victorialogs.md)._

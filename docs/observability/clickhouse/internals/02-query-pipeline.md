@@ -344,6 +344,3 @@ Before continuing, explain these without rereading the chapter:
 - [PREWHERE clause](https://clickhouse.com/docs/reference/statements/select/prewhere)
 - [system.query_log](https://clickhouse.com/docs/reference/system-tables/query_log)
 - [Architecture overview](https://clickhouse.com/docs/resources/develop-contribute/introduction/architecture)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified; example value `cart-service` (no rows in pod logs) replaced by `clickhouse`, query_log read-back excludes itself. Earlier: 2026-09-29 — first published version of the query-pipeline chapter; live lab pending verification._

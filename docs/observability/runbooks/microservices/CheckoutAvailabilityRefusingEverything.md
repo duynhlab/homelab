@@ -85,6 +85,3 @@ was serving orders — that is data loss, not a gap.
 - [`CheckoutAvailabilityErrors`](CheckoutAvailabilityErrors.md)
 - [`docs/api/inventory.md`](../../../api/inventory.md) — the contract, including this gap
 - [RFC-0021](../../../proposals/rfc/RFC-0021/)
-
----
-_Last updated: 2026-08-05_

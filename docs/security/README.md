@@ -57,6 +57,3 @@ flowchart LR
 - [docs/api/api.md § edge exposure](../api/api.md) — audience doctrine the fences implement
 - [docs/platform/keycloak.md](../platform/keycloak.md) — the identity provider: its NetworkPolicy, exposed login surface, and credential handling
 - [docs/api/identity.md](../api/identity.md) — where a token is verified, and why the edge is not authoritative
-
----
-_Last updated: 2026-10-01 — the Exceptions row says none is active, matching `exceptions/kustomization.yaml` (`resources: []`). Earlier: 2026-09-30 — PSS baseline is ten CEL ValidatingPolicies (ADR-078 step 3). Earlier: 2026-09-28 — Kyverno chart 3.9.1 / engine v1.19.1 (RFC-0032 prerequisite). Previously 2026-08-24 — policy count trued up: 7 deployed + 1 disabled (`pss-restricted-apps`) rather than 8 deployed, matching the [platform guide's inventory](../platform/kyverno.md#policy-inventory). Adds the Keycloak and identity cross-links. Previously — 2026-08-19: hub created (the folder was the last docs area without one)._

@@ -61,6 +61,3 @@ there. Recent-changes check when config drift is plausible:
 ```bash
 git log --oneline -5 -- kubernetes/infra/controllers/caching/valkey/
 ```
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the valkey/ domain folder_

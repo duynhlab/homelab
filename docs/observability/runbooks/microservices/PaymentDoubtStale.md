@@ -68,5 +68,3 @@ Three causes, distinguishable from the row:
   (migration 000011).
 - Watch [PaymentProviderUnknownRate](PaymentProviderUnknownRate.md): it fires
   while the backlog is still small.
-
-_Last updated: 2026-08-02_

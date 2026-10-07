@@ -339,7 +339,7 @@ persist across pod restarts — enough to exercise auto-unseal.
 - [x] At least **two alternatives** with tradeoffs (four for the spine)
 - [x] **Platform as-built** filled from manifests/docs (the 8-axis table)
 - [x] Primary direction stated (auto-unseal spine; local rehearsal via emulator/HSM)
-- [x] **Context7 audit** complete; footer date updated
+- [x] **Context7 audit** complete; audit date recorded
 - [x] At least **one Mermaid**; deployed vs **planned** labelled
 - [x] No Kubernetes manifest changes in this research file
 - [ ] Owner sign-off: **ready for RFC** (README already exists — confirm the parity-matrix

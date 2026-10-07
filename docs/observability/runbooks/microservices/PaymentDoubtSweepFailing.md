@@ -56,5 +56,3 @@ An empty `idempotency_key` on a refund row is the unresolvable shape.
 ## Prevention
 Every attempt written since migration 000011 records its key, so the
 unresolvable shapes are historical rows only.
-
-_Last updated: 2026-08-02_

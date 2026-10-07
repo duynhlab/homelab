@@ -71,6 +71,3 @@ hoping it sticks: the loop is deterministic, and each delete only destroys the
   crash loop.
 - [KubeDeploymentReplicasMismatch](KubeDeploymentReplicasMismatch.md) —
   co-fires when the loop keeps a Deployment below desired replicas.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

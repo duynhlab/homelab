@@ -542,6 +542,3 @@ relevant feature ownership in `docs/api/microservices.md`.
 - [`pg_cron` scheduler and operations](https://github.com/citusdata/pg_cron)
 - [CNPG shared preload configuration](https://cloudnative-pg.io/docs/1.30/postgresql_conf/#shared-preload-libraries)
 - [ClickHouse platform guide](../../../observability/clickhouse/README.md)
-
----
-_Last updated: 2026-09-08_

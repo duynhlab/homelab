@@ -70,6 +70,3 @@ warning.
 - [VMAlertRecordingRulesError](VMAlertRecordingRulesError.md)
 - [VMAlertTooManyMissedIterations](VMAlertTooManyMissedIterations.md)
 - [VMAlertConfigurationReloadFailure](VMAlertConfigurationReloadFailure.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

@@ -636,6 +636,3 @@ new-code coverage, `go test -race`, golangci-lint, agent-skills review.
     reconciliation (**P5**, landed)
   - [ADR-012](../../adr/ADR-012-reconciliation-auto-heal/) — flag-gated
     auto-heal of the lost-capture-response window (landed)
-
----
-_Last updated: 2026-08-25_

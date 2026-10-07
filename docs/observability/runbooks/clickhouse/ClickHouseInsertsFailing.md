@@ -98,6 +98,3 @@ queue, which is the data you were trying to save.
 - [ClickHouseInsertsRejected](ClickHouseInsertsRejected.md) — the too-many-parts subset.
 - [ClickHouseServerErrorsElevated](ClickHouseServerErrorsElevated.md) — every error, not just inserts.
 - [ClickHouseExporterUnhealthy](ClickHouseExporterUnhealthy.md) — the consumer side.
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — schema drift diffs against the DDL image source (ADR-077), not a ConfigMap. Earlier: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_

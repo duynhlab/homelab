@@ -107,6 +107,3 @@ place to look.
 - [ClickHouseReplicationLag](ClickHouseReplicationLag.md) — a queue stuck on a part nobody has fires this after giving up.
 - [ClickHouseDiskAlmostFull](ClickHouseDiskAlmostFull.md) — the disk failure that usually precedes a lost PVC.
 - [ClickHouseKeeperNoLeader](ClickHouseKeeperNoLeader.md) — a long quorum outage with a rolling PVC loss is the worst-case path here.
-
----
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `ClickHouseReplicatedDataLoss`, `[1m]` widened to `[10m]`)_

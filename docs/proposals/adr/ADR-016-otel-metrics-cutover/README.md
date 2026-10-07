@@ -97,5 +97,3 @@ the rollback is a single file.
   "0" on failure panels.
 - The scrape-era dashboard and rule history remain in git; P5 deletes the
   remaining docs references and the dead middleware.
-
-_Last updated: 2026-07-09_

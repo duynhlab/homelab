@@ -75,6 +75,3 @@ two of three is one step from the page.
 - [ClickHouseAllReplicasUnreachable](ClickHouseAllReplicasUnreachable.md)
 - [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md)
 - [ClickHouseKeeperQuorumDegraded](ClickHouseKeeperQuorumDegraded.md)
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

@@ -59,6 +59,3 @@ chain ends in dropped samples.
 - [VMSingleTooHighChurnRate](VMSingleTooHighChurnRate.md)
 - [VMTooHighMemoryUsage](VMTooHighMemoryUsage.md)
 - [VMAgentPersistentQueueIsDroppingData](VMAgentPersistentQueueIsDroppingData.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

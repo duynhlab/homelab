@@ -10,6 +10,10 @@
 
 ## Meaning
 
+On 2026-09-08, the unfiltered expression had paged for 11 hours on the healthy
+DR designated primary, `product-db-replica-1`. Excluding
+`cnpg_io_instanceRole="primary"` prevents that archive-recovery false positive.
+
 An instance is **in recovery but has no WAL receiver** for 5 minutes. It is a
 standby that has stopped replicating: not slow, not lagging — disconnected.
 
@@ -58,6 +62,10 @@ kubectl -n $NS logs $POD -c postgres --tail=200 | grep -i timeline
 
 ## Common causes
 
+Historical incident, 2026-09-06: a timeline-3 failover stranded `product-db-3`
+and the `product-db-replica` DR cluster on timeline 2. No standby-streaming
+alert covered that failure then.
+
 | Cause | Signal | Action |
 |---|---|---|
 | **Timeline divergence after a failover** | pod log: `Refusing to restore future timeline history file`; standby `timeline_id` lower than the primary's | The standby cannot follow the new timeline on its own. Rejoin it — `pg_rewind`, or let CNPG re-bootstrap by deleting the instance's PVC and pod |
@@ -87,11 +95,3 @@ kubectl -n $NS logs $POD -c postgres --tail=200 | grep -i timeline
 - [`CNPGClusterPhysicalReplicationLagWarning`](CNPGClusterPhysicalReplicationLagWarning.md) / [`Critical`](CNPGClusterPhysicalReplicationLagCritical.md) — byte lag while still connected
 - [`CNPGClusterHAWarning`](CNPGClusterHAWarning.md) — the streaming-replica count, which drops for the same reason
 - [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md)
-
----
-_Last updated: 2026-09-08 — scoped to `cnpg_io_instanceRole!="primary"` after the
-unfiltered expression fired critical for 11 hours on `product-db-replica-1`, the
-DR cluster's designated primary, while CNPG, Postgres and both cascading
-standbys were healthy. Created 2026-09-06 after a live incident where a
-timeline-3 failover stranded `product-db-3` and the whole `product-db-replica`
-DR cluster on timeline 2, and no alert covered it._

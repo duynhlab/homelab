@@ -209,6 +209,3 @@ an id exists beyond what the public read already reveals (it returns 404 either 
 - [Application caching](../../../api/caching.md) — product Cache-Aside, stampede prevention, ownership boundary
 - [Caching (platform)](../../../caching/README.md) — Valkey deployment, eviction, roadmap gaps
 - [`docs/databases/architecture.md`](../../../databases/architecture.md) — the shared `cnpg-db` cluster product/cart/order write to.
-
----
-_Last updated: 2026-07-07_

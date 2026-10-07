@@ -53,5 +53,3 @@ The sweep is bounded at 50 entries per minute deliberately, so a provider
 outage cannot turn into a flood against a provider that is already
 struggling. A backlog larger than that drains at 50/min once answers return;
 that is expected, not a fault.
-
-_Last updated: 2026-08-02_

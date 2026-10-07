@@ -76,6 +76,3 @@ failure. The HTTP request stays async (`201 pending`); the workflow drives the o
 - When to reach for Temporal again (and when not) is documented in the
   [guide — When to Use Temporal](../../../api/temporal.md#when-to-use-temporal) — it is for
   durable multi-step orchestration, not for ordinary request/response.
-
----
-_Last updated: 2026-06-26_

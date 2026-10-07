@@ -57,6 +57,3 @@ has a hard deadline.
 
 - [CertManagerCertExpiryCritical](CertManagerCertExpiryCritical.md)
 - [CertManagerCertNotReady](CertManagerCertNotReady.md)
-
----
-_Last updated: 2026-09-05 — created; the cert-manager alert group had no runbooks_

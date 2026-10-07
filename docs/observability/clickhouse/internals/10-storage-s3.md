@@ -413,7 +413,3 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse: MergeTree — multiple block devices and storage policies](https://clickhouse.com/docs/engines/table-engines/mergetree-family/mergetree)
 - [ClickHouse: manage data with TTL](https://clickhouse.com/docs/concepts/features/operations/delete/ttl)
 - [ClickHouse: `system.remote_data_paths`](https://clickhouse.com/docs/reference/system-tables/remote_data_paths)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: disks and `hot_cold` policy live, cold tier still empty so the `{replica}` expansion stays unverified. Earlier: 2026-09-29 — first draft of the tiered-storage chapter; live
-observation pending verification on the Ubuntu Kind cluster._

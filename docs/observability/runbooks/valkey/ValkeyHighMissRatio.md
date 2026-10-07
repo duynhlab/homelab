@@ -74,6 +74,3 @@ it re-warms.
 - [ValkeyHighEvictionRate](ValkeyHighEvictionRate.md) — evictions removing hot
   keys is one cause of a rising miss ratio.
 - Cache-miss impact lands on product latency (`MicroserviceHighLatency*`).
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the valkey/ domain folder_

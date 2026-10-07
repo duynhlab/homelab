@@ -90,6 +90,3 @@ fix that "was deployed" but is not running, or a config that keeps reverting.
   states.
 - [FluxKustomizationNotReady](FluxKustomizationNotReady.md) — what you may see
   shortly after resuming.
-
----
-_Last updated: 2026-09-05 — created; the flux-alerts group had no runbooks at all_

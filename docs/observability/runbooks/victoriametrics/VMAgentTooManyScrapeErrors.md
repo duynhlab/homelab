@@ -64,6 +64,3 @@ scrape silently disables every rule built on it.
 - [VMAgentScrapePoolHasNoTargets](VMAgentScrapePoolHasNoTargets.md)
 - [VMTooManyLogs](VMTooManyLogs.md)
 - [VMRowsRejectedOnIngestion](VMRowsRejectedOnIngestion.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

@@ -364,5 +364,3 @@ Transport peers call `logic/v1`; logic calls `core` only
 - [checkout.md](./checkout.md) · [order.md](./order.md) — the callers: checkout for availability, the order saga for reserve/commit/release
 - [RFC-0021](../proposals/rfc/RFC-0021/) — inventory extraction program (supersedes [RFC-0003](../proposals/rfc/RFC-0003/))
 - [ADR-027](../proposals/adr/ADR-027-inventory-sole-stock-authority/) — stock authority · [ADR-028](../proposals/adr/ADR-028-inventory-reservation-model/) — reservation/balance model
-
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — ADR-050 moved the protected group to the workforce realm._

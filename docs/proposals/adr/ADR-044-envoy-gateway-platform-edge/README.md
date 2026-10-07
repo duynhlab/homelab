@@ -524,6 +524,3 @@ Two consequences worth knowing before anyone reads a dashboard:
 | 2026-08-18 | Accepted / Partial | Amended: Envoy Gateway v1.8.3 → v1.9.0 with Gateway API v1.6.1 (mandatory for the TCPRoute/UDPRoute `v1` move); adopted `crds.enabled: false`; re-verified Amendment #1's subchart rejection against both chart packages and recorded the upstream evidence |
 | 2026-08-24 | Accepted / Partial | Documentation validation row satisfied: [`docs/platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) now links this ADR (and 045/046) and carries a Design decisions section for both amendments — it had linked neither since it was created. Its resource counts were also trued up against the manifests, and both amendments' live constraints written down. Remaining for `Complete`: the Kind K-row gate pass |
 | 2026-08-25 | Accepted / **Complete** | Kind gate passed. **The Documentation row is closed for real this time** — `docs/api/api.md` now links this ADR; the 2026-08-24 entry claimed that row was satisfied while only `envoy-gateway.md` linked it. |
-
----
-_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

@@ -247,6 +247,3 @@ Re-open this decision when one or more of the following become true:
 |------|-------------------|--------|
 | 2026-08-02 | Proposed / Partial | Drafted during RFC-0021 P6; the rule and the attempt log had landed |
 | 2026-08-04 | Accepted / Complete | P6 shipped: payment #47–#51, order #168–#169, homelab #646 |
-
----
-_Last updated: 2026-08-04_

@@ -409,6 +409,3 @@ Before continuing, explain these without rereading the chapter:
 - [Network ports and interfaces](https://clickhouse.com/docs/concepts/features/security/tls/configuring-tls)
 - [Prometheus metrics endpoint](https://clickhouse.com/docs/concepts/features/interfaces/prometheus)
 - [Altinity ClickHouse operator](https://github.com/Altinity/clickhouse-operator)
-
----
-_Last updated: 2026-10-01 — the server-image repository fact now reads `26.8` (the CHI moved off `26.7`; the lab record stays as observed). Earlier: 2026-09-30 — engine-layers Draw.io diagram added; MySQL/PostgreSQL listeners recorded as an observed difference. Earlier the same day: live lab verified: 3 replicas + 3 Keeper members, patch 26.7.17.7 behind the `26.7` tag. Earlier: 2026-09-29 — first published version of the architecture chapter; live lab pending verification._

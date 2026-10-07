@@ -370,7 +370,3 @@ Connect commands: [Playground](README.md#playground--mergetree-by-hand).
 - [Choosing a primary key](https://clickhouse.com/docs/best-practices/choosing-a-primary-key)
 - Platform: [ClickHouse hub](README.md) · [schema-and-queries](schema-and-queries.md) · [materialized views](materialized-views.md)
 - Postgres contrast: [WAL and checkpoints](../../databases/fundamentals/04-wal-and-checkpoints.md)
-
----
-
-_Last updated: 2026-09-30 — `otel_traces_trace_id_ts` partitions by `toDate(Start)`; Distributed / extra shards are reference, not planned. Earlier: 2026-09-07 — audit table: every repo-managed `system.*` engine string now carries `ttl_only_drop_parts = 1`, the three monthly tables are daily, `query_metric_log` is removed (issue #1025). Previously 2026-09-04 — the platform audit table now shows the five formerly unmanaged `system.*` tables on a 7-day TTL with daily partitions, set by this repo. Earlier the same day: added **Partitions and TTL**: the alignment rule between `PARTITION BY` and TTL granularity, both `ttl_only_drop_parts` modes with the settings read off the deployed cluster, the audit of which `otel.*` and `system.*` tables are aligned, and the object-store lifecycle trap for the planned S3 tier. Inline vendor-figure source links removed (References already cites the overview). Earlier the same day: page created._

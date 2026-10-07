@@ -108,6 +108,3 @@ count with no owner at all.
 ```bash
 git log --oneline -5 -- kubernetes/infra/controllers/keda/ kubernetes/clusters/local/keda.yaml
 ```
-
----
-_Last updated: 2026-09-05 — created with the KEDA install (ADR-055)_

@@ -76,6 +76,3 @@ back up, and you lose the live heap Pyroscope needs to name the culprit.
 ## Related
 
 - [KubePodOOMKilled](KubePodOOMKilled.md) — fires if memory hits the hard limit.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

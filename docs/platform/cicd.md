@@ -1109,7 +1109,3 @@ VictoriaMetrics (see [observability](../observability/README.md)).
   `scan-severity: 'CRITICAL'` and reports `CRITICAL,HIGH,MEDIUM` non-blocking via `trivy-report`.
   Prefer named secrets over `secrets: inherit`.
 - Remove the dead `go-version` input from `sonarqube.yml` (unused; next interface bump).
-
----
-
-_Last updated: 2026-10-01 — Go 1.27 (`go 1.27.1`) and golangci-lint v2.14.0, the fallback in `go-check.yml` at the SHA the services pin. Previously 2026-08-19 — synced to the fixed workflows/template (SHA pins, CRITICAL-only gate, no -init image), auth-service examples replaced, homelab required-checks corrected, dev/uat marked target; previously 2026-07-22._

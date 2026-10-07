@@ -474,6 +474,3 @@ Each PR is independently revertable; W0 lands before any service adopts it.
   reference pattern for the `logic`-layer catalog.
 - [Application Metrics (RED)](../../../observability/metrics/metrics-apps.md) —
   the metrics-pillar doc this RFC extends with the Business family.
-
----
-_Last updated: 2026-07-16_

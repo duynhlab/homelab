@@ -175,6 +175,3 @@ flowchart LR
 - [`docs/api/README.md`](../../../api/README.md)
 - [RFC-0014](../RFC-0014/) — OTel adoption (Phase B builds on Collector fan-out)
 - [RFC-0018](../RFC-0018/) — platform-db / product-db topology for optional Phase A sync sources
-
----
-_Last updated: 2026-08-07_

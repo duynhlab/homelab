@@ -296,7 +296,3 @@ flowchart LR
   (monitoring → `:9187`/`:9127`/`:9090`, and → Keycloak `:9000`) already have
   allow rules. Policies are ingress-only, so egress (incl. kube-dns) is
   unfenced today — egress fencing is out of scope for now.
-
----
-
-_Last updated: 2026-09-30 — deny-all-ingress in app-tier namespaces has one owner, the Kyverno GeneratingPolicy; committed objects 26 → 15. Earlier: 2026-09-29 — kindnet enforcement re-measured on Kind 1.35.8 (RFC-0032). 2026-09-28 — Draw.io views of the app mesh (§ 3) and of the allows into the data and identity tier. 2026-08-27 — identity gains the ADR-062 monitoring→:8080 allow (Grafana OAuth backchannel) in prose, matrix, and diagram; the diagram's JWKS arrow corrected from seven to the ten pkg/authmw namespaces. 2026-08-19: rebuilt against the deployed manifests: auth residue removed (service retired, Keycloak/identity is the issuer), checkout/inventory/identity rows added, pod-scoped policy pattern documented, ADR-026 pooler swap reflected._

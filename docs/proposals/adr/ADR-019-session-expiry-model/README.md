@@ -87,6 +87,3 @@ Rejected outright; this ADR's core is that the timer is never load-bearing.
   order worker.
 - Revisit trigger: reservations at checkout time (stock/price holds) would
   make expiry a money-adjacent event and reopen the authority question.
-
----
-_Last updated: 2026-07-13_

@@ -258,6 +258,3 @@ a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-14 | Proposed / Not started | Safety review RFC-0023 deferred on 2026-08-10; three options put to the owner |
 | 2026-08-14 | Accepted / Complete | Accepted with the RFC-0023 amendment; order-service#199 and admin-service#10 implement it, gated by audit row A20 |
-
----
-_Last updated: 2026-08-14_

@@ -374,7 +374,3 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse: data replication — recovery after failures](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/replication)
 - [ClickHouse: `system.replicas`](https://clickhouse.com/docs/reference/system-tables/replicas)
 - [ClickHouse: MergeTree settings — `parts_to_delay_insert`, `parts_to_throw_insert`](https://clickhouse.com/docs/reference/settings/merge-tree-settings/parts-to)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: healthy replicas, bring-up authentication errors bounded to the first minutes. Earlier: 2026-09-29 — first draft of the failure-reasoning chapter; live
-observation pending verification on the Ubuntu Kind cluster._

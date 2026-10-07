@@ -19,6 +19,10 @@ only showed up when the design was run on a real cluster instead of read about.
 
 ## Overview
 
+The measurements below come from the ADR-055 drill on a from-scratch Kind
+cluster on 2026-09-05; they are historical observations, not measurements of
+the current version pins.
+
 A Temporal worker is not a web server. A web server is scaled on a signal it
 *emits* — CPU, request rate, latency. A worker is scaled on a signal that lives
 **somewhere else entirely**: the depth of the task queue on the Temporal server.
@@ -404,6 +408,3 @@ becomes **`exported_namespace`**. Dashboards and alerts filter on that, not on
 - [RFC-0026](../proposals/rfc/RFC-0026/) and its [`research.md`](../proposals/rfc/RFC-0026/research.md) — the proposal this page is distilled from; § Autoscaling mechanics is the `WorkerResourceTemplate` deep dive
 - [`docs/api/temporal.md`](../api/temporal.md) — worker versioning from the application side
 - KEDA Temporal scaler — <https://keda.sh/docs/latest/scalers/temporal/>
-
----
-_Last updated: 2026-09-05 — written from the ADR-055 Kind drill; every measurement quoted here was taken on a from-scratch cluster that day._

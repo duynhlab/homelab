@@ -112,7 +112,3 @@ Database manifests are indexed in the
 - [Metrics hub](README.md) · [Application metrics (RED)](metrics-apps.md) · [Database metrics](postgresql/README.md)
 - [VictoriaMetrics Operator Stack](victoriametrics.md) · [PromQL Guide](promql-guide.md)
 - [SLO Documentation](../slo/README.md) · [Grafana Dashboard Guide](../grafana/dashboard-reference.md)
-
----
-
-_Last updated: 2026-07-09 — USE coverage via kube-state-metrics; control-plane components scoped out on Kind; HTTP body-size metrics renamed to semconv (RFC-0014 P3)._

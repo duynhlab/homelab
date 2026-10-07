@@ -76,6 +76,3 @@ product feature.
   audit) is out of scope and noted as future work.
 - Revisit trigger: promo stacking (multiple codes per session) or
   order-level refunds needing redemption reversal.
-
----
-_Last updated: 2026-07-13_

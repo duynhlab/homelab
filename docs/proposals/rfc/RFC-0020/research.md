@@ -367,7 +367,7 @@ T3 (cert-auth) is the endpoint where a service could stop using a password entir
 - [x] At least **two alternatives** documented with tradeoffs
 - [x] **Platform as-built** section filled from manifests/docs (not boilerplate)
 - [x] Primary use-case direction stated — in-process per-workload on `homelab-ca`; scope decided: umbrella Slice 0–6 (owner, 2026-07-22)
-- [x] **Context7 audit** complete; footer date updated (PgDog, Istio, and OpenBAO rows resolved 2026-07-21)
+- [x] **Context7 audit** complete; audit date recorded (PgDog, Istio, and OpenBAO rows resolved 2026-07-21)
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
 - [x] Owner sign-off: **ready for RFC** (2026-07-22 — decisions recorded in [Open questions](#open-questions); RFC: [./README.md](./README.md))

@@ -67,6 +67,3 @@ the rejection storm worse.
 - [ValkeyHighClientConnections](ValkeyHighClientConnections.md) — the warning
   stage; usually fires first and names the leaking client.
 - Cache-miss impact lands on product latency (`MicroserviceHighLatency*`).
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the valkey/ domain folder_

@@ -161,39 +161,3 @@ when someone starts research (owner OK → `research.md` → index `researching`
 > HA and audit logging → [ADR-005](../adr/ADR-005-openbao-ha-raft/),
 > [ADR-004](../adr/ADR-004-enable-openbao-audit-logging/)); Temporal durability/DR →
 > [RFC-0001](RFC-0001/) (not a separate backlog row).
-
----
-_Last updated: 2026-10-06 — **RFC-0029** → `Accepted` with ADR-084, ADR-085 and ADR-086 (Adoption `Not started`). Earlier the same day — **RFC-0029** → `provisional`: owner approved "ready for RFC", README authored from the research. Previously 2026-10-05 — **RFC-0029** Phase 0 executed on Kind and recorded; research gate 10/11, only owner sign-off open. Earlier the same day — **RFC-0029** research refreshed against main and the cluster (versions, local-stack roles, a pgroles alternative, the `vault_rotator` membership guard); still `researching`. Earlier the same day — **RFC-0029** indexed at `researching` with the Phase 0 `vault_rotator` hardening; Phase 0 live rotation and the owner gate remain open. Previously 2026-10-01 — **RFC-0033** → `Accepted`: bounded jobs plus the GitHub
-ledger selected, publishing human-operated in Phases 0–1, and ADR-079 through ADR-083
-accepted at Adoption `Not started`; no runtime component is installed. Previously
-2026-09-30 — **RFC-0032** closed at 1.35.8 (implemented). Earlier: 2026-09-29 — **RFC-0033** → `provisional` (2026-09-28): the research
-gate passed with owner-confirmed directions, including a schema-normalized GitHub task
-contract, App-scoped unattended identity, external heartbeat, measurable promotion bars,
-and documentation page/example contracts. The architecture choice remains undecided
-pending review; no runtime component is installed. Previously 2026-09-28 — **RFC-0031**
-→ `implemented` (2026-09-25): every delivery-plan
-task done, both final gates passed, ADR-070 through ADR-076 at `Adoption: Complete`.
-Previously 2026-09-25 — **RFC-0033** reserved at `researching` for a
-Claude-native autonomous engineering organization. The research corrects unsupported
-viral attribution and headcount claims, evaluates an always-on but human-gated target,
-adds a Documentation Steward for an executable `docs/` learning and knowledge plane,
-and recommends qualifying routines + custom subagents + worktrees + a GitHub ledger
-before considering a custom Agent SDK controller. No runtime component is installed._
-
-_Last updated: 2026-09-29 — **RFC-0032** Phase 2 landed (ADR-077 Complete). Earlier the same day — **RFC-0032** Phase 1 on `v1.35.8` (amended: ZFS blocks the 1.36 kubelet), Kind gate ELIGIBLE. Previously 2026-09-28 — **RFC-0032** → `Accepted`, with ADR-077 at `Proposed` and Kyverno 1.19.1 as its landed prerequisite. Previously 2026-09-22 — **RFC-0032** opened at `provisional`: the Kind baseline moves to `kindest/node:v1.36.4` by digest before Kubernetes 1.34 reaches EOL on 2026-10-27, taking the move **before** any Kyverno release lists 1.36 and recording that pairing as an explicit acceptance evidenced by the full Kind gate. Two blockers in the earlier local research were re-verified and found void (Kind v0.33.0 publishes a digest-pinned 1.36.4 image; the installed kubectl 1.37 is within skew of a 1.36 server). Every 1.35/1.36 feature is given a verdict and only OCI image volumes are adopted — `ADR-077`, replacing the ClickHouse DDL ConfigMap. Previously 2026-09-18 — RFC-0031 Phase 1 started — ADR-072 `Partial` after the fleet pkg-pin and linter convergence. Previously 2026-09-17 — RFC-0031 **Accepted** with ADR-070…076 created at `Accepted / Not started` (facade `pkg/logger/slogx`, bare namespaces as registered exceptions, greenfield cutover). Previously 2026-09-09 — **RFC-0030** and its four independent decisions are Accepted at Adoption `Not started`: [ADR-066](../adr/ADR-066-adopt-peerdb-for-commerce-cdc/) for PeerDB transport, [ADR-067](../adr/ADR-067-constrain-commerce-cdc-source-allowlist/) for source egress, [ADR-068](../adr/ADR-068-schedule-cdc-heartbeats-with-pg-cron/) for `pg_cron` heartbeats, and [ADR-069](../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) for the read-only serving boundary. Mandatory Phase 0 qualification blocks rollout and no component is installed. Previously 2026-09-08 — RFC-0030 selected a custom CNPG system image plus `pg_cron` for its 30-second target heartbeat, removing the planned external writer while keeping PeerDB as the CDC transport, after reversing its pre-Accepted transport direction from custom batch to self-hosted PeerDB. Previously 2026-09-07 — RFC-0030 advanced to `provisional` after its research and Context7 gates passed and the owner said `ready for RFC`. Previously 2026-09-06 — **RFC-0030** reserved for Backoffice commerce analytics. Previously 2026-09-05 — **RFC-0026**'s deferred half landed: ADR-055 Accepted and installed (KEDA 2.20.2, one `ScaledObject` per worker version, two capacity alerts), Adoption Partial until the Kind audit. Previously 2026-08-28 — **RFC-0028** accepted and implemented, with its schema decision **reversed during implementation**: exporter-owned DDL cannot complete at three replicas, so a bootstrap Job owns the schema in a `Replicated` database. Earlier the same day: research gate passed and README authored at `provisional` (owner resolved every open question in-session; the gate chose exporter-owned Option B). Earlier: opened at `researching` (ClickHouse replication + least-privilege; sharding researched-not-built). Previously 2026-08-25 — the Kind gate passed and **RFC-0023** and **RFC-0024** both
-reached `implemented`, converting nine ADRs to `Adoption: Complete` in one run; a docs audit
-over the whole tree followed, correcting index rows that had drifted from the records they
-point at (this row among them). 2026-08-24 — **RFC-0027** → `implemented`: Tempo (both installs) and Jaeger are
-retired, VictoriaTraces + ClickHouse are the two trace sinks, and P6 put the edge's access log on
-the OTLP road so it finally reaches the 90-day store. Three of its four ADRs are
-`Adoption: Complete`, ADR-057 included once the `red-spanmetrics` and `otel-collector-health`
-boards were ported to the cluster, and
-ADR-040 is `Withdrawn` — an obligation P4 missed and the P5 docs audit caught. That audit also
-found two defects that were not documentation: a **critical** alert deleted as collateral because
-it shared a file with `TempoDown`, and a Grafana pivot (`tracesToProfiles`) that turns out to be
-Tempo-datasource-only and is now a recorded gap. 2026-08-21 — RFC-0026 **Accepted**: research gate
-passed and the Temporal Worker Controller adopted, retiring the per-build manifest and the
-hand-run activation Job; ADR-054 and ADR-055 created at `Proposed` (KEDA recorded, not installed).
-Previously: RFC-0025 `implemented` (storefront cutover as frontend v3.0.0, ADR-052 Accepted /
-Adoption Complete) and RFC-0023 Accepted (Backoffice portal + first `protected` APIs; ADR-047..049
-created at Accepted)._

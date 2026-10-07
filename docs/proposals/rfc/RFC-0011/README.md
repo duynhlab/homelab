@@ -454,6 +454,3 @@ Pre-purchase checklist:
   current cert-manager + LE DNS-01 setup
 - Reference repos: [jfroy/flatops](https://github.com/jfroy/flatops),
   [haraldkoch/kochhaus-home](https://github.com/haraldkoch/kochhaus-home)
-
----
-_Last updated: 2026-08-25_

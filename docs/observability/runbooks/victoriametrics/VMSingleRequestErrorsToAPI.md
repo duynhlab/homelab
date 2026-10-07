@@ -65,6 +65,3 @@ when escalating.
 - [VMSingleDiskRunsOutOfSpace](VMSingleDiskRunsOutOfSpace.md)
 - [VMTooHighQueryLoad](VMTooHighQueryLoad.md)
 - [VMAlertRemoteWriteErrors](VMAlertRemoteWriteErrors.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

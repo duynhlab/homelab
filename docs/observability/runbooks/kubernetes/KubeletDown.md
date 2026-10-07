@@ -71,6 +71,3 @@ have completely different urgencies and the alert cannot tell them apart.
 - [KubeNodeNotReady](KubeNodeNotReady.md)
 - [KubeAPIServerDown](KubeAPIServerDown.md)
 - [KubeletTooManyPods](KubeletTooManyPods.md)
-
----
-_Last updated: 2026-09-05 — created; the controlplane alert group had no runbooks_

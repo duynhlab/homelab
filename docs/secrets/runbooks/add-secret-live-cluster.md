@@ -113,6 +113,3 @@ A scoped **AppRole/Kubernetes-auth role with write on `secret/data/local/*`**
 for operator seeding would retire this ceremony — tracked as an RFC-0008
 follow-up. Until then the trade-off is deliberate: no standing write
 credential exists to steal.
-
----
-_Last updated: 2026-08-27 — OIDC infra-team login is the normal write path (ADR-062); recovery-key ceremony demoted to issuer-down fallback with its RFC-0008 403 gap stated. 2026-07-31: first version._

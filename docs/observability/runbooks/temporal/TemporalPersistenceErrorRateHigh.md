@@ -40,6 +40,12 @@ The visible failure is therefore four layers away from the cause, in Flux.
 
 ## Diagnosis
 
+On 2026-09-06, 535 `serviceerror_NotFound` events in 30 minutes from
+`GetCurrentExecution` and `GetTaskQueueUserData` produced a 0.02592 ratio
+against the 0.02 threshold; excluding not-found types yielded 0.0.
+`serviceerror_Unavailable` and `CurrentWorkflowConditionFailedError` remained
+included.
+
 **Compare both ends of the same operation.** This is the step that matters:
 
 ```promql
@@ -125,6 +131,3 @@ kubectl logs -n temporal deploy/temporal-history --since=2m | grep -c 'shard sta
 - [TemporalServerDown](TemporalServerDown.md)
 - [TemporalWorkerRequestErrorRateHigh](TemporalWorkerRequestErrorRateHigh.md) —
   what the SDK sees when the server is struggling.
-
----
-_Last updated: 2026-09-05 — created; the temporal alert group had no runbooks at all_

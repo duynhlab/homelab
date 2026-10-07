@@ -62,6 +62,3 @@ premature scale-up, more replicas fix nothing.
 
 - [KubePodCPUThrottlingHigh](KubePodCPUThrottlingHigh.md) — saturated replicas
   under CPU limits throttle before they scale.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

@@ -229,7 +229,3 @@ histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_
 - [SLO Documentation](../slo/README.md) — SLI mappings, Sloth integration
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) · [Datasource Strategy](../grafana/datasources.md)
 - [VictoriaMetrics docs](https://docs.victoriametrics.com/) · [prometheus-operator CRDs](https://prometheus-operator.dev/)
-
----
-
-_Last updated: 2026-07-14 — databases layer is now all-CloudNativePG (Zalando→CNPG migration); PgDog pooler; pg_exporter docs retained as retired reference._

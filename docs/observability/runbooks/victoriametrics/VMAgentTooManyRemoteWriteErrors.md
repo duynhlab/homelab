@@ -59,6 +59,3 @@ Warning. Escalate when the queue starts growing rather than holding flat.
 - [VMAgentPersistentQueueRunsOutOfSpaceIn4Hours](VMAgentPersistentQueueRunsOutOfSpaceIn4Hours.md)
 - [VMAgentRemoteWriteConnectionIsSaturated](VMAgentRemoteWriteConnectionIsSaturated.md)
 - [VMServiceDown](VMServiceDown.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

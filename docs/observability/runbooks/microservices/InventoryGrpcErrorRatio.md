@@ -64,5 +64,3 @@ sum by (outcome) (rate(inventory_reservation_total[5m]))
 - [`InventoryReserveUnknownSKU`](InventoryReserveUnknownSKU.md)
 - [`GrpcServerHighErrorRate`](GrpcServerHighErrorRate.md) — the fleet-wide equivalent
 - [`docs/api/inventory.md`](../../../api/inventory.md) — RPCs and status-code contract
-
-_Last updated: 2026-08-07_

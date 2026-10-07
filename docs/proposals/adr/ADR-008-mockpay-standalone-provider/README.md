@@ -90,7 +90,3 @@ mockpay's per-key replay to avoid a double charge.
   service (this platform's "NetworkPolicy is the fence" convention). Body-size
   caps and full server timeouts are in place on both the client read and the
   mock server.
-
----
-
-_Last updated: 2026-07-04_

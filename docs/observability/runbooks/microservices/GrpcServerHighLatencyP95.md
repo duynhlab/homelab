@@ -102,6 +102,3 @@ longer shopper waits and hides the regression this alert exists to catch.
   failing rather than slowing.
 - [DBClientQueryP95High](DBClientQueryP95High.md) — the most common span
   hiding inside a slow RPC.
-
----
-_Last updated: 2026-08-19 — rewritten to the canonical template (was a stub)_

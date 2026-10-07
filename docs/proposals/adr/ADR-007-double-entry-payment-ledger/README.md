@@ -134,7 +134,3 @@ money, so they post nothing.
 - **Revisit trigger:** if payments span multiple providers or currencies, or if a
   cross-service ledger becomes necessary, the fixed three-account chart and the
   in-service posting model will need to be reopened.
-
----
-
-_Last updated: 2026-07-04_

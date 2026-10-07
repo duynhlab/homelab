@@ -59,5 +59,3 @@ re-asking under the original key.
   a provider that is only just back.
 - If this fires without a provider fault, suspect the hop: DNS, NetworkPolicy,
   or a client timeout shorter than the provider's own latency.
-
-_Last updated: 2026-08-02_

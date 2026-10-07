@@ -231,6 +231,3 @@ requires a new ADR that supersedes this one.
 | 2026-08-27 | Proposed / Not started | Initial draft, from the owner-reviewed deep-dive |
 | 2026-08-27 | Accepted / Partial | Owner merged #936; registration code shipped inert in checkout#79 (verified: "worker versioning off" on compose); WorkerDeployment manifest in the homelab train PR |
 | 2026-08-27 | Accepted / Complete | Kind: WorkerDeployment checkout-abandon Ready first bring-up; live run pinned to the derived build; flux-validate guard now polices both workers |
-
----
-_Last updated: 2026-08-27_

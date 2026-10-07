@@ -152,7 +152,3 @@ otherwise stands.
   `missing_provider` recurring often enough to need automation, re-open with a
   proposal for a *provider-writing* reconciler — a larger decision that reverses
   ADR-011's read-only guarantee and deserves its own ADR.
-
----
-
-_Last updated: 2026-07-06_

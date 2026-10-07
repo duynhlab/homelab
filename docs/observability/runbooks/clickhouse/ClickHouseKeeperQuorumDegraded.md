@@ -73,6 +73,3 @@ follower has no margin left.
 - [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md),
   [ClickHouseZooKeeperExceptions](ClickHouseZooKeeperExceptions.md) — server-side
   effects.
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

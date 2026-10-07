@@ -162,6 +162,3 @@ decision requires a new ADR that supersedes this one.
 | 2026-08-10 | Proposed / Not started | Decision recorded during RFC-0023 review (as draft ADR-043, renumbered 048 on 2026-08-11) |
 | 2026-08-13 | Accepted / Not started | Accepted with RFC-0023 |
 | 2026-08-25 | Accepted / **Complete** | Kind gate passed. Note the History skipped `Partial` entirely — this table read `Accepted / Not started` from 2026-08-13 until today while the header carried `Partial`; recorded here rather than backdated. |
-
----
-_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

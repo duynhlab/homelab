@@ -69,6 +69,3 @@ and a guaranteed DB load spike.
 - [ValkeyHighEvictionRate](ValkeyHighEvictionRate.md) — the symptom that
   follows sustained saturation.
 - Cache-miss impact lands on product latency (`MicroserviceHighLatency*`).
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the valkey/ domain folder_

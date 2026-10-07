@@ -1155,7 +1155,3 @@ If the rate limiting counter encounters an error (memory pressure, internal issu
 - ~~Switch rate limiting from `local` to `redis` policy (Valkey backend)~~ — **done** (`policy: redis`, Valkey db 1, both rate-limit plugins)
 - Consider `KongConsumer` + `KongConsumerGroup` for tiered rate limits
 - Evaluate Kong Gateway API support (migrate from Ingress to HTTPRoute)
-
----
-
-_Last updated: 2026-08-19 — archive banner strengthened (kept-for-learning framing; the "arriving with P6" clause was stale — envoy-gateway.md is live). Body frozen since 2026-07-22._

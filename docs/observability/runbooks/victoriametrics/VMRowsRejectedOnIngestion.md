@@ -62,6 +62,3 @@ nobody investigated becomes a dashboard nobody trusts.
 - [VMSingleTooHighChurnRate](VMSingleTooHighChurnRate.md)
 - [VMAgentTooManyScrapeErrors](VMAgentTooManyScrapeErrors.md) — the other end of
   the pipeline.
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

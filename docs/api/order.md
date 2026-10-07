@@ -424,5 +424,3 @@ Paths in [`duynhlab/order-service`](https://github.com/duynhlab/order-service). 
 - [ADR-018](../proposals/adr/ADR-018-checkout-order-boundary/) — checkout→order boundary
 - [ADR-051](../proposals/adr/ADR-051-trusted-operator-resolution/) — why the resolve command trusts the operator, and what it records instead
 - [OrderManualReviewBacklog runbook](../observability/runbooks/microservices/OrderManualReviewBacklog.md) — operating the parked queue
-
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-22 — RFC-0026/ADR-054 assigned versioned-worker lifecycle to the Temporal Worker Controller._

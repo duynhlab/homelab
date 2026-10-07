@@ -95,6 +95,3 @@ These widen the gap between target and as-built; tracked in
 - [Backup policy](./backup-policy.md) — schedules, retention, and object-store paths.
 - [WAL and checkpoints](./fundamentals/04-wal-and-checkpoints.md) — WAL durability and checkpoint mechanics.
 - [runbooks/restore-and-failover-drills.md](./runbooks/restore-and-failover-drills.md) — how the targets get verified.
-
----
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

@@ -288,5 +288,3 @@ Prioritized platform and contract gaps; cross-service rules owner: [RFC-0004](..
 - [RFC-0004](../proposals/rfc/RFC-0004/) — cross-service caching and invalidation
 - [Valkey Documentation](https://valkey.io/)
 - [Valkey Helm chart](https://valkey.io/valkey-helm/)
-
-_Last updated: 2026-08-13 — platform hub; app contract in docs/api/caching.md._

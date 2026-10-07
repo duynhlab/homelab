@@ -139,7 +139,3 @@ observability **lookup**, not a metrics rollup.
 - [Materialized views](https://clickhouse.com/docs/concepts/features/materialized-views) (incremental `TO`)
 - [Architecture overview](https://clickhouse.com/docs/concepts/core-concepts/academic-overview) — Figure 5 (aggregating contrast)
 - [Fundamentals](fundamentals.md) · [Schema and queries](schema-and-queries.md) · [Hub](README.md)
-
----
-
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-04_

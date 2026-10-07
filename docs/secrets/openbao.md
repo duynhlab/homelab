@@ -1176,7 +1176,3 @@ gantt
 - [OpenBAO Helm Chart](https://openbao.org/docs/platform/k8s/helm)
 - [External Secrets Operator](https://external-secrets.io/)
 - [CloudNativePG External Secrets Integration](https://cloudnative-pg.io/docs/1.28/cncf-projects/external-secrets)
-
----
-
-_Last updated: 2026-10-05 — `vault_rotator` is backed by a random per-cluster OpenBAO value shared by CNPG and the database configurator. The database-engine diagram now draws that credential path. Earlier: 2026-10-01 — listener TLS and the ESO `https` + `caBundle` target now name their owner, RFC-0020 Slice 1 (was RFC-0008). Earlier: 2026-09-30 — § 11 `db-strong` marked reference, not deployed, with a warning that its symbol set breaks unescaped DSNs. Earlier the same day: which dashboard panels stay empty and why (Consul on Raft; lazily registered policy and route counters). Earlier: 2026-09-29 — Raft sequence says HTTP :8200 (TLS planned); the product-db connection diagram is labelled planned. Earlier: 2026-09-29 — audit is declared in the server config (the bootstrap's API-created device never worked) and ships to VictoriaLogs + ClickHouse; `telemetry {}` + ServiceMonitor. Earlier the same day — OpenBAO 2.7.0: the awskms seal is now an external KMS plugin, downloaded once and cached on the Raft PVC; the chart is pinned at 0.30.0. Previously 2026-08-26 — OIDC staff SSO is deployed (ADR-062): §4 rewritten from the GitHub/Google sketch to the Keycloak reality. Previous sync 2026-08-19 (ADR-024 + ADR-025)_

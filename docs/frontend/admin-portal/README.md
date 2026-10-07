@@ -231,6 +231,3 @@ Each verified against the manifests:
 - [Envoy Gateway](../../platform/envoy-gateway.md) — routes, SecurityPolicy, CORS
 - [RFC-0023](../../proposals/rfc/RFC-0023/README.md) — the RFC that introduced the portal and `/protected/`
 - [RFC-0025](../../proposals/rfc/RFC-0025/README.md) — the storefront's convergence onto this stack
-
----
-_Last updated: 2026-08-25_

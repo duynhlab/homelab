@@ -343,8 +343,3 @@ Before continuing, explain these without rereading the chapter:
 - [Hot standby — consistency messages](https://www.postgresql.org/docs/18/hot-standby.html)
 - [CloudNativePG recovery](https://cloudnative-pg.io/docs/1.30/recovery)
 - [Barman Cloud plugin concepts](https://cloudnative-pg.io/plugin-barman-cloud/docs/concepts)
-
----
-_Last updated: 2026-10-01 — live lab verified: timeline 1, the `pg_is_in_backup()` error on 18.1, and a PITR window that starts at the cluster's first backup. Earlier: 2026-09-29 — first version: backup label, restore loop,
-consistency, recovery targets, and timelines, absorbing the recovery notes
-from the former storage-and-WAL page._

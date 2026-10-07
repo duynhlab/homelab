@@ -264,6 +264,3 @@ TBD — provisional; deferred, no implementation. Revisit per the criteria above
   [shared API guide](../../../api/api.md) (runtime, security, and observability).
 - Network fence: [`docs/security/network-policies.md`](../../../security/network-policies.md).
 - Origin: platform planning backlog; tracked as RFC-0006 (defer).
-
----
-_Last updated: 2026-08-25_

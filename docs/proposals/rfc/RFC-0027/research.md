@@ -728,7 +728,7 @@ upstream advises keeping at least 20% free.
 - [x] At least **two alternatives** documented with tradeoffs — baseline plus three shapes
 - [x] **Platform as-built** section filled from manifests/docs (not boilerplate)
 - [x] Primary use-case direction stated — remains **undecided** pending the TraceQL experiment
-- [x] **Context7 audit** complete; footer date updated
+- [x] **Context7 audit** complete; audit date recorded
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
 - [x] Owner sign-off: **ready for RFC** — 2026-08-24, with the three-store shape

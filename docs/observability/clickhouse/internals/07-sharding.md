@@ -281,7 +281,3 @@ Before continuing, explain these without rereading the chapter:
 - [`optimize_skip_unused_shards` settings](https://clickhouse.com/docs/reference/settings/session-settings/optimize-skip)
 - [Scaling example: one shard, two replicas, `internal_replication`](https://clickhouse.com/docs/guides/oss/deployment-and-scaling/examples/1-shard-2-replicas)
 - [`SYSTEM` statements for managing distributed tables](https://clickhouse.com/docs/sql-reference/statements/system)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: one shard, three replicas. Earlier: 2026-09-29 — first published version; live observation pending
-verification on the Ubuntu Kind cluster._

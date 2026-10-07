@@ -61,5 +61,3 @@ the table was locked; check CNPG cluster health for the same window.
 A duplicate row refused by the one-SUCCESS-capture index is **not** counted
 here — that is `ErrDuplicateAttempt`, which means another writer got there
 first, not that evidence was lost.
-
-_Last updated: 2026-08-02_

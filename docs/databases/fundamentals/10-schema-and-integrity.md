@@ -300,8 +300,3 @@ Before continuing, explain these without rereading the chapter:
 - [CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)
 - [Explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
 - [PostgreSQL 18 release notes](https://www.postgresql.org/docs/18/release-18.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: the constraint census (PG 18 `NOT NULL` rows), the four RI triggers behind one FK, and FK counts across all 13 application databases. Earlier: 2026-09-29 — first published chapter; absorbs the former
-schema-and-integrity page and adds enforcement internals, the ALTER TABLE lock
-model, and the PG 18 generated-column and temporal-constraint changes._

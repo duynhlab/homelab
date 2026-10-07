@@ -71,7 +71,3 @@ Worked example: `vector-hostpath` (removed 2026-08-19) targeted DaemonSet
 `vector-*` in `monitoring`, but Vector deploys into `kube-system` — which
 pss-baseline excludes anyway. The exception matched nothing, so it was deleted
 rather than renewed.
-
----
-
-_Last updated: 2026-09-30 — last two exceptions removed as inert (ADR-078 step 3); add-workflow uses the CEL PolicyException. Earlier: 2026-09-30 — postgres-operators no longer waives require-resources (inert; dropped during ADR-078 step 1). Earlier: 2026-08-19 — inert `vector-hostpath` deleted (targeted the wrong namespace; kube-system is baseline-excluded), `postgres-operators` rescoped to the namespaces that actually host CNPG Clusters (was matching the retired `auth` ns and three cluster-less ns while missing `platform`), exceptions-namespace pin documented, issue-based workflow replaced with PR-based (no GitHub issues on this repo). Previously 2026-08-12 — `kong-openbao` narrowed to `openbao` (RFC-0024 P2.3)._

@@ -66,6 +66,3 @@ that raises the miss ratio and shifts even more load to PostgreSQL.
 - [ValkeyHighMissRatio](ValkeyHighMissRatio.md) — the downstream symptom when
   evictions remove hot keys.
 - Cache-miss impact lands on product latency (`MicroserviceHighLatency*`).
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the valkey/ domain folder_

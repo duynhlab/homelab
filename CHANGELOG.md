@@ -301,6 +301,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Remove accumulated editorial footers from docs; keep unique historical
+  verification evidence beside its owning claims and preserve RFC/ADR metadata.
+  Align the edge 429 catalog with the deployed `enforced` counter.
+
 - **The two Temporal worker runbooks select the worker pods again.**
   `TemporalWorkflowFailureRateHigh` and `TemporalWorkerRequestErrorRateHigh`
   used `-l app=order-fulfillment` / `-l app=checkout-abandon`, labels the

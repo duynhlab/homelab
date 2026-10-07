@@ -83,6 +83,3 @@ diagnose the store while half its telemetry is missing.
 - [ClickHouseOperatorReconcileErrors](ClickHouseOperatorReconcileErrors.md) — the
   operator alive but failing.
 - [FluxHelmReleaseNotReady](../gitops/FluxHelmReleaseNotReady.md)
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

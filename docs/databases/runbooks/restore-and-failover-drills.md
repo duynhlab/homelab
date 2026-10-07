@@ -212,6 +212,3 @@ artifact.
 - [reliability-targets.md](../reliability-targets.md) — the targets these drills verify.
 - [Emergency recovery](./emergency-recovery.md) — the real-incident version of these procedures.
 - [Backup and restore](./backup-restore.md) — full backup/restore runbook.
-
----
-_Last updated: 2026-08-31._

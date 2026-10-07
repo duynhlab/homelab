@@ -155,6 +155,3 @@ objects, or unbounded query text from other tenants.
 - [Monitoring and capacity](fundamentals/14-monitoring-and-capacity.md)
 - [Emergency recovery](runbooks/emergency-recovery.md)
 - [CloudNativePG](cloudnativepg.md)
-
----
-_Last updated: 2026-09-09 — added a symptom-first bridge across metrics, logs, traces, SQL, and runbooks._

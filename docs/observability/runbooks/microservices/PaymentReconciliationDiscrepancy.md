@@ -117,5 +117,3 @@ dirty on every pass forever.
   (`mp_<hex>`, also `re_` and `evt_`), so a restart no longer reissues an id —
   before that, a new charge could reuse an old `provider_payment_id` and a reused
   webhook `event_id` was dropped as a redelivery.
-
-_Last updated: 2026-09-24 — mockpay ids are random since payment v2.4.2; the reconciliation window replaces the stale full-scan note. Previously 2026-08-02_

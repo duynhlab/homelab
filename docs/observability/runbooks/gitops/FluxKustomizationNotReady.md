@@ -113,6 +113,3 @@ bring-up noise, not an incident; treat one that persists across retries as real.
   warning-level rule across every Flux kind.
 - [FluxReconcileDurationHigh](FluxReconcileDurationHigh.md) — slow, not failed;
   often the precursor.
-
----
-_Last updated: 2026-09-05 — created; the flux-alerts group had no runbooks at all_

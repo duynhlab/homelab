@@ -70,6 +70,3 @@ leak a bigger meal, and the kill comes back on a slower fuse.
 - [KubePodMemoryNearLimit](KubePodMemoryNearLimit.md) — the early warning for
   this alert.
 - [KubePodCrashLooping](KubePodCrashLooping.md) — where repeated OOMKills end up.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

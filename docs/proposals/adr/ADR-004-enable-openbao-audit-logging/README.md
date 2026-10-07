@@ -48,6 +48,3 @@ gives an immediate, searchable audit trail using infrastructure we already run.
 ---
 
 <!-- Append-only: supersede with a new ADR rather than rewriting this one. -->
-
----
-_Last updated: 2026-06-29_

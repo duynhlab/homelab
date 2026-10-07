@@ -48,6 +48,3 @@ Warning. Escalate only if it becomes the 4-hour alert.
 
 - [VMAgentPersistentQueueRunsOutOfSpaceIn4Hours](VMAgentPersistentQueueRunsOutOfSpaceIn4Hours.md)
 - [VMAgentPersistentQueueIsDroppingData](VMAgentPersistentQueueIsDroppingData.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

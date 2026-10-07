@@ -154,5 +154,3 @@ Ready condition alone is not application recovery. Follow the
 - [CloudNativePG 1.30 rolling updates](https://cloudnative-pg.io/docs/1.30/rolling_update/)
 - [CloudNativePG 1.30 Kubernetes maintenance](https://cloudnative-pg.io/docs/1.30/kubernetes_upgrade/)
 - [CloudNativePG 1.30 storage](https://cloudnative-pg.io/docs/1.30/storage/)
-
-_Last updated: 2026-10-06 — added planned-maintenance checks and distinct upgrade/recovery boundaries._

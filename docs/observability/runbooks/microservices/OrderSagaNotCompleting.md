@@ -31,6 +31,9 @@ reserved, customers waiting. The outbox gauges stay green (rows are DISPATCHED;
 the workflow *did* start), so nothing else fires.
 
 ## Diagnosis
+
+The diagnosis commands were exercised against a healthy cluster on 2026-08-22
+during the ADR-054 revision.
 First suspect, before anything else — the versioning routing. Read it from the CR,
 which is the cheapest and most reliable source:
 ```bash
@@ -140,8 +143,3 @@ exist under ADR-030.
 - [RFC-0021 cutover rollback](../../../proposals/rfc/RFC-0021/cutover-rollback.md)
   — **historical**: describes the per-build manifest and activation Job that no
   longer exist. Do not follow it during an incident.
-
----
-_Last updated: 2026-08-22 — rewritten for ADR-054. Every command in Diagnosis was
-run against a healthy cluster first: the three it replaced returned an error, an
-empty table, and a false positive respectively._

@@ -61,6 +61,3 @@ node's container-runtime or PV storage paths by hand — pruning through
 - [KubePersistentVolumeFillingUp](KubePersistentVolumeFillingUp.md) — the
   per-volume view; on Kind both alerts watch the same physical disk.
 - [KubeNodeNotReady](KubeNodeNotReady.md) — where unresolved pressure ends.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

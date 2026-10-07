@@ -57,6 +57,3 @@ workers is alerted on the Temporal side
 
 Every runbook here follows [`_TEMPLATE.md`](../_TEMPLATE.md): quick facts →
 Meaning → Impact → Diagnosis → Mitigation → Escalation (→ Related).
-
----
-_Last updated: 2026-10-01 — the dashboard row points at the as-code board (Kubernetes folder); the in-repo `keda.json` went with #1085. Earlier: 2026-09-05 — created with the KEDA install (ADR-055)_

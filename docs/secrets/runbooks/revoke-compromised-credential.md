@@ -41,7 +41,3 @@ Verify from PostgreSQL that the old password no longer authenticates (the
 ```bash
 kubectl exec -n platform platform-db-1 -- psql -U postgres -c "\du" | grep notification
 ```
-
----
-
-_Last updated: 2026-08-27 — step 0 is the ADR-062 staff OIDC login (one command beats a multi-party ceremony under incident pressure); generate-root demoted to issuer-down fallback. 2026-08-19: ceremony added, ADR-025 alignment._

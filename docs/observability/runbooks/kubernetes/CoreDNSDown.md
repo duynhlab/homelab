@@ -70,6 +70,3 @@ this one; fix here first and do not chase them.
 - [KubeletDown](KubeletDown.md), [KubeAPIServerDown](KubeAPIServerDown.md) — the
   other control-plane absences.
 - [CoreDNSHighErrorRate](CoreDNSHighErrorRate.md) — degraded rather than absent.
-
----
-_Last updated: 2026-09-05 — created; the controlplane alert group had no runbooks_

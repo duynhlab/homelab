@@ -352,13 +352,3 @@ Query-side symptoms (logs ingested but blank in Grafana) are
 - [Vector docs](https://vector.dev/docs/) ·
   [VictoriaLogs Vector setup](https://docs.victoriametrics.com/victorialogs/data-ingestion/vector)
 - [PostgreSQL metrics hub](../metrics/postgresql/README.md) — the metrics-side view of the same CNPG clusters
-
----
-
-_Last updated: 2026-09-30 — chart 0.58.0; buffer gauges renamed (`vector_buffer_size_events`/`_bytes`), upstream board buffer-bytes panel gap noted. Earlier: 2026-09-29 — second log path: the same lines also reach ClickHouse `otel_logs` via `to_otlp` → `otel_clickhouse` → the collector's `otlp/vector` receiver; OpenBao audit fields extracted. Previously 2026-08-25 — ADR-061 adds the edge-runtime carve-out: a second
-`kubernetes_logs` source scoped to the EG proxy pods whose filter keeps only
-non-JSON runtime lines (the access log is ClickHouse-only now). Earlier the same
-day: the PostgreSQL pipeline section was rebuilt hop-by-hop after a live audit
-found `auto_explain.log_format` unset — every plan had been failing the JSON
-parse into the `pg_parse_failures` sink; the parameter is now set and the
-troubleshooting checklist runs in root-cause order._

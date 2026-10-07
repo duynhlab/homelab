@@ -1195,9 +1195,3 @@ dev password in local-stack.
 - [Grafana ClickHouse datasource](https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/) · [ClickHouse docs — Using Grafana](https://clickhouse.com/docs/observability/grafana)
 - Design: [RFC-0019](../../proposals/rfc/RFC-0019/) · [ADR-023](../../proposals/adr/ADR-023-clickhouse-observability-olap/)
 - Observability hub: [`docs/observability/README.md`](../README.md)
-
----
-
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-10-01 — plugin version references updated to 4.22.0. Earlier: 2026-10-01 — plugin-bundled dashboards fetched by URL at the plugin tag (no local patch; the #1142 sort-key bound is dropped). Earlier the same day: vendored on the cluster from v4.22.0 (the old "manual import" text was stale). Earlier: 2026-09-30 — server 26.8 LTS with asynchronous_metrics_key_values_mode=both (Keeper follows separately); operator 0.27.4; exporter version 0.161.0; Playground: forcing a merge is local-stack only, a part's level is not a merge count, `DownloadPart` explained by per-signal replica pinning, the 22-rule audit figure dated (23 deployed). Earlier: 2026-09-29 — Playground re-captured on the Kind cluster (three replicas; `DownloadPart`, part-name anatomy, and the measured `otel_logs` pruning caveat with the `toStartOfFiveMinutes` recipe); the edge example uses the cluster's `platform.envoy-gateway`; architecture and ingest show Vector's second log path. Previously 2026-09-14 — added the operator learning path, real Kind audit,
-credential-safe query examples, and current runtime evidence for parts, TTL,
-cold storage, and the 22-rule ClickHouse alert group._

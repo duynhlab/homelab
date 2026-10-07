@@ -314,8 +314,3 @@ Before continuing, explain these without rereading the chapter:
 - [Wait events and `pg_wait_events`](https://www.postgresql.org/docs/18/monitoring-stats.html)
 - [Lock management configuration](https://www.postgresql.org/docs/18/runtime-config-locks.html)
 - [`pg_locks` view](https://www.postgresql.org/docs/18/view-pg-locks.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: an idle wait census and an empty blocking chain; corrected the exported lock metric name to `cnpg_pg_locks_count_count`. Earlier: 2026-09-29 — first published chapter version for issue #1137;
-absorbs the locking sections of the retired mvcc-locking-and-vacuum page and
-the blocking-chain queries of the retired monitoring page._

@@ -71,7 +71,3 @@ migration gating an in-flight release, especially when
 on the waiting service. Do not blindly delete-and-retry a half-applied
 migration Job: read the logs first, or the rerun can double-apply DDL against
 an inconsistent schema.
-
----
-_Last updated: 2026-09-14 — corrected the rendered namespace to the
-kube-state-metrics `exported_namespace` label._

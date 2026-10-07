@@ -132,9 +132,3 @@ Grafana `victoriatraces` datasource are both deployed config (`otel-collector.ya
 measured at 12 edges including database dependencies on the Kind cluster. The
 long-retention copy of the same spans lives in ClickHouse `otel_traces` (90d).
 See [backends-comparison.md](./backends-comparison.md) for the decision context.
-
----
-_Last updated: 2026-08-24 — no longer a pilot. RFC-0027 retired Tempo and Jaeger, so this
-is the primary trace store: the title, the caveat block, the diagram, the exporter list and the
-status section all said otherwise. Added the service-graph endpoint and its not-retroactive
-caveat, and demoted the Tempo-compatible API to what it is — experimental and unused here._

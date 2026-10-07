@@ -95,6 +95,3 @@ so a new start path inherits the refusal instead of having to remember it.
 - [`OrderParticipantDisagreement`](OrderParticipantDisagreement.md)
 - [`docs/api/temporal.md`](../../../api/temporal.md)
 - [RFC-0021 cutover rollback](../../../proposals/rfc/RFC-0021/cutover-rollback.md)
-
----
-_Last updated: 2026-08-04_

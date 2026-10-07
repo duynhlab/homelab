@@ -93,6 +93,3 @@ degrades quickly rather than staying stable.
 - [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md) — the consequence.
 - [ClickHouseZooKeeperExceptions](ClickHouseZooKeeperExceptions.md) — the
   server-side symptom of Keeper trouble.
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

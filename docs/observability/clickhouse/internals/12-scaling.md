@@ -339,7 +339,3 @@ Before continuing, explain these without rereading the chapter:
 - [ClickHouse: MergeTree settings — `parts_to_delay_insert`, `parts_to_throw_insert`](https://clickhouse.com/docs/reference/settings/merge-tree-settings/parts-to)
 - [ClickHouse: `max_concurrent_queries`](https://clickhouse.com/docs/reference/settings/server-settings/settings/max-concurrent)
 - [ClickHouse knowledge base: `max_threads` and pipeline parallelism](https://clickhouse.com/docs/resources/support-center/knowledge-base/performance-optimization/async-vs-optimize-read-in-order)
-
----
-_Last updated: 2026-09-30 — live lab verified: 2 GiB cgroup, ~139 MiB tracked memory at idle, no delayed inserts. Earlier: 2026-09-29 — first draft of the scaling-decisions chapter; live
-observation pending verification on the Ubuntu Kind cluster._

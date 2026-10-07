@@ -94,7 +94,3 @@ kubectl get secret <secret-name> -n <namespace>
 ```
 
 If the ExternalSecret is not Ready, see [ESO sync failure](./eso-sync-failure.md).
-
----
-
-_Last updated: 2026-08-19 — Fixed the bootstrap configmap path (`configs/secrets/openbao-bootstrap/`, not `configs/openbao/`)._

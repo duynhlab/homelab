@@ -360,8 +360,3 @@ Before continuing, explain these without rereading the chapter:
 - [Automatic vacuuming and freezing configuration](https://www.postgresql.org/docs/18/runtime-config-vacuum.html)
 - [Vacuum progress reporting](https://www.postgresql.org/docs/18/progress-reporting.html#VACUUM-PROGRESS-REPORTING)
 - [PostgreSQL 18 release notes — eager freezing](https://www.postgresql.org/docs/18/release-18.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: uniform XID age 997 on a 13-hour-old cluster, sub-threshold dead tuples, and the eager-freeze default 0.03. Earlier: 2026-09-29 — first published chapter version for issue #1137;
-absorbs the vacuum sections of the retired mvcc-locking-and-vacuum page and
-the maintenance-pressure section of the retired monitoring page._

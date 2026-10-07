@@ -58,6 +58,3 @@ more invisible drift has accumulated.
 - [VMAgentScrapePoolHasNoTargets](VMAgentScrapePoolHasNoTargets.md)
 - [VMAlertConfigurationReloadFailure](VMAlertConfigurationReloadFailure.md) — the
   same failure on the alerting side, and worse, because it silently freezes rules.
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

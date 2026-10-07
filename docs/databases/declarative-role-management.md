@@ -174,7 +174,3 @@ Replica behavior: roles and databases replicate through WAL to
 - [002 — Database integration](./architecture.md) · [003.1 — CNPG operator deep dive](./cloudnativepg.md)
 - CloudNativePG official docs: *PostgreSQL Role Management* and *Database
   Management* (v1.30)
-
----
-
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

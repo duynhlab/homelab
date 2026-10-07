@@ -20,6 +20,10 @@ its own; a slot pinning WAL cannot, and it ends in a full disk.
 
 ## Impact
 
+Historical incident, 2026-08-24: promotion during host saturation left
+`platform-db-3` on timeline 1 while the primary retained 2.4 GiB of WAL,
+growing approximately 250 MiB/h. Only the lag alert fired at the time.
+
 The primary's PVC fills. On this platform a full disk is especially nasty: it
 does **not** announce itself as a storage problem. It surfaces as RBAC
 `Forbidden`, API `EOF`, stalled Flux reconciles and pods that will not start —
@@ -120,6 +124,3 @@ Three details, each found by measuring rather than reasoning:
   and [`CNPGClusterPhysicalReplicationLagCritical`](CNPGClusterPhysicalReplicationLagCritical.md) — the symptom side
 - [`CNPGWALArchiveFailing`](CNPGWALArchiveFailing.md) — the other way WAL piles up, and the disk-full misdirection
 - [alert catalog](../../alerting/alert-catalog.md)
-
----
-_Last updated: 2026-08-24 — written after a promotion during host saturation left `platform-db-3` diverged on timeline 1 and the primary retaining 2.4 GiB of WAL, growing ~250 MiB/h, with only the lag alert firing._

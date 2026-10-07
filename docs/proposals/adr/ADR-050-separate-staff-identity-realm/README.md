@@ -205,6 +205,3 @@ decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-08-13 | Accepted / Not started | Owner decision after meeting the alice dual-role seed in practice; Keycloak realm-separation pattern verified via Context7 |
 | 2026-08-25 | Accepted / **Complete** | Kind gate passed — the cluster realm import, the one item this record's Adoption named, is verified. The History skipped `Partial`: it read `Accepted / Not started` from 2026-08-13 until today. |
-
----
-_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

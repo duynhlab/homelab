@@ -71,6 +71,3 @@ GitOps reconciler reverts the edit anyway.
 - [KubePodCrashLooping](KubePodCrashLooping.md), [KubePodNotReady](KubePodNotReady.md)
   — the usual reasons a replica never becomes ready.
 - [KubeHPAMaxedOut](KubeHPAMaxedOut.md) — when autoscaling owns the replica count.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

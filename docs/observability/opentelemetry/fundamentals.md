@@ -537,9 +537,3 @@ never set `OTEL_SEMCONV_STABILITY_OPT_IN`
 - [OpenTelemetry specification](https://opentelemetry.io/docs/specs/otel/) · [Log data model](https://opentelemetry.io/docs/specs/otel/logs/data-model/) · [OTLP](https://opentelemetry.io/docs/specs/otlp/)
 - [W3C Trace Context](https://www.w3.org/TR/trace-context/) · [W3C Baggage](https://www.w3.org/TR/baggage/)
 - In-house: [OpenTelemetry (platform)](README.md) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014](../../proposals/rfc/RFC-0014/) (design record)
-
----
-
-_Last updated: 2026-08-24 — trace backends are VictoriaTraces + ClickHouse after RFC-0027.
-The **BEFORE RFC-0014** diagram keeps Tempo/Jaeger on purpose: it is historical. Also corrected
-the pivot list — `tracesToProfiles` does not exist on a jaeger-type datasource._

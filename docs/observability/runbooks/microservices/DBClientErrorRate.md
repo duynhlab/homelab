@@ -97,6 +97,3 @@ error rate into a platform-wide connection storm.
   up there first.
 - [MicroserviceHighErrorRate](MicroserviceHighErrorRate.md) — where these
   errors land at the HTTP layer.
-
----
-_Last updated: 2026-08-19 — rewritten to the canonical template (was a stub)_

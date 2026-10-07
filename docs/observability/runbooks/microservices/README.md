@@ -327,6 +327,3 @@ domain's additions.
   metric → log via `{app="$APP"} | trace_id` in VictoriaLogs.
 - **Dashboards:** Microservices folder (RED per service) plus the Checkout
   funnel board for order-path alerts.
-
----
-_Last updated: 2026-08-19 — absorbed the investigation workflows, threshold tuning, and retired-alert context from the dissolved microservices-alerts.md hub_

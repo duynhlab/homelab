@@ -87,6 +87,3 @@ the only thing telling you the other ten are blind.
 ```bash
 git log --oneline -5 -- kubernetes/infra/configs/observability/metrics/podmonitors/clickhouse-server.yaml kubernetes/infra/configs/clickhouse/clickhouseinstallation.yaml
 ```
-
----
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `ClickHouseNodeDown` is a bare `up == 0`, which cannot see a scrape with no targets)_

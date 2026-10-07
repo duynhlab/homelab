@@ -14,7 +14,7 @@
 ## Prerequisites
 
 - [x] [./research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
-- [x] Context7 audit complete (see research footer)
+- [x] Context7 audit complete (see research audit record)
 - [x] Owner approved **ready for RFC** (2026-07-23)
 
 ## Summary
@@ -565,6 +565,3 @@ count and retention hit zero.
   workflow versioning, start outbox, order status model) and ADR-034…037
   (provider-outcome ambiguity, windowed reconciliation, single-writer lease,
   refund identity)
-
----
-_Last updated: 2026-08-25_

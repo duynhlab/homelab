@@ -131,5 +131,3 @@ The rule is unchanged. Two things are recorded against it.
 - [Service contracts](../../../api/README.md#service-contracts)
 - [ADR-003](../ADR-003-jwt-validation-in-services-not-kong/) · [ADR-006](../ADR-006-rs256-jwt-kong-edge-auth/) — the auth-path surfaces this rename touches
 - Google API Design Guide (collections & custom methods)
-
-_Last updated: 2026-08-25_

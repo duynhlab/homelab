@@ -179,7 +179,3 @@ idempotent-kickoff branch, which had depended on that error since RFC-0015 P2. T
 tests could not catch it, because the fakes returned an error the real client
 never produces. Any future change to how a start is issued should re-read that
 part of the SDK rather than the SDK's method signature.
-
----
-
-_Last updated: 2026-07-28_

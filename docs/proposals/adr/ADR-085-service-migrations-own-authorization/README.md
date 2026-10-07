@@ -173,6 +173,3 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Proposed / Not started | Drafted from RFC-0029 |
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 |
 | 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): the mechanism is `migratex.WithSetRole` in `duynhlab/pkg` (fails hard when `SET ROLE` is denied or the role is empty), chosen over a catalog `ALTER ROLE … SET role` default and over pgroles; no backfill on this platform (greenfield). The `0001_authorization` snippet is in [`authorization.md`](../../../databases/authorization.md) |
-
----
-_Last updated: 2026-10-06 (amended: `migratex.WithSetRole`, greenfield)_

@@ -73,6 +73,3 @@ throttled service, which means shoppers are feeling it. Do not delete the CPU
 limit in a panic without checking node headroom first: an unlimited hot loop
 can starve every neighbor on the node and turn one slow pod into a node-wide
 incident.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

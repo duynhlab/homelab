@@ -421,6 +421,3 @@ PostgreSQL fundamentals, product-tier recovery mechanics, `add-service-database.
 - **Builds on:** [RFC-0012](../RFC-0012/) triplet pattern, [ADR-013](../../adr/ADR-013-per-service-db-triplet/), [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/)
 - **Canonical docs after ship:** [`docs/databases/architecture.md`](../../../databases/architecture.md), [`docs/databases/disaster-recovery.md`](../../../databases/disaster-recovery.md)
 - **DR unchanged:** [`docs/databases/cross-region-dr.md`](../../../databases/cross-region-dr.md) (product line)
-
----
-_Last updated: 2026-08-07_

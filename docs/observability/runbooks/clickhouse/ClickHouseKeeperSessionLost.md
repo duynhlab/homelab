@@ -100,6 +100,3 @@ the CHK while the quorum is unhealthy; the `< 2` literal in
 - [ClickHouseKeeperNoLeader](ClickHouseKeeperNoLeader.md), [ClickHouseKeeperQuorumDegraded](ClickHouseKeeperQuorumDegraded.md) — the quorum's side.
 - [ClickHouseZooKeeperExceptions](ClickHouseZooKeeperExceptions.md) — the rate that precedes this.
 - [ClickHouseReadonlyReplica](ClickHouseReadonlyReplica.md) — what follows after 30 s.
-
----
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `ClickHouseZooKeeperConnectionIssues`; `for` 2m instead of 3m, job filter added)_

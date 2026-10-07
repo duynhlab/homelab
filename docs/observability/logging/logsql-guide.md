@@ -5,8 +5,8 @@ ingest paths create different stream fields — the #1 cause of "zero results"),
 which **severity field** each path carries (the #2 cause), the filter syntax,
 and the pipes that turn raw lines into answers. LogsQL runs in
 **Grafana → Explore → VictoriaLogs** or directly against
-`/select/logsql/query` on `:9428`. Every query in this guide was executed
-against this cluster before being written down.
+`/select/logsql/query` on `:9428`. The queries in the 2026-08-25 version of
+this guide were executed against the live cluster that day.
 
 | | |
 |---|---|
@@ -355,14 +355,3 @@ curl -G 'http://localhost:9428/select/logsql/query' \
 - [LogsQL reference](https://docs.victoriametrics.com/victorialogs/logsql/) ·
   [LogsQL examples](https://docs.victoriametrics.com/victorialogs/logsql-examples/) ·
   [SQL → LogsQL mapping](https://docs.victoriametrics.com/victorialogs/sql-to-logsql/)
-
----
-
-_Last updated: 2026-08-25 — expanded from the first cut: full pipe/stats table
-(`top`, `first`, `unpack_json`, `extract`, `math`, `stream_context`,
-`quantile`, `count_uniq`), recipes grouped per stream family, every query
-re-executed against the live cluster. Two field-contract corrections landed
-with the expansion: app-path records carry `severity_text`, not `level` (the
-old app examples matched nothing), and pgaudit's `logger` is a key inside the
-raw CNPG `_msg`, not a queryable field — the old `logger:pgaudit` example also
-matched nothing; the working recipes use a word filter + `unpack_json`._

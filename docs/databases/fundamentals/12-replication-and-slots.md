@@ -395,8 +395,3 @@ Before continuing, explain these without rereading the chapter:
 - [`pg_stat_replication`](https://www.postgresql.org/docs/18/monitoring-stats.html)
 - [Replication slot synchronization](https://www.postgresql.org/docs/18/logicaldecoding-explanation.html)
 - [CloudNativePG replication](https://cloudnative-pg.io/docs/1.30/replication) and [replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster)
-
----
-_Last updated: 2026-10-01 — live lab verified: quorum ladder at ≈3 ms flush lag, and archive-fed DR replay that caught up to the last archived segment with no walreceiver. Earlier: 2026-09-29 — first version: quorum acknowledgement semantics,
-slot retention, and the archive-fed DR replica, absorbing the former
-replication fundamentals page._

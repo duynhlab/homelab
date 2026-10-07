@@ -66,5 +66,3 @@ tokenless internal REST route.
 - [ADR-020](../ADR-020-checkout-revalidation-policy/) — why prices in this
   read are advisory (cart is not the price authority)
 - `cart-service/internal/grpc/v1` — the server
-
-_Last updated: 2026-07-12_

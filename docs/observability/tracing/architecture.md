@@ -405,9 +405,3 @@ own the source of** — that is the case auto-instrumentation exists for.
 - [VictoriaTraces Documentation](https://docs.victoriametrics.com/victoriatraces/)
 - [CNCF Observability Best Practices](https://www.cncf.io/blog/)
 - [OpenTelemetry Operator](https://opentelemetry.io/docs/platforms/kubernetes/operator/)
-
-_Last updated: 2026-08-24 — RFC-0027 retired Tempo (both installs) and Jaeger, so the
-fan-out is **two** trace sinks, not five. Rewritten: the overview, the topology diagram, the
-backend rationale, the pipeline table (now including `metrics/spanmetrics`), the trace
-lifecycle, the production limitations, and the deployment-method section — which described
-deploying Jaeger._

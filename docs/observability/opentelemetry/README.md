@@ -286,7 +286,3 @@ Quick verification:
 
 - Official: [opentelemetry.io/docs/concepts](https://opentelemetry.io/docs/concepts/) · [Go SDK](https://opentelemetry.io/docs/languages/go/) · [versioning & stability](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/) · [Collector](https://opentelemetry.io/docs/collector/) · [sampling](https://opentelemetry.io/docs/concepts/sampling/) · [VictoriaMetrics OTel](https://docs.victoriametrics.com/victoriametrics/integrations/opentelemetry/) · [VictoriaLogs OTel](https://docs.victoriametrics.com/victorialogs/data-ingestion/opentelemetry/)
 - In-house: [OTel fundamentals](fundamentals.md) (concepts + old-vs-new migration story) · [Collector](collector.md) · [Application observability](../../api/observability.md) · [RFC-0014](../../proposals/rfc/RFC-0014/README.md) (design record + tracking) · [tracing/README.md](../tracing/README.md) · [tracing/architecture.md](../tracing/architecture.md) · [logging/README.md](../logging/README.md) · [metrics/histograms.md](../metrics/histograms.md) · [metrics/streaming-aggregation.md](../metrics/streaming-aggregation.md) · [../platform/envoy-gateway.md](../../platform/envoy-gateway.md)
-
-_Last updated: 2026-08-24 — trace fan-out is **two** sinks after RFC-0027 retired Tempo and
-Jaeger. The claim corrected here yesterday (three → five) was made true and then made false
-again by the retirement, which is the drift the RFC's P5 phase exists to close._

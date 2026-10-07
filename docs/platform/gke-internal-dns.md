@@ -168,7 +168,3 @@ POST http://notification.notification.svc.cluster.local:8080/notification/v1/int
 follow the **default Kubernetes DNS model** — Cloud DNS is not required.
 
 If you want names like `notification.prod.gke.internal`, use a **private zone + records** (section 4) and, if needed, **CoreDNS forward** (section 4.3).
-
----
-
-_Last updated: 2026-07-22 — reference-only callout (not homelab Kind topology)._

@@ -69,6 +69,3 @@ API-server alerts, which do work.
   [EtcdHighFsyncDurations](EtcdHighFsyncDurations.md),
   [EtcdHighNumberOfLeaderChanges](EtcdHighNumberOfLeaderChanges.md) — the other
   three inert etcd rules.
-
----
-_Last updated: 2026-09-05 — created; documents why this rule is inert rather than leaving it looking like coverage_

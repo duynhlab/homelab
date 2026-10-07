@@ -126,6 +126,3 @@ marked *deployed, no live caller*.
 - [ADR-020](../ADR-020-checkout-revalidation-policy/) — availability checked, never reserved (carries into inventory)
 - [RFC-0003](../../rfc/RFC-0003/) — superseded by RFC-0021
 - [`docs/api/inventory.md`](../../../api/inventory.md) · [`product.md`](../../../api/product.md)
-
----
-_Last updated: 2026-08-25_

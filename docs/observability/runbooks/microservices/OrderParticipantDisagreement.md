@@ -108,6 +108,3 @@ inherits it. The column stays `CHECK`-constrained to the enum.
 - [`docs/api/temporal.md`](../../../api/temporal.md)
 - [RFC-0021 cutover rollback](../../../proposals/rfc/RFC-0021/cutover-rollback.md)
 - [`OrderStartParticipantUnrecognised`](OrderStartParticipantUnrecognised.md)
-
----
-_Last updated: 2026-08-04_

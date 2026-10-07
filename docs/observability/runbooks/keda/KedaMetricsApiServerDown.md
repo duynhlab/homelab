@@ -117,6 +117,3 @@ kubectl -n checkout describe hpa   # look for FailedGetExternalMetric / ScalingA
 - [`KedaScalerErrors`](KedaScalerErrors.md) — the trigger fails, the pipeline is fine
 - [`TemporalTaskQueueBacklogGrowing`](../temporal/TemporalTaskQueueBacklogGrowing.md) — the delayed downstream symptom
 - [`ADR-055`](../../../proposals/adr/ADR-055-keda-worker-autoscaling/) — why KEDA owns replicas at all
-
----
-_Last updated: 2026-09-05_

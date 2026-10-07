@@ -73,6 +73,3 @@ which means data loss is next.
 - [ClickHouseTooManyParts](ClickHouseTooManyParts.md) — the cause.
 - [ClickHouseExporterUnhealthy](ClickHouseExporterUnhealthy.md) — what firing
   next means data is actually being dropped.
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

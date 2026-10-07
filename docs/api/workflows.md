@@ -247,5 +247,3 @@ resolves it.
 
 - [temporal.md](./temporal.md) — the three workflows as built, plus saga theory and operations
 - [Service contracts](README.md#service-contracts) — platform deployment rollup
-
-_Last updated: 2026-09-28 — Draw.io view of the work layer with the Worker Controller and KEDA; the checkout and Kind-audit lines brought up to date. 2026-08-27 — ADR-064: checkout-worker joins the controller (Pinned); the versioned-vs-unversioned asymmetry this file existed to teach is retired and recorded as history above. 2026-08-21: ADR-054 gave order the controller._

@@ -185,9 +185,3 @@ Runbooks: [`runbooks/microservices/README.md`](../runbooks/microservices/README.
 - [API → gRPC runtime model](../../api/api.md#grpc-runtime-model) · [API reference](../../api/api.md)
 - [PromQL Guide](promql-guide.md) · [SLO Documentation](../slo/README.md)
 - [Grafana Dashboard Guide](../grafana/dashboard-reference.md) · [Variables & Regex Guide](../grafana/variables.md)
-
----
-
-_Last updated: 2026-07-18 — Phase 2 runbook split: learning path + signal→alert map; per-alert files under `runbooks/microservices/`._
-</content>
-</invoke>

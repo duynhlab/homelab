@@ -136,5 +136,3 @@ for this documentation review.
 - [CloudNativePG 1.30 resource management](https://cloudnative-pg.io/docs/1.30/resource_management/)
 - [CloudNativePG 1.30 scheduling](https://cloudnative-pg.io/docs/1.30/scheduling/)
 - [PostgreSQL 18 resource consumption](https://www.postgresql.org/docs/18/runtime-config-resource.html)
-
-_Last updated: 2026-10-06 — configuration and capacity boundaries reviewed against main `d421daf3`._

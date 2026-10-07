@@ -63,5 +63,3 @@ independently and only one of them can stop an apply:
 | KyvernoAdmissionDenying | [KyvernoAdmissionDenying](./KyvernoAdmissionDenying.md) | What is being refused, and is the refusal correct? |
 | KyvernoAdmissionLatencyHigh | [KyvernoAdmissionLatencyHigh](./KyvernoAdmissionLatencyHigh.md) | Is Kyverno slow, or waiting on something slower? |
 | KyvernoPolicyRuleErrors | [KyvernoPolicyRuleErrors](./KyvernoPolicyRuleErrors.md) | Which rule stopped deciding, and what is now unprotected? |
-
-_Last updated: 2026-08-21 — domain created with Kyverno's first alerts, scrape and dashboard._

@@ -33,6 +33,3 @@ topk(20, cnpg_pg_stat_user_indexes_index_bytes{cnpg_io_cluster="product-db"})
 
 - Stats reset on restart — confirm uptime before dropping.
 - Partial indexes and FK indexes may show low scan but are still required.
-
----
-_Last updated: 2026-07-18_

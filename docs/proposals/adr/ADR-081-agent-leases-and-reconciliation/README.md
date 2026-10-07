@@ -173,6 +173,3 @@ a guarantee that requires an Agent SDK controller.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted bounded dispatch, leases, and best-effort reconciliation |
-
----
-_Last updated: 2026-10-01 — Accepted, Adoption Not started_

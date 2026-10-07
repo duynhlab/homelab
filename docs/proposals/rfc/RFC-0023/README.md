@@ -731,6 +731,3 @@ When Status → implemented, confirm:
 - [`docs/api/api.md`](../../../api/api.md) · [`docs/api/product.md`](../../../api/product.md) · [`docs/api/inventory.md`](../../../api/inventory.md) · [`docs/api/order.md`](../../../api/order.md) · [`docs/api/payments.md`](../../../api/payments.md) · [`docs/api/shipping.md`](../../../api/shipping.md) · [`docs/api/user.md`](../../../api/user.md)
 - [ADR-051](../../adr/ADR-051-trusted-operator-resolution/) — the safety review behind the `manual_review` resolve
 - [OrderManualReviewBacklog runbook](../../../observability/runbooks/microservices/OrderManualReviewBacklog.md) — the raw-SQL path this RFC retired to break-glass
-
----
-_Last updated: 2026-08-25 — Status → `implemented`: the Kind gate passed, verifying the portal against the cluster edge (K4.7) and the realm fence (K4.8). ADR-048/049/050/053 all reached `Complete`._

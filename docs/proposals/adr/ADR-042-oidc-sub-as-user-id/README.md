@@ -248,6 +248,3 @@ requires a new ADR that supersedes this one.
 | 2026-08-13 | Accepted / Partial | Fleet pinned to the cutover tags (#756) — five INTEGER columns, the notification and payment protos, `pkg/idempotency` and Temporal inputs all carry the string `sub`. Adoption recorded in #757 |
 | 2026-08-24 | Accepted / Partial | Contract documented in [`docs/api/identity.md`](../../../api/identity.md); the per-service `VARCHAR(255)` rows already cite this ADR. Remaining for `Complete`: the cluster greenfield reset, which is part of the Kind gate |
 | 2026-08-25 | Accepted / **Complete** | Kind gate passed — the cluster greenfield reset happened as part of the 2026-08-25 bring-up; the subject round-trips HTTP → gRPC → DB → Temporal without conversion. |
-
----
-_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

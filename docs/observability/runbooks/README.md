@@ -54,6 +54,3 @@ Domain-specific rows and diagnosis dialects live in each folder README's
 - [PostgreSQL metrics hub](../metrics/postgresql/README.md) — custom queries, workflows, learning path
 - [Database HA Scaling](../../databases/reference/zalando/ha-scaling.md) — historical Zalando HA reference
 - [Prepared Databases](../../databases/reference/zalando/prepared-databases.md) -- preparedDatabases issue runbook
-
----
-_Last updated: 2026-10-01 — Envoy Gateway (13 files / 16 alerts) and Kubernetes (29 files) counts re-derived from the folders. Earlier: 2026-09-09 — removed stale hand-maintained runbook counts and linked the validation contract._

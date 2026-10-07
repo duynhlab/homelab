@@ -158,6 +158,3 @@ http_server_request_duration_seconds_count{app="<service>"}
 - [Burn-Rate Alerts](../alerting/slo-burn-rate-alerts.md) -- Alert configuration and runbooks
 - [SLO Fundamentals](./fundamentals.md) -- SLA/SLO/SLI/Error Budget primer
 - [Error Budget Policy](./error_budget_policy.md) -- Budget management guidelines
-
----
-_Last updated: 2026-10-06 — SLOs come from the `slo` chart (`<service>-slo` HelmRelease) instead of `mop`'s `slo.enabled`; the error-rate SLO is gone since `mop` 0.19.0._

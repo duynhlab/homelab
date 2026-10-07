@@ -758,6 +758,3 @@ CR, or delete the CR and let it be recreated.
 | VM Agent Skills | https://github.com/VictoriaMetrics/skills |
 | Grafana MCP (mcp-grafana) GitHub | https://github.com/grafana/mcp-grafana |
 | Grafana Operator Docs | https://grafana.github.io/grafana-operator/ |
-
----
-_Last updated: 2026-08-27 — Grafana token rationale re-read under ADR-062 (anonymous is Viewer now; the Viewer token is least-privilege, no longer a downgrade from anonymous Admin). 2026-08-20: Grafana MCP added as the fourth server: chart 0.20.0 (mcp-grafana 1.1.0), entrypoint override + `--allowed-hosts` + tcpSocket probes explained, Viewer service-account token read as a downgrade from anonymous Admin, and the two convention divergences stated plainly (operator-minted credential outside OpenBAO; no caller auth behind the CIDR fence). `grafana-operator-oci` pin 5.24.0 recorded. Verified live on Kind the same day: operator v5.24.0 ships the CRD, the SA synchronized, the token landed, 59 tools with no write tool, handshake 200 in-cluster and via the gateway, wrong-`Host` 403._

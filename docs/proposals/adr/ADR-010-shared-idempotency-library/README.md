@@ -88,7 +88,3 @@ flowchart LR
 - **The domain-sentinel boundary is deliberate indirection.** Payment keeps its
   own `ErrKeyConflict/ErrKeyLocked` vocabulary and translates at the seam, so a
   `pkg` change can never silently alter an HTTP status code.
-
----
-
-_Last updated: 2026-07-04_

@@ -318,7 +318,3 @@ more sensitive.
 - [Prometheus instrumentation](https://prometheus.io/docs/practices/instrumentation/) · [Naming conventions](https://prometheus.io/docs/practices/naming/)
 - [Grafana time-range controls](https://grafana.com/docs/grafana/latest/dashboards/time-range-controls/) · [Dashboard variables](https://grafana.com/docs/grafana/latest/dashboards/variables/)
 - [Application metrics (RED)](metrics-apps.md) · [Metrics hub](README.md)
-
----
-
-_Last updated: 2026-07-09 — counters, `rate()` vs `increase()`, Time Range vs `$rate` on VictoriaMetrics._

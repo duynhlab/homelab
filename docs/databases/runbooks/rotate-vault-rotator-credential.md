@@ -183,6 +183,10 @@ configurator then reads that same Secret.
 
 ## Verification
 
+The first Kind run on 2026-10-05 exercised headless OIDC login, the initial
+transient `applied=false`, a login through the pooler with the rotated
+credential, and a non-interactive old-password rejection check.
+
 1. Confirm both reconcilers consumed the Secret:
 
    ```bash
@@ -334,6 +338,3 @@ configurator then reads that same Secret.
 - [OpenBao `kv put` command](https://openbao.org/docs/commands/kv/put/)
 - [Add or write a KV secret on a live cluster](../../secrets/runbooks/add-secret-live-cluster.md)
 - [Revoke a compromised credential](../../secrets/runbooks/revoke-compromised-credential.md)
-
----
-_Last updated: 2026-10-06 — the membership drift alert is referenced. 2026-10-05 — notes from the first live run on Kind: headless OIDC login, the transient `applied=false` after the first apply, a pooler login as rotation evidence, and a non-interactive old-password check. 2026-09-05: first version._

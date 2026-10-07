@@ -77,5 +77,3 @@ A pass holds one pooled connection for its duration (the single-writer lease),
 so pool exhaustion can starve it. `MicroserviceDown` and the database alerts
 own the underlying causes; this alert exists because none of them can tell you
 that the *consequence* — undetected money drift — is currently in effect.
-
-_Last updated: 2026-08-04_

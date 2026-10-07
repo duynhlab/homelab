@@ -69,6 +69,3 @@ leak until the pod runs out of file descriptors instead.
 - [ValkeyRejectedConnections](ValkeyRejectedConnections.md) — what this alert
   becomes if the climb continues to `maxclients`.
 - Cache-miss impact lands on product latency (`MicroserviceHighLatency*`).
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the valkey/ domain folder_

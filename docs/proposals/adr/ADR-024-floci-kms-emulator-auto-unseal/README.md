@@ -131,6 +131,3 @@ is a plugin](../../../secrets/openbao.md#the-awskms-seal-is-a-plugin-openbao-27)
 
 - [RFC-0008](../../rfc/RFC-0008/) · [research.md](../../rfc/RFC-0008/research.md) (auto-unseal spine + PoC)
 - [`docs/secrets/openbao.md`](../../../secrets/openbao.md) · [ADR-005 (OpenBAO HA Raft)](../ADR-005-openbao-ha-raft/)
-
----
-_Last updated: 2026-09-29 — amendment: the awskms seal ships as an external KMS plugin since OpenBAO 2.7_

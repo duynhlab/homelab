@@ -100,7 +100,3 @@ flowchart LR
 - **`PAYMENT_ENABLED` was temporary — now removed (P3.exit).** The flag and its
   two guarded branches were the rollout scaffolding; once payment became
   permanent the flag was deleted and payment is now unconditional in the saga.
-
----
-
-_Last updated: 2026-07-04_

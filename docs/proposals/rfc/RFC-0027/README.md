@@ -12,7 +12,7 @@
 ## Prerequisites
 
 - [research.md](./research.md) merged (#877); [research review gate](./research.md#research-review-gate) ticked
-- Context7 audit complete (see research footer)
+- Context7 audit complete (see research audit record)
 - Owner approved **ready for RFC** — 2026-08-24, with the three-store shape
 - Mechanism deep-dive is **not** repeated here — see [`./research.md`](./research.md)
 - ADR folders (all `Accepted` 2026-08-24): [`ADR-057`](../../adr/ADR-057-span-metrics-in-collector/),
@@ -336,6 +336,3 @@ the SLO maths consumes. The other two stand alone.
 - [ADR-032](../../adr/ADR-032-tempo-operator-monolithic/) · [ADR-040](../../adr/ADR-040-tempo-community-helm-chart/) — the Tempo lineage this RFC closes
 - [RFC-0014](../RFC-0014/) — full OpenTelemetry adoption · [RFC-0019](../RFC-0019/) — ClickHouse for OTel logs and traces
 - [`docs/observability/README.md`](../../../observability/README.md) — as-built observability hub
-
----
-_Last updated: 2026-08-24_

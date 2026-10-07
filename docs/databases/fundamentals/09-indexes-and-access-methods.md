@@ -315,8 +315,3 @@ Before continuing, explain these without rereading the chapter:
 - [Visibility map](https://www.postgresql.org/docs/18/storage-vm.html)
 - [Heap-only tuples](https://www.postgresql.org/docs/18/storage-hot.html)
 - [PostgreSQL 18 release notes](https://www.postgresql.org/docs/18/release-18.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: 13 index inventory rows (a duplicate `categories.name` index and five never-scanned indexes) and a prefix `LIKE` rewritten into an Index Only Scan. Earlier: 2026-09-29 — first published chapter; absorbs the former
-indexes-and-access-paths page and adds B-tree descent mechanics, PG 18 skip
-scan, and the HOT write-tax model._

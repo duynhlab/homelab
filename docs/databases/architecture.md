@@ -149,5 +149,3 @@ services, not by the infrastructure manifests.
 - [CloudNativePG 1.30 architecture](https://cloudnative-pg.io/docs/1.30/architecture/)
 - [CloudNativePG 1.30 service management](https://cloudnative-pg.io/docs/1.30/service_management/)
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
-
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

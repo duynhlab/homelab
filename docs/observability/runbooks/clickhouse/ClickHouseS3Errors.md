@@ -120,6 +120,3 @@ VictoriaLogs / VictoriaTraces 7-day copies are what remains.
 - [ClickHouseDiskAlmostFull](ClickHouseDiskAlmostFull.md) — the hot tier fills while moves fail
 - [ClickHouseServerErrorsElevated](ClickHouseServerErrorsElevated.md) — the broad counter this one is a slice of
 - Cold tier design: `docs/observability/clickhouse/README.md` § Cold tier on RustFS
-
----
-_Last updated: 2026-09-07 — created with the RustFS cold tier (4 of 4)_

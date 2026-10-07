@@ -83,7 +83,3 @@ HBA allow rule in `instance.yaml` before its terminal reject.
   `DatabaseRole` and flip it to `applied: false` (that's the rollback lever,
   not the pattern).
 - Put a password in any manifest or Helm value.
-
----
-
-_Last updated: 2026-10-06 — corrected day-2 seeding, HBA exception and diagnostic client pin._

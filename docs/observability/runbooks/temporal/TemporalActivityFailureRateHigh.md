@@ -74,6 +74,3 @@ Temporal.
   this becomes when retries run out.
 - [TemporalWorkerTaskSlotsExhausted](TemporalWorkerTaskSlotsExhausted.md) — slow
   activities hold slots and can produce both alerts together.
-
----
-_Last updated: 2026-09-05 — created; the temporal alert group had no runbooks at all_

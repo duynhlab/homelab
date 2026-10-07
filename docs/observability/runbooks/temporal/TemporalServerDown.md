@@ -100,6 +100,3 @@ matters most.
 - [TemporalPersistenceErrorRateHigh](TemporalPersistenceErrorRateHigh.md) — the
   database-facing cause that often precedes a component failing.
 - [FluxHelmReleaseNotReady](../gitops/FluxHelmReleaseNotReady.md)
-
----
-_Last updated: 2026-09-05 — created; the temporal alert group had no runbooks at all_

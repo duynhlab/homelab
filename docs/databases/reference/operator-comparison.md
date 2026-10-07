@@ -138,6 +138,3 @@ Upstream source: [CloudNativePG 1.30 PostgreSQL upgrades](https://cloudnative-pg
 - [Replication and slots](../fundamentals/12-replication-and-slots.md) - Sync vs async replication and commit behavior.
 - [Backup policy](../backup-policy.md) - Deployed backup, WAL archiving, PITR, and retention policy.
 - [disaster-recovery.md](../disaster-recovery.md) - Production-ready DRP model for this homelab.
-
----
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

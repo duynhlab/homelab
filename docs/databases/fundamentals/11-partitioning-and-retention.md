@@ -309,9 +309,3 @@ Before continuing, explain these without rereading the chapter:
 - [Table partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html)
 - [CREATE TABLE — partitioning and unique constraints](https://www.postgresql.org/docs/18/sql-createtable.html)
 - [Explicit locking](https://www.postgresql.org/docs/18/explicit-locking.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: no partitioned table or inheritance edge in any of the 13 application databases. Earlier: 2026-09-29 — first published chapter; absorbs the former
-partitioning-and-retention page, adds the three-phase pruning model and
-attach/detach lock mechanics, and records the deliberate zero-partitioned-table
-state of this platform._

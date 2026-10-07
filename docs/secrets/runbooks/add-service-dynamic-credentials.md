@@ -73,7 +73,3 @@ kubectl get secret <name> -n <namespace>
 
 Deeper checks (engine reads, forced rotation):
 [Dynamic credentials debug](./dynamic-credentials-debug.md).
-
----
-
-_Last updated: 2026-08-27 — live-cluster policy edits via ADR-062 staff OIDC login. 2026-08-19: rewritten to the ADR-025 onboarding flow; dynamic creds remain planned._

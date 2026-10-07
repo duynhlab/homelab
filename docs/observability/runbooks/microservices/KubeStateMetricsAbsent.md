@@ -34,6 +34,3 @@ rather than fail-open-with-noise.
 
 ## References
 - [MicroserviceDown](MicroserviceDown.md) — the alert this one guards
-
----
-_Last updated: 2026-07-31_

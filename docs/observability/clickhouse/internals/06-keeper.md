@@ -349,8 +349,3 @@ Before continuing, explain these without rereading the chapter:
 - [Data replication — recovery after failures](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/replication)
 - [Replicated database engine](https://clickhouse.com/docs/engines/database-engines/replicated)
 - [`system.zookeeper`](https://clickhouse.com/docs/reference/system-tables/zookeeper) and [`system.zookeeper_connection`](https://clickhouse.com/docs/reference/system-tables/zookeeper_connection)
-
----
-_Last updated: 2026-10-01 — the Keeper image repository fact now reads `26.8`. Earlier the same day: DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: one leader and two synced followers, 2,409 znodes; database vs table znode paths distinguished. Earlier: 2026-09-29 — first draft: quorum mental model, znode inventory,
-session→read-only lifecycle, outage capability matrix, and the deployed
-3-member CHK; live lab pending verification._

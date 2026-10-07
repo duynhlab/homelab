@@ -132,6 +132,3 @@ leaving the broken trigger in place.
 ```bash
 git log --oneline -5 -- kubernetes/apps/order-fulfillment-scaler.yaml kubernetes/apps/checkout-abandon-scaler.yaml
 ```
-
----
-_Last updated: 2026-09-05 — created with the KEDA install (ADR-055)_

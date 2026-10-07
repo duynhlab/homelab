@@ -50,7 +50,3 @@ kubectl get secret platform-db-notification-secret -n notification \
 
 If the store or ExternalSecret is not Ready, see
 [ESO sync failure](./eso-sync-failure.md).
-
----
-
-_Last updated: 2026-08-27 — admin access via ADR-062 staff OIDC login. 2026-08-19: rewritten to the deployed ADR-025 pilot._

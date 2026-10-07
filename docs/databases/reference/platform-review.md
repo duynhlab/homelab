@@ -55,5 +55,3 @@ measurements as though they ran on today's versions.
 - [Reliability targets and measured evidence](../reliability-targets.md)
 - [CloudNativePG 1.30 release notes](https://cloudnative-pg.io/docs/1.30/release_notes/v1.30/)
 - [CloudNativePG 1.30 PostgreSQL upgrades](https://cloudnative-pg.io/docs/1.30/postgres_upgrades/)
-
-_Last updated: 2026-10-06._

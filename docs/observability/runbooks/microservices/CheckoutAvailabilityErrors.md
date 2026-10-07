@@ -95,6 +95,3 @@ response.
 - [`CheckoutAvailabilityRefusingEverything`](CheckoutAvailabilityRefusingEverything.md) — the other failure shape: inventory answering, and refusing everything
 - [`docs/api/checkout.md`](../../../api/checkout.md) · [`docs/api/inventory.md`](../../../api/inventory.md)
 - [RFC-0021](../../../proposals/rfc/RFC-0021/) — why there is one authority
-
----
-_Last updated: 2026-08-05_

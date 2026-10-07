@@ -392,7 +392,7 @@ costs the same rewrite plus the cost of running two of everything while it happe
 - [x] Four alternatives documented with tradeoffs (including the owner's own earlier plan)
 - [x] Platform as-built section filled from both repositories and the manifests
 - [x] Primary direction stated: full convergence, single cutover
-- [x] Context7 audit complete; footer date updated
+- [x] Context7 audit complete; audit date recorded
 - [x] One Mermaid diagram; the migrated SPA is labelled **planned**
 - [x] No Kubernetes manifest changes in this file
 - [ ] Owner sign-off: **ready for RFC**

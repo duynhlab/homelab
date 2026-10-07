@@ -92,6 +92,3 @@ checking the Postgres-side ceiling.
 ```bash
 git log --oneline -5 -- kubernetes/apps/services/
 ```
-
----
-_Last updated: 2026-08-19 — rewritten to the canonical template (was a stub)_

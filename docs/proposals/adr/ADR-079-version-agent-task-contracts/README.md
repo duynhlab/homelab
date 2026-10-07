@@ -190,6 +190,3 @@ measured need for transactional state justifies the Agent SDK controller path.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted the versioned GitHub-ledger contract; implementation begins in RFC-0033 Phase 0 |
-
----
-_Last updated: 2026-10-01 — Accepted, Adoption Not started_

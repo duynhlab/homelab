@@ -302,5 +302,3 @@ Paths in [`duynhlab/notification-service`](https://github.com/duynhlab/notificat
 - [order.md](./order.md) — the orchestrator's contract
 - [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
-
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved `user_id` and verification to Keycloak._

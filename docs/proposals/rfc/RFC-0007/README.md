@@ -317,6 +317,3 @@ the SLO. A run with no recorded evidence did not happen.
   Drill D's deliverable.
 - [RFC backlog — Chaos / GameDay](../README.md#backlog--candidate-rfcs) — PITR drill, DR
   runbooks periodically tested, game days, and chaos engineering (the (c) follow-on).
-
----
-_Last updated: 2026-08-07_

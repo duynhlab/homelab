@@ -10,5 +10,3 @@
 
 Use [CloudNativePG](../../cloudnativepg.md) and the current
 [runbook index](../../runbooks/README.md) for operations.
-
-_Last updated: 2026-08-31._

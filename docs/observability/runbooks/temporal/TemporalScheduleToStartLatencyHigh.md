@@ -151,6 +151,3 @@ or raise worker concurrency to hide queueing behind a slow dependency.
 ```bash
 git log --oneline -5 -- kubernetes/apps/order-fulfillment-scaler.yaml kubernetes/apps/checkout-abandon-scaler.yaml
 ```
-
----
-_Last updated: 2026-09-05 — created with the KEDA scaler it gives a signal to (ADR-055)_

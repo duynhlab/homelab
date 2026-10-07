@@ -80,6 +80,3 @@ combination is the path to workflow timeouts.
   failing activities are the usual cause.
 - [TemporalWorkflowFailureRateHigh](TemporalWorkflowFailureRateHigh.md) — what
   sustained exhaustion eventually produces.
-
----
-_Last updated: 2026-09-05 — created; the temporal alert group had no runbooks at all_

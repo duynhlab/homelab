@@ -29,6 +29,3 @@ runbooks.
 - [Zalando Postgres Operator](https://postgres-operator.readthedocs.io/en/latest/)
 - [Patroni](https://patroni.readthedocs.io/en/latest/)
 - [Spilo](https://github.com/zalando/spilo)
-
----
-_Last updated: 2026-08-31._

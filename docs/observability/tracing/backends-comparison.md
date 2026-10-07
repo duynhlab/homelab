@@ -95,9 +95,3 @@ the live `otel_*` tables: [schema-and-queries](../clickhouse/schema-and-queries.
 - Decisions: [RFC-0027](../../proposals/rfc/RFC-0027/README.md) · [ADR-058](../../proposals/adr/ADR-058-retire-jaeger/) · [ADR-059](../../proposals/adr/ADR-059-retire-tempo/) · [ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/)
 - Archived, read-only: [Jaeger](./jaeger.md) · [Tempo](./tempo.md)
 - VictoriaTraces: <https://docs.victoriametrics.com/victoriatraces/> · ClickHouse: <https://clickhouse.com/docs>
-
----
-_Last updated: 2026-08-24 — rewritten for RFC-0027. The page used to compare three
-candidates to help pick one; the pick is made, so it now records the decision and
-the accepted costs. The old version also linked `README.md#tempo-runs-twice`, an
-anchor that no longer exists._

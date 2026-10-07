@@ -266,6 +266,3 @@ a new ADR that supersedes this one.
 - **2026-09-24** — **amended** (RFC-0031 Task 4.4): the connector declares
   `http.request.method` beside `http.method`; see the amendment section. The
   decision itself and its adoption status are unchanged.
-
----
-_Last updated: 2026-09-24 — amendment: both HTTP method dimensions. Previously 2026-08-25_

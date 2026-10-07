@@ -111,6 +111,3 @@ a red `HelmRepository` or `HelmChart` produces exactly that pattern.
   rule across every kind.
 - [FluxSuspendedResource](FluxSuspendedResource.md) — a suspended release is not
   failing, and does not fire this alert.
-
----
-_Last updated: 2026-09-05 — created; the flux-alerts group had no runbooks at all_

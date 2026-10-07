@@ -65,6 +65,3 @@ would be trading milliseconds for the cluster's policy enforcement.
   [KubeAPIServerErrorRate](KubeAPIServerErrorRate.md),
   [KubeAPIServerHighInflight](KubeAPIServerHighInflight.md) — the four golden
   signals of the same control plane; read them together.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

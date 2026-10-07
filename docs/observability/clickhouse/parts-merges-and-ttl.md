@@ -301,8 +301,3 @@ The audited procedure and results live in the dated
 - [MergeTree settings](https://clickhouse.com/docs/operations/settings/merge-tree-settings)
 - [Platform ClickHouse architecture](README.md)
 - [ClickHouse operations](operations.md)
-
----
-_Last updated: 2026-09-30 — correct response order gains step 6, the only sanctioned `OPTIMIZE` (targeted partition, last). Earlier: 2026-09-14 — lifecycle guide synthesized from repository
-manifests and a local learning note; runtime-sensitive values remain
-evidence-labelled._

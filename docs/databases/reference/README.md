@@ -10,5 +10,3 @@ is a current operating procedure.
 - [Zalando operator history](./zalando/README.md) — not deployed
 
 For deployed state, return to the [database hub](../README.md).
-
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

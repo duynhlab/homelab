@@ -117,8 +117,3 @@ operator from the manifest under
 - **Restarting is safe and cheap** (`kubectl rollout restart deploy -n platform
   -l cnpg.io/poolerName=platform-db-pooler-rw`) but is rarely the fix, precisely
   because there is no cached config to clear.
-
----
-_Last updated: 2026-08-07 — ADR-026: `pgdog-platform` removed; `platform-db` now
-pools through the CNPG PgBouncer `Pooler` `platform-db-pooler-rw`, documented in
-its own section. The PgDog content applies to `product-db` only._

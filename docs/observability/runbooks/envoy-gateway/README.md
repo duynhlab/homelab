@@ -75,6 +75,3 @@ domain's additions.
   the services expose — never mix them in one panel or ratio.
 - **Local-stack:** job names differ (see the section above) but every query
   ports once the job label is substituted.
-
----
-_Last updated: 2026-09-08 — three runbooks added from the awesome-prometheus-alerts audit (`EdgeUpstreamNoHealthyEndpoints`, `EdgeUpstreamTimeoutRatioHigh`, the shared `EdgeCertExpiry`); 10 files / 12 alerts → 13 / 16. Previously 2026-08-19 — template pointer added (canonical template lives at the runbooks parent)_

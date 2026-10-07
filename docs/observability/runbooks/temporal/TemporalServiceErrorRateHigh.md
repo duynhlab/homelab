@@ -103,6 +103,3 @@ responder's time.
 - [TemporalPersistenceErrorRateHigh](TemporalPersistenceErrorRateHigh.md)
 - [TemporalServerDown](TemporalServerDown.md)
 - [TemporalWorkerRequestErrorRateHigh](TemporalWorkerRequestErrorRateHigh.md)
-
----
-_Last updated: 2026-10-02 — the rule counts frontend server faults only (allowlist), at 2%; the old all-services, all-types ratio was 99% control-flow `NotFound`. Previously 2026-09-05 — created; the temporal alert group had no runbooks at all_

@@ -189,5 +189,3 @@ resource sizing lives in [storage and capacity](./storage-and-capacity.md).
 - [CloudNativePG 1.30 replica clusters](https://cloudnative-pg.io/docs/1.30/replica_cluster/)
 - [CloudNativePG 1.30 automated failover and Lease](https://cloudnative-pg.io/docs/1.30/failover/)
 - [CloudNativePG 1.30 release notes](https://cloudnative-pg.io/docs/1.30/release_notes/v1.30/)
-
-_Last updated: 2026-10-06 — reconciled pins with main, expanded bootstrap and failure semantics, and linked day-2 guides._

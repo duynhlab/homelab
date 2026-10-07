@@ -192,7 +192,3 @@ enum — no ids, no PII; amounts ride in histogram **values**, never labels.
 - [Alert catalog §1](../alerting/alert-catalog.md#1-microservices-red-metrics) — the alerts consuming these series
 - [RFC-0017](../../proposals/rfc/RFC-0017/README.md) — the design decisions (D-8/D-9) and original catalog (historical)
 - [Grafana dashboards](../grafana/README.md#dashboards) — Business KPIs + RED boards built from this catalog
-
----
-
-_Last updated: 2026-08-01 — added the nine RFC-0021 phase-5 order series; `order_value_minor` lost its `totals_source` label (v1.11.0)._

@@ -107,6 +107,3 @@ Kubernetes confirms the pods are the problem.
 ```bash
 git log --oneline -5 -- kubernetes/infra/configs/envoy-gateway/policies/
 ```
-
----
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `EnvoyClusterMembershipEmpty`, re-keyed on `envoy_cluster_name`)_

@@ -409,7 +409,3 @@ Stated plainly, because none of these are hidden by the manifests:
 - [Alert catalog](../observability/alerting/alert-catalog.md) · runbooks in `docs/observability/runbooks/keycloak/`
 - [RFC-0022](../proposals/rfc/RFC-0022/) · [RFC-0024](../proposals/rfc/RFC-0024/) · [ADR-041](../proposals/adr/ADR-041-keycloak-platform-idp/) · [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)
 - [Keycloak server documentation](https://www.keycloak.org/documentation)
-
----
-
-_Last updated: 2026-10-01 — image 26.7.2 → 26.7.4 to match `controllers/keycloak/deployment.yaml` and `compose.yaml`. Previously 2026-08-27 — live-realm client procedure (kcadm, exercised for flux-web) + the four-owner chain diagram + the two scope rules. Previously: added the ADR-062 staff-SSO consumers (groups, confidential clients, realm events). First version 2026-08-24 closed the deliverable named by ADR-041 and RFC-0022 and absorbed the retired `identity-cutover-runbook.md` as the realm reset procedure._

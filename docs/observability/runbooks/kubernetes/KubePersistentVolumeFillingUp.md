@@ -72,6 +72,3 @@ incident.
   — the 5% escalation of this alert.
 - [KubeNodeDiskPressure](KubeNodeDiskPressure.md) — node-level disk exhaustion
   with pod evictions.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

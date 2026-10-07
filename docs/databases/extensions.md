@@ -158,5 +158,3 @@ and `status.message`.
 - [PostgreSQL 18 `CREATE EXTENSION`](https://www.postgresql.org/docs/18/sql-createextension.html)
 - [CloudNativePG 1.30 declarative database management](https://cloudnative-pg.io/docs/1.30/declarative_database_management/)
 - [CloudNativePG 1.30 ImageVolume extensions](https://cloudnative-pg.io/docs/1.30/imagevolume_extensions/)
-
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

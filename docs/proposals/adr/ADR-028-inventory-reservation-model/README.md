@@ -132,6 +132,3 @@ allocation, observability).
 - [ADR-027](../ADR-027-inventory-sole-stock-authority/) — the ownership decision this model implements
 - [`docs/api/inventory.md`](../../../api/inventory.md) — the as-built contract
 - [product.md](../../../api/product.md) — the predecessor `stock_quantity` model being replaced
-
----
-_Last updated: 2026-07-24_

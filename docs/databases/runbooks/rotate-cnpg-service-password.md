@@ -164,7 +164,3 @@ A fresh `make up` needs none of this — Secrets are born basic-auth.
   re-run steps 2–5. Old cleartext values that once lived in Git history are
   **not** a rollback path — they are burned.
 - Manifest changes: revert the PR; Flux converges.
-
----
-
-_Last updated: 2026-10-06 — corrected day-2 KV writes, six-service scope, worker checks and diagnostic client pin._

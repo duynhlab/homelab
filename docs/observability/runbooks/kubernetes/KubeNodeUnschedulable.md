@@ -57,6 +57,3 @@ or mid-diagnosis.
 
 - [KubePodNotReady](KubePodNotReady.md) — Pending pods are how a forgotten
   cordon becomes visible.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

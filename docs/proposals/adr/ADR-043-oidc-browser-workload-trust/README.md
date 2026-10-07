@@ -261,6 +261,3 @@ requires a new ADR that supersedes this one.
 | 2026-08-14 | Accepted / Partial | [ADR-050](../ADR-050-separate-staff-identity-realm/) extends the same browser model to the Backoffice against a second realm, and [ADR-048](../ADR-048-admin-portal-no-bff/) reaffirms the no-BFF half of this decision |
 | 2026-08-24 | Accepted / Partial | Browser flow and its two consequences (token in JS memory, no central revocation inside the 15-minute TTL) documented in [`docs/api/identity.md`](../../../api/identity.md). Remaining for `Complete`: the Kind gate |
 | 2026-08-25 | Accepted / **Complete** | Kind gate passed — K4.6/K4.7 ran for the first time. They had been unrunnable since 2026-08-17 on an undocumented step: `homelab-ca` must be trusted in the macOS **System** keychain, now written into the runbook and cert-manager.md. |
-
----
-_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

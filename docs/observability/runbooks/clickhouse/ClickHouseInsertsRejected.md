@@ -91,6 +91,3 @@ access log (ClickHouse-only, ADR-061) has no other copy.
 - [ClickHouseInsertsDelayed](ClickHouseInsertsDelayed.md), [ClickHouseTooManyPartsPerPartition](ClickHouseTooManyPartsPerPartition.md) — the two links before this.
 - [ClickHouseInsertsFailing](ClickHouseInsertsFailing.md) — the broader INSERT-error counter; this one is a subset of it.
 - [ClickHouseExporterUnhealthy](ClickHouseExporterUnhealthy.md) — the consumer side.
-
----
-_Last updated: 2026-09-30 — targeted `OPTIMIZE` points at the correct response order's conditions. Earlier: 2026-09-08 — created; the cluster rule was restored from the compose twin on the `:9363` ProfileEvent after the exporter-based version was deleted 2026-08-22_

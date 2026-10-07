@@ -328,7 +328,3 @@ Before continuing, explain these without rereading the chapter:
 - [Transaction isolation levels](https://www.postgresql.org/docs/18/transaction-iso.html)
 - [Snapshot and transaction information functions](https://www.postgresql.org/docs/18/functions-info.html)
 - [System columns](https://www.postgresql.org/docs/18/ddl-system-columns.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: bootstrap `xmin` 4–6, and an empty snapshot `1741:1741:` on a quiet primary. Earlier: 2026-09-29 — first published chapter version for issue #1137;
-absorbs the MVCC sections of the retired mvcc-locking-and-vacuum page._

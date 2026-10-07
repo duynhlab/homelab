@@ -201,7 +201,7 @@ Optional later: mirror **read-only commerce facts** into ClickHouse. No new publ
 - [x] At least **two alternatives** with tradeoffs
 - [x] **Platform as-built** filled from manifests/docs
 - [x] Primary use-case direction stated (Phase B OTel logs/traces; Phase A commerce optional)
-- [x] Context7 / doc audit noted; footer date set
+- [x] Context7 / doc audit noted; audit date recorded
 - [x] At least **one Mermaid** diagram; **planned** vs deployed labeled
 - [x] No Kubernetes manifest changes in this research file
 - [x] Owner sign-off: **ready for RFC** (provisional README)

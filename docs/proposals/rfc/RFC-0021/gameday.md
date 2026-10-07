@@ -558,6 +558,3 @@ missing.
 - [PaymentProviderUnknownRate.md](../../../observability/runbooks/microservices/PaymentProviderUnknownRate.md) — G4's claim.
 - [PaymentReconciliationDiscrepancy.md](../../../observability/runbooks/microservices/PaymentReconciliationDiscrepancy.md) — G5's claim.
 - [ADR-035](../../adr/ADR-035-windowed-reconciliation/) — the windowing G5 tested.
-
----
-_Last updated: 2026-08-06_

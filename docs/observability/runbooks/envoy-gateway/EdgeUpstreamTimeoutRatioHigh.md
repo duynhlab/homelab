@@ -111,6 +111,3 @@ bottleneck.
 ```bash
 git log --oneline -5 -- kubernetes/infra/configs/envoy-gateway/policies/btp-api.yaml
 ```
-
----
-_Last updated: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `EnvoyHighClusterUpstreamRequestTimeoutRate`, plus the job filter, per-cluster key and traffic guard)_

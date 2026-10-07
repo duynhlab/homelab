@@ -70,5 +70,3 @@ RFC-0021 P4 contraction, so a failing reservation write fails orders outright.
 - [`InventoryGrpcErrorRatio`](InventoryGrpcErrorRatio.md) — the RPC-level view of the same failures
 - [`docs/api/inventory.md`](../../../api/inventory.md) — reservation contract and outcomes
 - [Alert catalog § 9](../../alerting/alert-catalog.md) — RFC-0021 order-side stock
-
-_Last updated: 2026-08-07_

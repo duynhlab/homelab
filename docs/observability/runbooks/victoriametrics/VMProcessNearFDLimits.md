@@ -55,6 +55,3 @@ Critical — the failure mode is a cliff, not a slope.
 
 - [VMServiceDown](VMServiceDown.md)
 - [VMSingleTooHighChurnRate](VMSingleTooHighChurnRate.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

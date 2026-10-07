@@ -598,6 +598,3 @@ When Status → implemented, confirm:
 - [`docs/api/auth.md`](../../../api/auth.md) — current contract, to be retired
 - [`docs/api/user.md`](../../../api/user.md) · [`docs/api/api.md`](../../../api/api.md)
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) · [`docs/secrets/openbao.md`](../../../secrets/openbao.md)
-
----
-_Last updated: 2026-08-25_

@@ -64,6 +64,3 @@ kind of failure that erodes trust in every dashboard afterwards.
 
 - [VMTooManyRestarts](VMTooManyRestarts.md)
 - [VMSingleDiskRunsOutOfSpace](VMSingleDiskRunsOutOfSpace.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

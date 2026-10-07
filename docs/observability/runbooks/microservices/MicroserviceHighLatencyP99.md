@@ -105,6 +105,3 @@ contenders and make the tail worse.
   body of the distribution; shares the core cause list.
 - [MicroserviceLatencyCritical](MicroserviceLatencyCritical.md) — P95 >2s.
 - [PgxPoolAcquireWaitHigh](PgxPoolAcquireWaitHigh.md) — queueing only the tail sees.
-
----
-_Last updated: 2026-08-19 — rewritten to the canonical template (was a stub)_

@@ -816,6 +816,3 @@ flowchart LR
 | How do I release to production? | Merge to `main`, then create `vX.Y.Z` tag |
 | What image tag do I deploy? | `vX.Y.Z` or `sha256:...` digest, never only `latest` |
 | How do I rollback? | Redeploy previous `vX.Y.Z` tag |
-
----
-_Last updated: 2026-08-19 — 10 deployed services (inventory in, auth archived); approvals aligned to 1 (rulesets); dev/uat sections marked target design; third-party links synthesized in-house; Quick Reference to Mermaid._

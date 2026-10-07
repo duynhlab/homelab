@@ -45,7 +45,3 @@ governs **alert** runbooks only and does not apply here.
 | Prefer `flux reconcile ... --with-source` after GitOps changes | Keeps the cluster aligned with the repo |
 | Do not copy local floci/recovery-key practices to production | The local Kind pattern is intentionally unsafe for production learning |
 | Keep secrets out of Git | Local placeholders are exceptions documented in the OpenBAO bootstrap flow |
-
----
-
-_Last updated: 2026-08-19 — Indexed `add-secret-live-cluster.md`; moved the two ADR-025 runbooks out of "Planned"; added the procedural-runbook convention note._

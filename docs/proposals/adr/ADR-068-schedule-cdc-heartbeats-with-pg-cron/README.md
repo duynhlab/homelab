@@ -204,6 +204,3 @@ A changed decision requires a new ADR that supersedes this one.
 |------|-------------------|--------|
 | 2026-09-09 | Proposed / Not started | Initial decision drafted during RFC-0030 architecture review |
 | 2026-09-09 | Accepted / Not started | Owner accepted the architecture; qualification remains Phase 0 of implementation |
-
----
-_Last updated: 2026-09-09._

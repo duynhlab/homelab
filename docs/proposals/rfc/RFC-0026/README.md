@@ -12,7 +12,7 @@
 ## Prerequisites
 
 - [research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
-- Context7 audit complete (see research footer)
+- Context7 audit complete (see research audit record)
 - Owner approved **ready for RFC** — 2026-08-21, with the clean-slate direction
 - Mechanism deep-dive is **not** repeated here — see [`./research.md`](./research.md)
 - ADR folders: [`ADR-054`](../../adr/ADR-054-temporal-worker-controller/) (controller),
@@ -406,6 +406,3 @@ started before the rollout completed on the old build).
 - [`local-stack/docs/e2e-audit.md`](../../../../local-stack/docs/e2e-audit.md) — A15
 - [`temporalio/temporal-worker-controller`](https://github.com/temporalio/temporal-worker-controller)
 - [Temporal — Kubernetes controller](https://docs.temporal.io/production-deployment/worker-deployments/kubernetes-controller)
-
----
-_Last updated: 2026-09-05 — ADR-055 installed; KEDA drawn solid; Implementation History row added_

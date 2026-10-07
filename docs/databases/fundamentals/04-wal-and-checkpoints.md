@@ -346,8 +346,3 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 — `full_page_writes` and WAL settings](https://www.postgresql.org/docs/18/runtime-config-wal.html)
 - [PostgreSQL 18 — `pg_control_checkpoint` and admin functions](https://www.postgresql.org/docs/18/functions-info.html)
 - [PostgreSQL 18 — WAL monitoring views](https://www.postgresql.org/docs/18/monitoring-stats.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: LSNs on 64 MB boundaries from `archive_timeout` switches, and two segments archived in 11 minutes on a quiet primary. Earlier: 2026-09-29 — chapter authored for issue #1137, absorbing the
-WAL half of the former storage-and-wal page; owns case-study steps 1 and 3;
-live lab pending verification._

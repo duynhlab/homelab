@@ -90,6 +90,3 @@ it invites someone to debug the wrong repository.
 - [TemporalPersistenceErrorRateHigh](TemporalPersistenceErrorRateHigh.md) — the
   root cause in the sequence above.
 - [TemporalServerDown](TemporalServerDown.md)
-
----
-_Last updated: 2026-09-05 — created; the temporal alert group had no runbooks at all_

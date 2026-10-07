@@ -126,6 +126,3 @@ Page. Then split the worklist by code:
 - `PARTICIPANT_UNSERVABLE` appearing at a rollout → a worker-versioning problem,
   not an order problem. Revert the image tag in `kubernetes/apps/order-worker.yaml` and let Flux reconcile — the ramp is 30s per step and cannot be paused by hand (ADR-054).
 - Mixed codes → per-order data, work the list.
-
----
-_Last updated: 2026-08-04_

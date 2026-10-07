@@ -82,6 +82,3 @@ on-call, unless the server-side alerts are firing too.
 - [TemporalServiceErrorRateHigh](TemporalServiceErrorRateHigh.md),
   [TemporalPersistenceErrorRateHigh](TemporalPersistenceErrorRateHigh.md) — the
   platform-side causes to rule out.
-
----
-_Last updated: 2026-09-05 — created; the temporal alert group had no runbooks at all_

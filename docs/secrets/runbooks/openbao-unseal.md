@@ -138,7 +138,3 @@ sequenceDiagram
 
 **Homelab only:** floci is a zero-auth KMS emulator fenced by NetworkPolicy —
 production points the same `seal "awskms"` stanza at a real cloud KMS.
-
----
-
-_Last updated: 2026-09-29 — crash-loop triage for the awskms KMS plugin (OpenBAO 2.7). Previously 2026-08-27 — recovery-key purpose updated: generate-root is the fallback behind the ADR-062 OIDC login. 2026-08-19: rewritten for awskms auto-unseal (ADR-024)._

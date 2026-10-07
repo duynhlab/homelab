@@ -483,7 +483,7 @@ EG runs in its first-class environment.
 - [x] At least **two alternatives** documented with tradeoffs
 - [x] **Platform as-built** section filled from manifests/docs (not boilerplate)
 - [x] Primary use-case direction stated (may remain "undecided")
-- [x] **Context7 audit** complete; footer date updated
+- [x] **Context7 audit** complete; audit date recorded
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
 - [x] Owner sign-off: **ready for RFC** — 2026-08-11, with the RFC-0024 acceptance

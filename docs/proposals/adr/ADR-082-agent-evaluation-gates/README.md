@@ -181,6 +181,3 @@ cannot reproduce a promotion decision.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted the eval definitions, promotion bars, and privacy boundary |
-
----
-_Last updated: 2026-10-01 — Accepted, Adoption Not started_

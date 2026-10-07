@@ -508,7 +508,3 @@ flux reconcile kustomization apps-local -n flux-system
 ---
 
 **Tip**: Always execute `make validate` before pushing. The validation script includes Flux Operator schemas for comprehensive verification.
-
----
-
-_Last updated: 2026-10-02 — the worker files carry only the `WorkerDeployment`; the connection is the cluster-wide `ClusterConnection`. Previously 2026-10-01 — `checkout-worker` is a `Connection` + `WorkerDeployment`, not a HelmRelease; the two `WorkerResourceTemplate` scaler files are in the tree; `disallow-latest-tag` is a `ValidatingPolicy` (ADR-078). Previously 2026-09-29 — namespaces are owned by `namespaces.yaml` alone (the domain templates render no Namespace); onboarding step 0 declares it. Previously 2026-08-22 — RFC-0026/ADR-054: the Temporal Worker Controller owns the versioned-worker lifecycle (build id derived, one file, no activation step). Previously 2026-08-19 — synced to the deployed 5-domain reality (fulfillment/inventory added, auth removed); honest blast-radius numbers (rs-checkout = 40%); Kyverno `:latest` ban stated as Audit-mode, not enforced; payment direct-TLS DB exception documented._

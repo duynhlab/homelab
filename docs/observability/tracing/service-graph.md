@@ -195,6 +195,3 @@ Note the cluster's ClickHouse user is **not** the local-stack one — compose us
 - [Tracing architecture](architecture.md) — how spans reach both stores
 - [ClickHouse](../clickhouse/README.md) — the OTel schema and retention ([schema-and-queries](../clickhouse/schema-and-queries.md))
 - [Grafana](../grafana/README.md) — datasources, dashboards and how they are provisioned
-
----
-_Last updated: 2026-08-25_

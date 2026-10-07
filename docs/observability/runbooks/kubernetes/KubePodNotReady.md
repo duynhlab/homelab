@@ -73,6 +73,3 @@ trades one stuck pod for cluster-wide contention.
   the schedulable pool.
 - [KubeDeploymentReplicasMismatch](KubeDeploymentReplicasMismatch.md) —
   Pending pods keep the Deployment below desired replicas.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

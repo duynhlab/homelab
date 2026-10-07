@@ -299,12 +299,3 @@ attribute.String("db.table", "users")
 - [OpenTelemetry Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)
 
 ---
-
-
-
----
-_Last updated: 2026-08-24 — the fan-out is **two** sinks. RFC-0027 retired Tempo (both
-installs) and Jaeger; the "Tempo runs twice" section moved to the archived
-[tempo.md](tempo.md), and the troubleshooting commands now read span flow at the collector
-(`otelcol_receiver_accepted_spans`) instead of at a store, so they survive the next backend
-change. Two commands also still targeted the `auth` namespace, retired with RFC-0024._

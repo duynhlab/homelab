@@ -87,6 +87,3 @@ domain's additions.
   `pg_stat_*`; `auto_explain` and `pgaudit` output lands in VictoriaLogs when a
   query, not a metric, is the suspect.
 - **Dashboards:** Databases folder (CloudNativePG board per cluster).
-
----
-_Last updated: 2026-10-06 — added the ADR-086 role-membership runbooks. Previously 2026-09-09 — linked the symptom map and made safe validation levels explicit._

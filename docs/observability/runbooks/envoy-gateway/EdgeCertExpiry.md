@@ -121,6 +121,3 @@ time; the proxy still holds the old cert until a push delivers the new one.
 ```bash
 git log --oneline -5 -- kubernetes/infra/configs/envoy-gateway/certificate.yaml
 ```
-
----
-_Last updated: 2026-09-30 — step 4: the certless-listener signal (envoy#47309) and replace-all proxies. Earlier: 2026-09-08 — created from the awesome-prometheus-alerts audit (upstream `EnvoySSLCertificateExpiringSoon` / `EnvoySSLCertificateExpired`; the upstream `< 0` critical can never fire on an unsigned day gauge, so ours is `< 1`)_

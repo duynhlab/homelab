@@ -310,5 +310,3 @@ Paths in [`duynhlab/auth-service`](https://github.com/duynhlab/auth-service). Tr
 - [Kong gateway — edge JWT](../platform/kong-gateway.md) (the `auth-issuer` consumer + `jwt-edge` plugin)
 - [RFC-0009: RS256 JWT and edge authentication](../proposals/rfc/RFC-0009/)
 - [ADR-006: Kong edge JWT](../proposals/adr/ADR-006-rs256-jwt-kong-edge-auth/) · [ADR-017: collection-noun migration](../proposals/adr/ADR-017-api-path-collection-noun/)
-
-_Last updated: 2026-08-26 — separates capability availability, evidence, and ownership metadata while preserving the completed archive. Previously 2026-08-24 — the banner and footer were aligned with the executed P5 decommission._

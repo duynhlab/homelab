@@ -58,6 +58,3 @@ Critical, with a 4-hour fuse. Escalate on the destination.
 - [VMAgentPersistentQueueIsDroppingData](VMAgentPersistentQueueIsDroppingData.md)
 - [VMAgentPersistentQueueRunsOutOfSpaceIn12Hours](VMAgentPersistentQueueRunsOutOfSpaceIn12Hours.md)
 - [VMAgentTooManyRemoteWriteErrors](VMAgentTooManyRemoteWriteErrors.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

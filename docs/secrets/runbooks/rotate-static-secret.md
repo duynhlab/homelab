@@ -68,7 +68,3 @@ kubectl describe externalsecret <name> -n <namespace>
 ```
 
 If sync fails, see [ESO sync failure](./eso-sync-failure.md).
-
----
-
-_Last updated: 2026-08-19 — RustFS example uses the break-glass ceremony token (stored root_token is inert); database static-role row updated to the deployed ADR-025 pilot._

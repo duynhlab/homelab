@@ -228,7 +228,3 @@ demo identities in `scripts/k6/lib/config.js`. Demo login is by **username**
 - [auth.md](./auth.md) — the retired hand-rolled issuer, kept as an archived record
 - [RFC-0022](../proposals/rfc/RFC-0022/) — identity design record · [RFC-0024](../proposals/rfc/RFC-0024/) — the cutover that executed it
 - [ADR-041](../proposals/adr/ADR-041-keycloak-platform-idp/) · [ADR-042](../proposals/adr/ADR-042-oidc-sub-as-user-id/) · [ADR-043](../proposals/adr/ADR-043-oidc-browser-workload-trust/) · [ADR-050](../proposals/adr/ADR-050-separate-staff-identity-realm/)
-
----
-
-_Last updated: 2026-08-27 — staff realm's confidential infra-tool clients (grafana, openbao — ADR-062) added to the client rows. 2026-08-24 — first version: the identity contract had no home in `docs/api/`, so realms, the `sub`-as-`user_id` rule, and the `OIDC_*` env pair were scattered across `api.md`, `pkg.md`, and seven service files. Records that the edge does **not** verify `aud`._

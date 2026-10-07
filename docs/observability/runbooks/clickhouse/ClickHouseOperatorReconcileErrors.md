@@ -81,6 +81,3 @@ that is a redundancy loss, and the store is one failure from
 - [ClickHouseOperatorDown](ClickHouseOperatorDown.md)
 - [ClickHouseReplicaUnreachable](ClickHouseReplicaUnreachable.md)
 - [FluxHelmReleaseNotReady](../gitops/FluxHelmReleaseNotReady.md)
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

@@ -328,8 +328,3 @@ Before continuing, explain these without rereading the chapter:
 - [EXPLAIN reference](https://www.postgresql.org/docs/18/sql-explain.html)
 - [pg_stat_statements](https://www.postgresql.org/docs/18/pgstatstatements.html)
 - [auto_explain](https://www.postgresql.org/docs/18/auto-explain.html)
-
----
-_Last updated: 2026-10-01 — live lab verified: an all-seq-scan catalog plan, and a workload ranking topped by `pg_backup_start()` and exporter SQL; corrected the pod limit to 1Gi. Earlier: 2026-09-29 — first published chapter; absorbs the former
-query-planning-and-execution page and the plan-investigation half of the
-monitoring page, grounded in the deployed planner GUCs._

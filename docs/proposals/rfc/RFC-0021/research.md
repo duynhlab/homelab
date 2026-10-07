@@ -337,7 +337,7 @@ focused PRs without waiting for the research gate.
 - [x] At least **two alternatives** documented with tradeoffs
 - [x] **Platform as-built** section filled from manifests/docs (not boilerplate — code audit 2026-07-23)
 - [x] Primary use-case direction stated (extraction per Alternative (b); umbrella program)
-- [x] **Context7 audit** complete; footer date updated
+- [x] **Context7 audit** complete; audit date recorded
 - [x] At least **one Mermaid** diagram; labels match deployed vs **planned** reality
 - [x] No Kubernetes manifest changes smuggled into this research file
 - [x] Owner sign-off: **ready for RFC** (2026-07-23)

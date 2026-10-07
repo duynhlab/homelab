@@ -95,6 +95,3 @@ must query.
 - [custom-metrics.md](custom-metrics.md) — the custom-query counterpart
 - [alert-catalog.md](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) — §4 / §4b PostgreSQL alerts
 - Runbooks: [postgresql/](../../runbooks/postgresql/)
-
----
-_Last updated: 2026-09-10 — corrected the deployed time-lag alert inventory after a live Kind audit._

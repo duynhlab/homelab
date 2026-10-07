@@ -70,6 +70,3 @@ for the number to mean something.
 - [VMSingleDiskRunsOutOfSpace](VMSingleDiskRunsOutOfSpace.md)
 - [VMSingleTooHighSlowInsertsRate](VMSingleTooHighSlowInsertsRate.md) — high churn
   makes inserts slow, so these often fire together.
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

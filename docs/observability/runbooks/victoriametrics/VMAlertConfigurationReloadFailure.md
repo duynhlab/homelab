@@ -65,6 +65,3 @@ an alert that does not exist.
 
 - [VMAlertAlertingRulesError](VMAlertAlertingRulesError.md)
 - [VMAgentConfigurationReloadFailure](VMAgentConfigurationReloadFailure.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

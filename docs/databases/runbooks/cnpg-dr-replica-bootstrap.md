@@ -171,8 +171,3 @@ from the then-current primary.
 single instance to keep the spare cheap (2026-09-29), so a promoted cluster
 would otherwise be a single point of failure with no quorum. CNPG adds the two
 standbys by streaming from the new primary; they do not need the object store.
-
----
-_Last updated: 2026-09-29 — the DR cluster runs one instance; promotion raises
-it back to 3. 2026-09-14 — documented the owner-approved Barman `serverName`
-rotation required before a DR re-clone and corrected the stale WAL-only claim._

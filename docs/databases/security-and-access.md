@@ -144,5 +144,3 @@ Use [pooler operations](./runbooks/pooler-operations.md) and
 - [CloudNativePG 1.30 certificates](https://cloudnative-pg.io/docs/1.30/certificates/)
 - [PostgreSQL 18 HBA](https://www.postgresql.org/docs/18/auth-pg-hba-conf.html)
 - [PostgreSQL 18 client TLS verification](https://www.postgresql.org/docs/18/libpq-ssl.html)
-
-_Last updated: 2026-10-06 — current connection controls separated from planned authorization._

@@ -350,7 +350,3 @@ Before continuing, explain these without rereading the chapter:
 - [PostgreSQL 18 — `pg_stat_activity`](https://www.postgresql.org/docs/18/monitoring-stats.html)
 - [PostgreSQL 18 — glossary: auxiliary process](https://www.postgresql.org/docs/18/glossary.html)
 - [CloudNativePG — Postgres instance manager](https://cloudnative-pg.io/docs/1.30/instance_manager)
-
----
-_Last updated: 2026-10-01 — live lab verified on `product-db` (primary and standby): three I/O workers, 24 client backends, and the standby's `slotsync worker`. Earlier: 2026-09-29 — chapter authored for issue #1137, absorbing the
-former processes-and-memory page; live lab pending verification._

@@ -75,6 +75,3 @@ the outage the absence of *other* application alerts means nothing.
   one exporter failing while the collector is up.
 - [VMServiceDown](../victoriametrics/VMServiceDown.md) — a backend outage is the
   usual root cause behind a collector that fell over.
-
----
-_Last updated: 2026-09-05 — created; this alert had no runbook_

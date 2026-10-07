@@ -108,6 +108,3 @@ comparison on identical workloads.
 |------|-------------------|--------|
 | 2026-07-20 | Accepted / Not started | Decision date recorded in the header; the pilot was decided before it was applied |
 | 2026-08-07 | Accepted / **Complete** | Accepted and adopted in the same change (#707), which also retired the PgDog story on `platform-db` |
-
----
-_Last updated: 2026-08-25_

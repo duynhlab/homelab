@@ -169,6 +169,3 @@ separately accepted controller introduces a stronger workload-identity model.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted tokenless workers and human publishing for Phases 0–1 |
-
----
-_Last updated: 2026-10-01 — Accepted, Adoption Not started_

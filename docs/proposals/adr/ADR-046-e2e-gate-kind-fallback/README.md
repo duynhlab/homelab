@@ -239,6 +239,3 @@ new ADR that supersedes this one.
 | 2026-08-11 | Accepted / Not started | Accepted with RFC-0024; numbering assigned 044–046 because ADR-039/040 were consumed by unrelated decisions (RFC text had said 045–047) |
 | 2026-08-12 | Accepted / **Complete** | **Arm A — the standalone spike — was taken and passed** (#752). Evidence: one Envoy Gateway container reading the same Gateway API YAML as the cluster carried the full release audit twice on 2026-08-12. The gate therefore stays on compose; the Kind-fallback arm was never exercised. Consequence shipped in the same train: the 283-line `kong.yml` second dialect, the `kong:3.9` image and its `kong health` healthcheck are gone. Adoption recorded in #757 |
 | 2026-08-24 | Accepted / Complete | History appended per this ADR's own obligation row ("flip Adoption and append the chosen arm + evidence to History") — the Adoption field had named the arm since 2026-08-13 while this table still read `Not started` |
-
----
-_Last updated: 2026-08-24 — closed this ADR's own outstanding obligation: the chosen arm and its evidence are now in History, not only in the Adoption field._

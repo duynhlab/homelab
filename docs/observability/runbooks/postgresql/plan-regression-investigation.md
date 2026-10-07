@@ -60,7 +60,8 @@ flowchart LR
 
 ## Diagnosis
 
-Cheapest first. Every query below was executed on this cluster (2026-08-25).
+Cheapest first. Every query below was executed on this cluster (2026-08-25,
+[PR #912](https://github.com/duynhlab/homelab/pull/912)).
 
 ### 1. Metrics — which queryid, and when did it turn (VictoriaMetrics)
 
@@ -208,10 +209,3 @@ drops back to its baseline.
   (format contract first).
 - Query-language reference for the pivots used here:
   [LogsQL guide § PostgreSQL plans](../../logging/logsql-guide.md#postgresql-plans-from-the-vector-pg-pipeline).
-
----
-
-_Last updated: 2026-08-25 — first version. Every PromQL/LogsQL/psql command was
-executed on the live cluster the day the auto_explain pipeline was fixed
-(PR #912); the honest-limits section reflects what the 1s threshold actually
-records._

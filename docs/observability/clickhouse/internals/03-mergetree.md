@@ -360,6 +360,3 @@ Before continuing, explain these without rereading the chapter:
 - [Full-text search with text indexes](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/textindexes)
 - [mergeTreeIndex table function](https://clickhouse.com/docs/reference/functions/table-functions/mergeTreeIndex)
 - [Architecture overview — MergeTree](https://clickhouse.com/docs/resources/develop-contribute/introduction/architecture)
-
----
-_Last updated: 2026-10-01 — DDL links point at the duynhlab/images repository. Earlier: 2026-09-30 — live lab verified: part anatomy (~7,600 rows per granule) and skip-index granularities. Earlier: 2026-09-29 — first published version of the MergeTree layout chapter; live lab pending verification._

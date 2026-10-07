@@ -261,6 +261,3 @@ requires a new ADR that supersedes this one.
 | 2026-08-27 | Accepted / Partial | Owner merged #936 and the train shipped same-day: pkg v0.38.0 (pkg#84), services (checkout#79, order#219, tags v0.9.2/v2.6.0), compose gate green, fleet metric convergence measured (identical 49-name set per worker) |
 | 2026-08-27 | Accepted / Complete | Kind final gate green on the train PR: 25 rows / 144 assertions incl. the redefined K5.4/K5.5; alerts+dashboards+k6 moved to compose-measured names |
 | 2026-08-27 | Accepted / Complete | Fleet converged, and the tighten-`AllowInvalidParentSpans` caveat was deliberately retired instead of executed (pkg#86, comment-only): `false` turns a bad tracing header into a failed workflow task — the failure class the plugin's `OnError` override already guards against |
-
----
-_Last updated: 2026-08-27_

@@ -107,6 +107,3 @@ Verified against the manifests, not assumed:
 - [Identity and tokens](../api/identity.md) — the verification contract these apps obtain tokens for
 - [Application delivery](../platform/application-delivery.md) — ResourceSets and the Flux chain
 - [RFC-0023](../proposals/rfc/RFC-0023/README.md) · [RFC-0025](../proposals/rfc/RFC-0025/README.md) — the portal, and the storefront's convergence onto its stack
-
----
-_Last updated: 2026-08-25_

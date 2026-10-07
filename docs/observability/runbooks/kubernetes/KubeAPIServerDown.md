@@ -64,6 +64,3 @@ queued against a flapping control plane land unpredictably when it returns.
   precursors to a full outage.
 - [KubeNodeNotReady](KubeNodeNotReady.md) — all nodes NotReady at once usually
   means the control plane, not the nodes.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

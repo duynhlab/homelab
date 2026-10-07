@@ -61,6 +61,3 @@ per alert name.
 
 New runbooks follow [`_TEMPLATE.md`](../_TEMPLATE.md) (Meaning → Impact →
 Diagnosis → Mitigation → Escalation).
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

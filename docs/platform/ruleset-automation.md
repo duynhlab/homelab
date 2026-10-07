@@ -129,6 +129,3 @@ See [gitflow.md](gitflow.md) section 7 for the full ruleset specification.
 - [Gitflow standard](gitflow.md)
 - [CI/CD documentation](cicd.md)
 - [Check template](check_template.yml) / [Build template](build_template.yml)
-
----
-_Last updated: 2026-08-19 — build.yml trigger row includes `v*` tags; gh-patcher scope clarified (Base Protection only; Production Gate + Release Tags manual/planned); exclude example for archived auth-service; homelab governance note._

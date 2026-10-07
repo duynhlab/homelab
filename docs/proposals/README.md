@@ -86,6 +86,3 @@ flowchart LR
 
 > "ADR" is the industry-standard term (Nygard 2011; adr.github.io). RFC + ADR used
 > together is a common open-source pattern (e.g. Kubernetes, Flux).
-
----
-_Last updated: 2026-08-24 — RFC template bumped to v3: added § Decision outcome (chosen option + rationale). It had no home before, so every RFC put it somewhere different — the Summary, prose under Alternatives, a bolded "Owner decision" paragraph in `research.md`, or a bespoke decisions table. Per-option pros/cons stay in `research.md` § Alternatives, and the ADR template is unchanged: `## Decision drivers` + `## Alternatives considered` + `### Why the selected option won` already cover the same ground. Previously — 2026-08-18: RFC template bumped to v2: added § Other solutions considered._

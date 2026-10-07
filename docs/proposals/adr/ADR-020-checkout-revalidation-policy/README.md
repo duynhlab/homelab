@@ -70,5 +70,3 @@ the saga's idempotent `ReserveStock`.
 - [RFC-0015](../../rfc/RFC-0015/) §Price & stock re-validation policy
 - [RFC-0003](../../rfc/RFC-0003/) — inventory single-owner
 - `product-service/internal/logic/v1.GetProductsByIDs` (cache-bypass note)
-
-_Last updated: 2026-07-12_

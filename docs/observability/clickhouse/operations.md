@@ -253,6 +253,3 @@ contain credentials.
 - [ClickHouse runbooks](../runbooks/clickhouse/README.md)
 - [Alert catalog](../alerting/alert-catalog.md#8b-clickhouse-otel-olap-engine)
 - [Kind end-to-end audit](../../platform/kind-e2e-audit.md)
-
----
-_Last updated: 2026-09-10 — added credential-safe client use and linked the live Kind evidence._

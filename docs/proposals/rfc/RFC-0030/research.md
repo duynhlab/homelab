@@ -761,6 +761,3 @@ gate.
 This research is sufficient for RFC-0030 to remain **provisional** and enter
 architecture/prototype review. It is not evidence that PeerDB is installed,
 compatible, or production-ready.
-
----
-_Last updated: 2026-09-08_

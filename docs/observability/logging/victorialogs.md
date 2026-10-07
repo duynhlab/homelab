@@ -210,10 +210,3 @@ Pipeline-side failures (nothing ingested at all, PG plans missing) are
 - [VictoriaLogs docs](https://docs.victoriametrics.com/victorialogs/) ·
   [data ingestion](https://docs.victoriametrics.com/victorialogs/data-ingestion/) ·
   [VLSingle operator resource](https://docs.victoriametrics.com/operator/resources/vlsingle/)
-
----
-
-_Last updated: 2026-08-25 — split out of the logging README (hub keeps the
-architecture; this doc owns the store). Corrected against the manifests: the
-config snippet no longer shows `removePvcAfterDelete` (never valid on VLSingle
-v1, removed from the manifest), and the PVC-fill alert's Kind caveat is stated._

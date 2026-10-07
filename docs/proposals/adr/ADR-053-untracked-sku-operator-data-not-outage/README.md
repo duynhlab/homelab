@@ -294,6 +294,3 @@ requires a new ADR that supersedes this one.
 | 2026-08-19 | Accepted / Not started | Errata during adoption: the publish-warning read is the protected balances HTTP route (`BatchGetAvailability` is gRPC-only, unreachable from the SPA), and session create answers a flat 409 — no session exists yet to requote. Decision unchanged |
 | 2026-08-19 | Accepted / **Partial** | The train shipped: httpx v0.37.0, checkout 0.9.0 (409 both arms), frontend 3.2.0 (copy, no retry), admin 0.4.0 (bootstrap + publish warning); full compose gate green incl. the new A21/B9/B10 rows; pins bumped. Complete waits on the Kind gate |
 | 2026-08-25 | Accepted / **Complete** | Kind gate passed. The two obligations tracked as `to file` turned out to already exist as compose **B9/B10** — both were run and both pass, so nothing needed filing. |
-
----
-_Last updated: 2026-08-25 — Adoption → **Complete** on the Kind gate pass (ELIGIBLE); the History row was appended in the same edit._

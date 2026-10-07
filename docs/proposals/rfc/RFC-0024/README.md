@@ -510,6 +510,3 @@ When Status → implemented, confirm:
 - [RFC-0009](../RFC-0009/README.md) / [ADR-006](../../adr/ADR-006-rs256-jwt-kong-edge-auth/) — the Kong edge design being superseded in its vehicle, preserved in its principle
 - [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md) — archived read-only (2026-08-12)
 - [`docs/platform/envoy-gateway.md`](../../../platform/envoy-gateway.md) · [`docs/platform/keycloak.md`](../../../platform/keycloak.md) · [`docs/api/identity.md`](../../../api/identity.md) — the as-built platform and contract docs
-
----
-_Last updated: 2026-08-25 — Status → `implemented` on the Kind gate pass; all six ADRs Complete; the last open box (RFC-0022/0023 Kong cross-references) closed by annotation the same day._

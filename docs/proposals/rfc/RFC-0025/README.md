@@ -12,7 +12,7 @@
 ## Prerequisites
 
 - [research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
-- Context7 audit complete (see research footer)
+- Context7 audit complete (see research audit record)
 - Owner approved **ready for RFC**
 - Mechanism deep dive stays in `./research.md` — this file decides and schedules
 - Expected ADR: [`ADR-052`](../../adr/ADR-052-converge-the-customer-spa-on-the-portal-stack/).
@@ -253,6 +253,3 @@ rather than discovered.
 - [ADR-043](../../adr/ADR-043-oidc-browser-workload-trust/) — the browser auth model kept unchanged
 - [RFC-0015](../RFC-0015/README.md) — the checkout funnel the storefront implements
 - [`local-stack/docs/e2e-audit.md`](../../../../local-stack/docs/e2e-audit.md) — Phase B rows to rewrite
-
----
-_Last updated: 2026-08-15_

@@ -101,8 +101,3 @@ restored; application health alone does not close it.
 - [Database disaster recovery](../../../databases/disaster-recovery.md)
 - [CNPG DR replica bootstrap](../../../databases/runbooks/cnpg-dr-replica-bootstrap.md)
 - [PostgreSQL runbooks](README.md)
-
----
-
-_Last updated: 2026-09-29 — expected state is 1/1 instance (DR cluster down from 3). Earlier: 2026-09-14 — added explicit coverage for complete DR-cluster
-absence and separated it from standby-streaming failures._

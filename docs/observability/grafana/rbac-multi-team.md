@@ -174,6 +174,3 @@ flowchart TD
 - [Anonymous authentication](https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/#anonymous-authentication)
 - [Grafana overview](README.md)
 - [VMAuth and vmauth](../metrics/victoriametrics.md#vmauth--vmauth-planned)
-
----
-_Last updated: 2026-08-26_

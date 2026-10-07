@@ -337,6 +337,3 @@ assumption:
    Before running it in the cluster: take the dump against `product-db-rw`, keep
    it outside the cluster, and confirm the restore into a scratch database — a
    backup nobody has restored is a hypothesis.
-
----
-_Last updated: 2026-08-06_

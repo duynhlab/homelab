@@ -65,6 +65,3 @@ unrelated service failures until someone checks here.
 - [CoreDNSDown](CoreDNSDown.md)
 - [KubeAPIServerHighLatency](KubeAPIServerHighLatency.md) — CoreDNS resolves
   Services through the API server.
-
----
-_Last updated: 2026-09-05 — created; the controlplane alert group had no runbooks_

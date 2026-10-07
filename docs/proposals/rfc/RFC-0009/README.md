@@ -680,6 +680,3 @@ The original open questions were resolved on 2026-06-30:
 - Sibling: [RFC-0008](../RFC-0008/) (secrets hardening — shared OpenBAO/ESO pattern).
 - Context: [`docs/platform/kong-gateway.md`](../../../platform/kong-gateway.md),
   [shared API guide](../../../api/api.md#http-url-model).
-
----
-_Last updated: 2026-08-11_

@@ -78,6 +78,3 @@ violation.
   the local stack's flat network (accepted for local dev).
 - Revisit trigger: a second internal caller of CreateOrder (it would need its
   own key namespace), or payment-before-order flows (RFC-0016 territory).
-
----
-_Last updated: 2026-07-13_

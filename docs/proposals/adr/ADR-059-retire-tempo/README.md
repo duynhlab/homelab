@@ -289,6 +289,3 @@ a new ADR that supersedes this one.
   `failed` reads **0** on every edge because no `Server`-kind span on this platform
   has ever carried `StatusCode = 'Error'`, and the dependency API reports more
   edges than the SQL (34 vs 24) because it includes database dependencies.
-
----
-_Last updated: 2026-08-25_

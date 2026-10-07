@@ -332,5 +332,3 @@ Server-side Valkey metrics and hit-rate queries: [Caching (platform) § Observab
 - [3-Layer Architecture](./api.md#inside-each-service)
 - [Redis Go Client](https://github.com/redis/go-redis)
 - [Cache-Aside Pattern](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Strategies.html)
-
-_Last updated: 2026-10-02 — the retired internal product create is replaced by the protected catalog writes and what each invalidates. Previously 2026-08-11 — `product-db` holds six databases, not three — the stale-cache blast radius is wider than stated._

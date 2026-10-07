@@ -360,5 +360,3 @@ Paths in [`duynhlab/product-service`](https://github.com/duynhlab/product-servic
 - [Application caching](./caching.md) — cache-aside pattern theory
 - [Caching (platform)](../caching/README.md) — Valkey deployment and ops
 - [RFC-0003](../proposals/rfc/RFC-0003/) — inventory ownership and stock semantics
-
-_Last updated: 2026-10-02 — the retired `POST /product/v1/internal/products` row is removed. Previously 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-11 — product left the saga and the public edge surface was recorded._

@@ -92,5 +92,3 @@ the owning service contract and deployment manifest before changing a DSN.
 - [CloudNativePG 1.30 connection pooling](https://cloudnative-pg.io/docs/1.30/connection_pooling/)
 - [PgBouncer features](https://www.pgbouncer.org/features.html)
 - [PgDog documentation](https://docs.pgdog.dev/)
-
-_Last updated: 2026-10-01 — payment's direct hop labelled TLS, unverified (`sslmode=require`). Earlier: 2026-08-31._

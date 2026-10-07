@@ -15,6 +15,9 @@
 | **Percentiles computed by** | VictoriaMetrics (`histogram_quantile()` over `_bucket` series) |
 | **Exponential histograms** | Not used — rationale below |
 
+Repository review on 2026-07-29 checked the platform values against `pkg/obsx`
+and the Collector manifest; this was not a runtime measurement.
+
 ---
 
 ## Bucket mechanics
@@ -140,7 +143,3 @@ flowchart LR
 
 - [OTel metrics data model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/) · [Exponential histograms (OTEP-0149)](https://opentelemetry.io/docs/specs/otel/metrics/data-model/#exponentialhistogram) · [Aggregation temporality](https://opentelemetry.io/docs/specs/otel/metrics/data-model/#temporality)
 - In-house: [Application metrics contract](../../api/metrics.md) · [Streaming aggregation](streaming-aggregation.md) · [PromQL guide](promql-guide.md) · [Metrics hub](README.md)
-
----
-
-_Last updated: 2026-07-29 — initial histogram & temporality fundamentals; platform values verified against `pkg/obsx` and the collector manifest._

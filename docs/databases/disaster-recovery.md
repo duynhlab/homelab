@@ -484,7 +484,3 @@ retire. The hold stays meaningful for a durable store ([RFC-0011](../proposals/r
 - [CloudNativePG Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
 - [Zalando Postgres Operator documentation](https://postgres-operator.readthedocs.io/en/latest/)
 - [PostgreSQL WAL documentation](https://www.postgresql.org/docs/current/wal-intro.html)
-
----
-
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

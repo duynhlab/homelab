@@ -113,6 +113,3 @@ deserves a `kubectl get kustomization -A` before it is believed.
   their `HelmChart` or `HelmRepository` cannot resolve.
 - [FluxReconciliationFailure](FluxReconciliationFailure.md) — warning-level rule
   covering every Flux kind, including sources.
-
----
-_Last updated: 2026-09-05 — created; the flux-alerts group had no runbooks at all_

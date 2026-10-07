@@ -728,6 +728,3 @@ Phased P1→P6 as above. Blast-radius notes:
   [`docs/api/checkout.md`](../../../api/checkout.md),
   [`docs/api/temporal.md`](../../../api/temporal.md),
   [`docs/README.md` § Repositories](../../../README.md#repositories).
-
----
-_Last updated: 2026-08-25_

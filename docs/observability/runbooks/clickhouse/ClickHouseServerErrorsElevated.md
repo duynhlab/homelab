@@ -91,6 +91,3 @@ Info. It is context for another alert far more often than it is the incident.
 - All four rows in the table above.
 - [ClickHouseZooKeeperExceptions](ClickHouseZooKeeperExceptions.md) — the
   narrower Keeper-specific counter.
-
----
-_Last updated: 2026-09-05 — created; the clickhouse alert group had no runbooks at all_

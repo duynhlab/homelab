@@ -115,5 +115,3 @@ acceptance gate.
 - [PostgreSQL continuous archiving and PITR](https://www.postgresql.org/docs/18/continuous-archiving.html)
 - [CloudNativePG 1.30 backup](https://cloudnative-pg.io/docs/1.30/backup/)
 - [Barman Cloud plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
-
-_Last updated: 2026-10-06 — platform documentation review; current claims checked against main `d421daf3`, historical evidence preserved._

@@ -269,6 +269,3 @@ open http://karma.duynh.me
 - [Microservices runbooks](../runbooks/microservices/README.md) — Layer-1 per-alert investigation
 - [Google SRE Workbook — Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/) — origin of the method
 - [Sloth](https://github.com/slok/sloth) — generator details and alert overrides (the sloth.dev docs site no longer serves the alerts page)
-
----
-_Last updated: 2026-09-30 — minimum-events guard on every burn-rate alert (Sloth alerts disabled, re-emitted by the chart and `sloth/slo-alerts.yaml`); counts corrected to 31 SLOs / 62 alerts. 2026-08-20 — Keycloak's 2 hand-written identity SLOs added (32 → 34 SLOs, 64 → 68 alerts)_

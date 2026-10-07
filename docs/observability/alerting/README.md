@@ -311,8 +311,3 @@ For a detailed comparison of Karma against other alert dashboard tools (Alerta, 
 - [SLO Burn-Rate Alerts](./slo-burn-rate-alerts.md) -- burn-rate methodology details
 - [SLO Fundamentals](../slo/fundamentals.md) -- SLA/SLO/SLI/Error Budget primer
 - [Grafana Datasources](../grafana/datasources.md) -- how read-only rules display works
-
----
-
-_Last updated: 2026-09-30 — burn-rate table corrected (severity page/ticket, four arms) and minimum-events guard; counts 31 / 62. Earlier: 2026-09-14 — reconciled the alert inventory with the live Kind
-rule set and linked the alert-lifecycle and runbook evidence guide._

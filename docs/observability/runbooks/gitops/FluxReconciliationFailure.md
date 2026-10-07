@@ -78,6 +78,3 @@ looks clean during an incident should still be checked with
   generalises.
 - [FluxSuspendedResource](FluxSuspendedResource.md) — suspended is not failing.
 - [FluxReconcileDurationHigh](FluxReconcileDurationHigh.md) — slow, not failed.
-
----
-_Last updated: 2026-09-05 — created; the flux-alerts group had no runbooks at all_

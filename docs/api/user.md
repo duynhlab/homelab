@@ -285,5 +285,3 @@ Paths in [`duynhlab/user-service`](https://github.com/duynhlab/user-service). Tr
 - [workflows.md](./workflows.md) — Temporal registry (user: None)
 - [Service contracts](./README.md#service-contracts)
 - [microservices.md](./microservices.md) — feature matrix
-
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-14 — RFC-0023 Train 3 shipped the protected Backoffice reads._

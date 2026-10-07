@@ -313,5 +313,3 @@ Paths in [`duynhlab/review-service`](https://github.com/duynhlab/review-service)
 - [Service contracts](./README.md#service-contracts)
 - [product.md](./product.md) — the details aggregation that calls `GetProductReviews`
 - [microservices.md](./microservices.md) — feature matrix
-
-_Last updated: 2026-08-26 — adds evidence-backed capability and ownership summaries. Previously 2026-08-12 — RFC-0024 P3 moved `user_id` and verification to Keycloak._

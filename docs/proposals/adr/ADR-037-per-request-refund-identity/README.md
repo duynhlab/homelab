@@ -195,6 +195,3 @@ Re-open this decision when one or more of the following become true:
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-08-04 | Accepted / Complete | Shipped in pkg v0.32.0, payment-service #51, order-service #169 |
-
----
-_Last updated: 2026-08-04_

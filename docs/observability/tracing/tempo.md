@@ -107,6 +107,3 @@ recovers the full picture. The trade and the rejected alternatives are recorded 
 - [ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/) · [ADR-059](../../proposals/adr/ADR-059-retire-tempo/)
 - [VictoriaTraces](victoriatraces.md) · [tracing hub](README.md)
 - [`docs/platform/kong-gateway.md`](../../platform/kong-gateway.md) — the archived-doc pattern this follows
-
----
-_Last updated: 2026-08-24 — archived; frozen at retirement._

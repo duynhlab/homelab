@@ -82,6 +82,3 @@ pod logs, tailed by the Vector DaemonSet into VictoriaLogs (no separate exporter
 - [PgDog operations](../../../databases/runbooks/pooler-operations.md)
 - [PromQL guide](../promql-guide.md)
 - [Metrics hub](../README.md)
-
----
-_Last updated: 2026-09-01 — the DR replica is now scraped (its own `PodMonitor`), so backup alerting covers it. Previously 2026-08-31 — backup alerts migrated to Barman Cloud plugin metrics; rule count re-derived (55)._

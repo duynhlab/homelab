@@ -97,7 +97,3 @@ kubectl get clustersecretstore openbao-db   # ADR-025 database static-role pilot
 # Specific ExternalSecret state
 kubectl describe externalsecret product-db-secret -n product
 ```
-
----
-
-_Last updated: 2026-08-27 — day-2 admin access is the ADR-062 staff OIDC login; ceremony demoted to issuer-down fallback throughout. 2026-08-19: rewritten for the automated bootstrap Job._

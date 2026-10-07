@@ -58,5 +58,3 @@ curl -s http://openbao.openbao.svc.cluster.local:8200/v1/auth/kubernetes/login \
 # Check audit log (Vector → VictoriaLogs) for denied requests
 # In Grafana (VictoriaLogs, LogsQL): _stream:{namespace="openbao"} stream:=stdout | unpack_json | type:=response error:!=""
 ```
-
-_Last updated: 2026-08-27 — fixed a broken credential: the commands read the inert root_token (403 since ADR-024); they now use an ADR-062 staff OIDC token, which also survives this incident because OIDC auth does not depend on kubernetes auth. 2026-07-14: split from the secrets README._

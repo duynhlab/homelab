@@ -196,6 +196,11 @@ On local-stack there is no API server, so `k8s.cluster.name`,
 `k8s.container.name`, `k8s.deployment.name`, `k8s.node.name` and
 `k8s.pod.uid` stay empty there — expected, not a fault.
 
+The 2026-09-24 Kind verification recorded all seven `k8s.*` columns populated
+in the inspected logs. This historical observation does not imply every
+producer supplies every field; the edge container-name exception above still
+applies.
+
 ### Exporters and durability
 
 Backend-facing exporters own their own resilience — retry and queueing moved
@@ -255,14 +260,3 @@ alert — watch `otelcol_exporter_send_failed_*` and `otelcol_processor_refused_
 
 - [Collector docs](https://opentelemetry.io/docs/collector/) · [Configuration](https://opentelemetry.io/docs/collector/configuration/) · [Deployment patterns](https://opentelemetry.io/docs/collector/deployment/)
 - In-house: [OTel fundamentals](fundamentals.md) (incl. the [RFC-0014 migration story](fundamentals.md#how-this-platform-got-here--rfc-0014-in-pictures)) · [OpenTelemetry (platform)](README.md) · [Logging pipeline](../logging/README.md) · [ClickHouse](../clickhouse/README.md) · [ClickHouse fundamentals](../clickhouse/fundamentals.md)
-
----
-
-_Last updated: 2026-09-30 — contrib 0.161.0 on the cluster and local-stack. Earlier: 2026-09-24 — `transform/privacy` on traces and both logs pipelines strips the ADR-071 deny list from every producer. Earlier the same day — RFC-0031 Task 4.4: `k8sattributes` + `resource/cluster` on
-both logs pipelines (all seven `k8s.*` columns filled on Kind), both HTTP method
-dimensions on the span-metrics connector, and the pipeline table brought up to the five
-pipelines actually deployed. Previously 2026-08-24 — exporters are **6 defined / 5 wired** after RFC-0027 removed
-`otlp/tempo`, `otlp/tempo-chart` and `otlp/jaeger` and added `prometheus_remote_write`. There
-are now **four** pipelines: the new `metrics/spanmetrics` is fed by the `span_metrics`
-connector, which appears twice in `service.pipelines` — as an exporter on `traces` and as the
-receiver of its own metrics pipeline ([ADR-057](../../proposals/adr/ADR-057-span-metrics-in-collector/))._

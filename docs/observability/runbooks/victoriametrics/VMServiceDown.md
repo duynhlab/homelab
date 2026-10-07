@@ -72,6 +72,3 @@ others.
 - [VMTooHighMemoryUsage](VMTooHighMemoryUsage.md) — the usual cause.
 - [VMAgentPersistentQueueIsDroppingData](VMAgentPersistentQueueIsDroppingData.md)
   — what a long `vmsingle` outage does to ingestion.
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

@@ -294,6 +294,3 @@ falls back to its current direct-TLS connection string.
 - [RFC-0002](../RFC-0002/) (superseded — gRPC mTLS absorbed as Slice 6) · [RFC-0006](../RFC-0006/) (mesh-later) · [RFC-0008](../RFC-0008/) (credentials — complements)
 - [ADR-005](../../adr/ADR-005-openbao-ha-raft/) (OpenBAO TLS target) · [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/) (`pg_hba` isolation) · [ADR-025](../../adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) (credential ladder)
 - [`docs/secrets/cert-manager.md`](../../../secrets/cert-manager.md) — deployed PKI chain; [§ 12](../../../secrets/cert-manager.md#12-tls-topology--which-hops-are-encrypted-today) — TLS topology as deployed (the amendment's starting point)
-
----
-_Last updated: 2026-10-01 — amendment slices 7–14 and decisions 9–12 (proposed); Motivation, edge-leaf note and expiry-alert drift corrected._

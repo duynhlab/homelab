@@ -59,6 +59,3 @@ the node needs memory freed, not different casualties.
 - [KubePodOOMKilled](KubePodOOMKilled.md) — the per-container face of the same
   exhaustion.
 - [KubeNodeNotReady](KubeNodeNotReady.md) — where unresolved pressure ends.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

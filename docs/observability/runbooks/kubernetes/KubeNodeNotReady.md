@@ -63,6 +63,3 @@ does more damage than the blip itself.
   often precede NotReady.
 - [KubeAPIServerDown](KubeAPIServerDown.md) — control-plane loss can present
   as all nodes NotReady.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

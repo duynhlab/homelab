@@ -213,6 +213,3 @@ A changed decision requires a new ADR that supersedes this one.
 | 2026-09-18 | Accepted / Partial | First obligation closed: every `duynhlab/pkg` module at its current tag in all ten services (`obsx v0.38.0` fleet-wide, was three versions) and pkg lints at the fleet's golangci-lint v2.12.2 |
 | 2026-09-18 | Accepted / Partial | Lint-policy channel merged in the shared workflows (Task 1.1c-A, obsx v0.39.2 removed the SDK types that would have needed a `cmd/**` exemption); services opt in non-blocking first |
 | 2026-09-25 | Accepted / Complete | **Complete.** The last two obligations closed: `gomodguard_v2` blocks a telemetry module more than one minor behind (validated: a tree pinned two minors back fails), every service flipped `policy-lint-blocking` (all green at 0 findings once payment took its otelhttp hop from `httpmw v0.3.0`), and pkg's README/AGENTS state that a new minor moves the floor and the release notes say so. |
-
----
-_Last updated: 2026-09-25 — Adoption `Complete` at the close of RFC-0031 (both final gates passed). Previously second History row: the fleet lint-policy channel is merged (Task 1.1c-A); earlier the same day Adoption moved to `Partial` on the pin and linter convergence obligation. Previously 2026-09-17._

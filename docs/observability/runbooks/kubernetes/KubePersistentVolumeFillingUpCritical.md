@@ -67,6 +67,3 @@ recover at all.
 
 - [KubePersistentVolumeFillingUp](KubePersistentVolumeFillingUp.md) — the 15%
   early warning this alert escalates from.
-
----
-_Last updated: 2026-08-19 — split out of infrastructure-alerts.md into the kubernetes/ domain folder_

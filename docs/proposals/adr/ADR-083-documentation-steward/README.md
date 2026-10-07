@@ -186,6 +186,3 @@ preventing drift, or executable examples cannot be isolated safely.
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
 | 2026-10-01 | Accepted / Not started | Architecture review accepted the four content contracts, review split, and safe-example policy |
-
----
-_Last updated: 2026-10-01 — Accepted, Adoption Not started_

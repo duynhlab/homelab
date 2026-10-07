@@ -116,6 +116,3 @@ so every version scales out again from scratch.
 ```bash
 git log --oneline -5 -- kubernetes/apps/order-fulfillment-scaler.yaml kubernetes/infra/controllers/temporal/worker-controller-helmrelease.yaml
 ```
-
----
-_Last updated: 2026-09-05 — created with the KEDA install (ADR-055)_

@@ -7,7 +7,7 @@
 ## Prerequisites
 
 - [x] [./research.md](./research.md) merged; [research review gate](./research.md#research-review-gate) ticked
-- [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research footer](./research.md#context7-audit-log) and it changed four normative statements
+- [x] Context7 audit complete — rerun 2026-09-17 after the first pass recorded it unavailable; the log is in the [research audit log](./research.md#context7-audit-log) and it changed four normative statements
 - [x] Owner approved **ready for RFC**
 - [x] Live verification recorded — local-stack and a fresh, seeded Kind cluster, 2026-09-17, in [research § Live verification](./research.md#live-verification); every claim it contradicted was changed to match
 - [x] Mechanism detail stays in `./research.md`; this document summarises and links it
@@ -1330,6 +1330,3 @@ in the metrics guide while the platform does not promise them.
 - [OTel Logs Data Model](https://opentelemetry.io/docs/specs/otel/logs/data-model/)
 - [OTel HTTP semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/)
 - [OTel RPC semantic conventions](https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/)
-
----
-_Last updated: 2026-09-25 — **Implemented**: every delivery-plan task done, both final gates passed (compose #1095, Kind § Previous runs 2026-09-25), ADR-070…076 at `Complete`, Implementation History filled in from the 2026-09-18 floor to the 2026-09-25 close. Previously 2026-09-17 — **Accepted** at architecture review (owner, 2026-09-17): facade `pkg/logger/slogx`, bare namespaces with registered exceptions; ADR-070…076 created at `Accepted / Not started`. third revision. Added the shared-package rule for all four signals with its enforcement mechanism, a tracing contract with gate, task and ADR-075, Collector and fleet-scale contracts, a semantic-convention registry as ADR-076, and the Design Details, Security considerations and Observability & SLO impact sections. Corrected the sampling table, Kubernetes enrichment, profile labels and mockpay scope to deployed reality, and verified the contract live on local-stack and a fresh Kind cluster (research § Live verification). The standard is greenfield: no migration mechanism. Earlier the same day: Context7 rerun, facade renamed to `pkg/logger/slogx`, log-record representation taken out of scope._

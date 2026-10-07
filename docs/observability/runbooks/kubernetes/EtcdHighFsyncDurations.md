@@ -60,6 +60,3 @@ Not applicable as written.
 - [EtcdMembersDown](EtcdMembersDown.md)
 - [KubeAPIServerDown](KubeAPIServerDown.md),
   [KubeAPIServerHighLatency](KubeAPIServerHighLatency.md) — how this surfaces here
-
----
-_Last updated: 2026-09-05 — created; documents why this rule is inert rather than leaving it looking like coverage_

@@ -388,6 +388,3 @@ part most likely to be skipped under pressure.
 - [ADR-023](../../adr/ADR-023-clickhouse-observability-olap/) — why ClickHouse exists here; [ADR-061](../../adr/ADR-061-edge-log-routing/) — edge logs are ClickHouse-only
 - [RFC-0019](../RFC-0019/) — the observability OLAP program this extends
 - Quick-win train (system-table TTLs, image pin, PVC Retain) — independent of this RFC's gate; the `:9363` scrape was pulled out of it and shipped here instead
-
----
-_Last updated: 2026-08-28 — schema ownership **reversed to Option A** at implementation: a bootstrap Job owns the DDL and the `otel` database is `ENGINE = Replicated`, after exporter-owned `ON CLUSTER` DDL was measured reaching 1 of 3 then 2 of 3 replicas and the exporter's README was found to recommend `create_schema: false` for production. Earlier: Status → `Accepted`; ADR-065 created at `Accepted`, implementation opened in the same PR, `:9363` scrape folded in. Earlier still: owner review — the bare “docs/api: N/A” hid the real docs impact._

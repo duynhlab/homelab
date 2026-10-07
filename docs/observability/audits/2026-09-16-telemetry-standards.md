@@ -149,5 +149,3 @@ The API tree is normative for application-side observability. It adds constraint
 - `docs/api/profiling.md` defines shared Pyroscope setup, ten Go profile types, low-cardinality labels and non-critical failure behavior. The platform profiling guide confirms the one-click trace pivot was lost with Tempo and the deployed VictoriaTraces Jaeger datasource requires a manual service/time pivot.
 
 The service-specific API pages should be the next audit slice for business event and metric names: they define intended operational interpretation, while this report identifies shared implementation and pipeline gaps.
-
-_Last updated: 2026-09-17 — canonical gRPC status attribute corrected to `rpc.status_code` and the conflicting `url.path` recommendation dropped; facade renamed to `pkg/logger/slogx`; F1 and F5 restated against the deployed `event` attribute, since the log-record representation question is out of scope. Audit date and evidence are unchanged._

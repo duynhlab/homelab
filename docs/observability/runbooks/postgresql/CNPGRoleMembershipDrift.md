@@ -87,6 +87,3 @@ works: step 3 of [Rotate the `vault_rotator` credential](../../../databases/runb
   then review notification data access in the PostgreSQL audit log.
 - Lost `ADMIN`: restore it in working hours; rotation is paused, not broken for
   traffic.
-
----
-_Last updated: 2026-10-06 — first version (ADR-086)._

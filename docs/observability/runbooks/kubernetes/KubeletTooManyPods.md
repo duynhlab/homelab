@@ -67,6 +67,3 @@ use the direct checks above rather than waiting for an alert that will not come.
 - [KubeletDown](KubeletDown.md)
 - [KubeNodeNotReady](KubeNodeNotReady.md)
 - Catalog: **Alerts that are inert on Kind, and why they are kept**
-
----
-_Last updated: 2026-09-05 — created; documents why this rule is inert rather than leaving it looking like coverage_

@@ -69,6 +69,3 @@ drift/centralisation concerns above.
   **public key**) *and* we need to shed bad tokens before they reach pods at scale, re-open this
   ADR. The implementation shape (KongConsumer + `jwt` credential + per-private-route plugin) is
   recorded in the gateway research notes for that future case.
-
----
-_Last updated: 2026-07-01_

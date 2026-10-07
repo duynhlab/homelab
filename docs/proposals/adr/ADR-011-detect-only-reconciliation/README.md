@@ -101,7 +101,3 @@ alert data shows it's needed, not speculatively.
   `discrepancies_found > 0` (today detection is a log line + a report someone
   must poll), retention reaper for the recon tables, windowed scans before
   production volume, currency on the report, and the heal rules themselves.
-
----
-
-_Last updated: 2026-07-04_

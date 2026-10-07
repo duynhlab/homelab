@@ -55,6 +55,3 @@ later stages are the ones that hurt.
   link.
 - [VMTooHighMemoryUsage](VMTooHighMemoryUsage.md)
 - [VMSingleTooHighChurnRate](VMSingleTooHighChurnRate.md)
-
----
-_Last updated: 2026-09-05 — created; the victoriametrics alert groups had no runbooks at all_

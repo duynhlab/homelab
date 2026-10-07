@@ -172,6 +172,3 @@ version that may hold pinned workflows.
 ```bash
 git log --oneline -5 -- kubernetes/apps/order-fulfillment-scaler.yaml kubernetes/infra/controllers/keda/helmrelease.yaml
 ```
-
----
-_Last updated: 2026-09-05 — created with the KEDA scaler it gives a signal to (ADR-055)_

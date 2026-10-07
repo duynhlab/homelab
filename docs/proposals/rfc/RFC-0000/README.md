@@ -193,5 +193,3 @@ When Status → implemented, confirm:
 - <!-- docs/api/{service}.md — as-built contract after implemented -->
 - <!-- ADRs linked in Resulting decisions (Proposed at review, Accepted with RFC) -->
 - <!-- Linked PRs -->
-
----

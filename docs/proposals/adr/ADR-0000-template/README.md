@@ -279,5 +279,3 @@ A changed architectural decision requires a new ADR.
 | YYYY-MM-DD | Proposed / Not started | Initial draft |
 | YYYY-MM-DD | Accepted / Not started | Decision accepted in RFC-NNNN review |
 | YYYY-MM-DD | Accepted / Complete | Implementation and contract tests completed |
-
----

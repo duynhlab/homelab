@@ -180,6 +180,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Introduce ADR template v3: a concise decision record with optional extensions,
+  evidence-aware rationale and scope-appropriate adoption checks. Existing v1/v2
+  records remain valid without backfill.
+
 - Define concise manifest comments and evidence-aware documentation conventions;
   remove editorial update footers from authoring templates while preserving
   decision and verification dates.

@@ -7,7 +7,7 @@ cannot.
 
 | Quick facts | |
 |---|---|
-| Copy source | [`ADR-0000-template/`](ADR-0000-template/) (template v2) |
+| Copy source | [`ADR-0000-template/`](ADR-0000-template/) (template v3) |
 | Proposals hub | [`docs/proposals/README.md`](../README.md) |
 | RFC process | [`rfc/README.md`](../rfc/README.md) |
 | As-built contracts | [`docs/api/`](../../api/README.md) |
@@ -23,11 +23,13 @@ cannot.
 - [Status and Adoption](#status-and-adoption)
 - [Append-only rules](#append-only-rules)
 - [Naming and layout](#naming-and-layout)
+- [Writing a concise ADR](#writing-a-concise-adr)
 - [RFC Resulting decisions](#rfc-resulting-decisions)
 - [Review checklist](#review-checklist)
 - [Common mistakes](#common-mistakes)
 - [Definition of Done](#definition-of-done)
 - [Illustrative splits](#illustrative-splits)
+- [References](#references)
 - [Records index](#records-index)
 
 ---
@@ -114,6 +116,10 @@ flowchart LR
 
 ## Process
 
+For RFC-backed work, follow the sequence below. A small standalone ADR skips
+steps 2–3 and RFC-specific updates; the deciders review and accept the ADR
+directly. Confirmation and owning-document updates still apply.
+
 1. Frame the problem (optionally in `research.md`).
 2. Write the RFC with target design and alternatives.
 3. During RFC review, identify **independent** architectural decisions.
@@ -197,20 +203,26 @@ Typical flow: `Proposed → Accepted → Superseded by ADR-NNN` (or `Deprecated`
 
 Example after RFC approval: `Status: Accepted`, `Adoption: Not started`.
 
-**Legacy ADRs** (ADR-001–031 and earlier v1 shape) remain valid. They may omit
-Adoption in the file body; the index below assigns Adoption for tracking. New ADRs
-from [`ADR-0000-template/`](ADR-0000-template/) use template v2. No backfill unless
-the owner asks.
+**Existing v1/v2 ADRs remain valid.** Legacy v1 records may omit Adoption in the
+file body; the index below assigns Adoption for tracking. New ADRs from
+[`ADR-0000-template/`](ADR-0000-template/) use template v3. No backfill unless
+the owner asks; do not reshape accepted decisions to match the new template.
 
 ---
 
 ## Append-only rules
 
-After **`Accepted`**, do not silently rewrite **Decision**, **Alternatives
-considered**, **Decision drivers**, or accepted **Consequences**.
+After **`Accepted`**, do not silently rewrite the **Context** and decision basis
+(including drivers, assumptions and evidence), **Decision**, **Alternatives
+considered**, or accepted **Consequences**. This also protects a separate
+**Decision drivers** section in older or extended records. Append newly learned
+evidence with its scope/date rather than making it look known at acceptance.
 
 Allowed updates: typos, broken links, append PRs, change **Adoption**, add **History**
 rows, mark **Deprecated** or **Superseded**.
+
+History records lifecycle/adoption milestones and important evidence, not an
+editing diary. Wording, formatting and link-fix history belongs in Git/PRs.
 
 When the decision itself changes, write a **new** ADR, set `Supersedes: ADR-NNN` on
 the new record, and update the old record to `Superseded by ADR-XXX`.
@@ -244,6 +256,41 @@ Keep per-ADR diagrams and assets inside the folder. Use the next platform-wide
 
 ---
 
+## Writing a concise ADR
+
+Template v3 keeps one copy source, not separate simple/full templates. Aim for
+1–2 readable pages without a hard limit: keep the argument here and link the
+research, rollout schedule and operational procedures.
+
+The core is **Context → Decision → Alternatives considered → Consequences →
+Confirmation → References → History**, preceded by a decision summary and
+Status, Decision date, Owner, Deciders and Adoption. Add other metadata only
+when relevant; omit unused rows and placeholder links.
+
+- **Context:** explain why a decision is needed now, its scope and the decisive
+  constraints. Distinguish observed facts, assumptions and unknowns. Learning
+  value is a valid homelab driver; do not invent a production need to justify it.
+- **Decision and alternatives:** explain why this choice beats the closest
+  credible alternative under those constraints, including the additional cost.
+  Consider keeping the current approach or deferring when viable. There is no
+  required number of options; avoid straw men and product-feature lists.
+- **Consequences:** state both expected benefit and a meaningful accepted cost,
+  limitation or risk. Identify an observable revisit condition when an
+  important assumption could invalidate the choice.
+- **Confirmation:** state how compliance will be checked and what permits
+  Adoption: Complete. Link scoped evidence when checks actually run, and update
+  the owning documentation: API contracts for API changes, platform docs for
+  infrastructure, runbooks when operationally relevant.
+
+Extend only when the decision needs it: a separate Scope section for complex
+boundaries; prioritized drivers or a rules table for multiple constraints; an
+obligations table with owner/tracking/completion signal for phased adoption;
+Revisit triggers for several material assumptions. Use Mermaid only when a
+small diagram clarifies the decision. None of these extensions is a mandatory
+heading, table or bullet quota, and neutral consequences need no empty section.
+
+---
+
 ## RFC Resulting decisions
 
 Every multi-decision RFC should link its ADRs explicitly. Add to the RFC body (see
@@ -258,8 +305,9 @@ Every multi-decision RFC should link its ADRs explicitly. Add to the RFC body (s
 ```
 
 On approval: RFC → **Accepted**; each linked ADR → **Accepted**; Adoption →
-**Not started**. After ship: update Adoption, `docs/api`, runbooks (if needed), and
-RFC Implementation History.
+**Not started** unless implementation already landed. After ship: update
+Adoption, owning docs (`docs/api` only when API-touching), runbooks if needed,
+and RFC Implementation History.
 
 ---
 
@@ -269,26 +317,27 @@ RFC Implementation History.
 
 - [ ] Title is one decision, not a topic name.
 - [ ] Decision summary states benefit **and** cost.
-- [ ] Context states facts only (no chosen option).
-- [ ] In scope / Out of scope are explicit.
-- [ ] Decision drivers are prioritized.
-- [ ] Alternatives are credible (not straw men).
+- [ ] Context explains scope, constraints and why now without preselecting an answer.
+- [ ] Facts, assumptions and unknowns are distinguishable; evidence is scoped.
+- [ ] The decisive drivers explain why the choice beats the closest credible alternative.
+- [ ] Alternatives are real; keeping the current approach or deferring was considered when viable.
 - [ ] At least one meaningful negative consequence.
-- [ ] Implementation obligations, validation, and revisit triggers present.
-- [ ] Related RFC/research linked or `—`.
+- [ ] Confirmation defines compliance checks and an observable adoption result.
+- [ ] Material assumptions have revisit conditions when applicable.
+- [ ] Relevant references are linked; unused metadata and boilerplate are removed.
 - [ ] Optional diagram answers one boundary question only.
 
 ### On Accept
 
 - [ ] Decision date and Deciders filled in.
 - [ ] Status → **Accepted**; Adoption → **Not started** (unless code already landed).
-- [ ] RFC **Resulting decisions** table updated.
+- [ ] RFC **Resulting decisions** table updated when RFC-backed.
 - [ ] History row added.
 
 ### On Adoption Complete
 
-- [ ] Obligations met; tests prove decision rules.
-- [ ] `docs/api/` as-built; Design records link this ADR.
+- [ ] Confirmation checks passed with evidence; any adoption obligations are met.
+- [ ] Owning docs are as-built and link this ADR (`docs/api/` for API-touching work).
 - [ ] Runbooks updated when ops-relevant.
 - [ ] Adoption → **Complete**; History updated.
 
@@ -305,9 +354,10 @@ RFC Implementation History.
 |---------|-----|
 | ADR duplicates the whole RFC | Move target design to RFC; keep one decision + rules here |
 | Context argues for the answer | State forces only; decide in **Decision** |
-| Straw-man alternatives | Record real options from RFC/research |
-| Benefits only, no costs | Fill **Negative consequences** |
-| Phase plan inside ADR | Link RFC rollout or planning doc; use **Implementation obligations** |
+| Straw-man alternatives | Record real options; link RFC/research when available |
+| Benefits only, no costs | State the accepted cost or risk in **Consequences** |
+| Phase plan inside ADR | Link rollout/tracking; **Confirmation** states the adoption signal, with an obligations table only if needed |
+| Filling every template extension | Keep only sections and tables that add decision-relevant information |
 | `Status: Implemented` | Use `Accepted` + `Adoption: Complete` |
 | Calendar-only revisit trigger | Use observable thresholds (scale, requirement, cost) |
 
@@ -316,6 +366,10 @@ RFC Implementation History.
 ## Definition of Done
 
 An ADR is not complete at compile time.
+
+The checklist below concerns **Adoption: Complete**, not architecture approval.
+Use checks and documentation updates relevant to the decision's scope; a small
+infra-only ADR does not require service contract or workflow tests.
 
 ```text
 Decision accepted (ADR)
@@ -369,6 +423,13 @@ invalidating the others.
 
 Do **not** duplicate an existing ADR when the decision is already recorded; link
 and extend Adoption instead.
+
+---
+
+## References
+
+- [Michael Nygard — Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions): one decision, contextual forces, consequences and supersession.
+- [MADR 4.0.0 minimal template](https://github.com/adr/madr/blob/4.0.0/template/adr-template-minimal.md) and [full template](https://github.com/adr/madr/blob/4.0.0/template/adr-template.md): explicit justification with optional detail. Homelab additionally requires consequences, confirmation and lifecycle tracking.
 
 ---
 

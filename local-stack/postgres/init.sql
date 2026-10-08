@@ -8,7 +8,7 @@ DO $$
 DECLARE
   r text;
 BEGIN
-  FOREACH r IN ARRAY ARRAY['user','product','cart','order','review','shipping',
+  FOREACH r IN ARRAY ARRAY['user','product','cart','order','shipping',
                            'notification','payment','checkout','inventory',
                            'keycloak','temporal'] LOOP
     EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
@@ -20,7 +20,16 @@ CREATE DATABASE "user" OWNER "user";
 CREATE DATABASE product OWNER product;
 CREATE DATABASE cart OWNER cart;
 CREATE DATABASE "order" OWNER "order";
-CREATE DATABASE review OWNER review;
+-- review uses the owner / migrator / runtime split (RFC-0029,
+-- docs/databases/authorization.md): the owner owns the database and never
+-- logs in; the migrator reaches it only through SET ROLE.
+CREATE ROLE review_owner NOLOGIN;
+CREATE ROLE review_migrator LOGIN NOINHERIT PASSWORD 'review_migrator-local'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE review_runtime LOGIN PASSWORD 'review_runtime-local'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE;
+GRANT review_owner TO review_migrator WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+CREATE DATABASE review OWNER review_owner;
 CREATE DATABASE shipping OWNER shipping;
 CREATE DATABASE notification OWNER notification;
 CREATE DATABASE payment OWNER payment;
@@ -42,3 +51,5 @@ CREATE DATABASE temporal_visibility OWNER temporal;
 REVOKE CONNECT ON DATABASE "user", product, cart, "order", review, shipping,
   notification, payment, checkout, inventory, keycloak, temporal,
   temporal_visibility FROM PUBLIC;
+-- review's owner cannot log in, so its two logins get CONNECT explicitly.
+GRANT CONNECT ON DATABASE review TO review_runtime, review_migrator;

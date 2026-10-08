@@ -408,17 +408,19 @@ secret/{environment}/{category}/{service}/{resource}
 | `staging` | `secret/staging/` | Staging environment |
 | `prod` | `secret/prod/` | EKS / GKE production |
 
-**Current KV paths** (seeded at bootstrap). RFC-0029 replaces the per-service
-entries with `secret/local/databases/<cluster>/<svc>-runtime` and
-`…/<svc>-migrator`, random per cluster, as each service is cut over
-([Database authorization](../databases/authorization.md#naming)); **planned**.
+**Current KV paths** (seeded at bootstrap). RFC-0029 replaces a service's entry
+with `secret/local/databases/<cluster>/<svc>-runtime` and `…/<svc>-migrator`,
+random per cluster, when the service is cut over
+([Database authorization](../databases/authorization.md#naming)); `review` is
+converted, the rest still use one path each.
 
 | Path | Keys | Consumer |
 |------|------|---------|
 | `secret/local/databases/shared-db/user` | `username`, `password` | platform-db user owner (compat path) |
 | `secret/local/databases/shared-db/notification` | `username`, `password` | **superseded** — still seeded, now unused: the live Secret comes from `database/static-creds/notification` (ADR-025 pilot, §5.2) |
 | `secret/local/databases/shared-db/shipping` | `username`, `password` | platform-db shipping owner (compat path) |
-| `secret/local/databases/shared-db/review` | `username`, `password` | platform-db review owner (compat path) |
+| `secret/local/databases/platform-db/review-runtime` | `username`, `password` | `review_runtime` login (service pods) — random per cluster |
+| `secret/local/databases/platform-db/review-migrator` | `username`, `password` | `review_migrator` login (migrate init container) — random per cluster |
 | `secret/local/databases/platform-db/temporal` | `username`, `password` | platform-db temporal owner (Temporal server) |
 | `secret/local/databases/platform-db/keycloak` | `username`, `password` | Keycloak persistence role — RFC-0012 triplet in ns `platform` (`platform-db/services/keycloak.yaml`) + copy in ns `identity` (`platform-db-keycloak-secret-identity-ns.yaml`) |
 | `secret/local/databases/platform-db/vault-rotator` | `username`, `password` | OpenBAO database-engine administrator — random per cluster; projected to `platform-db-vault-rotator-secret` for CNPG and the configurator Job |
@@ -725,7 +727,8 @@ credential secrets to reconcile against.
 ```mermaid
 flowchart LR
     subgraph cnpg_platform["platform-db (CloudNativePG)"]
-        p_shared["user / notification /\nshipping / review owners\n(compat: shared-db/*)"]
+        p_shared["user / notification /\nshipping owners\n(compat: shared-db/*)"]
+        p_review["review runtime + migrator\n(platform-db/review-*)"]
         p_temporal["temporal owner\n(platform-db/temporal)"]
         p_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end

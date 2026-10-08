@@ -27,7 +27,7 @@ const CATALOG = '/product/v1/public/products';
 // The ten deployed services. `auth` is retired (Keycloak replaced it) and its
 // continued absence is an assertion, not an omission.
 // Membership edges the ADR-086 guard must report, as member->parent.
-const GUARDED_EDGES = ['vault_rotator->notification'];
+const GUARDED_EDGES = ['vault_rotator->notification', 'review_migrator->review_owner'];
 
 const SERVICES = [
   'cart', 'checkout', 'inventory', 'notification', 'order',

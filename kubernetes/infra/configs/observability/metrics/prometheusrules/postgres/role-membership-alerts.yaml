@@ -33,7 +33,10 @@ spec:
     - alert: CNPGRoleMembershipGuardMissing
       # The query returns a row for every guarded edge even when it is revoked,
       # so no series means the query, the ConfigMap or the exporter is broken.
-      expr: absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="notification"})
+      # One absent() per guarded edge; each carries its member/parent labels.
+      expr: |-
+        absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="vault_rotator", parent="notification"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="review_migrator", parent="review_owner"})
       for: 15m
       labels:
         severity: warning
@@ -41,6 +44,6 @@ spec:
       annotations:
         summary: Role membership guard is not reporting (platform-db)
         description: >-
-          cnpg_pg_role_membership_drift has no series for vault_rotator →
-          notification on platform-db, so drift on that edge would go unseen.
+          cnpg_pg_role_membership_drift has no series for {{ $labels.member }} →
+          {{ $labels.parent }} on platform-db, so drift on that edge would go unseen.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md"

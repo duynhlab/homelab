@@ -11,6 +11,12 @@
 # service itself uses. A hand-written Job would drift the moment the chart or a
 # pin changes, and would seed the wrong database while looking correct.
 #
+# The DB identity comes from the `migrate` init container, not the service
+# container: a seed writes as the migrator, directly to the primary (RFC-0029 —
+# a converted service's runtime login cannot setval, and its migrator needs
+# DB_MIGRATION_ROLE). For a service not yet converted both containers carry the
+# same login, so this changes only the host (primary instead of the pooler).
+#
 # ONE deliberate override: ENV. The services run with ENV=production (the
 # ResourceSet sets it fleet-wide), and every seed refuses to run there —
 # "seed refused in production — demo data is dev-only". That guard is right; a
@@ -48,11 +54,14 @@ for svc in "${SERVICES[@]}"; do
   fi
 
   job="${svc}-seed-${STAMP}"
-  # Take image/args/env/resources/pullPolicy from container[0]; leave probes
-  # behind (a batch pod serves no traffic and would fail readiness forever).
+  # Take image/args/env/resources/pullPolicy from container[0] and the DB_*
+  # variables from the migrate init container; leave probes behind (a batch pod
+  # serves no traffic and would fail readiness forever).
   if ! kubectl -n "${svc}" get deploy "${svc}" -o json |
     jq --arg job "${job}" --arg ns "${svc}" '
       .spec.template.spec.containers[0] as $c |
+      ((.spec.template.spec.initContainers // []) | map(select(.name == "migrate")) | (.[0].env // [])) as $m |
+      ($m | map(.name)) as $mnames |
       {
         apiVersion: "batch/v1",
         kind: "Job",
@@ -70,7 +79,7 @@ for svc in "${SERVICES[@]}"; do
                 imagePullPolicy: $c.imagePullPolicy,
                 args: ["seed"],
                 resources: $c.resources,
-                env: ($c.env | map(
+                env: (([$c.env[] | select(.name as $n | $mnames | index($n) | not)] + $m) | map(
                   if .name == "ENV" then { name: "ENV", value: "development" } else . end
                 ))
               }]

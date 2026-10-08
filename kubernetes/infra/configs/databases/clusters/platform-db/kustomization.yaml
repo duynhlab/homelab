@@ -8,7 +8,8 @@ resources:
   - secrets/platform-db-user-secret-user-ns.yaml
   - secrets/platform-db-notification-secret-notification-ns.yaml
   - secrets/platform-db-shipping-secret-shipping-ns.yaml
-  - secrets/platform-db-review-secret-review-ns.yaml
+  - secrets/platform-db-review-runtime-secret-review-ns.yaml
+  - secrets/platform-db-review-migrator-secret-review-ns.yaml
   - secrets/platform-db-temporal-secret-temporal-ns.yaml
   - secrets/platform-db-keycloak-secret-identity-ns.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)

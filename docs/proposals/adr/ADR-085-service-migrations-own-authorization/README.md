@@ -19,7 +19,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029 Phase 2 (canary `review`) and Phase 3 |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -173,3 +173,4 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Proposed / Not started | Drafted from RFC-0029 |
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 |
 | 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): the mechanism is `migratex.WithSetRole` in `duynhlab/pkg` (fails hard when `SET ROLE` is denied or the role is empty), chosen over a catalog `ALTER ROLE … SET role` default and over pgroles; no backfill on this platform (greenfield). The `0001_authorization` snippet is in [`authorization.md`](../../../databases/authorization.md) |
+| 2026-10-08 | Accepted / Partial | review-service `v2.5.0` ships `000004_authorization` and migrates and seeds through `migratex.WithSetRole`; on a fresh Kind cluster every relation in `public` belongs to `review_owner` (extension views excepted) and `review_runtime` holds CRUD on `reviews` only |

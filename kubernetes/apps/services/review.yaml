@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: review
-    image_tag: "2.4.1" # {"$imagepolicy": "flux-system:review:tag"}
+    image_tag: "2.5.0" # {"$imagepolicy": "flux-system:review:tag"}
     namespace: review
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).
@@ -20,6 +20,7 @@ spec:
     db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
     db_port: "5432"
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
-    db_secret: "platform-db-review-secret"
+    db_runtime_secret: "platform-db-review-runtime-secret"
+    db_migrator_secret: "platform-db-review-migrator-secret"
     db_sslmode: "disable"
     pool_max: "30"

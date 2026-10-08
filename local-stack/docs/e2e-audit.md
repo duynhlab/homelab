@@ -1149,6 +1149,24 @@ done
 audit_curl -s -o /dev/null -w '%{http_code}\n' \
   "$BASE/order/v1/protected/orders?status=not_a_status" \
   -H "Authorization: Bearer $KCT_STAFF"   # 400
+
+# A23. REVIEW'S THREE DATABASE ROLES (RFC-0029, docs/databases/authorization.md).
+#      Run as the real logins over TCP (password auth), not as postgres: the
+#      runtime reads but cannot change the schema, the migrator creates
+#      nothing until SET ROLE, and the owner owns every object. Mirrors the
+#      Kind rows K3.8/K3.9 (scripts/db-authz-check.sh).
+a23() { # $1 login, $2 SQL
+  docker compose exec -T postgres psql -qAtX -v ON_ERROR_STOP=1 \
+    "host=127.0.0.1 dbname=review user=$1 password=$1-local" -c "$2" 2>&1 </dev/null | head -1
+}
+echo "A23 runtime reads:          $(a23 review_runtime 'SELECT count(*) > 0 FROM reviews')"       # t
+echo "A23 runtime CREATE:         $(a23 review_runtime 'CREATE TABLE a23 (i int)')"               # permission denied for schema public
+echo "A23 runtime DROP:           $(a23 review_runtime 'DROP TABLE reviews')"                     # must be owner of table reviews
+echo "A23 runtime SET ROLE owner: $(a23 review_runtime 'SET ROLE review_owner')"                  # permission denied to set role
+echo "A23 runtime migrations:     $(a23 review_runtime 'SELECT 1 FROM schema_migrations')"        # permission denied for table
+echo "A23 migrator CREATE:        $(a23 review_migrator 'CREATE TABLE a23 (i int)')"              # permission denied for schema public
+echo "A23 migrator as owner:      $(a23 review_migrator 'BEGIN; SET ROLE review_owner; CREATE TABLE a23 (i int); ROLLBACK;')"  # (empty: succeeded, rolled back)
+echo "A23 non-owner objects:      $(a23 review_migrator "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> 'review_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')")"  # 0
 ```
 
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
@@ -2205,6 +2223,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
 | A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |
 | A22 | The attention cards' six reads (RFC-0023) | the five count queries the portal dashboard issues each answer **200** with a **numeric `total_items`** (zero is a legitimate count; a missing or non-numeric field is not), the recent-orders panel honours `page_size=5`, and a status order-service does not know is **400** — which is what proves the `manual_review` and `cancelling` cards are genuinely filtered rather than both reporting the total order count |
+| A23 | Review's three database roles (RFC-0029) | as `review_runtime`: reads `reviews`, and `CREATE`, `DROP`, `SET ROLE review_owner` and reading `schema_migrations` are each **refused**; as `review_migrator`: `CREATE` is **refused** until `SET ROLE review_owner` and succeeds after it; **0** relations in `public` owned by anyone but `review_owner` |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |
@@ -2276,7 +2295,7 @@ evidence table too, not just service and `pkg` changes.
 
 | Phase | Checks | Result | Evidence / failure |
 |-------|--------|--------|--------------------|
-| A | A1–A14 + A16–A22 API contract | PASS / FAIL | |
+| A | A1–A14 + A16–A23 API contract | PASS / FAIL | |
 | A | A15 versioning drill | PASS / FAIL / N/A | |
 | B | B1–B10 real browser | PASS / FAIL | |
 | C | C1–C21 telemetry + engine-health loop | PASS / FAIL | |

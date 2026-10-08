@@ -183,15 +183,15 @@ flowchart LR
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
-This one answers the order of work. Phase 0, including the step 6 guard, is
-done; the rest is **planned**.
+This one answers the order of work. Phases 0–2 are done; the rest is
+**planned**.
 
 ```mermaid
 flowchart LR
     p0["Phase 0 · revoke the leaked credential<br/>done 2026-10-05 on Kind"]:::data
     p0g["Phase 0 step 6 · membership guard<br/>done 2026-10-06 on Kind"]:::data
-    p1["Phase 1 · lab + policy contract<br/>conventions, catalog queries (planned)"]:::platform
-    p2["Phase 2 · one canary service<br/>three roles, cutover (planned)"]:::platform
+    p1["Phase 1 · lab + policy contract<br/>done 2026-10-06"]:::data
+    p2["Phase 2 · canary review<br/>done 2026-10-08 on Kind"]:::data
     p3["Phase 3 · fleet by domain<br/>local-stack parity, drift evidence (planned)"]:::platform
     p4["Phase 4 · RLS / definer / IAM<br/>only on a real use case (planned)"]:::platform
 
@@ -263,7 +263,7 @@ flowchart LR
 |---|---|---|
 | 0 | Revoke the leaked `vault_rotator` credential | **Done 2026-10-05** (research § Phase 0 execution record); step 6 guard done 2026-10-06 (ADR-086) |
 | 1 | Harness as a repeatable gate; catalog queries; naming/Secret/HBA conventions; local-stack decision; `migratex.WithSetRole` | owner review of the conventions ([`authorization.md`](../../../databases/authorization.md)) |
-| 2 | One canary (`review`) | Goals 1–3 proven on Kind, negative tests in the gate |
+| 2 | One canary (`review`) | **Done 2026-10-08**: goals 1–3 proven on a fresh Kind cluster, K3.8–K3.9 in the gate, local-stack A23 |
 | 3 | Fleet by domain, never all databases at once | every service passes positive and negative tests |
 | 4 | RLS / definer / IAM | only with a real use case and its own review |
 
@@ -332,6 +332,10 @@ Resolved in Phase 1 (2026-10-06, owner):
 - 2026-10-06 — Phase 1 conventions authored
   ([`authorization.md`](../../../databases/authorization.md)); the open questions
   resolved as greenfield, `migratex.WithSetRole`, alert plus gate.
+- 2026-10-08 — Phase 2: `review` converted (homelab #1245, review-service
+  `v2.5.0`). Fresh Kind: sweep 84/84, K3.7 2/2, K3.8–K3.9 10/10, `make e2e`
+  146/146, drift drill on the new edge; local-stack audit A1–A23, B1–B10,
+  C0–C22 PASS.
 
 ## Related
 

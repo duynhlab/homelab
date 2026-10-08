@@ -20,7 +20,7 @@
 | **Supersedes** | — (amends [ADR-013](../ADR-013-per-service-db-triplet/): the triplet keeps its shape, its single login/owner role becomes three roles) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029 Phase 2 (canary `review`) and Phase 3 |
-| **Adoption** | Not started |
+| **Adoption** | Partial |
 
 ## Context
 
@@ -212,3 +212,4 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Accepted / Not started | The service workloads moved from the `mop` chart to `duynh`. The obligation "separate runtime/migration Secret inputs in the `mop` chart" now needs no chart change: the `migrate` init container is declared in the domain ResourceSets (`initContainers`), so the migrator Secret is a values change there |
 | 2026-10-06 | Accepted / Not started | Correction to the row above: the migrator Secret is not only a values change. The workload and the `migrate` init container both read `inputs.db_secret` / `db_user`, so the domain ResourceSets need new inputs; the chart still needs none. The summary's count is fixed to two Secrets (the owner has no credential) |
 | 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): greenfield cutover. The legacy `<svc>` login is never created, there is no compatibility window, rollback is `git revert` + a fresh `make up`, and the ownership transfer for existing data is reference only. Conventions in [`authorization.md`](../../../databases/authorization.md) |
+| 2026-10-08 | Accepted / Partial | Canary `review` converted (RFC-0029 Phase 2): three DatabaseRoles, `review_owner` owns the database, `pg_hba` admits runtime and migrator only, random per-cluster Secrets, review-service `v2.5.0`. Fresh Kind: sweep 84/84, K3.8–K3.9 10/10, `make e2e` 146/146; local-stack mirrors the roles (A23). The rest of the fleet is Phase 3 |

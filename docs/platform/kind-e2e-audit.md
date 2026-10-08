@@ -600,8 +600,11 @@ cannot be derived from a single file — they get their own row (K2.3).
   role×database `pg_hba` matrix ADR-015 promised would run "at each bring-up", and
   no document other than this one schedules it.
   `./scripts/db-isolation-sweep.sh`
-  Expect **72 rows, all PASS** — 36 per cluster (6 roles x 6 databases), of which
-  6 + 7 are `allow`. The row count is itself an assertion: the script fails if it
+  Expect **84 rows, all PASS**: 36 on product-db (6 roles x 6 databases) and 48 on
+  platform-db (8 roles x 6 databases), of which 6 + 8 are `allow`. review counts
+  three roles (RFC-0029): `review_runtime` and `review_migrator` are allowed into
+  `review` only, and `review_owner` is rejected everywhere because it has no
+  `pg_hba` line. The row count is itself an assertion: the script fails if it
   parses fewer verdicts than the matrix has pairs, so "PASS" cannot mean "probed
   nothing". Run it with no cluster reachable and it says `FAIL … parsed 0
   verdicts, expected 36`, not `PASS`. Two defects that used to sit on this row were fixed on
@@ -713,25 +716,31 @@ cannot be derived from a single file — they get their own row (K2.3).
   options of security-relevant edges are watched by the `pg_role_membership`
   custom query. Asserted by `make e2e-smoke` (`smoke.js`, `GUARDED_EDGES`):
   every guarded edge reports a series, and `max(cnpg_pg_role_membership_drift)`
-  is `0`. Today the only edge is `vault_rotator → notification`; each RFC-0029
-  cutover adds its `<svc>_migrator → <svc>_owner` edge to the query and to
-  `GUARDED_EDGES` in the same PR.
+  is `0`. The guarded edges are `vault_rotator → notification` and
+  `review_migrator → review_owner`; each RFC-0029 cutover adds its
+  `<svc>_migrator → <svc>_owner` edge to the query and to `GUARDED_EDGES` in the
+  same PR.
   **FAIL:** a guarded edge with no series (the query or exporter is broken, see
   [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md))
   or a drift of `1` (repair with
   [`CNPGRoleMembershipDrift`](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md);
   do not relax the row).
 
-- [ ] **K3.8** — **planned (RFC-0029 Phase 2), not runnable yet.** The runtime
-  login cannot change its schema: as `<svc>_runtime`, `CREATE TABLE`,
-  `ALTER TABLE` and `DROP TABLE` are refused and `SET ROLE <svc>_owner` is
-  refused. Runs as the real login, through `pg_hba`, once a service has the
-  three roles.
+- [ ] **K3.8** The runtime login cannot change its schema (RFC-0029). As
+  `<svc>_runtime`, through `pg_hba`: it reads its table, and `CREATE TABLE`,
+  `ALTER TABLE`, `DROP TABLE`, `SET ROLE <svc>_owner` and reading
+  `schema_migrations` are each refused with a privilege error.
+  `./scripts/db-authz-check.sh` (every converted service; today `review`).
+  **FAIL:** any `K3.8-*` check not `PASS`, or fewer checks parsed than expected.
 
-- [ ] **K3.9** — **planned (RFC-0029 Phase 2), not runnable yet.** The migrator
-  creates nothing as itself: as `<svc>_migrator`, `CREATE TABLE` is refused
-  until `SET ROLE <svc>_owner`, and succeeds after it; no object in the database
-  is owned by anyone but `<svc>_owner`.
+- [ ] **K3.9** The migrator creates nothing as itself (RFC-0029). As
+  `<svc>_migrator`: `CREATE TABLE` is refused until `SET ROLE <svc>_owner` and
+  succeeds after it (in a rolled-back transaction); no relation in `public` is
+  owned by anyone but `<svc>_owner` (extension members such as
+  `pg_stat_statements`, created by CNPG as `postgres`, excepted); the membership reads `f/f/t`. Same script
+  as K3.8.
+  **FAIL:** any `K3.9-*` check not `PASS`. An object owned by the migrator means
+  a migration ran without `SET ROLE`; fix the service, do not grant around it.
 
 ---
 
@@ -1386,7 +1395,7 @@ Preconditions: Compose gate <link/date> · tags pinned · previous cluster torn 
 | K0 machine | 8 | | tools present; ports free; N/N route hostnames resolve; multi-arch legs |
 | K1 bring-up | 8 | | `make up` <time> exit 0; N/N Kustomizations Ready; seed 8/8; worker version Current |
 | K2 delivery | 7 | | image↔pin table N/N exact; `auth` absent; 7/7 ResourceSets Ready |
-| K3 admission/secrets | 7 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token; K3.7 guard 2/2 (K3.8–K3.9 planned) |
+| K3 admission/secrets | 9 | | exceptions 2/2 live; OpenBAO self-unsealed; 4/4 MCP Ready + glsa_ token; K3.4 84/84; K3.7 guard 2/2; K3.8–K3.9 db-authz 10/10 |
 | K4 edge/identity | 10 | | 301 → 200; issuer `CN = homelab-ca`; both realms; both browser flows |
 | K5 signals | 10 | | traces rooted at edge; both log legs; 33/33 dashboards resolve; N VERIFY-AT-KIND markers closed |
 | K6 wrap | 3 | | `make down` removes cluster **and** registry |

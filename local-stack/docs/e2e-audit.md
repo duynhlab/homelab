@@ -1157,7 +1157,7 @@ audit_curl -s -o /dev/null -w '%{http_code}\n' \
 #      Kind rows K3.8/K3.9 (scripts/db-authz-check.sh).
 a23() { # $1 login, $2 SQL
   docker compose exec -T postgres psql -qAtX -v ON_ERROR_STOP=1 \
-    "host=127.0.0.1 dbname=review user=$1 password=$1-local" -c "$2" 2>&1 </dev/null | tail -1
+    "host=127.0.0.1 dbname=review user=$1 password=$1-local" -c "$2" 2>&1 </dev/null | head -1
 }
 echo "A23 runtime reads:          $(a23 review_runtime 'SELECT count(*) > 0 FROM reviews')"       # t
 echo "A23 runtime CREATE:         $(a23 review_runtime 'CREATE TABLE a23 (i int)')"               # permission denied for schema public

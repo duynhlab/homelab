@@ -736,7 +736,8 @@ cannot be derived from a single file — they get their own row (K2.3).
 - [ ] **K3.9** The migrator creates nothing as itself (RFC-0029). As
   `<svc>_migrator`: `CREATE TABLE` is refused until `SET ROLE <svc>_owner` and
   succeeds after it (in a rolled-back transaction); no relation in `public` is
-  owned by anyone but `<svc>_owner`; the membership reads `f/f/t`. Same script
+  owned by anyone but `<svc>_owner` (extension members such as
+  `pg_stat_statements`, created by CNPG as `postgres`, excepted); the membership reads `f/f/t`. Same script
   as K3.8.
   **FAIL:** any `K3.9-*` check not `PASS`. An object owned by the migrator means
   a migration ran without `SET ROLE`; fix the service, do not grant around it.

@@ -1166,7 +1166,7 @@ echo "A23 runtime SET ROLE owner: $(a23 review_runtime 'SET ROLE review_owner')"
 echo "A23 runtime migrations:     $(a23 review_runtime 'SELECT 1 FROM schema_migrations')"        # permission denied for table
 echo "A23 migrator CREATE:        $(a23 review_migrator 'CREATE TABLE a23 (i int)')"              # permission denied for schema public
 echo "A23 migrator as owner:      $(a23 review_migrator 'BEGIN; SET ROLE review_owner; CREATE TABLE a23 (i int); ROLLBACK;')"  # (empty: succeeded, rolled back)
-echo "A23 non-owner objects:      $(a23 review_migrator "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> 'review_owner'::regrole")"  # 0
+echo "A23 non-owner objects:      $(a23 review_migrator "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> 'review_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')")"  # 0
 ```
 
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven

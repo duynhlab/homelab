@@ -51,7 +51,7 @@ check K3.8-runtime-no-owner        RT denied "SET ROLE ${svc}_owner"
 check K3.8-runtime-no-migrations   RT denied "SELECT count(*) FROM public.schema_migrations"
 check K3.9-migrator-no-create      MG denied "CREATE TABLE public.k39_probe (i int)"
 check K3.9-migrator-creates-as-owner MG ok   "BEGIN; SET ROLE ${svc}_owner; CREATE TABLE public.k39_probe (i int); ROLLBACK;"
-check K3.9-owner-owns-everything   MG 0      "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> '${svc}_owner'::regrole"
+check K3.9-owner-owns-everything   MG 0      "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> '${svc}_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')"
 check K3.9-membership-f-f-t        MG f/f/t  "SELECT admin_option::text::char || '/' || inherit_option::text::char || '/' || set_option::text::char FROM pg_auth_members WHERE member = '${svc}_migrator'::regrole AND roleid = '${svc}_owner'::regrole"
 EOF
 )

@@ -268,7 +268,9 @@ SELECT pg_get_userbyid(member) AS member, pg_get_userbyid(roleid) AS parent,
  WHERE pg_get_userbyid(roleid) LIKE '%\_owner';
 ```
 
-Expected for a converted service: every object owned by `<svc>_owner`; the
+Expected for a converted service: every object owned by `<svc>_owner`, except
+the views extensions install (`pg_stat_statements`), which CNPG creates as
+`postgres`; the
 runtime has the four table rights and nothing else; `pg_default_acl` has the
 owner's rows; `<svc>_migrator → <svc>_owner` is `f / f / t`.
 

@@ -23,6 +23,7 @@ spec:
     db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
     db_port: "5432"
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
-    db_secret: "platform-db-user-secret"
+    db_runtime_secret: "platform-db-user-runtime-secret"
+    db_migrator_secret: "platform-db-user-migrator-secret"
     db_sslmode: "disable"
     pool_max: "30"

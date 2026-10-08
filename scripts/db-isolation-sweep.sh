@@ -54,9 +54,13 @@ for r in "${product_roles[@]}"; do
   done
 done
 
-# review is split into three roles (RFC-0029); review_owner has no pg_hba line,
-# so every probe of it must be rejected.
-platform_roles=(user notification shipping review_owner review_migrator review_runtime temporal vault_rotator)
+# Every app database has three roles (RFC-0029); <svc>_owner has no pg_hba
+# line, so every probe of it must be rejected.
+platform_roles=(user_owner user_migrator user_runtime
+                notification_owner notification_migrator notification_runtime
+                shipping_owner shipping_migrator shipping_runtime
+                review_owner review_migrator review_runtime
+                temporal vault_rotator)
 platform_dbs=(user notification shipping review temporal temporal_visibility)
 for r in "${platform_roles[@]}"; do
   for d in "${platform_dbs[@]}"; do
@@ -73,7 +77,9 @@ done
 # ADR-041), so the pair is real and currently untested — untested coverage, not
 # a failure. Adding it means deciding its full allow/reject row against every
 # other platform role, which is its own change.
-for p in user/user notification/notification shipping/shipping \
+for p in user_runtime/user user_migrator/user \
+         notification_runtime/notification notification_migrator/notification \
+         shipping_runtime/shipping shipping_migrator/shipping \
          review_runtime/review review_migrator/review \
          temporal/temporal temporal/temporal_visibility \
          vault_rotator/notification; do
@@ -146,7 +152,7 @@ sweep() { # $1=cluster-label $2=namespace $3=host $4=roles... (uses EXPECT)
 
 echo "== product-db (6 allow / 30 reject expected)"
 sweep product product "product-db-rw.product.svc.cluster.local"
-echo "== platform-db (8 allow / 40 reject expected)"
+echo "== platform-db (11 allow / 73 reject expected)"
 sweep platform platform "platform-db-rw.platform.svc.cluster.local"
 
 echo

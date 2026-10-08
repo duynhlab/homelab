@@ -5,9 +5,12 @@ kind: Kustomization
 # Databases: user, notification, shipping, review, temporal, temporal_visibility, keycloak
 # Order: secrets (app-ns copies) -> instance -> services (triplets) -> configmaps -> poolers -> monitoring -> backup
 resources:
-  - secrets/platform-db-user-secret-user-ns.yaml
-  - secrets/platform-db-notification-secret-notification-ns.yaml
-  - secrets/platform-db-shipping-secret-shipping-ns.yaml
+  - secrets/platform-db-user-runtime-secret-user-ns.yaml
+  - secrets/platform-db-user-migrator-secret-user-ns.yaml
+  - secrets/platform-db-notification-runtime-secret-notification-ns.yaml
+  - secrets/platform-db-notification-migrator-secret-notification-ns.yaml
+  - secrets/platform-db-shipping-runtime-secret-shipping-ns.yaml
+  - secrets/platform-db-shipping-migrator-secret-shipping-ns.yaml
   - secrets/platform-db-review-runtime-secret-review-ns.yaml
   - secrets/platform-db-review-migrator-secret-review-ns.yaml
   - secrets/platform-db-temporal-secret-temporal-ns.yaml

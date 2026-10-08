@@ -1,5 +1,5 @@
 # openbao-db-config — enable the OpenBAO database secrets engine + configure a
-# static-role that rotates the `notification` role's password (RFC-0008 / ADR-025
+# static-role that rotates the `notification_runtime` role's password (RFC-0008 / ADR-025
 # pattern-A pilot). Runs in the databases wave (after platform-db) because
 # database/config validates the live PostgreSQL connection, which the
 # openbao-bootstrap Job (secrets wave) cannot — platform-db is not up yet, and
@@ -100,7 +100,7 @@ spec:
               # list and OpenBAO command logs; bao reads it from stdin.
               until printf '%s' "$DB_ADMIN_PASSWORD" | bao write database/config/platform-db \
                   plugin_name=postgresql-database-plugin \
-                  allowed_roles="notification" \
+                  allowed_roles="notification-runtime" \
                   connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=disable" \
                   username="$DB_ADMIN_USERNAME" \
                   password=- 2>/dev/null; do
@@ -108,21 +108,21 @@ spec:
                 echo "  platform-db not reachable yet, retry 5s..."; sleep 5
               done
 
-              echo "Writing static-role notification (rotate the fixed role's password)..."
+              echo "Writing static-role notification-runtime (rotate the fixed role's password)..."
               # Retried for the same reason the config write above is: a leader
               # election DURING this Job moves the active node, and the next write
               # would hang rather than error. The address fix removes the
               # steady-state race; this removes the mid-run one.
               n=0
-              until bao write database/static-roles/notification \
+              until bao write database/static-roles/notification-runtime \
                 db_name=platform-db \
-                username="notification" \
+                username="notification_runtime" \
                 rotation_period="720h"; do
-                n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role notification failed after 60s"; exit 1; }
+                n=$((n + 1)); [ "$n" -ge 12 ] && { echo "ERROR: static-role notification-runtime failed after 60s"; exit 1; }
                 echo "  static-role write failed, retry 5s..."; sleep 5
               done
 
-              echo "openbao-db-config complete: static-role notification ready."
+              echo "openbao-db-config complete: static-role notification-runtime ready."
           resources:
             requests:
               cpu: 20m

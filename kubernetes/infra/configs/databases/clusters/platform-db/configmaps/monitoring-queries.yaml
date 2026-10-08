@@ -381,7 +381,10 @@ data:
                 OR COALESCE(bool_or(m.admin_option), false) <> e.want_admin
                 OR COALESCE(bool_or(m.inherit_option), false) <> e.want_inherit
                 OR COALESCE(bool_or(m.set_option), false) <> e.want_set)::int AS drift
-               FROM (VALUES ('vault_rotator', 'notification', true, false, false),
+               FROM (VALUES ('vault_rotator', 'notification_runtime', true, false, false),
+                            ('user_migrator', 'user_owner', false, false, true),
+                            ('notification_migrator', 'notification_owner', false, false, true),
+                            ('shipping_migrator', 'shipping_owner', false, false, true),
                             ('review_migrator', 'review_owner', false, false, true))
                  AS e(member, parent, want_admin, want_inherit, want_set)
                LEFT JOIN pg_roles mr ON mr.rolname = e.member

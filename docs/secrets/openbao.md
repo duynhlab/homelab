@@ -319,7 +319,7 @@ flowchart TD
     end
 
     subgraph policies["Policies Issued"]
-        p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/static-creds/notification"]
+        p_eso["eso-read\nread secret/{data,metadata}/local/{databases,infra,services,auth}/*\nread database/static-creds/notification-runtime"]
         p_infra["infra-team\nfull access (renamed from devops-admin)"]
         p_sre["sre-team\nread-only secret/local/infra/*"]
         p_default["default only\n(dev-team maps to no policy — deliberate)"]
@@ -411,14 +411,17 @@ secret/{environment}/{category}/{service}/{resource}
 **Current KV paths** (seeded at bootstrap). RFC-0029 replaces a service's entry
 with `secret/local/databases/<cluster>/<svc>-runtime` and `…/<svc>-migrator`,
 random per cluster, when the service is cut over
-([Database authorization](../databases/authorization.md#naming)); `review` is
-converted, the rest still use one path each.
+([Database authorization](../databases/authorization.md#naming)). On
+platform-db every service is converted; product-db services still use one path
+each until RFC-0029 Phase 3 wave 2.
 
 | Path | Keys | Consumer |
 |------|------|---------|
-| `secret/local/databases/shared-db/user` | `username`, `password` | platform-db user owner (compat path) |
-| `secret/local/databases/shared-db/notification` | `username`, `password` | **superseded** — still seeded, now unused: the live Secret comes from `database/static-creds/notification` (ADR-025 pilot, §5.2) |
-| `secret/local/databases/shared-db/shipping` | `username`, `password` | platform-db shipping owner (compat path) |
+| `secret/local/databases/platform-db/user-runtime` | `username`, `password` | `user_runtime` login (service pods) — random per cluster |
+| `secret/local/databases/platform-db/user-migrator` | `username`, `password` | `user_migrator` login (migrate init container) — random per cluster |
+| `secret/local/databases/platform-db/shipping-runtime` | `username`, `password` | `shipping_runtime` login — random per cluster |
+| `secret/local/databases/platform-db/shipping-migrator` | `username`, `password` | `shipping_migrator` login — random per cluster |
+| `secret/local/databases/platform-db/notification-migrator` | `username`, `password` | `notification_migrator` login — random per cluster. The runtime's password is the static role `database/static-creds/notification-runtime` |
 | `secret/local/databases/platform-db/review-runtime` | `username`, `password` | `review_runtime` login (service pods) — random per cluster |
 | `secret/local/databases/platform-db/review-migrator` | `username`, `password` | `review_migrator` login (migrate init container) — random per cluster |
 | `secret/local/databases/platform-db/temporal` | `username`, `password` | platform-db temporal owner (Temporal server) |
@@ -461,7 +464,7 @@ role instead of minting per-request users:
 - The bootstrap pre-provisions the pieces the engine needs without root: the
   `db-configurator` policy + Kubernetes-auth role (bound to SA
   `openbao-db-configurator`, ns `platform`) and an `eso-read` grant on
-  `database/static-creds/notification` (`openbao-bootstrap/configmap.yaml`).
+  `database/static-creds/notification-runtime` (`openbao-bootstrap/configmap.yaml`).
 - The `openbao-db-config` Job (`configs/databases/clusters/platform-db/openbao-db-config.yaml`)
   runs in the **databases wave** — after `platform-db` is up, because
   `database/config` validates the live PG connection, which the bootstrap (secrets
@@ -473,9 +476,9 @@ role instead of minting per-request users:
 - ESO reads the rotated credential through a **second ClusterSecretStore `openbao-db`**
   (`configs/secrets/cluster-secret-store-db.yaml`): the default `openbao` store is
   pinned to the KV v2 mount, so this store uses `version: "v1"` with no `path` to read
-  the raw engine path `database/static-creds/notification` verbatim (KV-v2 semantics
+  the raw engine path `database/static-creds/notification-runtime` verbatim (KV-v2 semantics
   would insert `/data/` and 403).
-- The `platform-db-notification-secret` ExternalSecret (ns `notification`,
+- The `platform-db-notification-runtime-secret` ExternalSecret (ns `notification`,
   `refreshInterval: 1m`) materialises it for the service.
 
 ```mermaid
@@ -487,7 +490,7 @@ flowchart LR
     eng["database/config/platform-db<br/>static role notification<br/>rotation_period 720h"]:::platform
     pg[("platform-db (CNPG)<br/>roles notification · vault_rotator")]:::data
     store["ClusterSecretStore openbao-db<br/>(v1 — raw engine paths)"]:::platform
-    es["ExternalSecret<br/>platform-db-notification-secret<br/>(ns notification, 1m)"]:::service
+    es["ExternalSecret<br/>platform-db-notification-runtime-secret<br/>(ns notification, 1m)"]:::service
 
     kv --> adm
     adm -->|"passwordSecret"| dbrole
@@ -495,7 +498,7 @@ flowchart LR
     adm -->|"admin credential (stdin)"| job
     job -->|"enable + configure"| eng
     eng -->|"as vault_rotator (ADMIN on notification):<br/>ALTER ROLE ... PASSWORD (720h)"| pg
-    store -->|"read database/static-creds/notification"| eng
+    store -->|"read database/static-creds/notification-runtime"| eng
     es --> store
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
@@ -720,15 +723,13 @@ credential secrets to reconcile against.
 > **Historical:** the retired Zalando operator managed its own K8s secrets
 > (`{user}.{cluster}.credentials.postgresql.acid.zalan.do`). The former `auth-db`,
 > `shared-db`, and `temporal-db` clusters were consolidated into **`platform-db`**
-> (RFC-0018). OpenBAO keeps **compat paths** `shared-db/*` for app credentials
-> (the `auth-db/*` seeds retired with auth-service); Temporal uses the new path
-> `platform-db/temporal`.
+> (RFC-0018). The `shared-db/*` compat paths were retired when the platform-db
+> services moved to the RFC-0029 roles; Temporal uses `platform-db/temporal`.
 
 ```mermaid
 flowchart LR
     subgraph cnpg_platform["platform-db (CloudNativePG)"]
-        p_shared["user / notification /\nshipping owners\n(compat: shared-db/*)"]
-        p_review["review runtime + migrator\n(platform-db/review-*)"]
+        p_shared["user / notification / shipping / review\nruntime + migrator logins\n(platform-db/svc-runtime, svc-migrator)"]
         p_temporal["temporal owner\n(platform-db/temporal)"]
         p_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
@@ -852,7 +853,7 @@ flowchart TD
     end
 
     subgraph service["Service Policies"]
-        eso_read["eso-read\nRead secret/{data,metadata}/local/{databases,infra,services,auth}/*\nRead database/static-creds/notification\nUsed by: ESO K8s auth role"]
+        eso_read["eso-read\nRead secret/{data,metadata}/local/{databases,infra,services,auth}/*\nRead database/static-creds/notification-runtime\nUsed by: ESO K8s auth role"]
         svc_product["service-product\nRead database/creds/product-app-rw\nUsed by: product SA (future direct auth)"]
     end
 
@@ -894,7 +895,7 @@ path "secret/metadata/local/auth/*" {
   capabilities = ["read", "list"]
 }
 # Database engine static-role pilot (ADR-025) — the only database/ grant today
-path "database/static-creds/notification" {
+path "database/static-creds/notification-runtime" {
   capabilities = ["read"]
 }
 

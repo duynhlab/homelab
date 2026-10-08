@@ -1,39 +1,69 @@
-# notification — per-service database triplet (RFC-0012, ADR-013).
+# notification — owner / migrator / runtime roles (RFC-0029, ADR-084).
+# Conventions: docs/databases/authorization.md.
 #
-# ExternalSecret for platform-db notification database credentials — platform namespace.
-# OpenBAO path: secret/data/local/databases/shared-db/notification (compat — pre-merge path)
-#
-# Rendered as kubernetes.io/basic-auth: this secret doubles as the
-# passwordSecret for the DatabaseRole below, and CNPG requires basic-auth
-# there. Secret `type` is immutable — migrating a live cluster requires
-# deleting the old Secret so ESO recreates it
-# (see docs/databases/runbooks/rotate-cnpg-service-password.md).
+# The Secrets are basic-auth because they double as each login's
+# passwordSecret; the owner has no password and no pg_hba line.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: platform-db-notification-secret
+  name: platform-db-notification-runtime-secret
   namespace: platform
   labels:
-    app.kubernetes.io/name: platform-db-notification-secret
+    app.kubernetes.io/name: platform-db-notification-runtime-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
-  # RFC-0008 / ADR-025 pilot: source from the OpenBAO database static-role
-  # (openbao-db store) instead of KV. Short refresh so the rotated password lands
-  # in the Secret promptly; the app reads it from a file per connection (pattern A).
   refreshInterval: 1m
   secretStoreRef:
     name: openbao-db
     kind: ClusterSecretStore
   target:
-    name: platform-db-notification-secret
+    name: platform-db-notification-runtime-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: platform-db-notification-secret
+          app.kubernetes.io/name: platform-db-notification-runtime-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: database/static-creds/notification-runtime
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: database/static-creds/notification-runtime
+        property: password
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-notification-migrator-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-notification-migrator-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-notification-migrator-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-notification-migrator-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -43,24 +73,72 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: database/static-creds/notification
+        key: secret/data/local/databases/platform-db/notification-migrator
         property: username
     - secretKey: password
       remoteRef:
-        key: database/static-creds/notification
+        key: secret/data/local/databases/platform-db/notification-migrator
         property: password
 ---
-# Written out IN FULL — adoption resets omitted attributes.
+# Every attribute written out: adoption resets anything left out.
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: platform-db-role-notification
+  name: platform-db-role-notification-owner
   namespace: platform
 spec:
   cluster:
     name: platform-db
-  name: notification
-  comment: "notification-service application role (RFC-0012)"
+  name: notification_owner
+  comment: "notification: owns the schema; nobody logs in"
+  login: false
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  databaseRoleReclaimPolicy: retain
+---
+# inherit: false makes CNPG's plain GRANT give the f/f/t membership
+# (lab CNPG-07); the ADR-086 guard watches the edge.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: platform-db-role-notification-migrator
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  name: notification_migrator
+  comment: "notification: runs migrations as notification_owner via SET ROLE"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: false
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: [notification_owner]
+  passwordSecret:
+    name: platform-db-notification-migrator-secret
+  databaseRoleReclaimPolicy: retain
+---
+# No passwordSecret: OpenBAO's static role owns the runtime password
+# (ADR-025); CNPG manages only its attributes.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: platform-db-role-notification-runtime
+  namespace: platform
+spec:
+  cluster:
+    name: platform-db
+  name: notification_runtime
+  comment: "notification: the service; CRUD only"
   login: true
   superuser: false
   createdb: false
@@ -70,11 +148,10 @@ spec:
   bypassrls: false
   connectionLimit: -1
   inRoles: []
-  # No passwordSecret: OpenBAO's static-role owns this role's password now
-  # (RFC-0008 / ADR-025). CNPG manages the role's attributes but not its password.
   databaseRoleReclaimPolicy: retain
 ---
-# notification Database extensions.
+# notification_owner owns the database, which on PostgreSQL 15+ is what gives it
+# CREATE on the public schema.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
@@ -82,7 +159,7 @@ metadata:
   namespace: platform
 spec:
   name: notification
-  owner: notification
+  owner: notification_owner
   cluster:
     name: platform-db
   extensions:

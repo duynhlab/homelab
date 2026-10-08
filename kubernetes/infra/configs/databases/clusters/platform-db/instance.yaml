@@ -32,12 +32,16 @@ spec:
       - auto_explain
 
     pg_hba:
-      - host user         user         all scram-sha-256
-      - host notification notification all scram-sha-256
-      - host shipping     shipping     all scram-sha-256
-      # review: runtime and migrator only; review_owner never logs in (RFC-0029).
-      - host review       review_runtime  all scram-sha-256
-      - host review       review_migrator all scram-sha-256
+      # Each app database admits its runtime and migrator only; <svc>_owner
+      # never logs in (RFC-0029, docs/databases/authorization.md).
+      - host user         user_runtime          all scram-sha-256
+      - host user         user_migrator         all scram-sha-256
+      - host notification notification_runtime  all scram-sha-256
+      - host notification notification_migrator all scram-sha-256
+      - host shipping     shipping_runtime      all scram-sha-256
+      - host shipping     shipping_migrator     all scram-sha-256
+      - host review       review_runtime        all scram-sha-256
+      - host review       review_migrator       all scram-sha-256
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
       # Keycloak connects direct to :5432 like temporal — its Agroal pool needs
@@ -118,10 +122,10 @@ spec:
 
   bootstrap:
     initdb:
+      # initdb creates the user database for user_owner; its DatabaseRole
+      # (services/user.yaml) then makes the role NOLOGIN. No password.
       database: user
-      owner: user
-      secret:
-        name: platform-db-user-secret
+      owner: user_owner
       dataChecksums: true
       walSegmentSize: 64
       encoding: "UTF8"
@@ -131,21 +135,19 @@ spec:
         - CREATE ROLE temporal WITH LOGIN
         - CREATE DATABASE temporal OWNER temporal
         - CREATE DATABASE temporal_visibility OWNER temporal
-        # RFC-0008 / ADR-025 pattern-A pilot (notification): pre-create the
-        # notification role (the DatabaseRole CR then adopts it, same as
-        # temporal above) and a least-privilege rotation admin so OpenBAO can
-        # rotate notification's password. PG18 requires ADMIN OPTION on the
-        # target role (not bare CREATEROLE); postInitSQL runs as the initdb
-        # superuser, so the GRANT is done here (no persistent superuser access).
-        - CREATE ROLE notification WITH LOGIN
+        # ADR-025 pattern A: OpenBAO rotates notification_runtime's password
+        # through vault_rotator, which needs ADMIN OPTION on it (PG18). Both
+        # roles are created here so the GRANT can carry ADMIN; the DatabaseRole
+        # CRs then adopt them.
+        - CREATE ROLE notification_runtime WITH LOGIN
         # Password and ordinary attributes converge through DatabaseRole from a
         # per-cluster OpenBAO value. SQL retains only the ADMIN OPTION that the
         # DatabaseRole API cannot express or audit.
         - CREATE ROLE vault_rotator WITH LOGIN CREATEROLE NOINHERIT
         # ALTER ROLE needs CREATEROLE plus ADMIN on the target. INHERIT/SET are
         # deliberately false: the administrator rotates a credential but must
-        # not inherit notification data access or become the notification role.
-        - GRANT notification TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        # not inherit the runtime's data access or become it.
+        - GRANT notification_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
 
   storage:
     size: 10Gi

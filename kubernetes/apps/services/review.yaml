@@ -10,7 +10,7 @@ spec:
   type: Static
   defaultValues:
     name: review
-    image_tag: "2.4.1" # {"$imagepolicy": "flux-system:review:tag"}
+    image_tag: "2.5.0" # {"$imagepolicy": "flux-system:review:tag"}
     namespace: review
     # RFC-0024 P3: authmw consumer — the domain template injects the explicit
     # OIDC_ISSUER/OIDC_JWKS_URL pair (Keycloak realm; pkg v0.37.0 contract).

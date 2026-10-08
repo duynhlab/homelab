@@ -169,6 +169,20 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **review runs on three database roles (RFC-0029 Phase 2 canary).**
+  `review_owner` (cannot log in) owns the database; `review_migrator` reaches
+  it only through `SET ROLE` (`DB_MIGRATION_ROLE`); the service logs in as
+  `review_runtime` with CRUD on `reviews` only. `pg_hba` admits the runtime
+  and the migrator, their passwords are random per cluster (the committed
+  `shared-db/review` literal is gone), and review-service is pinned to
+  `2.5.0`. `catalog-rs.yaml` takes `db_runtime_secret` / `db_migrator_secret`
+  for a converted service; product keeps the old inputs until Phase 3. The
+  ADR-086 guard watches the new edge, `db-isolation-sweep.sh` covers 84 pairs,
+  `db-authz-check.sh` runs K3.8–K3.9 as the real logins, `kind-seed.sh` seeds
+  with the migrate container's identity, and local-stack mirrors the roles
+  (A23). Verified 2026-10-08 on a fresh Kind cluster and a fresh local-stack:
+  all gate rows pass.
+
 - **`scripts/pg-authz-lab/`: the RFC-0029 authorization experiments as a
   repeatable gate.** `run.sh pg` runs PG-01..08 against a throwaway PostgreSQL
   container, each experiment asserting its own pass condition; `run.sh cnpg`

@@ -13,20 +13,24 @@
 set -u
 
 IMAGE="ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
-# service -> "cluster namespace host". Add a service when it is converted.
+# service -> "cluster namespace host table", where table is one table the
+# runtime serves from. Add a service when it is converted.
 declare_service() {
   case "$1" in
-    review) echo "platform-db platform platform-db-rw.platform.svc.cluster.local" ;;
+    user)         echo "platform-db platform platform-db-rw.platform.svc.cluster.local user_profiles" ;;
+    notification) echo "platform-db platform platform-db-rw.platform.svc.cluster.local notifications" ;;
+    shipping)     echo "platform-db platform platform-db-rw.platform.svc.cluster.local shipments" ;;
+    review)       echo "platform-db platform platform-db-rw.platform.svc.cluster.local reviews" ;;
     *) return 1 ;;
   esac
 }
-CONVERTED=(review)
+CONVERTED=(user notification shipping review)
 EXPECTED_CHECKS=10
 FAIL=0
 
 check_service() {
-  local svc="$1" cluster ns host
-  read -r cluster ns host <<<"$(declare_service "$svc")" || { echo "FAIL  unknown service $svc"; FAIL=1; return; }
+  local svc="$1" cluster ns host table
+  read -r cluster ns host table <<<"$(declare_service "$svc")" || { echo "FAIL  unknown service $svc"; FAIL=1; return; }
   local pod="db-authz-check-$svc-$$"
 
   # $1 = check name, $2 = role env prefix (RT|MG), $3 = expectation
@@ -43,10 +47,10 @@ check() {
     *)      [ "\$out" = "\$3" ] && echo "CHECK \$1 PASS \$out" || echo "CHECK \$1 FAIL want=\$3 got=\$out" ;;
   esac
 }
-check K3.8-runtime-reads           RT ok     "SELECT count(*) FROM public.reviews"
+check K3.8-runtime-reads           RT ok     "SELECT count(*) FROM public.$table"
 check K3.8-runtime-no-create       RT denied "CREATE TABLE public.k38_probe (i int)"
-check K3.8-runtime-no-alter        RT denied "ALTER TABLE public.reviews ADD COLUMN k38_probe int"
-check K3.8-runtime-no-drop         RT denied "DROP TABLE public.reviews"
+check K3.8-runtime-no-alter        RT denied "ALTER TABLE public.$table ADD COLUMN k38_probe int"
+check K3.8-runtime-no-drop         RT denied "DROP TABLE public.$table"
 check K3.8-runtime-no-owner        RT denied "SET ROLE ${svc}_owner"
 check K3.8-runtime-no-migrations   RT denied "SELECT count(*) FROM public.schema_migrations"
 check K3.9-migrator-no-create      MG denied "CREATE TABLE public.k39_probe (i int)"

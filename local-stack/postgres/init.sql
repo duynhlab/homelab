@@ -1,37 +1,44 @@
--- One login role and one database per consumer, each database OWNED by its
--- role — the cluster's per-service triplet (RFC-0012, ADR-013): a non-superuser
--- role, `owner: <role>` on the Database, and the role confined to its own
--- database (pg_hba on the cluster; REVOKE CONNECT FROM PUBLIC here). The
--- `postgres` superuser stays for administration and the audit's psql reads.
--- Passwords are dev-only `<role>-local`; `user` and `order` are reserved words.
+-- One database per consumer, confined to its own logins (pg_hba on the
+-- cluster; REVOKE CONNECT FROM PUBLIC here). Services not yet converted to the
+-- RFC-0029 roles still use one login that owns its database; converted ones
+-- are created in the second block. The `postgres` superuser stays for
+-- administration and the audit's psql reads. Passwords are dev-only
+-- `<role>-local`; `user` and `order` are reserved words.
 DO $$
 DECLARE
   r text;
 BEGIN
-  FOREACH r IN ARRAY ARRAY['user','product','cart','order','shipping',
-                           'notification','payment','checkout','inventory',
+  FOREACH r IN ARRAY ARRAY['product','cart','order','payment','checkout','inventory',
                            'keycloak','temporal'] LOOP
     EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
                    r, r || '-local');
   END LOOP;
 END $$;
 
-CREATE DATABASE "user" OWNER "user";
 CREATE DATABASE product OWNER product;
 CREATE DATABASE cart OWNER cart;
 CREATE DATABASE "order" OWNER "order";
--- review uses the owner / migrator / runtime split (RFC-0029,
+-- Converted services use the owner / migrator / runtime split (RFC-0029,
 -- docs/databases/authorization.md): the owner owns the database and never
 -- logs in; the migrator reaches it only through SET ROLE.
-CREATE ROLE review_owner NOLOGIN;
-CREATE ROLE review_migrator LOGIN NOINHERIT PASSWORD 'review_migrator-local'
-  NOSUPERUSER NOCREATEDB NOCREATEROLE;
-CREATE ROLE review_runtime LOGIN PASSWORD 'review_runtime-local'
-  NOSUPERUSER NOCREATEDB NOCREATEROLE;
-GRANT review_owner TO review_migrator WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+DO $$
+DECLARE
+  s text;
+BEGIN
+  FOREACH s IN ARRAY ARRAY['user','notification','shipping','review'] LOOP
+    EXECUTE format('CREATE ROLE %I NOLOGIN', s || '_owner');
+    EXECUTE format('CREATE ROLE %I LOGIN NOINHERIT PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
+                   s || '_migrator', s || '_migrator-local');
+    EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
+                   s || '_runtime', s || '_runtime-local');
+    EXECUTE format('GRANT %I TO %I WITH INHERIT FALSE, SET TRUE, ADMIN FALSE',
+                   s || '_owner', s || '_migrator');
+  END LOOP;
+END $$;
+CREATE DATABASE "user" OWNER user_owner;
+CREATE DATABASE notification OWNER notification_owner;
+CREATE DATABASE shipping OWNER shipping_owner;
 CREATE DATABASE review OWNER review_owner;
-CREATE DATABASE shipping OWNER shipping;
-CREATE DATABASE notification OWNER notification;
 CREATE DATABASE payment OWNER payment;
 CREATE DATABASE checkout OWNER checkout;
 CREATE DATABASE inventory OWNER inventory;
@@ -51,5 +58,9 @@ CREATE DATABASE temporal_visibility OWNER temporal;
 REVOKE CONNECT ON DATABASE "user", product, cart, "order", review, shipping,
   notification, payment, checkout, inventory, keycloak, temporal,
   temporal_visibility FROM PUBLIC;
--- review's owner cannot log in, so its two logins get CONNECT explicitly.
+-- The owners cannot log in, so each converted service's two logins get
+-- CONNECT explicitly.
+GRANT CONNECT ON DATABASE "user" TO user_runtime, user_migrator;
+GRANT CONNECT ON DATABASE notification TO notification_runtime, notification_migrator;
+GRANT CONNECT ON DATABASE shipping TO shipping_runtime, shipping_migrator;
 GRANT CONNECT ON DATABASE review TO review_runtime, review_migrator;

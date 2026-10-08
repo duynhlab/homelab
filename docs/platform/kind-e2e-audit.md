@@ -600,11 +600,11 @@ cannot be derived from a single file — they get their own row (K2.3).
   role×database `pg_hba` matrix ADR-015 promised would run "at each bring-up", and
   no document other than this one schedules it.
   `./scripts/db-isolation-sweep.sh`
-  Expect **84 rows, all PASS**: 36 on product-db (6 roles x 6 databases) and 48 on
-  platform-db (8 roles x 6 databases), of which 6 + 8 are `allow`. review counts
-  three roles (RFC-0029): `review_runtime` and `review_migrator` are allowed into
-  `review` only, and `review_owner` is rejected everywhere because it has no
-  `pg_hba` line. The row count is itself an assertion: the script fails if it
+  Expect **120 rows, all PASS**: 36 on product-db (6 roles x 6 databases) and 84
+  on platform-db (14 roles x 6 databases), of which 6 + 11 are `allow`. Each
+  converted service counts three roles (RFC-0029): `<svc>_runtime` and
+  `<svc>_migrator` are allowed into their own database only, and `<svc>_owner`
+  is rejected everywhere because it has no `pg_hba` line. The row count is itself an assertion: the script fails if it
   parses fewer verdicts than the matrix has pairs, so "PASS" cannot mean "probed
   nothing". Run it with no cluster reachable and it says `FAIL … parsed 0
   verdicts, expected 36`, not `PASS`. Two defects that used to sit on this row were fixed on
@@ -716,8 +716,9 @@ cannot be derived from a single file — they get their own row (K2.3).
   options of security-relevant edges are watched by the `pg_role_membership`
   custom query. Asserted by `make e2e-smoke` (`smoke.js`, `GUARDED_EDGES`):
   every guarded edge reports a series, and `max(cnpg_pg_role_membership_drift)`
-  is `0`. The guarded edges are `vault_rotator → notification` and
-  `review_migrator → review_owner`; each RFC-0029 cutover adds its
+  is `0`. The guarded edges are `vault_rotator → notification_runtime` and the
+  `<svc>_migrator → <svc>_owner` edge of every converted service (user,
+  notification, shipping, review); each RFC-0029 cutover adds its
   `<svc>_migrator → <svc>_owner` edge to the query and to `GUARDED_EDGES` in the
   same PR.
   **FAIL:** a guarded edge with no series (the query or exporter is broken, see
@@ -730,7 +731,8 @@ cannot be derived from a single file — they get their own row (K2.3).
   `<svc>_runtime`, through `pg_hba`: it reads its table, and `CREATE TABLE`,
   `ALTER TABLE`, `DROP TABLE`, `SET ROLE <svc>_owner` and reading
   `schema_migrations` are each refused with a privilege error.
-  `./scripts/db-authz-check.sh` (every converted service; today `review`).
+  `./scripts/db-authz-check.sh` (every converted service: user, notification,
+  shipping, review; 10 checks each).
   **FAIL:** any `K3.8-*` check not `PASS`, or fewer checks parsed than expected.
 
 - [ ] **K3.9** The migrator creates nothing as itself (RFC-0029). As

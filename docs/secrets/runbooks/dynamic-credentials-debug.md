@@ -6,14 +6,14 @@ ready, or the `openbao-db-config` Job fails.
 
 | Status | Meaning |
 |---|---|
-| Deployed (ADR-025 pilot) | Database engine at `database/`, static role `notification` on `platform-db`, `rotation_period` 720h, read path `database/static-creds/notification` |
+| Deployed (ADR-025 pilot) | Database engine at `database/`, static role `notification` on `platform-db`, `rotation_period` 720h, read path `database/static-creds/notification-runtime` |
 | Planned | Anything beyond the static-role pattern — dynamic `database/creds/*` roles with per-lease users are **not deployed** |
 
 ```bash
 # 1. ESO side: store + ExternalSecret health
 kubectl get clustersecretstore openbao-db
-kubectl get externalsecret platform-db-notification-secret -n notification
-kubectl describe externalsecret platform-db-notification-secret -n notification
+kubectl get externalsecret platform-db-notification-runtime-secret -n notification
+kubectl describe externalsecret platform-db-notification-runtime-secret -n notification
 # (a platform-namespace copy of the same ExternalSecret exists too)
 
 # 2. Engine-config side: the openbao-db-config Job (databases wave, ns platform)
@@ -32,19 +32,19 @@ when the issuer is down. Then:
 ```bash
 # 3. Inspect the engine (inside openbao-0, BAO_TOKEN exported)
 bao read database/config/platform-db          # connection config
-bao read database/static-roles/notification   # role + rotation_period
-bao read database/static-creds/notification   # current username/password + ttl
+bao read database/static-roles/notification-runtime   # role + rotation_period
+bao read database/static-creds/notification-runtime   # current username/password + ttl
 
 # 4. Force a rotation and watch it propagate
-bao write -f database/rotate-role/notification
+bao write -f database/rotate-role/notification-runtime
 bao token revoke -self                        # revoke the ceremony token when done
 ```
 
 The ExternalSecret refreshes every **1m**, so within a minute of rotation
-`platform-db-notification-secret` should carry the new password:
+`platform-db-notification-runtime-secret` should carry the new password:
 
 ```bash
-kubectl get secret platform-db-notification-secret -n notification \
+kubectl get secret platform-db-notification-runtime-secret -n notification \
   -o jsonpath='{.data.password}' | base64 -d
 ```
 

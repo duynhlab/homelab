@@ -20,7 +20,8 @@ spec:
     db_host: "platform-db-pooler-rw.platform.svc.cluster.local"
     db_port: "5432"
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
-    db_secret: "platform-db-notification-secret"
+    db_runtime_secret: "platform-db-notification-runtime-secret"
+    db_migrator_secret: "platform-db-notification-migrator-secret"
     db_sslmode: "disable"
     pool_max: "30"
     # RFC-0008 / ADR-025 pattern A: presence of this input makes the domain

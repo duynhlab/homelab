@@ -282,7 +282,7 @@ checked here. Every guarded edge and its expected options are listed in the quer
 | Alert | Sev | Metric & trigger | Impact | for | Runbook |
 |-------|-----|------------------|--------|-----|---------|
 | CNPGRoleMembershipDrift | critical | `max by (cnpg_io_cluster, member, parent) (cnpg_pg_role_membership_drift)` >0 | A guarded edge is missing or has the wrong options: rotation breaks (no `ADMIN`) or the member gets the parent's data (`INHERIT` / `SET`) | 5m | [CNPGRoleMembershipDrift](../runbooks/postgresql/CNPGRoleMembershipDrift.md) |
-| CNPGRoleMembershipGuardMissing | warning | `absent(cnpg_pg_role_membership_drift{…vault_rotator → notification})` | The guard stopped reporting, so drift would go unseen | 15m | [CNPGRoleMembershipGuardMissing](../runbooks/postgresql/CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleMembershipGuardMissing | warning | `absent(cnpg_pg_role_membership_drift{…vault_rotator → notification_runtime})` | The guard stopped reporting, so drift would go unseen | 15m | [CNPGRoleMembershipGuardMissing](../runbooks/postgresql/CNPGRoleMembershipGuardMissing.md) |
 
 ## 5. Kubernetes
 

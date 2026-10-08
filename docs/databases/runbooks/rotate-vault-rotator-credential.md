@@ -151,7 +151,7 @@ run once and cannot add this path to an existing OpenBAO installation.
      -o jsonpath='{.items[0].metadata.name}')"
    kubectl exec -n platform "$PRIMARY" -- psql -U postgres -d postgres \
      -v ON_ERROR_STOP=1 -c \
-     "GRANT notification TO vault_rotator
+     "GRANT notification_runtime TO vault_rotator
         WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;"
    ```
 
@@ -216,7 +216,7 @@ credential, and a non-interactive old-password rejection check.
    ```
 
    Expected invariant: `rolsuper=f`, `rolcreaterole=t`, `rolinherit=f`,
-   `rolbypassrls=f`, `member_of=notification`, `admin_option=t`,
+   `rolbypassrls=f`, `member_of=notification_runtime`, `admin_option=t`,
    `inherit_option=f`, and `set_option=f`. The administrator may change the
    target's password without automatic inheritance or direct `SET ROLE`.
    This is containment, not non-impersonation: password-reset authority can
@@ -233,24 +233,24 @@ credential, and a non-interactive old-password rejection check.
    export BAO_ADDR=http://127.0.0.1:8200
    bao login -method=oidc
    OLD_PLATFORM_NOTIFICATION_RV="$(kubectl get secret -n platform \
-     platform-db-notification-secret \
+     platform-db-notification-runtime-secret \
      -o jsonpath='{.metadata.resourceVersion}')"
    OLD_NOTIFICATION_RV="$(kubectl get secret -n notification \
-     platform-db-notification-secret \
+     platform-db-notification-runtime-secret \
      -o jsonpath='{.metadata.resourceVersion}')"
-   bao write -f database/rotate-role/notification
+   bao write -f database/rotate-role/notification-runtime
    kubectl annotate externalsecret -n platform \
-     platform-db-notification-secret force-sync="$(date +%s)" --overwrite
+     platform-db-notification-runtime-secret force-sync="$(date +%s)" --overwrite
    kubectl annotate externalsecret -n notification \
-     platform-db-notification-secret force-sync="$(date +%s)" --overwrite
+     platform-db-notification-runtime-secret force-sync="$(date +%s)" --overwrite
    NEW_PLATFORM_NOTIFICATION_RV=""
    NEW_NOTIFICATION_RV=""
    for _ in $(seq 1 60); do
      NEW_PLATFORM_NOTIFICATION_RV="$(kubectl get secret -n platform \
-       platform-db-notification-secret \
+       platform-db-notification-runtime-secret \
        -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || true)"
      NEW_NOTIFICATION_RV="$(kubectl get secret -n notification \
-       platform-db-notification-secret \
+       platform-db-notification-runtime-secret \
        -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || true)"
      [ "$NEW_PLATFORM_NOTIFICATION_RV" != "$OLD_PLATFORM_NOTIFICATION_RV" ] \
        && [ "$NEW_NOTIFICATION_RV" != "$OLD_NOTIFICATION_RV" ] && break
@@ -276,7 +276,7 @@ credential, and a non-interactive old-password rejection check.
    test "$(kubectl exec -n platform "$PRIMARY" -- \
      psql -U postgres -d notification -Atc \
      "SELECT count(*) > 0 FROM pg_stat_activity
-       WHERE usename = 'notification' AND datname = 'notification';")" = t
+       WHERE usename = 'notification_runtime' AND datname = 'notification';")" = t
    ```
 
    Behind PgBouncer those sessions can be server connections opened before the
@@ -284,11 +284,11 @@ credential, and a non-interactive old-password rejection check.
    password travels on stdin and is never printed:
 
    ```bash
-   kubectl get secret -n notification platform-db-notification-secret \
+   kubectl get secret -n notification platform-db-notification-runtime-secret \
      -o jsonpath='{.data.password}' | base64 -d |
      kubectl exec -i -n platform "$PRIMARY" -c postgres -- sh -c \
        'IFS= read -r PGPASSWORD; export PGPASSWORD
-        psql "host=platform-db-pooler-rw user=notification dbname=notification" -Atc "select current_user"'
+        psql "host=platform-db-pooler-rw user=notification_runtime dbname=notification" -Atc "select current_user"'
    ```
 
 4. Attempt an HBA-valid connection and enter the compromised password only at
@@ -321,7 +321,7 @@ credential, and a non-interactive old-password rejection check.
   Job and reconcile `databases-local`; do not roll the role password back to the
   compromised value.
 - **Membership options drifted:** restore them from the primary as `postgres`
-  with `GRANT notification TO vault_rotator WITH INHERIT FALSE, SET FALSE,
+  with `GRANT notification_runtime TO vault_rotator WITH INHERIT FALSE, SET FALSE,
   ADMIN TRUE`. The CR cannot encode these options, so catalog verification is
   the guardrail; `CNPGRoleMembershipDrift` (ADR-086) alerts when they drift.
 - **Rollback:** write another newly generated value to the same KV path and

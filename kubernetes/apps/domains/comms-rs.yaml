@@ -70,7 +70,12 @@ spec:
         volumes:
           - name: db-credentials
             secret:
+              # The runtime's Secret: only the service container reads the file.
+              <<- if (index inputs "db_runtime_secret") >>
+              secretName: << inputs.db_runtime_secret >>
+              <<- else >>
               secretName: << inputs.db_secret >>
+              <<- end >>
         volumeMounts:
           - name: db-credentials
             mountPath: /etc/db/secret
@@ -154,6 +159,20 @@ spec:
             value: << index inputs "db_port" | default "5432" | quote >>
           - name: DB_NAME
             value: << inputs.name >>
+          # RFC-0029: a converted service sets db_runtime_secret and logs in
+          # as <name>_runtime; the username comes from the Secret.
+          <<- if (index inputs "db_runtime_secret") >>
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: << inputs.db_runtime_secret >>
+                key: username
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: << inputs.db_runtime_secret >>
+                key: password
+          <<- else >>
           - name: DB_USER
             value: << index inputs "db_user" | default inputs.name >>
           - name: DB_PASSWORD
@@ -161,6 +180,7 @@ spec:
               secretKeyRef:
                 name: << inputs.db_secret >>
                 key: password
+          <<- end >>
           <<- if (index inputs "db_password_file") >>
           - name: DB_PASSWORD_FILE
             value: /etc/db/secret/password
@@ -279,15 +299,31 @@ spec:
                 value: "5432"
               - name: DB_NAME
                 value: << inputs.name >>
-              - name: DB_USER
-                value: << index inputs "db_user" | default inputs.name >>
               - name: DB_SSLMODE
                 value: "require"
+              # RFC-0029: the migrator logs in, then SET ROLE <name>_owner.
+              <<- if (index inputs "db_migrator_secret") >>
+              - name: DB_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: << inputs.db_migrator_secret >>
+                    key: username
+              - name: DB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: << inputs.db_migrator_secret >>
+                    key: password
+              - name: DB_MIGRATION_ROLE
+                value: << inputs.name >>_owner
+              <<- else >>
+              - name: DB_USER
+                value: << index inputs "db_user" | default inputs.name >>
               - name: DB_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: << inputs.db_secret >>
                     key: password
+              <<- end >>
     <<- if not (index inputs "slo_disabled") >>
     ---
     # The slo chart is HTTP-only (http_server_request_duration_seconds SLIs).

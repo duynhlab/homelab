@@ -6,7 +6,7 @@ keys, or other values that are still not dynamic.
 | Rotation type | Current status |
 |---|---|
 | KV v2 static secret | Deployed today |
-| Database static role (ADR-025 pilot) | Deployed for `notification` only — rotate now with `bao write -f database/rotate-role/notification` (ceremony token); other services remain KV static. See [OpenBAO architecture §5.2](../openbao.md#52-database-secrets-engine--dynamic-credentials) |
+| Database static role (ADR-025 pilot) | Deployed for `notification` only — rotate now with `bao write -f database/rotate-role/notification-runtime` (ceremony token); other services remain KV static. See [OpenBAO architecture §5.2](../openbao.md#52-database-secrets-engine--dynamic-credentials) |
 
 ## Generic rotation flow
 

@@ -1,0 +1,348 @@
+# RFC-0011 / ADR-087; reviewed 2026-10-12. No network configuration is applied.
+# Sources: RFC access/network gates; official Tailscale homelab, subnet-router,
+# Kubernetes Operator and OSI docs; Cloudflare OSI and Tunnel connectivity docs.
+# Source links are maintained in docs/architecture/README.md under Network references.
+diagram:
+  id: rfc0011-network-osi
+  title: 04 / duynhlab — Network roles across OSI layers
+  scope: RFC-0011 / ADR-087 reference • Seven conceptual network layers, not installation order. Mini-PC
+    target not deployed.
+  question: domain-topology
+  level: L4
+  pin_order: true
+  animate: []
+  assumptions:
+  - This is an OSI role map across local infrastructure and external providers, not a cluster placement
+    or packet-path diagram.
+  - Modern TCP/IP products span layers. L5/L6 are conceptual functions, not separate devices.
+  - IP ranges, VLANs, LAN routes, CNI mode and connector placement remain undecided.
+layers:
+- l7-edge
+- l7-app
+- l6
+- l5
+- l4
+- l3
+- l2
+- l1
+boundaries:
+- id: network
+  label: Network roles / local + external
+- id: osi7
+  label: L7 / APPLICATION
+  parent: network
+- id: osi6
+  label: L6 / PRESENTATION
+  parent: network
+- id: osi5
+  label: L5 / SESSION
+  parent: network
+- id: osi4
+  label: L4 / TRANSPORT
+  parent: network
+- id: osi3
+  label: L3 / NETWORK
+  parent: network
+- id: osi2
+  label: L2 / DATA LINK
+  parent: network
+- id: osi1
+  label: L1 / PHYSICAL
+  parent: network
+nodes:
+- id: access
+  label: 'Cloudflare Access
+
+    L7 • private web admission
+
+    planned'
+  role: external
+  layer: l7-edge
+  parent: osi7
+  status: planned
+  w: 270
+  h: 78
+  icon: cloudflare
+- id: tunnel
+  label: 'cloudflared
+
+    L7 • selected web origin proxy
+
+    planned'
+  role: edge
+  layer: l7-edge
+  parent: osi7
+  status: planned
+  w: 270
+  h: 78
+  icon: cloudflare
+- id: envoy
+  label: 'Envoy Gateway
+
+    L7 • HTTP host/path routing
+
+    planned'
+  role: edge
+  layer: l7-edge
+  parent: osi7
+  status: planned
+  w: 270
+  h: 78
+  icon: envoy
+- id: api_proxy
+  label: 'Tailscale API proxy
+
+    L7 • Kubernetes API requests
+
+    planned'
+  role: edge
+  layer: l7-app
+  parent: osi7
+  status: planned
+  w: 270
+  h: 78
+  icon: tailscale
+- id: app
+  label: 'Web / API / DNS protocols
+
+    L7 • application messages
+
+    planned'
+  role: service
+  layer: l7-app
+  parent: osi7
+  status: planned
+  w: 270
+  h: 78
+- id: identity
+  label: 'Keycloak
+
+    L7 • OIDC / application identity
+
+    planned'
+  role: platform
+  layer: l7-app
+  parent: osi7
+  status: planned
+  w: 270
+  h: 78
+  icon: keycloak
+- id: tls
+  label: 'TLS encryption
+
+    L6 analogy • HTTPS protection
+
+    planned'
+  role: edge
+  layer: l6
+  parent: osi6
+  status: planned
+  w: 270
+  h: 78
+- id: encoding
+  label: 'Data representation
+
+    L6 analogy • JSON / Protobuf encoding
+
+    planned'
+  role: service
+  layer: l6
+  parent: osi6
+  status: planned
+  w: 270
+  h: 78
+- id: session
+  label: 'Session coordination
+
+    L5 concept • establish / resume / close
+
+    planned'
+  role: platform
+  layer: l5
+  parent: osi5
+  status: planned
+  w: 270
+  h: 78
+- id: session_note
+  label: 'No standalone session appliance
+
+    Modern protocols combine these functions
+
+    planned'
+  role: platform
+  layer: l5
+  parent: osi5
+  status: planned
+  w: 270
+  h: 78
+- id: tcp
+  label: 'TCP transport
+
+    L4 • HTTPS / HTTP/2 carrier
+
+    planned'
+  role: edge
+  layer: l4
+  parent: osi4
+  status: planned
+  w: 270
+  h: 78
+- id: udp
+  label: 'UDP transport
+
+    L4 • WireGuard / QUIC carrier
+
+    planned'
+  role: edge
+  layer: l4
+  parent: osi4
+  status: planned
+  w: 270
+  h: 78
+- id: policy
+  label: 'NetworkPolicy
+
+    L3/L4 • endpoints / ports / protocols
+
+    planned'
+  role: platform
+  layer: l4
+  parent: osi4
+  status: planned
+  w: 270
+  h: 78
+- id: router
+  label: 'Home router
+
+    L3 • LAN/WAN IP routing
+
+    planned'
+  role: external
+  layer: l3
+  parent: osi3
+  status: planned
+  w: 270
+  h: 78
+- id: tailnet
+  label: 'Tailscale overlay
+
+    L3 • encrypted IP network
+
+    planned'
+  role: edge
+  layer: l3
+  parent: osi3
+  status: planned
+  w: 270
+  h: 78
+  icon: tailscale
+- id: cni
+  label: 'Cilium
+
+    L3/L4 CNI candidate • mode open
+
+    planned'
+  role: platform
+  layer: l3
+  parent: osi3
+  status: planned
+  w: 270
+  h: 78
+  icon: cilium
+- id: switch
+  label: 'Managed switch
+
+    L2 • Ethernet frames / MAC forwarding
+
+    planned'
+  role: external
+  layer: l2
+  parent: osi2
+  status: planned
+  w: 270
+  h: 78
+- id: vlan
+  label: 'VLAN separation
+
+    L2 • IDs / trunks / access ports open
+
+    planned'
+  role: platform
+  layer: l2
+  parent: osi2
+  status: planned
+  w: 270
+  h: 78
+- id: nic
+  label: 'NIC data-link function
+
+    L2 • Ethernet frames on each host
+
+    planned'
+  role: platform
+  layer: l2
+  parent: osi2
+  status: planned
+  w: 270
+  h: 78
+- id: wire
+  label: 'Ethernet cabling
+
+    L1 • physical medium / link signals
+
+    planned'
+  role: external
+  layer: l1
+  parent: osi1
+  status: planned
+  w: 270
+  h: 78
+- id: ports
+  label: 'NIC PHY and switch ports
+
+    L1 • transceivers / link speed open
+
+    planned'
+  role: platform
+  layer: l1
+  parent: osi1
+  status: planned
+  w: 270
+  h: 78
+- id: hosts
+  label: 'Mini-PC network links
+
+    L1 • node 1, then nodes 2–3
+
+    planned'
+  role: platform
+  layer: l1
+  parent: osi1
+  status: planned
+  w: 270
+  h: 78
+edges: []
+notes:
+- id: reading
+  title: Read by network function
+  text: L1 carries bits; L2 forwards frames; L3 routes IP; L4 carries TCP/UDP; L5–L7 describe session,
+    representation and application functions. These OSI numbers differ from the five hosting bands in
+    the stack preview. The physical and access views own connectivity and request paths.
+- id: span
+  title: Products span layers
+  text: 'Tailscale carries IP at L3 over WireGuard, normally using UDP; relays may carry encrypted traffic
+    when direct connectivity is unavailable. Its API proxy is L7. The depicted Cloudflare web proxy uses
+    an outbound Tunnel connection: QUIC/UDP 7844 or HTTP/2/TCP 7844. No inbound management port forwarding
+    is proposed.'
+- id: homelab
+  title: Tailscale homelab choices
+  text: A supported host can run its own client. A subnet router extends access to selected LAN CIDRs;
+    route approval and access policy are separate requirements. An Operator Connector can provide that
+    router, but an in-cluster connector is not independent recovery. API proxy and subnet routing are
+    separate roles, not consecutive mandatory hops.
+- id: open
+  title: Not yet selected
+  text: No VLAN IDs, subnets, addresses, firewall implementation or CNI routing mode are chosen. A switch
+    may also support L3 features, but none are selected here. L5/L6 are teaching analogies for modern
+    protocols, not claims of dedicated OSI implementations. Cilium L7 policy is not selected by this view.
+tests: []

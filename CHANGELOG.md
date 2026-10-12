@@ -230,9 +230,11 @@ Skeleton (copy what you need):
   Envoy/Keycloak platform. Require restore evidence before migration. ADR-087
   separates Tailscale administration from selected Cloudflare Tunnel/Access web
   routes while preserving application authorization. RFC remains provisional;
-  ADR adoption has not started, and no infrastructure is installed. Three editable
+  ADR adoption has not started, and no infrastructure is installed. Four editable
   Draw.io previews show physical connectivity, a hardware-to-applications stack
-  with individual observability products, and separate private/web access.
+  with individual observability products, separate private/web access, and all
+  seven OSI network layers. Tailscale homelab guidance clarifies native clients,
+  subnet routers and Kubernetes API proxies without selecting router placement.
   SVG/PNG exports and sourced product icons accompany the reference design.
 
 - **RFC-0029 Phase 1: open questions resolved, ADR-084/085 amended.** The

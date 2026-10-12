@@ -138,6 +138,11 @@ router remain deployment prerequisites. Existing admin CIDR policies must be
 reviewed against connector traffic, not bypassed by treating a proxy IP as a user.
 No hostname becomes public because it appears as an example in this proposal.
 
+The [Tailscale homelab deployment roles](../../adr/ADR-087-homelab-private-and-web-access/#tailscale-homelab-deployment-roles)
+separate a native client, a subnet router and the Kubernetes API proxy. Router
+placement, approved prefixes and SNAT/source-IP behavior remain qualification
+items; an in-cluster Connector does not satisfy independent recovery.
+
 ### Recovery before migration
 
 Before moving data that must be retained, specify the maximum acceptable data loss

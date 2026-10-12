@@ -74,7 +74,7 @@ not imply installing WARP on clients.
 | Rule | Required behavior |
 |------|-------------------|
 | **Private administration** | Tailnet permissions restrict identities to required destinations/ports; Kubernetes RBAC and application authentication still apply. No public Tunnel routes for Kubernetes API, Talos API or databases |
-| **Management route** | The Kubernetes API proxy can provide `kubectl` access. Talos/LAN reachability needs an explicitly configured separate route; do not assume the Operator exposes host management |
+| **Management route** | The Kubernetes API proxy can provide `kubectl` access. Talos/LAN reachability needs an explicitly configured separate route, such as a subnet router; the API proxy does not supply it |
 | **Web publication** | Only an explicit hostname/path allowlist reaches Envoy. Private web routes require Access; public application routes must be identified separately and retain existing app authentication |
 | **Identity ownership** | Access gates entry. Keycloak and applications retain token validation and permissions. Access assertions or email headers must not be substituted for application bearer tokens |
 | **Origin protection** | Private Tunnel routes validate Access tokens at cloudflared or the origin; prevent an alternate public origin path from bypassing Access. Preserve Host/SNI and validate origin TLS |
@@ -84,6 +84,22 @@ not imply installing WARP on clients.
 | **Recovery** | Direct LAN management and independently stored emergency credentials must work without the in-cluster Operator or Keycloak. Remote rescue needs a separately designed dependency-independent route |
 | **Secrets** | Connector credentials and recovery material stay out of plaintext Git; bootstrap and rotation must not depend solely on the unavailable component being restored |
 | **Compatibility** | No change to the browser OIDC or service API contracts in ADR-043, Envoy ownership in ADR-044, or staff authorization in ADR-062 |
+
+### Tailscale homelab deployment roles
+
+The official homelab guidance describes private connectivity; implementation
+requires choosing which of these roles serves each destination:
+
+| Role | Reachability | Qualification for this proposal |
+|------|--------------|---------------------------------|
+| Client on a supported host | The host joins the tailnet directly | Verify support for the chosen OS; do not assume a conventional package install on Talos |
+| Subnet router | Selected LAN prefixes, including devices without a Tailscale client | Select router placement and prefixes, approve routes and configure access policy; review default SNAT against source-IP policies |
+| Kubernetes Operator | API proxy, selected service exposure, or a separately configured Connector | A Connector can route to reachable cluster or external networks; enabling the API proxy alone does not enable subnet routing |
+
+A subnet router is not an exit node: Internet egress through the homelab remains
+out of scope. An in-cluster Connector cannot count as independent cluster-outage
+recovery. Keep direct LAN access; any remote rescue router needs its own failure
+domain and recovery validation. None of these placement choices is accepted here.
 
 ### Decision view
 
@@ -215,6 +231,9 @@ These are future acceptance scenarios, **not tests executed by this docs change*
 - [ADR-062 — staff authorization](../ADR-062-staff-groups-sso/)
 - [Identity contract](../../../api/identity.md)
 - [Existing Envoy admin CIDR policies](../../../../kubernetes/infra/configs/envoy-gateway/policies/security-admin-cidr.yaml)
+- [Tailscale homelab guide](https://tailscale.com/use-cases/homelab)
+- [Tailscale subnet routers](https://tailscale.com/docs/features/subnet-routers)
+- [Tailscale Operator architecture](https://tailscale.com/docs/kubernetes-operator/concepts/architecture)
 - [Tailscale Kubernetes API proxy](https://tailscale.com/docs/kubernetes-operator/api-server-access)
 - [Cloudflare published applications](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/)
 - [Cloudflare Access and origin token validation](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)

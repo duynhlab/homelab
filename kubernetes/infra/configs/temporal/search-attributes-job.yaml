@@ -44,7 +44,7 @@ spec:
         - name: create
           # Matches the chart's appVersion (helmrelease.yaml), so the CLI is
           # never older than the server it talks to.
-          image: temporalio/admin-tools:1.32.0
+          image: temporalio/admin-tools:1.32.1
           env:
             - name: TEMPORAL_ADDRESS
               value: temporal-frontend.temporal.svc.cluster.local:7233

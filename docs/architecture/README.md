@@ -33,6 +33,24 @@ IR is what you edit and the `.drawio` is its output.
 | workflows | [`workflows/temporal-keda`](workflows/temporal-keda.drawio) | **The Temporal work layer** — who starts each workflow, which queue and worker serve it, and which controllers own each worker's builds and replicas. | [`api/workflows.md`](../api/workflows.md) |
 | workflows | [`workflows/temporal-worker-versions`](workflows/temporal-worker-versions.drawio) | **One worker release** — the builds, the Progressive rollout and the per-build KEDA scaling while order-fulfillment ramps from build A to build B. | [`api/workflows.md`](../api/workflows.md) · [`api/temporal.md` § Worker Deployment Versioning](../api/temporal.md#worker-deployment-versioning-as-built) |
 
+
+## RFC-0011 previews
+
+These views illustrate the provisional [mini-PC migration proposal](../proposals/rfc/RFC-0011/)
+and [ADR-087](../proposals/adr/ADR-087-homelab-private-and-web-access/). They are
+**proposed, not approved, and not deployed**. They do not replace the RFC's Mermaid views.
+
+| View | Source | Preview | Question |
+|------|--------|---------|----------|
+| Physical infrastructure | [Draw.io](platform/rfc0011-infrastructure.drawio) · [IR](platform/rfc0011-infrastructure.ir.yaml) | [SVG](platform/rfc0011-infrastructure.svg) · [PNG](platform/img/rfc0011-infrastructure.png) | Which physical hosts and network links are being considered? |
+| Platform and access | [Draw.io](platform/rfc0011-platform-access.drawio) · [IR](platform/rfc0011-platform-access.ir.yaml) | [SVG](platform/rfc0011-platform-access.svg) · [PNG](platform/img/rfc0011-platform-access.png) | Which platform components and entry paths are proposed on mini PCs? |
+
+The lower frames in the platform view are a component inventory: their unconnected
+cards are intentional, not missing packet paths. Validation reports no errors;
+the generated legend's dashed sample has its caption in a separate cell, which
+produces an unlabelled-edge warning despite the visible caption. Neither warning
+implies deployed connectivity.
+
 ## Conventions
 
 - **One question per file**, kebab-case name. Pick the question from

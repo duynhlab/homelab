@@ -1,0 +1,106 @@
+<mxfile host="homelab-drawio">
+  <diagram id="rfc0011-physical" name="01 / duynhlab — Mini-PC infrastructure">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="01 / duynhlab — Mini-PC infrastructure" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=18;fontColor=#1E293B;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="780" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="scope" value="RFC-0011 reference design — proposed, not approved; not deployed. Physical connectivity only." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=12;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="40" y="54" width="780" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="cluster" value="Mini-PC cluster / proposed, not deployed" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="582" width="780" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="internet" value="&lt;b&gt;Internet&lt;/b&gt;&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="320" y="100" width="220" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="router" value="&lt;b&gt;Home router&lt;/b&gt;&lt;br&gt;Model and LAN plan: undecided&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="290" y="280" width="280" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="switch" value="&lt;b&gt;Managed switch&lt;/b&gt;&lt;br&gt;Ports / speed / VLANs: undecided&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#F1F5F9;strokeColor=#64748B;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="285" y="450" width="290" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="node1" value="&lt;b&gt;Mini PC / Node 1&lt;/b&gt;&lt;br&gt;Phase 1 • one physical host&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
+          <mxGeometry x="30" y="48" width="220" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="node2" value="&lt;b&gt;Mini PC / Node 2&lt;/b&gt;&lt;br&gt;Phase 2 • expansion candidate&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
+          <mxGeometry x="280" y="48" width="220" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="node3" value="&lt;b&gt;Mini PC / Node 3&lt;/b&gt;&lt;br&gt;Phase 2 • expansion candidate&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
+          <mxGeometry x="540" y="48" width="220" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="wan" value="WAN (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="internet" target="router">
+          <mxGeometry relative="1" as="geometry" x="-0.68">
+            <Array as="points">
+              <mxPoint x="430" y="235" />
+              <mxPoint x="430" y="235" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lan" value="LAN uplink (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="router" target="switch">
+          <mxGeometry relative="1" as="geometry" x="-0.68">
+            <Array as="points">
+              <mxPoint x="430" y="410" />
+              <mxPoint x="430" y="410" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n1" value="Ethernet (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="switch" target="node1">
+          <mxGeometry relative="1" as="geometry" x="-0.92">
+            <Array as="points">
+              <mxPoint x="386.56" y="560" />
+              <mxPoint x="326.56" y="560" />
+              <mxPoint x="326.56" y="612" />
+              <mxPoint x="180" y="612" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n2" value="Ethernet (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.57;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="switch" target="node2">
+          <mxGeometry relative="1" as="geometry" x="0.16">
+            <Array as="points">
+              <mxPoint x="451.56" y="560" />
+              <mxPoint x="430" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3" value="Ethernet (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.78;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="switch" target="node3">
+          <mxGeometry relative="1" as="geometry" x="0.64">
+            <Array as="points">
+              <mxPoint x="511.56" y="560" />
+              <mxPoint x="690" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="status" value="&lt;b&gt;Reading this preview&lt;/b&gt;&lt;br&gt;Dashed / planned = proposed target, not approval or deployment. No IP addresses or workload placement are selected." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="40" y="762" width="780" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="hardware" value="&lt;b&gt;Hardware qualification&lt;/b&gt;&lt;br&gt;M720q is a candidate: one M.2 SSD slot + one SATA 2.5-inch bay. CPU, RAM, disks, budget and UPS remain open." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="40" y="814" width="780" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="os" value="&lt;b&gt;OS and storage candidates&lt;/b&gt;&lt;br&gt;Talos, Cilium and Ceph remain under review. Three physical nodes are a target, not proof of HA; shared power and network still matter." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="40" y="866" width="780" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="936" width="780" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-role-planned" value="" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;dashed=1;fillColor=#FFFFFF;strokeColor=#64748B;strokeWidth=1.5;" vertex="1" parent="legend">
+          <mxGeometry x="14" y="38" width="26" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-role-planned-text" value="planned (not deployed)" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
+          <mxGeometry x="48" y="34" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-edge-planned" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;" edge="1" parent="legend">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="196" y="45" as="sourcePoint" />
+            <mxPoint x="222" y="45" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend-edge-planned-text" value="planned path (dashed)" style="text;html=1;whiteSpace=nowrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#334155;" vertex="1" parent="legend">
+          <mxGeometry x="230" y="34" width="130" height="22" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

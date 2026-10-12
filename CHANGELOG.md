@@ -224,6 +224,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0011 refreshed; ADR-087 proposed for homelab access.** Correct the
+  M720q disk assumptions, replace unverified capacity and purchase claims with
+  qualification gates, and review every open design question against the current
+  Envoy/Keycloak platform. Require restore evidence before migration. ADR-087
+  separates Tailscale administration from selected Cloudflare Tunnel/Access web
+  routes while preserving application authorization. RFC remains provisional;
+  ADR adoption has not started, and no infrastructure is installed. Two editable
+  Draw.io previews with SVG/PNG exports illustrate the reference design.
+
 - **RFC-0029 Phase 1: open questions resolved, ADR-084/085 amended.** The
   owner chose a greenfield cutover: the legacy `<svc>` login is never created,
   there is no compatibility window, and rollback is `git revert` plus a fresh

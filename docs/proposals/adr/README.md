@@ -462,6 +462,7 @@ and extend Adoption instead.
 | [ADR-084](ADR-084-split-service-database-roles/) | Split Each Service Database Identity into Owner, Migrator and Runtime Roles | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-085](ADR-085-service-migrations-own-authorization/) | Own Object ACLs and Default Privileges in Service Migrations | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-086](ADR-086-guard-membership-options/) | Guard PostgreSQL Membership Options with a CNPG Monitoring Query | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-087](ADR-087-homelab-private-and-web-access/) | Separate Private Administration from Published Web Access | Proposed | Not started | [RFC-0011](../rfc/RFC-0011/) |
 
 Principles:
 

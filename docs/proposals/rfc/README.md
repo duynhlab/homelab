@@ -114,7 +114,7 @@ for its own sake.
 | [RFC-0008](RFC-0008/) | Production secrets hardening & local/prod parity | infra | P1 | implementable — Slice 1 (awskms auto-unseal, [ADR-024](../adr/ADR-024-floci-kms-emulator-auto-unseal/)) landed; cloud-bound items remain proposal-only |
 | [RFC-0009](RFC-0009/) | Production-grade API gateway: signed JWT + Kong edge auth | platform-wide | done | implemented — superseded in part by [RFC-0022](RFC-0022/) / [RFC-0024](RFC-0024/); the Kong vehicle is gone, the signed-JWT contract survives |
 | [RFC-0010](RFC-0010/) | Payment service: PaymentIntent, ledger & charge/refund saga step | platform-wide | done | implemented (P1–P6 landed) |
-| [RFC-0011](RFC-0011/) | Homelab migration: Kind to bare-metal Talos (1 → 3 node HA) | infra | P2 | provisional |
+| [RFC-0011](RFC-0011/) | Homelab migration: Kind to mini PCs (1 → 3 node HA) | infra | P2 | provisional — hardware/storage qualification pending; access proposed in [ADR-087](../adr/ADR-087-homelab-private-and-web-access/) |
 | [RFC-0012](RFC-0012/) | Converge CNPG role & database management on declarative CRDs | infra | done | implemented (P0–P4 landed) |
 | [RFC-0013](RFC-0013/) | App-metrics cardinality audit & streaming-aggregation scale playbook | platform-wide | — | superseded |
 | [RFC-0014](RFC-0014/) | Full OpenTelemetry adoption: OTLP push for metrics, logs and traces | platform-wide | done | implemented (live-cluster drill pending) |

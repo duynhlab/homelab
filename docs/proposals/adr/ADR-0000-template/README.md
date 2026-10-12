@@ -1,281 +1,109 @@
 # ADR-NNN: {Imperative decision title}
 
 <!--
-Use an imperative, decision-shaped title:
-
-Good:
-- Separate Inventory from Product
-- Use Temporal for Order Fulfillment
-- Keep Checkout as a Purchase-Funnel Orchestrator
-- Expose Administrative Commands through Protected APIs
-
-Avoid:
-- Inventory Architecture
-- Thoughts about Temporal
-- Order Service Improvements
+Template v3: one decision, not a topic or implementation plan.
+Aim for 1–2 readable pages, not a hard limit. Delete authoring comments.
+See ../README.md for optional extensions and lifecycle rules.
 -->
 
-> **Decision summary:** We will {decision} because {primary reason}. We accept
+> **Decision summary:** We will {decision} because {decisive reason}. We accept
 > {main cost or limitation} in exchange for {main benefit}.
 
 | Attribute | Value |
 |-----------|-------|
 | **Status** | Proposed |
 | **Decision date** | — |
-| **Owners** | `{person or team responsible for the record}` |
-| **Deciders** | `{people or architecture group that accepts the decision}` |
-| **Scope** | `{bounded scope of this decision}` |
-| **Affected components** | `{services, workers, databases, frontend, platform}` |
-| **Related RFC** | [RFC-NNNN](../../rfc/RFC-NNNN/) or — |
-| **Related research** | [research.md](../../rfc/RFC-NNNN/research.md) or — |
-| **Supersedes** | ADR-NNN or — |
-| **Superseded by** | ADR-NNN or — |
-| **Implementation tracking** | `{issue / epic / planning document / PRs}` |
-| **Adoption** | Not started / Partial / Complete |
+| **Owner** | {person or team responsible for the record} |
+| **Deciders** | {people who accept the decision} |
+| **Adoption** | Not started |
 
 <!--
-Decision status:
-Proposed → Accepted → (Deprecated | Superseded by ADR-NNN)
-Proposed → Withdrawn
-
-Adoption describes implementation progress and is independent from the
-decision status.
+Status and Adoption are independent; Accepted does not mean deployed.
+Use Adoption: Not started / Partial / Complete.
+Add RFC, research, tracking, affected-component or supersession links only when
+relevant, here or in References. Omit unused metadata rather than filling dashes.
 -->
 
 ## Context
 
-<!--
-State the facts and forces that made a decision necessary.
-
-Include:
-- the current condition;
-- the concrete problem;
-- affected actors and components;
-- constraints;
-- why the decision is needed now.
-
-Do not announce the selected option in this section.
-Do not copy the full mechanism deep dive from research.md.
--->
-
-{Describe the current architecture and the problem.}
-
-{Describe the correctness, operational, delivery, security, or maintainability
-pressure.}
-
-## Scope
-
-### In scope
-
-<!-- Name exactly what this ADR decides. -->
-
-- {decision boundary 1}
-- {decision boundary 2}
-
-### Out of scope
+{What problem or change makes a decision necessary now? State the scope,
+constraints and most important drivers without announcing the chosen option.}
 
 <!--
-Name adjacent topics that this ADR deliberately does not decide.
-They may become separate ADRs.
+Distinguish observed facts from assumptions and unknowns; cite evidence with
+its scope/date when available. Do not invent measurements.
+For a learning-driven homelab choice, state learning value honestly rather
+than presenting it as a production requirement. Link lengthy research.
 -->
-
-- {non-goal 1}
-- {non-goal 2}
-
-## Decision drivers
-
-<!--
-Drivers are the criteria used to compare alternatives.
-Order them by importance.
--->
-
-| Priority | Driver | Why it matters |
-|---------:|--------|----------------|
-| 1 | {correctness / ownership / security / operability} | {reason} |
-| 2 | {simplicity / delivery speed / reversibility} | {reason} |
-| 3 | {cost / performance / learning value} | {reason} |
 
 ## Decision
 
-<!--
-Write the decision in active voice:
+We will {specific choice and architectural boundary} because {why it best
+satisfies the decisive constraint compared with the closest alternative}.
 
-"We will ..."
-"The platform will ..."
-"{Service} will own ..."
-
-Be precise enough that an engineer can tell whether an implementation complies
-with the decision.
-
-Do not turn this section into the complete implementation plan.
--->
-
-We will {exact decision}.
-
-{One or two paragraphs describing the architectural shape and its boundaries.}
-
-### Decision rules
+{State any durable ownership, failure or compatibility rule needed to judge
+compliance. Explain why the benefit warrants the additional cost.}
 
 <!--
-Durable architectural rules derived from the decision.
-These rules make the ADR useful during code review.
+Add a rules list/table only when prose is insufficient.
+Use a small Mermaid diagram only if it clarifies this decision.
 -->
-
-| Rule | Required behavior |
-|------|-------------------|
-| **Ownership** | {which component is authoritative} |
-| **Write path** | {who may change the owned state} |
-| **Read path** | {how other components obtain the state} |
-| **Boundary** | {what must not be implemented in this component} |
-| **Failure behavior** | {important failure or consistency rule} |
-| **Compatibility** | {breaking change / compatibility expectation} |
-
-### Decision view
-
-<!--
-Optional. Use at most one small Mermaid diagram.
-
-The diagram should clarify the decision boundary, not redraw the whole
-platform. Delete this subsection when a diagram adds no value.
--->
-
-```mermaid
-flowchart LR
-    Caller["{caller}"] -->|"{contract}"| Owner["{owning component}"]
-    Owner --> DB[("{owned data}")]
-
-    Other["{adjacent service}"] -.->|"must not write"| DB
-
-    classDef edge fill:#dbeafe,color:#1e3a8a,stroke:#2563eb;
-    classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
-    classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
-    classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
-    classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
-    classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
-
-    class Caller edge;
-    class Owner,Other service;
-    class DB data;
-```
 
 ## Alternatives considered
 
+{Describe the credible options actually considered and the concrete trade-off
+that ruled each out, especially the closest alternative.}
+
 <!--
-Include only credible alternatives.
-
-Do not use obviously bad straw-man options.
-For a large analysis, summarize here and link to RFC research.
+No fixed option count or mandatory table. Include keeping the current approach
+or deferring the change when viable. Do not manufacture straw-man alternatives;
+if only one option is viable, explain the constraint that excludes the others.
 -->
-
-| Option | Benefits | Costs / risks | Result |
-|--------|----------|---------------|--------|
-| **A — {option}** | {benefits} | {costs} | Selected / Rejected |
-| **B — {option}** | {benefits} | {costs} | Rejected |
-| **C — {option}** | {benefits} | {costs} | Rejected |
-
-### Why the selected option won
-
-{Explain how the selected option best satisfies the decision drivers.}
-
-### Why the closest alternative lost
-
-{Explain the real trade-off. Avoid saying only that it was "more complex".}
 
 ## Consequences
 
-### Positive consequences
-
-- {benefit that becomes true}
-- {correctness, ownership, operability, delivery, or learning benefit}
-
-### Negative consequences and accepted trade-offs
-
-- {new cost, complexity, latency, dependency, limitation, or operational burden}
-- {capability deliberately deferred}
-- {risk that remains}
-
-### Neutral consequences
-
-- {changes that are neither clearly good nor bad}
-- {teams or repositories that must adapt}
-
-## Implementation obligations
+- {Expected benefit in this context.}
+- {Accepted cost, limitation or remaining risk, and mitigation if applicable.}
 
 <!--
-This is not the full phase plan.
-Link to planning for detailed tasks.
-
-List work that must happen for the decision to be considered adopted.
+Do not force positive/negative/neutral subsections.
+When an important assumption could invalidate the decision, state an observable
+revisit condition here; use a separate Revisit triggers section only if useful.
 -->
 
-| Obligation | Owner | Tracking | Completion signal |
-|------------|-------|----------|-------------------|
-| {code or contract change} | {team} | {issue/PR} | {observable result} |
-| {test or operational work} | {team} | {issue/PR} | {observable result} |
-| Update service contracts | {team} | `docs/api/...` | As-built docs match code |
-| Update diagrams and call graph | {team} | `docs/api/api.md` | No stale edge remains |
+## Confirmation
 
-## Validation and compliance
+{How will we confirm implementation follows this decision, and what observable
+result permits Adoption: Complete? Link tracking and, once available, evidence.}
+
+{Identify the owning docs/runbook to update. API-touching decisions update
+docs/api contracts; infrastructure decisions update the relevant platform docs.}
 
 <!--
-Explain how engineers and CI can verify that implementation follows this ADR.
+Choose relevant checks, e.g. manifest review, gateway route/contract tests,
+database constraints or a failure drill. A planned test is not a passed test.
+For phased work, add an obligations table (owner/tracking/completion signal);
+keep the rollout schedule and detailed test output in their owning records.
 -->
-
-| Requirement | Verification |
-|-------------|--------------|
-| {ownership rule} | {contract test / static check / repository test} |
-| {transport rule} | {Kong route test / gRPC contract test} |
-| {data invariant} | {database constraint / concurrency test} |
-| {failure rule} | {integration / workflow / chaos test} |
-| Documentation | Relevant `docs/api/` contracts link this ADR |
-
-## Revisit triggers
-
-<!--
-Use observable conditions that invalidate an assumption.
-Do not use a vague calendar date unless the decision truly expires with time.
--->
-
-Re-open this decision when one or more of the following become true:
-
-- {scale threshold}
-- {new business requirement}
-- {security or compliance change}
-- {operational cost threshold}
-- {assumption is proven false}
-
-A review does not automatically reverse the decision. A changed decision
-requires a new ADR that supersedes this one.
 
 ## References
 
-- [RFC-NNNN](../../rfc/RFC-NNNN/)
-- [RFC-NNNN research](../../rfc/RFC-NNNN/research.md)
-- [{Service} contract](../../../api/{service}.md)
-- [{Related workflow}](../../../api/workflows.md)
-- [{Planning document}]({link})
-- [{Runbook}]({link})
+<!-- Link only applicable RFC/research, alternatives evidence, contracts,
+tracking and runbooks. No placeholder links or empty rows in a finished ADR. -->
+
+- {Relevant source or owning-document link.}
 
 ## History
 
 <!--
-Append-only after acceptance.
-
-Allowed:
-- correct spelling and broken links;
-- append implementation links;
-- update Adoption;
-- add a history row;
-- mark Deprecated or Superseded.
-
-Not allowed:
-- silently rewrite Decision, Alternatives, or accepted trade-offs.
-
-A changed architectural decision requires a new ADR.
+Record lifecycle/adoption milestones and important evidence only; editorial
+changes belong in Git/PR history. Add acceptance/adoption rows when they happen.
+After acceptance, preserve Context, assumptions, rationale and trade-offs.
+Append new evidence with its scope/date, not as if known at acceptance. Typos, links, Adoption
+and lifecycle annotations may change; a changed decision needs a new ADR with
+Supersedes and a reciprocal Superseded by link on this record.
 -->
 
 | Date | Status / adoption | Change |
 |------|-------------------|--------|
-| YYYY-MM-DD | Proposed / Not started | Initial draft |
-| YYYY-MM-DD | Accepted / Not started | Decision accepted in RFC-NNNN review |
-| YYYY-MM-DD | Accepted / Complete | Implementation and contract tests completed |
+| YYYY-MM-DD | Proposed / Not started | Initial proposal |

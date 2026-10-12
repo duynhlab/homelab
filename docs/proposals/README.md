@@ -7,7 +7,7 @@ split by artifact type:
   **`research.md`**, decide in **`README.md`** (template v3). **RFC index & backlog:**
   [`rfc/README.md`](rfc/README.md). Copy source: [`RFC-0000/`](rfc/RFC-0000/).
 - **[`adr/`](adr/) — Architecture Decision Records.** Record **one durable decision**
-  per ADR (template v2). Process, vocabulary, and index:
+  per ADR (template v3: concise core, optional extensions). Process, vocabulary, and index:
   [`adr/README.md`](adr/README.md). Copy source: [`ADR-0000-template/`](adr/ADR-0000-template/).
 
 ## How they fit together
@@ -78,8 +78,8 @@ flowchart LR
 > **Historical note — ADRs:** [RFC-0001](rfc/RFC-0001/) through [RFC-0018](rfc/RFC-0018/)
 > predate the research-first workflow. **From RFC-0019 onward**, reserve a number →
 > [`research.md`](rfc/RFC-0000/research.md) → owner **ready for RFC** → `README.md`.
-> ADR-001–031 use template v1 unless backfilled by owner request; new ADRs use
-> [`ADR-0000-template/`](adr/ADR-0000-template/) v2. RFCs authored before
+> Existing v1/v2 ADRs remain valid; do not backfill without owner request. New ADRs
+> use [`ADR-0000-template/`](adr/ADR-0000-template/) v3. RFCs authored before
 > 2026-08-18 use RFC template v1 (no **Other solutions considered** section) and
 > those before 2026-08-24 use v2 (no **Decision outcome** section); new RFCs use
 > [`RFC-0000/README.md`](rfc/RFC-0000/README.md) v3.

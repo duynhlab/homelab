@@ -1,7 +1,7 @@
 # RFC-0011 / ADR-087; reviewed 2026-10-12. No network configuration is applied.
 # Sources: RFC access/network gates; official Tailscale homelab, subnet-router,
 # Kubernetes Operator and OSI docs; Cloudflare OSI and Tunnel connectivity docs.
-# Source links are maintained in docs/architecture/README.md under Network references.
+# Source links are maintained in docs/architecture/platform/README.md under Network references.
 diagram:
   id: rfc0011-network-osi
   title: 04 / duynhlab — Network roles across OSI layers

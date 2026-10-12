@@ -1,0 +1,622 @@
+# RFC-0011 / ADR-087 reference target, reviewed 2026-10-12. Not installed.
+# Sources: kubernetes/clusters/local; infra/controllers and configs; docs/api/api.md;
+# docs/observability/README.md; docs/databases/architecture.md.
+diagram:
+  id: rfc0011-stack
+  title: 02 / duynhlab — Homelab stack
+  scope: 'RFC-0011 reference • Read bottom → top: hardware supports OS, Kubernetes, platform, applications.
+    Not deployed.'
+  question: platform-landscape
+  level: L2
+  pin_order: true
+  animate: []
+  assumptions:
+  - 'Owner-requested layered stack: L2 component inventory with explicit OS and physical support layers,
+    not a runtime or placement graph.'
+  - All mini-PC components are planned, not approved or installed. Existing product choices come from
+    Kind; candidate choices remain open.
+  - Cards in a band are peers; vertical band order expresses the hosting stack, not install order or packet
+    paths.
+layers:
+- apps
+- runtime
+- security
+- delivery
+- data
+- obs-0
+- obs-1
+- obs-2
+- obs-3
+- foundation
+- os
+- hardware
+boundaries:
+- id: site
+  label: Homelab target / proposed, not deployed
+- id: cluster
+  label: Kubernetes cluster / logical stack
+  parent: site
+- id: apps
+  label: 05 / APPLICATIONS
+  parent: cluster
+- id: platform
+  label: 04 / PLATFORM SERVICES
+  parent: cluster
+- id: runtime
+  label: Edge and workflows
+  parent: platform
+- id: security
+  label: Identity and secrets
+  parent: platform
+- id: delivery
+  label: Platform controllers
+  parent: platform
+- id: data
+  label: Databases and object storage
+  parent: platform
+- id: obs
+  label: Observability / each product shown
+  parent: platform
+- id: foundation
+  label: 03 / CLUSTER FOUNDATION
+  parent: cluster
+- id: os
+  label: 02 / OPERATING SYSTEM
+  parent: site
+- id: hardware
+  label: 01 / HARDWARE
+  parent: site
+nodes:
+- id: storefront
+  label: 'Storefront
+
+    React SPA
+
+    planned'
+  role: service
+  layer: apps
+  status: planned
+  w: 210
+  h: 70
+  parent: apps
+  icon: react
+- id: backoffice
+  label: 'Back-office
+
+    React portal
+
+    planned'
+  role: service
+  layer: apps
+  status: planned
+  w: 210
+  h: 70
+  parent: apps
+  icon: react
+- id: services
+  label: '10 Go microservices
+
+    Existing API contracts
+
+    planned'
+  role: service
+  layer: apps
+  status: planned
+  w: 210
+  h: 70
+  parent: apps
+  icon: go
+- id: workers
+  label: 'Application workers
+
+    Existing async workloads
+
+    planned'
+  role: worker
+  layer: apps
+  status: planned
+  w: 210
+  h: 70
+  parent: apps
+  icon: go
+- id: envoy
+  label: 'Envoy Gateway
+
+    Gateway API routes
+
+    planned'
+  role: edge
+  layer: runtime
+  status: planned
+  w: 225
+  h: 70
+  parent: runtime
+  icon: envoy
+- id: temporal
+  label: 'Temporal server
+
+    Workflow orchestration
+
+    planned'
+  role: service
+  layer: runtime
+  status: planned
+  w: 225
+  h: 70
+  parent: runtime
+  icon: temporal
+- id: keda
+  label: 'KEDA
+
+    Event-driven scaling
+
+    planned'
+  role: platform
+  layer: runtime
+  status: planned
+  w: 225
+  h: 70
+  parent: runtime
+  icon: keda
+- id: twc
+  label: 'Temporal worker controller
+
+    Worker deployment lifecycle
+
+    planned'
+  role: platform
+  layer: runtime
+  status: planned
+  w: 225
+  h: 70
+  parent: runtime
+  icon: temporal
+- id: keycloak
+  label: 'Keycloak
+
+    OIDC / application roles
+
+    planned'
+  role: platform
+  layer: security
+  status: planned
+  w: 225
+  h: 70
+  parent: security
+  icon: keycloak
+- id: bao
+  label: 'OpenBao
+
+    Replica / unseal choice open
+
+    planned'
+  role: platform
+  layer: security
+  status: planned
+  w: 225
+  h: 70
+  parent: security
+  icon: openbao
+- id: eso
+  label: 'External Secrets Operator
+
+    Secret delivery
+
+    planned'
+  role: platform
+  layer: security
+  status: planned
+  w: 225
+  h: 70
+  parent: security
+  icon: external-secrets
+- id: cert
+  label: 'cert-manager
+
+    Certificate issuance
+
+    planned'
+  role: platform
+  layer: security
+  status: planned
+  w: 225
+  h: 70
+  parent: security
+  icon: cert-manager
+- id: flux
+  label: 'Flux Operator / Flux
+
+    OCI GitOps reconciliation
+
+    planned'
+  role: platform
+  layer: delivery
+  status: planned
+  w: 225
+  h: 70
+  parent: delivery
+  icon: flux
+- id: kyverno
+  label: 'Kyverno
+
+    Admission policy
+
+    planned'
+  role: platform
+  layer: delivery
+  status: planned
+  w: 225
+  h: 70
+  parent: delivery
+  icon: kyverno
+- id: trust
+  label: 'trust-manager
+
+    CA bundle distribution
+
+    planned'
+  role: platform
+  layer: delivery
+  status: planned
+  w: 225
+  h: 70
+  parent: delivery
+  icon: cert-manager
+- id: cnpg
+  label: 'CloudNativePG operator
+
+    PostgreSQL lifecycle
+
+    planned'
+  role: platform
+  layer: delivery
+  status: planned
+  w: 225
+  h: 70
+  parent: delivery
+  icon: cloudnativepg
+- id: pg
+  label: 'PostgreSQL
+
+    platform-db / product-db / DR
+
+    planned'
+  role: data
+  layer: data
+  status: planned
+  w: 225
+  h: 70
+  parent: data
+  icon: postgresql
+- id: pgdog
+  label: 'PgDog
+
+    Database connection pooling
+
+    planned'
+  role: data
+  layer: data
+  status: planned
+  w: 225
+  h: 70
+  parent: data
+  icon: pgdog
+- id: valkey
+  label: 'Valkey
+
+    Application cache
+
+    planned'
+  role: data
+  layer: data
+  status: planned
+  w: 225
+  h: 70
+  parent: data
+  icon: valkey
+- id: rustfs
+  label: 'RustFS
+
+    S3-compatible object storage
+
+    planned'
+  role: data
+  layer: data
+  status: planned
+  w: 225
+  h: 70
+  parent: data
+  icon: rustfs
+- id: otel
+  label: 'OpenTelemetry Collector
+
+    planned'
+  role: collector
+  layer: obs-0
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: opentelemetry
+- id: vector
+  label: 'Vector
+
+    planned'
+  role: collector
+  layer: obs-0
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: vector
+- id: vmagent
+  label: 'VMAgent
+
+    planned'
+  role: collector
+  layer: obs-0
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: victoriametrics
+- id: grafana
+  label: 'Grafana
+
+    planned'
+  role: platform
+  layer: obs-0
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: grafana
+- id: vm
+  label: 'VictoriaMetrics
+
+    planned'
+  role: metric
+  layer: obs-1
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: victoriametrics
+- id: vl
+  label: 'VictoriaLogs
+
+    planned'
+  role: log
+  layer: obs-1
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: victorialogs
+- id: vt
+  label: 'VictoriaTraces
+
+    planned'
+  role: trace
+  layer: obs-1
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: victoriatraces
+- id: pyro
+  label: 'Pyroscope
+
+    planned'
+  role: profile
+  layer: obs-1
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: pyroscope
+- id: ch
+  label: 'ClickHouse
+
+    planned'
+  role: data
+  layer: obs-2
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: clickhouse
+- id: keeper
+  label: 'ClickHouse Keeper
+
+    planned'
+  role: data
+  layer: obs-2
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: clickhouse
+- id: vmalert
+  label: 'VMAlert
+
+    planned'
+  role: platform
+  layer: obs-2
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: victoriametrics
+- id: am
+  label: 'Alertmanager
+
+    planned'
+  role: platform
+  layer: obs-2
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: prometheus
+- id: sloth
+  label: 'Sloth
+
+    planned'
+  role: platform
+  layer: obs-3
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: sloth
+- id: vmop
+  label: 'VictoriaMetrics operator
+
+    planned'
+  role: platform
+  layer: obs-3
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: victoriametrics
+- id: gop
+  label: 'Grafana operator
+
+    planned'
+  role: platform
+  layer: obs-3
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: grafana
+- id: chop
+  label: 'ClickHouse operator
+
+    planned'
+  role: platform
+  layer: obs-3
+  status: planned
+  w: 225
+  h: 58
+  parent: obs
+  icon: clickhouse
+- id: k8s
+  label: 'Kubernetes
+
+    Control plane + workloads
+
+    planned'
+  role: platform
+  layer: foundation
+  status: planned
+  w: 225
+  h: 70
+  parent: foundation
+  icon: kubernetes
+- id: cilium
+  label: 'Cilium
+
+    CNI candidate / not selected
+
+    planned'
+  role: platform
+  layer: foundation
+  status: planned
+  w: 225
+  h: 70
+  parent: foundation
+  icon: cilium
+- id: ceph
+  label: 'Ceph
+
+    Rook-managed candidate / open
+
+    planned'
+  role: platform
+  layer: foundation
+  status: planned
+  w: 225
+  h: 70
+  parent: foundation
+  icon: ceph
+- id: local
+  label: 'Local persistence
+
+    Alternative to initial Ceph
+
+    planned'
+  role: platform
+  layer: foundation
+  status: planned
+  w: 225
+  h: 70
+  parent: foundation
+- id: talos
+  label: 'Talos Linux
+
+    Leading OS candidate
+
+    planned'
+  role: platform
+  layer: os
+  status: planned
+  w: 430
+  h: 70
+  parent: os
+  icon: talos
+- id: host1
+  label: 'Mini PC / Node 1
+
+    Phase 1 • M720q-class candidate
+
+    planned'
+  role: platform
+  layer: hardware
+  status: planned
+  w: 290
+  h: 70
+  parent: hardware
+- id: host2
+  label: 'Mini PC / Node 2
+
+    Phase 2 • expansion candidate
+
+    planned'
+  role: platform
+  layer: hardware
+  status: planned
+  w: 290
+  h: 70
+  parent: hardware
+- id: host3
+  label: 'Mini PC / Node 3
+
+    Phase 2 • expansion candidate
+
+    planned'
+  role: platform
+  layer: hardware
+  status: planned
+  w: 290
+  h: 70
+  parent: hardware
+edges: []
+notes:
+- id: reading
+  title: How to read the stack
+  text: Read upward from hardware. Cards name installed-software candidates, not packet paths or pod placement.
+    Domain rows inside layer 04 are peers. Dashed + planned means uninstalled on mini PCs, not an approved
+    decision.
+- id: choices
+  title: Open choices and capacity
+  text: Node 1 starts the rollout; nodes 2–3 are later expansion, not a claim of HA. Hardware, sizing,
+    OS, CNI and storage remain open. Ubuntu + k3s is the OS fallback. Ceph and local persistence are alternatives;
+    RustFS is the existing object-store baseline. Native database backups and restore gates remain required.
+- id: palette
+  title: Role colours
+  text: 'Blue: edge • cyan: applications • amber: workers • purple: controllers • green: data. Observability:
+    orange metrics, pale green logs, teal traces, violet profiles, light blue collectors.'
+tests: []

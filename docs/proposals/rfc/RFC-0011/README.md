@@ -1,456 +1,326 @@
-# RFC-0011: Homelab migration — Kind to bare-metal Talos (1 → 3 node HA)
+# RFC-0011: Homelab migration — Kind to mini PCs (1 → 3 node HA)
 
-| Status | Scope | Created | Last updated |
-|--------|-------|---------|--------------|
-| provisional | infra | 2026-07-04 | 2026-08-25 |
+Move the platform onto durable hardware with verified recovery before migrating state.
 
-> **Gateway decision reversed (2026-08-11).** The Non-Goals below reject Envoy
-> Gateway outright — *"Kong (DB-less) stays; Envoy Gateway is explicitly
-> rejected"* — and the Alternatives table concludes **"Keep Kong"** on the
-> grounds that *"Kong runs fine today. Switching means relearning config for no
-> gain."* [RFC-0024](../RFC-0024/README.md) reversed both: the platform edge is
-> Envoy Gateway ([ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/)),
-> Kong is decommissioned, and its manifests are deleted. The **hardware**
-> migration this RFC is actually about — Kind to bare-metal Talos, 1 → 3 nodes —
-> is untouched by that and remains `provisional`. Body kept unchanged below for
-> history; read every gateway row as the 2026-07-04 position, not the current
-> one.
+| Status | Scope | Created | Review evidence |
+|--------|-------|---------|-----------------|
+| provisional | infra | 2026-07-04 | Repository and official-documentation review, 2026-10-12; no hardware or runtime qualification |
 
-> **Origin:** converted from a May 2026 planning discussion (formerly
-> `docs/platform/homelab-migration-plan.md`), triggered by OpenBAO PVC pain on
-> Kind — every cluster rebuild lost the Cloudflare API token and cascaded into
-> cert-manager failures.
-
-> **Tradeoff:** this RFC trades the zero-cost, disposable Kind cluster for
-> ~21.2tr VND (~$840) of hardware plus the operational burden of real machines
-> (power, disks, upgrades) — in exchange for durable state, 24/7 operation, and
-> a genuine bare-metal Kubernetes learning platform with a clean 1 → 3 node HA
-> path.
+> **Not deployed.** No hardware has been purchased for this proposal. Talos,
+> Cilium and Rook-Ceph remain candidates, not approved installations. The access
+> direction is recorded in [ADR-087](../../adr/ADR-087-homelab-private-and-web-access/)
+> at **Proposed / Not started**. This RFC is not a purchase order or a deployment runbook.
 
 ## Summary
 
-Graduate the homelab from Kind (ephemeral, single-host Docker) to bare-metal
-Talos Linux on Lenovo ThinkCentre M720q mini PCs, scaling from 1 node
-(Phase 1) to a 3-node HA cluster (Phase 2). The GitOps model (Flux Operator +
-ResourceSets + OCI), Kong gateway, secrets stack (OpenBAO + External Secrets +
-cert-manager), observability stack, and the 8 microservices all carry over
-unchanged; what changes is the substrate: Talos OS, Cilium CNI, Rook-Ceph
-storage, VolSync + Kopia backups to Cloudflare R2, and Tailscale for remote
-access.
+Replace the disposable Kind substrate with a persistent mini-PC cluster, starting
+with one physical node and evaluating expansion to three physical nodes. Preserve
+platform behavior and GitOps ownership while qualifying hardware, storage,
+recovery and access. Talos is the leading OS candidate, with Ubuntu + k3s still an
+alternative. The proposed access split is Tailscale for private administration and
+Cloudflare Tunnel + Access for selected web applications, through Envoy Gateway.
+
+The cost is hardware, electricity and operating physical machines. The benefit is
+persistent state and a platform on which to test host failures. One node remains
+one failure domain regardless of how many replicas run on it.
 
 ## Motivation
 
-Pain points of Kind (single-host Docker):
-
-- **Ephemeral PVCs** — every `make down && make up` wipes all data: OpenBAO
-  loses the Cloudflare token → cert-manager fails → cascading cluster-wide
-  errors.
-- **Bootstrap secret pain** — the Cloudflare API token must be manually
-  re-seeded on every rebuild.
-- **Not real** — no exposure to bare-metal networking, storage, or OS-level
-  concerns.
-- **Single-host Docker** — HA cannot be tested; no meaningful chaos
-  engineering.
-- **Not production-grade** — the current stack is a "production-grade design
-  on dev-grade infrastructure".
+Kind is useful for reproducible integration gates, but rebuilding its local state
+is not a durable-hardware recovery strategy. This proposal originated in a May
+2026 planning discussion about OpenBAO PVC loss and repeated secret bootstrap
+(formerly `docs/platform/homelab-migration-plan.md`). That history explains the
+problem; it does not describe the current secrets implementation.
 
 ### Goals
 
-- Run 24/7 without fear of data loss.
-- Learn bare-metal Kubernetes end to end (Talos, Cilium, Rook-Ceph,
-  Tailscale).
-- Automatic off-site backups to Cloudflare R2.
-- A clear path from 1 node to 3-node HA without a redesign.
+- Operate a persistent homelab with explicit availability and recovery targets.
+- Prove restoration before entrusting the cluster with data that must survive.
+- Provide private administration and selected browser access without exposing
+  the Kubernetes or Talos management APIs publicly.
+- Define a tested migration from one physical failure domain to three.
 
 ### Non-Goals
 
-- Changing the gateway — Kong (DB-less) stays; Envoy Gateway is explicitly
-  rejected (see Alternatives).
-- Changing the GitOps model — Flux Operator + ResourceSets + OCI stays as is.
-- Public internet hosting — cloudflared tunnel remains optional/undecided
-  (see Open decisions).
-- Replacing OpenBAO + External Secrets with another secrets manager.
+- Buying hardware or approving a final bill of materials in this revision.
+- Replacing Envoy Gateway, Keycloak, service authentication or the GitOps model.
+- Installing Tailscale, Cloudflare connectors, an OS, a CNI or a storage system.
+- Requiring WARP on user devices in Phase 1.
+- Reducing existing security controls or replica counts without a separate decision.
+
+## Current repository baseline
+
+Reviewed against `eea44b97` on 2026-10-12. This is a **repository review**, not a live
+cluster audit. Historical runtime evidence remains in the linked records.
+
+| Area | Baseline to preserve | Source of truth |
+|------|----------------------|-----------------|
+| Delivery | Kind, OpenTofu bootstrap, Flux Operator + OCI + Kustomize | [Setup](../../../platform/setup.md), [local Flux graph](../../../../kubernetes/clusters/local/kustomization.yaml) |
+| Edge and identity | Envoy Gateway, Keycloak; application authorization remains in its existing owners | [ADR-044](../../adr/ADR-044-envoy-gateway-platform-edge/), [identity contract](../../../api/identity.md) |
+| Workloads | 10 service InputProviders, storefront, back-office portal, Temporal and workers | [Service declarations](../../../../kubernetes/apps/services/), [workflow registry](../../../api/workflows.md) |
+| Observability | VictoriaMetrics, VictoriaLogs, VictoriaTraces, ClickHouse/Keeper, Grafana, Vector, OTel Collector and Pyroscope | [Observability hub](../../../observability/README.md), [ADR-059](../../adr/ADR-059-retire-tempo/), [ADR-065](../../adr/ADR-065-clickhouse-replicated-topology/) |
+| Data | CNPG `platform-db` and `product-db` (three instances each), separate DR configuration, PgDog, Barman backup integration, RustFS and Valkey | [Database architecture](../../../databases/architecture.md), [database declarations](../../../../kubernetes/infra/configs/databases/kustomization.yaml), [storage wave](../../../../kubernetes/clusters/local/storage.yaml) |
+| Secrets and trust | OpenBAO Raft, Kind-specific floci auto-unseal, ESO, cert-manager and CA consumers | [Secrets hub](../../../secrets/README.md), [ADR-024](../../adr/ADR-024-floci-kms-emulator-auto-unseal/), [certificate declarations](../../../../kubernetes/infra/configs/cert-manager/) |
+| Human authorization | Staff-realm groups mapped to tool permissions | [ADR-062](../../adr/ADR-062-staff-groups-sso/) |
+
+The old Kong, Tempo and eight-service baseline is historical. Do not carry it into
+hardware sizing. The repository already contains backup mechanisms; this migration
+must qualify their recovery on the new substrate rather than assume there are none.
 
 ## Proposal
 
-### Hardware plan
+### Hardware candidate and purchase gate
 
-Buying philosophy:
+A used Lenovo ThinkCentre M720q Tiny is a **reference candidate**, not a selected
+purchase. Lenovo's M720 Tiny specification lists one M.2 SSD slot, one M.2 WLAN
+slot and a 2.5-inch SATA bay. The WLAN slot is not a second supported SSD slot.
+The SATA bay and PCIe card are mutually exclusive in the documented layout;
+verify the actual SKU and accessories before planning NIC or disk expansion.
+The specification lists DDR4-2666 and multiple adapter options (65W/90W/135W),
+so the old DDR4-3200 shopping line is not an operating-speed guarantee and a
+90W adapter is not a universal requirement. Match memory and power to the SKU.
 
-- Buy 2nd-hand Lenovo Tiny: 50–70% cheaper than new, more than enough
-  performance for a homelab.
-- Keep all 3 nodes the same model → swappable spare parts, easier
-  troubleshooting.
-- Buy right the first time rather than "saving" with cheaper parts.
-- Buy the switch in Phase 1 so the final topology exists from day one.
+| Item | Candidate / requirement | Evidence required before purchase |
+|------|-------------------------|-----------------------------------|
+| Compute | Used M720q-class mini PC; exact model and CPU undecided | Seller SKU, CPU, firmware/virtualization support, thermals and condition |
+| Memory | 32GB was the original candidate, not demonstrated capacity | Peak workload, backup and upgrade headroom; supported DIMMs for the exact machine |
+| OS and data disks | M.2 NVMe and/or SATA 2.5-inch SSD as supported by the SKU | Separate OS/etcd, workload and OSD allocation; caddy/cable availability, disk health and endurance |
+| Network | Managed switch; speed and port count undecided | LAN plan, required VLANs, Ceph/recovery traffic and upgrade options |
+| Power | Suitable adapter and a measured UPS decision | Sustained wall power, outage frequency, shutdown integration and vendor runtime curve |
 
-**Phase 1 — buy now (~7.0tr VND / ~$280):**
+**Historical estimate only:** the May plan budgeted approximately 7.0 million VND
+for Phase 1 and 21.2 million VND cumulatively for three nodes. Those figures relied
+on an incorrect second-M.2 purchase and unverified sizing. They are not current
+quotes or an approved budget. Obtain a fresh BOM after the capacity and disk-layout
+gates; do not infer UPS runtime from its VA rating alone.
 
-| Item | Price (VND) |
-|------|-------------|
-| 1× Lenovo ThinkCentre M720q Tiny (barebone, 2nd-hand) — i5-8500T (6c/6t, 35W TDP) or i5-9500T; 2× M.2 NVMe slots + 1× 2.5" SATA bay | ~3.0tr |
-| 2× 16GB DDR4 SODIMM 3200MHz (Crucial/Kingston) | ~1.2tr |
-| 1× 1TB NVMe Lexar NM710 (PCIe 3.0) | ~1.3tr |
-| 1× 500GB SATA M.2 KingSpec/Lexar (future Ceph 2nd OSD) | ~0.7tr |
-| **Node #1 subtotal** | **6.2tr** |
-| 1× Switch TP-Link TL-SG108E (1GbE 8-port managed) | 0.6tr |
-| 3× CAT6 1m cables (bought upfront for all 3 nodes) | 0.2tr |
-| **Total Phase 1** | **7.0tr (~$280)** |
+### Capacity and storage qualification
 
-Why buy the switch + 3 cables immediately:
+There is no verified memory or disk budget yet. Replace the old “~21GB, comfortably
+fits 32GB” and “no disk pressure for two years” claims with measurements:
 
-- The final topology is ready — plug node #1 into the switch, switch into the
-  router.
-- The TL-SG108E has VLAN tagging, QoS, and port mirroring — enough to learn
-  networking properly.
-- 8 ports = 3 nodes + uplink + 4 spare (NAS/Pi/laptop later).
+| Question | Required evidence |
+|----------|-------------------|
+| Does the full stack fit? | Rendered resource requests/limits plus measured memory/CPU during representative traffic, backups, restarts and upgrades; include Keycloak, Temporal/workers, ClickHouse/Keeper, RustFS and all services |
+| Which bytes belong to which layer? | Disk/partition map for OS, etcd, images, OSDs, PVCs and staging; every allocation counted once |
+| Is Ceph appropriate on one node? | Compare its operational cost with local persistent storage and a later migration; qualify the chosen Talos/kernel/CSI versions if Talos is selected |
+| What is usable storage? | Actual OSD capacity, replication policy, failure-domain placement, free-space reserve, snapshots and backup staging |
+| How does storage expand? | A tested one-to-three-node procedure, including any StorageClass/PVC migration and rebalance behavior |
+| What happens to existing object storage? | Decide how Ceph would coexist with RustFS; no implicit replacement or nested replication assumption |
 
-Why buy the second 500GB M.2 immediately:
+Rook's raw OSD path needs eligible unformatted devices or partitions; an OS
+filesystem is not an OSD. Do not count an entire OS disk as available Ceph capacity.
+Do not reserve an entire 500GB disk for an OSD and also assign another 50GB on that
+same disk to staging. The old **4.5TB raw / 1.5TB usable** estimate is withdrawn
+until the actual allocation and replication design are verified.
 
-- The M720q has 2 M.2 slots — use both from the start.
-- Separating OS + workload (1TB NVMe) from Ceph data (500GB SATA M.2) avoids
-  I/O contention.
-- When scaling to 3 nodes, every node already has 2 disks for Ceph.
+Keep the existing OpenBAO and ClickHouse decisions as the baseline. A Phase 1
+single-replica exception requires its own decision and consequences. Three pods
+on one host do not establish physical HA. Retention changes also require explicit
+acceptance of which operational evidence will be lost.
 
-**Phase 2 — scale to 3 nodes (after 6–12 months, ~14.2tr VND / ~$560):**
+### Access direction
 
-| Item | Price (VND) |
-|------|-------------|
-| 2× Lenovo M720q Tiny barebone | 6.0tr |
-| 4× 16GB DDR4 SODIMM (2 nodes × 32GB) | 2.4tr |
-| 2× 1TB NVMe | 2.6tr |
-| 2× 500GB SATA M.2 | 1.4tr |
-| 1× UPS APC BX650CI (650VA) | 1.8tr |
-| **Total Phase 2** | **14.2tr** |
+[ADR-087](../../adr/ADR-087-homelab-private-and-web-access/) owns the access boundary:
 
-Why the UPS waits until Phase 2:
+| Use | Proposed path | Deployment prerequisite |
+|-----|---------------|-------------------------|
+| Kubernetes administration and internal debugging | Tailscale, with explicit tailnet permissions and Kubernetes/application authorization | Select exposed services and API proxy authentication mode; test denied users |
+| Talos or LAN administration | Separate private management route or direct LAN access | Select and verify that route; Kubernetes Operator alone does not supply it |
+| Selected private web tools | Browser → Cloudflare Access → Tunnel → Envoy Gateway → application | Hostname/identity allowlist, origin protection, working existing application login |
+| Explicitly public web applications | Browser → Tunnel → Envoy Gateway → application | Separate publication approval and preserved application authentication |
+| Recovery when cluster or SSO is unavailable | Direct LAN management and independently stored emergency credentials | Restore procedure tested without the in-cluster IdP or Operator |
 
-- A single Phase 1 node rebooting on power loss is fine (Talos is immutable;
-  restore from the R2 backup).
-- 3 nodes + Ceph 3-replica + etcd quorum: a sudden power cut can corrupt
-  etcd/Ceph.
-- 650VA ≈ 10–15 minutes of uptime for 3 mini PCs + switch — enough for a
-  graceful shutdown.
+Cloudflare One does not require WARP for the selected browser path. WARP/Gateway
+Internet filtering is outside Phase 1. Tool publication, Access IdP, hostnames,
+DNS/TLS details, forwarded-header/client-IP trust at Envoy and any external subnet
+router remain deployment prerequisites. Existing admin CIDR policies must be
+reviewed against connector traffic, not bypassed by treating a proxy IP as a user.
+No hostname becomes public because it appears as an example in this proposal.
 
-**Total investment:**
+The [Tailscale homelab deployment roles](../../adr/ADR-087-homelab-private-and-web-access/#tailscale-homelab-deployment-roles)
+separate a native client, a subnet router and the Kubernetes API proxy. Router
+placement, approved prefixes and SNAT/source-IP behavior remain qualification
+items; an in-cluster Connector does not satisfy independent recovery.
 
-| Phase | When | Cost | Cumulative |
-|-------|------|------|------------|
-| Phase 1 | Now | 7.0tr | 7.0tr |
-| Phase 2 | +6–12 months | 14.2tr | **21.2tr** (~$840) |
+### Recovery before migration
 
-→ Under $1000 for an HA homelab usable for 3–5 years.
+Before moving data that must be retained, specify the maximum acceptable data loss
+(**RPO**) and time to restore service (**RTO**) for each data class, then measure
+both in a restore drill. Hardware-specific recovery objectives are not accepted yet. Start from the existing
+[database reliability targets](../../../databases/reliability-targets.md) and
+record which targets the new substrate can actually meet; do not erase prior
+Kind drill evidence or treat it as a hardware result.
 
-**Common purchasing pitfalls:**
+| Data class | Required recovery design |
+|------------|--------------------------|
+| PostgreSQL, including identity and workflow databases | Application-consistent database backup/WAL strategy using the existing CNPG/Barman design as the starting point; restore and verify representative records |
+| OpenBAO | Raft snapshot procedure, compatible seal material and offline recovery credentials; demonstrate restored secrets can be read by their consumers |
+| RustFS / object data | Inventory buckets and dependent services; recover data and credentials independently of the failed cluster |
+| Observability and cache state | Classify retained evidence versus rebuildable state; define ClickHouse and telemetry-store restore or explicitly accepted data loss. Decide cache recovery per workload rather than treating every PVC as equally critical |
+| Other persistent volumes | Choose application-consistent backup or documented quiescing; VolSync/Kopia is a candidate, not universal proof of consistency |
+| Cluster bootstrap | Recover GitOps access, machine configuration, trust material and secrets needed before OpenBAO/ESO can run |
 
-| Mistake | Consequence |
-|---------|-------------|
-| Buying an i3 instead of the i5-8500T | Not enough cores for Ceph + workload |
-| Buying 8GB RAM planning to upgrade later | Wasteful — buy 32GB upfront |
-| Buying a 512GB SSD to "save money" | Full in 6 months → painful migration |
-| Skipping the second SATA M.2 | Ceph shares the OS disk → terrible I/O wait |
-| Buying an unmanaged switch (no "E" suffix) | No VLAN, no QoS → nothing to learn |
-| Forgetting the original 90W adapter | CPU throttling, instability |
+An off-site store such as R2 remains a candidate. Size it from retained data,
+change rate, retention and operations; do not assume a free tier covers recovery.
+Keep restoration credentials outside the cluster they restore. Auto-unseal and
+bootstrap-secret choices for physical hardware require a separate decision;
+ADR-024's Kind emulator is not automatically the durable-hardware answer.
 
-### Stack decisions
+## Alternatives and decision outcome
 
-Two opinionated repos were used as references for the stack design:
-**jfroy/flatops** (Talos + Cilium + Rook-Ceph + Envoy Gateway + cloudflared +
-tuppr) and **haraldkoch/kochhaus-home** (Cilium + Envoy + cert-manager +
-External Secrets + 1Password + SOPS + Rook/Longhorn + VolSync + Harbor +
-actions-runner-controller). Both are production-grade homelab patterns but
-expensive in cognitive load — this proposal cherry-picks rather than adopting
-either wholesale.
+| Question | Candidates | Current disposition |
+|----------|------------|---------------------|
+| OS | Talos; Ubuntu + k3s | Talos remains the leading candidate; not approved |
+| CNI | Cilium; another policy-enforcing CNI | Cilium is the review preference; qualify networking, required privileges and both allowed/denied traffic before choosing |
+| Storage | Ceph from Phase 1; local persistence followed by a deliberate HA migration | Open pending disk layout, capacity and recovery evidence |
+| Access | Tailscale-only; Cloudflare-only; split private administration and web access | Split model proposed in ADR-087; not installed |
+| Substrate | Keep Kind; migrate to physical nodes | Kind remains the reproducible integration environment; hardware migration awaits gates |
 
-**Adopt 100%:**
+**Decision outcome:** migration is provisional. Only the access direction is
+specified for review; the ADR remains Proposed. No hardware, storage, OS or unseal
+decision is accepted by this document revision.
 
-| Pattern | Rationale |
-|---------|-----------|
-| **Talos Linux** | Immutable, API-driven, no SSH, auto-recovery. Fits a headless mini PC running 24/7 |
-| **Cilium CNI** | eBPF, replaces kube-proxy → less overhead, strong network observability (Hubble) |
-| **Tailscale Operator** | Game-changer. Access the cluster from laptop/phone without exposing anything or self-hosting a VPN |
-| **VolSync + Kopia → R2** | **Mandatory** on 1 node — losing the disk means losing everything. The R2 free tier (10GB) covers metadata + DB dumps |
-| **cert-manager + LE DNS-01** | Already in place. Keep |
-| **External Secrets** | Already in place. Keep |
+## Architecture
 
-**Adopt with caution:**
-
-| Pattern | Concern on 1 node |
-|---------|-------------------|
-| **Rook-Ceph** | On 1 node with 2 OSDs there is no real HA, but it provides snapshot/clone for VolSync. ~2GB RAM overhead. **Worth it** because Phase 2 scales to 3 nodes |
-| **Envoy Gateway** | Kong runs fine today. Switching means relearning config for no gain. **Keep Kong** |
-| **cloudflared tunnel** | Useful only if internet exposure is needed. If Tailscale suffices → skip |
-| **tuppr** | Auto-upgrades Talos + K8s. Useful at 3 nodes, overkill for 1. **Add in Phase 2** |
-| **actions-runner-controller** | Self-hosted GH runner, ~1GB RAM idle. **Skip in Phase 1**; add only if CI becomes a bottleneck |
-| **Harbor (image mirror)** | Saves bandwidth on heavy image pulls. Not needed in Phase 1; add in Phase 2 if the network is slow |
-
-### Final stack: Current vs Phase 1 vs Phase 2
-
-| Layer | **Current (Kind)** | **Phase 1 (1× M720q Talos)** | **Phase 2 (3× M720q Talos HA)** |
-|---|---|---|---|
-| **OS** | Docker container (Kind) | Talos Linux | Talos Linux |
-| **CNI** | kindnet | Cilium (Hubble off, kube-proxy replacement on) | Cilium (Hubble on) |
-| **Ingress** | Kong (DB-less) ✅ | Kong (DB-less) ✅ | Kong (DB-less) ✅ |
-| **Storage** | hostPath ephemeral | Rook-Ceph 2 OSD (1 node, no HA) | Rook-Ceph 6 OSD (3 nodes, 3-replica) |
-| **Backup** | ❌ None | VolSync + Kopia → Cloudflare R2 | VolSync + Kopia → Cloudflare R2 |
-| **Secrets manager** | OpenBAO HA Raft (1 pod in practice) | OpenBAO single replica + VolSync PVC backup | OpenBAO HA Raft, 3 real nodes |
-| **Secrets sync** | External Secrets ✅ | External Secrets ✅ | External Secrets ✅ |
-| **Bootstrap secret** | Manual `bao kv put` (painful) | SOPS + age (CF token, age key in `~/.homelab/`) | SOPS + age |
-| **Cert** | cert-manager + LE DNS-01 ✅ | cert-manager + LE DNS-01 ✅ | cert-manager + LE DNS-01 ✅ |
-| **Trust distribution** | trust-manager + homelab-ca | **Drop** (no internal mTLS use case yet) | Re-add when mTLS is needed |
-| **GitOps** | Flux Operator + ResourceSets + OCI ✅ | Flux Operator + ResourceSets + OCI ✅ | Flux Operator + ResourceSets + OCI ✅ |
-| **Remote access** | localhost only | Tailscale Operator | Tailscale Operator |
-| **Public expose** | localhost | cloudflared tunnel (optional) | cloudflared tunnel |
-| **Cluster upgrade** | recreate Kind | Manual `talosctl upgrade` | tuppr (auto + healthcheck) |
-| **CI runner** | GitHub-hosted | GitHub-hosted | actions-runner-controller (if CI bottleneck) |
-| **Image mirror** | ❌ | ❌ | Harbor (if network is slow) |
-| **Postgres** | 3 clusters + DR | 3 clusters, 1 instance each | 3 clusters HA, 3 instances each |
-| **Observability** | Full stack (VM + Tempo + VL + Vector + Pyroscope + Grafana) ✅ | Full stack ✅ (retention 7d) | Full stack ✅ (retention 30d) |
-| **Apps** | 8 microservices + frontend ✅ | Same ✅ | Same ✅ |
-
-Net change:
-
-- ✅ **Add**: Talos, Cilium, Rook-Ceph, VolSync + Kopia, Tailscale Operator,
-  SOPS (bootstrap only)
-- ❌ **Remove (Phase 1)**: trust-manager + homelab-ca (deferred until an mTLS
-  use case exists)
-- 🔄 **Restructure**: OpenBAO HA → single replica + backup (Phase 1), back to
-  HA Raft (Phase 2)
-- ✅ **Keep**: Kong, ESO, cert-manager + LE, Flux + ResourceSets + OCI,
-  observability stack, 8 microservices
-
-### Roadmap
-
-| Month | Hardware | Software milestone |
-|-------|----------|--------------------|
-| **0** | Buy node 1 + switch (7tr) | Talos single node + migrate the Kind stack |
-| **1–2** | — | VolSync + Kopia → Cloudflare R2 backup setup |
-| **2–3** | — | Tailscale Operator, cloudflared tunnel (if needed) |
-| **3–6** | — | Trim observability, validate stack stability, run smooth |
-| **6–12** | Buy nodes 2+3 + UPS (14tr) | Talos HA cluster, Ceph 3-replica, OpenBAO Raft 3 |
-| **12+** | (Optional) 2.5GbE / 10GbE upgrade | Chaos engineering, tuppr |
-
-### Alternatives
-
-| Alternative | Why rejected |
-|-------------|--------------|
-| **1Password Connect** (kochhaus-home pattern) | Adds an external dependency and a $20/user/month license. OpenBAO is already in place — keep it |
-| **SOPS replacing External Secrets** | SOPS fits static secrets in Git. OpenBAO + ESO already handles dynamic secrets + rotation — better. SOPS is used only for **bootstrap-only secrets** (CF token, age key), which is the correct pattern |
-| **Longhorn** (instead of Rook-Ceph) | Simpler, but block storage only — no S3. Rook-Ceph provides block + S3 (object), a better fit |
-| **Envoy Gateway** (flatops pattern) | Kong already works well; switching costs relearning time for no functional gain |
-| **Ubuntu Server + k3s** (instead of Talos) | Easier to debug but far less immutable; still an open decision (see Open decisions) |
-| **Stay on Kind** | Zero cost, but none of the goals (durability, 24/7, bare-metal learning, HA) are achievable |
-
-## Architecture & diagrams
-
-Final network topology (Phase 2):
-
-```mermaid
-flowchart LR
-    Internet[Internet] --> Router[Home Router<br/>1GbE WAN]
-    Router --> Switch[TP-Link SG108E<br/>1GbE 8-port managed]
-    Switch --> N1[Node 1 - M720q]
-    Switch --> N2[Node 2 - M720q]
-    Switch --> N3[Node 3 - M720q]
-    Switch --> Spare[4 port spare<br/>NAS/Laptop/Pi]
-
-    Tailscale[Tailscale tailnet] -.->|tailnet| N1
-    Tailscale -.->|tailnet| N2
-    Tailscale -.->|tailnet| N3
-
-    UPS[UPS APC BX650CI] -.->|power| Switch
-    UPS -.->|power| N1
-    UPS -.->|power| N2
-    UPS -.->|power| N3
-```
-
-Per-node disk layout (Phase 1, carried into Phase 2 on every node):
+This reference topology answers **which physical failure domains a future
+three-node cluster would have**. It is not deployed; exact hardware, control-plane
+placement and networking are undecided. Access ownership lives in ADR-087's
+separate diagram, not in these physical links.
 
 ```mermaid
 flowchart TB
-    subgraph M720q["M720q node"]
-        NVMe["1TB NVMe<br/>Talos OS + etcd + workload PVCs"]
-        SATA["500GB SATA M.2<br/>Ceph OSD #2 + VolSync staging"]
+    Router["Home router<br/>reference uplink"]
+    Switch["Managed switch<br/>reference, not deployed"]
+    subgraph Cluster["Reference mini-PC cluster — not deployed"]
+        N1["Node 1<br/>reference Phase 1 host"]
+        N2["Node 2<br/>reference Phase 2 host"]
+        N3["Node 3<br/>reference Phase 2 host"]
     end
-    NVMe -->|VolSync + Kopia| R2[(Cloudflare R2<br/>off-site backup)]
-    SATA -->|snapshots| R2
+    Router -.->|reference LAN| Switch
+    Switch -.->|reference Ethernet| N1
+    Switch -.->|reference Ethernet| N2
+    Switch -.->|reference Ethernet| N3
+    classDef external fill:#64748b,color:#fff,stroke:#334155;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class Router external;
+    class Switch,N1,N2,N3 planned;
 ```
 
-## Design details
+Dashed nodes and labelled dotted links denote uninstalled reference elements.
+No disk layout is drawn until the storage allocation is decided.
 
-### RAM budget on the M720q (32GB, Phase 1)
+## Rollout and rollback gates
 
-| Component | RAM | Note |
-|---|---|---|
-| Talos OS + kernel | 0.5GB | Immutable, lean |
-| K8s control plane (etcd + apiserver + controller-manager + scheduler) | 1.5GB | Single node |
-| Cilium agent + operator | 0.5GB | Hubble disabled in Phase 1 |
-| Rook-Ceph (mon + mgr + 2 OSD) | 2.5GB | 2 OSDs on 2 disks |
-| Flux Operator + Source/Helm/Kustomize controllers | 0.4GB | |
-| cert-manager + ESO + Kyverno | 0.6GB | |
-| OpenBAO (single replica) | 0.3GB | PVC backed up via VolSync |
-| VolSync + Kopia | 0.2GB | Idle outside backup windows |
-| Tailscale Operator + cloudflared | 0.3GB | |
-| Kong | 0.4GB | DB-less, 1 replica |
-| VictoriaMetrics single + VMAgent + VMAlert + VMAlertmanager | 1.5GB | Retention trimmed to 7d |
-| Tempo + OTel Collector | 0.8GB | Trace retention 24h |
-| VictoriaLogs + Vector | 0.8GB | Log retention 7d |
-| Pyroscope | 0.5GB | Optional, can drop in Phase 1 |
-| Grafana | 0.3GB | |
-| Sloth Operator | 0.1GB | |
-| 3 PostgreSQL clusters (Zalando + CNPG + DR) | 3.0GB | 1 instance per cluster in Phase 1 |
-| PgBouncer + PgDog poolers | 0.4GB | |
-| Valkey cache | 0.3GB | |
-| 8 microservices | 1.6GB | ~200MB per Go service |
-| Frontend (nginx + React build) | 0.1GB | |
-| MCP servers (3) | 0.5GB | Droppable if no AI assistant in use |
-| kube-system overhead (CoreDNS, metrics-server, …) | 0.5GB | |
-| Buffer / OS cache | 4.0GB | Page cache for I/O performance |
-| **Total** | **~21GB** | of 32GB → **~66% utilization, 11GB headroom** |
+| Gate | Required result before moving on |
+|------|----------------------------------|
+| 0 — Design and purchase | Verify SKU/BOM, capacity, OS/CNI/storage choices, power and LAN plan; approve required ADRs |
+| 1 — Bootstrap | Bring up a disposable test installation; establish direct management access, trust, admission controls and reproducible Flux bootstrap |
+| 2 — Recovery | Accept per-data-class RPO/RTO; restore onto a clean target with independent credentials before migrating retained data |
+| 3 — Access and migration | Pass ADR-087 access tests, preserve application auth, plan a write cutover and demonstrate data restoration/rollback |
+| 4 — Stable single node | Run representative traffic, backup and upgrade cycles; record resource peaks, disk growth, alerts and measured recovery |
+| 5 — Three physical nodes | Validate control-plane/etcd quorum, stable management endpoint, replica placement, storage migration/rebalance and a physical node-loss drill |
 
-→ Comfortable. The full stack fits without aggressive trimming.
+Keep Kind's bring-up intact. Shared GitOps does not by itself guarantee that new
+storage classes or networking work on Kind. Rollback needs a compatible target,
+a tested data restore and a defined write freeze/cutover; restarting `make up`
+is not a lossless reversal of writes made on the physical cluster.
 
-Optional trims (if a leaner profile is wanted):
+## Security, observability and verification
 
-| Trim | RAM saved | Tradeoff |
-|------|-----------|----------|
-| Drop Pyroscope | 0.5GB | No profiling — only needed for perf debugging |
-| Drop the DR replica (cnpg-db-replica) | 0.5GB | Less load; VolSync backups still cover it |
-| Drop MCP servers | 0.5GB | Enable only when using an AI assistant |
-| Trim VM retention 7d → 3d | 0.5GB | Less metric history |
-| Drop Kyverno (keep policies in `audit` mode) | 0.4GB | No enforcement |
+Preserve the Kyverno controller, its configured Audit/Enforce modes, NetworkPolicy
+declarations and certificate trust consumers. The current Kind CNI is kindnet,
+which does not enforce NetworkPolicy; a policy-enforcing hardware CNI changes
+actual connectivity and requires both allow and deny tests. See the
+[policy catalog](../../../security/policy-catalog.md) and
+[network policy guide](../../../security/network-policies.md).
+“No internal mTLS” does not justify removing the CA. Any privileges required by a
+new CNI, CSI or connector must use the repository's scoped exception process;
+do not weaken global admission policies to make the installation pass.
 
-→ Can trim down to **~17GB** if needed.
+Before rollout, assign alerts/runbooks for storage health, backup freshness and
+restore failures, node resource pressure and remote-access failures. Define
+availability expectations for one physical node and shared power/network failures;
+three nodes alone do not remove those shared dependencies.
 
-### Disk budget on the M720q (1TB NVMe + 500GB SATA, Phase 1)
+The following are **future acceptance tests, not results from this documentation review**:
 
-NVMe 1TB (OS + workload + hot data):
+- Rebuild a clean target and restore each retained data class; measure RPO/RTO.
+- Prove authorized and denied access on both remote paths using ADR-087's matrix.
+- With Cloudflare, Keycloak or the Kubernetes Operator unavailable, verify the
+  documented failure behavior and independent LAN recovery path.
+- Restart the single node after a verified backup, checking storage, secrets and
+  Flux convergence. Plan any abrupt-power test separately with recoverable data.
+- At three nodes, stop one physical host and verify quorum, workload availability,
+  PVC access and recovery against the accepted availability target.
 
-| Volume | Size |
-|--------|------|
-| Talos system + container images | ~50GB |
-| etcd data | ~5GB |
-| Postgres data + WAL (3 clusters) | ~40GB after 6 months |
-| VictoriaMetrics data (7d retention) | ~15GB |
-| VictoriaLogs (7d retention) | ~10GB |
-| Tempo (24h retention) | ~5GB |
-| OpenBAO Raft data | ~1GB |
-| Grafana + misc PVCs | ~5GB |
-| **NVMe 1TB used** | **~131GB (~13% — plenty of room)** |
+## Open decisions — reviewed 2026-10-12
 
-SATA M.2 500GB (Ceph 2nd OSD + backup staging):
+This review distinguishes existing decisions from recommendations and missing
+qualification. **Recommendations are not approvals.** `duynhne` owns closing the
+remaining gates. This section replaces the original five-question list rather
+than carrying its stale choices forward.
 
-| Volume | Size |
-|--------|------|
-| Ceph OSD #2 (HA-ready block storage) | 500GB raw |
-| VolSync staging (snapshots before pushing to R2) | ~50GB |
-| **SATA M.2 used** | **~100–200GB (~20–40%)** |
+### Original questions
 
-→ 1TB + 500GB is more than enough for Phase 1 — no disk pressure for at
-least 2 years.
+| Original question | Review outcome and recommendation | Evidence / closure condition |
+|-------------------|-----------------------------------|------------------------------|
+| Talos or Ubuntu + k3s? | **Open; prefer qualifying Talos first.** Its API-managed operation fits the GitOps learning goal. Ubuntu + k3s remains the fallback if required hardware/storage support or recovery is impractical; neither is installed by this RFC | Test install, direct `talosctl` recovery, CNI/CSI prerequisites, upgrade and workload scheduling on the chosen SKU; accept an OS/topology decision before purchase commitment |
+| One or three OpenBAO replicas on one host? | **Open exception, not a new default.** ADR-005 remains the three-replica baseline. A single-replica Phase 1 profile is worth evaluating for measured capacity savings, accepting secret-service downtime during restarts; three replicas on one host tolerate some pod failures but not host loss | Measure both profiles, specify outage/recovery behavior and accept a scoped exception before changing replica counts. Keep Raft and native snapshot recovery |
+| SOPS + age or a local secrets file? | **Open; prefer a minimal encrypted bootstrap bundle**, with offline recovery of the decryption material; keep application secrets in OpenBAO + ESO. SOPS + age is a candidate, not an existing integration. A local file alone is not a recovery plan | Inventory the credentials needed before OpenBAO/ESO and Flux can start; prove clean bootstrap from an independently recoverable copy. Do not put the only key in the failed cluster or one laptop |
+| Tailscale-only or add cloudflared? | **Reviewed into ADR-087 Proposed.** Use private administration plus selected web access when clientless sharing is required; a Tunnel does not mean every app is public | Accept ADR-087 and close its hostname, identity, origin and recovery obligations before enabling routes; no WARP requirement |
+| Keep MCP servers or drop them? | **Resolved for the baseline: keep disabled.** The local Flux list already disables `mcp-local` because these servers were unused and consumed idle memory | [Local kustomization](../../../../kubernetes/clusters/local/kustomization.yaml) is the evidence. Re-enable only for a concrete consumer with measured resource cost; no hardware-specific change needed now |
 
-Phase 2 Ceph capacity: 3 nodes × (1TB NVMe + 500GB SATA) = **4.5TB raw**;
-Ceph 3-replica → **~1.5TB usable**. Enough for PostgreSQL HA + long-retention
-observability (30d) + media + local backups.
+### Additional gates uncovered by the review
 
-### Reversibility & operator visibility
+| Topic | Recommendation and rationale | What closes the gate |
+|-------|------------------------------|----------------------|
+| Hardware and budget | Treat M720q as one candidate; do not buy from the old BOM or reduce RAM merely to match its price | Correct SKU/disk compatibility, measured capacity and current quotes; approved budget including power/network accessories |
+| Control plane and CNI | Evaluate one schedulable control-plane node initially and three physical control-plane nodes for HA; prefer a policy-enforcing CNI such as Cilium | Pin compatible versions, define the stable API endpoint, prove bootstrap/upgrade, scheduling, policy enforcement and one-to-three-node migration |
+| Ceph timing and disk layout | Compare dedicated-data-disk Ceph with local persistence plus an explicit later migration. **Do not select Ceph solely to obtain snapshots**, and do not count replication on one host as HA | Eligible disk map, current RustFS relationship, CSI backup compatibility, steady/peak resource measurements and accepted migration procedure |
+| Database and ClickHouse footprint | Preserve the CNPG/Barman and ADR-065 baseline while measuring; no silent conversion to single replicas to fit a 32GB target | Application/database load and maintenance measurements. Any intentional replica reduction needs its own decision, data migration and restore evidence |
+| Physical-hardware unseal | Prefer evaluating a durable external KMS for unattended restart, consistent with RFC-0008. Keep manually operated Shamir as an alternative if external dependency/cost is unacceptable; do not promote floci by default | Choose provider/authentication or manual ceremony, credential custody, outage behavior and full restore with the original seal material. Recovery keys alone cannot replace an unavailable auto-unseal key |
+| Backup destination and retention | Retain application-native recovery mechanisms; evaluate R2 as an off-site destination. VolSync/Kopia may complement them for suitable PVCs | Inventory data, independent credentials, retention/cost, accepted RPO/RTO and clean-target restore; losing local RustFS must not also lose the only recovery copy |
+| UPS and power | Evaluate protection in Phase 1 rather than assuming an immutable OS makes power loss harmless | Measure load and acceptable downtime; select a compatible UPS/shutdown procedure or explicitly accept the power-loss risk |
+| Upgrade automation and optional services | Start with documented manual upgrades. Defer automatic OS upgrades, self-hosted CI and an image mirror until their benefit is demonstrated | Upgrade/rollback rehearsal first; add a component only for a measured need and sufficient capacity |
 
-- **Enable/disable:** the migration is a substrate swap, phased by the
-  roadmap; each phase gates on the previous one running stably.
-- **Rollback:** the Kind stack remains fully functional via `make up` — the
-  GitOps manifests are shared, so falling back costs only the state restored
-  from R2.
-- **Operator visibility:** the existing observability stack carries over;
-  Ceph/Talos health surfaces through the same Grafana/VMAlert pipeline.
-- **Drawbacks:** hardware cost (~21.2tr total), single-node Phase 1 has no
-  real HA (Rook-Ceph 2 OSD on one host), Talos has a steeper debugging curve
-  than a general-purpose OS, and physical concerns (power, heat, disk wear)
-  become the operator's problem.
+### Existing decisions that are not reopened
 
-## Open decisions
+- **Envoy Gateway is the current edge**, replacing Kong under ADR-044. There is
+  no gateway selection left for this migration.
+- **Keycloak and application authorization remain authoritative** under ADR-043
+  and ADR-062. Access is an additional entry policy, not a replacement IdP decision.
+- **CA consumers remain supported.** Gateway and OIDC-related certificate
+  declarations exist; review certificate issuers/renewal for hardware rather than
+  deleting trust-manager because internal mTLS is not yet universal.
+- **Kyverno remains installed.** Keeping policy YAML without its controller does
+  not retain audit behavior. New component privileges need scoped exceptions.
 
-To settle before Phase 1 starts:
+### Inherited recovery obligations
 
-1. **OS**: Talos Linux (immutable, opinionated) or Ubuntu Server + k3s
-   (easier debugging, less immutable)?
-2. **OpenBAO Phase 1**: single replica (no HA, PVC backed up via VolSync) or
-   3 replicas on 1 node (fake HA, 3× RAM)?
-3. **Bootstrap secret**: SOPS + age (encrypted in Git, decrypted at
-   bootstrap) or keep the script-based `~/.homelab/secrets.env` pattern?
-4. **Public expose**: Tailscale only (private) or add a cloudflared tunnel
-   (host a blog/app publicly)?
-5. **MCP servers**: keep in Phase 1 (AI assistant in active use) or drop to
-   save RAM?
+[RFC-0007](../RFC-0007/) already records successful Kind drills and assigns ongoing
+cadence. Durable hardware must activate the deferred DR promotion and platform-db
+restore work (Drills C/D), repeat applicable drills on the new substrate and keep
+records in the existing [drill evidence log](../../../databases/runbooks/restore-and-failover-drills.md).
+A successful one-time migration does not replace that recurring program.
 
-Pre-purchase checklist:
+## References
 
-- [ ] Confirm the Phase 1 budget (7tr) or cut to 5.5tr (drop the 2nd SATA
-      M.2 + only 16GB RAM)
-- [ ] UPS or stable power? If outages are common → buy the UPS in Phase 1
-- [ ] Tailscale account ready? (Free tier: 100 devices — plenty)
-- [ ] Cloudflare R2 set up? (Free tier: 10GB storage + 1M Class A ops/month)
-- [ ] Any real need to expose services publicly? (Decides cloudflared vs
-      Tailscale-only)
-- [ ] Where to buy the M720q (HN: Mai Hắc Đế / Lê Thanh Nghị, or a Shopee
-      shop with ≥1000 reviews)
-- [ ] Ask the seller: original 90W adapter, both M.2 slots enabled, WiFi M.2
-      card present?
-
-## Security considerations
-
-- **Bootstrap secrets** move from manual `bao kv put` to SOPS + age: the CF
-  token is committed encrypted; the age key lives only in `~/.homelab/`.
-- **OpenBAO in Phase 1** runs a single replica — availability risk, not a
-  confidentiality one; the Raft PVC is backed up (encrypted at rest in R2 via
-  Kopia).
-- **Remote access** is Tailscale-only by default (no exposed control plane or
-  NodePorts); cloudflared, if adopted, exposes only chosen HTTP routes.
-- **Talos** removes SSH and runs an immutable, API-driven OS — a smaller host
-  attack surface than a general-purpose distro.
-- Kyverno/PSS posture is unchanged (Kyverno may run in `audit` mode if
-  trimmed — an explicit enforcement tradeoff).
-
-## Observability & SLO impact
-
-- The full stack (VictoriaMetrics, Grafana, Tempo, VictoriaLogs, Vector,
-  Pyroscope, Sloth) carries over; retention is trimmed to 7d in Phase 1 and
-  raised to 30d in Phase 2.
-- New signals to watch: Ceph health (mon/OSD), Talos node health, VolSync
-  backup job success, Tailscale connectivity.
-- SLOs are unaffected by design; Phase 1 is a single node, so
-  availability SLOs measure the stack, not real HA.
-
-## Rollout & rollback
-
-- **Phased rollout** per the roadmap: single node first, backups before
-  anything else (month 1–2), remote access next, then 6+ months of stability
-  before buying nodes 2–3.
-- **Blast radius:** a homelab — no external users; worst case is losing local
-  state, mitigated by R2 backups from month 1–2.
-- **Rollback:** the Kind flow (`make up`) stays intact throughout; manifests
-  are substrate-agnostic via Flux + Kustomize overlays.
-
-## Testing / verification
-
-- **Backup restore drill:** after VolSync + Kopia is live, delete a PVC and
-  restore it from R2 — the backup is only real once a restore has succeeded.
-- **Power-loss test (Phase 1):** hard-reboot the node; Talos should recover
-  and Flux should reconcile to steady state unattended.
-- **Stability soak (months 3–6):** run the full stack continuously; alerts
-  quiet, no OOM, disk growth within budget — the gate for buying nodes 2–3.
-- **Phase 2 HA validation:** kill one node; Ceph 3-replica and etcd quorum
-  must keep the platform serving.
+- [Platform hub](../../../platform/README.md)
+- [Secrets and recovery](../../../secrets/openbao.md)
+- [Certificate management](../../../secrets/cert-manager.md)
+- [Lenovo ThinkCentre M720 Tiny specifications](https://psrefstuff.lenovo.com/syspool/Sys/PDF/ThinkCentre/ThinkCentre_M720_Tiny/ThinkCentre_M720_Tiny_Spec.pdf)
+- [Rook Ceph prerequisites](https://www.rook.io/docs/rook/latest/Getting-Started/Prerequisites/prerequisites/)
+- [Talos machine configuration (scheduling on control-plane nodes)](https://docs.siderolabs.com/talos/v1.9/reference/configuration/v1alpha1/config) — mechanism reference, not a selected Talos version
+- [OpenBao seal and recovery-key limitations](https://openbao.org/docs/2.5.x/concepts/seal/)
+- [OpenBao integrated storage and snapshot workflow](https://openbao.org/docs/concepts/integrated-storage/)
 
 ## Implementation History
 
-- 2026-07-04 — RFC created from the May 2026 planning discussion (formerly
-  `docs/platform/homelab-migration-plan.md`).
+- 2026-07-04 — Created from the May planning discussion; no hardware rollout recorded.
+- 2026-08-11 — RFC-0024 / ADR-044 reversed the original Kong choice; Envoy Gateway owns the edge.
+- 2026-10-12 — Provisional scope corrected against repository baseline `eea44b97`;
+  hardware/capacity assumptions withdrawn and ADR-087 proposed. Hardware purchase,
+  architecture acceptance and implementation remain outstanding.
 
-## Related
-
-- [`docs/secrets/README.md`](../../../secrets/README.md) — current OpenBAO
-  architecture
-- [`docs/secrets/cert-manager.md`](../../../secrets/cert-manager.md) —
-  current cert-manager + LE DNS-01 setup
-- Reference repos: [jfroy/flatops](https://github.com/jfroy/flatops),
-  [haraldkoch/kochhaus-home](https://github.com/haraldkoch/kochhaus-home)
+_Last updated: 2026-10-12_

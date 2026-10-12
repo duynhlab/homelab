@@ -1,0 +1,132 @@
+# Sources: RFC-0011 draft + ADR-087; repo eea44b97, reviewed 2026-10-12.
+# Preview only; planned means proposed, not approved.
+diagram:
+  id: rfc0011-physical
+  title: 01 / duynhlab — Mini-PC infrastructure
+  scope: RFC-0011 reference design — proposed, not approved; not deployed. Physical
+    connectivity only.
+  question: platform-landscape
+  level: L1
+  pin_order: true
+  animate: []
+layers:
+- wan
+- router
+- switch
+- hosts
+boundaries:
+- id: cluster
+  label: Mini-PC cluster / proposed, not deployed
+nodes:
+- id: internet
+  label: 'Internet
+
+    planned'
+  role: external
+  layer: wan
+  status: planned
+  w: 220
+  h: 85
+- id: router
+  label: 'Home router
+
+    Model and LAN plan: undecided
+
+    planned'
+  role: external
+  layer: router
+  status: planned
+  w: 280
+  h: 85
+- id: switch
+  label: 'Managed switch
+
+    Ports / speed / VLANs: undecided
+
+    planned'
+  role: external
+  layer: switch
+  status: planned
+  w: 290
+  h: 85
+- id: node1
+  label: 'Mini PC / Node 1
+
+    Phase 1 • one physical host
+
+    planned'
+  role: platform
+  layer: hosts
+  status: planned
+  w: 220
+  h: 85
+  parent: cluster
+- id: node2
+  label: 'Mini PC / Node 2
+
+    Phase 2 • expansion candidate
+
+    planned'
+  role: platform
+  layer: hosts
+  status: planned
+  w: 220
+  h: 85
+  parent: cluster
+- id: node3
+  label: 'Mini PC / Node 3
+
+    Phase 2 • expansion candidate
+
+    planned'
+  role: platform
+  layer: hosts
+  status: planned
+  w: 220
+  h: 85
+  parent: cluster
+edges:
+- id: wan
+  source: internet
+  target: router
+  label: WAN (planned)
+  type: traffic
+  status: planned
+- id: lan
+  source: router
+  target: switch
+  label: LAN uplink (planned)
+  type: traffic
+  status: planned
+- id: n1
+  source: switch
+  target: node1
+  label: Ethernet (planned)
+  type: traffic
+  status: planned
+- id: n2
+  source: switch
+  target: node2
+  label: Ethernet (planned)
+  type: traffic
+  status: planned
+- id: n3
+  source: switch
+  target: node3
+  label: Ethernet (planned)
+  type: traffic
+  status: planned
+notes:
+- id: status
+  title: Reading this preview
+  text: Dashed / planned = proposed target, not approval or deployment. No IP addresses
+    or workload placement are selected.
+- id: hardware
+  title: Hardware qualification
+  text: 'M720q is a candidate: one M.2 SSD slot + one SATA 2.5-inch bay. CPU, RAM,
+    disks, budget and UPS remain open.'
+- id: os
+  title: OS and storage candidates
+  text: Talos, Cilium and Ceph remain under review. Three physical nodes are a target,
+    not proof of HA; shared power and network still matter.
+tests: []

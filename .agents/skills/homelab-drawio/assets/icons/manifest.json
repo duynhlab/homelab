@@ -1,6 +1,6 @@
 {
-  "_note": "Curated PNG logos for homelab-drawio diagrams. PNG, not SVG: headless Draw.io export does not render SVG data URIs. Embed with image=data:image/png,<base64> (a COMMA, never ';base64,', which truncates the mxCell style). Prefer scripts/icon_style.py style <name> --role <role> over hand-rolling a data URI. Every icon here was fetched from the source URL, rasterised at 64px with rsvg-convert, and eyeballed at 24px before being catalogued.",
-  "_scope": "Deployed platform components only. An icon must not assert something false: a box gets a logo only for the product it IS, not a product its label mentions.",
+  "_note": "Curated PNG logos for homelab-drawio diagrams. PNG, not SVG: headless Draw.io export does not render SVG data URIs. Embed with image=data:image/png,<base64> (a COMMA, never ';base64,', which truncates the mxCell style). Prefer scripts/icon_style.py style <name> --role <role> over hand-rolling a data URI. Icons are sourced from the recorded URL, fitted within a 64px PNG canvas with aspect preserved, and inspected at 24px.",
+  "_scope": "Deployed platform products and explicitly labelled RFC/ADR candidates. Catalog presence does not establish adoption; diagram status follows the design record.",
   "aliases": {
     "victorialogs": "victoriametrics",
     "victoriatraces": "victoriametrics",
@@ -178,12 +178,89 @@
       "label": "VictoriaMetrics",
       "source": "https://cdn.simpleicons.org/victoriametrics",
       "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "rustfs": {
+      "file": "rustfs.png",
+      "bytes": 3291,
+      "sha256": "b79ea1ac8c3e6b35eb59cf33b6f281188742d3d73fbed42823529bf2a8fa9bbd",
+      "label": "RustFS",
+      "source": "https://rustfs.com/favicon-32x32.png",
+      "license": "RustFS official site brand mark; identification use only. 32px favicon fitted to 64px."
+    },
+    "tailscale": {
+      "file": "tailscale.png",
+      "bytes": 917,
+      "sha256": "dee349131e7da603bc674d62bb6f1251941ba4e5c13cba20791ae390ca3ec659",
+      "label": "Tailscale",
+      "source": "https://cdn.simpleicons.org/tailscale",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "cloudflare": {
+      "file": "cloudflare.png",
+      "bytes": 1107,
+      "sha256": "9fd35bd3585a6e1cb393dd4df7eea2fda04e90207acb86a198d6406bdbc3c992",
+      "label": "Cloudflare",
+      "source": "https://cdn.simpleicons.org/cloudflare",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "react": {
+      "file": "react.png",
+      "bytes": 3835,
+      "sha256": "56433e59b07923f8570a8d550c7d6a1bae604dfaace2a5660344f096ea360a01",
+      "label": "React",
+      "source": "https://cdn.simpleicons.org/react",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "talos": {
+      "file": "talos.png",
+      "bytes": 2294,
+      "sha256": "c5f90e0d770e0fba111fd7efd3631ab71b980019f32106d2cb2af840018c7008",
+      "label": "Talos Linux",
+      "source": "https://cdn.simpleicons.org/talos",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "cilium": {
+      "file": "cilium.png",
+      "bytes": 3625,
+      "sha256": "75d95c571c457da6a21a9a0371028066edc0dcf327b6173b2785a7bda70fde97",
+      "label": "Cilium",
+      "source": "https://cdn.simpleicons.org/cilium",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "prometheus": {
+      "file": "prometheus.png",
+      "bytes": 2365,
+      "sha256": "62e2ae9999f554d83a8fd6522019986cd628a2c9998f9a46f50e9bb66d317473",
+      "label": "Prometheus",
+      "source": "https://cdn.simpleicons.org/prometheus",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "ceph": {
+      "file": "ceph.png",
+      "bytes": 3391,
+      "sha256": "28eacc4628595215be9dd2ea52da090fc91f2b0d078e0719de566f52dfc3fd6f",
+      "label": "Ceph",
+      "source": "https://cdn.simpleicons.org/ceph",
+      "license": "simple-icons (simpleicons.org, CC0); brand trademark - identification use only"
+    },
+    "vector": {
+      "file": "vector.png",
+      "bytes": 1565,
+      "sha256": "834ef9e84a9a26e4c07c4b1732468d6cda8aee112b692036c63c14c2230102c7",
+      "label": "Vector",
+      "source": "https://github.com/vectordotdev/vector/blob/master/website/static/img/logos/vector.svg",
+      "license": "Vector project brand mark; identification use only"
+    },
+    "sloth": {
+      "file": "sloth.png",
+      "bytes": 2811,
+      "sha256": "5972028e808544687027aafd05bc36e9244bf2681556afd3229fbee1d24564c0",
+      "label": "Sloth",
+      "source": "https://github.com/slok/sloth/blob/main/docs/img/logo.png",
+      "license": "Sloth project logo (Apache-2.0 repository); identification use only"
     }
   },
-  "none": {
-    "vector": "no mark at any source probed (project repo, site, simple-icons). Stays plain.",
-    "sloth": "no full-colour mark located. Stays plain."
-  },
+  "none": {},
   "follow_up": {},
   "_follow_up_note": "follow_up holds products whose mark exists but is not in the catalog yet; icon_style.py folds its keys into the audit's search terms, so only real product names belong here. KEDA reminder (already catalogued): present as keda; listed here only so a future editor does not re-add a duplicate."
 }

@@ -162,7 +162,7 @@ skill-creator format; they are a judgement aid, not a gate.
   - Icon the box's *subject*, never a product its label merely mentions.
   - Grouping frames and concept boxes stay plain.
   - Never invent or counterfeit a vendor mark.
-  - The catalogue is deployed-platform-only.
+  - The catalogue covers deployed products and explicitly labelled RFC/ADR candidates; a logo never establishes adoption.
 - **Planned = dashed + the word "planned".** The generator refuses a planned
   node or edge without the word. `validate_house.py` errors on a planned-styled
   box that omits it, and warns on the word without the dash.

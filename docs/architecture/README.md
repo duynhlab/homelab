@@ -33,7 +33,6 @@ IR is what you edit and the `.drawio` is its output.
 | workflows | [`workflows/temporal-keda`](workflows/temporal-keda.drawio) | **The Temporal work layer** — who starts each workflow, which queue and worker serve it, and which controllers own each worker's builds and replicas. | [`api/workflows.md`](../api/workflows.md) |
 | workflows | [`workflows/temporal-worker-versions`](workflows/temporal-worker-versions.drawio) | **One worker release** — the builds, the Progressive rollout and the per-build KEDA scaling while order-fulfillment ramps from build A to build B. | [`api/workflows.md`](../api/workflows.md) · [`api/temporal.md` § Worker Deployment Versioning](../api/temporal.md#worker-deployment-versioning-as-built) |
 
-
 ## RFC-0011 previews
 
 These views illustrate the provisional [mini-PC migration proposal](../proposals/rfc/RFC-0011/)
@@ -43,13 +42,28 @@ and [ADR-087](../proposals/adr/ADR-087-homelab-private-and-web-access/). They ar
 | View | Source | Preview | Question |
 |------|--------|---------|----------|
 | Physical infrastructure | [Draw.io](platform/rfc0011-infrastructure.drawio) · [IR](platform/rfc0011-infrastructure.ir.yaml) | [SVG](platform/rfc0011-infrastructure.svg) · [PNG](platform/img/rfc0011-infrastructure.png) | Which physical hosts and network links are being considered? |
-| Platform and access | [Draw.io](platform/rfc0011-platform-access.drawio) · [IR](platform/rfc0011-platform-access.ir.yaml) | [SVG](platform/rfc0011-platform-access.svg) · [PNG](platform/img/rfc0011-platform-access.png) | Which platform components and entry paths are proposed on mini PCs? |
+| Layered homelab stack | [Draw.io](platform/rfc0011-platform-stack.drawio) · [IR](platform/rfc0011-platform-stack.ir.yaml) | [SVG](platform/rfc0011-platform-stack.svg) · [PNG](platform/img/rfc0011-platform-stack.png) | What runs above hardware, OS and Kubernetes? |
+| Private and web access | [Draw.io](platform/rfc0011-access.drawio) · [IR](platform/rfc0011-access.ir.yaml) | [SVG](platform/rfc0011-access.svg) · [PNG](platform/img/rfc0011-access.png) | Which boundary admits administration, web access and LAN recovery? |
 
-The lower frames in the platform view are a component inventory: their unconnected
-cards are intentional, not missing packet paths. Validation reports no errors;
-the generated legend's dashed sample has its caption in a separate cell, which
-produces an unlabelled-edge warning despite the visible caption. Neither warning
-implies deployed connectivity.
+The stack reads **bottom to top**: hardware → operating system → cluster
+foundation → platform services → applications. Node 1 is Phase 1; nodes 2–3
+are later expansion. Software cards describe a logical stack, not host placement
+or installation order. The observability frame lists individual products.
+
+<p align="center"><a href="platform/rfc0011-platform-stack.svg"><img src="platform/rfc0011-platform-stack.svg" alt="Proposed mini-PC stack from hardware at the bottom to applications at the top" width="960"></a></p>
+<p align="center"><sub>Source <a href="platform/rfc0011-platform-stack.drawio"><code>platform/rfc0011-platform-stack.drawio</code></a> · <a href="platform/img/rfc0011-platform-stack.png">PNG</a></sub></p>
+
+The access view separates private administration, selected private web routes
+and independent LAN recovery. It does not select an Access identity provider or
+imply that Tailscale's Kubernetes proxy provides host recovery.
+
+<p align="center"><a href="platform/rfc0011-access.svg"><img src="platform/rfc0011-access.svg" alt="Proposed Tailscale administration, Cloudflare private web access and independent LAN recovery" width="960"></a></p>
+<p align="center"><sub>Source <a href="platform/rfc0011-access.drawio"><code>platform/rfc0011-access.drawio</code></a> · <a href="platform/img/rfc0011-access.png">PNG</a></sub></p>
+
+Validation has no errors. The stack intentionally has no packet arrows: its
+unconnected-card warnings describe a component inventory. The access and physical
+views retain the generator's dashed-legend warning because its visible caption
+is a separate cell. Product icons identify technology, not adoption status.
 
 ## Conventions
 

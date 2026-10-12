@@ -1,0 +1,254 @@
+# RFC-0011 / ADR-087 reference target, reviewed 2026-10-12. Not installed.
+# Sources: kubernetes/clusters/local; infra/controllers and configs; docs/api/api.md;
+# docs/observability/README.md; docs/databases/architecture.md.
+diagram:
+  id: rfc0011-access
+  title: 03 / duynhlab — Private and web access
+  scope: ADR-087 Proposed • reference paths, not installed. Entry policy does not replace destination
+    authorization.
+  question: request-path
+  level: L2
+  pin_order: true
+  animate: []
+layers:
+- clients
+- admission
+- connectors
+- targets
+- applications
+- identity
+boundaries:
+- id: cluster
+  label: Mini-PC cluster / proposed, not deployed
+nodes:
+- id: admin
+  label: 'Operator device
+
+    planned'
+  role: external
+  layer: clients
+  status: planned
+  w: 230
+  h: 58
+- id: browser
+  label: 'Web browser
+
+    planned'
+  role: external
+  layer: clients
+  status: planned
+  w: 230
+  h: 58
+- id: local
+  label: 'Local operator / LAN
+
+    Independent emergency access
+
+    planned'
+  role: external
+  layer: clients
+  status: planned
+  w: 250
+  h: 70
+- id: tailscale
+  label: 'Tailscale
+
+    Tailnet permissions
+
+    planned'
+  role: external
+  layer: admission
+  status: planned
+  w: 230
+  h: 70
+  icon: tailscale
+- id: cf
+  label: 'Cloudflare Access
+
+    Selected private web routes
+
+    planned'
+  role: external
+  layer: admission
+  status: planned
+  w: 230
+  h: 70
+  icon: cloudflare
+- id: lan
+  label: 'Direct LAN management
+
+    Offline credentials / no SSO reliance
+
+    planned'
+  role: external
+  layer: admission
+  status: planned
+  w: 280
+  h: 70
+- id: proxy
+  label: 'Tailscale API proxy
+
+    Proxy mode / identity mapping TBD
+
+    planned'
+  role: edge
+  layer: connectors
+  status: planned
+  w: 270
+  h: 70
+  parent: cluster
+  icon: tailscale
+- id: tunnel
+  label: 'cloudflared
+
+    Tunnel / Access token validation
+
+    planned'
+  role: edge
+  layer: connectors
+  status: planned
+  w: 270
+  h: 70
+  parent: cluster
+  icon: cloudflare
+- id: hostapi
+  label: 'Host management API
+
+    Talos if selected / LAN route
+
+    planned'
+  role: external
+  layer: connectors
+  status: planned
+  w: 250
+  h: 70
+- id: api
+  label: 'Kubernetes API
+
+    Kubernetes RBAC
+
+    planned'
+  role: platform
+  layer: targets
+  status: planned
+  w: 230
+  h: 70
+  parent: cluster
+  icon: kubernetes
+- id: envoy
+  label: 'Envoy Gateway
+
+    Origin HTTPS / Host / SNI
+
+    planned'
+  role: edge
+  layer: targets
+  status: planned
+  w: 230
+  h: 70
+  parent: cluster
+  icon: envoy
+- id: apps
+  label: 'Selected web applications
+
+    Existing app authentication
+
+    planned'
+  role: service
+  layer: applications
+  status: planned
+  w: 270
+  h: 70
+  parent: cluster
+- id: keycloak
+  label: 'Keycloak
+
+    Existing OIDC / roles
+
+    planned'
+  role: platform
+  layer: identity
+  status: planned
+  w: 230
+  h: 70
+  parent: cluster
+  icon: keycloak
+edges:
+- id: admin_tail
+  source: admin
+  target: tailscale
+  label: Private administration (planned)
+  type: traffic
+  status: planned
+- id: tail_proxy
+  source: tailscale
+  target: proxy
+  label: Permitted API access (planned)
+  type: traffic
+  status: planned
+- id: proxy_api
+  source: proxy
+  target: api
+  label: Authenticated requests (planned)
+  type: traffic
+  status: planned
+- id: web_access
+  source: browser
+  target: cf
+  label: HTTPS / Access policy (planned)
+  type: traffic
+  status: planned
+- id: access_tunnel
+  source: cf
+  target: tunnel
+  label: Tunnel delivery (planned)
+  type: traffic
+  status: planned
+- id: tunnel_envoy
+  source: tunnel
+  target: envoy
+  label: Validated origin HTTPS (planned)
+  type: traffic
+  status: planned
+- id: envoy_apps
+  source: envoy
+  target: apps
+  label: Allowed web routes (planned)
+  type: traffic
+  status: planned
+- id: apps_oidc
+  source: apps
+  target: keycloak
+  label: Existing identity contract (planned)
+  type: trust
+  status: planned
+- id: local_lan
+  source: local
+  target: lan
+  label: Independent LAN path (planned)
+  type: traffic
+  status: planned
+- id: lan_host
+  source: lan
+  target: hostapi
+  label: Host recovery (planned)
+  type: traffic
+  status: planned
+notes:
+- id: separate
+  title: Access boundaries
+  text: The LAN column is independent recovery, not a Tailscale Operator feature. A remote Talos/LAN route
+    is still an open design. Access IdP is not selected; the Keycloak card represents application identity
+    only. No WARP is required.
+- id: policy
+  title: Publication and authorization
+  text: This view follows private web access. Explicit public web routes are a separate allowlist decision
+    and retain application auth. Management APIs and datastores have no public Tunnel route. Selected
+    private services need their own tailnet restrictions; this view shows the Kubernetes API path.
+- id: origin
+  title: Origin and recovery gates
+  text: Validate Access tokens at cloudflared or the origin; preserve Host/SNI and TLS verification. Review
+    forwarded headers and admin CIDR trust. Recovery credentials and LAN procedures must work without
+    connectors or in-cluster identity.
+tests:
+- rule: no-public-datastore

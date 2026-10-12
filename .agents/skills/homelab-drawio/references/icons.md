@@ -1,6 +1,7 @@
 # Homelab Draw.io icon catalog
 
-Curated logos for the deployed platform, embedded as PNG data URIs. The catalog
+Curated logos for deployed products and explicitly labelled RFC/ADR candidates,
+embedded as PNG data URIs. Catalog membership does not establish deployment. The catalog
 is [`../assets/icons/manifest.json`](../assets/icons/manifest.json); every entry
 records its source URL, license, byte size, and SHA-256. Emit a ready style with
 `icon_style.py`; do not hand-roll a data URI.
@@ -51,23 +52,16 @@ cropped from the lockup). Run `icon_style.py list` for the exact names and alias
 company, one logo); `postgres`→`postgresql`, `eso`→`external-secrets`,
 `otel`→`opentelemetry`, `k8s`→`kubernetes`.
 
-## Deliberately plain (`none` — do not re-add)
+## Additional marks and search outcomes
 
-- **Vector** — no mark at any source probed (project repo, site, simple-icons).
-- **Sloth** — no full-colour mark located.
+Tailscale, Cloudflare, React, Talos, Cilium, Ceph and Prometheus use
+Simple Icons. RustFS uses its official site favicon, legible at 24px. Vector uses its official project SVG; Sloth uses the PNG linked
+from its project README. Pyroscope uses the Grafana project mark already in the
+catalog. Exact sources and checksums live in `manifest.json`.
 
-## Known gaps (`follow_up` — a search worth finishing)
-
-`manifest.json` also carries a `follow_up` block: products that *do* have a mark
-nobody has added yet, each recorded with the source to fetch it from. `none` says
-"stop looking"; `follow_up` says "this one is still open" — currently
-**Pyroscope**. `icon_style.py list` prints both blocks, and `audit` reports a
-`follow_up` match under its own heading so it is not confused with a logo that is
-already sitting in `assets/icons/`.
-
-(Valkey and PgDog were `none` until their official marks were located —
-`valkey.io/img/Valkey-logo.svg` and the PgDog lockup's paw — and are now in the
-catalog. Never put a Redis logo on Valkey: it would assert Redis is deployed.)
+Record an exhausted search in `none` and an unfinished search in `follow_up`.
+Revisit a prior miss when new official artwork is found; the former Vector and
+Sloth misses were resolved this way. Never substitute another product's logo.
 
 ## Rules that keep the catalog honest
 

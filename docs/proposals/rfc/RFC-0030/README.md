@@ -9,7 +9,8 @@
 > the analytics API, and the Admin route remain planned and not deployed. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
 > bounded-eventual read model.
 
-Current qualification work and evidence: [Phase 0](./phase0.md).
+Qualification runbook: [Phase 0](./phase0.md). Results and remaining work:
+[Linux handoff issue](https://github.com/duynhlab/homelab/issues/1266).
 
 ## Prerequisites
 

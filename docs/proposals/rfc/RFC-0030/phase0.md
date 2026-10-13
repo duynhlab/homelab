@@ -56,14 +56,14 @@ ports must be free; project isolation does not isolate host port bindings.
 
 ## Artifact and compatibility contract
 
-Exact references and package checksums: [artifact inventory](./qualification/artifacts.json).
+Image digests are pinned in the [Compose overlay](../../../../local-stack/compose.analytics.yaml);
+pg_cron package checksums are pinned in its [Dockerfile](../../../../local-stack/analytics/postgres/Dockerfile).
 
 - Core source: tag `v0.37.5`, commit `053ba64d0ec492438977d4e2bbe5f7b511aeb6ba`.
 - Chart: `v0.9.16`, commit `68ffa1449384d155ea03d3676c8be44d294833d4`; its
   default app is v0.36.26. Qualification overrides every enabled component to
   the v0.37.5 digest from the Compose overlay.
-- [Qualification values](./qualification/peerdb-values.yaml) render with Helm 3.
-  They are **not deployment-ready**: the upstream worker templates lack probes
+- The exploratory Helm 3 render is **not deployment-ready**: the upstream worker templates lack probes
   and explicit object namespaces, and cluster Secrets, staging configuration,
   network controls and admission must be supplied and tested on Linux.
 - The catalog schema is initialized by the matching `peerdb-server` image's
@@ -81,25 +81,18 @@ Exact references and package checksums: [artifact inventory](./qualification/art
 
 ### Reproduce the artifact checks
 
-From the homelab root, with Helm 3:
+From the homelab root:
 
 ```bash
-git clone --depth 1 --branch v0.9.16 \
-  https://github.com/PeerDB-io/peerdb-enterprise.git /tmp/rfc0030-peerdb-chart
-git -C /tmp/rfc0030-peerdb-chart rev-parse HEAD
-helm dependency build /tmp/rfc0030-peerdb-chart/peerdb
-helm template peerdb /tmp/rfc0030-peerdb-chart/peerdb --namespace peerdb \
-  -f docs/proposals/rfc/RFC-0030/qualification/peerdb-values.yaml \
-  > /tmp/rfc0030-peerdb-render.yaml
 make -C ../images lint IMAGE=postgresql-cron
 make -C ../images digest IMAGE=postgresql-cron
 ```
 
-Compare the source SHA and image references against the inventory. Rendering
-proves template compatibility only; it does not prove admission or deployment.
-The image recipe is on the sibling `images` branch `feat/rfc0030-pg-cron`.
-Use the repository's Make targets so the pinned builder and normalization are
-retained; do not publish the candidate manually.
+Use the image repository's Make targets so the pinned builder and normalization
+are retained; do not publish the candidate manually. Record the resulting digest
+and tested commit in the [Linux handoff issue](https://github.com/duynhlab/homelab/issues/1266).
+The exploratory chart values are not a supported deployment configuration;
+Linux qualification must supply and verify the cluster configuration.
 
 ### License disposition
 
@@ -153,33 +146,18 @@ identity, values and exclusion of the new PII fixture column. It does not prove
 automatic schema propagation or a production resync RTO; repeating this gate
 requires a fresh disposable project.
 
-## Mac qualification evidence
+## Verification records
 
-Verified on 2026-10-13 using the existing Podman Apple Virtualization machine.
-The pipeline ran native ARM64; this is functional evidence with small fixtures,
-not a capacity benchmark or release audit. The working tree was uncommitted;
-the report records exact input hashes and source checkout SHAs.
+Test results, machine-specific inventories and handoff status belong in
+[issue #1266](https://github.com/duynhlab/homelab/issues/1266), not in the source
+tree. Keep generated reports outside the checkout using `ANALYTICS_EVIDENCE_DIR`
+and attach evidence to the owning verification record.
 
-| Check | Result | Evidence / limit |
-|---|---|---|
-| CDC and access gate | 14/14 PASS | [Rows](./qualification/mac-compose/results.md), [machine-readable report](./qualification/mac-compose/results.json) |
-| Explicit DDL recovery | 3/3 PASS | [Rows](./qualification/mac-compose/ddl.md), [report](./qualification/mac-compose/ddl.json); scratch schema only |
-| Runtime artifacts | Native ARM64 | [Image identities](./qualification/mac-compose/runtime-images.json) |
-| Freshness and bootstrap preflight tests | 3 tests PASS | `python3 -m unittest discover -s local-stack/analytics -p 'test_*.py'` |
-| Platform manifests | PASS | `make validate`; repository validation, not cluster admission |
-| Image recipe | Lint and two-platform build PASS | Local candidate digest in artifact inventory; clean rebuild/scan/runtime qualification pending |
-| Chart | Helm 3 render PASS | No Kubernetes installation; deficiencies listed above |
-| Docs | Local links/fences and Mermaid rendering PASS | Both research diagrams rendered and inspected |
-| Full local-stack regression | BLOCKED before API/browser gates | [Baseline reproduction and follow-up](./qualification/mac-compose/regression.md): review migration role is not activated |
-
-The successful DDL run followed cleanup of only its failed scratch mirrors,
-publication, table and role; earlier raw snapshots were retained under failure
-names. The main CDC gate was not rerun as part of that DDL cleanup.
-
-The short RustFS interruption recovered in about 143 seconds; ClickHouse in
-about 200 seconds, including the stop/start and heartbeat checks. These measured
-recovery times do not establish a two-minute outage RTO. Normal target freshness
-and unavailable-state behavior are separate checks.
+The Mac prototype used small native ARM64 fixtures. It does not qualify CNPG,
+capacity or release readiness. Full local-stack regression is blocked by the
+review-service migration connection not activating its configured owner role;
+the issue records the baseline reproduction and required follow-up. Preserve
+NOINHERIT and restricted runtime privileges when fixing that wiring.
 
 ## Linux handoff gates
 

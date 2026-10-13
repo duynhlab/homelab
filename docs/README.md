@@ -428,7 +428,7 @@ here is how an index starts disagreeing with the records it points at.
 - [**RFC index**](./proposals/rfc/README.md) — all **32** proposals, plus the
   process (research gate → RFC → ADR) and the backlog.
 - [Proposals hub](./proposals/) — templates and how to open a new record.
-- [Commerce CDC Phase 0](./proposals/rfc/RFC-0030/phase0.md) — opt-in PeerDB prototype, Mac evidence and Linux qualification gates.
+- [Commerce CDC Phase 0](./proposals/rfc/RFC-0030/phase0.md) — opt-in PeerDB prototype, run commands and Linux qualification gates.
 - [Mini-PC homelab migration](./proposals/rfc/RFC-0011/) — hardware qualification, recovery gates and reviewed design questions; [private administration and web access](./proposals/adr/ADR-087-homelab-private-and-web-access/) records the proposed access boundary. [Four Draw.io previews](./architecture/platform/README.md#rfc-0011-previews) show physical connectivity, the layered stack, access and OSI network roles.
 
 **Start here** — a reading path, *not* an index. These eight decisions shape

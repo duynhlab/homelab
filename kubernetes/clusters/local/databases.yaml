@@ -31,7 +31,7 @@ spec:
   postBuild:
     substituteFrom:
       - kind: Secret
-        name: pg-stat-ch-clickhouse
+        name: clickhouse-pg-stat-ch
         optional: false
 
   dependsOn:

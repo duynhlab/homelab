@@ -17,7 +17,7 @@ what is captured, how it flows, what it costs, and how to operate it.
 | Loss model | Ring overflow or a failed insert **drops** events; nothing is retried and PostgreSQL is never slowed |
 | Cost on PostgreSQL | ~2 % CPU in the extension; up to ~11 % TPS on a lock-heavy pgbench (upstream, 32 clients); ~4 MiB ring + 16 MiB string area per instance here |
 | Health | `cnpg_pg_stat_ch_*` (custom query) → `PgStatChExportFailing`, `PgStatChDroppingEvents`, `PgStatChNotExporting` |
-| Dashboard | `postgresql-query-telemetry` (Databases folder) |
+| Dashboard | `postgresql-query-telemetry` (Databases folder) — Go in `duynhlab/grafana-dashboards`, delivered by the as-code OCI artifact (≥ 0.5.0), the first board on the logical `clickhouse` datasource |
 | Not covered | plan capture (use auto_explain), statements on the DR replica, local-stack (its Postgres is Alpine/musl; the release binary is glibc) |
 
 ## What one event holds

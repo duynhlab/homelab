@@ -136,11 +136,13 @@ Skeleton (copy what you need):
   `query_stats_5m`, `db_app_user_1m` and `errors_recent` rollups), and the
   `clickhouse-schema` Job now bootstraps and verifies both databases. The CHI
   defines the INSERT-only `pg_stat_ch` user. New Grafana board
-  `postgresql-query-telemetry` (Databases folder): server-side p50/p95/p99
-  over time, statements/s by operation, database and application, errors by
-  SQLSTATE, CPU-vs-I/O split, top statements by total time and physical reads,
-  slowest individual executions, recent errors, and an exporter-health row.
-  Three alerts with runbooks — `PgStatChExportFailing`,
+  `postgresql-query-telemetry` (Databases folder), written as Go in
+  `duynhlab/grafana-dashboards` and delivered by the as-code artifact pinned at
+  0.5.0 — its first board on the logical `clickhouse` datasource: server-side
+  p50/p95/p99 over time, statements/s by operation, database and application,
+  errors by SQLSTATE, CPU-vs-I/O split, top statements by total time and
+  physical reads, slowest individual executions, recent errors, and an
+  exporter-health row. Three alerts with runbooks — `PgStatChExportFailing`,
   `PgStatChDroppingEvents`, `PgStatChNotExporting` — watch the loss counters,
   because the extension drops rather than back-pressures.
 - **Kind gate row K3.7: guarded database memberships have not drifted.**

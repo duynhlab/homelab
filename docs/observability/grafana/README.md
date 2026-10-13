@@ -102,13 +102,13 @@ assigns them since `v0.2.1`, and a registry-wide test holds it.
 
 ## Dashboards
 
-**25 `GrafanaDashboard` CRs** still vendored here, plus **18 dashboards and 6 folders
+**25 `GrafanaDashboard` CRs** still vendored here, plus **19 dashboards and 6 folders
 delivered as `GrafanaManifest` from an OCI artifact** (re-derive the first with
 `cat kubernetes/infra/configs/observability/grafana/dashboards/*.yaml | grep -c '^kind: GrafanaDashboard'`).
 
 ## Dashboards as code
 
-Eighteen boards are no longer JSON in this repository. They are Go in
+Nineteen boards are no longer JSON in this repository. They are Go in
 [`duynhlab/grafana-dashboards`](https://github.com/duynhlab/grafana-dashboards), rendered
 with the Grafana Foundation SDK and published as one OCI artifact that Flux pins and
 applies:
@@ -117,11 +117,12 @@ applies:
 Go builders -> dashboard.grafana.app/v2 spec -> GrafanaManifest -> OCI artifact
   -> OCIRepository grafana-dashboards-as-code-oci
   -> Kustomization ...-folders-local   (6 folders)
-  -> Kustomization ...-dashboards-local (18 boards + 2 alert rule groups, dependsOn the folders)
+  -> Kustomization ...-dashboards-local (19 boards + 2 alert rule groups, dependsOn the folders)
 ```
 
 Which boards: `kubernetes-cluster-overview`, `kubernetes-workloads`, `keda`, `pg-io-waits`,
 `pg-maintenance`, `pg-query-performance`, `pg-exporter-instance`, `pgdog`,
+`postgresql-query-telemetry` (the one board on the logical `clickhouse` datasource),
 `temporal-worker`, `otel-collector-health`, `microservices-monitoring-001-otel`,
 `business-otel`, `red-spanmetrics`, `rfc0021-baseline`, `inventory-overview`,
 `cert-manager`, `keycloak-identity`, `eg-edge`.

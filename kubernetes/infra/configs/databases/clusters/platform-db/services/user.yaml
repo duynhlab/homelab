@@ -91,4 +91,7 @@ spec:
   extensions:
     - name: pgaudit
     - name: pg_stat_statements
+    # pg_stat_ch's SQL surface in one database per cluster (the exporter's
+    # pg_stat_ch custom query targets it); see product-db/services/product.yaml.
+    - name: pg_stat_ch
   databaseReclaimPolicy: retain

@@ -55,6 +55,9 @@ alerts, and operator health. One file per alert name — each file covers both
 | CNPGWALArchiveFailing | critical | deep-signal | active | [CNPGWALArchiveFailing.md](CNPGWALArchiveFailing.md) |
 | CNPGLongRunningTransaction | warning | deep-signal | active | [CNPGLongRunningTransaction.md](CNPGLongRunningTransaction.md) |
 | CNPGIdleInTransaction | warning | deep-signal | active | [CNPGIdleInTransaction.md](CNPGIdleInTransaction.md) |
+| PgStatChExportFailing | warning | pg-stat-ch | active | [PgStatChExportFailing.md](PgStatChExportFailing.md) |
+| PgStatChDroppingEvents | warning | pg-stat-ch | active | [PgStatChDroppingEvents.md](PgStatChDroppingEvents.md) |
+| PgStatChNotExporting | warning | pg-stat-ch | active | [PgStatChNotExporting.md](PgStatChNotExporting.md) |
 | CNPGRoleMembershipDrift | critical | role-membership | active | [CNPGRoleMembershipDrift.md](CNPGRoleMembershipDrift.md) |
 | CNPGRoleMembershipGuardMissing | warning | role-membership | active | [CNPGRoleMembershipGuardMissing.md](CNPGRoleMembershipGuardMissing.md) |
 | CNPGInstanceMetricsAbsent | — | chart upstream | not deployed | — |

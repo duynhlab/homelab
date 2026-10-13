@@ -7,6 +7,49 @@ metadata:
     cnpg.io/reload: ""
 data:
   custom-queries: |
+    # pg_stat_ch exporter health (cnpg_pg_stat_ch_*): the extension's
+    # shared-memory ring and its ClickHouse export, read from one database
+    # because pg_stat_ch_stats() reads cluster-wide shared memory and the
+    # extension's SQL objects exist only in `product`. One row per instance;
+    # standbys capture and export too. Ages are -1 until the first
+    # success/error so the gauge never goes missing.
+    pg_stat_ch:
+      query: "SELECT enqueued_events, dropped_events, exported_events, send_failures, dsa_oom_count,
+               queue_size, queue_usage_pct,
+               COALESCE(EXTRACT(EPOCH FROM (now() - last_success_ts)), -1) AS last_success_age_seconds,
+               COALESCE(EXTRACT(EPOCH FROM (now() - last_error_ts)), -1) AS last_error_age_seconds
+               FROM pg_stat_ch_stats()"
+      target_databases:
+        - "product"
+      metrics:
+        - enqueued_events:
+            usage: "COUNTER"
+            description: "Events accepted into the pg_stat_ch ring buffer"
+        - dropped_events:
+            usage: "COUNTER"
+            description: "Events dropped because the ring buffer was full"
+        - exported_events:
+            usage: "COUNTER"
+            description: "Events the background worker delivered to ClickHouse"
+        - send_failures:
+            usage: "COUNTER"
+            description: "Failed ClickHouse inserts (the batch is lost, not retried)"
+        - dsa_oom_count:
+            usage: "COUNTER"
+            description: "Query/error strings lost because the string area was full"
+        - queue_size:
+            usage: "GAUGE"
+            description: "Events waiting in the ring buffer"
+        - queue_usage_pct:
+            usage: "GAUGE"
+            description: "Ring buffer fill level in percent"
+        - last_success_age_seconds:
+            usage: "GAUGE"
+            description: "Seconds since the last successful export (-1 = never)"
+        - last_error_age_seconds:
+            usage: "GAUGE"
+            description: "Seconds since the last export error (-1 = never)"
+
     # Scope pg_stat_statements to current_database() for each target DB.
     # Joining pg_database and scanning all dbids on every target connection can
     # produce duplicate labelsets and make exporter /metrics fail with HTTP 500.

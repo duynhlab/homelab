@@ -96,4 +96,9 @@ spec:
     # auto_explain` always fails "extension is not available". Not listed here.
     - name: pgcrypto
     - name: uuid-ossp
+    # pg_stat_ch's SQL surface (pg_stat_ch_stats() and friends) lives in ONE
+    # database per cluster: the hooks capture every database from the preload,
+    # and the stats read shared memory, so the exporter's pg_stat_ch custom
+    # query targets this database only.
+    - name: pg_stat_ch
   databaseReclaimPolicy: retain

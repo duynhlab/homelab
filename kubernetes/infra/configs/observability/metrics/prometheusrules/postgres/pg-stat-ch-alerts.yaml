@@ -1,0 +1,64 @@
+# Hand-authored pg_stat_ch export-health alerts (NOT chart-generated).
+# The extension never back-pressures PostgreSQL: a full ring buffer or a failed
+# ClickHouse insert loses events silently, so these counters (cnpg_pg_stat_ch_*,
+# from the pg_stat_ch custom query) are the only place the loss shows. One
+# series per instance; grouped by cluster like deep-signals-alerts.yaml.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: postgres-pg-stat-ch
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: postgres-deep-signals
+    platform.duynhlab.dev/source: homelab-authored
+spec:
+  groups:
+  - name: postgres-pg-stat-ch
+    rules:
+    - alert: PgStatChExportFailing
+      expr: sum by (cnpg_io_cluster) (increase(cnpg_pg_stat_ch_send_failures[10m])) > 0
+      for: 10m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: pg_stat_ch inserts into ClickHouse are failing ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          {{ $value | printf "%.0f" }} ClickHouse insert batches from {{ $labels.cnpg_io_cluster }}
+          failed in the last 10m and were discarded. Query telemetry has a gap; PostgreSQL
+          itself is unaffected. Check pg_stat_ch_stats().last_error_text, the pg_stat_ch
+          ClickHouse user and the clickhouse-schema Job.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/PgStatChExportFailing.md"
+
+    - alert: PgStatChDroppingEvents
+      expr: sum by (cnpg_io_cluster) (increase(cnpg_pg_stat_ch_dropped_events[10m])) > 0
+      for: 10m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: pg_stat_ch ring buffer overflowing ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          {{ $labels.cnpg_io_cluster }} dropped {{ $value | printf "%.0f" }} query events in 10m
+          because the shared-memory ring filled faster than the background worker drained it.
+          Percentiles for the window are biased; raise pg_stat_ch.queue_capacity or lower
+          flush_interval_ms only after confirming ClickHouse is accepting inserts.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/PgStatChDroppingEvents.md"
+
+    - alert: PgStatChNotExporting
+      expr: >-
+        sum by (cnpg_io_cluster) (increase(cnpg_pg_stat_ch_enqueued_events[15m])) > 0
+        and sum by (cnpg_io_cluster) (increase(cnpg_pg_stat_ch_exported_events[15m])) == 0
+      for: 15m
+      labels:
+        severity: warning
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
+      annotations:
+        summary: pg_stat_ch is capturing but not exporting ({{ $labels.cnpg_io_cluster }})
+        description: >-
+          {{ $labels.cnpg_io_cluster }} enqueued query events for 15m without a single
+          successful export and without counting a send failure — the pg_stat_ch background
+          worker is not running or cannot reach ClickHouse at all. Expect a rising
+          queue_usage_pct followed by PgStatChDroppingEvents.
+        runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/PgStatChNotExporting.md"

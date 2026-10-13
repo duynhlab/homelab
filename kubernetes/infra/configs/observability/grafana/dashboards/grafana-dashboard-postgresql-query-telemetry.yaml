@@ -1,0 +1,21 @@
+# PostgreSQL — Query telemetry (pg_stat_ch). Per-execution query events from
+# the CNPG clusters' pg_stat_ch extension, read from ClickHouse database
+# pg_stat_ch (events_raw + the 5m/1m rollups) through the ClickHouse
+# datasource; the exporter-health row reads cnpg_pg_stat_ch_* from
+# VictoriaMetrics. JSON is generated into a ConfigMap by configMapGenerator
+# (see kustomization.yaml). Folder by UID like cloudnative-pg: the as-code
+# artifact owns `databases`, and a title would create a second folder.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: postgresql-query-telemetry
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  folderUID: databases
+  allowCrossNamespaceImport: true
+  resyncPeriod: 30s
+  configMapRef:
+    name: grafana-dashboard-postgresql-query-telemetry
+    key: postgresql-query-telemetry.json

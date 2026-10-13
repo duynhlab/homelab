@@ -293,6 +293,7 @@ docs/observability/
 │       ├── README.md             # Hub: architecture, learning path, runbook links
 │       ├── builtin-metrics.md    # CNPG built-in metric inventory
 │       ├── custom-metrics.md     # Custom query reference
+│       ├── query-telemetry.md    # Per-execution events: pg_stat_ch → ClickHouse (percentiles, errors, top statements)
 │       └── signals/              # Dashboard-only signal guides
 │
 ├── tracing/                      # Pillar 2: Distributed tracing

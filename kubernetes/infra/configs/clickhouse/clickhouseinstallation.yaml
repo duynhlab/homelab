@@ -12,7 +12,8 @@
 #
 # The `default` user's password comes from the ESO-managed clickhouse-credentials
 # Secret (OpenBAO secret/local/infra/clickhouse/admin). Both the schema Job and
-# the Collector connect as `default`.
+# the Collector connect as `default`; the CNPG clusters' pg_stat_ch extension
+# writes as its own INSERT-only `pg_stat_ch` user (users section below).
 #
 # Schema ownership lives elsewhere: the `clickhouse-schema` Job in
 # configs/clickhouse-schema/ creates the `otel` database (ENGINE = Replicated,
@@ -69,6 +70,24 @@ spec:
         - "::/0"
       default/profile: default
       default/quota: default
+      # pg_stat_ch: the writer the CNPG clusters' pg_stat_ch extension connects
+      # as. INSERT on its own database and nothing else — a leaked password
+      # cannot read telemetry or touch otel. `grants` is the users.xml form
+      # (GRANT without grantee); it cannot be combined with allow_databases.
+      # Password from the ESO-managed clickhouse-pg-stat-ch Secret
+      # (OpenBAO secret/local/infra/clickhouse/pg_stat_ch).
+      pg_stat_ch/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-pg-stat-ch
+            key: password
+      pg_stat_ch/networks/ip:
+        - "0.0.0.0/0"
+        - "::/0"
+      pg_stat_ch/profile: default
+      pg_stat_ch/quota: default
+      pg_stat_ch/grants/query:
+        - "GRANT INSERT ON pg_stat_ch.*"
     # The engine's own Prometheus endpoint, finally enabled. At 1x1 the Altinity
     # metrics-exporter's chi_* series were the whole engine view and a per-pod
     # scrape would have duplicated them; with three replicas the per-pod series

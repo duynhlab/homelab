@@ -7,6 +7,8 @@ resources:
   - grafana-dashboard-slo-detailed.yaml
   - grafana-dashboard-vector.yaml
   - grafana-dashboard-cloudnative-pg.yaml
+  # PostgreSQL per-execution query telemetry (pg_stat_ch → ClickHouse) — JSON via configMapGenerator below
+  - grafana-dashboard-postgresql-query-telemetry.yaml
   - grafana-dashboard-redis.yaml
   # Envoy Gateway first-party dashboards (RFC-0024 P4 edge slice) — JSON vendored
   # from envoyproxy/gateway v1.9.0 via configMapGenerator below
@@ -40,6 +42,9 @@ configMapGenerator:
   - name: grafana-dashboard-clickhouse-otel-sql
     files:
       - clickhouse-otel-sql.json
+  - name: grafana-dashboard-postgresql-query-telemetry
+    files:
+      - postgresql-query-telemetry.json
   - name: grafana-dashboard-clickhouse-otel-overview
     files:
       - clickhouse-otel-overview.json

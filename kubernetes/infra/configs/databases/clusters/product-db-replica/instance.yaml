@@ -29,6 +29,14 @@ spec:
   # Must match or exceed product-db primary for recovery-critical GUCs.
   # PostgreSQL refuses recovery when replica values < primary pg_controldata.
   postgresql:
+    # The same pg_stat_ch extension image as product-db, NOT preloaded: the
+    # extension's catalog objects arrive through WAL, and a promoted replica
+    # must be able to resolve them. Preload + pg_stat_ch.* parameters are a
+    # promotion-time decision (docs/databases/runbooks/cnpg-dr-replica-bootstrap.md).
+    extensions:
+      - name: pg_stat_ch
+        image:
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.1.0@sha256:0a7595c74478972efc25b43c79cd5c6f7b9f35decb793f22d7722bb3caed6c7b
     parameters:
       max_connections: "200"
       max_worker_processes: "8"

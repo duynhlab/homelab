@@ -709,7 +709,7 @@ will not run in parallel.
 - [PeerDB v0.37.5](https://github.com/PeerDB-io/peerdb/releases/tag/v0.37.5)
 - [Core license](https://github.com/PeerDB-io/peerdb#license)
 - [Enterprise chart v0.9.16](https://github.com/PeerDB-io/peerdb-enterprise/releases/tag/v0.9.16)
-- [Enterprise chart license](https://github.com/PeerDB-io/peerdb-enterprise/blob/main/LICENSE.md)
+- [Enterprise chart license](https://raw.githubusercontent.com/PeerDB-io/peerdb-enterprise/68ffa1449384d155ea03d3676c8be44d294833d4/LICENSE.md)
 - [Commit-lag semantics](https://github.com/PeerDB-io/peerdb/pull/4573)
 - [Open ClickHouse schema issue](https://github.com/PeerDB-io/peerdb/issues/4310)
 

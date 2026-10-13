@@ -213,4 +213,4 @@ belong to later phases; this prototype does not implement their endpoints.
 - [Versioned CDC retry behavior](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/flow/workflows/cdc_flow.go)
 - [Versioned dynamic settings](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/flow/internal/dynamicconf.go)
 - [Versioned core license](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/LICENSE)
-- [Versioned chart license](https://github.com/PeerDB-io/peerdb-enterprise/blob/v0.9.16/LICENSE.md)
+- [Versioned chart license](https://raw.githubusercontent.com/PeerDB-io/peerdb-enterprise/68ffa1449384d155ea03d3676c8be44d294833d4/LICENSE.md)

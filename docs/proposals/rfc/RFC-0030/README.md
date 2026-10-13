@@ -4,10 +4,12 @@
 |--------|-------|----------|---------|--------------|
 | Accepted | platform-wide | [./research.md](./research.md) — PeerDB + `pg_cron` direction audited 2026-09-08 | 2026-09-07 | 2026-09-09 |
 
-> **Accepted target architecture; not implemented.** PeerDB, the commerce
-> schema, the analytics workloads, and the Admin route are planned and not
-> deployed. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
+> **Accepted target architecture; Phase 0 qualification in progress.**
+> PeerDB and commerce CDC have an opt-in Compose prototype. Cluster rollout,
+> the analytics API, and the Admin route remain planned and not deployed. PostgreSQL stays authoritative; ClickHouse is a rebuildable,
 > bounded-eventual read model.
+
+Current qualification work and evidence: [Phase 0](./phase0.md).
 
 ## Prerequisites
 
@@ -48,7 +50,7 @@ historical questions about settled capture, refunds, checkout conversion, and
 top products. Browser fan-out cannot establish one honest cross-domain
 watermark, and repeated 90-day scans would couple review traffic to OLTP.
 
-The platform already runs PostgreSQL 18 on CloudNativePG, ClickHouse 26.7,
+The platform already runs PostgreSQL 18 on CloudNativePG, ClickHouse 26.9,
 Temporal, and RustFS. PeerDB is a narrower fit than building and operating a
 custom extractor because it owns the PostgreSQL snapshot/WAL/checkpoint path.
 It does not replace the semantic API, authorization, reconciliation, or
@@ -348,7 +350,7 @@ visible UTC/freshness labels, and accessible table equivalents for charts.
   heartbeat tables. Background-worker execution removes the external heartbeat
   password, HBA rule, network path, and workload. CNPG `DatabaseRole` manages
   role attributes; DDL owns the table grants and cron schedules.
-- Use a digest-pinned custom image derived from the deployed PostgreSQL 18.1
+- Use a digest-pinned custom image derived from the deployed PostgreSQL 18.6
   system image. The artifact must exist before adding `pg_cron` to
   `shared_preload_libraries`; a missing library prevents PostgreSQL startup.
 - Install `pg_cron` only in `postgres`, use UTC and background workers, cap its
@@ -513,6 +515,10 @@ service rollup in `docs/api/README.md`, the Admin consumer index
 relevant feature ownership in `docs/api/microservices.md`.
 
 ## Implementation history
+
+- 2026-10-13 — Added the opt-in Compose CDC qualification prototype and
+  [Linux handoff gates](./phase0.md). Cluster adoption and API/UI implementation
+  remain pending; Compose evidence does not close the CNPG gates.
 
 - 2026-09-09 — Owner accepted RFC-0030 and ADR-066 through ADR-069. Adoption
   remains `Not started`; the former acceptance blockers are mandatory Phase 0

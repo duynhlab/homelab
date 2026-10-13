@@ -1,0 +1,51 @@
+{
+  "user-service": {
+    "sha": "f4801bf93fca97a62e9e36d9024f386456a446b3",
+    "dirty": ""
+  },
+  "product-service": {
+    "sha": "e8db0715f5a3c7e3cfba8f944bd303c9344be8e1",
+    "dirty": "?? .DS_Store"
+  },
+  "inventory-service": {
+    "sha": "ca098483306837da6fab15701fac9e02ad0a3184",
+    "dirty": ""
+  },
+  "cart-service": {
+    "sha": "1647e4df09a0ee85ba68de07ad7062ad88ea6ee4",
+    "dirty": ""
+  },
+  "order-service": {
+    "sha": "ff7afe041a720127d6ebf691997d96f72d872520",
+    "dirty": ""
+  },
+  "review-service": {
+    "sha": "4ac3a8ba0cef17bd6a7c7ca23696abf6bf1f2c9d",
+    "dirty": "",
+    "runtime_override_sha": "d14e06f98636521708c43838db593f02a35b746d"
+  },
+  "shipping-service": {
+    "sha": "1a098a72a6bd9194f8e1208470c2cfa48c72cb2e",
+    "dirty": ""
+  },
+  "notification-service": {
+    "sha": "b62b938cd3ba60babe96ca241a6339d861a4d4ae",
+    "dirty": ""
+  },
+  "payment-service": {
+    "sha": "7672982380b39ba9ae3209d2fd2ccc6b40542aa2",
+    "dirty": ""
+  },
+  "checkout-service": {
+    "sha": "5ab15c6cb0e96c7e7deb832cf657c4925b9abe25",
+    "dirty": ""
+  },
+  "frontend": {
+    "sha": "d978217bb3cfd825c8177fbff1c2370ef361c317",
+    "dirty": ""
+  },
+  "admin-service": {
+    "sha": "733ff05840ee2b9af9137c0a192c4784beb8203e",
+    "dirty": ""
+  }
+}

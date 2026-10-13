@@ -1,0 +1,44 @@
+# Qualification render only; not referenced by Flux and not deployable as-is.
+# Linux must add admission-compliant probes/security and actual Secret objects.
+catalog:
+  deploy:
+    enabled: false
+  existingSecret: peerdb-catalog
+  pgHost: platform-db-rw.platform-db.svc
+  pgPort: "5432"
+  pgUser: peerdb_catalog
+  pgDatabase: peerdb_catalog
+  pgAdminDatabase: postgres
+temporal:
+  deploy:
+    enabled: false
+  host: temporal-frontend.temporal.svc
+  port: 7233
+  namespace: peerdb
+  taskQueueId: rfc0030
+  clientCert: ""
+  clientKey: ""
+aws:
+  region: us-east-1
+peerdb:
+  enabled: false
+  version: stable-v0.37.5
+peerdbUI:
+  enabled: false
+flowApi:
+  replicaCount: 1
+  version: stable-v0.37.5@sha256:9fc41a955674c0ea7542e56278daaf10f37954a83b6ce4d7c0c8174757b6f86a
+flowWorker:
+  replicaCount: 1
+  version: stable-v0.37.5@sha256:2f284658fb57a35cd92ab35205f0158a04971373ce1c96332b1d315026a04078
+flowSnapshotWorker:
+  replicaCount: 1
+  version: stable-v0.37.5@sha256:6524767f749548caf9ac1e7379485922cda8866f662390531531093dff4c3432
+pyroscope:
+  enabled: false
+datadog:
+  enabled: false
+global:
+  peerdb:
+    enterprise:
+      saveCustomerValuesAsSecret: false

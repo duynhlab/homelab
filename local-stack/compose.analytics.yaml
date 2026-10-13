@@ -1,0 +1,135 @@
+# RFC-0030 qualification only. Always use project rfc0030-phase0.
+# Credentials below are disposable fixtures, never cluster credentials.
+x-peerdb-env: &peerdb-env
+  PEERDB_CATALOG_HOST: postgres
+  PEERDB_CATALOG_PORT: "5432"
+  PEERDB_CATALOG_USER: peerdb_catalog
+  PEERDB_CATALOG_PASSWORD: peerdb-catalog-local
+  PEERDB_CATALOG_DATABASE: peerdb_catalog
+  TEMPORAL_HOST_PORT: temporal:7233
+  PEERDB_TEMPORAL_NAMESPACE: peerdb
+  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ACCESS_KEY_ID: analytics-local
+  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_SECRET_ACCESS_KEY: analytics-local-secret
+  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_REGION: us-east-1
+  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ENDPOINT_URL_S3: http://analytics-staging:9000
+  PEERDB_CLICKHOUSE_AWS_S3_BUCKET_NAME: peerdb-staging
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.9@sha256:387ebbcca253026def04dc79e83d2323ac7d97bf309ddd090a8a3c702573e01a
+    environment:
+      # Disposable bootstrap may create scoped ingest/read users.
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+
+  postgres:
+    image: localhost/rfc0030-postgres:18.6-cron
+    build: ./analytics/postgres
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_slot_wal_keep_size=1GB
+      - -c
+      - shared_preload_libraries=pg_cron
+      - -c
+      - cron.database_name=postgres
+      - -c
+      - cron.use_background_workers=on
+      - -c
+      - cron.enable_superuser_jobs=off
+      - -c
+      - cron.max_running_jobs=4
+      - -c
+      - cron.timezone=UTC
+      - -c
+      - max_worker_processes=16
+    volumes:
+      - ./analytics/postgres/catalog.sql:/docker-entrypoint-initdb.d/20-analytics.sql:ro
+
+  analytics-temporal-bootstrap:
+    image: temporalio/admin-tools:1.32.1@sha256:9ef0dc5b063bf4ffd5c1512de72e0e73e225bd2c7006a18ce69bd592a8862a83
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        temporal operator namespace describe --namespace peerdb >/dev/null 2>&1 ||
+          temporal operator namespace create --namespace peerdb --retention 168h
+        # Namespace registration returns before every frontend cache sees it.
+        n=0
+        until temporal operator search-attribute list --namespace peerdb > /tmp/attributes 2>/dev/null; do
+          n=$$((n + 1)); [ "$$n" -lt 60 ] || exit 1; sleep 2
+        done
+        grep -w MirrorName /tmp/attributes >/dev/null ||
+          temporal operator search-attribute create --namespace peerdb --name MirrorName --type Text
+    environment: { TEMPORAL_ADDRESS: "temporal:7233" }
+    depends_on:
+      temporal: { condition: service_healthy }
+    restart: "no"
+
+  analytics-catalog-migrate:
+    image: ghcr.io/peerdb-io/peerdb-server:stable-v0.37.5@sha256:24f4ac833b238453e0dcf801e84b936b2693a276fdb8e7456f847876d67c947d
+    environment:
+      <<: *peerdb-env
+      PEERDB_MIGRATIONS_ONLY: "true"
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  analytics-staging:
+    image: rustfs/rustfs:1.0.1@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c
+    environment:
+      RUSTFS_ACCESS_KEY: analytics-local
+      RUSTFS_SECRET_KEY: analytics-local-secret
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_OBS_LOGGER_LEVEL: warn
+    volumes:
+      - analytics-staging:/data
+
+  analytics-staging-bootstrap:
+    image: amazon/aws-cli:2.37.12@sha256:ce44b800602264c12298bbf3399055a4cefdb9ed4a098abe564afe26e7071bce
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        n=0
+        until aws --endpoint-url http://analytics-staging:9000 s3api list-buckets >/dev/null 2>&1; do
+          n=$$((n + 1)); [ "$$n" -lt 60 ] || exit 1; sleep 2
+        done
+        aws --endpoint-url http://analytics-staging:9000 s3api head-bucket --bucket peerdb-staging 2>/dev/null ||
+          aws --endpoint-url http://analytics-staging:9000 s3api create-bucket --bucket peerdb-staging
+    environment:
+      AWS_ACCESS_KEY_ID: analytics-local
+      AWS_SECRET_ACCESS_KEY: analytics-local-secret
+      AWS_DEFAULT_REGION: us-east-1
+    depends_on:
+      analytics-staging: { condition: service_started }
+    restart: "no"
+
+  analytics-flow-api:
+    image: ghcr.io/peerdb-io/flow-api:stable-v0.37.5@sha256:9fc41a955674c0ea7542e56278daaf10f37954a83b6ce4d7c0c8174757b6f86a
+    environment: *peerdb-env
+    ports: ["127.0.0.1:8113:8113"]
+    depends_on:
+      analytics-catalog-migrate: { condition: service_completed_successfully }
+      analytics-temporal-bootstrap: { condition: service_completed_successfully }
+      analytics-staging-bootstrap: { condition: service_completed_successfully }
+
+  analytics-flow-worker:
+    image: ghcr.io/peerdb-io/flow-worker:stable-v0.37.5@sha256:2f284658fb57a35cd92ab35205f0158a04971373ce1c96332b1d315026a04078
+    environment: *peerdb-env
+    depends_on:
+      analytics-flow-api: { condition: service_started }
+
+  analytics-snapshot-worker:
+    image: ghcr.io/peerdb-io/flow-snapshot-worker:stable-v0.37.5@sha256:6524767f749548caf9ac1e7379485922cda8866f662390531531093dff4c3432
+    environment: *peerdb-env
+    depends_on:
+      analytics-flow-api: { condition: service_started }
+
+volumes:
+  analytics-staging:

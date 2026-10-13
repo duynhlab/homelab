@@ -3,14 +3,18 @@
 | | |
 |---|---|
 | **RFC** | RFC-0030 |
-| **Status** | researching → PeerDB research gate passed with provisional RFC |
+| **Status** | Research gate passed; RFC and ADR-066–069 Accepted; Phase 0 in progress |
 | **Scope** | platform-wide |
 | **Created** | 2026-09-06 |
 | **Last updated** | 2026-09-08 |
 
 > **Research only.** PeerDB, `pg_cron`, commerce objects, and analytics workloads
-> are **reference — not deployed** until the RFC and resulting ADRs are accepted
-> and implementation is verified.
+> describe the accepted target, **planned — not deployed**. See
+> [Phase 0 qualification](./phase0.md) for current prototype evidence.
+
+Repository baseline checked on 2026-10-13: manifests now select PostgreSQL 18.6,
+ClickHouse 26.9 and Kind 1.35.8. This refresh is repository evidence, not a
+repeat of the September upstream/runtime qualification.
 
 ## Table of contents
 
@@ -97,17 +101,17 @@ and heartbeats are database-local even though `order`, `checkout`, and
 
 | Component | Responsibility | Candidate state |
 |-----------|----------------|-----------------|
-| Three CNPG `Publication` resources | Reconcile reviewed tables, columns, operations as GitOps | reference — not deployed |
-| Three PeerDB source logins | Snapshot and logical replication for one database each | reference — not deployed |
-| One `pg_cron` scheduler plus three heartbeat rows/jobs | Prove the complete idle-traffic path without an external writer workload | reference — not deployed |
-| PeerDB flow/snapshot workers | Initial copy, WAL consumption, staging, ClickHouse load | reference — not deployed |
-| PeerDB control API/server | Mirror lifecycle; cluster-internal only | reference — not deployed |
-| PeerDB catalog | Dedicated database/role on `platform-db` | reference — not deployed |
-| Temporal namespace `peerdb` | Isolated workflows on the deployed Temporal server | reference — not deployed |
-| RustFS `peerdb-staging` | Dedicated bucket, identity, quota, lifecycle | reference — not deployed |
-| ClickHouse raw tables | PeerDB versions and tombstones | reference — not deployed |
-| ClickHouse serving model | Latest-live rows and commerce aggregates | reference — not deployed |
-| `analytics-service` | Staff read API and reconciliation command | reference — not deployed |
+| Three CNPG `Publication` resources | Reconcile reviewed tables, columns, operations as GitOps | planned — not deployed |
+| Three PeerDB source logins | Snapshot and logical replication for one database each | planned — not deployed |
+| One `pg_cron` scheduler plus three heartbeat rows/jobs | Prove the complete idle-traffic path without an external writer workload | planned — not deployed |
+| PeerDB flow/snapshot workers | Initial copy, WAL consumption, staging, ClickHouse load | planned — not deployed |
+| PeerDB control API/server | Mirror lifecycle; cluster-internal only | planned — not deployed |
+| PeerDB catalog | Dedicated database/role on `platform-db` | planned — not deployed |
+| Temporal namespace `peerdb` | Isolated workflows on the deployed Temporal server | planned — not deployed |
+| RustFS `peerdb-staging` | Dedicated bucket, identity, quota, lifecycle | planned — not deployed |
+| ClickHouse raw tables | PeerDB versions and tombstones | planned — not deployed |
+| ClickHouse serving model | Latest-live rows and commerce aggregates | planned — not deployed |
+| `analytics-service` | Staff read API and reconciliation command | planned — not deployed |
 
 The upstream Kubernetes shape includes `flow-worker`,
 `flow-snapshot-worker`, `flow-api`, `peerdb-ui`, and `peerdb-server`, plus a
@@ -117,44 +121,47 @@ both PeerDB and ClickHouse must reach the staging endpoint.
 ## Core mechanism
 
 This diagram answers one question: **how do three database-local streams reach
-the serving model?** Every CDC-specific object is reference-only.
+the serving model?** Every CDC-specific object is planned and not deployed.
 
 ```mermaid
 flowchart LR
+  subgraph CLUSTER["Homelab cluster — planned CDC topology"]
   subgraph PG["product-db — deployed CNPG"]
-    CRON["pg_cron scheduler<br/>reference — primary only"]
-    ORD[("order<br/>publication + slot + heartbeat<br/>reference")]
-    CHECK[("checkout<br/>publication + slot + heartbeat<br/>reference")]
-    PAY[("payment<br/>publication + slot + heartbeat<br/>reference")]
+    CRON["pg_cron scheduler<br/>planned — primary only"]
+    ORD[("order<br/>publication + slot + heartbeat<br/>planned")]
+    CHECK[("checkout<br/>publication + slot + heartbeat<br/>planned")]
+    PAY[("payment<br/>publication + slot + heartbeat<br/>planned")]
   end
 
   RW["product-db-rw<br/>deployed primary Service"]
 
-  subgraph PDB["PeerDB — reference, not deployed"]
-    FLOW["flow workers<br/>three mirrors"]
-    SNAP["snapshot worker"]
-    CTRL["flow API / server"]
-    CAT[("catalog<br/>platform-db")]
-    TEMP["Temporal<br/>namespace peerdb"]
-    STAGE[("RustFS<br/>peerdb-staging")]
+  subgraph PDB["PeerDB — planned"]
+    FLOW["flow workers<br/>three mirrors — planned"]
+    SNAP["snapshot worker<br/>planned"]
+    CTRL["flow API / server<br/>planned"]
+    CAT[("catalog<br/>platform-db — planned")]
+    TEMP["Temporal<br/>namespace peerdb — planned"]
+    STAGE[("RustFS<br/>peerdb-staging — planned")]
   end
 
   subgraph CH["ClickHouse — deployed engine"]
-    RAW[("versioned raw tables<br/>reference")]
-    SERVE[("latest-live serving model<br/>reference")]
+    RAW[("versioned raw tables<br/>planned")]
+    SERVE[("latest-live serving model<br/>planned")]
   end
 
-  API["analytics-service<br/>reference"]
+  API["analytics-service<br/>planned"]
 
-  CRON -.->|"30-second UPSERT<br/>reference"| ORD & CHECK & PAY
-  ORD & CHECK & PAY -.->|"database-local pgoutput<br/>reference"| RW
-  RW -.->|"direct TLS<br/>reference"| FLOW
-  SNAP --- FLOW
-  FLOW --- CTRL & CAT & TEMP
-  FLOW -.->|"stage batches<br/>reference"| STAGE
-  STAGE -.->|"ClickHouse reads objects<br/>reference"| RAW
-  RAW -.->|"argMax then tombstone filter<br/>reference"| SERVE
-  SERVE -.->|"bounded SELECT<br/>reference"| API
+  CRON -.->|"30-second UPSERT<br/>planned"| ORD & CHECK & PAY
+  ORD & CHECK & PAY -.->|"database-local pgoutput<br/>planned"| RW
+  RW -.->|"direct TLS<br/>planned"| FLOW
+  SNAP -.->|"snapshot coordination<br/>planned"| FLOW
+  FLOW -.->|"control and workflow state<br/>planned"| CTRL & CAT & TEMP
+  FLOW -.->|"stage batches<br/>planned"| STAGE
+  STAGE -.->|"ClickHouse reads objects<br/>planned"| RAW
+  RAW -.->|"argMax then tombstone filter<br/>planned"| SERVE
+  SERVE -.->|"bounded SELECT<br/>planned"| API
+
+  end
 
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
@@ -163,7 +170,7 @@ flowchart LR
 ```
 
 **Legend** — green: deployed data boundary · dashed border/dotted edge:
-reference, not deployed.
+planned, not deployed.
 
 ### Initial snapshot and catch-up
 
@@ -326,12 +333,12 @@ preloading a library absent from the image prevents PostgreSQL startup and
 cannot be self-healed by the operator.
 
 1. Derive a custom system image from the exact deployed PostgreSQL
-   `18.1-system-trixie` base, install the PGDG `postgresql-18-cron` package, scan
+   `18.6-system-trixie` base, install the PGDG `postgresql-18-cron` package, scan
    it, and pin the resulting image by digest. Use the compatible image on both
    `product-db` and `product-db-replica`; `platform-db` does not need it.
-   ImageVolume delivery is deferred because the current Kubernetes 1.34 Kind
-   cluster does not enable its required feature gate and the platform has no
-   extension image/catalog supply chain.
+   ImageVolume delivery remains outside ADR-068: the current Kind 1.35.8
+   baseline supports the feature, but this extension has no approved
+   image/catalog delivery chain. The accepted custom-system-image path remains.
 2. Before changing preload, verify `pg_cron.so`, its control/SQL files, and a
    `pg_available_extensions` row on every supported architecture. Restore a
    backup with the same image to prove the artifact is present in recovery.
@@ -440,13 +447,13 @@ and the API returns `503`.
 
 | Aspect | Platform today | Candidate delta |
 |--------|----------------|-----------------|
-| Product DB | CNPG PostgreSQL 18.1, three instances, synchronous `ANY 1` | Three direct-primary PeerDB connections |
+| Product DB | CNPG PostgreSQL 18.6, three instances, synchronous `ANY 1` | Three direct-primary PeerDB connections |
 | Logical settings | `wal_level=logical`, `max_wal_senders=10`, slot sync settings enabled | Size slots/senders/WAL cap; prove external slot failover |
 | HBA/pooling | Exact pairs then reject-all; PgDog for app traffic | Exact PeerDB pairs; CDC bypasses PgDog; background-worker heartbeat adds no HBA pair |
 | Temporal | Deployed with PostgreSQL persistence | Dedicated namespace `peerdb` |
 | RustFS | Backups and ClickHouse cold tier | Dedicated staging bucket/identity |
 | `platform-db` | Hosts platform databases | Dedicated PeerDB catalog DB/role |
-| ClickHouse | 26.7, 1 shard × 3 replicas, `otel` data | Isolated commerce raw/serving objects |
+| ClickHouse | 26.9, 1 shard × 3 replicas, `otel` data | Isolated commerce raw/serving objects |
 | Extensions | `pgaudit`, `pg_stat_statements`, `auto_explain`; limited `pgcrypto`/`uuid-ossp`; system-image packaging | Custom system image plus `pg_cron` preload and one activation in `postgres` |
 | PeerDB | Not deployed | New stateful control/worker plane |
 
@@ -620,7 +627,7 @@ network path to perform three fixed-row updates.
 
 ## Remaining validation
 
-Before `Accepted`:
+Mandatory Phase 0 qualification before rollout:
 
 1. Pin a compatible released chart/image pair and digests. The audit found core
    v0.37.5 while released enterprise chart v0.9.16 packages an older app.
@@ -679,7 +686,8 @@ No. It is the oldest of three independently target-observed heartbeats.
 
 ### What if PeerDB fails the prototype?
 
-The RFC remains provisional and may explicitly return to batch. Both transports
+Reopen the accepted transport decision if the prototype fails a hard gate.
+Returning to batch requires an explicit revised decision; the two transports
 will not run in parallel.
 
 ## References
@@ -751,13 +759,13 @@ gate.
 | Real problem and bounded consumer | Pass |
 | Metric authority | Pass |
 | Source schema and PII boundary | Pass with accepted table-read drawback |
-| PeerDB mechanism and dependencies | Pass for provisional RFC |
+| PeerDB mechanism and dependencies | Pass for accepted architecture; runtime qualification pending |
 | Freshness authority | Pass for design via target heartbeat |
 | Platform and extension reality | Pass for custom-image `pg_cron` design; runtime prototype remains open |
 | Context7 plus primary sources | Pass |
 | Failure, security, and rollback | Pass |
-| Production acceptance evidence | Open by design; eleven prototype gates block `Accepted` |
+| Production acceptance evidence | Open; eleven prototype gates block rollout |
 
-This research is sufficient for RFC-0030 to remain **provisional** and enter
-architecture/prototype review. It is not evidence that PeerDB is installed,
-compatible, or production-ready.
+RFC-0030 and ADR-066–069 were accepted on 2026-09-09. The remaining
+validation now belongs to implementation Phase 0, not architecture acceptance.
+It is not evidence that PeerDB is installed, compatible, or production-ready.

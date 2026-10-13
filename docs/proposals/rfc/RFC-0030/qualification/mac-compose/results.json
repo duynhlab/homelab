@@ -1,0 +1,95 @@
+{
+  "scope": "Compose only; not CNPG qualification",
+  "project": "rfc0030-phase0",
+  "input_sha256": {
+    "local-stack/analytics/control.py": "ae85dded8924901a4a73f5f05b48eed928dbd19b28669918c94a8431007029ea",
+    "local-stack/analytics/allowlist.json": "db5ca41120587b5e18290487cb985d32ab6538c3fe730d7f3753619337e98417",
+    "local-stack/compose.analytics.yaml": "5e3dde4e787d6b42d6288c2e5410ab05061ef8da7015582ba8a5b250aaa6aedb",
+    "local-stack/analytics/postgres/Dockerfile": "c4897dcb23bec5810f0432abcc6f8706a55bef38699c92d479baf8ad94a6d922"
+  },
+  "dirty_status": {
+    "homelab": "M CHANGELOG.md\n M Makefile\n M docs/README.md\n M docs/proposals/rfc/RFC-0030/README.md\n M docs/proposals/rfc/RFC-0030/research.md\n M local-stack/README.md\n?? docs/proposals/rfc/RFC-0030/phase0.md\n?? docs/proposals/rfc/RFC-0030/qualification/\n?? local-stack/analytics/\n?? local-stack/compose.analytics.yaml\n?? tasks/",
+    "order-service": "",
+    "checkout-service": "",
+    "payment-service": ""
+  },
+  "source_shas": {
+    "homelab": "66ba6684e85c796e2ae952e6f4fd1c2ccc670f19",
+    "order-service": "ff7afe041a720127d6ebf691997d96f72d872520",
+    "checkout-service": "5ab15c6cb0e96c7e7deb832cf657c4925b9abe25",
+    "payment-service": "7672982380b39ba9ae3209d2fd2ccc6b40542aa2"
+  },
+  "timestamp_utc": "2026-10-13T07:01:57Z",
+  "rows": [
+    {
+      "gate": "snapshot counts and ledger sum",
+      "result": "PASS",
+      "duration_seconds": 1.439
+    },
+    {
+      "gate": "source roles and cron jobs",
+      "result": "PASS",
+      "duration_seconds": 0.974
+    },
+    {
+      "gate": "reader view access and raw/write denial",
+      "result": "PASS",
+      "duration_seconds": 0.211
+    },
+    {
+      "gate": "raw column allowlist and PII fixture",
+      "result": "PASS",
+      "duration_seconds": 1.382
+    },
+    {
+      "gate": "retained snapshot staging PII exclusion",
+      "result": "PASS",
+      "duration_seconds": 2.053
+    },
+    {
+      "gate": "three target-observed heartbeats",
+      "result": "PASS",
+      "duration_seconds": 0.442
+    },
+    {
+      "gate": "CDC updates, NULLs and deletes",
+      "result": "PASS",
+      "duration_seconds": 53.742
+    },
+    {
+      "gate": "worker restart and latest-row uniqueness",
+      "result": "PASS",
+      "duration_seconds": 129.007
+    },
+    {
+      "gate": "target stale and unavailable classification",
+      "result": "PASS",
+      "duration_seconds": 65.978
+    },
+    {
+      "gate": "analytics-staging outage and catch-up",
+      "result": "PASS",
+      "duration_seconds": 142.577
+    },
+    {
+      "gate": "clickhouse outage and catch-up",
+      "result": "PASS",
+      "duration_seconds": 200.418
+    },
+    {
+      "gate": "post-recovery raw PII exclusion",
+      "result": "PASS",
+      "duration_seconds": 1.51
+    },
+    {
+      "gate": "post-CDC staging PII exclusion",
+      "result": "PASS",
+      "duration_seconds": 5.483
+    },
+    {
+      "gate": "PeerDB logs exclude PII fixture",
+      "result": "PASS",
+      "duration_seconds": 0.191
+    }
+  ]
+}

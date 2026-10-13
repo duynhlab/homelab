@@ -224,6 +224,10 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0030 Phase 0 prototype.** Add an opt-in PeerDB Compose overlay,
+  allowlisted source bootstrap, target heartbeat checks and Linux handoff gates.
+  Keep the accepted architecture separate from pending cluster qualification.
+
 - **RFC-0011 refreshed; ADR-087 proposed for homelab access.** Correct the
   M720q disk assumptions, replace unverified capacity and purchase claims with
   qualification gates, and review every open design question against the current

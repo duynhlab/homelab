@@ -1,0 +1,22 @@
+{
+  "scope": "Compose copied schema; explicit pause/termination/new snapshot, not automatic propagation or CNPG",
+  "input_sha256": {
+    "ddl.py": "db6443c66d807a72b7657a9d2a399ac545a80bc780cf0f67485b9bf21482bb7f",
+    "control.py": "ae85dded8924901a4a73f5f05b48eed928dbd19b28669918c94a8431007029ea"
+  },
+  "timestamp_utc": "2026-10-13T07:08:13Z",
+  "rows": [
+    {
+      "gate": "baseline schema copy, pause and deliberate slot removal",
+      "result": "PASS"
+    },
+    {
+      "gate": "add excluded column and change varchar to text, then resnapshot",
+      "result": "PASS"
+    },
+    {
+      "gate": "drop mapped column, update contract and resnapshot",
+      "result": "PASS"
+    }
+  ]
+}

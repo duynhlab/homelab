@@ -1,0 +1,32 @@
+{
+  "postgres": {
+    "image": "localhost/rfc0030-postgres:18.6-cron",
+    "image_id": "195696fc55378c104f782457266c42cec5c38406859d416d88fd69279bea0404",
+    "architecture": "arm64"
+  },
+  "clickhouse": {
+    "image": "docker.io/clickhouse/clickhouse-server:26.9",
+    "image_id": "18bc880f0bfb6ca246b58fd6661f3929a927edc09b8e0d7de1cdfc4a4a7655df",
+    "architecture": "arm64"
+  },
+  "analytics-flow-api": {
+    "image": "ghcr.io/peerdb-io/flow-api@sha256:9fc41a955674c0ea7542e56278daaf10f37954a83b6ce4d7c0c8174757b6f86a",
+    "image_id": "d9fe2a1180e8acbb786cdc74e03485511109f5cb4b0500338f702b6ba195e5bb",
+    "architecture": "arm64"
+  },
+  "analytics-flow-worker": {
+    "image": "ghcr.io/peerdb-io/flow-worker@sha256:2f284658fb57a35cd92ab35205f0158a04971373ce1c96332b1d315026a04078",
+    "image_id": "933d0e701985d6cdb4516c3746865efde7df16a48f8fe0d7ac17ca427a422cc6",
+    "architecture": "arm64"
+  },
+  "analytics-snapshot-worker": {
+    "image": "ghcr.io/peerdb-io/flow-snapshot-worker@sha256:6524767f749548caf9ac1e7379485922cda8866f662390531531093dff4c3432",
+    "image_id": "21c685e2eda5f0911263a745353b425a8386abbba1b8936b607fd766f94a6654",
+    "architecture": "arm64"
+  },
+  "analytics-staging": {
+    "image": "docker.io/rustfs/rustfs@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c",
+    "image_id": "6024cc1b5bb731a1d1dbd80e85b271917eac6766554605e565bfb6e25e583f2e",
+    "architecture": "arm64"
+  }
+}

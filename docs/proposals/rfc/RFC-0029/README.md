@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-06 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-14 |
 
 > **Don't forget: every decision is a tradeoff.** The cost of the leading
 > direction is more Secrets, more HBA pairs and a coordinated consumer cutover
@@ -147,6 +147,16 @@ manage and the executor it needs.
 roles; existing data moves to the owner role once per service by an operator
 runbook, while new clusters are born correct.
 
+**Amended 2026-10-12** ([ADR-088](../../adr/ADR-088-platform-owns-database-authorization/),
+superseding ADR-085): authorization is **platform-owned**, not service-owned.
+The owner paused Phase 3 because the service-migration design put role names,
+`SET ROLE` and grants into every service repo. A role catalog Job (as
+`authz_admin`, re-run every 10 minutes) creates the owner and migrator and makes
+the migrator the owner at login (`role=`); in-database grants are applied by
+that Job (`review`) or by pgroles (the rest, D2). Services receive credentials
+only. The pgroles "runner-up" verdict above was re-examined in a lab: it is
+adopted for in-database grants, and still rejected for roles.
+
 ## Architecture & Diagrams
 
 This diagram answers who connects as which identity for one service once the
@@ -183,8 +193,8 @@ flowchart LR
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
-This one answers the order of work. Phases 0–2 are done; the rest is
-**planned**.
+This one answers the order of work. Phases 0–2 and the redesign decision are
+done; the rest is **planned**.
 
 ```mermaid
 flowchart LR
@@ -192,10 +202,13 @@ flowchart LR
     p0g["Phase 0 step 6 · membership guard<br/>done 2026-10-06 on Kind"]:::data
     p1["Phase 1 · lab + policy contract<br/>done 2026-10-06"]:::data
     p2["Phase 2 · canary review<br/>done 2026-10-08 on Kind"]:::data
-    p3["Phase 3 · fleet by domain<br/>local-stack parity, drift evidence (planned)"]:::platform
+    pr["Redesign · platform-owned authorization<br/>ADR-088, lab 2026-10-12"]:::data
+    d1["D1 · executor + catalog Job, review<br/>(planned)"]:::platform
+    d2["D2 · user, shipping, notification on pgroles<br/>(planned)"]:::platform
+    p3["Phase 3 · product-db by domain<br/>(planned)"]:::platform
     p4["Phase 4 · RLS / definer / IAM<br/>only on a real use case (planned)"]:::platform
 
-    p0 --> p0g --> p1 --> p2 --> p3 -. "only if needed" .-> p4
+    p0 --> p0g --> p1 --> p2 --> pr --> d1 --> d2 --> p3 -. "only if needed" .-> p4
 
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
@@ -314,8 +327,9 @@ Resolved in Phase 1 (2026-10-06, owner):
 | Decision | ADR | Status |
 |----------|-----|--------|
 | Three service roles (owner/migrator/runtime) replace the single login/owner role; amends ADR-013 | [`ADR-084`](../../adr/ADR-084-split-service-database-roles/) | Accepted |
-| Object ACLs and default privileges are owned by service migrations after `SET ROLE <svc>_owner` | [`ADR-085`](../../adr/ADR-085-service-migrations-own-authorization/) | Accepted |
+| Object ACLs and default privileges are owned by service migrations after `SET ROLE <svc>_owner` | [`ADR-085`](../../adr/ADR-085-service-migrations-own-authorization/) | Superseded by ADR-088 |
 | PG18 membership options are guarded by a CNPG monitoring query and alert | [`ADR-086`](../../adr/ADR-086-guard-membership-options/) | Accepted |
+| The platform applies authorization: role catalog Job for roles, Job or pgroles for in-database grants; services know credentials only | [`ADR-088`](../../adr/ADR-088-platform-owns-database-authorization/) | Accepted |
 
 ## Implementation History
 
@@ -336,6 +350,14 @@ Resolved in Phase 1 (2026-10-06, owner):
   `v2.5.0`). Fresh Kind: sweep 84/84, K3.7 2/2, K3.8–K3.9 10/10, `make e2e`
   146/146, drift drill on the new edge; local-stack audit A1–A23, B1–B10,
   C0–C22 PASS.
+- 2026-10-09 — Phase 3 wave 1 paused by the owner before merge (user, shipping,
+  notification PRs closed later): role knowledge does not belong in services.
+- 2026-10-12 — Redesign accepted after a Kind lab (pgroles 0.13.0, CNPG 1.30.1):
+  ADR-088 supersedes ADR-085. pkg `migratex/v0.39.0` removes `WithSetRole`;
+  review-service #208 drops `DB_MIGRATION_ROLE` and `000004_authorization`.
+- 2026-10-14 — D1 opened: `authz_admin` + `db_authz` executor (CNPG creates a
+  role with `IN ROLE`, so one CNPG-managed executor would deadlock a new
+  cluster), role catalog Job + CronJob, review moved onto it, guard extended.
 
 ## Related
 

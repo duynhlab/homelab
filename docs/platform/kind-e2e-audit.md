@@ -710,21 +710,21 @@ cannot be derived from a single file — they get their own row (K2.3).
   not runnable while this is off.
   Reference: [`mcp-servers.md`](mcp-servers.md).
 
-- [ ] **K3.7** Guarded database memberships have not drifted
-  ([ADR-086](../proposals/adr/ADR-086-guard-membership-options/)). CNPG
-  declares only a membership's name, so the PG18 `ADMIN` / `INHERIT` / `SET`
-  options of security-relevant edges are watched by the `pg_role_membership`
-  custom query. Asserted by `make e2e-smoke` (`smoke.js`, `GUARDED_EDGES`):
-  every guarded edge reports a series, and `max(cnpg_pg_role_membership_drift)`
-  is `0`. The guarded edges are `vault_rotator → notification` and
-  `review_migrator → review_owner`; each RFC-0029 cutover adds its
-  `<svc>_migrator → <svc>_owner` edge to the query and to `GUARDED_EDGES` in the
-  same PR.
-  **FAIL:** a guarded edge with no series (the query or exporter is broken, see
-  [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md))
-  or a drift of `1` (repair with
-  [`CNPGRoleMembershipDrift`](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md);
-  do not relax the row).
+- [ ] **K3.7** Guarded database authorization has not drifted
+  ([ADR-086](../proposals/adr/ADR-086-guard-membership-options/),
+  [ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/)).
+  Three custom queries watch what CNPG cannot declare: `pg_role_membership`
+  (PG18 `ADMIN` / `INHERIT` / `SET` of guarded edges), `pg_role_config` (each
+  migrator's `role=<owner>`) and `pg_default_privileges` (each Job-owned
+  database's owner defaults). Asserted by `make e2e-smoke` (`smoke.js`): every
+  guarded edge, role and database reports, and every drift series is `0`. The
+  guarded edges are `vault_rotator → notification`, `review_migrator →
+  review_owner` and `db_authz → authz_admin`; each conversion adds its rows to
+  the queries and to `smoke.js` in the same PR.
+  **FAIL:** a missing series (the query or exporter is broken, see
+  [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md),
+  [`CNPGAuthorizationGuardMissing`](../observability/runbooks/postgresql/CNPGAuthorizationGuardMissing.md))
+  or a drift of `1` (repair with the matching runbook; do not relax the row).
 
 - [ ] **K3.8** The runtime login cannot change its schema (RFC-0029). As
   `<svc>_runtime`, through `pg_hba`: it reads its table, and `CREATE TABLE`,
@@ -733,14 +733,26 @@ cannot be derived from a single file — they get their own row (K2.3).
   `./scripts/db-authz-check.sh` (every converted service; today `review`).
   **FAIL:** any `K3.8-*` check not `PASS`, or fewer checks parsed than expected.
 
-- [ ] **K3.9** The migrator creates nothing as itself (RFC-0029). As
-  `<svc>_migrator`: `CREATE TABLE` is refused until `SET ROLE <svc>_owner` and
-  succeeds after it (in a rolled-back transaction); no relation in `public` is
-  owned by anyone but `<svc>_owner` (extension members such as
-  `pg_stat_statements`, created by CNPG as `postgres`, excepted); the membership reads `f/f/t`. Same script
-  as K3.8.
+- [ ] **K3.9** The migrator is the owner from login (RFC-0029, ADR-088). As
+  `<svc>_migrator`, with no `SET ROLE` anywhere: `current_user` is
+  `<svc>_owner` at login and after `RESET ROLE`; its `rolconfig` is
+  `role=<svc>_owner`; `CREATE TABLE` succeeds (rolled back); no relation in
+  `public` is owned by anyone but `<svc>_owner` (extension members such as
+  `pg_stat_statements`, created by CNPG as `postgres`, excepted); the membership
+  reads `f/f/t`. Same script as K3.8.
   **FAIL:** any `K3.9-*` check not `PASS`. An object owned by the migrator means
-  a migration ran without `SET ROLE`; fix the service, do not grant around it.
+  `role=` was missing when the migration ran: see
+  [`CNPGRoleConfigDrift`](../observability/runbooks/postgresql/CNPGRoleConfigDrift.md).
+
+- [ ] **K3.10** The role catalog converged (ADR-088).
+  `kubectl -n platform get job platform-db-authz` reads `Complete`, and the most
+  recent Job the `platform-db-authz` CronJob created succeeded
+  (`kubectl -n platform get jobs -l app.kubernetes.io/name=platform-db-authz`);
+  its log ends with `authz applied: roles [...] grants [...]`.
+  **FAIL:** a failed run. The log names the service and the statement; a
+  `permission denied to revoke privileges granted by role "postgres"` is drift
+  only an operator can remove (see
+  [`authorization.md`](../databases/authorization.md#the-role-catalog-job)).
 
 ---
 

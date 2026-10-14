@@ -1,17 +1,19 @@
 # Database Authorization (owner / migrator / runtime)
 
 Every service database has three roles: one owns the objects, one changes the
-schema, and one serves traffic. A compromised service can read and write its
-own rows; it cannot change, drop or take ownership of its own schema.
+schema, and one serves traffic. The platform creates them and decides what each
+may do; a service only receives a user name and a password. A compromised
+service can read and write its own rows; it cannot change, drop or take
+ownership of its own schema.
 
 | | |
 |---|---|
-| **Status** | **Deployed for `review`** (Phase 2 canary). Every other service still uses one login that owns its database until Phase 3 converts it |
-| **Design records** | [RFC-0029](../proposals/rfc/RFC-0029/) · [ADR-084](../proposals/adr/ADR-084-split-service-database-roles/) (three roles) · [ADR-085](../proposals/adr/ADR-085-service-migrations-own-authorization/) (migrations own grants) · [ADR-086](../proposals/adr/ADR-086-guard-membership-options/) (membership guard) |
-| **Roles per service** | `<svc>_owner` (NOLOGIN) · `<svc>_migrator` (LOGIN, NOINHERIT) · `<svc>_runtime` (LOGIN) |
-| **Identity lifecycle** | CNPG `DatabaseRole` + `Database`, passwords from OpenBAO through ESO |
-| **Object grants** | The service's own migrations, run as the owner through `migratex.WithSetRole` (`duynhlab/pkg`) |
-| **Drift detection** | `pg_role_membership` custom query + `CNPGRoleMembershipDrift` alert, and Kind gate rows |
+| **Status** | **Deployed for `review`**. Every other service still uses one login that owns its database until it is converted |
+| **Design records** | [RFC-0029](../proposals/rfc/RFC-0029/) · [ADR-084](../proposals/adr/ADR-084-split-service-database-roles/) (three roles) · [ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/) (the platform owns authorization; supersedes ADR-085) · [ADR-086](../proposals/adr/ADR-086-guard-membership-options/) (guard) |
+| **Roles per service** | `<svc>_owner` (NOLOGIN) · `<svc>_migrator` (LOGIN, NOINHERIT, `role=<svc>_owner`) · `<svc>_runtime` (LOGIN) |
+| **Who applies what** | CNPG: runtime login, database, `pg_hba`, `db_authz` · role catalog Job + CronJob: owner, migrator, memberships, and (Job-owned services) in-database grants · pgroles: in-database grants for the other services (**planned**, D2) |
+| **What a service knows** | `DB_USER` / `DB_PASSWORD` for `migrate`/`seed` and for serving. No role name, no `GRANT`, no `SET ROLE` |
+| **Drift** | The CronJob re-applies every 10 minutes; `pg_role_membership`, `pg_role_config`, `pg_default_privileges` guards and their alerts; Kind gate rows |
 | **Rollout model** | Greenfield: no legacy login, no compatibility window. Rollback is `git revert` + a fresh `make up` |
 
 ## Concept
@@ -26,50 +28,50 @@ The split gives each job its own identity:
 | Role | Logs in | Owns | Can do |
 |---|---|---|---|
 | `<svc>_owner` | never | the database, its schemas and every object | everything on its objects, but nobody holds a password for it |
-| `<svc>_migrator` | yes, only from the `migrate` init container | nothing | nothing by itself. It is a member of the owner with `INHERIT FALSE, SET TRUE`, so it must say `SET ROLE <svc>_owner` to act as the owner |
-| `<svc>_runtime` | yes, from the service pods (through the pooler) | nothing | `SELECT/INSERT/UPDATE/DELETE` on tables and `USAGE/SELECT` on sequences, which the owner grants through default privileges |
+| `<svc>_migrator` | yes, from the `migrate` init container and the seed | nothing | becomes the owner at login: the platform sets `ALTER ROLE <svc>_migrator SET role = <svc>_owner`, and the membership is `INHERIT FALSE, SET TRUE`. `RESET ROLE` returns to the owner, not to the login |
+| `<svc>_runtime` | yes, from the service pods (through the pooler) | nothing | `SELECT/INSERT/UPDATE/DELETE` on tables and `USAGE/SELECT` on sequences, through the owner's default privileges |
 
-Three jobs keep that shape, and each has one owner:
+Everything that is not "the service's own schema" is platform work. The service
+repo creates tables and indexes in its migrations and nothing else:
 
-| Job | Owner | Why there |
-|---|---|---|
-| **A.** Create roles, passwords and memberships | CNPG `DatabaseRole` (GitOps) | Roles are cluster objects; a migration cannot create the login it connects with |
-| **B.** Grant rights on objects (`GRANT`, `ALTER DEFAULT PRIVILEGES`) | The service's migrations, run as the owner | The service knows which objects it creates; grants ship with the schema that needs them (ADR-085) |
-| **C.** Make the migration session act as the owner | `migratex.WithSetRole` in `duynhlab/pkg` | Must happen inside the session, before the first `CREATE`. Fails hard when denied |
+| Job | Owner |
+|---|---|
+| Runtime login, its password, the `Database` (`owner: <svc>_owner`), `pg_hba` | CNPG (`DatabaseRole`, `Database`, `instance.yaml`) |
+| Owner and migrator roles, the migrator's `role=`, the migrator → owner membership, the migrator's password | Role catalog Job + CronJob (`platform-db/authz/`) |
+| In-database grants: `CONNECT`, `USAGE`, the owner's default privileges, grants on existing objects, `REVOKE EXECUTE … FROM PUBLIC` | Role catalog Job for `review`; pgroles `PostgresPolicy` for the others (**planned**) |
+| The executor those jobs run as | `authz_admin` (bootstrap SQL) reached by the `db_authz` login (CNPG) |
 
 ## Architecture
 
-This diagram answers which identity each path uses on one service database. It
-shows the shape `review` runs; the other services are still on one login.
+This diagram answers which component applies which part of one service's
+authorization, and which identity each path uses. It shows `review`.
 
 ```mermaid
 flowchart LR
     subgraph cluster["Kind cluster · homelab"]
-        subgraph app["service namespace"]
-            pod["service pods<br/>as svc_runtime"]:::service
-            mig["migrate init container<br/>as svc_migrator"]:::worker
+        subgraph app["review namespace"]
+            pod["review pods<br/>as review_runtime"]:::service
+            mig["migrate init container<br/>as review_migrator → review_owner"]:::worker
         end
-        subgraph secrets["Secrets"]
-            rs["&lt;cluster&gt;-&lt;svc&gt;-runtime-secret"]:::platform
-            ms["&lt;cluster&gt;-&lt;svc&gt;-migrator-secret"]:::platform
-        end
-        subgraph db["CNPG cluster"]
-            pooler["pooler<br/>PgBouncer / PgDog"]:::data
-            rw[("primary -rw")]:::data
-            owner["svc_owner · NOLOGIN<br/>owns every object"]:::platform
-            guard["pg_role_membership query<br/>+ CNPGRoleMembershipDrift"]:::platform
+        subgraph plat["platform namespace"]
+            cnpg["CNPG<br/>DatabaseRole runtime + db_authz<br/>Database review · pg_hba"]:::platform
+            job["role catalog Job + CronJob (10 min)<br/>as db_authz → authz_admin"]:::platform
+            pooler["PgBouncer pooler"]:::data
+            rw[("platform-db primary -rw")]:::data
+            guard["guards: pg_role_membership<br/>pg_role_config · pg_default_privileges"]:::platform
         end
     end
     bao[("OpenBAO KV")]:::external
 
-    bao -->|"ESO"| rs
-    bao -->|"ESO"| ms
-    rs -->|"DB_USER / DB_PASSWORD"| pod
-    ms -->|"DB_USER / DB_PASSWORD"| mig
+    bao -->|"ESO: runtime, migrator, db_authz"| cnpg
+    bao -->|"ESO"| job
+    bao -->|"ESO: DB_USER / DB_PASSWORD"| pod
+    bao -->|"ESO: DB_USER / DB_PASSWORD"| mig
+    cnpg -->|"runtime login, database, db_authz"| rw
+    job -->|"owner, migrator, role=, edges, grants"| rw
     pod -->|"CRUD only"| pooler --> rw
-    mig -->|"direct, then SET ROLE svc_owner"| rw
-    rw -->|"objects owned by"| owner
-    guard -->|"reads pg_auth_members"| rw
+    mig -->|"direct; no SET ROLE in code"| rw
+    guard -->|"reads the catalog"| rw
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
@@ -84,14 +86,14 @@ flowchart LR
 
 | Thing | Convention | Example (`review` on `platform-db`) |
 |---|---|---|
-| Database | `<svc>` (unchanged) | `review` |
+| Database | `<svc>` | `review` |
 | Roles | `<svc>_owner`, `<svc>_migrator`, `<svc>_runtime` | `review_owner`, `review_migrator`, `review_runtime` |
-| `DatabaseRole` objects | `<cluster>-role-<svc>-owner` / `-migrator` / `-runtime` | `platform-db-role-review-runtime` |
+| Runtime `DatabaseRole` | `<cluster>-role-<svc>-runtime` | `platform-db-role-review-runtime` |
 | `Database` object | `<svc>-database`, `spec.owner: <svc>_owner` | `review-database` |
 | Secrets (cluster and app namespace, same name) | `<cluster>-<svc>-runtime-secret`, `<cluster>-<svc>-migrator-secret`; the owner has none | `platform-db-review-migrator-secret` |
 | OpenBAO KV | `secret/local/databases/<cluster>/<svc>-runtime`, `…/<svc>-migrator` | `secret/local/databases/platform-db/review-runtime` |
-| `pg_hba` | `host <svc> <svc>_runtime all scram-sha-256` and `host <svc> <svc>_migrator all scram-sha-256` (`hostssl` where the cluster already requires TLS). No line for the owner | — |
-| Guarded membership | `<svc>_migrator → <svc>_owner` = `ADMIN FALSE, INHERIT FALSE, SET TRUE` | `review_migrator → review_owner` |
+| `pg_hba` | `host <svc> <svc>_runtime …`, `host <svc> <svc>_migrator …`, `host <svc> db_authz …`. No line for the owner | — |
+| Executor | `authz_admin` (NOLOGIN, CREATEROLE) and `db_authz` (LOGIN, member of `authz_admin`), one pair per CNPG cluster | KV `…/platform-db/db-authz` |
 
 Names considered and not used:
 
@@ -99,142 +101,194 @@ Names considered and not used:
 |---|---|
 | `_app`, `_rw` | Ambiguous: `_rw` promises a `_ro` sibling that does not exist, and every role is "the app" |
 | `_deploy` | Migrations also run in local-stack and in tests, not only at deploy |
-| `_ddl` | The migrator also seeds data and writes grants, which is not DDL |
+| `_ddl` | The migrator also seeds data, which is not DDL |
 | `_admin` | Suggests `ADMIN OPTION`, which this role must never have |
 | keeping `<svc>` for runtime | A bare service name hides which of the three identities a log line, a connection or an alert refers to |
 
-The legacy `shared-db/` KV prefix that platform-db services use today is dropped
-at cutover: every path is `…/databases/<cluster>/…`.
+### The executor: `authz_admin` and `db_authz`
 
-### Role attributes
+The role catalog runs as a non-superuser. Two roles make that work with CNPG:
 
-All three `DatabaseRole`s state every attribute (adoption resets anything left
-out, CNPG-01) and use `databaseRoleReclaimPolicy: retain`.
+- **`authz_admin`** (NOLOGIN, `CREATEROLE`, `INHERIT`) is created once by the
+  cluster's bootstrap SQL and is **not** a CNPG `DatabaseRole`. It creates every
+  catalog role, so PostgreSQL 16+ gives it `ADMIN` on each one, and the session
+  setting `createrole_self_grant = 'set, inherit'` also gives it `SET` and
+  `INHERIT`, which `ALTER DEFAULT PRIVILEGES FOR ROLE <svc>_owner` needs.
+- **`db_authz`** is the login (a CNPG `DatabaseRole` with `inRoles:
+  [authz_admin]`, password random per cluster in OpenBAO). The Job connects with
+  `PGOPTIONS='-c role=authz_admin -c createrole_self_grant=set,inherit'`.
 
-| Attribute | `_owner` | `_migrator` | `_runtime` |
-|---|---|---|---|
-| `login` | `false` | `true` | `true` |
-| `inherit` | `true` | **`false`** | `true` |
-| `inRoles` | `[]` | `[<svc>_owner]` | `[]` |
-| `passwordSecret` | — | migrator Secret | runtime Secret |
-| `superuser`, `createdb`, `createrole`, `replication`, `bypassrls` | `false` | `false` | `false` |
+Why not one role: CNPG creates a `DatabaseRole` with `CREATE ROLE … IN ROLE
+<inRoles>`, so listing the owners there deadlocks a new cluster (the executor
+cannot be created before the owners it creates); and leaving them out makes
+CNPG revoke the executor's memberships on every reconcile (lab CNPG-08).
+`authz_admin` holds those memberships where CNPG never looks.
 
-`inherit: false` on the migrator is what shapes its membership without any SQL.
-CNPG grants `inRoles` with a plain `GRANT <svc>_owner TO <svc>_migrator`, and
-PostgreSQL 16+ takes an unspecified `INHERIT` option from the member's own
-`INHERIT` attribute; `SET` defaults to true and `ADMIN` to false. A NOINHERIT
-member therefore gets `f/f/t`, which is exactly the specified shape. The lab's
-CNPG-07 measured it on CNPG with PostgreSQL 18.6 on 2026-10-06, for a new edge
-and for one CNPG recreated after a manual revoke.
+An existing cluster that predates this design runs the bootstrap line once:
 
-### Passwords
+```sql
+CREATE ROLE authz_admin NOLOGIN CREATEROLE INHERIT;  -- as postgres, on the primary
+```
 
-- Generated per cluster by `openbao-bootstrap` with the same random generator
-  `vault-rotator` uses; never a literal in Git.
-- The owner has no password and no `pg_hba` line.
-- Runtime passwords can later move to OpenBAO static-role rotation (the
-  `notification` pattern A), which then targets `<svc>_runtime`.
+### The role catalog Job
+
+`platform-db/authz/` holds `apply.sh`, `roles.sql` and `grants.sql`, rendered
+into a hashed ConfigMap. Two workloads run the same script:
+
+| Workload | When | Why |
+|---|---|---|
+| `Job/platform-db-authz` | On every change to the SQL or the service lists (the ConfigMap hash changes; Flux recreates the Job) | A new service gets its roles without waiting |
+| `CronJob/platform-db-authz` | Every 10 minutes | Undoes drift. A failed run fires `KubeJobFailed`; job TTL is 1 h so the alert resolves after a fix |
+
+`ROLE_SERVICES` lists the services whose owner and migrator the catalog owns;
+`GRANT_SERVICES` lists the services whose in-database grants it owns (the rest
+will use pgroles). Per service, `roles.sql`:
+
+1. creates `<svc>_owner` and `<svc>_migrator` if missing and restates
+   `LOGIN`/`INHERIT`/`CREATEROLE`/`CONNECTION LIMIT` (`CREATEDB`, `REPLICATION`
+   and `BYPASSRLS` default to false and only a superuser can change them);
+2. `ALTER ROLE <svc>_migrator RESET ALL` then `SET role = '<svc>_owner'`;
+3. `GRANT <svc>_owner TO <svc>_migrator WITH INHERIT FALSE, SET TRUE, ADMIN FALSE`
+   (re-issuing it rewrites drifted options);
+4. revokes every other membership of the two roles, except `authz_admin`'s
+   creator edges, then **fails the run** if anything still differs: a revoke
+   PostgreSQL skipped because another grantor (for example `postgres`) holds the
+   edge is drift the executor may not repair, and a red Job is how it surfaces.
+
+The migrator's password is set only when the migrator can no longer log in with
+the Secret's value, so the verifier is not rewritten every 10 minutes.
+
+`grants.sql`, per Job-owned database, as `authz_admin` inheriting the owner:
+
+```sql
+GRANT CONNECT ON DATABASE <svc> TO <svc>_runtime, <svc>_migrator;
+GRANT USAGE ON SCHEMA public TO <svc>_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE <svc>_owner IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <svc>_runtime;
+ALTER DEFAULT PRIVILEGES FOR ROLE <svc>_owner IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO <svc>_runtime;
+-- Global, not IN SCHEMA: only a global entry cancels PUBLIC EXECUTE (PG-05).
+ALTER DEFAULT PRIVILEGES FOR ROLE <svc>_owner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+-- then, for every table and sequence the owner already has: REVOKE ALL from
+-- the runtime and grant exactly the set above, in one transaction;
+-- schema_migrations gets nothing.
+```
+
+The owner's default privileges also hand `schema_migrations` to the runtime
+when golang-migrate creates it after the first Job run; the next CronJob run
+revokes it (a window of at most 10 minutes on a new database).
 
 ### Wiring in the domain ResourceSets
 
-| Container | Host | `DB_USER` / `DB_PASSWORD` | Extra |
-|---|---|---|---|
-| service | pooler (`db_host`) | `username` / `password` keys of `inputs.db_runtime_secret` | `DB_PASSWORD_FILE` when `db_password_file` is set |
-| `migrate` | primary `-rw` (`db_migration_host`), never a pooler | `username` / `password` keys of `inputs.db_migrator_secret` | `DB_MIGRATION_ROLE` = `<< inputs.name >>_owner` |
+| Container | Host | `DB_USER` / `DB_PASSWORD` |
+|---|---|---|
+| service | pooler (`db_host`) | `username` / `password` of `inputs.db_runtime_secret` |
+| `migrate` | primary `-rw` (`db_migration_host`), never a pooler | `username` / `password` of `inputs.db_migrator_secret` |
 
-`DB_USER` comes from the Secret's `username` key, so the username lives in one
-place, and the `migrate` container cannot reuse the runtime credential by
-accident. Today only `catalog-rs.yaml` (product and review) has this branch: a
-service that sets `db_runtime_secret` / `db_migrator_secret` gets it, `product`
-keeps `db_secret` / `db_user`. Phase 3 converts the rest and removes the old
-inputs from all five domain templates.
+That is all a service receives. `role=` is applied by PostgreSQL at login, so
+the migrator must reach the primary directly: a transaction-mode pooler would
+hand its server connection to other clients. Seeding follows the migration:
+`scripts/kind-seed.sh` and the local-stack `<svc>-seed` service use the
+migrator's credentials.
 
-Seeding follows the migration: `scripts/kind-seed.sh` and the local-stack
-`<svc>-seed` service use the migrator's credentials and `DB_MIGRATION_ROLE`,
-directly against the primary.
+Poolers carry only `<svc>_runtime`.
 
-Poolers carry only `<svc>_runtime`. PgDog's `users[]` entries on `product-db`
-become `<svc>_runtime`; PgBouncer on `platform-db` authenticates through
-`auth_query` and needs no list.
+### The migration contract (service repos)
 
-### The migration contract
-
-The service's `migrate` command calls:
-
-```go
-migratex.Run(migrations.FS, "sql", cfg.Database.BuildDSN(),
-    migratex.WithSetRole(os.Getenv("DB_MIGRATION_ROLE")))
-```
-
-- `WithSetRole` runs `SET ROLE` on every connection before golang-migrate uses
-  it. A denied `SET ROLE` fails `Run`; an empty role fails `Run` before it
-  connects. There is no fallback to the login's own identity.
-- If the hook were missing, the migrator would still be stopped: it has no
-  rights of its own, so its first `CREATE` is denied (PG-04). The failure shows up
-  in the `migrate` container, not later in production.
-- Seed steps that create or change data run through the same identity.
-- Pass the variable unconditionally (`WithSetRole(os.Getenv(...))`): an empty
-  value is what makes a missing variable fail instead of skipping the switch.
-- Migration files must not run `RESET ROLE`, `SET ROLE`, `SET SESSION
-  AUTHORIZATION` or `DISCARD`; any of them ends the switch for every later
-  statement on that connection.
-- The migrator connects to the primary directly. `SET ROLE` is session state,
-  which a transaction-mode pooler would not keep.
-
-The first migration of every service grants the runtime role its rights, as the
-owner:
-
-```sql
--- 0001_authorization.up.sql, run as <svc>_owner
-GRANT USAGE ON SCHEMA public TO <svc>_runtime;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <svc>_runtime;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT USAGE, SELECT ON SEQUENCES TO <svc>_runtime;
--- Global, not IN SCHEMA: a per-schema revoke cannot cancel the global
--- PUBLIC grant (PG-05).
-ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
-```
-
-Because every later migration also runs as the owner, every new table and
-sequence inherits these grants without another line of SQL (PG-03).
+- Migrations create schema objects. They never `GRANT`, `ALTER DEFAULT
+  PRIVILEGES`, `SET ROLE` or name a role; `migratex.Run(fsys, dir, dsn)` takes no
+  role option (pkg `migratex/v0.39.0`).
+- A function the runtime must call is the exception that needs the platform: add
+  its `GRANT EXECUTE` to the service's grants (Job or pgroles policy), because
+  PUBLIC has no `EXECUTE` by default.
 
 ### Detection and gates
 
 | Signal | Where | What it proves |
 |---|---|---|
-| `CNPGRoleMembershipDrift` (critical) | [ADR-086 guard](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md) | Every guarded edge, including each `<svc>_migrator → <svc>_owner`, still has its specified options |
-| Kind gate K3.4 | `scripts/db-isolation-sweep.sh` | Each login reaches only its own database |
-| Kind gate K3.7 | `smoke.js` against VictoriaMetrics | Every guarded edge reports a series and `max(cnpg_pg_role_membership_drift) == 0` |
-| Kind gate K3.8 | `scripts/db-authz-check.sh`, as `<svc>_runtime` | The runtime cannot `CREATE`, `ALTER` or `DROP` |
-| Kind gate K3.9 | `scripts/db-authz-check.sh`, as `<svc>_migrator` | The migrator cannot `CREATE` until it runs `SET ROLE`, and can afterwards |
+| `CNPGRoleMembershipDrift` (critical) | [runbook](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md) | Every guarded edge (`vault_rotator → notification`, `review_migrator → review_owner`, `db_authz → authz_admin`) has its specified options |
+| `CNPGRoleConfigDrift` (critical, 15 m) | [runbook](../observability/runbooks/postgresql/CNPGRoleConfigDrift.md) | The migrator's `rolconfig` is exactly `role=<svc>_owner` |
+| `CNPGDefaultPrivilegesDrift` (critical, 15 m) | [runbook](../observability/runbooks/postgresql/CNPGDefaultPrivilegesDrift.md) | The owner's table, sequence and function defaults are exactly the declared set |
+| `KubeJobFailed` | the catalog CronJob | The last run could not converge (drift outside the executor's reach, a missing role, a missing database) |
+| Kind gate K3.4 | `scripts/db-isolation-sweep.sh` | Each login reaches only its own database; only `db_authz` reaches `postgres` |
+| Kind gate K3.7 | `smoke.js` against VictoriaMetrics | Every guard reports and nothing has drifted |
+| Kind gate K3.8 | `scripts/db-authz-check.sh`, as `<svc>_runtime` | The runtime cannot `CREATE`, `ALTER`, `DROP`, become the owner or read `schema_migrations` |
+| Kind gate K3.9 | `scripts/db-authz-check.sh`, as `<svc>_migrator` | The migrator is the owner at login and after `RESET ROLE`, its `rolconfig` is `role=<svc>_owner`, and its membership is `f/f/t` |
+| Kind gate K3.10 | `kubectl` | The catalog Job completed and the CronJob's last run succeeded |
 
-A PR that adds a service, or cuts one over, adds its `migrator → owner` edge to
-the `pg_role_membership` query, the guard's `absent()` selector and `smoke.js`
-`GUARDED_EDGES` in the same PR (ADR-086 write-path rule).
+A PR that converts a service adds its migrator edge, role config and database to
+the three guard queries, the `absent()` selectors and `smoke.js` in the same PR.
 
 ### local-stack
 
-Compose mirrors the three roles so the release gate exercises the same failures:
-`local-stack/postgres/init.sql` creates them per service (passwords
-`<role>-local`), `<svc>-migrate` connects as the migrator with
-`DB_MIGRATION_ROLE`, and `<svc>` connects as runtime.
-
-One deliberate difference stays: local-stack revokes `CONNECT` on every database
-from `PUBLIC`, because it has no other connection fence. The cluster keeps the
-default `PUBLIC CONNECT` and fences connections with `pg_hba` (ADR-015).
+Compose plays the platform: `local-stack/postgres/init.sql` creates the three
+roles and the migrator's `role=`, `review-migrate` and `review-seed` connect as
+the migrator with no role variable, and the `review-authz` one-shot service runs
+**the cluster's own `grants.sql`** after the migration. One deliberate
+difference stays: local-stack revokes `CONNECT` on every database from `PUBLIC`,
+because it has no other connection fence; the cluster fences with `pg_hba`
+(ADR-015).
 
 ### Rollback and existing data
 
-There is no compatibility window and no legacy login. Rolling back a cutover is
-`git revert` plus a fresh `make up`.
+There is no compatibility window and no legacy login. Rolling back is
+`git revert` plus a fresh `make up`. A cluster that already holds data would
+need a one-time, privileged ownership transfer (`REASSIGN OWNED` or
+`ALTER … OWNER TO <svc>_owner`) run by an operator; that path is described for
+reference only and is **not exercised here**.
 
-A cluster that already holds data would need a one-time, privileged ownership
-transfer (`REASSIGN OWNED` or `ALTER … OWNER TO <svc>_owner`, then the backfill
-grants) run by an operator, since a migrator cannot take objects it does not
-own. That path is described for reference only and is **not exercised here**.
+## Evidence
+
+**Runtime test, 2026-10-14**, `postgres:18-alpine` container with the bootstrap
+roles CNPG would create (`authz_admin`, `db_authz IN ROLE authz_admin`,
+`review_runtime`), `apply.sh` run as `db_authz`, and the real review-service
+binary (`d14e06f`, `migratex/v0.39.0`) running `migrate` and `seed` as
+`review_migrator` with no role variable:
+
+```text
+     role       |     member      |   grantor   | adm | inh | set
+-----------------+-----------------+-------------+-----+-----+-----
+ authz_admin     | db_authz        | postgres    | f   | t   | t
+ review_migrator | authz_admin     | authz_admin | f   | t   | t
+ review_migrator | authz_admin     | postgres    | t   | f   | f
+ review_owner    | authz_admin     | authz_admin | f   | t   | t
+ review_owner    | authz_admin     | postgres    | t   | f   | f
+ review_owner    | review_migrator | authz_admin | f   | f   | t
+
+ review_migrator | rolcanlogin t | rolinherit f | {role=review_owner}
+
+ S | public | {review_runtime=rU/review_owner}
+ f | -      | {review_owner=X/review_owner}
+ r | public | {review_runtime=arwd/review_owner}
+
+ tablename         | tableowner          -- after `migrate` as review_migrator
+ reviews           | review_owner
+ schema_migrations | review_owner
+
+review_runtime: SELECT count(*) FROM reviews → 12 · CREATE TABLE → permission
+denied for schema public · ALTER TABLE reviews → must be owner of table reviews
+review_migrator: SELECT current_user → review_owner
+```
+
+Drift drill, same container: `RESET role`, `INHERIT`, a new migrator password,
+the edge re-granted `INHERIT TRUE`, a removed default `DELETE`, a revoked
+`INSERT` and an extra `TRUNCATE` were all restored by the next run; runtime
+access to `schema_migrations` was revoked by it. A membership granted by
+`postgres` (`GRANT review_owner TO review_runtime`) made the run exit 1 with
+`permission denied to revoke privileges granted by role "postgres"`, and the
+other steps still ran.
+
+**Kind, fresh bring-up**: pending the D1 gate; the catalog, ACL and gate output
+from that cluster replace this note.
 
 ## Operations
+
+### Re-run the catalog now
+
+```bash
+kubectl -n platform create job --from=cronjob/platform-db-authz authz-manual-$(date +%s)
+kubectl -n platform logs -f job/authz-manual-<suffix>
+```
 
 ### Effective access for one role
 
@@ -256,23 +310,25 @@ SELECT c.relname,
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE n.nspname = 'public' AND c.relkind = 'r';
 
--- Default privileges the owner has set
+-- Default privileges and the migrator's session defaults
 SELECT pg_get_userbyid(defaclrole) AS owner, defaclnamespace::regnamespace AS schema,
        defaclobjtype, defaclacl
   FROM pg_default_acl;
+SELECT rolname, rolinherit, rolconfig FROM pg_roles WHERE rolname LIKE '%\_migrator';
 
--- Membership options (the guard reads the same catalog)
+-- Membership options, every grantor (the guard reads the same catalog)
 SELECT pg_get_userbyid(member) AS member, pg_get_userbyid(roleid) AS parent,
-       admin_option, inherit_option, set_option
+       pg_get_userbyid(grantor) AS grantor, admin_option, inherit_option, set_option
   FROM pg_auth_members
- WHERE pg_get_userbyid(roleid) LIKE '%\_owner';
+ WHERE pg_get_userbyid(roleid) ~ '_(owner|migrator)$' OR pg_get_userbyid(roleid) = 'authz_admin';
 ```
 
 Expected for a converted service: every object owned by `<svc>_owner`, except
 the views extensions install (`pg_stat_statements`), which CNPG creates as
-`postgres`; the
-runtime has the four table rights and nothing else; `pg_default_acl` has the
-owner's rows; `<svc>_migrator → <svc>_owner` is `f / f / t`.
+`postgres`; the runtime has the four table rights and nothing else;
+`pg_default_acl` has the owner's three rows; the migrator is `rolinherit f` with
+`{role=<svc>_owner}`; `<svc>_migrator → <svc>_owner` is `f / f / t`; the only
+other members of the owner and migrator are `authz_admin`'s creator edges.
 
 ### The lab
 
@@ -303,6 +359,13 @@ scripts/pg-authz-lab/run.sh cnpg   # Kind platform-db; lab_* objects only, remov
 | CNPG-06 | Manual drift survives until a spec change triggers a reconcile | cnpg |
 | CNPG-07 | With `inherit: false` on the member, CNPG creates and recreates the owner edge as `f/f/t` | cnpg |
 
+The ADR-088 lab (2026-10-12, Kind `platform-db`, CNPG 1.30.1, PostgreSQL 18.6,
+pgroles 0.13.0) added the rows that chose the executor shape and the
+Job / pgroles split; they are recorded in
+[ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/#evidence)
+and were run by hand, not by `run.sh`.
+
 The `pg` mode switches identity with `SET SESSION AUTHORIZATION`, which checks
 privileges exactly as a login would but not authentication or `pg_hba`; those
 are the Kind gate's job (K3.4, K3.8, K3.9), which connects as the real logins.
+PG-04 still holds for a migrator without `role=`; the platform now sets it.

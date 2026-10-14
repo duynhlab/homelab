@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kind gate K3.8 / K3.9 (RFC-0029, ADR-087): a converted service's runtime and
+# Kind gate K3.8 / K3.9 (RFC-0029, ADR-088): a converted service's runtime and
 # migrator logins behave as docs/databases/authorization.md says, checked as the
 # REAL logins through pg_hba rather than by asking the catalog as postgres. The
 # migrator is the owner from login (role=); no check runs SET ROLE.

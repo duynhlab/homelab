@@ -1,4 +1,4 @@
--- In-database grants for one service (ADR-087), run in database <svc> as
+-- In-database grants for one service (ADR-088), run in database <svc> as
 -- authz_admin, which inherits <svc>_owner. pgroles owns this layer for the
 -- other services; the statements are the same.
 \set owner :svc _owner

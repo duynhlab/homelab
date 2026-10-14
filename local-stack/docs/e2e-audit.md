@@ -1150,7 +1150,7 @@ audit_curl -s -o /dev/null -w '%{http_code}\n' \
   "$BASE/order/v1/protected/orders?status=not_a_status" \
   -H "Authorization: Bearer $KCT_STAFF"   # 400
 
-# A23. REVIEW'S THREE DATABASE ROLES (RFC-0029, ADR-087,
+# A23. REVIEW'S THREE DATABASE ROLES (RFC-0029, ADR-088,
 #      docs/databases/authorization.md). Run as the real logins over TCP
 #      (password auth), not as postgres: the runtime reads but cannot change
 #      the schema; the migrator IS the owner from login (role=, set by the

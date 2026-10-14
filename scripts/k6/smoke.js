@@ -30,7 +30,7 @@ const CATALOG = '/product/v1/public/products';
 const GUARDED_EDGES = [
   'vault_rotator->notification', 'review_migrator->review_owner', 'db_authz->authz_admin',
 ];
-// ADR-087: roles whose session defaults (role=<owner>) and databases whose
+// ADR-088: roles whose session defaults (role=<owner>) and databases whose
 // owner default privileges are guarded.
 const GUARDED_ROLE_CONFIG = ['review_migrator'];
 const GUARDED_DEFAULT_ACL_DBS = ['review'];
@@ -424,7 +424,7 @@ const UNITS = [
     },
   },
   {
-    // ADR-086 / ADR-087: the PG18 options of guarded edges, the migrators'
+    // ADR-086 / ADR-088: the PG18 options of guarded edges, the migrators'
     // role=<owner> defaults and the owners' default privileges are watched by
     // the pg_role_membership / pg_role_config / pg_default_privileges queries.
     // The row asserts each guard is reporting and that nothing has drifted. A

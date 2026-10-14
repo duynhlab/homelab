@@ -56,7 +56,7 @@ done
 
 # review is split into three roles (RFC-0029); review_owner has no pg_hba line,
 # so every probe of it must be rejected.
-# db_authz (ADR-087) applies authorization from `postgres` and inside review;
+# db_authz (ADR-088) applies authorization from `postgres` and inside review;
 # `postgres` is in the matrix so every other login is proven shut out of it.
 platform_roles=(user notification shipping review_owner review_migrator review_runtime temporal vault_rotator db_authz)
 platform_dbs=(user notification shipping review temporal temporal_visibility postgres)

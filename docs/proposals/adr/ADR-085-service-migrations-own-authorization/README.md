@@ -1,5 +1,7 @@
 # ADR-085: Own Object ACLs and Default Privileges in Service Migrations
 
+> **Superseded by [ADR-088](../ADR-088-platform-owns-database-authorization/)** (2026-10-12): the platform applies database authorization; service repositories carry no role names, grants or `SET ROLE`.
+
 > **Decision summary:** We will have each service's own migrations, running as
 > its owner role, grant runtime access, set default privileges and backfill
 > existing objects, because the repository that changes a schema is the only
@@ -8,7 +10,7 @@
 
 | Attribute | Value |
 |-----------|-------|
-| **Status** | Accepted |
+| **Status** | Superseded |
 | **Decision date** | 2026-10-06 |
 | **Owners** | `platform` |
 | **Deciders** | `owner (duynhlab)` |
@@ -17,7 +19,7 @@
 | **Related RFC** | [RFC-0029](../../rfc/RFC-0029/) |
 | **Related research** | [research.md](../../rfc/RFC-0029/research.md) |
 | **Supersedes** | — |
-| **Superseded by** | — |
+| **Superseded by** | [ADR-088](../ADR-088-platform-owns-database-authorization/) |
 | **Implementation tracking** | RFC-0029 Phase 2 (canary `review`) and Phase 3 |
 | **Adoption** | Partial |
 
@@ -135,7 +137,7 @@ removed.
 |------------|-------|----------|-------------------|
 | Authorization migration in `review-service` | review-service | canary PR | defaults present in the catalog |
 | Decide and verify how the migration tool reaches `SET ROLE` | platform | decided 2026-10-06: `migratex.WithSetRole` (duynhlab/pkg) fed by `DB_MIGRATION_ROLE`; canary PR verifies | objects created by the Job are owned by `review_owner` |
-| A reusable SQL snippet in the database runbooks | platform | [`authorization.md`](../../../databases/authorization.md#the-migration-contract) | second service copies it |
+| A reusable SQL snippet in the database runbooks | platform | [`authorization.md`](../../../databases/authorization.md#the-migration-contract-service-repos) | second service copies it |
 | `docs/api` | — | N/A | no route or RPC change |
 
 ## Validation and compliance
@@ -174,3 +176,4 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Accepted / Not started | Accepted with RFC-0029 |
 | 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): the mechanism is `migratex.WithSetRole` in `duynhlab/pkg` (fails hard when `SET ROLE` is denied or the role is empty), chosen over a catalog `ALTER ROLE … SET role` default and over pgroles; no backfill on this platform (greenfield). The `0001_authorization` snippet is in [`authorization.md`](../../../databases/authorization.md) |
 | 2026-10-08 | Accepted / Partial | review-service `v2.5.0` ships `000004_authorization` and migrates and seeds through `migratex.WithSetRole`; on a fresh Kind cluster every relation in `public` belongs to `review_owner` (extension views excepted) and `review_runtime` holds CRUD on `reviews` only |
+| 2026-10-12 | Superseded | Owner paused Phase 3: role knowledge does not belong in service repos. Its premise was also wrong: a member of the owner with INHERIT sets the owner's default privileges with `FOR ROLE`, and `ALTER ROLE … SET role` makes the migrator the owner without code. Superseded by [ADR-088](../ADR-088-platform-owns-database-authorization/); `WithSetRole` removed in `migratex/v0.39.0`, review-service `#208` drops `000004_authorization` |

@@ -1,4 +1,4 @@
-# ADR-086 / ADR-087: alert when a guarded membership edge, a role's session
+# ADR-086 / ADR-088: alert when a guarded membership edge, a role's session
 # defaults or an owner's default privileges drift from their specified shape,
 # or when the guard itself stops reporting. The expected values live in the
 # pg_role_membership, pg_role_config and pg_default_privileges queries
@@ -62,7 +62,7 @@ spec:
         summary: Session defaults of {{ $labels.role }} drifted ({{ $labels.cnpg_io_cluster }})
         description: >-
           {{ $labels.role }} on {{ $labels.cnpg_io_cluster }} is missing or its
-          rolconfig differs from what ADR-087 specifies. Without role=<owner> the
+          rolconfig differs from what ADR-088 specifies. Without role=<owner> the
           migrator creates objects it owns itself, which the runtime cannot use.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGRoleConfigDrift.md"
     - alert: CNPGDefaultPrivilegesDrift
@@ -75,7 +75,7 @@ spec:
         summary: Default privileges in {{ $labels.datname }} drifted ({{ $labels.cnpg_io_cluster }})
         description: >-
           The owner's default privileges for object type {{ $labels.objtype }} in
-          {{ $labels.datname }} differ from ADR-087: the next migration's tables
+          {{ $labels.datname }} differ from ADR-088: the next migration's tables
           would be unreadable by the runtime, over-granted, or (functions)
           executable by PUBLIC.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGDefaultPrivilegesDrift.md"

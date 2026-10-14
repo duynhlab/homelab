@@ -1,4 +1,4 @@
--- Role catalog for one service (ADR-087), run in `postgres` as authz_admin.
+-- Role catalog for one service (ADR-088), run in `postgres` as authz_admin.
 --   <svc>_owner     NOLOGIN; owns the database and every object in it
 --   <svc>_migrator  LOGIN NOINHERIT; becomes the owner at login (role=)
 -- The runtime login is a CNPG DatabaseRole and is not touched here.
@@ -16,8 +16,8 @@ SELECT format('CREATE ROLE %I', :'migrator')
 -- the attribute (a superuser) can change them, so they are not restated.
 ALTER ROLE :"owner" NOLOGIN INHERIT NOCREATEROLE CONNECTION LIMIT -1;
 ALTER ROLE :"migrator" LOGIN NOINHERIT NOCREATEROLE CONNECTION LIMIT -1;
-COMMENT ON ROLE :"owner" IS 'Owns the service schema; nobody logs in (ADR-087)';
-COMMENT ON ROLE :"migrator" IS 'Runs migrations; becomes the owner at login (ADR-087)';
+COMMENT ON ROLE :"owner" IS 'Owns the service schema; nobody logs in (ADR-088)';
+COMMENT ON ROLE :"migrator" IS 'Runs migrations; becomes the owner at login (ADR-088)';
 
 -- The migrator acts as the owner without any SET ROLE in service code.
 ALTER ROLE :"migrator" RESET ALL;

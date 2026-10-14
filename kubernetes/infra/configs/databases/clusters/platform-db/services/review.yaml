@@ -1,4 +1,4 @@
-# review — runtime login + database (RFC-0029, ADR-084, ADR-087).
+# review — runtime login + database (RFC-0029, ADR-084, ADR-088).
 # review_owner and review_migrator are created by the role catalog Job
 # (../authz), which also reads the migrator Secret below; CNPG keeps the
 # runtime login and the Database. Conventions: docs/databases/authorization.md.

@@ -1,4 +1,4 @@
-# db_authz: the login that applies database authorization (ADR-087). It holds
+# db_authz: the login that applies database authorization (ADR-088). It holds
 # no attribute of its own; it SET ROLEs to authz_admin (bootstrap SQL in
 # instance.yaml), which creates and administers every catalog role.
 apiVersion: external-secrets.io/v1
@@ -51,7 +51,7 @@ spec:
   cluster:
     name: platform-db
   name: db_authz
-  comment: "Applies database authorization as authz_admin (ADR-087)"
+  comment: "Applies database authorization as authz_admin (ADR-088)"
   login: true
   superuser: false
   createdb: false

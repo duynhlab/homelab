@@ -412,7 +412,7 @@ data:
             usage: "GAUGE"
             description: "1 if the membership is missing or its options differ from the specified shape"
 
-    # ADR-087: session defaults the platform sets on a role (the migrator's
+    # ADR-088: session defaults the platform sets on a role (the migrator's
     # role=<owner>). One row per guarded role, so a dropped role reads drift=1.
     pg_role_config:
       query: "SELECT e.role, (COALESCE(r.rolconfig, '{}') <> e.want)::int AS drift
@@ -426,7 +426,7 @@ data:
             usage: "GAUGE"
             description: "1 if the role is missing or its rolconfig differs from the specified defaults"
 
-    # ADR-087: the owner's default privileges in each Job-owned database. The
+    # ADR-088: the owner's default privileges in each Job-owned database. The
     # runtime's entry must be exactly the declared set, and functions must have
     # no PUBLIC EXECUTE. One row per expected entry.
     pg_default_privileges:

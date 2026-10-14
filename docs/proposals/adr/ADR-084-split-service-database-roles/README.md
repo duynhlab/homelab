@@ -52,7 +52,7 @@ membership options right.
 ### Out of scope
 
 - Which privileges the runtime receives and how they are applied
-  ([ADR-085](../ADR-085-service-migrations-own-authorization/)).
+  ([ADR-088](../ADR-088-platform-owns-database-authorization/), which superseded ADR-085).
 - Guarding membership options against drift
   ([ADR-086](../ADR-086-guard-membership-options/)).
 - Keycloak and Temporal, which run their own schema tooling and need separate
@@ -173,7 +173,7 @@ options that CNPG cannot express and ADR-086 would have to guard.
 | Ownership-transfer procedure for existing databases | platform | [`authorization.md`](../../../databases/authorization.md#rollback-and-existing-data) | described as reference; not exercised (greenfield, amended 2026-10-06) |
 | Canary `review` converted on Kind | platform + review-service | RFC-0029 Phase 2 | negative tests pass in the Kind gate |
 | local-stack parity for converted services | platform | `local-stack/postgres/init.sql`, `compose.yaml` | local-stack gate passes with three roles |
-| Verify how the migration tool reaches `SET ROLE` | platform | `migratex.WithSetRole` (duynhlab/pkg) + canary PR | migration Job creates objects owned by `<svc>_owner` |
+| Make the migrator act as the owner | platform | `ALTER ROLE <svc>_migrator SET role = <svc>_owner` by the role catalog Job ([ADR-088](../ADR-088-platform-owns-database-authorization/); `migratex.WithSetRole` removed in v0.39.0) | migration Job creates objects owned by `<svc>_owner` with no role variable |
 
 ## Validation and compliance
 
@@ -213,3 +213,4 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Accepted / Not started | Correction to the row above: the migrator Secret is not only a values change. The workload and the `migrate` init container both read `inputs.db_secret` / `db_user`, so the domain ResourceSets need new inputs; the chart still needs none. The summary's count is fixed to two Secrets (the owner has no credential) |
 | 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): greenfield cutover. The legacy `<svc>` login is never created, there is no compatibility window, rollback is `git revert` + a fresh `make up`, and the ownership transfer for existing data is reference only. Conventions in [`authorization.md`](../../../databases/authorization.md) |
 | 2026-10-08 | Accepted / Partial | Canary `review` converted (RFC-0029 Phase 2): three DatabaseRoles, `review_owner` owns the database, `pg_hba` admits runtime and migrator only, random per-cluster Secrets, review-service `v2.5.0`. Fresh Kind: sweep 84/84, K3.8–K3.9 10/10, `make e2e` 146/146; local-stack mirrors the roles (A23). The rest of the fleet is Phase 3 |
+| 2026-10-14 | Accepted / Partial | **Amended** by [ADR-088](../ADR-088-platform-owns-database-authorization/): the platform creates the owner and migrator (role catalog Job as `authz_admin`), the migrator becomes the owner at login (`role=`), CNPG keeps only the runtime `DatabaseRole`; services receive credentials only |

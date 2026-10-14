@@ -20,7 +20,7 @@ CREATE DATABASE "user" OWNER "user";
 CREATE DATABASE product OWNER product;
 CREATE DATABASE cart OWNER cart;
 CREATE DATABASE "order" OWNER "order";
--- review uses the owner / migrator / runtime split (RFC-0029, ADR-087,
+-- review uses the owner / migrator / runtime split (RFC-0029, ADR-088,
 -- docs/databases/authorization.md). This file plays the platform: the owner
 -- owns the database and never logs in; the migrator becomes the owner at login
 -- (role=), so the service runs no SET ROLE; the runtime gets CRUD through

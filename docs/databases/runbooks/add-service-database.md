@@ -10,7 +10,7 @@ HBA allow rule in `instance.yaml` before its terminal reject.
 | **Time** | ~15 minutes + one PR |
 | **Reference triplet** | `kubernetes/infra/configs/databases/clusters/product-db/services/payment.yaml` |
 | **Concepts** | [012 — Declarative Role & Database Management](../declarative-role-management.md) |
-| **Planned change** | RFC-0029 replaces the single login with owner + migrator + runtime roles; a service added after its cutover follows [Database authorization](../authorization.md) |
+| **Three-role services** | On `platform-db`, a service on owner + migrator + runtime roles ([ADR-088](../../proposals/adr/ADR-088-platform-owns-database-authorization/)) follows [Three-role service on platform-db](#three-role-service-on-platform-db) below; product-db services move in a later wave |
 
 ## Steps
 
@@ -74,6 +74,35 @@ HBA allow rule in `instance.yaml` before its terminal reject.
      --image=ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie -- \
      psql -W "host=product-db-rw.product user=<svc> dbname=<svc>" -c 'select 1'
    ```
+
+## Three-role service on platform-db
+
+The platform creates the owner and migrator and applies the grants; the service
+repo gets two credentials. One PR, no manual SQL ([Database
+authorization](../authorization.md)):
+
+1. **OpenBAO:** seed `secret/local/databases/platform-db/<svc>-runtime` and
+   `…/<svc>-migrator` (`username` = `<svc>_runtime` / `<svc>_migrator`, random
+   passwords; fresh clusters: the `openbao-bootstrap` loop).
+2. **`services/<svc>.yaml`** (copy `review.yaml`): runtime and migrator
+   ExternalSecrets, the runtime `DatabaseRole`, and `Database` with
+   `owner: <svc>_owner`. No owner or migrator `DatabaseRole`: the catalog
+   creates them, and CNPG retries the `Database` until the owner exists.
+3. **App-namespace copies** of both Secrets (`secrets/…-<svc>-ns.yaml`).
+4. **`pg_hba`:** `host <svc> <svc>_runtime`, `host <svc> <svc>_migrator`,
+   `host <svc> db_authz`, above the reject.
+5. **Role catalog** (`authz/job.yaml`, both the Job and the CronJob): add `<svc>`
+   to `ROLE_SERVICES`, add the `<SVC>_MIGRATOR_PASSWORD` env from the migrator
+   Secret, and either add `<svc>` to `GRANT_SERVICES` or give it a pgroles
+   policy (planned, D2).
+6. **Guards:** the migrator edge in `pg_role_membership`, the migrator in
+   `pg_role_config`, the database in `pg_default_privileges` (Job-owned), the
+   `absent()` selectors and `smoke.js`.
+7. **InputProvider:** `db_runtime_secret`, `db_migrator_secret`,
+   `db_migration_host` (the primary).
+8. **Verify:** `kubectl -n platform logs job/platform-db-authz` ends with
+   `authz applied`, then `./scripts/db-authz-check.sh <svc>` after adding the
+   service to its table.
 
 ## What you never do
 

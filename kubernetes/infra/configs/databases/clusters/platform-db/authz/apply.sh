@@ -1,5 +1,5 @@
 #!/bin/bash
-# Applies the role catalog and the in-database grants (ADR-087). Idempotent:
+# Applies the role catalog and the in-database grants (ADR-088). Idempotent:
 # the Job runs it on every change, the CronJob every 10 minutes to undo drift.
 #   ROLE_SERVICES   services whose owner/migrator roles this script owns
 #   GRANT_SERVICES  services whose in-database grants this script owns

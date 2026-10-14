@@ -294,11 +294,20 @@ NetworkPolicy, Secret isolation, audit, and no `BYPASSRLS`. It must never gain
 - Orders own completion state; order items preserve point-in-time product
   name, quantity, price, and subtotal.
 - Money remains integer minor units and is never summed across currencies.
+  The draft v1 contract supports USD only and serializes all money as canonical
+  decimal integer JSON strings; counts fail above JavaScript's safe integer bound.
+- Capture, reversal and refund use ledger transaction event dates. A September
+  capture refunded in October contributes to October refunds, so net may be
+  negative. Funnel membership instead uses checkout-created dates with current
+  observed stage state, which can progress after the interval ends.
+- Item price/subtotal already use BIGINT minor units after order migration
+  `000006`; no extra multiplication by 100 is permitted.
 - `from` is inclusive, `to` exclusive, and every boundary is UTC.
 - Raw tables retain `_peerdb_version`, `_peerdb_is_deleted`, and a sync
   timestamp. Serving views take the latest version, then filter deleted rows.
 - Source `order_id` values (`integer`, `text`, and `bigint`) normalize to
-  `String` only in ClickHouse serving objects.
+  `String` in the reader's ClickHouse SQL projections, preserving NULL.
+  Current live views retain the source types; no source schema is changed.
 - API history is capped at 90 days. Physical raw retention and full-snapshot
   capacity are set only after measurement; PeerDB cannot pretend its initial
   snapshot was filtered to 90 days.
@@ -334,8 +343,9 @@ It returns the existing overview dimensions plus:
 `sources` contains exactly `order`, `checkout`, and `payment`; state is
 `healthy`, `stale`, or `unavailable`. The service rejects unbounded
 intervals, arbitrary SQL/columns, non-staff issuers, and callers without
-`backoffice_admin`. Exact payload ownership moves to `docs/api/` only after
-implementation.
+`backoffice_admin`. The [draft canonical contract](../../../api/analytics.md)
+now owns exact payloads and the selected money/window semantics. Go code and the
+isolated UI preview are under review; neither is deployed or Linux-qualified.
 
 The Admin Portal adds a lazy `/_authenticated/analytics` route and leaves Home
 unchanged. It uses the existing TanStack/shadcn/Tailwind patterns, one query,
@@ -510,12 +520,17 @@ qualification or rollout evidence exists.
 | Package and operate `pg_cron` in a custom CNPG system image for target-observed heartbeat scheduling | [ADR-068](../../adr/ADR-068-schedule-cdc-heartbeats-with-pg-cron/) | Accepted / Not started |
 | Add a thin read-only `analytics-service` as the ADR-048 aggregation escape hatch | [ADR-069](../../adr/ADR-069-serve-commerce-analytics-through-read-only-service/) | Accepted / Not started |
 
-Expected contract updates after implementation are `docs/api/analytics.md`, the
+The draft `docs/api/analytics.md` contract exists; rollout must still update the
 service rollup in `docs/api/README.md`, the Admin consumer index
 `docs/api/admin.md`, the cross-service topology in `docs/api/api.md`, and the
 relevant feature ownership in `docs/api/microservices.md`.
 
 ## Implementation history
+
+- 2026-10-14 — Draft Go reader and isolated UI align on USD-only v1, exact money
+  strings, event-date ledger totals and checkout-created cohorts. The
+  [canonical contract](../../../api/analytics.md) records these choices;
+  Linux qualification and deployment remain pending.
 
 - 2026-10-13 — Added the opt-in Compose CDC qualification prototype and
   [Linux handoff gates](./phase0.md). Cluster adoption and API/UI implementation

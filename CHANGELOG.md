@@ -194,6 +194,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Document the draft RFC-0030 analytics API: exact money strings, USD-only v1,
+  event-date ledger totals, cohort semantics and fail-closed freshness. Backend
+  code and UI preview remain undeployed pending Linux qualification.
+
 - Define concise manifest comments and evidence-aware documentation conventions;
   remove editorial update footers from authoring templates while preserving
   decision and verification dates.

@@ -1,0 +1,15 @@
+{
+  "order": {
+    "orders": ["id", "status", "version", "created_at", "updated_at", "completed_at"],
+    "order_items": ["id", "order_id", "product_id", "product_name", "quantity", "price", "subtotal", "created_at"]
+  },
+  "checkout": {
+    "checkout_sessions": ["id", "status", "order_id", "currency", "created_at", "updated_at"]
+  },
+  "payment": {
+    "payments": ["id", "order_id", "currency", "created_at", "updated_at"],
+    "ledger_transactions": ["id", "payment_id", "kind", "created_at"],
+    "ledger_entries": ["id", "transaction_id", "account_id", "direction", "amount_minor"],
+    "ledger_accounts": ["id", "name", "type"]
+  }
+}

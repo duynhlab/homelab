@@ -84,6 +84,13 @@ The protected analytics route and portal navigation remain absent until the
 service passes dark-launch correctness, authorization, freshness, and failure
 gates.
 
+The [draft contract](../../../api/analytics.md) selects USD-only v1, decimal
+integer JSON strings for money, ledger event-date totals, and checkout-created
+cohorts with current observed stages. Backend code and the isolated UI preview
+are under review. Adoption remains **Not started** for deployment: Linux data,
+security and runtime gates are tracked in
+[#1266](https://github.com/duynhlab/homelab/issues/1266).
+
 ### Decision rules
 
 | Rule | Required behavior |

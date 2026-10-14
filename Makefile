@@ -97,6 +97,16 @@ validate: ## Validate Kubernetes manifests (Kustomize)
 # exit non-zero when a row fails, which is the point: the gates used to be
 # read by eye.
 
+.PHONY: e2e-analytics
+e2e-analytics: ## Qualify RFC-0030 on the disposable Compose project
+	@test "$(or $(GATE),compose)" = compose || { echo "Analytics CNPG gates require the Linux runbook"; exit 2; }
+	python3 local-stack/analytics/control.py gate
+
+.PHONY: e2e-analytics-ddl
+e2e-analytics-ddl: ## Exercise explicit CDC resnapshot on a disposable schema copy
+	@test "$(or $(GATE),compose)" = compose || exit 2
+	python3 local-stack/analytics/ddl.py
+
 .PHONY: e2e
 e2e: e2e-saga e2e-smoke e2e-staff e2e-operator ## Run the k6 gate suite (set GATE=compose|kind)
 # Order matters: saga runs FIRST. smoke's C6/K5.2 asserts all ten services have

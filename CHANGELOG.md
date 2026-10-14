@@ -194,6 +194,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Document the draft RFC-0030 analytics API: exact money strings, USD-only v1,
+  event-date ledger totals, cohort semantics and fail-closed freshness. Backend
+  code and UI preview remain undeployed pending Linux qualification.
+
 - Define concise manifest comments and evidence-aware documentation conventions;
   remove editorial update footers from authoring templates while preserving
   decision and verification dates.
@@ -223,6 +227,10 @@ Skeleton (copy what you need):
   secrets diagrams.
 
 #### Proposals
+
+- **RFC-0030 Phase 0 prototype.** Add an opt-in PeerDB Compose overlay,
+  allowlisted source bootstrap, target heartbeat checks and Linux handoff gates.
+  Keep the accepted architecture separate from pending cluster qualification.
 
 - **RFC-0011 refreshed; ADR-087 proposed for homelab access.** Correct the
   M720q disk assumptions, replace unverified capacity and purchase claims with

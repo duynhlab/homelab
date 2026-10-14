@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Kind gate K3.8 / K3.9 (RFC-0029): a converted service's runtime and migrator
-# logins behave as docs/databases/authorization.md says, checked as the REAL
-# logins through pg_hba rather than by asking the catalog as postgres.
+# Kind gate K3.8 / K3.9 (RFC-0029, ADR-087): a converted service's runtime and
+# migrator logins behave as docs/databases/authorization.md says, checked as the
+# REAL logins through pg_hba rather than by asking the catalog as postgres. The
+# migrator is the owner from login (role=); no check runs SET ROLE.
 #
 #   scripts/db-authz-check.sh            # every converted service
 #   scripts/db-authz-check.sh review     # one service
@@ -21,7 +22,7 @@ declare_service() {
   esac
 }
 CONVERTED=(review)
-EXPECTED_CHECKS=10
+EXPECTED_CHECKS=12
 FAIL=0
 
 check_service() {
@@ -49,8 +50,10 @@ check K3.8-runtime-no-alter        RT denied "ALTER TABLE public.reviews ADD COL
 check K3.8-runtime-no-drop         RT denied "DROP TABLE public.reviews"
 check K3.8-runtime-no-owner        RT denied "SET ROLE ${svc}_owner"
 check K3.8-runtime-no-migrations   RT denied "SELECT count(*) FROM public.schema_migrations"
-check K3.9-migrator-no-create      MG denied "CREATE TABLE public.k39_probe (i int)"
-check K3.9-migrator-creates-as-owner MG ok   "BEGIN; SET ROLE ${svc}_owner; CREATE TABLE public.k39_probe (i int); ROLLBACK;"
+check K3.9-migrator-is-owner       MG ${svc}_owner "SELECT current_user"
+check K3.9-owner-after-reset       MG ${svc}_owner "RESET ROLE; SELECT current_user"
+check K3.9-role-config             MG role=${svc}_owner "SELECT array_to_string(rolconfig, ',') FROM pg_roles WHERE rolname = '${svc}_migrator'"
+check K3.9-migrator-creates        MG ok     "BEGIN; CREATE TABLE public.k39_probe (i int); ROLLBACK;"
 check K3.9-owner-owns-everything   MG 0      "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> '${svc}_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')"
 check K3.9-membership-f-f-t        MG f/f/t  "SELECT admin_option::text::char || '/' || inherit_option::text::char || '/' || set_option::text::char FROM pg_auth_members WHERE member = '${svc}_migrator'::regrole AND roleid = '${svc}_owner'::regrole"
 EOF

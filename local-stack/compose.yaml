@@ -546,7 +546,7 @@ services:
   review-migrate:
     build: { context: ../../review-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, DB_MIGRATION_ROLE: review_owner }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   shipping-migrate:
@@ -617,10 +617,23 @@ services:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
     restart: "no"
+  # Plays the cluster's role catalog Job for review (ADR-087): the same
+  # grants.sql file, run by the platform after the migration.
+  review-authz:
+    image: postgres:18.6-alpine
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "review", "-v", "svc=review", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      review-migrate: { condition: service_completed_successfully }
+    restart: "no"
   review-seed:
     build: { context: ../../review-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, DB_MIGRATION_ROLE: review_owner }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local }
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
@@ -705,6 +718,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
+      review-authz: { condition: service_completed_successfully }
       review-seed: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
 

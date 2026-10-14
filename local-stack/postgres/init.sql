@@ -20,15 +20,19 @@ CREATE DATABASE "user" OWNER "user";
 CREATE DATABASE product OWNER product;
 CREATE DATABASE cart OWNER cart;
 CREATE DATABASE "order" OWNER "order";
--- review uses the owner / migrator / runtime split (RFC-0029,
--- docs/databases/authorization.md): the owner owns the database and never
--- logs in; the migrator reaches it only through SET ROLE.
+-- review uses the owner / migrator / runtime split (RFC-0029, ADR-087,
+-- docs/databases/authorization.md). This file plays the platform: the owner
+-- owns the database and never logs in; the migrator becomes the owner at login
+-- (role=), so the service runs no SET ROLE; the runtime gets CRUD through
+-- the owner's default privileges, applied after the migration by the
+-- review-authz service with the cluster's own grants.sql.
 CREATE ROLE review_owner NOLOGIN;
 CREATE ROLE review_migrator LOGIN NOINHERIT PASSWORD 'review_migrator-local'
   NOSUPERUSER NOCREATEDB NOCREATEROLE;
 CREATE ROLE review_runtime LOGIN PASSWORD 'review_runtime-local'
   NOSUPERUSER NOCREATEDB NOCREATEROLE;
 GRANT review_owner TO review_migrator WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+ALTER ROLE review_migrator SET role = 'review_owner';
 CREATE DATABASE review OWNER review_owner;
 CREATE DATABASE shipping OWNER shipping;
 CREATE DATABASE notification OWNER notification;

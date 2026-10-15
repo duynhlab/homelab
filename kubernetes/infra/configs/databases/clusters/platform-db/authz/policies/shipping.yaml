@@ -10,7 +10,7 @@ metadata:
 spec:
   connection:
     params:
-      host: platform-db-rw
+      host: platform-db-rw.platform.svc
       dbname: shipping
       sslMode: require
       usernameSecret:

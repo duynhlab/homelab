@@ -94,7 +94,7 @@ spec:
   name: notification_runtime
   comment: "notification: the service; CRUD only"
   login: true
-  supernotification: false
+  superuser: false
   createdb: false
   createrole: false
   inherit: true

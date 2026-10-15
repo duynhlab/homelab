@@ -6,7 +6,6 @@
 > accepted direction and remaining access-contract proposals are in the
 > [RFC](./README.md#decision-outcome); this research is not a new rollout audit.
 
-
 | | |
 |---|---|
 | **RFC** | RFC-0029 |

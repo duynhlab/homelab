@@ -33,7 +33,8 @@ one controller per concern. Services call `migratex.Run` without role options.
 
 **Adoption:** D1 (`review`) and D2 (`user`, `shipping`, `notification`) have
 recorded evidence on `platform-db`; see Implementation History. The expanded
-access contract below is **planned**, accepted in direction on 2026-10-15.
+access contract below is **planned**, accepted on 2026-10-15 as
+[ADR-089](../../adr/ADR-089-postgresql-access-contract/).
 Documentation review is not evidence that TLS, attribution or new consumer
 profiles have been deployed. Remaining fleet adoption stays pending.
 
@@ -69,25 +70,26 @@ They describe their recorded environment, not a fresh audit of the whole fleet.
 - RLS or SECURITY DEFINER patterns without a concrete use case.
 - Claiming Keycloak, Temporal, payment or CDC already satisfy the target paths;
   existing direct consumers need integration work before cutover.
-- A broad rotation audit or approval of specific rotation cadences.
+- A broad rotation audit.
 
 ## Decision outcome
 
-Owner decisions recorded 2026-10-15:
+Owner decisions recorded 2026-10-15, as
+[ADR-089](../../adr/ADR-089-postgresql-access-contract/):
 
 | Topic | Decision | Adoption / remaining work |
 |---|---|---|
 | Authorization | Platform-owned; retain owner/migrator/runtime split | ADR-088, D1/D2 evidence; remaining services pending |
 | Migration | Direct primary endpoint, bypass pooler | Preserve direct access; verify owner-at-login and locks |
 | Other consumers | Runtime, data, CDC and other SQL consumers use poolers | Planned; select compatible profiles before cutover |
-| Internal operations | Operator, node replication and backup/recovery retain native/direct paths | Preserve tool requirements; do not force through app pools |
+| Internal operations | Operator, node replication, per-instance monitoring and backup/recovery retain native/direct paths | Preserve tool requirements; do not force through app pools |
 | Break-glass | Controlled direct access for recovery | Explicit exception, scoped access and revocation procedure |
 | Pooler implementation | Keep PgDog and PgBouncer | Compatibility verified per deployed version and profile |
 | TLS | Applications support TLS; verify-full on both pooled hops | Planned; direct migration verifies its single hop |
 | User/password | Fixed usernames; both automatic and manual password policies | Per-role policy/cadence accepted below; delivery implementation pending |
 | Role model | NOLOGIN owner; separate migration/runtime; data/CDC/monitoring/platform templates | Templates below; new consumers not yet provisioned |
 | Attribution | application_name is required | Workload-only naming accepted; implementation and telemetry gate pending |
-| Consistency/retry | Primary by default; replica reads explicit; no blind replay of ambiguous writes | Apply these rules in implementation contracts |
+| Consistency/retry | Primary by default; replica reads explicit; no blind replay of ambiguous writes | PgDog splits reads today; turning that off is a rollout gate |
 
 ## Proposal
 
@@ -105,6 +107,23 @@ No password, CA private key or full credential-bearing DSN belongs in Git,
 logs or issue evidence. Endpoint abstraction does not hide consistency semantics
 or remove application responsibility for safe transaction retry.
 
+### Current baseline
+
+Repository review of `main` on 2026-10-15 (manifests, not a runtime audit):
+
+| Consumer | Route today | TLS today | `application_name` today |
+|---|---|---|---|
+| user, review, shipping, notification | CNPG PgBouncer `platform-db-pooler-rw` → primary | `sslmode=disable` | not set |
+| product, cart, order, checkout, inventory, order-worker, checkout-worker | PgDog `pgdog-product` → primary for writes and transactions, `product-db-r` for other `SELECT`s | `sslmode=disable` | not set; PgDog reports `PgDog` |
+| payment | direct `product-db-rw` | `require` (no verification) | not set |
+| Migrations (all ten services) | direct `-rw` | `require` (no verification) | not set |
+| Keycloak, Temporal | direct `platform-db-rw` | JDBC / plugin defaults | driver defaults |
+| OpenBAO database engine | direct `platform-db-rw` | `sslmode=disable` | not set |
+| Monitoring | CNPG exporter inside each instance (:9187), pooler metrics, `pg_stat_ch` in-server | n/a (local) | `cnpg_metrics_exporter` and similar |
+
+Migrations already take the target path. Runtime TLS, attribution and the
+PgDog read split are the gaps the contract closes.
+
 ### Connection matrix
 
 All target changes below are **planned** unless backed by the existing adoption
@@ -112,11 +131,12 @@ record. Native/direct does not mean unencrypted or unauthenticated.
 
 | Consumer | Target route | Constraint |
 |---|---|---|
-| API / workers | Pooler → primary by default | Runtime identity; explicit replica profile only when stale reads are acceptable |
+| API / workers | Pooler → primary by default | Runtime identity; explicit replica profile only when stale reads are acceptable. PgDog's automatic read split is turned off first |
 | Migration | Direct primary (`-rw`), no pooler | Migrator identity; owner-at-login; stable backend during lock lifetime |
 | Data robot / reporting | Pooler → primary or explicit replica profile | Dataset-scoped SELECT; timeout and connection budget |
 | CDC | Replication-compatible pooler → source primary | Snapshot, replication protocol, reconnect and slot recovery must pass before adoption |
-| Monitoring / platform SQL jobs | Compatible pooler profile | Preserve required session settings and permissions; not automatically transaction mode |
+| Monitoring | Native, per instance: CNPG exporter, `pg_stat_ch`, pooler metrics | A pooler reaches one primary and would hide replicas; a future database-scoped SQL monitor gets its own pooled profile |
+| Platform SQL jobs | Compatible pooler profile (authz Job, pgroles and OpenBAO connect direct today) | Preserve required session settings and permissions; not automatically transaction mode |
 | CNPG operator / node replication | Native/operator path | Operator-managed lifecycle; not an application-pool migration |
 | Backup / recovery | Tool-native path, including object storage | Do not reinterpret restore/WAL transfer as pooled application SQL |
 | Break-glass | Controlled direct path | Recovery when access layer fails; scoped credentials, record use, revoke afterwards |
@@ -134,7 +154,7 @@ Existing direct integrations remain current reality until their gated cutover.
 | `<svc>_runtime` | LOGIN; no ownership or privileged membership; object grants | Pooled API/worker access |
 | `<svc>_reader_data` | Separate robot login; SELECT on approved datasets/views | Pooled; no blanket PII access; one accountable consumer |
 | `<svc>_cdc_<consumer>` | Separate login; snapshot/replication rights required by connector | Pooled after compatibility gate; separate from data reader |
-| Monitoring | Minimum observation privileges needed by exporter | Pooled compatible profile; no business DML |
+| Monitoring | Minimum observation privileges needed by exporter | Native per-instance path (CNPG-managed); no business DML |
 | Platform authz / rotation | Separate functional identities, narrowly scoped elevated rights | One writer per role/grant/password concern; recovery procedure |
 | Support / break-glass | Individual, scoped access; no shared application login | Human-access implementation deferred; controlled direct recovery exception |
 
@@ -156,37 +176,53 @@ accepted exception in the evidence; this refactor does not claim it was removed.
 
 ## Architecture & Diagrams
 
-This diagram answers which target consumer paths are pooled and which are direct.
-It shows the **planned access contract**, not a new deployment measurement.
-Authorization ownership is explained in ADR-088 rather than duplicated here.
+This diagram answers which path each consumer takes to PostgreSQL, today and
+under the contract. Solid edges are routes that exist now; each label names
+today's TLS and, after "planned", the target. Dotted edges are exceptions or
+planned-only changes. Authorization ownership is in ADR-088, the as-built
+topology in [database architecture](../../../databases/architecture.md).
 
 ```mermaid
 flowchart TB
-    subgraph cluster["Homelab cluster — planned access contract"]
-        app["API / worker / data / CDC<br/>planned pooled contract<br/>CDC protocol gate pending"]:::service
-        mig["Migration<br/>planned verified direct contract"]:::worker
-        pool["PgDog / PgBouncer<br/>planned verified profiles"]:::platform
-        primary[("PostgreSQL primary")]:::data
-        replica[("PostgreSQL replica")]:::data
-        ops["Operator / replication / backup<br/>native tool paths"]:::platform
-        emergency["Break-glass<br/>controlled direct exception"]:::platform
-        app -. "planned verify-full hop 1" .-> pool
-        pool -. "planned verify-full hop 2, default" .-> primary
-        pool -. "planned explicit stale-read profile" .-> replica
-        mig -. "planned verify-full, direct primary" .-> primary
-        ops -. "documented native/direct exception" .-> primary
-        emergency -. "documented recovery exception" .-> primary
+    subgraph cluster["Kind cluster · homelab"]
+        subgraph prod["product-db consumers"]
+            pay["payment<br/>existing direct, pooled cutover planned"]:::service
+            prapi["product · cart · order · checkout · inventory<br/>order-worker · checkout-worker<br/>runtime · application_name planned"]:::service
+        end
+        mig["migrate init containers · all services<br/>migrator, owner-at-login"]:::worker
+        subgraph plat["platform-db consumers"]
+            papi["user · review · shipping · notification<br/>runtime · application_name planned"]:::service
+            pdirect["Keycloak · Temporal · OpenBAO<br/>existing direct, pooled cutover planned"]:::platform
+        end
+        pgd["PgDog<br/>pgdog-product · transaction"]:::platform
+        pgb["CNPG PgBouncer<br/>platform-db-pooler-rw · transaction"]:::platform
+        rrep[("product-db replicas · -r")]:::data
+        rprim[("product-db primary · -rw")]:::data
+        pprim[("platform-db primary · -rw")]:::data
+        ops["CNPG operator · exporter per instance<br/>Barman · break-glass"]:::platform
     end
+
+    papi -->|"plaintext; planned verify-full"| pgb
+    pgb -->|"verify-ca; planned verify-full"| pprim
+    prapi -->|"plaintext; planned verify-full"| pgd
+    pgd -->|"writes, transactions; planned verify-full"| rprim
+    pgd -. "automatic read split today;<br/>planned: explicit stale-read profile only" .-> rrep
+    pay -->|"require; planned via PgDog"| rprim
+    pdirect -->|"direct; planned pooled profile"| pprim
+    mig -->|"direct -rw, require; planned verify-full"| pprim
+    mig -->|"direct -rw, require; planned verify-full"| rprim
+    rprim -. "native per-instance path, not pooled" .- ops
+    pprim -. "native per-instance path, not pooled" .- ops
+
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef worker fill:#fef3c7,color:#78350f,stroke:#d97706;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
-Legend: cyan = consumer, amber = migration work, purple = platform,
-green = data. Dotted paths explicitly name planned behavior or an exception.
-Backup object-storage flows are outside this connection-routing question; see
-[database architecture](../../../databases/architecture.md).
+Legend: cyan = application consumer, amber = migration, purple = platform
+component or exception, green = PostgreSQL. CDC and data robots are not
+deployed and have no box; their target is in the connection matrix.
 
 ## Design Details
 
@@ -205,7 +241,7 @@ connection for lock/work/unlock. COMMIT does not release a session lock.
 Test concurrent runners and cleanup after success, failure and process death.
 On failover, abort and inspect migration version/dirty state before recovery;
 do not blindly replay DDL. Session pooling was considered but is not the chosen
-migration route. See [PostgreSQL advisory locks](https://www.postgresql.org/docs/18/explicit-locking.html#ADVISORY-LOCKS).
+migration route (PostgreSQL advisory locks: see Related).
 
 ### TLS and CA lifecycle
 
@@ -223,8 +259,18 @@ must actually reload trust; updating a mounted file alone is insufficient.
 No fallback to plaintext or disabled hostname verification on failure.
 
 The lifecycle is decided. Set the CA overlap duration, renewal thresholds,
-component reload mechanisms and error budget during implementation planning. Reuse [RFC-0020](../RFC-0020/) for internal
-TLS ownership; this RFC defines the database consumer boundary.
+component reload mechanisms and error budget during implementation planning.
+Reuse [RFC-0020](../RFC-0020/) for internal TLS ownership; this RFC defines
+the database consumer boundary.
+
+**Pooler support** (upstream source read 2026-10-15, not yet exercised here):
+
+| Pooler | Hop 1: client → pooler | Hop 2: pooler → PostgreSQL |
+|---|---|---|
+| CNPG PgBouncer (CNPG 1.30) | Operator default `client_tls_sslmode=prefer`, serving the cluster's certificate, whose SANs do not name the pooler Service. Verify-full needs a `clientTLSSecret` issued for `platform-db-pooler-rw` | Operator default `server_tls_sslmode=verify-ca`; the Pooler webhook allows overriding it to `verify-full` (CNPG's own e2e fixture does) |
+| PgDog 0.1.26 (chart `v0.39`) | `tls_certificate` / `tls_private_key`, with `tls_client_required` to refuse plaintext | `tls_verify = verify_full` with `tls_server_ca_certificate` |
+
+Confirm the chart value names before rollout, and again after any PgDog bump.
 
 ### application_name and telemetry
 
@@ -236,17 +282,51 @@ telemetry dimension rather than changing the workload name.
 
 Keep existing service/worker names and `OTEL_SERVICE_NAME` unchanged. Migration
 uses the service name plus `-migrate`, even when it shares the service image.
-Platform injects the complete value; the shared client maps it to the PostgreSQL
-startup parameter on every connection. Inventory each workload during rollout.
+
+**Delivery:** the platform sets the standard libpq variable `PGAPPNAME`; no
+custom variable is introduced. pgx reads `PGAPPNAME` when the DSN carries no
+`application_name`, and both `dbx.NewPool` (`pgxpool.ParseConfig`) and
+`migratex` (golang-migrate's pgx/v5 driver) parse through pgx, so service code
+does not change. Confirm with `SHOW application_name` from a pod at rollout.
+
+| Workload | Declared in | Mechanism | Value |
+|---|---|---|---|
+| API of each service | domain ResourceSet, main container | `PGAPPNAME: << inputs.name >>` | `user`, `review`, `shipping`, `notification`, `product`, `cart`, `order`, `checkout`, `inventory`, `payment` |
+| Migration of each service | domain ResourceSet, `migrate` init container | `PGAPPNAME: << inputs.name >>-migrate` | `user-migrate` … `payment-migrate` |
+| Workers | `order-worker.yaml`, `checkout-worker.yaml` | `PGAPPNAME` | `order-worker`, `checkout-worker` |
+| Local-stack | `local-stack/compose.yaml`, per service | `PGAPPNAME` | same values as the cluster |
+| Role catalog Job and CronJob | `platform-db/authz/job.yaml` | `PGAPPNAME` (psql) | `db-authz` |
+| Keycloak | Keycloak Deployment | JDBC URL property `ApplicationName` | `keycloak` |
+| Temporal | Temporal HelmRelease persistence | SQL `connectAttributes` (confirm the chart passes it) | `temporal` |
+| OpenBAO database engine | `connection_url` in `openbao-db-config.yaml` | `application_name` parameter | `openbao` |
+| pgroles | `PostgresPolicy` connection params, if supported | `application_name` parameter | `pgroles` |
+| CNPG internals, Barman, `pg_stat_ch` exporter, PgDog's own connections | set by the operator or the tool | unchanged | e.g. `cnpg_metrics_exporter`, `PgDog` |
+
+Roll out the application rows first (one environment line each); platform
+rows follow.
 
 Use lowercase ASCII letters/digits/hyphens and at most 63 bytes for a standard
 PostgreSQL build; reject rather than silently truncate. No pod UID, release
 SHA, request ID or secret in this label. The label is client-supplied
 observability metadata, never authorization.
 
-Repository inspection on 2026-10-15 found the workload names in Compose/domain
-ResourceSets but no explicit PostgreSQL `application_name`/`PGAPPNAME` wiring
-in the searched service/shared-client configuration. This is not runtime proof.
+Repository inspection on 2026-10-15 found no `application_name`/`PGAPPNAME`
+wiring in the manifests or the shared client. The #1265 Kind audit matched it:
+`pg_stat_ch.app` was empty on platform-db and `PgDog` on product-db.
+
+**Through the poolers** (upstream source read 2026-10-15):
+
+- PgDog opens server connections as `PgDog`. On each checkout,
+  `Server::link_client` replays the client's startup parameters, including
+  `application_name`, with `SET`, and resets them when the connection returns
+  to the pool (present in 0.1.26 and current main). The cost is one extra
+  `SET` whenever a backend changes hands between clients with different names.
+- PgBouncer tracks `application_name` as a client parameter in transaction
+  mode; confirm on the deployed version.
+- `pg_stat_ch` reads the live `application_name` setting at capture time, so
+  a value set by the pooler is what lands in ClickHouse.
+- Behind a pooler, `client_addr` is the pooler's address. `application_name`
+  is the only per-workload dimension in query telemetry.
 
 [Query telemetry](../../../observability/metrics/postgresql/query-telemetry.md)
 already maps `pg_stat_ch.app` to `application_name`; that mapping stays.
@@ -270,8 +350,8 @@ Exactly one writer changes a role's password. The notification static-role
 pilot declares `720h` in the repository; other roles do not inherit that policy
 by implication. Do not let CNPG/catalog overwrite an engine-managed password.
 An OpenBAO static-role creation can rotate immediately; manual rotate-role
-invocation does not disable its automatic schedule. See
-[OpenBAO database API](https://openbao.org/docs/api/secret/databases/).
+invocation does not disable its automatic schedule (OpenBAO database API:
+see Related).
 
 The following trigger/cadence mapping is **accepted for operation**; rollout
 is still planned:
@@ -282,14 +362,16 @@ is still planned:
 | Runtime / data robots | Automatic, 30 days | Fresh authentication and consumer reload proven |
 | Migrator | Manual workflow, 30 days | No concurrent migration; separate delivery/recovery |
 | CDC | Manual, 90 days initially; review monthly | Temporary exception until reconnect/slot/offset recovery permits automatic 30 days |
-| Monitoring | Automatic, 90 days | Minimum privileges; shorten if sensitive/wide access |
-| Authz / rotation management / pooler lookup | Manual workflow, 30 days | Scoped identity and independent recovery path |
+| Monitoring (SQL login, if one is added) | Automatic, 90 days | Minimum privileges; shorten if sensitive/wide access. The native CNPG exporter has no password |
+| Authz / rotation management | Manual workflow, 30 days | Scoped identity and independent recovery path |
+| Pooler lookup: CNPG PgBouncer | Certificate lifecycle, not a password | The operator authenticates `cnpg_pooler_pgbouncer` with a TLS client certificate |
+| Pooler lookup: PgDog | Follows each runtime password today | PgDog's user list is static (`valuesFrom`, ADR-014) and needs a reconcile after every rotation; `passthrough_auth` (ADR-025) removes that copy before automatic 30-day runtime rotation on product-db |
 | Break-glass | After use; access review every 90 days | Review frequency is not a password rotation schedule |
 | Operator-managed internals / humans | Separate lifecycle | Do not impose application machine-password policy |
 
-These are accepted homelab defaults, not universal security requirements or
-GitLab.com's verified internal cadence. Suspected compromise or revocation
-requires immediate handling regardless of a periodic schedule.
+These are accepted homelab defaults, not universal security requirements.
+Suspected compromise or revocation requires immediate handling regardless of
+a periodic schedule.
 
 **Accelerated audit only:** use a 3-hour rotation-period override in an
 isolated audit environment; extend to 5 hours or 1–2 days if observation needs
@@ -318,6 +400,12 @@ with a reconciler.
 
 - Default reads and writes to primary. Replica access is explicit per flow,
   with a lag tolerance; it is not an automatic optimization for every SELECT.
+- **Gap today:** PgDog sends every `SELECT` outside a transaction to
+  `product-db-r` for all six product-db databases, so a read right after a
+  committed write can be stale. Target: the default PgDog pools route to the
+  primary only, and a flow that accepts stale reads opts into a separate
+  replica profile (for example a dedicated database alias) with a declared lag
+  tolerance. Changing this is a rollout gate.
 - Read-after-write stays on primary for the relevant workflow. Existing
   transaction/snapshot semantics still apply; primary routing is not a promise
   of a globally fresh snapshot inside an older transaction.
@@ -364,6 +452,22 @@ No new numerical SLO or mandatory fleet-wide rotation audit is approved here.
 | Canary access contract | Migration direct, runtime pooled; TLS negatives, attribution and minimum rotation delivery gate |
 | Remaining fleet / data / CDC | Consumer-by-consumer evidence; local-stack parity and Linux/Kind gates before qualified rollout |
 
+**Authorization rollout still open** (ADR-088), by domain and never all
+databases at once:
+
+| Wave | Consumers | Notes |
+|---|---|---|
+| product-db, catalog | product, inventory | First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014) |
+| product-db, checkout | cart, order, checkout, payment, order-worker, checkout-worker | Workers share their service's runtime role; payment also leaves its direct path when the pooled profile is ready |
+| Close | — | Fleet gate on a fresh bring-up, ADR-084/086/088 adoption complete |
+
+Carried into the next fresh bring-up from the #1265 audit: re-run the
+`pg_stat_ch` rows for the schema Job, both clusters filling the rollups and
+the INSERT-only writer, with no hand-run `ALTER`. The databases wave
+substitutes `${...}` in everything it renders, so every new authz script needs
+the `kustomize.toolkit.fluxcd.io/substitute: disabled` opt-out until that
+substitution is narrowed to the CNPG `Cluster` manifests.
+
 Preserve data during access changes: restore a known-good endpoint/config and
 compatible trust/credential state, then verify new connections. Recreating a
 cluster was the historical disposable-lab cutover approach, not a rollback
@@ -375,6 +479,8 @@ Never restore a compromised or revoked password as a rollback target.
 ## Testing / verification
 
 - Documentation PR: render diagrams, check links/fences and run `make validate`.
+- Re-run the 14 PG18/CNPG experiments in [research](./research.md) on every
+  CNPG minor or major upgrade (CNPG-04 in particular).
 - Runtime implementation: positive CRUD/migration, negative DDL/grants/SET ROLE,
   catalog ownership/default ACLs/membership options; retain D2 exceptions explicitly.
 - Two direct migrators: serialization, same backend per lock lifetime, cleanup
@@ -397,15 +503,37 @@ are implementation tasks, not unapproved alternatives or completed deployment:
 
 | Workstream | Accepted direction | Required before rollout |
 |---|---|---|
-| application_name | Stable workload only; migration suffix -migrate | Workload inventory, shared-client mapping and end-to-end telemetry evidence |
+| application_name | Stable workload only; migration suffix -migrate; `PGAPPNAME` per the naming table | `SHOW application_name` from each workload, interleaved clients through each pooler, end-to-end telemetry evidence |
 | CA lifecycle | Trust overlap → verified reload → cert switch → new-connection checks → remove old trust | Durations, renewal settings, component reload support and failure budget |
 | Rotation | Accepted per-role 30/90-day table and lifecycle exceptions | Single writer, owner, consumer reload and recovery; isolated 3-hour audit override |
-| Pooler profiles | Keep both products; compatible profile per consumer | Versioned TLS/session/replication matrix, particularly CDC and platform jobs; failed gate blocks cutover |
-| Replica reads | Primary default; explicit stale-read flows only | Per-flow lag tolerance and fallback defined before enabling replica access |
+| Pooler profiles | Keep both products; compatible profile per consumer | Versioned TLS/session/replication matrix, particularly CDC and platform jobs; CNPG Pooler `clientTLSSecret` for the pooler Service; PgDog chart TLS values confirmed; failed gate blocks cutover |
+| Replica reads | Primary default; explicit stale-read flows only | Turn off PgDog's automatic read split; per-flow lag tolerance and fallback defined before enabling replica access |
+| PgDog version | Chart `v0.39` (PgDog 0.1.26); the features above exist there | Bump in its own change after this RFC update, with release notes, a values diff and a product-db Kind gate |
 
 The former service `WithSetRole` design is superseded by ADR-088. Exact
 data/CDC grants must be scoped to their datasets and connector requirements
 before provisioning. Accepted direction does not waive compatibility gates.
+
+## Historical decisions
+
+Resolved before the access contract and still in force unless noted:
+
+- **Canary** — `review` (2026-10-06).
+- **Drift collector** — CNPG monitoring query plus alert (ADR-086).
+- **Ownership transfer** — new clusters need none; existing data moves once
+  per service by an operator runbook (ADR-084).
+- **Local-stack** — mirrors the three roles for every converted service.
+- **Compatibility window** — none. Greenfield: the legacy login is never
+  created (2026-10-06).
+- **Chart Secret inputs** — no `duynh` chart change; the domain ResourceSets
+  carry separate runtime and migration Secret inputs.
+- **`PUBLIC CONNECT`** — kept on the cluster because `pg_hba` is the fence
+  (ADR-015); local-stack revokes it because it has no other fence. A
+  deliberate difference, recorded in the authorization guide.
+- **Alert and gate** — both: `CNPGRoleMembershipDrift` pages, and the Kind
+  gate asserts no drift and runs negative rows as the real logins.
+- **How migrations reach the owner** — `migratex.WithSetRole` (2026-10-06),
+  superseded by ADR-088's owner-at-login (2026-10-12).
 
 ## Resulting decisions
 
@@ -415,7 +543,7 @@ before provisioning. Accepted direction does not waive compatibility gates.
 | Service-owned authorization | [ADR-085](../../adr/ADR-085-service-migrations-own-authorization/) | Historical; superseded by ADR-088 |
 | Membership-option guard | [ADR-086](../../adr/ADR-086-guard-membership-options/) | Accepted |
 | Platform-owned authorization | [ADR-088](../../adr/ADR-088-platform-owns-database-authorization/) | Accepted; partial adoption |
-| Access paths, verified TLS and required attribution | This RFC, Decision outcome, owner decision 2026-10-15 | Accepted direction; planned rollout; implementation prerequisites remain |
+| Access paths, verified TLS, required attribution, rotation defaults | [ADR-089](../../adr/ADR-089-postgresql-access-contract/) | Accepted; adoption not started |
 
 ## Implementation History
 
@@ -460,4 +588,5 @@ before provisioning. Accepted direction does not waive compatibility gates.
 - [RFC-0020](../RFC-0020/) — internal TLS ownership
 - [RFC-0030](../RFC-0030/) — CDC/analytics integration and downstream contract
 - [Rotate vault_rotator](../../../databases/runbooks/rotate-vault-rotator-credential.md)
+- [PostgreSQL advisory locks](https://www.postgresql.org/docs/18/explicit-locking.html#ADVISORY-LOCKS), [OpenBAO database secrets API](https://openbao.org/docs/api/secret/databases/) — official references
 - [ADR-013](../../adr/ADR-013-per-service-db-triplet/), [ADR-014](../../adr/ADR-014-pooler-credentials-valuesfrom/), [ADR-015](../../adr/ADR-015-pg-hba-connection-isolation/), [ADR-025](../../adr/ADR-025-pgdog-passthrough-dynamic-db-creds/) — related identity, admission and credential records

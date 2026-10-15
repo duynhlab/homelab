@@ -27,7 +27,13 @@ const CATALOG = '/product/v1/public/products';
 // The ten deployed services. `auth` is retired (Keycloak replaced it) and its
 // continued absence is an assertion, not an omission.
 // Membership edges the ADR-086 guard must report, as member->parent.
-const GUARDED_EDGES = ['vault_rotator->notification', 'review_migrator->review_owner'];
+const GUARDED_EDGES = [
+  'vault_rotator->notification', 'review_migrator->review_owner', 'db_authz->authz_admin',
+];
+// ADR-088: roles whose session defaults (role=<owner>) and databases whose
+// owner default privileges are guarded.
+const GUARDED_ROLE_CONFIG = ['review_migrator'];
+const GUARDED_DEFAULT_ACL_DBS = ['review'];
 
 const SERVICES = [
   'cart', 'checkout', 'inventory', 'notification', 'order',
@@ -418,12 +424,12 @@ const UNITS = [
     },
   },
   {
-    // ADR-086 / RFC-0029: CNPG declares only a membership's name, so the PG18
-    // options of guarded edges are watched by the pg_role_membership query.
-    // The row asserts the guard is reporting (a series per guarded edge) and
-    // that nothing has drifted. Phase 2 adds each <svc>_migrator -> <svc>_owner
-    // edge to GUARDED_EDGES in the same PR that adds it to the query.
-    name: 'guarded database memberships have not drifted',
+    // ADR-086 / ADR-088: the PG18 options of guarded edges, the migrators'
+    // role=<owner> defaults and the owners' default privileges are watched by
+    // the pg_role_membership / pg_role_config / pg_default_privileges queries.
+    // The row asserts each guard is reporting and that nothing has drifted. A
+    // PR that adds a guarded edge, role or database adds it here too.
+    name: 'guarded database authorization has not drifted',
     rows: { kind: 'K3.7' },
     group: 'telemetry',
     run(id) {
@@ -433,9 +439,24 @@ const UNITS = [
         'edge'
       );
       const worst = promqlScalar(target.vm, 'max(cnpg_pg_role_membership_drift)');
+      const perRole = promqlCountBy(target.vm, 'count by (role) (cnpg_pg_role_config_drift)', 'role');
+      // Every instance runs the query, so collapse instances before counting types.
+      const perDb = promqlCountBy(
+        target.vm,
+        'count by (datname) (max by (datname, objtype) (cnpg_pg_default_privileges_drift))',
+        'datname'
+      );
+      const worstAuthz = promqlScalar(
+        target.vm,
+        'max(cnpg_pg_role_config_drift or cnpg_pg_default_privileges_drift)'
+      );
       rowCheck(id, null, {
         'the guard reports every guarded edge': () => GUARDED_EDGES.every((e) => perEdge[e] > 0),
         'no guarded edge has drifted': () => worst === 0,
+        'the guard reports every guarded role config': () => GUARDED_ROLE_CONFIG.every((r) => perRole[r] > 0),
+        'the guard reports every guarded database (3 object types)': () =>
+          GUARDED_DEFAULT_ACL_DBS.every((d) => perDb[d] === 3),
+        'no role config or default privilege has drifted': () => worstAuthz === 0,
       });
     },
   },

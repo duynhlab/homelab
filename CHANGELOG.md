@@ -130,6 +130,16 @@ Skeleton (copy what you need):
 
 #### Observability
 
+- **Authorization guards beyond membership options (ADR-088).** New CNPG
+  queries `pg_role_config` (each migrator's `role=`) and
+  `pg_default_privileges` (each Job-owned database's owner defaults), the
+  `db_authz → authz_admin` edge in `pg_role_membership`, and alerts
+  `CNPGRoleConfigDrift`, `CNPGDefaultPrivilegesDrift`,
+  `CNPGAuthorizationGuardMissing` with runbooks. K3.7 asserts all three guards;
+  K3.8/K3.9 check the migrator is the owner from login and after `RESET ROLE`;
+  K3.10 checks the catalog Job; the isolation sweep adds `db_authz` and the
+  `postgres` database.
+
 - **Kind gate row K3.7: guarded database memberships have not drifted.**
   `smoke.js` asserts that the ADR-086 guard reports a series for every edge in
   `GUARDED_EDGES` (today `vault_rotator → notification`) and that
@@ -168,6 +178,22 @@ Skeleton (copy what you need):
   ownership conflict.
 
 #### Databases
+
+- **The platform applies review's database authorization (ADR-088).** review
+  no longer carries roles or grants: an `authz_admin` role (bootstrap SQL,
+  NOLOGIN CREATEROLE, unmanaged by CNPG) reached by the `db_authz` login (CNPG
+  `DatabaseRole`, `inRoles: [authz_admin]`, random OpenBAO password) runs a
+  role catalog Job on every change and a CronJob every 10 minutes. It creates
+  `review_owner` and `review_migrator`, sets `ALTER ROLE review_migrator SET
+  role = review_owner` so the migrator is the owner at login, keeps the
+  membership `f/f/t` and exact, and applies review's grants, default privileges
+  and `REVOKE EXECUTE … FROM PUBLIC`. It creates `schema_migrations` as the
+  owner before the first migrate, so the runtime never holds it. Drift it
+  may not repair fails the run (`KubeJobFailed`). The owner and migrator `DatabaseRole`s are gone, the
+  catalog template drops `DB_MIGRATION_ROLE`, review is pinned to `2.6.0`, and
+  local-stack runs the cluster's `grants.sql` after review's migration.
+  One executor role in CNPG would deadlock a new cluster (CNPG creates a role
+  with `CREATE ROLE … IN ROLE`) or have its memberships revoked, hence two.
 
 - **review runs on three database roles (RFC-0029 Phase 2 canary).**
   `review_owner` (cannot log in) owns the database; `review_migrator` reaches
@@ -223,6 +249,12 @@ Skeleton (copy what you need):
   secrets diagrams.
 
 #### Proposals
+
+- **ADR-088 supersedes ADR-085.** Database authorization is platform-owned:
+  roles by the catalog Job, in-database grants by that Job or by pgroles;
+  services receive credentials only. Evidence from the 2026-10-12 pgroles/CNPG
+  lab (PGR-01…09, CNPG-08…10). ADR-084 and ADR-086 amended, RFC-0029 records
+  the pause and the redesign; `authorization.md` rewritten with exec evidence.
 
 - **RFC-0011 refreshed; ADR-087 proposed for homelab access.** Correct the
   M720q disk assumptions, replace unverified capacity and purchase claims with

@@ -57,6 +57,9 @@ alerts, and operator health. One file per alert name — each file covers both
 | CNPGIdleInTransaction | warning | deep-signal | active | [CNPGIdleInTransaction.md](CNPGIdleInTransaction.md) |
 | CNPGRoleMembershipDrift | critical | role-membership | active | [CNPGRoleMembershipDrift.md](CNPGRoleMembershipDrift.md) |
 | CNPGRoleMembershipGuardMissing | warning | role-membership | active | [CNPGRoleMembershipGuardMissing.md](CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleConfigDrift | critical | role-membership | active | [CNPGRoleConfigDrift.md](CNPGRoleConfigDrift.md) |
+| CNPGDefaultPrivilegesDrift | critical | role-membership | active | [CNPGDefaultPrivilegesDrift.md](CNPGDefaultPrivilegesDrift.md) |
+| CNPGAuthorizationGuardMissing | warning | role-membership | active | [CNPGAuthorizationGuardMissing.md](CNPGAuthorizationGuardMissing.md) |
 | CNPGInstanceMetricsAbsent | — | chart upstream | not deployed | — |
 
 ## Validation levels

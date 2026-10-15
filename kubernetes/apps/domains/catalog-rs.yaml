@@ -289,7 +289,7 @@ spec:
                 value: << inputs.name >>
               - name: DB_SSLMODE
                 value: "require"
-              # RFC-0029: the migrator logs in, then SET ROLE <name>_owner.
+              # RFC-0029 / ADR-088: the migrator login becomes <name>_owner at login.
               <<- if (index inputs "db_migrator_secret") >>
               - name: DB_USER
                 valueFrom:
@@ -301,8 +301,6 @@ spec:
                   secretKeyRef:
                     name: << inputs.db_migrator_secret >>
                     key: password
-              - name: DB_MIGRATION_ROLE
-                value: << inputs.name >>_owner
               <<- else >>
               - name: DB_USER
                 value: << index inputs "db_user" | default inputs.name >>

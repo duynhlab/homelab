@@ -6,7 +6,7 @@
 | **Source** | [`role-membership-alerts.yaml`](../../../../kubernetes/infra/configs/observability/metrics/prometheusrules/postgres/role-membership-alerts.yaml) ([ADR-086](../../../proposals/adr/ADR-086-guard-membership-options/)) |
 | **Clusters** | `platform-db` |
 | **Custom query** | `pg_role_membership` ([`monitoring-queries.yaml`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/configmaps/monitoring-queries.yaml)) |
-| **Guarded edges** | `vault_rotator → notification` = `ADMIN TRUE, INHERIT FALSE, SET FALSE` |
+| **Guarded edges** | `vault_rotator → notification` = `ADMIN TRUE, INHERIT FALSE, SET FALSE` · `review_migrator → review_owner` = `ADMIN FALSE, INHERIT FALSE, SET TRUE` · `db_authz → authz_admin` = `ADMIN FALSE, INHERIT TRUE, SET TRUE` ([ADR-088](../../../proposals/adr/ADR-088-platform-owns-database-authorization/)) |
 
 ## Meaning
 

@@ -56,8 +56,10 @@ done
 
 # review is split into three roles (RFC-0029); review_owner has no pg_hba line,
 # so every probe of it must be rejected.
-platform_roles=(user notification shipping review_owner review_migrator review_runtime temporal vault_rotator)
-platform_dbs=(user notification shipping review temporal temporal_visibility)
+# db_authz (ADR-088) applies authorization from `postgres` and inside review;
+# `postgres` is in the matrix so every other login is proven shut out of it.
+platform_roles=(user notification shipping review_owner review_migrator review_runtime temporal vault_rotator db_authz)
+platform_dbs=(user notification shipping review temporal temporal_visibility postgres)
 for r in "${platform_roles[@]}"; do
   for d in "${platform_dbs[@]}"; do
     expect_put "platform/$r/$d" reject
@@ -76,7 +78,7 @@ done
 for p in user/user notification/notification shipping/shipping \
          review_runtime/review review_migrator/review \
          temporal/temporal temporal/temporal_visibility \
-         vault_rotator/notification; do
+         vault_rotator/notification db_authz/postgres db_authz/review; do
   expect_put "platform/${p%%/*}/${p##*/}" allow
 done
 

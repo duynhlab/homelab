@@ -710,21 +710,21 @@ cannot be derived from a single file — they get their own row (K2.3).
   not runnable while this is off.
   Reference: [`mcp-servers.md`](mcp-servers.md).
 
-- [ ] **K3.7** Guarded database memberships have not drifted
-  ([ADR-086](../proposals/adr/ADR-086-guard-membership-options/)). CNPG
-  declares only a membership's name, so the PG18 `ADMIN` / `INHERIT` / `SET`
-  options of security-relevant edges are watched by the `pg_role_membership`
-  custom query. Asserted by `make e2e-smoke` (`smoke.js`, `GUARDED_EDGES`):
-  every guarded edge reports a series, and `max(cnpg_pg_role_membership_drift)`
-  is `0`. The guarded edges are `vault_rotator → notification` and
-  `review_migrator → review_owner`; each RFC-0029 cutover adds its
-  `<svc>_migrator → <svc>_owner` edge to the query and to `GUARDED_EDGES` in the
-  same PR.
-  **FAIL:** a guarded edge with no series (the query or exporter is broken, see
-  [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md))
-  or a drift of `1` (repair with
-  [`CNPGRoleMembershipDrift`](../observability/runbooks/postgresql/CNPGRoleMembershipDrift.md);
-  do not relax the row).
+- [ ] **K3.7** Guarded database authorization has not drifted
+  ([ADR-086](../proposals/adr/ADR-086-guard-membership-options/),
+  [ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/)).
+  Three custom queries watch what CNPG cannot declare: `pg_role_membership`
+  (PG18 `ADMIN` / `INHERIT` / `SET` of guarded edges), `pg_role_config` (each
+  migrator's `role=<owner>`) and `pg_default_privileges` (each Job-owned
+  database's owner defaults). Asserted by `make e2e-smoke` (`smoke.js`): every
+  guarded edge, role and database reports, and every drift series is `0`. The
+  guarded edges are `vault_rotator → notification`, `review_migrator →
+  review_owner` and `db_authz → authz_admin`; each conversion adds its rows to
+  the queries and to `smoke.js` in the same PR.
+  **FAIL:** a missing series (the query or exporter is broken, see
+  [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md),
+  [`CNPGAuthorizationGuardMissing`](../observability/runbooks/postgresql/CNPGAuthorizationGuardMissing.md))
+  or a drift of `1` (repair with the matching runbook; do not relax the row).
 
 - [ ] **K3.8** The runtime login cannot change its schema (RFC-0029). As
   `<svc>_runtime`, through `pg_hba`: it reads its table, and `CREATE TABLE`,
@@ -733,14 +733,26 @@ cannot be derived from a single file — they get their own row (K2.3).
   `./scripts/db-authz-check.sh` (every converted service; today `review`).
   **FAIL:** any `K3.8-*` check not `PASS`, or fewer checks parsed than expected.
 
-- [ ] **K3.9** The migrator creates nothing as itself (RFC-0029). As
-  `<svc>_migrator`: `CREATE TABLE` is refused until `SET ROLE <svc>_owner` and
-  succeeds after it (in a rolled-back transaction); no relation in `public` is
-  owned by anyone but `<svc>_owner` (extension members such as
-  `pg_stat_statements`, created by CNPG as `postgres`, excepted); the membership reads `f/f/t`. Same script
-  as K3.8.
+- [ ] **K3.9** The migrator is the owner from login (RFC-0029, ADR-088). As
+  `<svc>_migrator`, with no `SET ROLE` anywhere: `current_user` is
+  `<svc>_owner` at login and after `RESET ROLE`; its `rolconfig` is
+  `role=<svc>_owner`; `CREATE TABLE` succeeds (rolled back); no relation in
+  `public` is owned by anyone but `<svc>_owner` (extension members such as
+  `pg_stat_statements`, created by CNPG as `postgres`, excepted); the membership
+  reads `f/f/t`. Same script as K3.8.
   **FAIL:** any `K3.9-*` check not `PASS`. An object owned by the migrator means
-  a migration ran without `SET ROLE`; fix the service, do not grant around it.
+  `role=` was missing when the migration ran: see
+  [`CNPGRoleConfigDrift`](../observability/runbooks/postgresql/CNPGRoleConfigDrift.md).
+
+- [ ] **K3.10** The role catalog converged (ADR-088).
+  `kubectl -n platform get job platform-db-authz` reads `Complete`, and the most
+  recent Job the `platform-db-authz` CronJob created succeeded
+  (`kubectl -n platform get jobs -l app.kubernetes.io/name=platform-db-authz`);
+  its log ends with `authz applied: roles [...] grants [...]`.
+  **FAIL:** a failed run. The log names the service and the statement; a
+  `permission denied to revoke privileges granted by role "postgres"` is drift
+  only an operator can remove (see
+  [`authorization.md`](../databases/authorization.md#the-role-catalog-job)).
 
 ---
 
@@ -1425,6 +1437,38 @@ Rows not run: <list, with why> — outstanding, not passed.
 ---
 
 ## Previous runs
+
+### 2026-10-15 — review's authorization moves to the platform (ADR-088, RFC-0029 D1)
+
+Cluster: kind `homelab`, Kubernetes 1.35.8, Kind CLI v0.33.0, recreated twice
+for this run (the first bring-up found finding 1)
+Host: Linux + Docker (`/var/lib/docker` on ZFS), arch amd64
+Revision: `feat/rfc0029-d1-platform-authz` at `eceab9dd`, review `2.6.0`;
+**DR replica off** (working-tree patch, not committed), so 28 declared +
+`flux-system` = 29 Kustomizations
+Preconditions: compose gate for review `2.6.0` (`d14e06f`) passed the same
+morning, A1–A14, A16–A23, B1–B10, C0–C22 · scope is the rows this change
+touches, listed below; K4/K5 ran only through `make e2e`
+
+| Group | Result | Evidence |
+|---|---|---|
+| K1 bring-up | PASS | `make up` exit 0; **29/29 Ready**; `kind-seed.sh` 8/8 |
+| K2 delivery | PASS | review pod on `review-service:2.6.0`; 7/7 ResourceSets Ready |
+| K3 admission/secrets | PASS, after finding 1 | 42/42 ExternalSecrets synced (incl. `platform-db-db-authz-secret`); db-isolation **99/99** (`db_authz` allowed only `postgres` and `review`); K3.7 **5/5**; K3.8–K3.9 **12/12**; K3.10 Job and first CronJob run Complete, `authz applied: roles [review] grants [review]` |
+| K4/K5 via k6 | PASS, after finding 2 | saga 4/4 (9/9), smoke 16/16 (55/55), staff 5/5 (59/59), operator 1/1 (26/26) |
+| Drift drill | PASS | four in-reach drifts repaired by one run, guards 1 → 0 within a minute each way, three alerts pending; a `postgres`-granted membership failed the run and the next scheduled one, `KubeJobFailed` firing after 5 min, recovered after a manual revoke ([evidence](../databases/authorization.md#evidence)) |
+
+Findings:
+
+1. **K3.8 failed on the first bring-up.** review's migrate created
+   `schema_migrations` four seconds after a CronJob run, so the owner's default
+   privileges left it with `INSERT`/`DELETE` for `review_runtime` until the next
+   run. Fixed in the same PR: the Job creates the table as the owner before any
+   migrate. The second bring-up passed.
+2. **K3.7 counted instances, not object types.** The `pg_default_privileges`
+   query runs on all three instances, so the row saw 9 series for `review`
+   where it wanted 3; every series was `0`. `smoke.js` now collapses instances
+   first.
 
 ### 2026-09-29 — the Kubernetes 1.35.8 baseline (RFC-0032 Phase 1)
 

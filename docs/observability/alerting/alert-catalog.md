@@ -28,7 +28,7 @@ prove every expression matched data.
 
 ## Summary
 
-**243 statically defined alerts** exist in `.yaml` files under
+**248 statically defined alerts** exist in `.yaml` files under
 `prometheusrules/**`. Re-derive that number rather than incrementing it:
 
 ```bash
@@ -37,7 +37,7 @@ rg '^\s*- alert:' \
   -g '*.yaml' | wc -l
 ```
 
-The 2026-10-06 breakdown is: postgres 61, microservices 52,
+The 2026-10-14 breakdown is: postgres 64, microservices 52,
 victoriametrics 31, kubernetes 29, observability 26, envoy-gateway 16, gitops 9,
 valkey 7, keycloak 5, kyverno 4, keda 4, and one root watchdog. The glob excludes
 retired `.yaml.bak` files. Two CNPG topology rules are gated and therefore not
@@ -283,6 +283,9 @@ checked here. Every guarded edge and its expected options are listed in the quer
 |-------|-----|------------------|--------|-----|---------|
 | CNPGRoleMembershipDrift | critical | `max by (cnpg_io_cluster, member, parent) (cnpg_pg_role_membership_drift)` >0 | A guarded edge is missing or has the wrong options: rotation breaks (no `ADMIN`) or the member gets the parent's data (`INHERIT` / `SET`) | 5m | [CNPGRoleMembershipDrift](../runbooks/postgresql/CNPGRoleMembershipDrift.md) |
 | CNPGRoleMembershipGuardMissing | warning | `absent(cnpg_pg_role_membership_drift{…vault_rotator → notification})` | The guard stopped reporting, so drift would go unseen | 15m | [CNPGRoleMembershipGuardMissing](../runbooks/postgresql/CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleConfigDrift | critical | `max by (cnpg_io_cluster, role) (cnpg_pg_role_config_drift)` >0 | A migrator lost `role=<owner>`: the next migration fails or creates objects the runtime cannot use | 15m | [CNPGRoleConfigDrift](../runbooks/postgresql/CNPGRoleConfigDrift.md) |
+| CNPGDefaultPrivilegesDrift | critical | `max by (cnpg_io_cluster, datname, objtype) (cnpg_pg_default_privileges_drift)` >0 | An owner's default privileges differ: new tables unreadable, over-granted, or functions executable by PUBLIC | 15m | [CNPGDefaultPrivilegesDrift](../runbooks/postgresql/CNPGDefaultPrivilegesDrift.md) |
+| CNPGAuthorizationGuardMissing | warning | `absent(cnpg_pg_role_config_drift{…})` or `absent(cnpg_pg_default_privileges_drift{…})` | The authorization guards stopped reporting, so drift would go unseen | 15m | [CNPGAuthorizationGuardMissing](../runbooks/postgresql/CNPGAuthorizationGuardMissing.md) |
 
 ## 5. Kubernetes
 

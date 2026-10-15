@@ -16,6 +16,7 @@ resources:
   - objectstore.yaml
   - instance.yaml
   - vault-rotator.yaml
+  - authz/  # ADR-088: db_authz + role catalog Job/CronJob
   - services/
   - openbao-db-config.yaml  # RFC-0008/ADR-025: enable DB engine + notification static-role (after platform-db)
   - configmaps/monitoring-queries.yaml

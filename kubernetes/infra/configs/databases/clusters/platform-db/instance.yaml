@@ -38,6 +38,10 @@ spec:
       # review: runtime and migrator only; review_owner never logs in (RFC-0029).
       - host review       review_runtime  all scram-sha-256
       - host review       review_migrator all scram-sha-256
+      # db_authz applies the role catalog in `postgres` and each service's
+      # in-database grants (ADR-088). One line per database it manages.
+      - host postgres     db_authz     all scram-sha-256
+      - host review       db_authz     all scram-sha-256
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
       # Keycloak connects direct to :5432 like temporal — its Agroal pool needs
@@ -146,6 +150,11 @@ spec:
         # deliberately false: the administrator rotates a credential but must
         # not inherit notification data access or become the notification role.
         - GRANT notification TO vault_rotator WITH INHERIT FALSE, SET FALSE, ADMIN TRUE
+        # Creator of every catalog role (ADR-088). Unmanaged by CNPG on purpose:
+        # CNPG revokes undeclared memberships of the roles it manages, and this
+        # role is a member of every role it creates. db_authz reaches it via SET
+        # ROLE. An existing cluster runs this once by hand (runbook).
+        - CREATE ROLE authz_admin NOLOGIN CREATEROLE INHERIT
 
   storage:
     size: 10Gi

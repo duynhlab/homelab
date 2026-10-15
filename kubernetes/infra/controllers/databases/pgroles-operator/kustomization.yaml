@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# pgroles operator (ADR-088): owns in-database grants for the services whose
+# PostgresPolicy lives beside their database. Own Flux wave
+# (clusters/local/pgroles-operator.yaml) so databases-local can wait for its CRDs.
+resources:
+  - helmrelease.yaml

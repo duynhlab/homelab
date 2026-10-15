@@ -1,0 +1,29 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pgroles-operator
+  namespace: pgroles-system
+spec:
+  releaseName: pgroles-operator
+  targetNamespace: pgroles-system
+  storageNamespace: pgroles-system
+  interval: 10m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: pgroles-operator-oci
+    namespace: flux-system
+  install:
+    # The chart ships its five CRDs in Helm's crds/ directory.
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    fullnameOverride: pgroles-operator
+    # The chart's securityContext, probes and resources are already restricted
+    # (non-root 65534, read-only root, drop ALL, 50m/64Mi requests).

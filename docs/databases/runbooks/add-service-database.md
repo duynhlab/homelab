@@ -94,15 +94,20 @@ authorization](../authorization.md)):
 5. **Role catalog** (`authz/job.yaml`, both the Job and the CronJob): add `<svc>`
    to `ROLE_SERVICES`, add the `<SVC>_MIGRATOR_PASSWORD` env from the migrator
    Secret, and either add `<svc>` to `GRANT_SERVICES` or give it a pgroles
-   policy (planned, D2).
+   policy: copy `authz/policies/user.yaml`, rename, and list it in
+   `authz/kustomization.yaml`. A pgroles-owned runtime holds
+   `schema_migrations` (PGR-10); choose the Job if that is not acceptable.
 6. **Guards:** the migrator edge in `pg_role_membership`, the migrator in
-   `pg_role_config`, the database in `pg_default_privileges` (Job-owned), the
-   `absent()` selectors and `smoke.js`.
-7. **InputProvider:** `db_runtime_secret`, `db_migrator_secret`,
+   `pg_role_config`, the database in `pg_default_privileges`, the `absent()`
+   selectors and `smoke.js` (`CONVERTED_SERVICES`).
+7. **Gate scripts:** `scripts/db-authz-check.sh` (`declare_service`: a table
+   and `denied`/`ok` for `schema_migrations`) and the platform matrix in
+   `scripts/db-isolation-sweep.sh`.
+8. **InputProvider:** `db_runtime_secret`, `db_migrator_secret`,
    `db_migration_host` (the primary).
-8. **Verify:** `kubectl -n platform logs job/platform-db-authz` ends with
-   `authz applied`, then `./scripts/db-authz-check.sh <svc>` after adding the
-   service to its table.
+9. **Verify:** `kubectl -n platform logs job/platform-db-authz` ends with
+   `authz applied`, the policy (if any) is `Ready`, then
+   `./scripts/db-authz-check.sh <svc>`.
 
 ## What you never do
 

@@ -14,20 +14,28 @@
 set -u
 
 IMAGE="ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
-# service -> "cluster namespace host". Add a service when it is converted.
+# service -> "cluster namespace host table migrations": one table the runtime
+# serves from, and what the runtime gets on schema_migrations. The Job denies
+# it (review); a pgroles table wildcard cannot exclude it, so pgroles-owned
+# databases grant it by decision (ADR-088, PGR-10). Add a service when it is
+# converted.
 declare_service() {
+  local pdb="platform-db platform platform-db-rw.platform.svc.cluster.local"
   case "$1" in
-    review) echo "platform-db platform platform-db-rw.platform.svc.cluster.local" ;;
+    review)       echo "$pdb reviews denied" ;;
+    user)         echo "$pdb user_profiles ok" ;;
+    shipping)     echo "$pdb shipments ok" ;;
+    notification) echo "$pdb notifications ok" ;;
     *) return 1 ;;
   esac
 }
-CONVERTED=(review)
+CONVERTED=(review user shipping notification)
 EXPECTED_CHECKS=12
 FAIL=0
 
 check_service() {
-  local svc="$1" cluster ns host
-  read -r cluster ns host <<<"$(declare_service "$svc")" || { echo "FAIL  unknown service $svc"; FAIL=1; return; }
+  local svc="$1" cluster ns host table migrations
+  read -r cluster ns host table migrations <<<"$(declare_service "$svc")" || { echo "FAIL  unknown service $svc"; FAIL=1; return; }
   local pod="db-authz-check-$svc-$$"
 
   # $1 = check name, $2 = role env prefix (RT|MG), $3 = expectation
@@ -44,12 +52,12 @@ check() {
     *)      [ "\$out" = "\$3" ] && echo "CHECK \$1 PASS \$out" || echo "CHECK \$1 FAIL want=\$3 got=\$out" ;;
   esac
 }
-check K3.8-runtime-reads           RT ok     "SELECT count(*) FROM public.reviews"
+check K3.8-runtime-reads           RT ok     "SELECT count(*) FROM public.$table"
 check K3.8-runtime-no-create       RT denied "CREATE TABLE public.k38_probe (i int)"
-check K3.8-runtime-no-alter        RT denied "ALTER TABLE public.reviews ADD COLUMN k38_probe int"
-check K3.8-runtime-no-drop         RT denied "DROP TABLE public.reviews"
+check K3.8-runtime-no-alter        RT denied "ALTER TABLE public.$table ADD COLUMN k38_probe int"
+check K3.8-runtime-no-drop         RT denied "DROP TABLE public.$table"
 check K3.8-runtime-no-owner        RT denied "SET ROLE ${svc}_owner"
-check K3.8-runtime-no-migrations   RT denied "SELECT count(*) FROM public.schema_migrations"
+check K3.8-runtime-migrations      RT $migrations "SELECT count(*) > 0 FROM public.schema_migrations"
 check K3.9-migrator-is-owner       MG ${svc}_owner "SELECT current_user"
 check K3.9-owner-after-reset       MG ${svc}_owner "RESET ROLE; SELECT current_user"
 check K3.9-role-config             MG role=${svc}_owner "SELECT array_to_string(rolconfig, ',') FROM pg_roles WHERE rolname = '${svc}_migrator'"

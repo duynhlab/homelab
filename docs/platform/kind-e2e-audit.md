@@ -715,12 +715,13 @@ cannot be derived from a single file — they get their own row (K2.3).
   [ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/)).
   Three custom queries watch what CNPG cannot declare: `pg_role_membership`
   (PG18 `ADMIN` / `INHERIT` / `SET` of guarded edges), `pg_role_config` (each
-  migrator's `role=<owner>`) and `pg_default_privileges` (each Job-owned
+  migrator's `role=<owner>`) and `pg_default_privileges` (each converted
   database's owner defaults). Asserted by `make e2e-smoke` (`smoke.js`): every
   guarded edge, role and database reports, and every drift series is `0`. The
-  guarded edges are `vault_rotator → notification`, `review_migrator →
-  review_owner` and `db_authz → authz_admin`; each conversion adds its rows to
-  the queries and to `smoke.js` in the same PR.
+  guarded edges are `vault_rotator → notification_runtime`, each
+  `<svc>_migrator → <svc>_owner` (review, user, shipping, notification) and
+  `db_authz → authz_admin`; each conversion adds its rows to the queries and to
+  `smoke.js` (`CONVERTED_SERVICES`) in the same PR.
   **FAIL:** a missing series (the query or exporter is broken, see
   [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md),
   [`CNPGAuthorizationGuardMissing`](../observability/runbooks/postgresql/CNPGAuthorizationGuardMissing.md))
@@ -728,9 +729,11 @@ cannot be derived from a single file — they get their own row (K2.3).
 
 - [ ] **K3.8** The runtime login cannot change its schema (RFC-0029). As
   `<svc>_runtime`, through `pg_hba`: it reads its table, and `CREATE TABLE`,
-  `ALTER TABLE`, `DROP TABLE`, `SET ROLE <svc>_owner` and reading
-  `schema_migrations` are each refused with a privilege error.
-  `./scripts/db-authz-check.sh` (every converted service; today `review`).
+  `ALTER TABLE`, `DROP TABLE` and `SET ROLE <svc>_owner` are each refused with
+  a privilege error. `schema_migrations` is refused for a Job-owned database
+  (`review`) and readable for a pgroles-owned one (`user`, `shipping`,
+  `notification`; ADR-088 PGR-10). `./scripts/db-authz-check.sh` (every
+  converted service).
   **FAIL:** any `K3.8-*` check not `PASS`, or fewer checks parsed than expected.
 
 - [ ] **K3.9** The migrator is the owner from login (RFC-0029, ADR-088). As
@@ -753,6 +756,14 @@ cannot be derived from a single file — they get their own row (K2.3).
   `permission denied to revoke privileges granted by role "postgres"` is drift
   only an operator can remove (see
   [`authorization.md`](../databases/authorization.md#the-role-catalog-job)).
+
+- [ ] **K3.11** The pgroles policies converged (ADR-088).
+  `kubectl -n platform get postgrespolicies` lists one policy per pgroles-owned
+  database (`platform-db-user`, `-shipping`, `-notification`), each `Ready=True`,
+  and `kubectl -n platform get postgrespolicyplans` holds no plan awaiting
+  approval or failed.
+  **FAIL:** a policy not Ready (read `.status.conditions` and the operator log
+  in `pgroles-system`) or a plan that keeps re-planning the same SQL.
 
 ---
 
@@ -1437,6 +1448,33 @@ Rows not run: <list, with why> — outstanding, not passed.
 ---
 
 ## Previous runs
+
+### 2026-10-15 — user, shipping and notification move to the platform (ADR-088, RFC-0029 D2)
+
+Cluster: kind `homelab`, Kubernetes 1.35.8, Kind CLI v0.33.0, fresh
+Host: Linux + Docker (`/var/lib/docker` on ZFS), arch amd64
+Revision: `feat/rfc0029-d2-platform-db` at `bb3a3010`; **DR replica off**
+(working-tree patch, not committed), so 29 declared + `flux-system` = 30
+Kustomizations
+Preconditions: compose gate on the same branch passed A1–A14, A16–A23 (A23 for
+all four platform-db services), B1–B10, C0–C22 · scope is the rows this change
+touches; K4/K5 ran only through `make e2e`
+
+| Group | Result | Evidence |
+|---|---|---|
+| K1 bring-up | PASS, after findings 1–2 | `make up` exit 0; **30/30 Ready**; `kind-seed.sh` 8/8 |
+| K3 admission/secrets | PASS | 48/48 ExternalSecrets synced; db-isolation platform-db **105/105** (16 allow / 89 reject), product-db 36/36; K3.7 **5/5**; K3.8–K3.9 **48/48**; K3.10 Job and CronJob Complete, `authz applied: roles [review user shipping notification] grants [review]`; K3.11 three `PostgresPolicy` Ready, no drift |
+| K4/K5 via k6 | PASS | saga 4/4 (9/9), smoke 16/16 (55/55), staff 5/5 (59/59), operator 1/1 (26/26) |
+| Drift drill | PASS | pgroles reverted a revoke, an extra grant and a default-ACL change within one interval; the Job restored `role=`; a `postgres`-granted membership failed `roles/shipping` alone and fired `KubeJobFailed` ([evidence](../databases/authorization.md#evidence)) |
+
+Findings:
+
+1. **`databases-local` failed its dry-run.** A rename had turned
+   notification's `DatabaseRole` field `superuser` into `supernotification`.
+   `make validate` does not check that CRD's schema; fixed in the same PR.
+2. **The pgroles policies could not resolve `platform-db-rw`.** The operator
+   runs in `pgroles-system`, so the short Service name looked in the wrong
+   namespace. The policies now use `platform-db-rw.platform.svc`.
 
 ### 2026-10-15 — review's authorization moves to the platform (ADR-088, RFC-0029 D1)
 

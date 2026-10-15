@@ -179,6 +179,22 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **user, shipping and notification run on three database roles (RFC-0029
+  D2, ADR-088).** The role catalog Job now owns `<svc>_owner` and
+  `<svc>_migrator` (with `role=<svc>_owner`) for all four `platform-db`
+  services; CNPG keeps each `<svc>_runtime`. The pgroles operator 0.13.0
+  (`pgroles-system`, own Flux wave) owns the in-database grants of user,
+  shipping and notification through one `PostgresPolicy` per database
+  (`adopt`, as `db_authz` → `authz_admin`); review stays on the Job. pgroles
+  cannot leave `schema_migrations` out of a table wildcard (PGR-10), so those
+  three runtimes hold it, by owner decision. OpenBAO now rotates
+  `notification_runtime` (static role `notification-runtime`). `platform-db`
+  bootstraps a neutral `platform` database, and `user` became an ordinary
+  `Database` owned by `user_owner`. `identity-rs` and `comms-rs` gained the
+  runtime/migrator Secret branch; the `shared-db` KV literals are gone.
+  local-stack mirrors the split for the four services and plays the grants
+  with the cluster's `grants.sql`.
+
 - **The platform applies review's database authorization (ADR-088).** review
   no longer carries roles or grants: an `authz_admin` role (bootstrap SQL,
   NOLOGIN CREATEROLE, unmanaged by CNPG) reached by the `db_authz` login (CNPG
@@ -189,8 +205,9 @@ Skeleton (copy what you need):
   membership `f/f/t` and exact, and applies review's grants, default privileges
   and `REVOKE EXECUTE … FROM PUBLIC`. It creates `schema_migrations` as the
   owner before the first migrate, so the runtime never holds it. Drift it
-  may not repair fails the run (`KubeJobFailed`). The owner and migrator `DatabaseRole`s are gone, the
-  catalog template drops `DB_MIGRATION_ROLE`, review is pinned to `2.6.0`, and
+  may not repair fails the run (`KubeJobFailed`). The owner and migrator
+  `DatabaseRole`s are gone, the catalog template drops `DB_MIGRATION_ROLE`,
+  review is pinned to `2.6.0`, and
   local-stack runs the cluster's `grants.sql` after review's migration.
   One executor role in CNPG would deadlock a new cluster (CNPG creates a role
   with `CREATE ROLE … IN ROLE`) or have its memberships revoked, hence two.

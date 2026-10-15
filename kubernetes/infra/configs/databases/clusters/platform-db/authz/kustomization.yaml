@@ -1,12 +1,16 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Database authorization (ADR-088): the db_authz login, and the Job + CronJob
-# that apply the role catalog and the Job-owned in-database grants. The hashed
-# ConfigMap name changes with the SQL, which recreates the Job.
+# Database authorization (ADR-088): the db_authz login, the Job + CronJob that
+# apply the role catalog and review's grants, and the pgroles policies that own
+# the other databases' grants. The hashed ConfigMap name changes with the SQL,
+# which recreates the Job.
 resources:
   - db-authz.yaml
   - job.yaml
+  - policies/user.yaml
+  - policies/shipping.yaml
+  - policies/notification.yaml
 
 configMapGenerator:
   - name: platform-db-authz

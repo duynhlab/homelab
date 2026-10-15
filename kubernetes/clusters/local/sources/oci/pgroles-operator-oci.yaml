@@ -1,0 +1,14 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: pgroles-operator-oci
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/component: helm-chart
+spec:
+  interval: 10m
+  url: oci://ghcr.io/thepartly/charts/pgroles-operator
+  ref:
+    # 0.13.0 is the version the ADR-088 lab measured (PGR-01..09).
+    semver: "0.13.0"

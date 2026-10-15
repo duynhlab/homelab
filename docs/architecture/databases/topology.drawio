@@ -161,7 +161,7 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="e_rotate" value="rotates notification (720 h)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.88;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="openbao" target="platformdb">
+        <mxCell id="e_rotate" value="rotates notification_runtime (720 h)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#7C3AED;strokeWidth=1.5;endArrow=classic;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.88;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="openbao" target="platformdb">
           <mxGeometry relative="1" as="geometry" x="0.89">
             <Array as="points">
               <mxPoint x="570" y="415" />
@@ -221,14 +221,14 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="note_creds" value="&lt;b&gt;Credentials&lt;/b&gt;&lt;br&gt;Each role's password is a Kubernetes Secret rendered by External Secrets from OpenBao KV (secret/local/databases/&amp;lt;cluster&amp;gt;/&amp;lt;service&amp;gt;) and reloaded by CNPG. notification is the exception: its password is owned by the OpenBao database engine, which rotates it every 720 h, and External Secrets reads database/static-creds/notification every minute. PgDog takes the product-db role secrets through its HelmRelease valuesFrom; backups authenticate to RustFS with pg-backup-rustfs-credentials." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="990" width="1280" height="60" as="geometry" />
+        <mxCell id="note_creds" value="&lt;b&gt;Credentials&lt;/b&gt;&lt;br&gt;Each login's password is a Kubernetes Secret rendered by External Secrets from OpenBao KV and reloaded by CNPG: secret/local/databases/&amp;lt;cluster&amp;gt;/&amp;lt;service&amp;gt;-runtime and -migrator for services on the RFC-0029 roles (every platform-db service), &amp;lt;cluster&amp;gt;/&amp;lt;service&amp;gt; for the rest. notification_runtime is the exception: its password is owned by the OpenBao database engine, which rotates it every 720 h, and External Secrets reads database/static-creds/notification-runtime every minute. PgDog takes the product-db role secrets through its HelmRelease valuesFrom; backups authenticate to RustFS with pg-backup-rustfs-credentials." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
+          <mxGeometry x="40" y="990" width="1280" height="70" as="geometry" />
         </mxCell>
         <mxCell id="note_dr" value="&lt;b&gt;Why the DR replica reads from RustFS&lt;/b&gt;&lt;br&gt;product-db-replica never connects to the primary: it bootstraps from product-db's base backup and then replays its WAL archive from the bucket, so it survives the loss of the product-db pods. Its designated primary keeps its own archive and a daily backup in product-db-replica/ (7 d). Migrations always target the -rw service directly, never a pooler." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=11;fontColor=#475569;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1062" width="1280" height="60" as="geometry" />
+          <mxGeometry x="40" y="1072" width="1280" height="60" as="geometry" />
         </mxCell>
         <mxCell id="legend" value="Legend" style="rounded=1;absoluteArcSize=1;arcSize=12;verticalAlign=top;html=1;container=1;collapsible=0;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=1.5;fontColor=#334155;fontFamily=Helvetica;fontSize=13;fontStyle=1;align=left;spacingLeft=10;spacingTop=2;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1152" width="1280" height="88" as="geometry" />
+          <mxGeometry x="40" y="1162" width="1280" height="88" as="geometry" />
         </mxCell>
         <mxCell id="legend-role-platform" value="" style="rounded=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;" vertex="1" parent="legend">
           <mxGeometry x="14" y="38" width="26" height="14" as="geometry" />

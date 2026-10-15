@@ -522,7 +522,7 @@ services:
   user-migrate:
     build: { context: ../../user-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user, DB_PASSWORD: user-local }
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   product-migrate:
@@ -552,13 +552,13 @@ services:
   shipping-migrate:
     build: { context: ../../shipping-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping, DB_PASSWORD: shipping-local }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   notification-migrate:
     build: { context: ../../notification-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification, DB_PASSWORD: notification-local }
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   payment-migrate:
@@ -588,7 +588,7 @@ services:
   user-seed:
     build: { context: ../../user-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user, DB_PASSWORD: user-local }
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local }
     depends_on:
       postgres: { condition: service_healthy }
       user-migrate: { condition: service_completed_successfully }
@@ -617,8 +617,10 @@ services:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
     restart: "no"
-  # Plays the cluster's role catalog Job for review (ADR-088): the same
-  # grants.sql file, run by the platform after the migration.
+  # Play the cluster's in-database grants (ADR-088) after each migration, with
+  # the role catalog Job's own grants.sql. On the cluster user, shipping and
+  # notification get the same statements from pgroles, whose table wildcard
+  # also covers schema_migrations (PGR-10); here the runtime is denied it.
   review-authz:
     image: postgres:18.6-alpine
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
@@ -629,6 +631,39 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  user-authz:
+    image: postgres:18.6-alpine
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "user", "-v", "svc=user", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      user-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  shipping-authz:
+    image: postgres:18.6-alpine
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "shipping", "-v", "svc=shipping", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      shipping-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  notification-authz:
+    image: postgres:18.6-alpine
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "notification", "-v", "svc=notification", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      notification-migrate: { condition: service_completed_successfully }
     restart: "no"
   review-seed:
     build: { context: ../../review-service }
@@ -641,7 +676,7 @@ services:
   shipping-seed:
     build: { context: ../../shipping-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping, DB_PASSWORD: shipping-local }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local }
     depends_on:
       postgres: { condition: service_healthy }
       shipping-migrate: { condition: service_completed_successfully }
@@ -649,7 +684,7 @@ services:
   notification-seed:
     build: { context: ../../notification-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification, DB_PASSWORD: notification-local }
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local }
     depends_on:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
@@ -671,8 +706,8 @@ services:
       SERVICE_NAME: user
       OTEL_SERVICE_NAME: user
       DB_NAME: user
-      DB_USER: user
-      DB_PASSWORD: user-local
+      DB_USER: user_runtime
+      DB_PASSWORD: user_runtime-local
       # ADR-050: the protected group verifies the STAFF realm (split-horizon).
       OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
       OIDC_STAFF_JWKS_URL: http://keycloak:8080/realms/duynhlab-staff/protocol/openid-connect/certs
@@ -680,6 +715,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       user-migrate: { condition: service_completed_successfully }
+      user-authz: { condition: service_completed_successfully }
       user-seed: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
 
@@ -692,8 +728,8 @@ services:
       SERVICE_NAME: shipping
       OTEL_SERVICE_NAME: shipping
       DB_NAME: shipping
-      DB_USER: shipping
-      DB_PASSWORD: shipping-local
+      DB_USER: shipping_runtime
+      DB_PASSWORD: shipping_runtime-local
       GRPC_PORT: "9090"
       # ADR-050: the protected group verifies the STAFF realm (split-horizon).
       OIDC_STAFF_ISSUER: http://localhost:8081/realms/duynhlab-staff
@@ -702,6 +738,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       shipping-migrate: { condition: service_completed_successfully }
+      shipping-authz: { condition: service_completed_successfully }
       shipping-seed: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
 
@@ -729,12 +766,13 @@ services:
       SERVICE_NAME: notification
       OTEL_SERVICE_NAME: notification
       DB_NAME: notification
-      DB_USER: notification
-      DB_PASSWORD: notification-local
+      DB_USER: notification_runtime
+      DB_PASSWORD: notification_runtime-local
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
+      notification-authz: { condition: service_completed_successfully }
       notification-seed: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
 

@@ -508,7 +508,7 @@ are implementation tasks, not unapproved alternatives or completed deployment:
 | Rotation | Accepted per-role 30/90-day table and lifecycle exceptions | Single writer, owner, consumer reload and recovery; isolated 3-hour audit override |
 | Pooler profiles | Keep both products; compatible profile per consumer | Versioned TLS/session/replication matrix, particularly CDC and platform jobs; CNPG Pooler `clientTLSSecret` for the pooler Service; PgDog chart TLS values confirmed; failed gate blocks cutover |
 | Replica reads | Primary default; explicit stale-read flows only | Turn off PgDog's automatic read split; per-flow lag tolerance and fallback defined before enabling replica access |
-| PgDog version | Chart `v0.39` (PgDog 0.1.26); the features above exist there | Bump in its own change after this RFC update, with release notes, a values diff and a product-db Kind gate |
+| PgDog version | Chart `v0.90` (PgDog v0.1.60); the features above exist since 0.1.26 | Re-check the chart value names on every bump |
 
 The former service `WithSetRole` design is superseded by ADR-088. Exact
 data/CDC grants must be scoped to their datasets and connector requirements

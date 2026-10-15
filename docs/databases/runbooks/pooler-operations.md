@@ -12,7 +12,7 @@ covers what differs.
 |------|-------|
 | PgDog release | `pgdog-product` (product ns) — fronts `product-db` |
 | PgBouncer pooler | `platform-db-pooler-rw` (platform ns, CNPG `Pooler`) — fronts `platform-db`; see [PgBouncer pooler](#pgbouncer-pooler-platform-db) |
-| Chart | `pgdog` `v0.39` from the `pgdogdev` HelmRepository (flux-system) |
+| Chart | `pgdog` `v0.90` (PgDog v0.1.60) from the `pgdogdev` HelmRepository (flux-system) |
 | Ports | `6432` SQL, `9090` openmetrics (`pgdog_` prefix) |
 | Topology | 3 replicas, soft anti-affinity, PDB `minAvailable: 2` |
 | Pool mode | `transaction`; R/W splitting: SELECTs → `-r` replicas, writes → `-rw` primary; LSN lag monitoring bans lagging replicas |

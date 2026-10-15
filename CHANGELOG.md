@@ -459,6 +459,19 @@ Skeleton (copy what you need):
   its ESO Secret, the CNPG `DatabaseRole` and the configurator Job that reads it
   — the path #989 introduced, which the prose already described.
 
+### Dependency
+
+#### Databases
+
+- Bump the PgDog chart for `product-db` from `v0.39` (PgDog 0.1.26) to
+  `v0.90` (PgDog v0.1.60). The rendered `pgdog.toml` keeps the same
+  effective settings; the chart no longer writes binary defaults out, and
+  it now sets `load_balancing_strategy = "round_robin"` (was the binary's
+  `random`), a zone topology spread (`ScheduleAnyway`) and a termination
+  grace of 65 s to match the 60 s shutdown timeout. Every `pgdog_*` metric
+  the dashboards and alerts read still exists. Upstream breaking changes
+  in this range touch sharding, plugins and 2PC, none of which are used.
+
 ## [2.0.0] - 2026-10-05
 
 <!-- markdown-link-check-disable -->

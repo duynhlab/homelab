@@ -90,7 +90,8 @@ docs/
 │   │   └── postgresql/           # PostgreSQL-specific metrics (databases layer)
 │   │       ├── README.md
 │   │       ├── builtin-metrics.md
-│   │       └── custom-metrics.md
+│   │       ├── custom-metrics.md
+│   │       └── query-telemetry.md  # pg_stat_ch per-execution events in ClickHouse
 │   ├── tracing/                  # Pillar 2: Distributed Tracing
 │   │   ├── README.md             # Tracing guide (VictoriaTraces + OTel)
 │   │   ├── architecture.md       # Trace topology: VictoriaTraces + ClickHouse
@@ -242,7 +243,9 @@ Cross-signal conformance review: **[Telemetry standards audit (2026-09-16)](./ob
 
 3. **[PostgreSQL metrics hub](./observability/metrics/postgresql/README.md)** - CNPG custom queries, workflows, signal guides
 
-4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (36 alert files + a plan-regression guide)
+4. **[PostgreSQL alert runbooks](./observability/runbooks/postgresql/README.md)** - Per-alert CNPG investigation (41 alert files + a plan-regression guide)
+
+4a. **[PostgreSQL query telemetry](./observability/metrics/postgresql/query-telemetry.md)** - Per-execution events from pg_stat_ch in ClickHouse: percentiles over time, errors, top statements
 
 4b. **[Microservices alert runbooks](./observability/runbooks/microservices/README.md)** - Per-alert RED/Golden investigation (50 files) + cross-signal workflows and threshold tuning
 

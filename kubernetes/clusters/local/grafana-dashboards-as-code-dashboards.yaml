@@ -107,6 +107,12 @@ spec:
       kind: GrafanaManifest
       name: eg-edge
       namespace: monitoring
+    # pg_stat_ch query telemetry (artifact >= 0.5.0): the first board whose
+    # queries resolve the logical `clickhouse` datasource, not `prometheus`.
+    - apiVersion: grafana.integreatly.org/v1beta1
+      kind: GrafanaManifest
+      name: postgresql-query-telemetry
+      namespace: monitoring
 
   # GrafanaManifest reports ManifestSynchronized rather than the conventional
   # Ready condition, so kstatus cannot infer readiness without this contract.

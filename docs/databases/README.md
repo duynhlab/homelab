@@ -58,6 +58,7 @@ audit. Historical lab/drill records retain the versions they actually measured.
 Additional platform topics:
 
 - [Extensions](./extensions.md)
+- [Query telemetry — pg_stat_ch into ClickHouse](../observability/metrics/postgresql/query-telemetry.md) — per-execution events, server-side percentiles
 - [Database authorization (owner / migrator / runtime)](./authorization.md) — platform-owned roles and grants; deployed for `review` (RFC-0029, ADR-088)
 - [Cross-region DR roadmap](./cross-region-dr.md) — **planned, not
   deployed**

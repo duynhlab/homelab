@@ -26,10 +26,18 @@ spec:
       synchronizeLogicalDecoding: true
 
   postgresql:
+    # pg_stat_ch image-volume extension — same image and reasoning as
+    # product-db/instance.yaml; move the reference on both clusters together.
+    extensions:
+      - name: pg_stat_ch
+        image:
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.1.0@sha256:0a7595c74478972efc25b43c79cd5c6f7b9f35decb793f22d7722bb3caed6c7b
+
     shared_preload_libraries:
       - pgaudit
       - pg_stat_statements
       - auto_explain
+      - pg_stat_ch
 
     pg_hba:
       # Each app database admits its runtime and migrator only; <svc>_owner
@@ -120,6 +128,17 @@ spec:
       # JSON (Plan / Query Text / Planning Time keys) — the PG default `text`
       # sends every plan to the pg_parse_failures debug sink instead.
       auto_explain.log_format: "json"
+      # pg_stat_ch — see product-db/instance.yaml for the credential and sizing
+      # reasoning; the password is Flux-substituted, never a literal.
+      pg_stat_ch.clickhouse_host: "clickhouse-clickhouse.monitoring.svc.cluster.local"
+      pg_stat_ch.clickhouse_port: "9000"
+      pg_stat_ch.clickhouse_user: "pg_stat_ch"
+      pg_stat_ch.clickhouse_password: "${PG_STAT_CH_CLICKHOUSE_PASSWORD}"
+      pg_stat_ch.clickhouse_database: "pg_stat_ch"
+      pg_stat_ch.queue_capacity: "8192"
+      pg_stat_ch.string_area_size: "16"
+      pg_stat_ch.flush_interval_ms: "1000"
+      pg_stat_ch.batch_max: "8192"
       hot_standby_feedback: "on"
       sync_replication_slots: "on"
 

@@ -6,8 +6,8 @@
 |---|---|
 | **Type** | Investigation workflow (cross-signal), not a per-alert runbook |
 | **Entry points** | A microservice latency/SLO-burn alert whose slow span is a DB call · [`CNPGAutovacuumFallingBehind`](CNPGAutovacuumFallingBehind.md) · a human saying "API chậm" |
-| **Signals used** | `cnpg_pg_stat_statements_*` (VictoriaMetrics, per-`queryid`) · the auto_explain plans stream (VictoriaLogs) · `pg_stat_user_tables` (live) |
-| **Window** | 7 days — the plans stream rides the Vector path only (no ClickHouse copy) |
+| **Signals used** | `cnpg_pg_stat_statements_*` (VictoriaMetrics, per-`queryid`) · the auto_explain plans stream (VictoriaLogs) · `pg_stat_user_tables` (live) · per-execution events in ClickHouse `pg_stat_ch.events_raw` (same `query_id`; [query-telemetry.md](../../metrics/postgresql/query-telemetry.md)) |
+| **Window** | 7 days for the plans stream (Vector path only, no ClickHouse copy) · 90 days for the pg_stat_ch events, which also hold the executions **under** the 1 s auto_explain threshold — the onset of a flip is visible there as p95/`shared_blks_read` moving before any plan is logged |
 | **Sources** | [`vector.yaml` PG pipeline](../../logging/vector.md#postgresql-pipeline) · `auto_explain.*` in [`platform-db`](../../../../kubernetes/infra/configs/databases/clusters/platform-db/instance.yaml) / [`product-db`](../../../../kubernetes/infra/configs/databases/clusters/product-db/instance.yaml) `instance.yaml` |
 | **Applies to** | `platform-db` (ns `platform`), `product-db` (ns `product`) — the clusters that preload `auto_explain` |
 

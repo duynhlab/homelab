@@ -27,10 +27,22 @@ spec:
       synchronizeLogicalDecoding: true
 
   postgresql:
+    # pg_stat_ch (query telemetry → ClickHouse) arrives as an image-volume
+    # extension, not in the operand image: CNPG mounts it at /extensions/pg_stat_ch
+    # and appends its lib/ and share/ to dynamic_library_path and
+    # extension_control_path, so the preload entry below resolves. The image is
+    # built against this exact operand digest (duynhlab/images, pg-stat-ch);
+    # move the two together. Changing the image reference replaces the pods.
+    extensions:
+      - name: pg_stat_ch
+        image:
+          reference: ghcr.io/duynhlab/images/pg-stat-ch:0.1.0@sha256:0a7595c74478972efc25b43c79cd5c6f7b9f35decb793f22d7722bb3caed6c7b
+
     shared_preload_libraries:
       - pgaudit
       - pg_stat_statements
       - auto_explain
+      - pg_stat_ch
 
     # Connection isolation (RFC-0012 P4, ADR-015): each service role connects
     # only to its own database. CNPG inserts these BETWEEN its fixed rules
@@ -136,6 +148,25 @@ spec:
       # JSON (Plan / Query Text / Planning Time keys) — the PG default `text`
       # sends every plan to the pg_parse_failures debug sink instead.
       auto_explain.log_format: "json"
+
+      # pg_stat_ch: one event per statement execution into ClickHouse
+      # (database pg_stat_ch, native :9000) as the INSERT-only `pg_stat_ch` user.
+      # The password is a postmaster GUC with no file/env alternative, so Flux
+      # substitutes it at apply time from the pg-stat-ch-clickhouse Secret in
+      # flux-system (databases-local postBuild.substituteFrom) — never a
+      # literal here. Queue sized for this cluster's 1Gi pods: 8192 slots
+      # (~4 MiB) + a 16 MiB string area, far below the 128K/64 MiB defaults.
+      # ClickHouse down = events dropped and send_failures counted, never
+      # back-pressure on queries; PgStatCh* alerts watch those counters.
+      pg_stat_ch.clickhouse_host: "clickhouse-clickhouse.monitoring.svc.cluster.local"
+      pg_stat_ch.clickhouse_port: "9000"
+      pg_stat_ch.clickhouse_user: "pg_stat_ch"
+      pg_stat_ch.clickhouse_password: "${PG_STAT_CH_CLICKHOUSE_PASSWORD}"
+      pg_stat_ch.clickhouse_database: "pg_stat_ch"
+      pg_stat_ch.queue_capacity: "8192"
+      pg_stat_ch.string_area_size: "16"
+      pg_stat_ch.flush_interval_ms: "1000"
+      pg_stat_ch.batch_max: "8192"
 
       # Replication slot sync (PostgreSQL 18 native)
       hot_standby_feedback: "on"

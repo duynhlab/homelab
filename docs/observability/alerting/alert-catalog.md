@@ -28,7 +28,7 @@ prove every expression matched data.
 
 ## Summary
 
-**248 statically defined alerts** exist in `.yaml` files under
+**251 statically defined alerts** exist in `.yaml` files under
 `prometheusrules/**`. Re-derive that number rather than incrementing it:
 
 ```bash
@@ -37,18 +37,19 @@ rg '^\s*- alert:' \
   -g '*.yaml' | wc -l
 ```
 
-The 2026-10-14 breakdown is: postgres 64, microservices 52,
+The 2026-10-15 breakdown is: postgres 67 (three `PgStatCh*` export-health
+rules joined the 2026-10-14 count of 64), microservices 52,
 victoriametrics 31, kubernetes 29, observability 26, envoy-gateway 16, gitops 9,
 valkey 7, keycloak 5, kyverno 4, keda 4, and one root watchdog. The glob excludes
 retired `.yaml.bak` files. Two CNPG topology rules are gated and therefore not
-applied, leaving **243 deployed rules** from this tree.
+applied, leaving **249 deployed rules** from this tree.
 
 The tree above does not include the **12 Temporal rules** in
-`configs/temporal/prometheusrule.yaml`. The cluster therefore has **255
+`configs/temporal/prometheusrule.yaml`. The cluster therefore has **261
 hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
-22 SLOs, bringing the cluster total to **299**. Of the 243 deployed entries from
+22 SLOs, bringing the cluster total to **305**. Of the 249 deployed entries from
 the main tree, six are inert on Kind because the local-path/kubelet signals they
-need do not exist; effective Kind coverage for that tree is **237**. The inert
+need do not exist; effective Kind coverage for that tree is **243**. The inert
 rules and both gated rules are marked inline rather than presented as working
 coverage.
 
@@ -268,6 +269,9 @@ ignore (locks, deadlocks, autovacuum, cache, temp, checkpoints, wraparound, WAL 
 | CNPGWALArchiveFailing | critical | `cnpg_pg_stat_archiver_last_failed_time > …_last_archived_time` (last attempt failed, nothing archived since) | PITR/backup recovery broken; WAL piling up | 5m | [CNPGWALArchiveFailing](../runbooks/postgresql/CNPGWALArchiveFailing.md) |
 | CNPGInactiveSlotRetainingWAL | warning | inactive slot with `pg_wal_lsn_diff` >1 GiB, primary's view only | The **cause** the lag alerts report as a symptom: WAL pinned on the primary's disk, growing until the standby rejoins or the slot is dropped | 15m | [CNPGInactiveSlotRetainingWAL](../runbooks/postgresql/CNPGInactiveSlotRetainingWAL.md) |
 | CNPGLongRunningTransaction | warning | `cnpg_pg_long_running_transactions_oldest_transaction_seconds` >300 | Pins dead tuples; blocks VACUUM / freezing | 5m | [CNPGLongRunningTransaction](../runbooks/postgresql/CNPGLongRunningTransaction.md) |
+| PgStatChExportFailing | warning | `increase(cnpg_pg_stat_ch_send_failures[10m])` >0 (`pg-stat-ch-alerts.yaml`) | Query-event batches discarded; telemetry gap in ClickHouse `pg_stat_ch`, PostgreSQL unaffected | 10m | [PgStatChExportFailing](../runbooks/postgresql/PgStatChExportFailing.md) |
+| PgStatChDroppingEvents | warning | `increase(cnpg_pg_stat_ch_dropped_events[10m])` >0 | Shared-memory ring overflowed; percentiles under-report the busiest window | 10m | [PgStatChDroppingEvents](../runbooks/postgresql/PgStatChDroppingEvents.md) |
+| PgStatChNotExporting | warning | events enqueued but `exported_events` flat for 15m, no failures counted | Background worker dead or ClickHouse black-holed; ring will overflow next | 15m | [PgStatChNotExporting](../runbooks/postgresql/PgStatChNotExporting.md) |
 | CNPGIdleInTransaction | warning | `cnpg_pg_long_running_transactions_oldest_idle_in_transaction_seconds` >300 | Idle-in-transaction stalls autovacuum | 5m | [CNPGIdleInTransaction](../runbooks/postgresql/CNPGIdleInTransaction.md) |
 
 > `CNPGWALArchiveFailing` closes the previously-listed gap **CNPGContinuousArchivingFailing**.

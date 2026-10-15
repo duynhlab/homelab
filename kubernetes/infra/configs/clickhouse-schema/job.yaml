@@ -102,9 +102,21 @@ spec:
               # than an image, ADR-077) gives an EMPTY /sql with no error. Fail
               # here, loudly, instead of "applying" nothing and verifying a store
               # that was never created.
+              # Two Replicated databases share one bootstrap: `otel` (collector
+              # logs+traces) and `pg_stat_ch` (PostgreSQL query events from the
+              # pg_stat_ch extension). Per database: the file applied on EVERY
+              # replica, the table files applied ONCE, and the object count that
+              # proves the schema landed (a TO-style MV counts as two objects:
+              # the view and its target table).
+              DB_FILES_otel="00-database.sql"
+              TABLE_FILES_otel="10-otel_logs.sql 20-otel_traces.sql 30-otel_traces_trace_id_ts.sql 40-otel_traces_trace_id_ts_mv.sql"
+              OBJECTS_otel=4
+              DB_FILES_pg_stat_ch="05-pg_stat_ch_database.sql"
+              TABLE_FILES_pg_stat_ch="50-pg_stat_ch_events_raw.sql 60-pg_stat_ch_query_stats_5m.sql 70-pg_stat_ch_db_app_user_1m.sql 80-pg_stat_ch_errors_recent.sql"
+              OBJECTS_pg_stat_ch=7
+              DATABASES="otel pg_stat_ch"
               echo "==> DDL files in /sql:"
-              for f in 00-database.sql 10-otel_logs.sql 20-otel_traces.sql \
-                       30-otel_traces_trace_id_ts.sql 40-otel_traces_trace_id_ts_mv.sql; do
+              for f in $DB_FILES_otel $TABLE_FILES_otel $DB_FILES_pg_stat_ch $TABLE_FILES_pg_stat_ch; do
                 [ -s "/sql/$f" ] || { echo "FAIL: /sql/$f missing or empty -- is the image volume a real image?"; ls -la /sql; exit 1; }
                 echo "    $f ($(wc -c < "/sql/$f") bytes)"
               done
@@ -152,19 +164,22 @@ spec:
               # the verify at the end would then fail on the engine after this Job
               # had already created tables inside the wrong database. Catch it
               # here, before touching anything, and say what to do about it.
-              echo "==> preflight: no pre-existing non-Replicated otel database"
+              echo "==> preflight: no pre-existing non-Replicated database ($DATABASES)"
               stale=0
-              for h in $HOSTS; do
-                eng=$(cli "$h.monitoring.svc.cluster.local" -q \
-                  "SELECT engine FROM system.databases WHERE name='otel' FORMAT TSV" 2>/dev/null || true)
-                if [ -n "$eng" ] && [ "$eng" != "Replicated" ]; then
-                  echo "    $h: otel exists with engine '$eng'"
-                  stale=1
-                fi
+              for db in $DATABASES; do
+                for h in $HOSTS; do
+                  eng=$(cli "$h.monitoring.svc.cluster.local" -q \
+                    "SELECT engine FROM system.databases WHERE name='$db' FORMAT TSV" 2>/dev/null || true)
+                  if [ -n "$eng" ] && [ "$eng" != "Replicated" ]; then
+                    echo "    $h: $db exists with engine '$eng'"
+                    stale=1
+                  fi
+                done
               done
               if [ "$stale" = "1" ]; then
                 cat <<'MSG'
-              FAIL: an `otel` database already exists with a non-Replicated engine.
+              FAIL: a database above already exists with a non-Replicated engine
+              (the text below says `otel`; substitute the name printed).
 
               This is not repairable in place: CREATE DATABASE IF NOT EXISTS will
               not change the engine of an existing database, so this Job cannot
@@ -200,28 +215,32 @@ spec:
                 [ "$np" = "2" ] || { echo "FAIL: $h lacks storage policy hot_cold with volumes hot+cold. Has the operator finished rolling the CHI?"; exit 1; }
               done
 
-              echo "==> CREATE DATABASE on each replica (no ON CLUSTER, no DDL queue)"
-              for h in $HOSTS; do
-                cli "$h.monitoring.svc.cluster.local" --queries-file /sql/00-database.sql
-                echo "    $h database ready"
-              done
-
-              echo "==> CREATE TABLES once; the Replicated database propagates them"
               FIRST=$(echo "$HOSTS" | head -1)
-              for f in /sql/10-otel_logs.sql /sql/20-otel_traces.sql \
-                       /sql/30-otel_traces_trace_id_ts.sql \
-                       /sql/40-otel_traces_trace_id_ts_mv.sql; do
-                echo "    applying $(basename "$f") on $FIRST"
-                cli "$FIRST.monitoring.svc.cluster.local" --queries-file "$f"
-              done
+              for db in $DATABASES; do
+                eval "db_files=\$DB_FILES_$db; table_files=\$TABLE_FILES_$db; want=\$OBJECTS_$db"
 
-              echo "==> waiting for the schema to land on every replica"
-              for h in $HOSTS; do
-                n=0
-                until [ "$(cli "$h.monitoring.svc.cluster.local" -q \
-                    "SELECT count() FROM system.tables WHERE database='otel' FORMAT TSV" 2>/dev/null || echo 0)" = "4" ]; do
-                  n=$((n+1)); [ "$n" -ge 36 ] && { echo "FAIL: $h never reached 4 objects in otel"; exit 1; }
-                  sleep 5
+                echo "==> [$db] CREATE DATABASE on each replica (no ON CLUSTER, no DDL queue)"
+                for h in $HOSTS; do
+                  for f in $db_files; do
+                    cli "$h.monitoring.svc.cluster.local" --queries-file "/sql/$f"
+                  done
+                  echo "    $h database ready"
+                done
+
+                echo "==> [$db] CREATE TABLES once; the Replicated database propagates them"
+                for f in $table_files; do
+                  echo "    applying $f on $FIRST"
+                  cli "$FIRST.monitoring.svc.cluster.local" --queries-file "/sql/$f"
+                done
+
+                echo "==> [$db] waiting for $want objects to land on every replica"
+                for h in $HOSTS; do
+                  n=0
+                  until [ "$(cli "$h.monitoring.svc.cluster.local" -q \
+                      "SELECT count() FROM system.tables WHERE database='$db' FORMAT TSV" 2>/dev/null || echo 0)" = "$want" ]; do
+                    n=$((n+1)); [ "$n" -ge 36 ] && { echo "FAIL: $h never reached $want objects in $db"; exit 1; }
+                    sleep 5
+                  done
                 done
               done
 
@@ -229,23 +248,27 @@ spec:
               rc=0
               for h in $HOSTS; do
                 host="$h.monitoring.svc.cluster.local"
-                eng=$(cli "$host" -q "SELECT engine FROM system.databases WHERE name='otel' FORMAT TSV")
-                [ "$eng" = "Replicated" ] || { echo "FAIL: $h database engine is '$eng', want Replicated"; rc=1; }
-                bad=$(cli "$host" -q "SELECT count() FROM system.replicas WHERE database='otel' AND (total_replicas != $EXPECTED OR active_replicas != $EXPECTED OR is_readonly != 0) FORMAT TSV")
-                [ "$bad" = "0" ] || { echo "FAIL: $h has $bad replicated tables not at ${EXPECTED}/${EXPECTED} or read-only"; rc=1; }
-                plain=$(cli "$host" -q "SELECT count() FROM system.tables WHERE database='otel' AND engine='MergeTree' FORMAT TSV")
-                [ "$plain" = "0" ] || { echo "FAIL: $h has $plain unreplicated MergeTree tables in otel"; rc=1; }
-                tiered=$(cli "$host" -q "SELECT count() FROM system.tables WHERE database='otel' AND name IN ('otel_logs','otel_traces') AND storage_policy='hot_cold' AND position(create_table_query,'TO VOLUME') > 0 FORMAT TSV")
-                [ "$tiered" = "2" ] || { echo "FAIL: $h has $tiered/2 tables on hot_cold with a cold-volume TTL"; rc=1; }
                 disks=$(cli "$host" -q "SELECT count() FROM system.disks WHERE name IN ('s3','s3_cache') FORMAT TSV")
                 [ "$disks" = "2" ] || { echo "FAIL: $h lacks disks s3/s3_cache"; rc=1; }
-                echo "    $h: engine=$eng replicated_tables_ok=$([ "$bad" = 0 ] && echo yes || echo NO) tiered=$tiered/2"
+                for db in $DATABASES; do
+                  eng=$(cli "$host" -q "SELECT engine FROM system.databases WHERE name='$db' FORMAT TSV")
+                  [ "$eng" = "Replicated" ] || { echo "FAIL: $h $db engine is '$eng', want Replicated"; rc=1; }
+                  bad=$(cli "$host" -q "SELECT count() FROM system.replicas WHERE database='$db' AND (total_replicas != $EXPECTED OR active_replicas != $EXPECTED OR is_readonly != 0) FORMAT TSV")
+                  [ "$bad" = "0" ] || { echo "FAIL: $h has $bad replicated tables in $db not at ${EXPECTED}/${EXPECTED} or read-only"; rc=1; }
+                  plain=$(cli "$host" -q "SELECT count() FROM system.tables WHERE database='$db' AND engine IN ('MergeTree','AggregatingMergeTree') FORMAT TSV")
+                  [ "$plain" = "0" ] || { echo "FAIL: $h has $plain unreplicated MergeTree tables in $db"; rc=1; }
+                  echo "    $h: $db engine=$eng replicated_tables_ok=$([ "$bad" = 0 ] && echo yes || echo NO)"
+                done
+                # Cold-tier evidence, by name: the tables that carry a TO VOLUME tail.
+                tiered=$(cli "$host" -q "SELECT count() FROM system.tables WHERE (database='otel' AND name IN ('otel_logs','otel_traces')) OR (database='pg_stat_ch' AND name='events_raw') AND storage_policy='hot_cold' AND position(create_table_query,'TO VOLUME') > 0 FORMAT TSV")
+                [ "$tiered" = "3" ] || { echo "FAIL: $h has $tiered/3 tables on hot_cold with a cold-volume TTL"; rc=1; }
+                echo "    $h: tiered=$tiered/3"
               done
               [ "$rc" -eq 0 ] || { echo "SCHEMA BOOTSTRAP FAILED"; exit 1; }
 
-              cli "$LB" -q "SELECT table, disk_name, count() AS parts, formatReadableSize(sum(bytes_on_disk)) AS on_disk FROM system.parts WHERE database='otel' AND active GROUP BY table, disk_name ORDER BY table, disk_name FORMAT PrettyCompact"
+              cli "$LB" -q "SELECT database, table, disk_name, count() AS parts, formatReadableSize(sum(bytes_on_disk)) AS on_disk FROM system.parts WHERE database IN ('otel','pg_stat_ch') AND active GROUP BY database, table, disk_name ORDER BY database, table, disk_name FORMAT PrettyCompact"
 
-              cli "$LB" -q "SELECT table, is_readonly, total_replicas, active_replicas FROM system.replicas WHERE database='otel' ORDER BY table FORMAT PrettyCompact"
+              cli "$LB" -q "SELECT database, table, is_readonly, total_replicas, active_replicas FROM system.replicas WHERE database IN ('otel','pg_stat_ch') ORDER BY database, table FORMAT PrettyCompact"
               echo "==> schema bootstrap complete on $EXPECTED replicas"
           volumeMounts:
             - name: sql
@@ -272,7 +295,7 @@ spec:
       volumes:
         - name: sql
           image:
-            reference: ghcr.io/duynhlab/images/clickhouse-ddl:1.1.0@sha256:7f7f68bd76e07b27c24668f14822804df5f576c8381bbadca0ad5f68d0f94778
+            reference: ghcr.io/duynhlab/images/clickhouse-ddl:1.2.1@sha256:c3606896e41c36936aff09f8e1ecedf24087295687ba3ae91c1584d8e64585e4
             pullPolicy: IfNotPresent
         - name: tmp
           emptyDir: {}

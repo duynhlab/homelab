@@ -140,6 +140,23 @@ Skeleton (copy what you need):
   K3.10 checks the catalog Job; the isolation sweep adds `db_authz` and the
   `postgres` database.
 
+- **PostgreSQL query telemetry: dashboard, store and alerts.** ClickHouse gains
+  a second Replicated database, `pg_stat_ch` (`clickhouse-ddl` 1.2.1:
+  `events_raw` on `ReplicatedMergeTree`, 7 days hot → cold, 90 days, plus the
+  `query_stats_5m`, `db_app_user_1m` and `errors_recent` rollups), and the
+  `clickhouse-schema` Job now bootstraps and verifies both databases. The CHI
+  defines the INSERT-only `pg_stat_ch` user, with its own settings profile
+  pinning `network_compression_method: LZ4` (ClickHouse 26 replies in ZSTD,
+  which the extension cannot decode). New Grafana board
+  `postgresql-query-telemetry` (Databases folder), written as Go in
+  `duynhlab/grafana-dashboards` and delivered by the as-code artifact pinned at
+  0.6.0 — its first board on the logical `clickhouse` datasource: server-side
+  p50/p95/p99 over time, statements/s by operation, database and application,
+  errors by SQLSTATE, CPU-vs-I/O split, top statements by total time and
+  physical reads, slowest individual executions, recent errors, and an
+  exporter-health row. Three alerts with runbooks — `PgStatChExportFailing`,
+  `PgStatChDroppingEvents`, `PgStatChNotExporting` — watch the loss counters,
+  because the extension drops rather than back-pressures.
 - **Kind gate row K3.7: guarded database memberships have not drifted.**
   `smoke.js` asserts that the ADR-086 guard reports a series for every edge in
   `GUARDED_EDGES` (today `vault_rotator → notification`) and that
@@ -212,6 +229,23 @@ Skeleton (copy what you need):
   One executor role in CNPG would deadlock a new cluster (CNPG creates a role
   with `CREATE ROLE … IN ROLE`) or have its memberships revoked, hence two.
 
+- **Every statement execution on `platform-db` and `product-db` is now an
+  event in ClickHouse (`pg_stat_ch`).** The pg_stat_ch 0.4.0 extension arrives
+  as a CNPG image-volume extension (`ghcr.io/duynhlab/images/pg-stat-ch`,
+  built inside the pinned operand image and `ldd`-checked there), is preloaded
+  on both clusters and mounted-but-not-preloaded on `product-db-replica`, and
+  ships one 44-column event per execution over the native protocol to
+  ClickHouse database `pg_stat_ch` as an INSERT-only user. The password is a
+  postmaster GUC, so `databases-local` substitutes
+  `${PG_STAT_CH_CLICKHOUSE_PASSWORD}` at apply time from a Secret ESO lands in
+  `flux-system` (`postBuild.substituteFrom`, first use in this repo) — no
+  manifest carries it; OpenBAO seeds `secret/local/infra/clickhouse/pg_stat_ch`.
+  The `platform-db-authz` ConfigMap opts out of that substitution
+  (`kustomize.toolkit.fluxcd.io/substitute: disabled`), because `apply.sh`'s
+  bash `${...}` would otherwise fail the whole wave.
+  Ring sized for the 1 Gi pods (8192 slots, 16 MiB strings). The `pg_stat_ch`
+  custom query exports the exporter's own health as `cnpg_pg_stat_ch_*`.
+  Guide: `docs/observability/metrics/postgresql/query-telemetry.md`.
 - **review runs on three database roles (RFC-0029 Phase 2 canary).**
   `review_owner` (cannot log in) owns the database; `review_migrator` reaches
   it only through `SET ROLE` (`DB_MIGRATION_ROLE`); the service logs in as
@@ -237,6 +271,14 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- `docs/databases/extensions.md` compares the PostgreSQL query-telemetry tools
+  (`pg_stat_statements`, `auto_explain`, `pg_stat_monitor`, `pg_tracing`, the
+  OTel `postgresql` receiver, `pg_stat_ch`) by collection model, history,
+  strength, limitation and platform status, and its ImageVolume section now
+  describes the deployed `pg_stat_ch` delivery instead of a reference
+  capability. The custom-metrics reference, the PostgreSQL metrics hub, the
+  plan-regression workflow and `DBClientQueryP95High` point at the new
+  per-execution signal.
 - Define concise manifest comments and evidence-aware documentation conventions;
   remove editorial update footers from authoring templates while preserving
   decision and verification dates.

@@ -293,6 +293,7 @@ docs/observability/
 │       ├── README.md             # Hub: architecture, learning path, runbook links
 │       ├── builtin-metrics.md    # CNPG built-in metric inventory
 │       ├── custom-metrics.md     # Custom query reference
+│       ├── query-telemetry.md    # Per-execution events: pg_stat_ch → ClickHouse (percentiles, errors, top statements)
 │       └── signals/              # Dashboard-only signal guides
 │
 ├── tracing/                      # Pillar 2: Distributed tracing
@@ -327,7 +328,7 @@ docs/observability/
 │   └── audits/                   # Dated, sanitized Kind evidence
 │
 ├── grafana/                      # Visualization layer
-│   ├── README.md                 # Grafana overview: 25 dashboard CRs + 18 as-code boards, delivery patterns, plugins
+│   ├── README.md                 # Grafana overview: 25 dashboard CRs + 19 as-code boards, delivery patterns, plugins
 │   ├── rbac-multi-team.md        # Staff-SSO group→role mapping (ADR-062), Teams, folder permissions
 │   ├── datasources.md            # Dual datasource strategy (case study)
 │   ├── dashboard-reference.md    # Microservices dashboard (~41 panels, 8 rows)

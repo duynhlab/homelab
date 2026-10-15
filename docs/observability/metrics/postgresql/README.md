@@ -7,12 +7,13 @@ runbooks for the platform database layer.
 |---|---|
 | Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`), DR `product-db-replica` |
 | Exporter | CNPG built-in `:9187` — prefix `cnpg_` (backup series: `barman_cloud_cloudnative_pg_io_*` from the Barman Cloud plugin) |
-| Custom queries | **11** SQL definitions per cluster ConfigMap |
+| Custom queries | **12** SQL definitions per cluster ConfigMap |
 | Per-db scope | platform: user, notification, shipping, review · product: product, cart, order |
 | **Not in per-db queries** | platform: temporal, temporal_visibility · product: payment, checkout |
-| Alerts | 55 rules — [alert catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
+| Query events | one per execution, in ClickHouse `pg_stat_ch` via the pg_stat_ch extension — [query-telemetry.md](query-telemetry.md) |
+| Alerts | 64 rules in `prometheusrules/postgres/` — [alert catalog §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Runbooks | [postgresql/](../../runbooks/postgresql/README.md) (one file per alert) |
-| Dashboards | pg-query-performance, pg-maintenance, pg-io-waits, CloudNativePG Cluster Overview |
+| Dashboards | pg-query-performance, pg-maintenance, pg-io-waits, CloudNativePG Cluster Overview, postgresql-query-telemetry |
 
 ## Learning path
 
@@ -34,6 +35,7 @@ runbooks for the platform database layer.
 |-----|---------|
 | [builtin-metrics.md](builtin-metrics.md) | CNPG built-in metric inventory (default queries + collector) |
 | [custom-metrics.md](custom-metrics.md) | Custom query reference, PromQL, alert/runbook links |
+| [query-telemetry.md](query-telemetry.md) | Per-execution query events (pg_stat_ch → ClickHouse): percentiles over time, errors, top statements, exporter health |
 | [signals/capacity-planning.md](signals/capacity-planning.md) | Database/table size signals (no alert) |
 | [signals/index-hygiene.md](signals/index-hygiene.md) | Unused index detection (no alert) |
 
@@ -44,6 +46,7 @@ runbooks for the platform database layer.
 | CNPG built-in | `cnpg_collector_*`, `cnpg_pg_replication_lag`, `cnpg_pg_settings_*` | Chart rules (HA, offline, connections, …) |
 | Barman Cloud plugin | `barman_cloud_cloudnative_pg_io_*` (backup timestamps, first recoverability point) | Backup rules (`backup-alerts.yaml`) |
 | Custom queries | `cnpg_pg_stat_statements_*`, `cnpg_pg_blocking_queries_*`, … | Deep-signal rules |
+| pg_stat_ch export health | `cnpg_pg_stat_ch_*` (custom query); the events themselves are rows in ClickHouse, not metrics | `PgStatCh*` rules |
 | PgDog pooler | `pgdog_*` via `:9090` | — (investigate via connection runbooks) |
 
 Connection alerts and dashboards use built-in **`cnpg_backends_total`** and

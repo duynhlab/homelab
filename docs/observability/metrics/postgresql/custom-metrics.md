@@ -6,10 +6,10 @@ matters operationally, and how to query and alert on it.
 | Quick facts | |
 |---|---|
 | Source | CNPG built-in exporter (`:9187`), per-cluster custom-queries ConfigMap |
-| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 11 queries, different `target_databases` |
+| Clusters | `platform-db` (ns `platform`), `product-db` (ns `product`) — same 12 queries, different `target_databases` |
 | Per-db scope | platform: user, notification, shipping, review · product: product, cart, order |
 | **Gap** | payment, checkout, temporal, temporal_visibility — no per-db custom metrics yet |
-| Live queries | **11** (see reference below) |
+| Live queries | **12** (see reference below) |
 | Metric prefix | `cnpg_` — the exporter prepends it to every series (`cnpg_pg_stat_statements_calls`) |
 | Related alerts | [`alert-catalog.md` §4/§4b](../../alerting/alert-catalog.md#4-postgresql--cloudnativepg) |
 | Runbooks | [`../../runbooks/postgresql/README.md`](../../runbooks/postgresql/README.md) |
@@ -216,6 +216,36 @@ removed (2026-07-18) as redundant (they shadowed a superset built-in):
   (+ `_restartpoints_*`). Alert `CNPGCheckpointPressure` — runbook
   [CNPGCheckpointPressure](../../runbooks/postgresql/CNPGCheckpointPressure.md).
 
+### Query telemetry pipeline
+
+#### `pg_stat_ch` `[cluster]` (one target database)
+
+- **What** — `pg_stat_ch_stats()`: the pg_stat_ch extension's shared-memory
+  ring and ClickHouse export counters, one row per instance. Declared with a
+  single `target_databases` entry (`product` / `user`) because the function
+  reads cluster-wide shared memory and the extension's SQL objects exist only
+  there; it carries a `datname` label that is not meaningful.
+- **Columns** — counters `enqueued_events`, `dropped_events`, `exported_events`,
+  `send_failures`, `dsa_oom_count`; gauges `queue_size`, `queue_usage_pct`,
+  `last_success_age_seconds`, `last_error_age_seconds` (`-1` until the first
+  success/error).
+- **Why** — the extension drops events instead of slowing PostgreSQL, so these
+  counters are the only evidence that the picture in ClickHouse is complete.
+  The query events themselves are not metrics: they live in ClickHouse
+  `pg_stat_ch.events_raw` — see [query-telemetry.md](query-telemetry.md).
+- **PromQL**
+  ```promql
+  # Capture vs delivery, per cluster
+  sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_ch_enqueued_events[5m]))
+  sum by (cnpg_io_cluster) (rate(cnpg_pg_stat_ch_exported_events[5m]))
+  # Loss in the last 10 minutes
+  sum by (cnpg_io_cluster) (increase(cnpg_pg_stat_ch_dropped_events[10m]) + increase(cnpg_pg_stat_ch_send_failures[10m]))
+  ```
+- **Alerts** — `PgStatChExportFailing`, `PgStatChDroppingEvents`,
+  `PgStatChNotExporting` (`pg-stat-ch-alerts.yaml`). Board:
+  `postgresql-query-telemetry` → *Exporter health*.
+- **Runbooks** — [PgStatChExportFailing](../../runbooks/postgresql/PgStatChExportFailing.md), [PgStatChDroppingEvents](../../runbooks/postgresql/PgStatChDroppingEvents.md), [PgStatChNotExporting](../../runbooks/postgresql/PgStatChNotExporting.md)
+
 > **Not custom queries.** Replication lag (`cnpg_pg_replication_lag`), WAL
 > (`cnpg_collector_pg_wal`), backups (`cnpg_collector_last_*_backup_timestamp`),
 > xid/mxid age (`cnpg_pg_database_xid_age`/`mxid_age`), database size
@@ -223,9 +253,11 @@ removed (2026-07-18) as redundant (they shadowed a superset built-in):
 > per-database `pg_stat_database` come from CNPG's **built-in** collectors —
 > full inventory in [`builtin-metrics.md`](builtin-metrics.md).
 
-> **No latency heatmap.** `pg_stat_statements` exposes totals + calls only (no
-> per-bucket histogram), so a true query-latency-distribution heatmap is not
+> **No latency heatmap from metrics.** `pg_stat_statements` exposes totals +
+> calls only (no per-bucket histogram), so a query-latency distribution is not
 > derivable from these metrics — the boards chart mean/total exec time instead.
+> Server-side p50/p95/p99 over time come from the per-execution events in
+> ClickHouse ([query-telemetry.md](query-telemetry.md)), not from VictoriaMetrics.
 
 ## Writing a runbook from a custom query
 

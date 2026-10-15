@@ -209,6 +209,7 @@ JOB-03/JOB-04 (2026-10-15, the D1 gate):
 | JOB-02 | `apply.sh` with `authz_admin`/`db_authz`: review migrated and seeded as `review_migrator` with no role variable; every object owned by `review_owner`; seven drifts restored; a `postgres`-granted membership fails the run |
 | JOB-03 | Fresh Kind, 2026-10-15: the catalog, ACLs and default ACLs above in [`authorization.md`](../../../databases/authorization.md#evidence); K3.4 99/99, K3.8–K3.9 12/12, K3.7 5/5, `make e2e GATE=kind` green; four in-reach drifts repaired by one run with their guards at 1 then 0; a `postgres`-granted membership failed the run and fired `KubeJobFailed` |
 | JOB-04 | First bring-up: migrate created `schema_migrations` four seconds after a CronJob run and the runtime held it with `INSERT`/`DELETE`; the Job now creates the table first (fresh `postgres:18` + review `2.6.0`: runtime denied before and after migrate) |
+| JOB-05 | Fresh Kind for D2, 2026-10-15: `user`, `shipping`, `notification` on the Job + pgroles ([`authorization.md`](../../../databases/authorization.md#evidence)); K3.4 105/105 on platform-db, K3.8–K3.9 48/48, K3.11 three policies Ready, `make e2e GATE=kind` green; pgroles reverted a revoke, an extra grant and a default-ACL change within one interval; the Job restored `role=`; a `postgres`-granted membership failed `roles/shipping` alone and fired `KubeJobFailed` |
 
 ## References
 

@@ -436,6 +436,57 @@ The first bring-up of this gate failed K3.8: review's migrate ran four
 seconds after a CronJob run and the owner's defaults handed the new
 `schema_migrations` to the runtime. That is why the Job now creates the table.
 
+**Kind, fresh bring-up for D2** (2026-10-15, same versions, branch commit
+`bb3a3010`, DR replica off). `user`, `shipping` and `notification` on the Job
+for roles and pgroles for grants; catalog read as `postgres` after migrate and
+seed:
+
+```text
+ rolname               | login | inherit | createrole | connlimit | rolconfig
+ db_authz              | t     | t       | f          |        10 |
+ notification_migrator | t     | f       | f          |        -1 | {role=notification_owner}
+ notification_owner    | f     | t       | f          |        -1 |
+ notification_runtime  | t     | t       | f          |        -1 |
+ vault_rotator         | t     | f       | t          |        -1 |
+ (user_* and shipping_* match notification_*)
+
+ role                  | member                | grantor     | inh | set | adm
+ notification_owner    | notification_migrator | authz_admin | f   | t   | f
+ notification_runtime  | vault_rotator         | postgres    | f   | f   | t
+ (plus authz_admin's t/t/f and f/f/t edges on every owner and migrator)
+
+ datname      | owner              | datacl
+ platform     | platform           |
+ notification | notification_owner | {=Tc/…,notification_owner=CTc/…,notification_migrator=c/…,notification_runtime=c/…}
+
+ relname              | owner              | relacl
+ notifications        | notification_owner | {notification_runtime=arwd/…,notification_owner=arwdDxtm/…}
+ notifications_id_seq | notification_owner | {notification_runtime=rU/…,notification_owner=rwU/…}
+ schema_migrations    | notification_owner | {notification_runtime=arwd/…,notification_owner=arwdDxtm/…}
+
+ default ACL (notification_owner) | S public {notification_runtime=rU/notification_owner}
+                                  | f -      {notification_owner=X/notification_owner}
+                                  | r public {notification_runtime=arwd/notification_owner}
+```
+
+The runtime's CRUD on `schema_migrations` is the accepted PGR-10 gap. OpenBAO's
+`openbao-db-config` Job wrote static role `notification-runtime`, which set the
+runtime's password through `vault_rotator`; notification served on it. Gate
+output: `db-authz-check.sh` 48/48, `db-isolation-sweep.sh` platform-db 105/105
+and product-db 36/36, three `PostgresPolicy` Ready with no drift,
+`authz applied: roles [review user shipping notification] grants [review]`,
+`make e2e GATE=kind` green.
+
+Drift drill, same cluster, as `postgres`:
+
+| Injected | Guard / alert | Repair |
+|---|---|---|
+| `REVOKE SELECT ON user_profiles FROM user_runtime` | — | pgroles, 16 s later |
+| `GRANT TRUNCATE ON shipments TO shipping_runtime` | — | pgroles, within one 5 min interval |
+| `REVOKE DELETE` from `shipping_owner`'s table defaults | `cnpg_pg_default_privileges_drift` 1, `CNPGDefaultPrivilegesDrift` pending | pgroles, same reconcile; guard 0 half a minute later |
+| `ALTER ROLE shipping_migrator RESET role` | `cnpg_pg_role_config_drift` 1, `CNPGRoleConfigDrift` pending | the 07:10 CronJob run |
+| `GRANT shipping_owner TO shipping_runtime` (grantor `postgres`) | runs exit 1 on `roles/shipping` only (`permission denied to revoke privileges granted by role "postgres"`), the other services still applied; `KubeJobFailed` firing after 5 min | revoked by hand, next run Complete |
+
 ## Operations
 
 ### Re-run the catalog now

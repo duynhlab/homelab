@@ -1449,6 +1449,33 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 ## Previous runs
 
+### 2026-10-15 — user, shipping and notification move to the platform (ADR-088, RFC-0029 D2)
+
+Cluster: kind `homelab`, Kubernetes 1.35.8, Kind CLI v0.33.0, fresh
+Host: Linux + Docker (`/var/lib/docker` on ZFS), arch amd64
+Revision: `feat/rfc0029-d2-platform-db` at `bb3a3010`; **DR replica off**
+(working-tree patch, not committed), so 29 declared + `flux-system` = 30
+Kustomizations
+Preconditions: compose gate on the same branch passed A1–A14, A16–A23 (A23 for
+all four platform-db services), B1–B10, C0–C22 · scope is the rows this change
+touches; K4/K5 ran only through `make e2e`
+
+| Group | Result | Evidence |
+|---|---|---|
+| K1 bring-up | PASS, after findings 1–2 | `make up` exit 0; **30/30 Ready**; `kind-seed.sh` 8/8 |
+| K3 admission/secrets | PASS | 48/48 ExternalSecrets synced; db-isolation platform-db **105/105** (16 allow / 89 reject), product-db 36/36; K3.7 **5/5**; K3.8–K3.9 **48/48**; K3.10 Job and CronJob Complete, `authz applied: roles [review user shipping notification] grants [review]`; K3.11 three `PostgresPolicy` Ready, no drift |
+| K4/K5 via k6 | PASS | saga 4/4 (9/9), smoke 16/16 (55/55), staff 5/5 (59/59), operator 1/1 (26/26) |
+| Drift drill | PASS | pgroles reverted a revoke, an extra grant and a default-ACL change within one interval; the Job restored `role=`; a `postgres`-granted membership failed `roles/shipping` alone and fired `KubeJobFailed` ([evidence](../databases/authorization.md#evidence)) |
+
+Findings:
+
+1. **`databases-local` failed its dry-run.** A rename had turned
+   notification's `DatabaseRole` field `superuser` into `supernotification`.
+   `make validate` does not check that CRD's schema; fixed in the same PR.
+2. **The pgroles policies could not resolve `platform-db-rw`.** The operator
+   runs in `pgroles-system`, so the short Service name looked in the wrong
+   namespace. The policies now use `platform-db-rw.platform.svc`.
+
 ### 2026-10-15 — review's authorization moves to the platform (ADR-088, RFC-0029 D1)
 
 Cluster: kind `homelab`, Kubernetes 1.35.8, Kind CLI v0.33.0, recreated twice

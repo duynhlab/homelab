@@ -193,8 +193,8 @@ flowchart LR
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
-This one answers the order of work. Phases 0–2, the redesign decision and D1
-are done; the rest is **planned**.
+This one answers the order of work. Phases 0–2, the redesign decision, D1
+and D2 are done; the rest is **planned**.
 
 ```mermaid
 flowchart LR
@@ -204,7 +204,7 @@ flowchart LR
     p2["Phase 2 · canary review<br/>done 2026-10-08 on Kind"]:::data
     pr["Redesign · platform-owned authorization<br/>ADR-088, lab 2026-10-12"]:::data
     d1["D1 · executor + catalog Job, review<br/>done 2026-10-15 on Kind"]:::data
-    d2["D2 · user, shipping, notification on pgroles<br/>(planned)"]:::platform
+    d2["D2 · user, shipping, notification on pgroles<br/>done 2026-10-15 on Kind"]:::data
     p3["Phase 3 · product-db by domain<br/>(planned)"]:::platform
     p4["Phase 4 · RLS / definer / IAM<br/>only on a real use case (planned)"]:::platform
 
@@ -363,7 +363,8 @@ Resolved in Phase 1 (2026-10-06, owner):
   first bring-up failed K3.8, so the Job now creates `schema_migrations`.
 - 2026-10-15 — D2: user, shipping and notification on the catalog Job plus
   pgroles policies. PGR-10: pgroles cannot leave `schema_migrations` out of a
-  table wildcard; the owner accepted that those runtimes hold it.
+  table wildcard; the owner accepted that those runtimes hold it. Fresh
+  Kind: K3.4 105/105, K3.8 48/48, three policies Ready, drift drill green.
 
 ## Related
 

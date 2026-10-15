@@ -54,7 +54,8 @@ a load test, a runaway loop or a chatty new service is usually the source.
 ### kubectl / psql
 
 ```bash
-kubectl exec -n "$NAMESPACE" "${CLUSTER}-1" -c postgres -- \
+POD=$(kubectl get pod -n "$NAMESPACE" -l "cnpg.io/cluster=$CLUSTER,cnpg.io/instanceRole=primary" -o name)
+kubectl exec -n "$NAMESPACE" "$POD" -c postgres -- \
   psql -d "$DB" -c "SELECT * FROM pg_stat_ch_stats();"
 ```
 
@@ -67,8 +68,9 @@ because the 16 MiB `string_area_size` filled — same cause, same fix.
    once it passes, and the dashboard's exporter-health row marks the window.
 2. For a lasting throughput increase, either sample — `pg_stat_ch.min_duration_us`
    with `pg_stat_ch.sample_rate` keeps every slow statement and a fraction of
-   the fast ones, reload-only — or raise `queue_capacity` (power of two;
-   16384 ≈ 8 MiB of shared memory) and `string_area_size`, which need a
+   the fast ones, reload-only — or raise `queue_capacity` (power of two; a
+   slot is ~520 B, so 16384 ≈ 8 MiB and 65536 ≈ 34 MB of shared memory) and
+   `string_area_size`, which need a
    PostgreSQL restart through the CNPG rollout. Both are `Cluster` parameters
    in `instance.yaml`; the pods have a 1 Gi memory limit, so size with the
    memory comment there in view.

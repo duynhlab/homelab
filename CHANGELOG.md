@@ -145,7 +145,9 @@ Skeleton (copy what you need):
   `events_raw` on `ReplicatedMergeTree`, 7 days hot → cold, 90 days, plus the
   `query_stats_5m`, `db_app_user_1m` and `errors_recent` rollups), and the
   `clickhouse-schema` Job now bootstraps and verifies both databases. The CHI
-  defines the INSERT-only `pg_stat_ch` user. New Grafana board
+  defines the INSERT-only `pg_stat_ch` user, with its own settings profile
+  pinning `network_compression_method: LZ4` (ClickHouse 26 replies in ZSTD,
+  which the extension cannot decode). New Grafana board
   `postgresql-query-telemetry` (Databases folder), written as Go in
   `duynhlab/grafana-dashboards` and delivered by the as-code artifact pinned at
   0.5.0 — its first board on the logical `clickhouse` datasource: server-side
@@ -238,6 +240,9 @@ Skeleton (copy what you need):
   `${PG_STAT_CH_CLICKHOUSE_PASSWORD}` at apply time from a Secret ESO lands in
   `flux-system` (`postBuild.substituteFrom`, first use in this repo) — no
   manifest carries it; OpenBAO seeds `secret/local/infra/clickhouse/pg_stat_ch`.
+  The `platform-db-authz` ConfigMap opts out of that substitution
+  (`kustomize.toolkit.fluxcd.io/substitute: disabled`), because `apply.sh`'s
+  bash `${...}` would otherwise fail the whole wave.
   Ring sized for the 1 Gi pods (8192 slots, 16 MiB strings). The `pg_stat_ch`
   custom query exports the exporter's own health as `cnpg_pg_stat_ch_*`.
   Guide: `docs/observability/metrics/postgresql/query-telemetry.md`.

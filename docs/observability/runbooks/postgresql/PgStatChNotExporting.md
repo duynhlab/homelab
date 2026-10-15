@@ -29,9 +29,12 @@ follows. PostgreSQL is unaffected.
 ### kubectl — is the worker alive?
 
 ```bash
-kubectl exec -n "$NAMESPACE" "${CLUSTER}-1" -c postgres -- \
+POD=$(kubectl get pod -n "$NAMESPACE" -l "cnpg.io/cluster=$CLUSTER,cnpg.io/instanceRole=primary" -o name)
+kubectl exec -n "$NAMESPACE" "$POD" -c postgres -- \
   psql -c "SELECT pid, backend_type, state, wait_event FROM pg_stat_activity WHERE backend_type LIKE '%pg_stat_ch%';"
-kubectl logs -n "$NAMESPACE" "${CLUSTER}-1" -c postgres | grep -i pg_stat_ch | tail -20
+# worker start and exit lines come from the postmaster; export errors are
+# not logged (read them from pg_stat_ch_stats())
+kubectl logs -n "$NAMESPACE" "$POD" -c postgres | grep -i 'pg_stat_ch' | tail -20
 ```
 
 No row: the worker did not start. The log says why — the usual cause is a
@@ -42,7 +45,8 @@ worker, which PostgreSQL logs with its exit status and restarts after 5 s.
 ### kubectl — can it reach ClickHouse?
 
 ```bash
-kubectl exec -n "$NAMESPACE" "${CLUSTER}-1" -c postgres -- \
+POD=$(kubectl get pod -n "$NAMESPACE" -l "cnpg.io/cluster=$CLUSTER,cnpg.io/instanceRole=primary" -o name)
+kubectl exec -n "$NAMESPACE" "$POD" -c postgres -- \
   sh -c 'timeout 5 bash -c "</dev/tcp/clickhouse-clickhouse.monitoring.svc.cluster.local/9000" && echo open || echo closed'
 ```
 
@@ -66,6 +70,7 @@ max by (cnpg_io_cluster) (cnpg_pg_stat_ch_last_success_age_seconds)
    `ALTER SYSTEM` is off on CNPG, so set `pg_stat_ch.enabled: "off"` in
    `instance.yaml` (reload-only) and reconcile.
 3. Confirm recovery: `exported_events` increases, `queue_usage_pct` falls to ~0.
+   `SELECT pg_stat_ch_flush();` starts a drain now instead of at the next tick.
 
 ## Escalation
 

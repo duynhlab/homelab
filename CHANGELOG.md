@@ -141,7 +141,7 @@ Skeleton (copy what you need):
   `postgres` database.
 
 - **PostgreSQL query telemetry: dashboard, store and alerts.** ClickHouse gains
-  a second Replicated database, `pg_stat_ch` (`clickhouse-ddl` 1.2.0:
+  a second Replicated database, `pg_stat_ch` (`clickhouse-ddl` 1.2.1:
   `events_raw` on `ReplicatedMergeTree`, 7 days hot → cold, 90 days, plus the
   `query_stats_5m`, `db_app_user_1m` and `errors_recent` rollups), and the
   `clickhouse-schema` Job now bootstraps and verifies both databases. The CHI
@@ -150,7 +150,7 @@ Skeleton (copy what you need):
   which the extension cannot decode). New Grafana board
   `postgresql-query-telemetry` (Databases folder), written as Go in
   `duynhlab/grafana-dashboards` and delivered by the as-code artifact pinned at
-  0.5.0 — its first board on the logical `clickhouse` datasource: server-side
+  0.6.0 — its first board on the logical `clickhouse` datasource: server-side
   p50/p95/p99 over time, statements/s by operation, database and application,
   errors by SQLSTATE, CPU-vs-I/O split, top statements by total time and
   physical reads, slowest individual executions, recent errors, and an

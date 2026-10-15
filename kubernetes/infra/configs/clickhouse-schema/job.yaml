@@ -295,7 +295,7 @@ spec:
       volumes:
         - name: sql
           image:
-            reference: ghcr.io/duynhlab/images/clickhouse-ddl:1.2.0@sha256:0233432b32b1a8eb38803e7668b181a6568ef73fd265a50fa5880d62f262a2d7
+            reference: ghcr.io/duynhlab/images/clickhouse-ddl:1.2.1@sha256:c3606896e41c36936aff09f8e1ecedf24087295687ba3ae91c1584d8e64585e4
             pullPolicy: IfNotPresent
         - name: tmp
           emptyDir: {}

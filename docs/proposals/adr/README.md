@@ -463,7 +463,7 @@ and extend Adoption instead.
 | [ADR-085](ADR-085-service-migrations-own-authorization/) | Own Object ACLs and Default Privileges in Service Migrations | Superseded | Superseded by [ADR-088](ADR-088-platform-owns-database-authorization/) | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-086](ADR-086-guard-membership-options/) | Guard PostgreSQL Membership Options with a CNPG Monitoring Query | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-087](ADR-087-homelab-private-and-web-access/) | Separate Private Administration from Published Web Access | Proposed | Not started | [RFC-0011](../rfc/RFC-0011/) |
-| [ADR-088](ADR-088-platform-owns-database-authorization/) | Apply Database Authorization from the Platform, Not from Service Code | Accepted | Not started | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-088](ADR-088-platform-owns-database-authorization/) | Apply Database Authorization from the Platform, Not from Service Code | Accepted | Partial (`review`) | [RFC-0029](../rfc/RFC-0029/) |
 
 Principles:
 

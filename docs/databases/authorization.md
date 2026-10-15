@@ -286,8 +286,62 @@ access to `schema_migrations` was revoked by it. A membership granted by
 `permission denied to revoke privileges granted by role "postgres"`, and the
 other steps still ran.
 
-**Kind, fresh bring-up**: pending the D1 gate; the catalog, ACL and gate output
-from that cluster replace this note.
+**Kind, fresh bring-up** (2026-10-15, Kubernetes 1.35.8, CNPG 1.30.1,
+PostgreSQL 18.6, review `2.6.0`, branch commit `eceab9dd`, DR replica off).
+Catalog read as `postgres` on the primary after the Job, the first CronJob run
+and review's migrate:
+
+```text
+ rolname         | login | inherit | createrole | super | connlimit | rolconfig
+ authz_admin     | f     | t       | t          | f     |        -1 |
+ db_authz        | t     | t       | f          | f     |         4 |
+ review_migrator | t     | f       | f          | f     |        -1 | {role=review_owner}
+ review_owner    | f     | t       | f          | f     |        -1 |
+ review_runtime  | t     | t       | f          | f     |        -1 |
+
+ role            | member          | grantor     | inh | set | adm
+ authz_admin     | db_authz        | postgres    | t   | t   | f
+ review_migrator | authz_admin     | authz_admin | t   | t   | f
+ review_migrator | authz_admin     | postgres    | f   | f   | t
+ review_owner    | authz_admin     | authz_admin | t   | t   | f
+ review_owner    | authz_admin     | postgres    | f   | f   | t
+ review_owner    | review_migrator | authz_admin | f   | t   | f
+
+ relname           | kind | owner        | relacl
+ reviews           | r    | review_owner | {review_owner=arwdDxtm/review_owner,review_runtime=arwd/review_owner}
+ reviews_id_seq    | S    | review_owner | {review_owner=rwU/review_owner,review_runtime=rU/review_owner}
+ schema_migrations | r    | review_owner | {review_owner=arwdDxtm/review_owner}
+
+ default ACL (review_owner) | S public {review_runtime=rU/review_owner}
+                            | f -      {review_owner=X/review_owner}
+                            | r public {review_runtime=arwd/review_owner}
+
+ pg_hba_file_rules | 25 host {postgres} {db_authz} scram-sha-256
+                   | 26 host {review}   {db_authz} scram-sha-256
+```
+
+`schema_migrations` has a lower oid (16667) than `reviews_id_seq` (20553): the
+Job created it ten minutes before review's migrate. Gate output on the same
+cluster: `db-authz-check.sh` 12/12 PASS, `db-isolation-sweep.sh` 99/99 PASS
+(`db_authz` allowed only to `postgres` and `review`), `make e2e GATE=kind`
+saga 9/9, smoke 55/55 (K3.7 5/5), staff 59/59, operator 26/26.
+
+Drift drill, same cluster, as `postgres`:
+
+| Injected | Guard / alert | Repair |
+|---|---|---|
+| `GRANT TRUNCATE ON reviews TO review_runtime` | — (not a default ACL) | revoked by the next run |
+| `REVOKE DELETE` from the owner's table defaults | `cnpg_pg_default_privileges_drift` 1, `CNPGDefaultPrivilegesDrift` pending | restored |
+| `ALTER ROLE review_migrator RESET role` | `cnpg_pg_role_config_drift` 1, `CNPGRoleConfigDrift` pending | `{role=review_owner}` restored |
+| migrator → owner re-granted `t/t/f` by `authz_admin` | `cnpg_pg_role_membership_drift` 1, `CNPGRoleMembershipDrift` pending | back to `f/t/f` |
+| `GRANT review_owner TO review_runtime` (grantor `postgres`) | the run and the next scheduled run exit 1 (`permission denied to revoke privileges granted by role "postgres"`), grants still applied; `KubeJobFailed` firing after 5 min | revoked by hand, next run Complete |
+
+All three guard metrics read 1 within a minute of the injection and 0 within
+a minute of the repair run; `db-authz-check.sh` passed again afterwards.
+
+The first bring-up of this gate failed K3.8: review's migrate ran four
+seconds after a CronJob run and the owner's defaults handed the new
+`schema_migrations` to the runtime. That is why the Job now creates the table.
 
 ## Operations
 

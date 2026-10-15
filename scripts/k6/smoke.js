@@ -440,7 +440,12 @@ const UNITS = [
       );
       const worst = promqlScalar(target.vm, 'max(cnpg_pg_role_membership_drift)');
       const perRole = promqlCountBy(target.vm, 'count by (role) (cnpg_pg_role_config_drift)', 'role');
-      const perDb = promqlCountBy(target.vm, 'count by (datname) (cnpg_pg_default_privileges_drift)', 'datname');
+      // Every instance runs the query, so collapse instances before counting types.
+      const perDb = promqlCountBy(
+        target.vm,
+        'count by (datname) (max by (datname, objtype) (cnpg_pg_default_privileges_drift))',
+        'datname'
+      );
       const worstAuthz = promqlScalar(
         target.vm,
         'max(cnpg_pg_role_config_drift or cnpg_pg_default_privileges_drift)'

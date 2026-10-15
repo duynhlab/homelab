@@ -1438,6 +1438,38 @@ Rows not run: <list, with why> — outstanding, not passed.
 
 ## Previous runs
 
+### 2026-10-15 — review's authorization moves to the platform (ADR-088, RFC-0029 D1)
+
+Cluster: kind `homelab`, Kubernetes 1.35.8, Kind CLI v0.33.0, recreated twice
+for this run (the first bring-up found finding 1)
+Host: Linux + Docker (`/var/lib/docker` on ZFS), arch amd64
+Revision: `feat/rfc0029-d1-platform-authz` at `eceab9dd`, review `2.6.0`;
+**DR replica off** (working-tree patch, not committed), so 28 declared +
+`flux-system` = 29 Kustomizations
+Preconditions: compose gate for review `2.6.0` (`d14e06f`) passed the same
+morning, A1–A14, A16–A23, B1–B10, C0–C22 · scope is the rows this change
+touches, listed below; K4/K5 ran only through `make e2e`
+
+| Group | Result | Evidence |
+|---|---|---|
+| K1 bring-up | PASS | `make up` exit 0; **29/29 Ready**; `kind-seed.sh` 8/8 |
+| K2 delivery | PASS | review pod on `review-service:2.6.0`; 7/7 ResourceSets Ready |
+| K3 admission/secrets | PASS, after finding 1 | 42/42 ExternalSecrets synced (incl. `platform-db-db-authz-secret`); db-isolation **99/99** (`db_authz` allowed only `postgres` and `review`); K3.7 **5/5**; K3.8–K3.9 **12/12**; K3.10 Job and first CronJob run Complete, `authz applied: roles [review] grants [review]` |
+| K4/K5 via k6 | PASS, after finding 2 | saga 4/4 (9/9), smoke 16/16 (55/55), staff 5/5 (59/59), operator 1/1 (26/26) |
+| Drift drill | PASS | four in-reach drifts repaired by one run, guards 1 → 0 within a minute each way, three alerts pending; a `postgres`-granted membership failed the run and the next scheduled one, `KubeJobFailed` firing after 5 min, recovered after a manual revoke ([evidence](../databases/authorization.md#evidence)) |
+
+Findings:
+
+1. **K3.8 failed on the first bring-up.** review's migrate created
+   `schema_migrations` four seconds after a CronJob run, so the owner's default
+   privileges left it with `INSERT`/`DELETE` for `review_runtime` until the next
+   run. Fixed in the same PR: the Job creates the table as the owner before any
+   migrate. The second bring-up passed.
+2. **K3.7 counted instances, not object types.** The `pg_default_privileges`
+   query runs on all three instances, so the row saw 9 series for `review`
+   where it wanted 3; every series was `0`. `smoke.js` now collapses instances
+   first.
+
 ### 2026-09-29 — the Kubernetes 1.35.8 baseline (RFC-0032 Phase 1)
 
 Cluster: kind `homelab`, 4 nodes,

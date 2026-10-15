@@ -22,7 +22,7 @@
 | **Supersedes** | [ADR-085](../ADR-085-service-migrations-own-authorization/) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029: D1 (`review`, Job) · D2 (`user`, `shipping`, `notification`, pgroles) · product-db after |
-| **Adoption** | Not started |
+| **Adoption** | Partial: `review` (D1, Kind gate 2026-10-15); `user`, `shipping`, `notification` next (D2) |
 
 ## Context
 
@@ -179,8 +179,9 @@ membership fails when the role is created in the same plan.
 ## Evidence
 
 Measured 2026-10-12 on Kind `platform-db` (CNPG 1.30.1, PostgreSQL 18.6,
-pgroles 0.13.0, synthetic `lab*` roles), except CNPG-10 (source) and JOB-02
-(2026-10-14, `postgres:18-alpine` with the review-service binary):
+pgroles 0.13.0, synthetic `lab*` roles), except CNPG-10 (source), JOB-02
+(2026-10-14, `postgres:18-alpine` with the review-service binary) and
+JOB-03/JOB-04 (2026-10-15, the D1 gate):
 
 | Row | Result |
 |---|---|
@@ -198,6 +199,8 @@ pgroles 0.13.0, synthetic `lab*` roles), except CNPG-10 (source) and JOB-02
 | CNPG-10 | CNPG creates a role with `CREATE ROLE … IN ROLE <inRoles>` (`internal/management/controller/roles/postgres.go`, v1.30.1) |
 | JOB-01 | Job SQL for roles and grants: correct, idempotent, controls `SET` |
 | JOB-02 | `apply.sh` with `authz_admin`/`db_authz`: review migrated and seeded as `review_migrator` with no role variable; every object owned by `review_owner`; seven drifts restored; a `postgres`-granted membership fails the run |
+| JOB-03 | Fresh Kind, 2026-10-15: the catalog, ACLs and default ACLs above in [`authorization.md`](../../../databases/authorization.md#evidence); K3.4 99/99, K3.8–K3.9 12/12, K3.7 5/5, `make e2e GATE=kind` green; four in-reach drifts repaired by one run with their guards at 1 then 0; a `postgres`-granted membership failed the run and fired `KubeJobFailed` |
+| JOB-04 | First bring-up: migrate created `schema_migrations` four seconds after a CronJob run and the runtime held it with `INSERT`/`DELETE`; the Job now creates the table first (fresh `postgres:18` + review `2.6.0`: runtime denied before and after migrate) |
 
 ## References
 

@@ -403,7 +403,8 @@ Skeleton (copy what you need):
 - Align RFC-0029 with ADR-088 platform-owned authorization and record the
   planned access contract: direct migrations, pooled consumers with native
   recovery exceptions, verified TLS and required workload attribution. Keep
-  rotation cadences proposed and preserve D1/D2 deployment evidence.
+  accepted workload-only naming and 30/90-day rotation defaults distinct from
+  isolated 3-hour audits; preserve D1/D2 deployment evidence.
 
 #### GitOps
 

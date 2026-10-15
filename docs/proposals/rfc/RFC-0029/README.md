@@ -84,9 +84,9 @@ Owner decisions recorded 2026-10-15:
 | Break-glass | Controlled direct access for recovery | Explicit exception, scoped access and revocation procedure |
 | Pooler implementation | Keep PgDog and PgBouncer | Compatibility verified per deployed version and profile |
 | TLS | Applications support TLS; verify-full on both pooled hops | Planned; direct migration verifies its single hop |
-| User/password | Fixed usernames; both automatic and manual password policies | Per-role policy/cadence remains proposed |
+| User/password | Fixed usernames; both automatic and manual password policies | Per-role policy/cadence accepted below; delivery implementation pending |
 | Role model | NOLOGIN owner; separate migration/runtime; data/CDC/monitoring/platform templates | Templates below; new consumers not yet provisioned |
-| Attribution | application_name is required | Naming proposal below; implementation and telemetry gate pending |
+| Attribution | application_name is required | Workload-only naming accepted; implementation and telemetry gate pending |
 | Consistency/retry | Primary by default; replica reads explicit; no blind replay of ambiguous writes | Apply these rules in implementation contracts |
 
 ## Proposal
@@ -215,32 +215,34 @@ migration verifies the primary endpoint in one hop. Keeping TLS on one hop
 does not secure the other. Configure the equivalent behavior for each pooler;
 do not assume both products expose the same setting names.
 
-**Proposed delivery:** platform issues certificates with endpoint SANs and
+**Accepted lifecycle:** platform issues certificates with endpoint SANs and
 supplies trust bundles. For CA replacement, distribute a bundle trusting old
 and new CAs first, reload clients/poolers, switch server certificates, verify
 new connections, then remove old trust after the agreed overlap. Workloads
 must actually reload trust; updating a mounted file alone is insufficient.
 No fallback to plaintext or disabled hostname verification on failure.
 
-The CA overlap duration, renewal thresholds, component reload mechanisms and
-rollout error budget remain open. Reuse [RFC-0020](../RFC-0020/) for internal
+The lifecycle is decided. Set the CA overlap duration, renewal thresholds,
+component reload mechanisms and error budget during implementation planning. Reuse [RFC-0020](../RFC-0020/) for internal
 TLS ownership; this RFC defines the database consumer boundary.
 
 ### application_name and telemetry
 
-**Required:** every consumer sets `application_name`. **Proposed naming:**
-`<workload>@<environment>`, retaining existing workload names:
-`order@local`, `order-worker@local`, `checkout-worker@local` and
-`order-migrate@local`. Do not rename `order` to the note's illustrative
-`orders-api`. Platform injects the complete value; the shared client maps it
-to the PostgreSQL startup parameter on every connection.
+**Accepted naming:** every consumer sets `application_name` to its stable
+workload name: `order`, `order-worker`, `checkout-worker`, `order-migrate`.
+No environment suffix: observability storage is separated by environment.
+If environments are aggregated later, preserve environment as a separate
+telemetry dimension rather than changing the workload name.
 
-Use the existing telemetry environment source (`DEPLOYMENT_ENVIRONMENT`);
-Compose currently sets `local`. Keep `OTEL_SERVICE_NAME` unchanged. Proposed
-validation is lowercase ASCII letters/digits/hyphens per component, one `@`,
-and at most 63 bytes for a standard PostgreSQL build; reject rather than
-silently truncate. No pod UID, release SHA, request ID or secret in this label.
-The label is client-supplied observability metadata, never authorization.
+Keep existing service/worker names and `OTEL_SERVICE_NAME` unchanged. Migration
+uses the service name plus `-migrate`, even when it shares the service image.
+Platform injects the complete value; the shared client maps it to the PostgreSQL
+startup parameter on every connection. Inventory each workload during rollout.
+
+Use lowercase ASCII letters/digits/hyphens and at most 63 bytes for a standard
+PostgreSQL build; reject rather than silently truncate. No pod UID, release
+SHA, request ID or secret in this label. The label is client-supplied
+observability metadata, never authorization.
 
 Repository inspection on 2026-10-15 found the workload names in Compose/domain
 ResourceSets but no explicit PostgreSQL `application_name`/`PGAPPNAME` wiring
@@ -251,8 +253,9 @@ already maps `pg_stat_ch.app` to `application_name`; that mapping stays.
 After implementation, verify client → pooler → PostgreSQL → ClickHouse →
 dashboard, then update guide examples, dashboard filters and
 [DBClientQueryP95High](../../../observability/runbooks/microservices/DBClientQueryP95High.md).
-Client metric `app=order` need not equal server event `app=order@local`:
-explicitly map workload and environment. Preserve interpretation of historical
+Align client workload labels and server event `app` (for example `order`);
+verify worker and migration attribution separately rather than assuming all
+producers already use matching labels. Preserve interpretation of historical
 empty/old names; do not invent attribution for old records.
 
 ### Password rotation and delivery
@@ -270,9 +273,10 @@ An OpenBAO static-role creation can rotate immediately; manual rotate-role
 invocation does not disable its automatic schedule. See
 [OpenBAO database API](https://openbao.org/docs/api/secret/databases/).
 
-The following is a **proposal, not an approved schedule**:
+The following trigger/cadence mapping is **accepted for operation**; rollout
+is still planned:
 
-| Role category | Proposed trigger / cadence | Adoption condition |
+| Role category | Accepted trigger / cadence | Adoption condition |
 |---|---|---|
 | NOLOGIN owner | None | No password exists |
 | Runtime / data robots | Automatic, 30 days | Fresh authentication and consumer reload proven |
@@ -283,9 +287,18 @@ The following is a **proposal, not an approved schedule**:
 | Break-glass | After use; access review every 90 days | Review frequency is not a password rotation schedule |
 | Operator-managed internals / humans | Separate lifecycle | Do not impose application machine-password policy |
 
-These are homelab starting points, not universal security requirements or
+These are accepted homelab defaults, not universal security requirements or
 GitLab.com's verified internal cadence. Suspected compromise or revocation
 requires immediate handling regardless of a periodic schedule.
+
+**Accelerated audit only:** use a 3-hour rotation-period override in an
+isolated audit environment; extend to 5 hours or 1–2 days if observation needs
+more time. Do not change the operational 30/90-day policy. For automatic roles,
+observe a scheduler-triggered rotation, not only a manual API invocation. For
+manual roles, exercise the operator-triggered workflow without adding an
+automatic schedule. Check fresh frontend/backend authentication, consumer reload
+and mismatch recovery; record the override and restore/remove it after the audit.
+A short audit proves that exercised delivery path, not long-term reliability.
 
 **Minimum delivery gate, not a broad audit:** inventory writer and consumers;
 prepare versioned secret/recovery; coordinate the actual DB writer, pooler
@@ -346,8 +359,8 @@ No new numerical SLO or mandatory fleet-wide rotation audit is approved here.
 | Stage | Status / exit |
 |---|---|
 | Phase 0–2, ADR-088 redesign, D1/D2 | Historical evidence below; do not reclassify as new access-contract validation |
-| Access-contract documentation | Record accepted decisions and explicit remaining proposals; no runtime mutation |
-| Implementation planning | Set profile compatibility, naming, CA/reload/error budget and per-role password ownership |
+| Access-contract documentation | Record accepted decisions and implementation prerequisites; no runtime mutation |
+| Implementation planning | Inventory workloads; implement accepted naming, profiles, CA/reload/error budget and per-role password ownership |
 | Canary access contract | Migration direct, runtime pooled; TLS negatives, attribution and minimum rotation delivery gate |
 | Remaining fleet / data / CDC | Consumer-by-consumer evidence; local-stack parity and Linux/Kind gates before qualified rollout |
 
@@ -377,21 +390,22 @@ Never restore a compromised or revoked password as a rollback target.
 - Consistency: explicit replica flow tolerance, primary read-after-write and
   no duplicated effects under retry/ambiguous commit.
 
-## Open questions
+## Implementation prerequisites & gates
 
-Accepted directions are in Decision outcome; these details remain **open**:
+The architecture directions and rotation defaults are decided. The following
+are implementation tasks, not unapproved alternatives or completed deployment:
 
-| Detail | Recommended direction | Needed before implementation |
+| Workstream | Accepted direction | Required before rollout |
 |---|---|---|
-| application_name naming | Existing workload + @environment | Approve inventory/validation and shared-client mapping |
-| CA lifecycle | Trust overlap → cert switch → verified reload → remove old trust | Durations, component reload support and failure budget |
-| Rotation policy | Proposed table above | Per-role trigger/cadence, writer, owner and recovery |
-| Pooler profiles | Keep both products; compatible profile per consumer | Versioned TLS/session/replication matrix, particularly CDC and platform jobs |
-| Replica reads | Opt-in only | Per-flow lag tolerance and fallback behavior |
+| application_name | Stable workload only; migration suffix -migrate | Workload inventory, shared-client mapping and end-to-end telemetry evidence |
+| CA lifecycle | Trust overlap → verified reload → cert switch → new-connection checks → remove old trust | Durations, renewal settings, component reload support and failure budget |
+| Rotation | Accepted per-role 30/90-day table and lifecycle exceptions | Single writer, owner, consumer reload and recovery; isolated 3-hour audit override |
+| Pooler profiles | Keep both products; compatible profile per consumer | Versioned TLS/session/replication matrix, particularly CDC and platform jobs; failed gate blocks cutover |
+| Replica reads | Primary default; explicit stale-read flows only | Per-flow lag tolerance and fallback defined before enabling replica access |
 
-The former service `WithSetRole` decision is superseded by ADR-088, not an open
-choice. Capability templates are accepted in shape; exact data/CDC grants must
-be scoped to their datasets and connector requirements before provisioning.
+The former service `WithSetRole` design is superseded by ADR-088. Exact
+data/CDC grants must be scoped to their datasets and connector requirements
+before provisioning. Accepted direction does not waive compatibility gates.
 
 ## Resulting decisions
 
@@ -401,7 +415,7 @@ be scoped to their datasets and connector requirements before provisioning.
 | Service-owned authorization | [ADR-085](../../adr/ADR-085-service-migrations-own-authorization/) | Historical; superseded by ADR-088 |
 | Membership-option guard | [ADR-086](../../adr/ADR-086-guard-membership-options/) | Accepted |
 | Platform-owned authorization | [ADR-088](../../adr/ADR-088-platform-owns-database-authorization/) | Accepted; partial adoption |
-| Access paths, verified TLS and required attribution | This RFC, Decision outcome, owner decision 2026-10-15 | Accepted direction; planned rollout; named implementation details open |
+| Access paths, verified TLS and required attribution | This RFC, Decision outcome, owner decision 2026-10-15 | Accepted direction; planned rollout; implementation prerequisites remain |
 
 ## Implementation History
 

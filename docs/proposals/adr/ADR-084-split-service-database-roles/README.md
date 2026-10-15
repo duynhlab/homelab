@@ -1,7 +1,8 @@
 # ADR-084: Split Each Service Database Identity into Owner, Migrator and Runtime Roles
 
 > **Decision summary:** We will give every application database three roles — a
-> NOLOGIN owner, a migrator that acts as the owner at login (ADR-088), and a
+> NOLOGIN owner, a migrator that acts as the owner at login (amended
+> 2026-10-15, ADR-088), and a
 > runtime login that owns nothing — because a runtime compromise must not be a
 > schema compromise. We accept two Secrets, two HBA pairs and a coordinated
 > cutover per service in exchange for separating data access from DDL and
@@ -65,7 +66,7 @@ membership options right.
 |---------:|--------|----------------|
 | 1 | Runtime compromise stays a data-access incident | The single largest exposure the audit measured |
 | 2 | Expressible in CNPG and GitOps | Identity, passwords and membership names stay declarative (ADR-013) |
-| 3 | Bound privileged infrastructure | ADR-088 accepts a scoped platform executor; Phase 0 showed why its privileges and recovery must be explicit |
+| 3 | Bound privileged infrastructure (amended 2026-10-15; was "no standing privileged executor") | ADR-088 accepts a scoped platform executor; Phase 0 showed why its privileges and recovery must be explicit |
 | 4 | Same failure modes in every gate | The release gate should catch an authorization bug before Kind does |
 
 ## Decision
@@ -78,7 +79,7 @@ We will give every application database three roles:
 | `<svc>_migrator` | yes | nothing | `<svc>_owner`, membership `INHERIT FALSE, SET TRUE, ADMIN FALSE` | migration Job Secret | primary `-rw` |
 | `<svc>_runtime` | yes | nothing | object grants only | workload Secret | pooler |
 
-**Amended by [ADR-088](../ADR-088-platform-owns-database-authorization/):**
+**Amended 2026-10-12 by [ADR-088](../ADR-088-platform-owns-database-authorization/):**
 the catalog Job creates owner/migrator roles and sets the migrator's effective
 owner role at login. CNPG retains runtime identity and `Database.spec.owner`;
 password ownership respects the OpenBAO pilot exception. Services do not issue

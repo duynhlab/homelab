@@ -57,9 +57,9 @@ the owner from login without any code (PG-09).
 - The membership guard's design ([ADR-086](../ADR-086-guard-membership-options/)); this ADR adds edges and two queries to it.
 - Runtime password rotation (OpenBAO static roles, ADR-025).
 
-The expanded connection/TLS/attribution contract is owned by
-[RFC-0029](../../rfc/RFC-0029/#decision-outcome). It retains direct-primary
-migrations and does not expand this ADR into a rotation-policy decision.
+The connection, TLS, attribution and rotation contract is
+[ADR-089](../ADR-089-postgresql-access-contract/). It keeps this ADR's
+direct-primary migrations.
 
 ## Decision drivers
 

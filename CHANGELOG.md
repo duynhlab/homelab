@@ -309,6 +309,15 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- Align RFC-0029 with ADR-088 platform-owned authorization and accept the
+  access contract as ADR-089: direct migrations, pooled consumers with native
+  per-instance monitoring and recovery exceptions, verify-full TLS on both
+  pooled hops, `application_name` through `PGAPPNAME`, primary-default reads
+  (PgDog's automatic read split becomes a gate) and per-role rotation
+  defaults. Record today's baseline, CNPG Pooler and PgDog support read from
+  upstream source, the remaining product-db rollout, and restore the
+  resolved historical decisions; D1/D2 evidence is unchanged.
+
 - **ADR-088 supersedes ADR-085.** Database authorization is platform-owned:
   roles by the catalog Job, in-database grants by that Job or by pgroles;
   services receive credentials only. Evidence from the 2026-10-12 pgroles/CNPG

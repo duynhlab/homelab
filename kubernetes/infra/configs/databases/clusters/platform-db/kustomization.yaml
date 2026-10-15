@@ -5,9 +5,12 @@ kind: Kustomization
 # Databases: user, notification, shipping, review, temporal, temporal_visibility, keycloak
 # Order: secrets (app-ns copies) -> instance -> services (triplets) -> configmaps -> poolers -> monitoring -> backup
 resources:
-  - secrets/platform-db-user-secret-user-ns.yaml
-  - secrets/platform-db-notification-secret-notification-ns.yaml
-  - secrets/platform-db-shipping-secret-shipping-ns.yaml
+  - secrets/platform-db-user-runtime-secret-user-ns.yaml
+  - secrets/platform-db-user-migrator-secret-user-ns.yaml
+  - secrets/platform-db-notification-runtime-secret-notification-ns.yaml
+  - secrets/platform-db-notification-migrator-secret-notification-ns.yaml
+  - secrets/platform-db-shipping-runtime-secret-shipping-ns.yaml
+  - secrets/platform-db-shipping-migrator-secret-shipping-ns.yaml
   - secrets/platform-db-review-runtime-secret-review-ns.yaml
   - secrets/platform-db-review-migrator-secret-review-ns.yaml
   - secrets/platform-db-temporal-secret-temporal-ns.yaml
@@ -16,6 +19,7 @@ resources:
   - objectstore.yaml
   - instance.yaml
   - vault-rotator.yaml
+  - authz/  # ADR-088: db_authz + role catalog Job/CronJob
   - services/
   - openbao-db-config.yaml  # RFC-0008/ADR-025: enable DB engine + notification static-role (after platform-db)
   - configmaps/monitoring-queries.yaml

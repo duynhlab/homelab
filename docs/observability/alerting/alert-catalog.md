@@ -28,7 +28,7 @@ prove every expression matched data.
 
 ## Summary
 
-**248 statically defined alerts** exist in `.yaml` files under
+**251 statically defined alerts** exist in `.yaml` files under
 `prometheusrules/**`. Re-derive that number rather than incrementing it:
 
 ```bash
@@ -37,19 +37,19 @@ rg '^\s*- alert:' \
   -g '*.yaml' | wc -l
 ```
 
-The 2026-10-13 breakdown is: postgres 64 (three `PgStatCh*` export-health
-rules joined the 2026-10-06 count of 61), microservices 52,
+The 2026-10-15 breakdown is: postgres 67 (three `PgStatCh*` export-health
+rules joined the 2026-10-14 count of 64), microservices 52,
 victoriametrics 31, kubernetes 29, observability 26, envoy-gateway 16, gitops 9,
 valkey 7, keycloak 5, kyverno 4, keda 4, and one root watchdog. The glob excludes
 retired `.yaml.bak` files. Two CNPG topology rules are gated and therefore not
-applied, leaving **246 deployed rules** from this tree.
+applied, leaving **249 deployed rules** from this tree.
 
 The tree above does not include the **12 Temporal rules** in
-`configs/temporal/prometheusrule.yaml`. The cluster therefore has **258
+`configs/temporal/prometheusrule.yaml`. The cluster therefore has **261
 hand-written rule entries**. The SLO burn-rate rules add **44 entries** for
-22 SLOs, bringing the cluster total to **302**. Of the 246 deployed entries from
+22 SLOs, bringing the cluster total to **305**. Of the 249 deployed entries from
 the main tree, six are inert on Kind because the local-path/kubelet signals they
-need do not exist; effective Kind coverage for that tree is **240**. The inert
+need do not exist; effective Kind coverage for that tree is **243**. The inert
 rules and both gated rules are marked inline rather than presented as working
 coverage.
 
@@ -286,7 +286,10 @@ checked here. Every guarded edge and its expected options are listed in the quer
 | Alert | Sev | Metric & trigger | Impact | for | Runbook |
 |-------|-----|------------------|--------|-----|---------|
 | CNPGRoleMembershipDrift | critical | `max by (cnpg_io_cluster, member, parent) (cnpg_pg_role_membership_drift)` >0 | A guarded edge is missing or has the wrong options: rotation breaks (no `ADMIN`) or the member gets the parent's data (`INHERIT` / `SET`) | 5m | [CNPGRoleMembershipDrift](../runbooks/postgresql/CNPGRoleMembershipDrift.md) |
-| CNPGRoleMembershipGuardMissing | warning | `absent(cnpg_pg_role_membership_drift{…vault_rotator → notification})` | The guard stopped reporting, so drift would go unseen | 15m | [CNPGRoleMembershipGuardMissing](../runbooks/postgresql/CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleMembershipGuardMissing | warning | `absent(cnpg_pg_role_membership_drift{…vault_rotator → notification_runtime})` | The guard stopped reporting, so drift would go unseen | 15m | [CNPGRoleMembershipGuardMissing](../runbooks/postgresql/CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleConfigDrift | critical | `max by (cnpg_io_cluster, role) (cnpg_pg_role_config_drift)` >0 | A migrator lost `role=<owner>`: the next migration fails or creates objects the runtime cannot use | 15m | [CNPGRoleConfigDrift](../runbooks/postgresql/CNPGRoleConfigDrift.md) |
+| CNPGDefaultPrivilegesDrift | critical | `max by (cnpg_io_cluster, datname, objtype) (cnpg_pg_default_privileges_drift)` >0 | An owner's default privileges differ: new tables unreadable, over-granted, or functions executable by PUBLIC | 15m | [CNPGDefaultPrivilegesDrift](../runbooks/postgresql/CNPGDefaultPrivilegesDrift.md) |
+| CNPGAuthorizationGuardMissing | warning | `absent(cnpg_pg_role_config_drift{…})` or `absent(cnpg_pg_default_privileges_drift{…})` | The authorization guards stopped reporting, so drift would go unseen | 15m | [CNPGAuthorizationGuardMissing](../runbooks/postgresql/CNPGAuthorizationGuardMissing.md) |
 
 ## 5. Kubernetes
 

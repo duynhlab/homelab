@@ -13,8 +13,8 @@
 #
 # The DB identity comes from the `migrate` init container, not the service
 # container: a seed writes as the migrator, directly to the primary (RFC-0029 —
-# a converted service's runtime login cannot setval, and its migrator needs
-# DB_MIGRATION_ROLE). For a service not yet converted both containers carry the
+# a converted service's runtime login cannot setval; its migrator is the owner
+# at login, ADR-088). For a service not yet converted both containers carry the
 # same login, so this changes only the host (primary instead of the pooler).
 #
 # ONE deliberate override: ENV. The services run with ENV=production (the

@@ -60,6 +60,9 @@ alerts, and operator health. One file per alert name — each file covers both
 | PgStatChNotExporting | warning | pg-stat-ch | active | [PgStatChNotExporting.md](PgStatChNotExporting.md) |
 | CNPGRoleMembershipDrift | critical | role-membership | active | [CNPGRoleMembershipDrift.md](CNPGRoleMembershipDrift.md) |
 | CNPGRoleMembershipGuardMissing | warning | role-membership | active | [CNPGRoleMembershipGuardMissing.md](CNPGRoleMembershipGuardMissing.md) |
+| CNPGRoleConfigDrift | critical | role-membership | active | [CNPGRoleConfigDrift.md](CNPGRoleConfigDrift.md) |
+| CNPGDefaultPrivilegesDrift | critical | role-membership | active | [CNPGDefaultPrivilegesDrift.md](CNPGDefaultPrivilegesDrift.md) |
+| CNPGAuthorizationGuardMissing | warning | role-membership | active | [CNPGAuthorizationGuardMissing.md](CNPGAuthorizationGuardMissing.md) |
 | CNPGInstanceMetricsAbsent | — | chart upstream | not deployed | — |
 
 ## Validation levels

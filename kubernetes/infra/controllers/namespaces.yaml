@@ -57,6 +57,13 @@ kind: Namespace
 metadata:
   labels:
     environment: local
+  name: pgroles-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    environment: local
     # Platform component namespace (like temporal) — no app-tier label.
     # Envoy Gateway control plane + per-Gateway Envoy proxy fleet (RFC-0024 P2).
   name: envoy-gateway

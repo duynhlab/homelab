@@ -84,10 +84,14 @@ spec:
       pg_stat_ch/networks/ip:
         - "0.0.0.0/0"
         - "::/0"
-      pg_stat_ch/profile: default
+      pg_stat_ch/profile: pg_stat_ch
       pg_stat_ch/quota: default
       pg_stat_ch/grants/query:
         - "GRANT INSERT ON pg_stat_ch.*"
+    # ClickHouse 26.x answers in ZSTD by default; the extension's client only
+    # speaks LZ4, so the writer's profile pins the network codec.
+    profiles:
+      pg_stat_ch/network_compression_method: LZ4
     # The engine's own Prometheus endpoint, finally enabled. At 1x1 the Altinity
     # metrics-exporter's chi_* series were the whole engine view and a per-pod
     # scrape would have duplicated them; with three replicas the per-pod series

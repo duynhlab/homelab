@@ -163,6 +163,12 @@ the Secret's value, so the verifier is not rewritten every 10 minutes.
 ```sql
 GRANT CONNECT ON DATABASE <svc> TO <svc>_runtime, <svc>_migrator;
 GRANT USAGE ON SCHEMA public TO <svc>_runtime;
+-- golang-migrate's bookkeeping table, created as the owner before the first
+-- migrate (same DDL as migrate's CREATE TABLE IF NOT EXISTS, which adopts it).
+SET ROLE <svc>_owner;
+CREATE TABLE IF NOT EXISTS public.schema_migrations
+  (version bigint NOT NULL PRIMARY KEY, dirty boolean NOT NULL);
+RESET ROLE;
 ALTER DEFAULT PRIVILEGES FOR ROLE <svc>_owner IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <svc>_runtime;
 ALTER DEFAULT PRIVILEGES FOR ROLE <svc>_owner IN SCHEMA public
@@ -174,9 +180,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE <svc>_owner REVOKE EXECUTE ON FUNCTIONS FROM P
 -- schema_migrations gets nothing.
 ```
 
-The owner's default privileges also hand `schema_migrations` to the runtime
-when golang-migrate creates it after the first Job run; the next CronJob run
-revokes it (a window of at most 10 minutes on a new database).
+`schema_migrations` is created by the Job, not by the first migrate. The
+owner's default privileges would otherwise hand it to the runtime with
+`INSERT`/`DELETE` until the next CronJob run: on the first Kind gate
+(2026-10-15) migrate ran at 03:10:04, four seconds after a CronJob run
+finished, and K3.8 read the table as `review_runtime`.
 
 ### Wiring in the domain ResourceSets
 

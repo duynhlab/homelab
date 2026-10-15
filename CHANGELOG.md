@@ -187,8 +187,9 @@ Skeleton (copy what you need):
   `review_owner` and `review_migrator`, sets `ALTER ROLE review_migrator SET
   role = review_owner` so the migrator is the owner at login, keeps the
   membership `f/f/t` and exact, and applies review's grants, default privileges
-  and `REVOKE EXECUTE … FROM PUBLIC`. Drift it may not repair fails the run
-  (`KubeJobFailed`). The owner and migrator `DatabaseRole`s are gone, the
+  and `REVOKE EXECUTE … FROM PUBLIC`. It creates `schema_migrations` as the
+  owner before the first migrate, so the runtime never holds it. Drift it
+  may not repair fails the run (`KubeJobFailed`). The owner and migrator `DatabaseRole`s are gone, the
   catalog template drops `DB_MIGRATION_ROLE`, review is pinned to `2.6.0`, and
   local-stack runs the cluster's `grants.sql` after review's migration.
   One executor role in CNPG would deadlock a new cluster (CNPG creates a role

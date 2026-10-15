@@ -10,6 +10,14 @@ SELECT set_config('authz.owner', :'owner', false),
 GRANT CONNECT ON DATABASE :"svc" TO :"runtime", :"migrator";
 GRANT USAGE ON SCHEMA public TO :"runtime";
 
+-- golang-migrate's bookkeeping table, created as the owner before the first
+-- migrate so the runtime never holds it via the defaults below. Same DDL as
+-- migrate's CREATE TABLE IF NOT EXISTS, which then adopts it.
+SET ROLE :"owner";
+CREATE TABLE IF NOT EXISTS public.schema_migrations
+  (version bigint NOT NULL PRIMARY KEY, dirty boolean NOT NULL);
+RESET ROLE;
+
 -- Every table and sequence a later migration creates.
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"runtime";
@@ -19,8 +27,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public
 -- EXECUTE on functions.
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
--- Objects that exist already (a migration that ran before the defaults, or
--- drift), and never the migration bookkeeping table.
+-- Objects that exist already (the bookkeeping table above, a migration that
+-- ran before the defaults, or drift); the bookkeeping table gets nothing.
 DO $$
 DECLARE
   v_owner   text := current_setting('authz.owner');

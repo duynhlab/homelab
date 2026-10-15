@@ -140,8 +140,11 @@ membership fails when the role is created in the same plan.
   whoever holds `db_authz`'s password can act as any service owner. Mitigated by
   a random per-cluster password, `pg_hba` lines only for `postgres` and the
   managed databases, `connectionLimit: 4`, and the guard on its edge.
-- Up to 10 minutes of drift, and up to 10 minutes during which a new database's
-  `schema_migrations` is readable by its runtime.
+- Up to 10 minutes of drift.
+- The platform knows one name from the migration tool: the Job creates
+  golang-migrate's `schema_migrations` as the owner before the first migrate,
+  because the owner's default privileges would otherwise grant it to the
+  runtime until the next run.
 - `authz_admin` is bootstrap SQL; a cluster that predates it needs the line run
   once by hand.
 - Two mechanisms (Job and pgroles) for in-database grants, kept deliberately to

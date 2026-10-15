@@ -46,7 +46,7 @@ spec:
             # Services whose owner/migrator roles the catalog owns, and those
             # whose in-database grants it owns (the rest use pgroles).
             - name: ROLE_SERVICES
-              value: "review"
+              value: "review user shipping notification"
             - name: GRANT_SERVICES
               value: "review"
             - name: DB_AUTHZ_USER
@@ -63,6 +63,21 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: platform-db-review-migrator-secret
+                  key: password
+            - name: USER_MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-db-user-migrator-secret
+                  key: password
+            - name: SHIPPING_MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-db-shipping-migrator-secret
+                  key: password
+            - name: NOTIFICATION_MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-db-notification-migrator-secret
                   key: password
           resources:
             requests:
@@ -130,7 +145,7 @@ spec:
                   # Services whose owner/migrator roles the catalog owns, and those
                   # whose in-database grants it owns (the rest use pgroles).
                   - name: ROLE_SERVICES
-                    value: "review"
+                    value: "review user shipping notification"
                   - name: GRANT_SERVICES
                     value: "review"
                   - name: DB_AUTHZ_USER
@@ -147,6 +162,21 @@ spec:
                     valueFrom:
                       secretKeyRef:
                         name: platform-db-review-migrator-secret
+                        key: password
+                  - name: USER_MIGRATOR_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: platform-db-user-migrator-secret
+                        key: password
+                  - name: SHIPPING_MIGRATOR_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: platform-db-shipping-migrator-secret
+                        key: password
+                  - name: NOTIFICATION_MIGRATOR_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: platform-db-notification-migrator-secret
                         key: password
                 resources:
                   requests:

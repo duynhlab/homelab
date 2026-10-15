@@ -715,12 +715,13 @@ cannot be derived from a single file — they get their own row (K2.3).
   [ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/)).
   Three custom queries watch what CNPG cannot declare: `pg_role_membership`
   (PG18 `ADMIN` / `INHERIT` / `SET` of guarded edges), `pg_role_config` (each
-  migrator's `role=<owner>`) and `pg_default_privileges` (each Job-owned
+  migrator's `role=<owner>`) and `pg_default_privileges` (each converted
   database's owner defaults). Asserted by `make e2e-smoke` (`smoke.js`): every
   guarded edge, role and database reports, and every drift series is `0`. The
-  guarded edges are `vault_rotator → notification`, `review_migrator →
-  review_owner` and `db_authz → authz_admin`; each conversion adds its rows to
-  the queries and to `smoke.js` in the same PR.
+  guarded edges are `vault_rotator → notification_runtime`, each
+  `<svc>_migrator → <svc>_owner` (review, user, shipping, notification) and
+  `db_authz → authz_admin`; each conversion adds its rows to the queries and to
+  `smoke.js` (`CONVERTED_SERVICES`) in the same PR.
   **FAIL:** a missing series (the query or exporter is broken, see
   [`CNPGRoleMembershipGuardMissing`](../observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md),
   [`CNPGAuthorizationGuardMissing`](../observability/runbooks/postgresql/CNPGAuthorizationGuardMissing.md))
@@ -728,9 +729,11 @@ cannot be derived from a single file — they get their own row (K2.3).
 
 - [ ] **K3.8** The runtime login cannot change its schema (RFC-0029). As
   `<svc>_runtime`, through `pg_hba`: it reads its table, and `CREATE TABLE`,
-  `ALTER TABLE`, `DROP TABLE`, `SET ROLE <svc>_owner` and reading
-  `schema_migrations` are each refused with a privilege error.
-  `./scripts/db-authz-check.sh` (every converted service; today `review`).
+  `ALTER TABLE`, `DROP TABLE` and `SET ROLE <svc>_owner` are each refused with
+  a privilege error. `schema_migrations` is refused for a Job-owned database
+  (`review`) and readable for a pgroles-owned one (`user`, `shipping`,
+  `notification`; ADR-088 PGR-10). `./scripts/db-authz-check.sh` (every
+  converted service).
   **FAIL:** any `K3.8-*` check not `PASS`, or fewer checks parsed than expected.
 
 - [ ] **K3.9** The migrator is the owner from login (RFC-0029, ADR-088). As
@@ -753,6 +756,14 @@ cannot be derived from a single file — they get their own row (K2.3).
   `permission denied to revoke privileges granted by role "postgres"` is drift
   only an operator can remove (see
   [`authorization.md`](../databases/authorization.md#the-role-catalog-job)).
+
+- [ ] **K3.11** The pgroles policies converged (ADR-088).
+  `kubectl -n platform get postgrespolicies` lists one policy per pgroles-owned
+  database (`platform-db-user`, `-shipping`, `-notification`), each `Ready=True`,
+  and `kubectl -n platform get postgrespolicyplans` holds no plan awaiting
+  approval or failed.
+  **FAIL:** a policy not Ready (read `.status.conditions` and the operator log
+  in `pgroles-system`) or a plan that keeps re-planning the same SQL.
 
 ---
 

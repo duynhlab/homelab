@@ -17,8 +17,8 @@ bao login -method=oidc
 # 1a. Compromised ADR-025 static-role password (deployed pilot: notification):
 #     static-creds are rotated, not lease-revoked — force an immediate rotation,
 #     the old password stops working at once.
-bao write -f database/rotate-role/notification
-# ESO re-syncs Secret platform-db-notification-secret within refreshInterval (1m).
+bao write -f database/rotate-role/notification-runtime
+# ESO re-syncs Secret platform-db-notification-runtime-secret within refreshInterval (1m).
 
 # 1b. Compromised KV v2 static secret: overwrite it — see
 #     ./rotate-static-secret.md (same ceremony token works).

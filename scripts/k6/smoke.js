@@ -27,13 +27,15 @@ const CATALOG = '/product/v1/public/products';
 // The ten deployed services. `auth` is retired (Keycloak replaced it) and its
 // continued absence is an assertion, not an omission.
 // Membership edges the ADR-086 guard must report, as member->parent.
+// ADR-088: every converted service's migrator, its role=<owner> default, and
+// its database's owner default privileges are guarded.
+const CONVERTED_SERVICES = ['review', 'user', 'shipping', 'notification'];
 const GUARDED_EDGES = [
-  'vault_rotator->notification', 'review_migrator->review_owner', 'db_authz->authz_admin',
+  'vault_rotator->notification_runtime', 'db_authz->authz_admin',
+  ...CONVERTED_SERVICES.map((s) => `${s}_migrator->${s}_owner`),
 ];
-// ADR-088: roles whose session defaults (role=<owner>) and databases whose
-// owner default privileges are guarded.
-const GUARDED_ROLE_CONFIG = ['review_migrator'];
-const GUARDED_DEFAULT_ACL_DBS = ['review'];
+const GUARDED_ROLE_CONFIG = CONVERTED_SERVICES.map((s) => `${s}_migrator`);
+const GUARDED_DEFAULT_ACL_DBS = CONVERTED_SERVICES;
 
 const SERVICES = [
   'cart', 'checkout', 'inventory', 'notification', 'order',

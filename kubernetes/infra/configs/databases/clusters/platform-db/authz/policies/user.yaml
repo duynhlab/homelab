@@ -1,0 +1,70 @@
+# In-database grants for user (ADR-088), owned by pgroles in adopt mode. The
+# catalog Job creates user_owner and user_migrator; CNPG creates user_runtime.
+# The table wildcard also covers schema_migrations: pgroles cannot exclude one
+# table from a wildcard (PGR-10), so the runtime holds it here, by decision.
+apiVersion: pgroles.io/v1alpha1
+kind: PostgresPolicy
+metadata:
+  name: platform-db-user
+  namespace: platform
+spec:
+  connection:
+    params:
+      host: platform-db-rw
+      dbname: user
+      sslMode: require
+      usernameSecret:
+        name: platform-db-db-authz-secret
+        key: username
+      passwordSecret:
+        name: platform-db-db-authz-secret
+        key: password
+      # authz_admin inherits user_owner, so it can grant on every object.
+      setRole: authz_admin
+  mode: apply
+  reconciliation_mode: adopt
+  approval: auto
+  interval: 5m
+  roles:
+    - name: user_owner
+      external: true
+    - name: user_migrator
+      external: true
+    - name: user_runtime
+      external: true
+  default_privileges:
+    - owner: user_owner
+      schema: public
+      grant:
+        - role: user_runtime
+          on_type: table
+          privileges: [SELECT, INSERT, UPDATE, DELETE]
+        - role: user_runtime
+          on_type: sequence
+          privileges: [USAGE, SELECT]
+    # Global, not schema-scoped: only a global entry cancels PUBLIC EXECUTE (PGR-05).
+    - owner: user_owner
+      scope:
+        type: global
+      grant:
+        - role: PUBLIC
+          on_type: function
+          privileges: [EXECUTE]
+          ensure: absent
+  grants:
+    - role: user_runtime
+      object: { type: database, name: user }
+      privileges: [CONNECT]
+    - role: user_migrator
+      object: { type: database, name: user }
+      privileges: [CONNECT]
+    - role: user_runtime
+      object: { type: schema, name: public }
+      privileges: [USAGE]
+    # Existing objects; adopt would revoke anything undeclared.
+    - role: user_runtime
+      object: { type: table, schema: public, name: "*" }
+      privileges: [SELECT, INSERT, UPDATE, DELETE]
+    - role: user_runtime
+      object: { type: sequence, schema: public, name: "*" }
+      privileges: [USAGE, SELECT]

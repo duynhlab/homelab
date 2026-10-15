@@ -59,7 +59,9 @@ spec:
   inherit: true
   replication: false
   bypassrls: false
-  connectionLimit: 4
+  # The Job (one session) plus the pgroles operator's pooled connections, one
+  # pool per PostgresPolicy.
+  connectionLimit: 10
   inRoles: [authz_admin]
   passwordSecret:
     name: platform-db-db-authz-secret

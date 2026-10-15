@@ -24,6 +24,7 @@ spec:
     - name: secrets-local
     - name: monitoring-local
     - name: cnpg-barman-plugin-local
+    - name: pgroles-operator-local # PostgresPolicy CRD (ADR-088)
     - name: storage-local
     # Ordering hygiene: bring DB namespaces up behind their NetworkPolicies so
     # the CNPG operator never races an un-fenced namespace.

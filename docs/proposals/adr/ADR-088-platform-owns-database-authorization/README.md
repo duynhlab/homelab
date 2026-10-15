@@ -22,7 +22,7 @@
 | **Supersedes** | [ADR-085](../ADR-085-service-migrations-own-authorization/) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029: D1 (`review`, Job) · D2 (`user`, `shipping`, `notification`, pgroles) · product-db after |
-| **Adoption** | Partial: `review` (D1, Kind gate 2026-10-15); `user`, `shipping`, `notification` next (D2) |
+| **Adoption** | Partial: `review` (D1, 2026-10-15), `user`, `shipping`, `notification` (D2) on `platform-db`; `product-db` next |
 
 ## Context
 
@@ -81,7 +81,8 @@ the owner from login without any code (PG-09).
    and fail the run when the result still differs.
 3. **In-database grants.** Exactly one owner per database: the same Job
    (`GRANT_SERVICES`, review) or a pgroles `PostgresPolicy` in `adopt` mode (the
-   other services, from D2). Both apply the same statements.
+   other services, from D2). Both apply the same statements, except that a
+   pgroles table wildcard cannot leave out `schema_migrations` (PGR-10).
 4. **CNPG** keeps the runtime login and password, the `Database`
    (`owner: <svc>_owner`), `pg_hba`, and `db_authz`.
 5. **Service repositories** call `migratex.Run(fsys, dir, dsn)` with no role
@@ -139,12 +140,18 @@ membership fails when the role is created in the same plan.
 - `authz_admin` holds `ADMIN` on every catalog role and inherits every owner:
   whoever holds `db_authz`'s password can act as any service owner. Mitigated by
   a random per-cluster password, `pg_hba` lines only for `postgres` and the
-  managed databases, `connectionLimit: 4`, and the guard on its edge.
+  managed databases, `connectionLimit: 10` (the Job plus one pgroles pool per
+  policy), and the guard on its edge.
 - Up to 10 minutes of drift.
 - The platform knows one name from the migration tool: the Job creates
   golang-migrate's `schema_migrations` as the owner before the first migrate,
   because the owner's default privileges would otherwise grant it to the
   runtime until the next run.
+- In a pgroles-owned database the runtime holds CRUD on `schema_migrations`
+  (owner decision, 2026-10-15): pgroles 0.13.0 rejects a table wildcard plus
+  `ensure: absent` on one table (PGR-10), and without the wildcard `adopt`
+  revokes the runtime's grants on every table a migration adds. The Job-owned
+  databases keep the runtime off the table.
 - `authz_admin` is bootstrap SQL; a cluster that predates it needs the line run
   once by hand.
 - Two mechanisms (Job and pgroles) for in-database grants, kept deliberately to
@@ -194,6 +201,7 @@ JOB-03/JOB-04 (2026-10-15, the D1 gate):
 | PGR-07 | Per-database policy in `adopt`: a GRANT, a REVOKE and a default-ACL change were each reverted within one interval |
 | PGR-08 | `additive`: `RESET role`, `INHERIT`, a stray membership and a new password were not repaired and reported no drift |
 | PGR-09 | A drifted password is not re-applied (only on a Secret change) |
+| PGR-10 | 2026-10-15, pgroles CLI 0.13.0 against `postgres:18`: a `"*"` table grant plus `ensure: absent` for the same role on `schema_migrations` fails validation ("declare privilege SELECT as present for one object selector and absent for another — grants apply before revokes, so the plan could never converge") |
 | CNPG-08 | A `DatabaseRole` without `inRoles` makes CNPG revoke the role's other memberships; with dependants it fails and blocks every later change to the role |
 | CNPG-09 | Listing the memberships in `inRoles` stops the revoke |
 | CNPG-10 | CNPG creates a role with `CREATE ROLE … IN ROLE <inRoles>` (`internal/management/controller/roles/postgres.go`, v1.30.1) |
@@ -214,3 +222,4 @@ JOB-03/JOB-04 (2026-10-15, the D1 gate):
 |------|-------------------|--------|
 | 2026-10-12 | Accepted / Not started | Owner paused RFC-0029 Phase 3 (2026-10-09), chose the platform-owned model, then Job for roles and pgroles for in-database grants after the lab |
 | 2026-10-14 | Accepted / Not started | D1 opened: executor split into `authz_admin` + `db_authz` (CNPG-10); review on the catalog Job; pkg `migratex/v0.39.0`, review-service `#208` |
+| 2026-10-15 | Accepted / Partial | D1 merged (#1267, review 2.6.0). D2: user, shipping, notification on the catalog Job + pgroles policies; neutral `platform` bootstrap database; `notification_runtime` rotated by OpenBAO; PGR-10 accepted (runtime holds `schema_migrations` in pgroles-owned databases) |

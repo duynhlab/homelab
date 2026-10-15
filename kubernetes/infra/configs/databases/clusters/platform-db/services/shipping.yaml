@@ -1,20 +1,15 @@
-# shipping — per-service database triplet (RFC-0012, ADR-013).
-#
-# ExternalSecret for platform-db shipping database credentials — platform namespace.
-# OpenBAO path: secret/data/local/databases/shared-db/shipping (compat — pre-merge path)
-#
-# Rendered as kubernetes.io/basic-auth: this secret doubles as the
-# passwordSecret for the DatabaseRole below, and CNPG requires basic-auth
-# there. Secret `type` is immutable — migrating a live cluster requires
-# deleting the old Secret so ESO recreates it
-# (see docs/databases/runbooks/rotate-cnpg-service-password.md).
+# shipping — runtime login + database (RFC-0029, ADR-084, ADR-088).
+# shipping_owner and shipping_migrator are created by the role catalog Job
+# (../authz), which also reads the migrator Secret below; its pgroles policy
+# (../authz/policies/shipping.yaml) owns the grants; CNPG keeps the
+# runtime login and the Database. Conventions: docs/databases/authorization.md.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: platform-db-shipping-secret
+  name: platform-db-shipping-runtime-secret
   namespace: platform
   labels:
-    app.kubernetes.io/name: platform-db-shipping-secret
+    app.kubernetes.io/name: platform-db-shipping-runtime-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -23,14 +18,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: platform-db-shipping-secret
+    name: platform-db-shipping-runtime-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: platform-db-shipping-secret
+          app.kubernetes.io/name: platform-db-shipping-runtime-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -40,24 +35,62 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/shared-db/shipping
+        key: secret/data/local/databases/platform-db/shipping-runtime
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/shared-db/shipping
+        key: secret/data/local/databases/platform-db/shipping-runtime
         property: password
 ---
-# Written out IN FULL — adoption resets omitted attributes.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: platform-db-shipping-migrator-secret
+  namespace: platform
+  labels:
+    app.kubernetes.io/name: platform-db-shipping-migrator-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: platform-db-shipping-migrator-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: platform-db-shipping-migrator-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/platform-db/shipping-migrator
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/platform-db/shipping-migrator
+        property: password
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: platform-db-role-shipping
+  name: platform-db-role-shipping-runtime
   namespace: platform
 spec:
   cluster:
     name: platform-db
-  name: shipping
-  comment: "shipping-service application role (RFC-0012)"
+  name: shipping_runtime
+  comment: "shipping: the service; CRUD only"
   login: true
   superuser: false
   createdb: false
@@ -68,10 +101,11 @@ spec:
   connectionLimit: -1
   inRoles: []
   passwordSecret:
-    name: platform-db-shipping-secret
+    name: platform-db-shipping-runtime-secret
   databaseRoleReclaimPolicy: retain
 ---
-# shipping Database extensions.
+# shipping_owner owns the database, which on PostgreSQL 15+ is what gives it
+# CREATE on the public schema. CNPG retries until the catalog Job creates it.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
@@ -79,7 +113,7 @@ metadata:
   namespace: platform
 spec:
   name: shipping
-  owner: shipping
+  owner: shipping_owner
   cluster:
     name: platform-db
   extensions:

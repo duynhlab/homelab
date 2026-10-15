@@ -6,7 +6,7 @@ pool mode determines which session behaviors remain safe.
 | Cluster | Pooler | Replicas | Endpoint | Mode | Routing |
 |---|---|---:|---|---|---|
 | `platform-db` | CNPG PgBouncer `Pooler` | 2 | `platform-db-pooler-rw.platform.svc:5432` | transaction | Primary only |
-| `product-db` | PgDog chart v0.39 | 3 | `pgdog-product.product.svc:6432` | transaction | Writes to `-rw`, reads to `-r` |
+| `product-db` | PgDog chart v0.90 (PgDog v0.1.60) | 3 | `pgdog-product.product.svc:6432` | transaction | Writes to `-rw`, reads to `-r` |
 
 ## Why pooling exists
 

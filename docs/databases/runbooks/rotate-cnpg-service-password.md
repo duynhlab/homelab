@@ -105,10 +105,10 @@ including workers, before changing its credential.
    kubectl rollout status deploy/pgdog-product -n product
    ```
 
-   The restart is **mandatory**: the pgdog chart (verified on v0.39 via
-   `helm template`) puts `users.toml` in a Secret but stamps no
-   config-checksum annotation on the Deployment, so a values change alone
-   never rolls the pods.
+   The restart is **mandatory**: the pgdog chart (verified on v0.90 via
+   `helm template`) puts `users.toml` in a Secret. Its optional
+   `restartOnConfigChange` checksum covers `pgdog.toml` only, not the users
+   Secret, so a password change alone never rolls the pods.
 
    **`platform-db` (CNPG PgBouncer `Pooler`, ADR-026).** Do **nothing** here.
    The pooler holds no passwords: CNPG configures PgBouncer with `auth_query`,

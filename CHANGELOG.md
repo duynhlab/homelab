@@ -398,6 +398,13 @@ Skeleton (copy what you need):
 
 ### Bugfix
 
+#### Proposals
+
+- Align RFC-0029 with ADR-088 platform-owned authorization and record the
+  planned access contract: direct migrations, pooled consumers with native
+  recovery exceptions, verified TLS and required workload attribution. Keep
+  rotation cadences proposed and preserve D1/D2 deployment evidence.
+
 #### GitOps
 
 - Trim release diaries and repeated explanations in service, worker, CNPG,

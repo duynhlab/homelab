@@ -57,6 +57,10 @@ the owner from login without any code (PG-09).
 - The membership guard's design ([ADR-086](../ADR-086-guard-membership-options/)); this ADR adds edges and two queries to it.
 - Runtime password rotation (OpenBAO static roles, ADR-025).
 
+The expanded connection/TLS/attribution contract is owned by
+[RFC-0029](../../rfc/RFC-0029/#decision-outcome). It retains direct-primary
+migrations and does not expand this ADR into a rotation-policy decision.
+
 ## Decision drivers
 
 - A service repository must not name a role, run `GRANT` or `SET ROLE`.
@@ -83,7 +87,10 @@ the owner from login without any code (PG-09).
    (`GRANT_SERVICES`, review) or a pgroles `PostgresPolicy` in `adopt` mode (the
    other services, from D2). Both apply the same statements, except that a
    pgroles table wildcard cannot leave out `schema_migrations` (PGR-10).
-4. **CNPG** keeps the runtime login and password, the `Database`
+4. **CNPG** keeps the runtime login and, where `passwordSecret` is configured,
+   its password. The notification OpenBAO database-engine pilot remains the
+   sole writer of that runtime password (no competing CNPG password writer).
+   CNPG also keeps the `Database`
    (`owner: <svc>_owner`), `pg_hba`, and `db_authz`.
 5. **Service repositories** call `migratex.Run(fsys, dir, dsn)` with no role
    option and ship no authorization SQL.

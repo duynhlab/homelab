@@ -459,7 +459,8 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Restore & Failover Drills](./databases/runbooks/restore-and-failover-drills.md) - Drill cadence, roles, and evidence log
 - [Cross-Region / Cross-Zone DR](./databases/cross-region-dr.md) - Planned roadmap to independent failure domains
 - [Declarative Role & Database Management](./databases/declarative-role-management.md) - Per-service triplet (ExternalSecret + DatabaseRole + Database) on product-db; RFC-0012 rollout state
-- [Database Authorization](./databases/authorization.md) - Owner / migrator / runtime roles per service, applied by the platform (role catalog Job, pgroles planned); services receive credentials only (RFC-0029, ADR-088; deployed for `review`)
+- [Database Authorization](./databases/authorization.md) - Owner / migrator / runtime roles per service, applied by the platform (role catalog Job and pgroles); services receive credentials only (RFC-0029, ADR-088; D1/D2 recorded on platform-db)
+- [RFC-0029 access contract](./proposals/rfc/RFC-0029/) — planned direct migration, pooled consumers, verified TLS and workload attribution; current routing remains in the database architecture guide.
 - [PostgreSQL Further Reading](./databases/reference/further-reading.md) - Curated external references
 - [PostgreSQL internals learning path](./databases/fundamentals/README.md) - Fourteen explanation-first chapters from processes through capacity, grounded in the deployed CNPG clusters with read-only evidence labs
 - [PostgreSQL observability and troubleshooting](./databases/observability-and-troubleshooting.md) - Symptom-to-evidence-to-runbook map

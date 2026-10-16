@@ -52,15 +52,32 @@ Order matters — the pooler learns passwords only at Helm reconcile time:
 
 `pgdog-product` terminates client TLS with the cert-manager `Certificate`
 `pgdog-product-tls` (ClusterIssuer `homelab-ca`, 90 days, renewed 15 days
-before expiry). PgDog reads the certificate files only at start, so a renewed
-Secret takes effect on the next pod restart:
+before expiry). A renewal needs no manual step:
 
-1. `kubectl get certificate pgdog-product-tls -n product` — Ready, with the new `notAfter`.
-2. `kubectl rollout restart deploy/pgdog-product -n product` — rolling, 3 replicas + PDB; in-flight transactions on a drained pod are cut, so avoid load tests.
-3. Verify: payment connects and serves; the presented certificate's dates match the Secret.
+- The Secret carries `reconcile.fluxcd.io/watch: Enabled`, so helm-controller
+  reconciles `pgdog-product` when cert-manager rewrites it.
+- The HelmRelease copies `tls.crt` into the pod annotation `pgdog-tls-crt`
+  (`valuesFrom`), so a new certificate changes the pod template and the
+  Deployment rolls, draining each pod (below).
 
-Do it inside the 15-day renewal window. Automating the restart is an ADR-089
-follow-up. This procedure has not been exercised yet.
+To check or force it:
+
+1. `kubectl get certificate pgdog-product-tls -n product` — Ready, with the new `notAfter`. `cmctl renew pgdog-product-tls -n product` forces a renewal.
+2. The pods roll on their own; `kubectl rollout status deploy/pgdog-product -n product`. If they did not, `flux reconcile helmrelease pgdog-product -n product`.
+3. Verify: the serial PgDog presents (`openssl s_client -starttls postgres -connect pgdog-product.product.svc:6432 </dev/null | openssl x509 -noout -serial`, from a pod the NetworkPolicy admits) matches the Secret's.
+
+PgDog itself can reload the certificate without a restart (`SIGHUP` or the
+admin `RELOAD`), but nothing in the chart can send either, so the roll is the
+mechanism.
+
+## Rolling restarts drain
+
+Each PgDog pod gets a 10-second `preStop` sleep, so the Service stops routing to
+it before PgDog is signalled, and then `SIGINT` (the image's stop signal) makes
+PgDog stop accepting connections and wait up to `shutdown_timeout` (60 s) for
+clients to finish. `terminationGracePeriodSeconds` is 75 so the sleep and the
+drain both fit. With 3 replicas and PDB `minAvailable: 2` a restart is
+rolling, one pod at a time.
 
 ## Add a database backend (new service)
 
@@ -68,7 +85,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 
 1. In the cluster's `poolers/helmrelease.yaml`: append a `databases:` entry (primary `-rw` only, no `replicas:`) **and** a `users:` entry, then a `valuesFrom` block with `targetPath: "users[N].password"`.
 2. **Indices are positional** — `users[N]` must match the position in `values.users`. Keep the header comment (`[0]=product, …`) true; a mismatched index silently wires service A's password to service B's user, which surfaces as auth failures for BOTH.
-3. `make validate`, merge, reconcile. The rollout restarts pooler pods; with 3 replicas + PDB 2 the restart is rolling, but in-flight transactions on the drained pod are cut — sequence with deploys, not during load tests.
+3. `make validate`, merge, reconcile. The rollout restarts pooler pods one at a time and each drains (above).
 
 ## Known failure modes
 
@@ -77,7 +94,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 | New connections fail after a password rotation | `valuesFrom` read at reconcile time only | `flux reconcile helmrelease pgdog-<cluster>` (step 2 above) |
 | Auth failures for two services at once after adding a backend | positional `users[N]` mismatch | re-align `valuesFrom` targetPath indices with `values.users` order |
 | App migrations hang in Init | migrations connect **direct** to `<cluster>-rw:5432`, not the pooler — NetworkPolicy must admit the app namespace to 5432 | check the cluster namespace's netpol app-services rule |
-| payment cannot connect, TLS errors | payment's runtime requires TLS to PgDog (`sslmode=require`); PgDog serves `pgdog-product-tls` from `/etc/pgdog-tls` | `kubectl get certificate pgdog-product-tls -n product` must be Ready; after a renewal, restart PgDog (below). payment's `migrate` goes direct to `product-db-rw:5432` |
+| payment cannot connect, TLS errors | payment's runtime requires TLS to PgDog (`sslmode=require`); PgDog serves `pgdog-product-tls` from `/etc/pgdog-tls` | `kubectl get certificate pgdog-product-tls -n product` must be Ready; after a renewal the pods roll on their own (above). payment's `migrate` goes direct to `product-db-rw:5432` |
 | `up{job=~"pgdog.*"}` empty | ServiceMonitor scrape broken | `kubectl get servicemonitor -n <ns>`; port 9090 must be admitted from the monitoring namespace in the netpol |
 
 ## References

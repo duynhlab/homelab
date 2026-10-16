@@ -83,12 +83,11 @@ session advisory lease (reconciler) acquires and releases through PgDog. `verify
 (ADR-089, RFC-0020). local-stack has no pooler and keeps payment direct to
 PostgreSQL without TLS.
 
-**Rotation needs a restart.** PgDog reads the certificate files when it starts.
-cert-manager renews the Secret on schedule, but PgDog keeps serving the old
-certificate until its pods restart; restart the Deployment inside the 15-day
-renewal window
-([pooler operations](./runbooks/pooler-operations.md)). Automating that restart
-is an ADR-089 follow-up.
+**A renewal rolls PgDog.** cert-manager renews the Secret on schedule. The
+Secret's `reconcile.fluxcd.io/watch` label makes helm-controller reconcile, and
+the HelmRelease carries `tls.crt` as a pod annotation, so the new certificate
+rolls the Deployment and every pod drains first
+([pooler operations](./runbooks/pooler-operations.md)).
 
 CNPG generates PgBouncer authentication support through `auth_query`; it does
 not store a second application password set. Temporal and Keycloak bypass the
@@ -104,7 +103,9 @@ outside the PgBouncer pilot.
   HelmRelease so new clients do not use a stale pooler password.
 - Pooler restarts can cut in-flight transactions. PDBs and replica counts reduce
   availability risk but do not preserve a transaction owned by a terminating
-  pod.
+  pod. PgDog drains first (a 10 s `preStop`, then up to 60 s for clients to
+  finish), so only a transaction still open after that is cut; the CNPG
+  PgBouncer Pooler has no such drain configured.
 
 ## Operations
 

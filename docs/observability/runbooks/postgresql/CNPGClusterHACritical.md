@@ -4,7 +4,7 @@
 |---|---|
 | **Severity** | critical |
 | **Source** | chart |
-| **Clusters** | `platform-db`, `product-db` (3 instances each) |
+| **Clusters** | `platform-db`, `product-db` (3 instances each); not the 1-instance DR `product-db-replica`, see [`CNPGDRClusterOffline`](./CNPGDRClusterOffline.md) |
 
 ## Meaning
 

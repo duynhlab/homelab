@@ -5,7 +5,9 @@
 # the PgDog HelmRelease (primary only, ADR-089) and PgBouncer Pooler,
 # configs/databases/clusters/*/authz/ (role catalog Job + CronJob, pgroles policies),
 # controllers/keycloak/deployment.yaml, controllers/temporal/helmrelease.yaml and
-# platform-db/{openbao-db-config,vault-rotator}.yaml.
+# platform-db/{openbao-db-config,vault-rotator}.yaml. 2026-10-16 (RFC-0029 wave 2,
+# configured, not yet run on Kind): payment's runtime goes through PgDog with
+# client TLS (product-db/poolers/certificate.yaml, sslmode=require).
 diagram:
   id: databases
   title: "duynhlab homelab — Database connection and recovery paths"
@@ -62,7 +64,7 @@ nodes:
 edges:
   - {id: e_platform, source: c_platform, target: pgbouncer, type: data, label: ":5432"}
   - {id: e_product, source: c_product, target: pgdog, type: data, label: ":6432"}
-  - {id: e_payment, source: c_payment, target: productdb, type: data, label: "direct TLS"}
+  - {id: e_payment, source: c_payment, target: pgdog, type: data, label: ":6432 TLS (require)"}
   - {id: e_keycloak, source: c_keycloak, target: platformdb, type: data, label: "direct"}
   - {id: e_temporal, source: c_temporal, target: platformdb, type: data, label: "direct"}
   - {id: e_mig_platform, source: c_migrate, target: platformdb, type: dependency, label: "platform-db-rw"}
@@ -85,7 +87,7 @@ edges:
 notes:
   - id: note_creds
     title: "Credentials"
-    text: "Each login's password is a Kubernetes Secret rendered by External Secrets from OpenBao KV and reloaded by CNPG: secret/local/databases/<cluster>/<service>-runtime and -migrator for services on the RFC-0029 roles (every platform-db service, product and inventory on product-db), <cluster>/<service> for the rest. notification_runtime is the exception: its password is owned by the OpenBao database engine, which rotates it every 720 h, and External Secrets reads database/static-creds/notification-runtime every minute. PgDog takes the product-db role secrets through its HelmRelease valuesFrom; backups authenticate to RustFS with pg-backup-rustfs-credentials."
+    text: "Each login's password is a Kubernetes Secret rendered by External Secrets from OpenBao KV and reloaded by CNPG: secret/local/databases/<cluster>/<service>-runtime and -migrator for every service (RFC-0029 roles), <cluster>/<name> for Temporal and Keycloak. notification_runtime is the exception: its password is owned by the OpenBao database engine, which rotates it every 720 h, and External Secrets reads database/static-creds/notification-runtime every minute. PgDog takes the product-db role secrets through its HelmRelease valuesFrom; backups authenticate to RustFS with pg-backup-rustfs-credentials."
   - id: note_dr
     title: "Why the DR replica reads from RustFS"
     text: "product-db-replica never connects to the primary: it bootstraps from product-db's base backup and then replays its WAL archive from the bucket, so it survives the loss of the product-db pods. Its designated primary keeps its own archive and a daily backup in product-db-replica/ (7 d). Migrations always target the -rw service directly, never a pooler."

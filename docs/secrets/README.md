@@ -244,17 +244,19 @@ OpenBAO-backed secrets. No `-vault` suffix is used.
 | `platform-db-temporal-secret` | temporal, platform | `secret/data/local/databases/platform-db/temporal` |
 | `platform-db-keycloak-secret` | identity | `secret/data/local/databases/platform-db/keycloak` |
 | `platform-db-vault-rotator-secret` | platform | `secret/data/local/databases/platform-db/vault-rotator` (random per cluster; CNPG + OpenBAO database configurator) |
-| `product-db-secret` | product | `secret/data/local/databases/product-db/product` |
-| `product-db-cart-secret` | cart | `secret/data/local/databases/product-db/cart` |
-| `product-db-order-secret` | order | `secret/data/local/databases/product-db/order` |
-| `product-db-inventory-secret` | inventory | `secret/data/local/databases/product-db/inventory` |
-| `product-db-checkout-secret` | checkout | `secret/data/local/databases/product-db/checkout` |
-| `product-db-payment-secret` | payment | `secret/data/local/databases/product-db/payment` |
+| `product-db-secret` | product | `secret/data/local/databases/product-db/product` (bootstrap role `product`, NOLOGIN; RFC-0029) |
+| `product-db-product-runtime-secret`, `product-db-product-migrator-secret` | product | `secret/data/local/databases/product-db/product-runtime` / `-migrator` (random per cluster; RFC-0029) |
+| `product-db-cart-runtime-secret`, `product-db-cart-migrator-secret` | cart, product | `secret/data/local/databases/product-db/cart-runtime` / `-migrator` (random per cluster; RFC-0029) |
+| `product-db-order-runtime-secret`, `product-db-order-migrator-secret` | order, product | `secret/data/local/databases/product-db/order-runtime` / `-migrator` (random per cluster; RFC-0029) |
+| `product-db-inventory-runtime-secret`, `product-db-inventory-migrator-secret` | inventory, product | `secret/data/local/databases/product-db/inventory-runtime` / `-migrator` (random per cluster; RFC-0029) |
+| `product-db-checkout-runtime-secret`, `product-db-checkout-migrator-secret` | checkout, product | `secret/data/local/databases/product-db/checkout-runtime` / `-migrator` (random per cluster; RFC-0029) |
+| `product-db-payment-runtime-secret`, `product-db-payment-migrator-secret` | payment, product | `secret/data/local/databases/product-db/payment-runtime` / `-migrator` (random per cluster; RFC-0029) |
 
-The `product-db-payment-secret` ExternalSecret materialises in `payment` (the
-service connects direct-TLS to `product-db-rw`); the product-side owner secret
-comes from the RFC-0012 triplet in
-`configs/databases/clusters/product-db/services/payment.yaml`.
+Each product-db runtime and migrator Secret exists in `product` (the CNPG
+`passwordSecret`, the PgDog `valuesFrom` source and the role catalog Job's
+input) and, for every service outside `product`, as a copy in the service's
+namespace (`product-db/secrets/product-db-<svc>-{runtime,migrator}-secret-<svc>-ns.yaml`).
+`order-worker` and `checkout-worker` read their service's runtime Secret.
 
 #### Shared secrets (ClusterExternalSecret)
 

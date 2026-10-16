@@ -22,7 +22,7 @@ Known gaps: [pooler and reconciliation limits](#known-gaps).
 |-----------|-------|
 | **Owns** | Payment/refund state, double-entry ledger, provider attempts, webhook records, and reconciliation reports |
 | **Does not own** | Orders, provider-side truth, inventory, or customer identity |
-| **Database** | `payment` on `product-db`, direct to `product-db-rw.product:5432` with `sslmode=require` |
+| **Database** | `payment` on `product-db`: runtime as `payment_runtime` through PgDog (`pgdog-product.product:6432`, client TLS `sslmode=require`, not verified); `migrate` as `payment_migrator` direct to `product-db-rw.product:5432` (`sslmode=require`) |
 | **Cache** | None |
 | **Sensitive data** | Customer subject, financial ledger and provider references; only opaque `tok_` methods are accepted, never PAN data |
 | **Design records** | [RFC-0010](../proposals/rfc/RFC-0010/) · [RFC-0021](../proposals/rfc/RFC-0021/) · [ADR-034](../proposals/adr/ADR-034-provider-outcome-ambiguity/) · [ADR-035](../proposals/adr/ADR-035-windowed-reconciliation/) · [ADR-036](../proposals/adr/ADR-036-single-writer-lease/) · [ADR-037](../proposals/adr/ADR-037-per-request-refund-identity/) |
@@ -434,8 +434,9 @@ mockpay posts its events back to payment's signed webhook,
 
 ## Known gaps
 
-- **No pooler for payment DB** — direct CNPG connection with `sslmode=require`
-  because PgDog does not terminate TLS yet (RFC-0020 research).
+- **DB TLS is encrypted, not verified** — payment reaches PgDog with
+  `sslmode=require`; `verify-full` against `homelab-ca` is an ADR-089 / RFC-0020
+  follow-up, and the PgDog TLS hop is not yet verified on Kind.
 - **Reconciliation limits (deliberate, tracked):** refund *amounts* aren't
   reconciled (the provider reports a refunded flag only — don't read a clean run
   as "refunds reconcile"); currency isn't carried on the report (single-currency

@@ -411,9 +411,10 @@ secret/{environment}/{category}/{service}/{resource}
 **Current KV paths** (seeded at bootstrap). RFC-0029 replaces a service's entry
 with `secret/local/databases/<cluster>/<svc>-runtime` and `…/<svc>-migrator`,
 random per cluster, when the service is cut over
-([Database authorization](../databases/authorization.md#naming)). On
-platform-db every service is converted; product-db services still use one path
-each until RFC-0029 Phase 3 wave 2.
+([Database authorization](../databases/authorization.md#naming)). Every
+service on both clusters is converted (product-db wave 2 is configured, not yet
+verified on Kind); `product-db/product` remains only for the NOLOGIN bootstrap
+role `product`.
 
 | Path | Keys | Consumer |
 |------|------|---------|
@@ -427,12 +428,19 @@ each until RFC-0029 Phase 3 wave 2.
 | `secret/local/databases/platform-db/temporal` | `username`, `password` | platform-db temporal owner (Temporal server) |
 | `secret/local/databases/platform-db/keycloak` | `username`, `password` | Keycloak persistence role — RFC-0012 triplet in ns `platform` (`platform-db/services/keycloak.yaml`) + copy in ns `identity` (`platform-db-keycloak-secret-identity-ns.yaml`) |
 | `secret/local/databases/platform-db/vault-rotator` | `username`, `password` | OpenBAO database-engine administrator — random per cluster; projected to `platform-db-vault-rotator-secret` for CNPG and the configurator Job |
-| `secret/local/databases/product-db/product` | `username`, `password` | CNPG bootstrap owner |
-| `secret/local/databases/product-db/cart` | `username`, `password` | CNPG cart owner |
-| `secret/local/databases/product-db/order` | `username`, `password` | CNPG order owner |
-| `secret/local/databases/product-db/payment` | `username`, `password` | CNPG payment owner — materialised in ns `payment` only (`product-db-payment-secret-payment-ns.yaml`); the product-side secret comes from the RFC-0012 triplet (`product-db/services/payment.yaml`) |
-| `secret/local/databases/product-db/inventory` | `username`, `password` | CNPG inventory owner — RFC-0012 triplet (`product-db/services/inventory.yaml`) + copy in ns `inventory` (`product-db-inventory-secret-inventory-ns.yaml`) |
-| `secret/local/databases/product-db/checkout` | `username`, `password` | CNPG checkout owner — RFC-0012 triplet (`product-db/services/checkout.yaml`) + copy in ns `checkout` (`product-db-checkout-secret-checkout-ns.yaml`) |
+| `secret/local/databases/product-db/product` | `username`, `password` | bootstrap role `product` (NOLOGIN, no `pg_hba` line) — `product-db-secret`, CNPG `passwordSecret` only |
+| `secret/local/databases/product-db/product-runtime` | `username`, `password` | `product_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/product.yaml` |
+| `secret/local/databases/product-db/product-migrator` | `username`, `password` | `product_migrator` login (migrate init container, role catalog Job) — random per cluster |
+| `secret/local/databases/product-db/cart-runtime` | `username`, `password` | `cart_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/cart.yaml` + copy in ns `cart` (`product-db-cart-runtime-secret-cart-ns.yaml`) |
+| `secret/local/databases/product-db/cart-migrator` | `username`, `password` | `cart_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `cart` |
+| `secret/local/databases/product-db/order-runtime` | `username`, `password` | `order_runtime` login (service pods, through PgDog) — order-worker uses it too — random per cluster; `product-db/services/order.yaml` + copy in ns `order` (`product-db-order-runtime-secret-order-ns.yaml`) |
+| `secret/local/databases/product-db/order-migrator` | `username`, `password` | `order_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `order` |
+| `secret/local/databases/product-db/checkout-runtime` | `username`, `password` | `checkout_runtime` login (service pods, through PgDog) — checkout-worker uses it too — random per cluster; `product-db/services/checkout.yaml` + copy in ns `checkout` (`product-db-checkout-runtime-secret-checkout-ns.yaml`) |
+| `secret/local/databases/product-db/checkout-migrator` | `username`, `password` | `checkout_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `checkout` |
+| `secret/local/databases/product-db/payment-runtime` | `username`, `password` | `payment_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/payment.yaml` + copy in ns `payment` (`product-db-payment-runtime-secret-payment-ns.yaml`) |
+| `secret/local/databases/product-db/payment-migrator` | `username`, `password` | `payment_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `payment` |
+| `secret/local/databases/product-db/inventory-runtime` | `username`, `password` | `inventory_runtime` login (service pods, through PgDog) — random per cluster; `product-db/services/inventory.yaml` + copy in ns `inventory` (`product-db-inventory-runtime-secret-inventory-ns.yaml`) |
+| `secret/local/databases/product-db/inventory-migrator` | `username`, `password` | `inventory_migrator` login (migrate init container, role catalog Job) — random per cluster + copy in ns `inventory` |
 | `secret/local/services/payment/webhook-hmac` | `secret` | payment ↔ mockpay webhook HMAC (shared signing key) — `payment-webhook-hmac` ExternalSecret, ns `payment` only (both workloads run there) |
 | `secret/local/auth/jwt-signing` | `private_key`, `public_key` | **orphaned** — zero consumers since auth-service retired (see note below); recorded cleanup candidate |
 | `secret/local/infra/rustfs/root` | `access_key`, `secret_key` | RustFS root creds — `rustfs-credentials` Secret in ns `rustfs` (`controllers/storage/rustfs/external-secret.yaml`) |
@@ -735,7 +743,7 @@ flowchart LR
     end
 
     subgraph cnpg_product["product-db (CloudNativePG)"]
-        prod_owners["product / cart / order / payment owners\n(ExternalSecret → KV v2)"]
+        prod_owners["product / inventory / cart / order / checkout / payment\nruntime + migrator logins\n(product-db/svc-runtime, svc-migrator)"]
         prod_roles["service role(s)\n(RFC-0012 triplet:\nDatabaseRole + Database)"]
     end
 

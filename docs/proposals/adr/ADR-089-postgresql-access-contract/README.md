@@ -146,3 +146,4 @@ All of it is the target. Today's routes are drawn in the
 
 - 2026-10-15 — Accepted with the RFC-0029 access-contract refactor; adoption not started.
 - 2026-10-16 — Partial: application workloads set `application_name` (#1272), and PgDog's automatic read split is off; product-db pools reach the primary only.
+- 2026-10-16 — Partial (RFC-0029 product-db wave 2, in PR, not yet verified on Kind): payment's runtime leaves its direct path and reaches PgDog over client TLS from `pgdog-product-tls` (`homelab-ca`) with `sslmode=require`, which encrypts but does not verify; its migration stays direct over `hostssl`. Two follow-ups stay open: `verify-full` on that hop, and certificate rotation, which needs a PgDog restart because PgDog reads the files only at start.

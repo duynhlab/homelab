@@ -132,7 +132,7 @@ depend on. Without these the operator cannot reach the database pods and
 | **platform** | intra-namespace | `:5432`, `:8000` | CNPG HA replica WAL streaming + PgBouncer → Postgres + operator status probe. (`:6432` is gone — ADR-026 removed PgDog from `platform`.) |
 | **platform** | `monitoring` | `:9187` (postgres exporter), `:9127` (PgBouncer exporter, ADR-026) | VMAgent scrapes the postgres/pooler exporters. |
 | **product** | `cloudnative-pg` operator | `:8000` (status), `:5432` | Operator extracts instance status + manages SQL. |
-| **product** | `cart`, `order`, `payment`, `checkout`, `inventory` (cross-ns) | `:6432` (PgDog), `:5432` (`product-db-rw`) | Sibling apps use the PgDog pooler for runtime + the primary for migration initContainers; `payment` connects **direct-TLS to `product-db-rw:5432`** for runtime too (its config refuses cleartext and PgDog has no TLS yet). |
+| **product** | `cart`, `order`, `payment`, `checkout`, `inventory` (cross-ns) | `:6432` (PgDog), `:5432` (`product-db-rw`) | Sibling apps use the PgDog pooler for runtime + the primary for migration initContainers; `payment`'s runtime also goes through PgDog, over client TLS (`sslmode=require`, RFC-0029 wave 2). |
 | **product** | intra-namespace | `:5432`, `:6432`, `:8000` | CNPG replica WAL streaming + product-service → PgDog + PgDog → Postgres + operator status probe. |
 | **product** | `monitoring` | `:9187` (postgres exporter), `:9090` (PgDog openmetrics) | VMAgent scrapes the postgres/pooler exporters. |
 

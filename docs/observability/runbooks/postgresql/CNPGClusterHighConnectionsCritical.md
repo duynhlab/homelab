@@ -81,8 +81,8 @@ kubectl logs -n "$NAMESPACE" deploy/pgdog-${CLUSTER%-db} --tail=50
 
 **Direct connections (exceptions):**
 
-- **payment-service** connects direct to `product-db-rw:5432` with TLS — counts
-  against Postgres, not PgDog. See
+- Every product-db service, payment included (client TLS), uses PgDog for
+  runtime traffic. See
   [PgDog operations](../../../databases/runbooks/pooler-operations.md).
 - **Init/migration jobs** connect direct to `-rw:5432`.
 

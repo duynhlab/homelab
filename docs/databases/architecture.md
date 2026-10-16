@@ -48,7 +48,7 @@ flowchart TB
     PlatformApps --> PgBouncer --> Platform
     DirectPlatform --> Platform
     ProductApps --> PgDog --> Product
-    Payment --> Product
+    Payment -->|"client TLS · require"| PgDog
     Platform -->|"base backups + WAL"| Store
     Product -->|"base backups + WAL"| Store
     Store -->|"continuous recovery"| DR
@@ -103,10 +103,13 @@ it shares the same Kubernetes environment and object-storage failure domain.
 - Platform services use the CNPG PgBouncer transaction pooler. Temporal and
   Keycloak connect directly because their session and prepared-statement
   semantics are outside the pilot.
-- Product, cart, order, checkout, and inventory use PgDog. PgDog sends reads
-  and writes to `product-db-rw`; no database lists a replica (ADR-089).
-- Payment currently connects directly to `product-db-rw` with TLS, unverified
-  (`sslmode=require`: encrypted, but the server certificate is not checked).
+- Every product-db service uses PgDog as its `<svc>_runtime` login. PgDog
+  sends reads and writes to `product-db-rw`; no database lists a replica
+  (ADR-089).
+- Payment reaches PgDog over client TLS, unverified (`sslmode=require`:
+  encrypted, but the certificate is not checked); the others stay plaintext.
+  This hop is configured in RFC-0029 wave 2 and not yet verified on Kind
+  ([poolers](./poolers.md#tls)).
 - Migration jobs connect directly to the primary so schema changes are not
   multiplexed or read-routed.
 
@@ -122,7 +125,10 @@ replication lag. That is why a replica profile will be an explicit opt-in.
 | `product-db` | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` |
 | `product-db-replica` | Physical recovery copy of `product-db` |
 
-Each service triplet owns a Secret projection, `DatabaseRole`, and `Database`.
+Each service has two Secret projections (runtime and migrator), a runtime
+`DatabaseRole`, and a `Database` owned by `<svc>_owner`; the owner and migrator
+roles come from the cluster's role catalog Job
+([authorization](./authorization.md)).
 Database content such as application tables remains owned by migrations and
 services, not by the infrastructure manifests.
 

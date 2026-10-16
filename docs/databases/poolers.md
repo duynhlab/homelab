@@ -33,10 +33,10 @@ not make concurrency free.
 
 ```mermaid
 flowchart LR
-    ProductClients["product / cart / order<br/>checkout / inventory"] --> PgDog["PgDog :6432"]
+    ProductClients["product / cart / order<br/>checkout / inventory"] -->|"plaintext"| PgDog["PgDog :6432"]
+    Payment["payment"] -->|"client TLS, not verified<br/>sslmode=require"| PgDog
     PgDog -->|"reads and writes"| ProductRW["product-db-rw :5432"]
     PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432"]
-    Payment["payment"] -->|"direct · TLS, unverified<br/>sslmode=require"| ProductRW
 
     PlatformClients["user / notification<br/>shipping / review"] --> PgBouncer["PgBouncer :5432"]
     PgBouncer --> PlatformRW["platform-db-rw :5432"]
@@ -58,11 +58,35 @@ replica any more. A flow that tolerates stale reads will opt in through a
 separate replica profile with a stated lag tolerance (**planned**, RFC-0029).
 
 PgDog declares the six product-cluster database/user pairs and receives their
-passwords through Flux `valuesFrom`. A service converted to the three-role split
-(RFC-0029; today product and inventory) is listed under its `<svc>_runtime`
-login; its migrator never goes through PgDog. Current application manifests intentionally
-keep payment on a direct connection with TLS, unverified (`sslmode=require`:
-encrypted, but the server certificate is not checked — RFC-0020 Slice 4).
+passwords through Flux `valuesFrom`. Every pair is the service's
+`<svc>_runtime` login (RFC-0029 three-role split); migrators never go through
+PgDog, and every `migrate` init container connects to `product-db-rw:5432`
+directly. The order and checkout workers use their service's runtime login.
+
+## TLS
+
+PgDog terminates client TLS with the cert-manager `Certificate`
+`pgdog-product-tls` (ClusterIssuer `homelab-ca`, ECDSA P-256, 90 days, renewed
+15 days before expiry; DNS names `pgdog-product.product.svc` and
+`pgdog-product.product.svc.cluster.local`), mounted at `/etc/pgdog-tls`.
+
+| Client | To PgDog | Notes |
+|---|---|---|
+| payment runtime | TLS, `sslmode=require` | Encrypted, but the client does not check the certificate. payment's config refuses cleartext in production |
+| product, cart, order, checkout, inventory, workers | plaintext, `sslmode=disable` | TLS is optional at PgDog |
+| payment `migrate` | direct to `product-db-rw:5432`, `sslmode=require` | CNPG's own certificate; `pg_hba` admits `payment_runtime` and `payment_migrator` on `hostssl` lines only |
+
+This is the configured design (RFC-0029 wave 2, ADR-089) and is **not yet
+verified on Kind**. `verify-full` against `homelab-ca` is a follow-up
+(ADR-089, RFC-0020). local-stack has no pooler and keeps payment direct to
+PostgreSQL without TLS.
+
+**Rotation needs a restart.** PgDog reads the certificate files when it starts.
+cert-manager renews the Secret on schedule, but PgDog keeps serving the old
+certificate until its pods restart; restart the Deployment inside the 15-day
+renewal window
+([pooler operations](./runbooks/pooler-operations.md)). Automating that restart
+is an ADR-089 follow-up.
 
 CNPG generates PgBouncer authentication support through `auth_query`; it does
 not store a second application password set. Temporal and Keycloak bypass the
@@ -89,6 +113,7 @@ the owning service contract and deployment manifest before changing a DSN.
 ## Manifest evidence
 
 - `kubernetes/infra/configs/databases/clusters/product-db/poolers/helmrelease.yaml`
+- `kubernetes/infra/configs/databases/clusters/product-db/poolers/certificate.yaml`
 - `kubernetes/infra/configs/databases/clusters/platform-db/poolers/pooler.yaml`
 - `kubernetes/apps/services/*.yaml`
 

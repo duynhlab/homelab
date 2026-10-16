@@ -48,6 +48,21 @@ Order matters — the pooler learns passwords only at Helm reconcile time:
 2. **`flux reconcile helmrelease pgdog-<cluster> -n <ns>`** — helm-controller re-reads `valuesFrom` only on reconcile; skipping this leaves PgDog authenticating with the old password and every new app connection failing.
 3. Verify: `kubectl logs … | grep -i auth` goes quiet; `pgdog_errors_total` flattens.
 
+## Rotate the client TLS certificate
+
+`pgdog-product` terminates client TLS with the cert-manager `Certificate`
+`pgdog-product-tls` (ClusterIssuer `homelab-ca`, 90 days, renewed 15 days
+before expiry). PgDog reads the certificate files only at start, so a renewed
+Secret takes effect on the next pod restart:
+
+1. `kubectl get certificate pgdog-product-tls -n product` — Ready, with the new `notAfter`.
+2. `kubectl rollout restart deploy/pgdog-product -n product` — rolling, 3 replicas + PDB; in-flight transactions on a drained pod are cut, so avoid load tests.
+3. Verify: payment connects and serves; the presented certificate's dates match the Secret.
+
+Do it inside the 15-day renewal window. Automating the restart is an ADR-089
+follow-up; this procedure is the configured design and is not yet verified on
+Kind.
+
 ## Add a database backend (new service)
 
 The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add-service-database.md); the PgDog slice of it:
@@ -63,7 +78,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 | New connections fail after a password rotation | `valuesFrom` read at reconcile time only | `flux reconcile helmrelease pgdog-<cluster>` (step 2 above) |
 | Auth failures for two services at once after adding a backend | positional `users[N]` mismatch | re-align `valuesFrom` targetPath indices with `values.users` order |
 | App migrations hang in Init | migrations connect **direct** to `<cluster>-rw:5432`, not the pooler — NetworkPolicy must admit the app namespace to 5432 | check the cluster namespace's netpol app-services rule |
-| Payment errors that look pooler-related | payment doesn't use PgDog — it connects direct over TLS (`sslmode=require`) because PgDog terminates no TLS yet | debug against `product-db-rw:5432`, not `pgdog-product` |
+| payment cannot connect, TLS errors | payment's runtime requires TLS to PgDog (`sslmode=require`); PgDog serves `pgdog-product-tls` from `/etc/pgdog-tls` | `kubectl get certificate pgdog-product-tls -n product` must be Ready; after a renewal, restart PgDog (below). payment's `migrate` goes direct to `product-db-rw:5432` |
 | `up{job=~"pgdog.*"}` empty | ServiceMonitor scrape broken | `kubectl get servicemonitor -n <ns>`; port 9090 must be admitted from the monitoring namespace in the netpol |
 
 ## References

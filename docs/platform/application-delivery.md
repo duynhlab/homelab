@@ -181,7 +181,7 @@ Every key that is **not guaranteed** to exist in all input entries must use the 
 
 | Pattern | Use when |
 |---------|----------|
-| `inputs.name` | Key is **required** and present in every InputProvider (`name`, `namespace`, `db_host`, `db_secret`, `pool_max`, `replicaCount`) |
+| `inputs.name` | Key is **required** and present in every InputProvider (`name`, `namespace`, `db_host`, `db_runtime_secret`, `db_migrator_secret`, `pool_max`, `replicaCount`) |
 | `index inputs "key" \| default "val"` | Key is **optional** or only present in some InputProviders (`db_port`, `db_user`, `db_sslmode`, `cache_enabled`, `review_url`, `auth_url`) |
 
 ### 4.2 String Typing for Env Values
@@ -415,11 +415,10 @@ To enable automatic semver-based rollouts, define a `ResourceSetInputProvider` o
        # (product, cart, checkout, order, payment, inventory):
        # db_host: "pgdog-product.product.svc.cluster.local"
        # db_migration_host: "product-db-rw.product.svc.cluster.local"
-       # Exception — payment: connects DIRECT to CNPG over TLS, not via PgDog
-       # (db_host: "product-db-rw.product.svc.cluster.local" + db_sslmode: "require");
-       # payment refuses cleartext DB and PgDog terminates no TLS yet — see the
-       # comment in kubernetes/apps/services/payment.yaml.
-       db_secret: "<name>-db-credentials"
+       # payment also uses PgDog but with db_sslmode: "require" (PgDog client
+       # TLS) — see the comment in kubernetes/apps/services/payment.yaml.
+       db_runtime_secret: "<cluster>-<name>-runtime-secret"
+       db_migrator_secret: "<cluster>-<name>-migrator-secret"
        pool_max: "10"
    ```
 2. **Validate and deploy**:

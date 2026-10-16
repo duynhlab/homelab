@@ -35,6 +35,9 @@ spec:
   values:
     server:
       replicaCount: 1
+      # Chart 1.7.0 defaults to 1.32.0; pinned to match local-stack.
+      image:
+        tag: "1.32.1"
       # Shared default for frontend / matching / worker. `history` overrides it
       # below -- it is the only service that carries the 512 history shards, and
       # measurement says it needs an order of magnitude more than its siblings.
@@ -124,6 +127,8 @@ spec:
     # tctl/temporal CLI pod — used for namespace + search-attribute operations.
     admintools:
       enabled: true
+      image:
+        tag: "1.32.1" # chart default 1.32.0; same as the search-attributes Job
       resources:
         requests:
           cpu: 25m

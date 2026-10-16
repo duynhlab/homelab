@@ -49,7 +49,7 @@ CR: [`kubernetes/infra/configs/observability/tracing/victoriatraces/vtsingle.yam
 | Field | Value |
 |-------|-------|
 | `image` | `victoriametrics/victoria-traces:v0.11.0` (pinned — 0.x, fast-moving) |
-| operator | chart `0.67.2` / app `v0.74.0` (matching CRDs rendered by the same chart) |
+| operator | chart `0.68.1` / app `v0.75.0` (matching CRDs rendered by the same chart) |
 | `retentionPeriod` | `7d` (matches VMSingle/VLSingle) |
 | `storage` | 10Gi PVC (VictoriaLogs engine — **no object storage**) |
 | `useStrictSecurity` | `true` (non-root, hardened) |

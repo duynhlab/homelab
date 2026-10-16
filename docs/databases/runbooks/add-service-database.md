@@ -10,7 +10,7 @@ HBA allow rule in `instance.yaml` before its terminal reject.
 | **Time** | ~15 minutes + one PR |
 | **Reference service** | `kubernetes/infra/configs/databases/clusters/product-db/services/cart.yaml` |
 | **Concepts** | [012 — Declarative Role & Database Management](../declarative-role-management.md) |
-| **Three-role services** | Every service on both clusters (RFC-0029; product-db wave 2 configured, not yet verified on Kind) — see [Three-role service](#three-role-service) |
+| **Three-role services** | Every service on both clusters (RFC-0029) — see [Three-role service](#three-role-service) |
 
 ## Steps
 

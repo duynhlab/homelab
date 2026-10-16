@@ -230,7 +230,9 @@ Skeleton (copy what you need):
   `checkout_runtime` (ADR-014 indices kept). order-worker and checkout-worker
   use their service's runtime Secret. `db-authz-check.sh`, the isolation sweep,
   `smoke.js` and local-stack (`init.sql`, compose, audit rows) cover all ten
-  services. Not yet verified on Kind.
+  services. Verified on a fresh Kind bring-up 2026-10-16: authz-check 120/120,
+  isolation sweep, six policies Ready, drift restored in 26 s, e2e saga 9/9,
+  staff 59/59, operator 26/26.
 
 - **payment reaches its database through PgDog, over client TLS (ADR-089).**
   PgDog terminates client TLS with the cert-manager `Certificate`
@@ -240,8 +242,11 @@ Skeleton (copy what you need):
   certificate only at start, so a renewal needs a PgDog restart
   ([pooler operations](docs/databases/runbooks/pooler-operations.md)). payment's
   migrate stays direct to `product-db-rw` over `hostssl`; local-stack keeps
-  payment direct to PostgreSQL, with no pooler. Configured design, not yet
-  verified on Kind; the database topology diagram shows the new edge.
+  payment direct to PostgreSQL, with no pooler. On Kind (2026-10-16) PgDog
+  serves the `homelab-ca` certificate, every `payment_runtime` session comes
+  from a PgDog pod, and the reconciler's session advisory lease works through
+  it (7 passes completed, none failed, no lock left). The database topology
+  diagram shows the new edge.
 
 - **product and inventory move to the owner / migrator / runtime split
   (RFC-0029 product-db wave 1, ADR-088).** product-db gets the platform-db

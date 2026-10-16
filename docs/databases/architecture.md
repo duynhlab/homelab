@@ -108,8 +108,8 @@ it shares the same Kubernetes environment and object-storage failure domain.
   (ADR-089).
 - Payment reaches PgDog over client TLS, unverified (`sslmode=require`:
   encrypted, but the certificate is not checked); the others stay plaintext.
-  This hop is configured in RFC-0029 wave 2 and not yet verified on Kind
-  ([poolers](./poolers.md#tls)).
+  Checked on Kind on 2026-10-16 (RFC-0029 wave 2;
+  [poolers](./poolers.md#tls)).
 - Migration jobs connect directly to the primary so schema changes are not
   multiplexed or read-routed.
 

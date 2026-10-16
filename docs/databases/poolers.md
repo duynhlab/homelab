@@ -76,8 +76,10 @@ PgDog terminates client TLS with the cert-manager `Certificate`
 | product, cart, order, checkout, inventory, workers | plaintext, `sslmode=disable` | TLS is optional at PgDog |
 | payment `migrate` | direct to `product-db-rw:5432`, `sslmode=require` | CNPG's own certificate; `pg_hba` admits `payment_runtime` and `payment_migrator` on `hostssl` lines only |
 
-This is the configured design (RFC-0029 wave 2, ADR-089) and is **not yet
-verified on Kind**. `verify-full` against `homelab-ca` is a follow-up
+Verified on Kind on 2026-10-16 (RFC-0029 wave 2, ADR-089): PgDog presents
+`CN=pgdog-product.product.svc` issued by `homelab-ca` with both DNS names, every
+`payment_runtime` server session originates from a PgDog pod, and payment's
+session advisory lease (reconciler) acquires and releases through PgDog. `verify-full` against `homelab-ca` is a follow-up
 (ADR-089, RFC-0020). local-stack has no pooler and keeps payment direct to
 PostgreSQL without TLS.
 

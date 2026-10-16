@@ -8,7 +8,7 @@ ownership of its own schema.
 
 | | |
 |---|---|
-| **Status** | **Deployed** on `platform-db` for `review`, `user`, `shipping` and `notification`, and on `product-db` for `product` and `inventory` (RFC-0029 product-db wave 1). `cart`, `order`, `checkout` and `payment` are configured on the split in RFC-0029 product-db wave 2, with `order-worker` and `checkout-worker` on their service's runtime login; wave 2 is not yet verified on Kind. Every service is then on the split |
+| **Status** | **Deployed** on `platform-db` for `review`, `user`, `shipping` and `notification`, and on `product-db` for every product-db service (RFC-0029 product-db waves 1 and 2). Wave 2 adds `cart`, `order`, `checkout` and `payment`, with `order-worker` and `checkout-worker` on their service's runtime login: every service is on the split |
 | **Design records** | [RFC-0029](../proposals/rfc/RFC-0029/) · [ADR-084](../proposals/adr/ADR-084-split-service-database-roles/) (three roles) · [ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/) (the platform owns authorization; supersedes ADR-085) · [ADR-086](../proposals/adr/ADR-086-guard-membership-options/) (guard) |
 | **Roles per service** | `<svc>_owner` (NOLOGIN) · `<svc>_migrator` (LOGIN, NOINHERIT, `role=<svc>_owner`) · `<svc>_runtime` (LOGIN) |
 | **Who applies what** | CNPG: runtime login, database, `pg_hba`, `db_authz` · role catalog Job + CronJob per cluster: owner, migrator, memberships, and (Job-owned services) in-database grants · pgroles: in-database grants for `user`, `shipping`, `notification` and all six product-db databases |

@@ -464,7 +464,7 @@ databases at once:
 | Wave | Consumers | Notes |
 |---|---|---|
 | product-db, catalog (wave 1) | product, inventory | **Done in PR** (#1279). First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014). The bootstrap database keeps its name `product`; its initdb role `product` becomes NOLOGIN with no `pg_hba` line |
-| product-db, checkout (wave 2) | cart, order, checkout, payment, order-worker, checkout-worker | **Done in PR**, not yet verified on Kind. Workers share their service's runtime role. payment's runtime moves behind PgDog with client TLS (`pgdog-product-tls`, `homelab-ca`, `sslmode=require`, not verified); its migrate stays direct over `hostssl` (ADR-089) |
+| product-db, checkout (wave 2) | cart, order, checkout, payment, order-worker, checkout-worker | **Done in PR**, Kind gate passed 2026-10-16. Workers share their service's runtime role. payment's runtime moves behind PgDog with client TLS (`pgdog-product-tls`, `homelab-ca`, `sslmode=require`, not verified); its migrate stays direct over `hostssl` (ADR-089) |
 | Close | — | Fleet gate on a fresh bring-up, ADR-084/086/088 adoption complete |
 
 Carried into the next fresh bring-up from the #1265 audit: re-run the
@@ -588,7 +588,7 @@ Resolved before the access contract and still in force unless noted:
 - 2026-10-16 — product-db wave 2 in PR: cart, order, checkout and payment on
   the split (catalog Job, pgroles policies, guards), so all ten services are
   converted; payment's runtime behind PgDog with client TLS (`require`, not
-  verified). Kind verification pending; the RFC stays `Accepted`.
+  verified). Kind gate passed; the RFC stays `Accepted` until the close PR.
 
 ## Related
 

@@ -436,7 +436,8 @@ mockpay posts its events back to payment's signed webhook,
 
 - **DB TLS is encrypted, not verified** — payment reaches PgDog with
   `sslmode=require`; `verify-full` against `homelab-ca` is an ADR-089 / RFC-0020
-  follow-up, and the PgDog TLS hop is not yet verified on Kind.
+  follow-up. The PgDog TLS hop and the reconciler's session lease through PgDog
+  were checked on Kind on 2026-10-16.
 - **Reconciliation limits (deliberate, tracked):** refund *amounts* aren't
   reconciled (the provider reports a refunded flag only — don't read a clean run
   as "refunds reconcile"); currency isn't carried on the report (single-currency

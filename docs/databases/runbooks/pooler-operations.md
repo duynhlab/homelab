@@ -60,8 +60,7 @@ Secret takes effect on the next pod restart:
 3. Verify: payment connects and serves; the presented certificate's dates match the Secret.
 
 Do it inside the 15-day renewal window. Automating the restart is an ADR-089
-follow-up; this procedure is the configured design and is not yet verified on
-Kind.
+follow-up. This procedure has not been exercised yet.
 
 ## Add a database backend (new service)
 

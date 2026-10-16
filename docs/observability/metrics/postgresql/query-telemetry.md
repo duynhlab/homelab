@@ -17,14 +17,14 @@ what is captured, how it flows, what it costs, and how to operate it.
 | Loss model | ClickHouse unreachable: events **wait in the ring** and are dropped once it is full (8192 slots ≈ 7–15 min of Kind traffic). ClickHouse reachable but rejecting the insert: that batch is **lost**. Never retried by the server, never back-pressure on PostgreSQL |
 | Cost on PostgreSQL | ~2 % CPU in the extension; up to ~11 % TPS on a lock-heavy pgbench (upstream, 32 clients); shared memory ≈ `queue_capacity` × ~520 B + `string_area_size`, i.e. 20 MB per instance here (`pg_shmem_allocations`) |
 | Health | `cnpg_pg_stat_ch_*` (custom query) → `PgStatChExportFailing`, `PgStatChDroppingEvents`, `PgStatChNotExporting` |
-| Dashboard | `postgresql-query-telemetry` (Databases folder) — Go in `duynhlab/grafana-dashboards`, delivered by the as-code OCI artifact (≥ 0.6.0), the first board on the logical `clickhouse` datasource |
+| Dashboard | `postgresql-query-telemetry` (Databases folder) — Go in `duynhlab/grafana-dashboards`, delivered by the as-code OCI artifact (≥ 0.7.0, which reads `application_name`), the first board on the logical `clickhouse` datasource |
 | Not covered | plan capture (use auto_explain), statements on the DR replica, local-stack (its Postgres is Alpine/musl; the release binary is glibc) |
 
 ## What one event holds
 
 Every statement — DML, DDL, utility, and statements that *failed* — becomes a
-fixed set of 44 columns: start time and duration, `db_name`, `db_user`, `app`
-(`application_name`), `client_addr`, `pid`, the `query_id` fingerprint that
+fixed set of 44 columns: start time and duration, `db_name`, `db_user`,
+`application_name`, `client_addr`, `pid`, the `query_id` fingerprint that
 `pg_stat_statements` and the auto_explain plans stream also carry
 (`compute_query_id`), the normalised text (literals → `$N`, cut at 2 KB),
 rows, shared/local/temp buffer counters, block read/write wait
@@ -33,6 +33,11 @@ timings, parallel workers planned vs launched, and on failure the SQLSTATE,
 elevel and message. `db_name` is the cluster key on this platform because
 every database name is unique across `platform-db` and `product-db`; the
 extension's own instance columns are only filled on its Arrow/OTel path.
+The extension inserts the client name as upstream's `app`; since clickhouse-ddl
+2.0.0 that is an `EPHEMERAL` column, so ClickHouse stores the value as
+`application_name` and `app` cannot be queried. Each workload sets it through
+`PGAPPNAME` (ADR-089); a role whose statements arrive without one shows on the
+dashboard's *Statements without application_name* table.
 
 ## How it flows
 

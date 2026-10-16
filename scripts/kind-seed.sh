@@ -80,7 +80,9 @@ for svc in "${SERVICES[@]}"; do
                 args: ["seed"],
                 resources: $c.resources,
                 env: (([$c.env[] | select(.name as $n | $mnames | index($n) | not)] + $m) | map(
-                  if .name == "ENV" then { name: "ENV", value: "development" } else . end
+                  if .name == "ENV" then { name: "ENV", value: "development" }
+                  elif .name == "PGAPPNAME" then { name: "PGAPPNAME", value: ($ns + "-seed") }
+                  else . end
                 ))
               }]
             }

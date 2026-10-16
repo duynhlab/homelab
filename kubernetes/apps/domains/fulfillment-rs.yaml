@@ -141,6 +141,10 @@ spec:
             value: << index inputs "db_port" | default "5432" | quote >>
           - name: DB_NAME
             value: << inputs.name >>
+          # ADR-089: pgx reads PGAPPNAME as application_name, which names the
+          # session in pg_stat_activity and pg_stat_ch.
+          - name: PGAPPNAME
+            value: << inputs.name >>
           - name: DB_USER
             value: << index inputs "db_user" | default inputs.name >>
           - name: DB_PASSWORD
@@ -293,6 +297,8 @@ spec:
                 value: "5432"
               - name: DB_NAME
                 value: << inputs.name >>
+              - name: PGAPPNAME
+                value: << inputs.name >>-migrate
               - name: DB_USER
                 value: << index inputs "db_user" | default inputs.name >>
               - name: DB_SSLMODE

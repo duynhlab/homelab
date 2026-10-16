@@ -294,6 +294,7 @@ does not change. Confirm with `SHOW application_name` from a pod at rollout.
 | API of each service | domain ResourceSet, main container | `PGAPPNAME: << inputs.name >>` | `user`, `review`, `shipping`, `notification`, `product`, `cart`, `order`, `checkout`, `inventory`, `payment` |
 | Migration of each service | domain ResourceSet, `migrate` init container | `PGAPPNAME: << inputs.name >>-migrate` | `user-migrate` … `payment-migrate` |
 | Workers | `order-worker.yaml`, `checkout-worker.yaml` | `PGAPPNAME` | `order-worker`, `checkout-worker` |
+| Demo seed of each service | `local-stack/compose.yaml` `*-seed`, `scripts/kind-seed.sh` | `PGAPPNAME` | `<name>-seed` |
 | Local-stack | `local-stack/compose.yaml`, per service | `PGAPPNAME` | same values as the cluster |
 | Role catalog Job and CronJob | `platform-db/authz/job.yaml` | `PGAPPNAME` (psql) | `db-authz` |
 | Keycloak | Keycloak Deployment | JDBC URL property `ApplicationName` | `keycloak` |
@@ -328,15 +329,19 @@ wiring in the manifests or the shared client. The #1265 Kind audit matched it:
 - Behind a pooler, `client_addr` is the pooler's address. `application_name`
   is the only per-workload dimension in query telemetry.
 
-[Query telemetry](../../../observability/metrics/postgresql/query-telemetry.md)
-already maps `pg_stat_ch.app` to `application_name`; that mapping stays.
+Since clickhouse-ddl 2.0.0 the
+[query telemetry](../../../observability/metrics/postgresql/query-telemetry.md)
+store names the column `application_name` too. The extension still inserts it
+as upstream's `app`, an `EPHEMERAL` column that is never stored, and the
+dashboard filters on `application_name`. The rename was fresh-only, with no
+compatibility for queries that read `app`.
 After implementation, verify client → pooler → PostgreSQL → ClickHouse →
-dashboard, then update guide examples, dashboard filters and
+dashboard, then update guide examples and
 [DBClientQueryP95High](../../../observability/runbooks/microservices/DBClientQueryP95High.md).
-Align client workload labels and server event `app` (for example `order`);
-verify worker and migration attribution separately rather than assuming all
-producers already use matching labels. Preserve interpretation of historical
-empty/old names; do not invent attribution for old records.
+Align client workload labels and server-side `application_name` (for example
+`order`); verify worker and migration attribution separately rather than
+assuming all producers already use matching labels. Do not invent attribution
+for records written before the rollout.
 
 ### Password rotation and delivery
 

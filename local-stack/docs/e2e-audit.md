@@ -1175,6 +1175,22 @@ for st in review:reviews user:user_profiles shipping:shipments notification:noti
   echo "A23 $S migrator CREATE:        $(a23 $S ${S}_migrator 'BEGIN; CREATE TABLE a23 (i int); ROLLBACK;')"  # (empty: succeeded, rolled back)
   echo "A23 $S non-owner objects:      $(a23 $S ${S}_migrator "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relowner <> '${S}_owner'::regrole AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')")"  # 0
 done
+
+# A24. EVERY CLIENT NAMES ITSELF (ADR-089, RFC-0029 naming table). Each
+#      long-running client sets application_name through PGAPPNAME; read it
+#      from the server, not from the env. The one-shot jobs have exited by now,
+#      so for them assert the env they ran with.
+docker compose exec -T postgres psql -U postgres -qAtX -F' ' -c \
+  "SELECT application_name, usename, datname FROM pg_stat_activity
+   WHERE backend_type = 'client backend' AND usename NOT IN ('postgres', 'temporal', 'keycloak')
+   GROUP BY 1, 2, 3 ORDER BY 1"
+# user user_runtime user · review review_runtime review · shipping shipping_runtime shipping
+# notification notification_runtime notification · product, cart, inventory, order,
+# checkout, payment as <svc> on <svc> · order-worker order order · checkout-worker
+# checkout checkout. No row with an empty first column.
+for c in $(docker compose ps -a --format '{{.Name}}' | grep -E -- '-(migrate|seed|authz)-1$'); do
+  echo "A24 $c $(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$c" | grep '^PGAPPNAME=')"
+done   # <svc>-migrate-1 → <svc>-migrate, <svc>-seed-1 → <svc>-seed, <svc>-authz-1 → db-authz
 ```
 
 > A 429 from the edge is a FINDING, not audit pacing. At 50 req/s a shell-driven
@@ -2232,6 +2248,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |
 | A22 | The attention cards' six reads (RFC-0023) | the five count queries the portal dashboard issues each answer **200** with a **numeric `total_items`** (zero is a legitimate count; a missing or non-numeric field is not), the recent-orders panel honours `page_size=5`, and a status order-service does not know is **400** — which is what proves the `manual_review` and `cancelling` cards are genuinely filtered rather than both reporting the total order count |
 | A23 | The split services' three database roles (RFC-0029) | for each of review, user, shipping and notification: as `<svc>_runtime`, reads its table, and `CREATE`, `DROP`, `SET ROLE <svc>_owner` and reading `schema_migrations` are each **refused**; as `<svc>_migrator` with no `SET ROLE` anywhere: `current_user` is `<svc>_owner` at login **and after `RESET ROLE`**, and `CREATE` succeeds; **0** relations in `public` owned by anyone but `<svc>_owner` |
+| A24 | Every client names itself (ADR-089) | `pg_stat_activity` shows each of the 10 services under its own name and role, plus `order-worker` and `checkout-worker`, with **no** application session left unnamed; every `*-migrate`, `*-seed` and `*-authz` container ran with `PGAPPNAME` `<svc>-migrate`, `<svc>-seed` and `db-authz` |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |
 | B3 | Logout via end-session | logout is a **GET** to `…/protocol/openid-connect/logout` with `post_logout_redirect_uri` + `id_token_hint`, and **no POST reaches any service**; back on the SPA unauthenticated (Sign in link, no Sign out button); a private route afterwards renders a sign-in prompt in place — **no order data from the previous session** — instead of the pre-RFC-0025 bounce to `/login`; sessionStorage empty and localStorage holds nothing token-shaped |

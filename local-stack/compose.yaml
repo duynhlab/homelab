@@ -522,49 +522,49 @@ services:
   user-migrate:
     build: { context: ../../user-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local, PGAPPNAME: user-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   product-migrate:
     build: { context: ../../product-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local }
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local, PGAPPNAME: product-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   cart-migrate:
     build: { context: ../../cart-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local }
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local, PGAPPNAME: cart-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   order-migrate:
     build: { context: ../../order-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local }
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local, PGAPPNAME: order-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   review-migrate:
     build: { context: ../../review-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, PGAPPNAME: review-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   shipping-migrate:
     build: { context: ../../shipping-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local, PGAPPNAME: shipping-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   notification-migrate:
     build: { context: ../../notification-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local, PGAPPNAME: notification-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   payment-migrate:
     build: { context: ../../payment-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment, DB_USER: payment, DB_PASSWORD: payment-local }
+    environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment, DB_USER: payment, DB_PASSWORD: payment-local, PGAPPNAME: payment-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
@@ -572,13 +572,13 @@ services:
   checkout-migrate:
     build: { context: ../../checkout-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout, DB_USER: checkout, DB_PASSWORD: checkout-local }
+    environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout, DB_USER: checkout, DB_PASSWORD: checkout-local, PGAPPNAME: checkout-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   inventory-migrate:
     build: { context: ../../inventory-service }
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local }
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local, PGAPPNAME: inventory-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
@@ -588,7 +588,7 @@ services:
   user-seed:
     build: { context: ../../user-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local, PGAPPNAME: user-seed }
     depends_on:
       postgres: { condition: service_healthy }
       user-migrate: { condition: service_completed_successfully }
@@ -596,7 +596,7 @@ services:
   product-seed:
     build: { context: ../../product-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local }
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local, PGAPPNAME: product-seed }
     depends_on:
       postgres: { condition: service_healthy }
       product-migrate: { condition: service_completed_successfully }
@@ -604,7 +604,7 @@ services:
   cart-seed:
     build: { context: ../../cart-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local }
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local, PGAPPNAME: cart-seed }
     depends_on:
       postgres: { condition: service_healthy }
       cart-migrate: { condition: service_completed_successfully }
@@ -612,7 +612,7 @@ services:
   order-seed:
     build: { context: ../../order-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local }
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local, PGAPPNAME: order-seed }
     depends_on:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
@@ -625,7 +625,7 @@ services:
     image: postgres:18.6-alpine
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "review", "-v", "svc=review", "-f", "/authz/grants.sql"]
-    environment: { PGPASSWORD: postgres }
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
     volumes:
       - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
     depends_on:
@@ -636,7 +636,7 @@ services:
     image: postgres:18.6-alpine
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "user", "-v", "svc=user", "-f", "/authz/grants.sql"]
-    environment: { PGPASSWORD: postgres }
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
     volumes:
       - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
     depends_on:
@@ -647,7 +647,7 @@ services:
     image: postgres:18.6-alpine
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "shipping", "-v", "svc=shipping", "-f", "/authz/grants.sql"]
-    environment: { PGPASSWORD: postgres }
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
     volumes:
       - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
     depends_on:
@@ -658,7 +658,7 @@ services:
     image: postgres:18.6-alpine
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "notification", "-v", "svc=notification", "-f", "/authz/grants.sql"]
-    environment: { PGPASSWORD: postgres }
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
     volumes:
       - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
     depends_on:
@@ -668,7 +668,7 @@ services:
   review-seed:
     build: { context: ../../review-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, PGAPPNAME: review-seed }
     depends_on:
       postgres: { condition: service_healthy }
       review-migrate: { condition: service_completed_successfully }
@@ -676,7 +676,7 @@ services:
   shipping-seed:
     build: { context: ../../shipping-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local, PGAPPNAME: shipping-seed }
     depends_on:
       postgres: { condition: service_healthy }
       shipping-migrate: { condition: service_completed_successfully }
@@ -684,7 +684,7 @@ services:
   notification-seed:
     build: { context: ../../notification-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local }
+    environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local, PGAPPNAME: notification-seed }
     depends_on:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
@@ -692,7 +692,7 @@ services:
   inventory-seed:
     build: { context: ../../inventory-service }
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local }
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local, PGAPPNAME: inventory-seed }
     depends_on:
       postgres: { condition: service_healthy }
       inventory-migrate: { condition: service_completed_successfully }
@@ -705,6 +705,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: user
       OTEL_SERVICE_NAME: user
+      PGAPPNAME: user
       DB_NAME: user
       DB_USER: user_runtime
       DB_PASSWORD: user_runtime-local
@@ -727,6 +728,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: shipping
       OTEL_SERVICE_NAME: shipping
+      PGAPPNAME: shipping
       DB_NAME: shipping
       DB_USER: shipping_runtime
       DB_PASSWORD: shipping_runtime-local
@@ -748,6 +750,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: review
       OTEL_SERVICE_NAME: review
+      PGAPPNAME: review
       DB_NAME: review
       DB_USER: review_runtime
       DB_PASSWORD: review_runtime-local
@@ -765,6 +768,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: notification
       OTEL_SERVICE_NAME: notification
+      PGAPPNAME: notification
       DB_NAME: notification
       DB_USER: notification_runtime
       DB_PASSWORD: notification_runtime-local
@@ -782,6 +786,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: product
       OTEL_SERVICE_NAME: product
+      PGAPPNAME: product
       DB_NAME: product
       DB_USER: product
       DB_PASSWORD: product-local
@@ -820,6 +825,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: cart
       OTEL_SERVICE_NAME: cart
+      PGAPPNAME: cart
       DB_NAME: cart
       DB_USER: cart
       DB_PASSWORD: cart-local
@@ -841,6 +847,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: inventory
       OTEL_SERVICE_NAME: inventory
+      PGAPPNAME: inventory
       DB_NAME: inventory
       DB_USER: inventory
       DB_PASSWORD: inventory-local
@@ -866,6 +873,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: checkout
       OTEL_SERVICE_NAME: checkout
+      PGAPPNAME: checkout
       DB_NAME: checkout
       DB_USER: checkout
       DB_PASSWORD: checkout-local
@@ -906,6 +914,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: checkout
       OTEL_SERVICE_NAME: checkout-worker
+      PGAPPNAME: checkout-worker
       DB_NAME: checkout
       DB_USER: checkout
       DB_PASSWORD: checkout-local
@@ -942,6 +951,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: payment
       OTEL_SERVICE_NAME: payment
+      PGAPPNAME: payment
       DB_NAME: payment
       DB_USER: payment
       DB_PASSWORD: payment-local
@@ -966,6 +976,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: order
       OTEL_SERVICE_NAME: order
+      PGAPPNAME: order
       DB_NAME: order
       DB_USER: order
       DB_PASSWORD: order-local
@@ -1013,6 +1024,7 @@ services:
       <<: *svc-env
       SERVICE_NAME: order
       OTEL_SERVICE_NAME: order-worker
+      PGAPPNAME: order-worker
       DB_NAME: order
       DB_USER: order
       DB_PASSWORD: order-local

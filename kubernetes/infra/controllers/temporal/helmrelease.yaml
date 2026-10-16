@@ -88,6 +88,9 @@ spec:
                 maxConns: 20
                 maxIdleConns: 10
                 maxConnLifetime: 1h
+                # ADR-089: passed to the postgres12 plugin as a DSN parameter.
+                connectAttributes:
+                  application_name: temporal
             visibility:
               sql:
                 pluginName: postgres12
@@ -104,6 +107,9 @@ spec:
                 maxConns: 20
                 maxIdleConns: 10
                 maxConnLifetime: 1h
+                # ADR-089: passed to the postgres12 plugin as a DSN parameter.
+                connectAttributes:
+                  application_name: temporal
         # Replaces the retired TemporalNamespace CRD: the chart's namespace job
         # registers `mop` with the same 7-day retention the platform ran before.
         namespaces:

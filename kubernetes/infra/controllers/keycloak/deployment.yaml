@@ -54,7 +54,8 @@ spec:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
-              value: jdbc:postgresql://platform-db-rw.platform.svc.cluster.local:5432/keycloak
+              # ADR-089: ApplicationName is pgjdbc's application_name.
+              value: jdbc:postgresql://platform-db-rw.platform.svc.cluster.local:5432/keycloak?ApplicationName=keycloak
             - name: KC_DB_USERNAME
               valueFrom:
                 secretKeyRef:

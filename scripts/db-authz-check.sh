@@ -43,7 +43,7 @@ check_service() {
   # typo or a missing table can never pass as a denial.
   local script
   script=$(cat <<EOF
-q() { PGPASSWORD="\$(eval echo \\\$\${2}_PASS)" psql "host=$host dbname=$svc user=\$(eval echo \\\$\${2}_USER) connect_timeout=5" -qAtX -v ON_ERROR_STOP=1 -c "\$4" 2>&1; }
+q() { PGPASSWORD="\$(eval echo \\\$\${2}_PASS)" psql "host=$host dbname=$svc user=\$(eval echo \\\$\${2}_USER) connect_timeout=5 application_name=db-authz-check" -qAtX -v ON_ERROR_STOP=1 -c "\$4" 2>&1; }
 check() {
   out=\$(q "\$@"); rc=\$?
   case "\$3" in

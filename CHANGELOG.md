@@ -211,6 +211,14 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **Platform clients name themselves too (ADR-089).** The role catalog Job and
+  CronJob run as `db-authz` (`PGAPPNAME`), `db-authz-check` as `db-authz-check`,
+  Keycloak as `keycloak` (`ApplicationName` in the JDBC URL, also in local-stack),
+  Temporal as `temporal` (`connectAttributes` on both datastores; local-stack uses
+  `PGAPPNAME`, which its driver reads), and the OpenBAO database engine as
+  `openbao`. pgroles stays unnamed: its `PostgresPolicy` connection has no
+  `application_name` field in 0.13 or 0.14.
+
 - **PgDog sends every query to the primary (ADR-089).** The six product-db
   databases no longer list `product-db-r`, so PgDog cannot route a `SELECT`
   outside a transaction to a replica, where a read right after a commit could

@@ -297,14 +297,15 @@ does not change. Confirm with `SHOW application_name` from a pod at rollout.
 | Demo seed of each service | `local-stack/compose.yaml` `*-seed`, `scripts/kind-seed.sh` | `PGAPPNAME` | `<name>-seed` |
 | Local-stack | `local-stack/compose.yaml`, per service | `PGAPPNAME` | same values as the cluster |
 | Role catalog Job and CronJob | `platform-db/authz/job.yaml` | `PGAPPNAME` (psql) | `db-authz` |
-| Keycloak | Keycloak Deployment | JDBC URL property `ApplicationName` | `keycloak` |
-| Temporal | Temporal HelmRelease persistence | SQL `connectAttributes` (confirm the chart passes it) | `temporal` |
+| Authorization check script | `scripts/db-authz-check.sh` conninfo | `application_name` parameter | `db-authz-check` |
+| Keycloak | Keycloak Deployment `KC_DB_URL` (and local-stack) | JDBC URL property `ApplicationName` | `keycloak` |
+| Temporal | Temporal HelmRelease persistence, both datastores (chart 1.7.0 copies the datastore config as is); local-stack `PGAPPNAME`, because the image's config template has no postgres12 `connectAttributes` variable | SQL `connectAttributes` | `temporal` |
 | OpenBAO database engine | `connection_url` in `openbao-db-config.yaml` | `application_name` parameter | `openbao` |
-| pgroles | `PostgresPolicy` connection params, if supported | `application_name` parameter | `pgroles` |
+| pgroles | — | **Gap:** `PostgresPolicy.spec.connection.params` has no `application_name` field in 0.13.0 or 0.14.0. Its sessions show an empty name under `authz_admin`; revisit on a pgroles release that adds it | (`pgroles`) |
 | CNPG internals, Barman, `pg_stat_ch` exporter, PgDog's own connections | set by the operator or the tool | unchanged | e.g. `cnpg_metrics_exporter`, `PgDog` |
 
-Roll out the application rows first (one environment line each); platform
-rows follow.
+The application rows shipped first (#1272) and the platform rows followed; only
+pgroles is still unnamed.
 
 Use lowercase ASCII letters/digits/hyphens and at most 63 bytes for a standard
 PostgreSQL build; reject rather than silently truncate. No pod UID, release

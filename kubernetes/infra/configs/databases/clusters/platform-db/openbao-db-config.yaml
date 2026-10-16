@@ -101,7 +101,7 @@ spec:
               until printf '%s' "$DB_ADMIN_PASSWORD" | bao write database/config/platform-db \
                   plugin_name=postgresql-database-plugin \
                   allowed_roles="notification-runtime" \
-                  connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=disable" \
+                  connection_url="postgresql://{{username}}:{{password}}@platform-db-rw.platform.svc.cluster.local:5432/notification?sslmode=disable&application_name=openbao" \
                   username="$DB_ADMIN_USERNAME" \
                   password=- 2>/dev/null; do
                 n=$((n + 1)); [ "$n" -ge 60 ] && { echo "ERROR: database/config failed after 300s (platform-db unreachable / vault_rotator?)"; exit 1; }

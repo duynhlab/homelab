@@ -141,7 +141,7 @@ services:
       # Heap inside the 1280m container cap; the JVM default sizes from host RAM.
       JAVA_OPTS_KC_HEAP: "-Xms128m -Xmx640m"
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak?ApplicationName=keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: keycloak-local
       # Dev-only bootstrap admin (cluster: keycloak-bootstrap-admin via ESO).
@@ -270,6 +270,10 @@ services:
       POSTGRES_PWD: temporal-local
       DBNAME: temporal
       VISIBILITY_DBNAME: temporal_visibility
+      # ADR-089. The image's config template has no connectAttributes variable
+      # for postgres12, but its Go driver reads the libpq PGAPPNAME variable;
+      # the cluster sets connectAttributes.application_name instead.
+      PGAPPNAME: temporal
       # Cluster runs 512 (helmrelease.yaml). 4 is a deliberate local divergence:
       # shard count partitions throughput, not behaviour, and local-stack does no
       # load testing. Immutable once the databases are initialised.

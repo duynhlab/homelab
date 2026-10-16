@@ -58,7 +58,9 @@ replica any more. A flow that tolerates stale reads will opt in through a
 separate replica profile with a stated lag tolerance (**planned**, RFC-0029).
 
 PgDog declares the six product-cluster database/user pairs and receives their
-passwords through Flux `valuesFrom`. Current application manifests intentionally
+passwords through Flux `valuesFrom`. A service converted to the three-role split
+(RFC-0029; today product and inventory) is listed under its `<svc>_runtime`
+login; its migrator never goes through PgDog. Current application manifests intentionally
 keep payment on a direct connection with TLS, unverified (`sslmode=require`:
 encrypted, but the server certificate is not checked — RFC-0020 Slice 4).
 

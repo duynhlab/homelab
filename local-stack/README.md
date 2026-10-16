@@ -367,7 +367,7 @@ counters or state ambiguous.
 |---------|-------------|------------|
 | Runtime | Docker Compose | Kubernetes + Flux Operator |
 | Application image | Built from sibling source checkout | Released semver image pinned in manifests |
-| Database | One PostgreSQL 18.6 container on Debian trixie (glibc, the CNPG image's libc) initialised with locale `C` like the CNPG clusters, 13 databases (including Keycloak's and Temporal's two). review, user, shipping and notification use the owner/migrator/runtime split; the other six still use one role per database | CloudNativePG clusters and poolers, with the same role split per service |
+| Database | One PostgreSQL 18.6 container on Debian trixie (glibc, the CNPG image's libc) initialised with locale `C` like the CNPG clusters, 13 databases (including Keycloak's and Temporal's two). review, user, shipping, notification, product and inventory use the owner/migrator/runtime split; cart, order, checkout and payment still use one role per database | CloudNativePG clusters and poolers, with the same role split per service |
 | Database TLS | None (`DB_SSLMODE=disable`) | `require` on every `migrate` container and on payment; verify-full is planned under RFC-0029 |
 | Database client name | `PGAPPNAME` per service, `-migrate`, `-seed`, `db-authz` (audit A24) | The same names from the domain ResourceSets and workers; platform consumers follow later |
 | Temporal | `temporalio/server` on that PostgreSQL, all roles in one container, `numHistoryShards: 4` | Official Helm chart, four role Deployments, `numHistoryShards: 512` |

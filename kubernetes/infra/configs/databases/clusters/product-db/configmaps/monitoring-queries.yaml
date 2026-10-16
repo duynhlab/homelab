@@ -403,3 +403,96 @@ data:
         - active_backends:
             usage: "GAUGE"
             description: "Active backends currently in this wait class (sampled at scrape time)"
+
+    # ADR-086: PG18 membership options on guarded edges. CNPG declares only the
+    # membership name and recreates it with defaults, so drift is detected
+    # here. One row per expected edge (VALUES), so a revoked edge reads
+    # present=0 / drift=1 instead of vanishing. bool_or: PG16+ keeps one row
+    # per grantor. A PR that creates a guarded edge adds it here and to
+    # role-membership-alerts.yaml.
+    pg_role_membership:
+      query: "SELECT e.member, e.parent, (count(m.roleid) > 0)::int AS present,
+               COALESCE(bool_or(m.admin_option), false)::int AS admin_option,
+               COALESCE(bool_or(m.inherit_option), false)::int AS inherit_option,
+               COALESCE(bool_or(m.set_option), false)::int AS set_option,
+               (count(m.roleid) = 0
+                OR COALESCE(bool_or(m.admin_option), false) <> e.want_admin
+                OR COALESCE(bool_or(m.inherit_option), false) <> e.want_inherit
+                OR COALESCE(bool_or(m.set_option), false) <> e.want_set)::int AS drift
+               FROM (VALUES ('product_migrator', 'product_owner', false, false, true),
+                            ('inventory_migrator', 'inventory_owner', false, false, true),
+                            ('db_authz', 'authz_admin', false, true, true))
+                 AS e(member, parent, want_admin, want_inherit, want_set)
+               LEFT JOIN pg_roles mr ON mr.rolname = e.member
+               LEFT JOIN pg_roles pr ON pr.rolname = e.parent
+               LEFT JOIN pg_auth_members m ON m.member = mr.oid AND m.roleid = pr.oid
+               GROUP BY e.member, e.parent, e.want_admin, e.want_inherit, e.want_set"
+      metrics:
+        - member:
+            usage: "LABEL"
+            description: "Role that holds the membership"
+        - parent:
+            usage: "LABEL"
+            description: "Role the membership grants"
+        - present:
+            usage: "GAUGE"
+            description: "1 if the membership exists"
+        - admin_option:
+            usage: "GAUGE"
+            description: "1 if any grant of the membership carries ADMIN"
+        - inherit_option:
+            usage: "GAUGE"
+            description: "1 if any grant of the membership carries INHERIT"
+        - set_option:
+            usage: "GAUGE"
+            description: "1 if any grant of the membership carries SET"
+        - drift:
+            usage: "GAUGE"
+            description: "1 if the membership is missing or its options differ from the specified shape"
+
+    # ADR-088: session defaults the platform sets on a role (the migrator's
+    # role=<owner>). One row per guarded role, so a dropped role reads drift=1.
+    pg_role_config:
+      query: "SELECT e.role, (COALESCE(r.rolconfig, '{}') <> e.want)::int AS drift
+               FROM (VALUES ('product_migrator', ARRAY['role=product_owner']),
+                            ('inventory_migrator', ARRAY['role=inventory_owner'])) AS e(role, want)
+               LEFT JOIN pg_roles r ON r.rolname = e.role"
+      metrics:
+        - role:
+            usage: "LABEL"
+            description: "Role whose session defaults are guarded"
+        - drift:
+            usage: "GAUGE"
+            description: "1 if the role is missing or its rolconfig differs from the specified defaults"
+
+    # ADR-088: the owner's default privileges in each converted database
+    # (pgroles applies them on product-db). The runtime's entry
+    # must be exactly the declared set, and functions must have no PUBLIC
+    # EXECUTE. One row per expected entry.
+    pg_default_privileges:
+      query: "SELECT current_database() AS datname, e.objtype,
+               (NOT EXISTS (
+                  SELECT 1 FROM pg_default_acl d
+                   WHERE d.defaclrole = to_regrole(current_database() || '_owner')
+                     AND d.defaclobjtype = e.objtype
+                     AND d.defaclnamespace = COALESCE(to_regnamespace(e.ns), 0)
+                     AND d.defaclacl::text[] @> e.want
+                     AND NOT d.defaclacl::text[] && e.forbid))::int AS drift
+               FROM (VALUES
+                 ('r', 'public', ARRAY[current_database() || '_runtime=arwd/' || current_database() || '_owner'], ARRAY[]::text[]),
+                 ('S', 'public', ARRAY[current_database() || '_runtime=rU/' || current_database() || '_owner'], ARRAY[]::text[]),
+                 ('f', NULL, ARRAY[current_database() || '_owner=X/' || current_database() || '_owner'], ARRAY['=X/' || current_database() || '_owner']))
+                 AS e(objtype, ns, want, forbid)"
+      target_databases:
+        - "product"
+        - "inventory"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database whose owner's default privileges are guarded"
+        - objtype:
+            usage: "LABEL"
+            description: "pg_default_acl object type (r table, S sequence, f function)"
+        - drift:
+            usage: "GAUGE"
+            description: "1 if the entry is missing or differs from the specified grant"

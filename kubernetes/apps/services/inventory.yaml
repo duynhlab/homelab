@@ -25,7 +25,10 @@ spec:
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
-    db_secret: "product-db-inventory-secret"
+    # RFC-0029: the service runs as inventory_runtime through PgDog; the migrate
+    # init container logs in as inventory_migrator, which becomes inventory_owner.
+    db_runtime_secret: "product-db-inventory-runtime-secret"
+    db_migrator_secret: "product-db-inventory-migrator-secret"
     db_sslmode: "disable"
     pool_max: "25"
     # Internal gRPC server (:9090) — inventory reservations for the checkout

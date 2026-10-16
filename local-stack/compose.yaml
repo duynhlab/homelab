@@ -66,8 +66,9 @@ x-svc-env: &svc-env
   DB_HOST: postgres
   DB_PORT: "5432"
   # DB_USER/DB_PASSWORD are per service (postgres/init.sql): review, user,
-  # shipping and notification run as <svc>_runtime and migrate as
-  # <svc>_migrator (RFC-0029); the other six still use one role per database.
+  # shipping, notification, product and inventory run as <svc>_runtime and
+  # migrate as <svc>_migrator (RFC-0029); the other four still use one role per
+  # database.
   # No TLS here, unlike the cluster (migrate and payment use require): the TLS
   # rollout of RFC-0029 brings verify-full to both together.
   DB_SSLMODE: disable
@@ -585,7 +586,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local, PGAPPNAME: product-migrate }
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product_migrator, DB_PASSWORD: product_migrator-local, PGAPPNAME: product-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   cart-migrate:
@@ -651,7 +652,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local, PGAPPNAME: inventory-migrate }
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory_migrator, DB_PASSWORD: inventory_migrator-local, PGAPPNAME: inventory-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
@@ -673,7 +674,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local, PGAPPNAME: product-seed }
+    environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product_migrator, DB_PASSWORD: product_migrator-local, PGAPPNAME: product-seed }
     depends_on:
       postgres: { condition: service_healthy }
       product-migrate: { condition: service_completed_successfully }
@@ -699,9 +700,10 @@ services:
       order-migrate: { condition: service_completed_successfully }
     restart: "no"
   # Play the cluster's in-database grants (ADR-088) after each migration, with
-  # the role catalog Job's own grants.sql. On the cluster user, shipping and
-  # notification get the same statements from pgroles, whose table wildcard
-  # also covers schema_migrations (PGR-10); here the runtime is denied it.
+  # the role catalog Job's own grants.sql. On the cluster user, shipping,
+  # notification, product and inventory get the same statements from pgroles,
+  # whose table wildcard also covers schema_migrations (PGR-10); here the
+  # runtime is denied it.
   review-authz:
     image: postgres:18.6-trixie
     mem_limit: *oneshot-mem
@@ -750,6 +752,30 @@ services:
       postgres: { condition: service_healthy }
       notification-migrate: { condition: service_completed_successfully }
     restart: "no"
+  product-authz:
+    image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "product", "-v", "svc=product", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      product-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  inventory-authz:
+    image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "inventory", "-v", "svc=inventory", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      inventory-migrate: { condition: service_completed_successfully }
+    restart: "no"
   review-seed:
     image: local-stack/review-service:dev # built by `review`
     mem_limit: *oneshot-mem
@@ -785,7 +811,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local, PGAPPNAME: inventory-seed }
+    environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory_migrator, DB_PASSWORD: inventory_migrator-local, PGAPPNAME: inventory-seed }
     depends_on:
       postgres: { condition: service_healthy }
       inventory-migrate: { condition: service_completed_successfully }
@@ -891,8 +917,8 @@ services:
       OTEL_SERVICE_NAME: product
       PGAPPNAME: product
       DB_NAME: product
-      DB_USER: product
-      DB_PASSWORD: product-local
+      DB_USER: product_runtime
+      DB_PASSWORD: product_runtime-local
       CACHE_ENABLED: "true"
       CACHE_HOST: cache
       CACHE_PORT: "6379"
@@ -914,6 +940,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       product-migrate: { condition: service_completed_successfully }
+      product-authz: { condition: service_completed_successfully }
       product-seed: { condition: service_completed_successfully }
       cache: { condition: service_healthy }
       review: { condition: service_healthy }
@@ -956,8 +983,8 @@ services:
       OTEL_SERVICE_NAME: inventory
       PGAPPNAME: inventory
       DB_NAME: inventory
-      DB_USER: inventory
-      DB_PASSWORD: inventory-local
+      DB_USER: inventory_runtime
+      DB_PASSWORD: inventory_runtime-local
       GRPC_PORT: "9090"
       # ADR-050: the protected group verifies the STAFF realm (split-horizon
       # like OIDC_ISSUER above — issuer is the browser-facing origin, JWKS
@@ -969,6 +996,7 @@ services:
       keycloak: { condition: service_healthy }
       postgres: { condition: service_healthy }
       inventory-migrate: { condition: service_completed_successfully }
+      inventory-authz: { condition: service_completed_successfully }
       inventory-seed: { condition: service_completed_successfully }
 
   # ---- Checkout (RFC-0015): session orchestrator — client-only, reached only

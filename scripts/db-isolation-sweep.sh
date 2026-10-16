@@ -46,11 +46,29 @@ expect_pairs() {
   printf '%s' "$EXPECT" | sed -n "s|^$1/\([^=]*\)=.*|\1|p" | sort -u
 }
 
-product_roles=(payment product cart order checkout inventory)
-product_dbs=(payment product cart order checkout inventory)
+# product-db: payment, cart, order and checkout still use one role per
+# database; product and inventory are split into three roles (RFC-0029 wave 1).
+# `product` is also the bootstrap.initdb owner, now NOLOGIN with no pg_hba line,
+# so it must be rejected everywhere, its own database included. db_authz
+# applies authorization from `postgres` and inside each converted database.
+single_roles=(payment cart order checkout)
+product_roles=("${single_roles[@]}" product db_authz)
+for svc in product inventory; do
+  product_roles+=("${svc}_owner" "${svc}_migrator" "${svc}_runtime")
+done
+product_dbs=(payment product cart order checkout inventory postgres)
 for r in "${product_roles[@]}"; do
   for d in "${product_dbs[@]}"; do
-    if [ "$r" = "$d" ]; then expect_put "product/$r/$d" allow; else expect_put "product/$r/$d" reject; fi
+    expect_put "product/$r/$d" reject
+  done
+done
+for r in "${single_roles[@]}"; do
+  expect_put "product/$r/$r" allow
+done
+expect_put "product/db_authz/postgres" allow
+for svc in product inventory; do
+  for p in "${svc}_runtime/$svc" "${svc}_migrator/$svc" "db_authz/$svc"; do
+    expect_put "product/${p%%/*}/${p##*/}" allow
   done
 done
 

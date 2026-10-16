@@ -463,7 +463,7 @@ databases at once:
 
 | Wave | Consumers | Notes |
 |---|---|---|
-| product-db, catalog | product, inventory | First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014) |
+| product-db, catalog | product, inventory | First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014). The bootstrap database keeps its name `product`; its initdb role `product` becomes NOLOGIN with no `pg_hba` line |
 | product-db, checkout | cart, order, checkout, payment, order-worker, checkout-worker | Workers share their service's runtime role; payment also leaves its direct path when the pooled profile is ready |
 | Close | — | Fleet gate on a fresh bring-up, ADR-084/086/088 adoption complete |
 
@@ -549,7 +549,7 @@ Resolved before the access contract and still in force unless noted:
 | Service-owned authorization | [ADR-085](../../adr/ADR-085-service-migrations-own-authorization/) | Historical; superseded by ADR-088 |
 | Membership-option guard | [ADR-086](../../adr/ADR-086-guard-membership-options/) | Accepted |
 | Platform-owned authorization | [ADR-088](../../adr/ADR-088-platform-owns-database-authorization/) | Accepted; partial adoption |
-| Access paths, verified TLS, required attribution, rotation defaults | [ADR-089](../../adr/ADR-089-postgresql-access-contract/) | Accepted; adoption not started |
+| Access paths, verified TLS, required attribution, rotation defaults | [ADR-089](../../adr/ADR-089-postgresql-access-contract/) | Accepted; partial adoption |
 
 ## Implementation History
 

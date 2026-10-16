@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Database authorization for product-db (ADR-088), the same shape as
+# platform-db/authz: the db_authz login, the role catalog Job + CronJob, and one
+# pgroles policy per converted service, which owns its in-database grants.
+# apply.sh and roles.sql are platform-db's files: one copy of the catalog logic
+# for both clusters (validation and Flux both build without load restrictions).
+resources:
+  - db-authz.yaml
+  - job.yaml
+  - policies/product.yaml
+  - policies/inventory.yaml
+
+configMapGenerator:
+  - name: product-db-authz
+    namespace: product
+    files:
+      - apply.sh=../../platform-db/authz/apply.sh
+      - roles.sql=../../platform-db/authz/roles.sql
+    # apply.sh is bash full of ${...}; keep databases-local's postBuild
+    # substitution (pg_stat_ch password) off it, or the wave fails to build.
+    options:
+      annotations:
+        kustomize.toolkit.fluxcd.io/substitute: disabled

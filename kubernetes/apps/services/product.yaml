@@ -23,7 +23,10 @@ spec:
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
-    db_secret: "product-db-secret"
+    # RFC-0029: the service runs as product_runtime through PgDog; the migrate
+    # init container logs in as product_migrator, which becomes product_owner.
+    db_runtime_secret: "product-db-product-runtime-secret"
+    db_migrator_secret: "product-db-product-migrator-secret"
     db_sslmode: "disable"
     pool_max: "50"
     cache_enabled: "true"

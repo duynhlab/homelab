@@ -29,7 +29,7 @@ const CATALOG = '/product/v1/public/products';
 // Membership edges the ADR-086 guard must report, as member->parent.
 // ADR-088: every converted service's migrator, its role=<owner> default, and
 // its database's owner default privileges are guarded.
-const CONVERTED_SERVICES = ['review', 'user', 'shipping', 'notification'];
+const CONVERTED_SERVICES = ['review', 'user', 'shipping', 'notification', 'product', 'inventory'];
 const GUARDED_EDGES = [
   'vault_rotator->notification_runtime', 'db_authz->authz_admin',
   ...CONVERTED_SERVICES.map((s) => `${s}_migrator->${s}_owner`),

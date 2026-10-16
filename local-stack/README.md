@@ -86,19 +86,36 @@ done
 Run from `homelab/local-stack`:
 
 ```bash
-docker compose up -d --build
+BUILDX_BUILDER=throttled docker compose up -d --build --wait
 docker compose ps
+make -C .. e2e GATE=compose      # the k6 assertion layer
 ```
 
+Build on a CPU-capped buildx builder: ten Go builds in parallel can exhaust the
+host's memory, and `COMPOSE_PARALLEL_LIMIT` alone does not prevent it. Create it
+once, then `docker update` caps its BuildKit container:
+
+```bash
+docker buildx create --name throttled --driver docker-container --bootstrap
+docker update --cpus 4 buildx_buildkit_throttled0
+```
+
+Each repository builds one image, `local-stack/<repo>:dev`, on the service of the same name; its migrate,
+seed, worker and mockpay containers reuse it with `pull_policy: never`, so
+starting one of those alone needs a `docker compose build <service>` first.
+
 The first build compiles the complete application fleet and can take several
-minutes. Do not start the audit until every container that declares a healthcheck
-reports `healthy`, and every run-once container has exited `0`. The run-once set
-is wider than the migrate and seed jobs: `temporal-schema` and
-`temporal-bootstrap` also exit `0` and gate the services behind them. Most
-observability containers declare no healthcheck at all and only ever show `Up`,
-so `running` alone is not evidence of readiness for those — and the `gateway`
-container is now one of them (see [Gateway](#gateway)), so probe the edge with
-`curl` before starting the audit.
+minutes. `--wait` returns once every container with a healthcheck is `healthy`
+and every run-once container has exited `0`. The run-once set is wider than the
+migrate and seed jobs: the `*-authz` grant jobs, `temporal-schema`,
+`temporal-bootstrap` and `gateway-ready` also exit `0` and gate the containers
+behind them. `gateway-ready` stands in for the healthcheck the distroless
+`gateway` image cannot run: it exits once the edge serves a public route, and
+both SPAs wait for it (see [Gateway](#gateway)). Service healthchecks probe
+`/ready`, like the cluster's readiness probe.
+
+Every published port binds `127.0.0.1` only; nothing in the stack is reachable
+from the LAN.
 
 This is the **canonical published-port table** — every host port the stack
 opens, nothing else in `docs/` repeats it. The first group is what a person
@@ -205,12 +222,11 @@ flowchart LR
     SVC -->|"OTLP/HTTP<br/>traces · metrics · logs"| COL["OTel Collector<br/>:4318 HTTP · :4317 gRPC"]
     MP -->|"OTLP/HTTP"| COL
     EDGE -->|"OTLP/gRPC<br/>root span, 100% sampled"| COL
-    EDGE -->|"JSON access log<br/>on stdout"| VEC
-    TAILED["containers Vector still tails:<br/>infra + inventory, checkout,<br/>checkout-worker, mockpay"] -->|"container stdout"| VEC["Vector"]
+    TAILED["infra containers<br/>without an OTel SDK"] -->|"container stdout"| VEC["Vector"]
     COL --> VT["VictoriaTraces<br/>:10428"]
     COL -->|"native + span metrics"| VM["VictoriaMetrics<br/>:8428"]
-    COL -->|"logs"| VL["VictoriaLogs<br/>:9428"]
-    COL -->|"logs + traces SQL"| CH[("ClickHouse<br/>:8123")]
+    COL -->|"app logs<br/>(edge access logs dropped)"| VL["VictoriaLogs<br/>:9428"]
+    COL -->|"logs incl. edge access logs<br/>+ traces SQL"| CH[("ClickHouse<br/>:8123")]
     VEC -->|"jsonline ingest"| VL
     VMA["vmagent :8429<br/>+ vmalert :8880"] -->|"scrape: clickhouse, collector,<br/>edge ×2, temporal :8000"| VM
     VT --> GRAF["Grafana<br/>:3002"]
@@ -339,9 +355,11 @@ docker compose down       # stop containers and keep named volumes
 docker compose down -v    # delete local data for a clean audit baseline
 ```
 
-Named volumes contain only local test data and telemetry. Reset before the
-release audit when earlier exploratory traffic would make counters or state
-ambiguous.
+Named volumes contain only telemetry, the Envoy binary cache and Grafana's
+plugins. PostgreSQL has no volume, so a plain `docker compose down` already
+drops application and Temporal state while telemetry survives; `down -v` resets
+both. Reset before the release audit when earlier exploratory traffic would make
+counters or state ambiguous.
 
 ## Environment differences
 
@@ -349,7 +367,9 @@ ambiguous.
 |---------|-------------|------------|
 | Runtime | Docker Compose | Kubernetes + Flux Operator |
 | Application image | Built from sibling source checkout | Released semver image pinned in manifests |
-| Database | One PostgreSQL container, 13 databases (including Keycloak's and Temporal's two), each owned by its own non-superuser role | CloudNativePG clusters and poolers; the same one-role-per-database triplets |
+| Database | One PostgreSQL 18.6 container on Debian trixie (glibc, the CNPG image's libc), 13 databases (including Keycloak's and Temporal's two). review, user, shipping and notification use the owner/migrator/runtime split; the other six still use one role per database | CloudNativePG clusters and poolers, with the same role split per service |
+| Database TLS | None (`DB_SSLMODE=disable`) | `require` on every `migrate` container and on payment; verify-full is planned under RFC-0029 |
+| Database client name | `PGAPPNAME` per service, `-migrate`, `-seed`, `db-authz` (audit A24) | The same names from the domain ResourceSets and workers; platform consumers follow later |
 | Temporal | `temporalio/server` on that PostgreSQL, all roles in one container, `numHistoryShards: 4` | Official Helm chart, four role Deployments, `numHistoryShards: 512` |
 | Secrets | Inline development values | OpenBAO + External Secrets Operator |
 | Network controls | Single Compose network | NetworkPolicy + Gateway route boundaries |
@@ -368,11 +388,3 @@ Passing one environment never implies that the other environment passes.
 - [Canonical API contracts](../docs/api/README.md)
 - [Observability](../docs/observability/README.md)
 - [agent-browser CLI](https://github.com/vercel-labs/agent-browser)
-
-_Last updated: 2026-10-01 — database count 13 (14 included the dropped `auth` database), 10 service repositories, the cluster edge limit is 25/s per replica in one window, and the Grafana port row lists the six provisioned folders. Earlier the same day — each database is owned by its own non-superuser role, as on the cluster. Earlier: 2026-08-18 — Temporal server metrics scraped (in-network
-`:8000` via `PROMETHEUS_ENDPOINT`), VictoriaLogs Grafana datasource added, and
-the dashboard set grew to 16 (collector health, RFC-0021 parity copies);
-previously 2026-08-13 — the port table became canonical and complete (17
-published ports in two groups: browsable + machine surfaces), adding the
-engine-health slice: ClickHouse `:9363/metrics`, vmagent `:8429`, vmalert
-`:8880` (audit rows C20/C21; see `docs/observability.md`)._

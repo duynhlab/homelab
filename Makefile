@@ -96,6 +96,10 @@ validate: ## Validate Kubernetes manifests (Kustomize)
 # GATE selects the target preset (compose | kind); every script reads it. These
 # exit non-zero when a row fails, which is the point: the gates used to be
 # read by eye.
+# GATE has no default: the targets used to default to different stacks, so a
+# bare `make e2e` ran saga and smoke against Kind and staff and operator against
+# compose. Expanded only when a recipe runs, so other targets are unaffected.
+E2E_GATE = $(if $(filter compose kind,$(GATE)),$(GATE),$(error set GATE=compose or GATE=kind))
 
 .PHONY: e2e
 e2e: e2e-saga e2e-smoke e2e-staff e2e-operator ## Run the k6 gate suite (set GATE=compose|kind)
@@ -106,23 +110,23 @@ e2e: e2e-saga e2e-smoke e2e-staff e2e-operator ## Run the k6 gate suite (set GAT
 
 .PHONY: e2e-smoke
 e2e-smoke: ## Functional + telemetry rows as checks with thresholds
-	GATE=$(or $(GATE),kind) k6 run scripts/k6/smoke.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/smoke.js
 
 .PHONY: e2e-saga
 e2e-saga: ## An order completes, Pinned, on the Current build id
-	GATE=$(or $(GATE),kind) k6 run scripts/k6/saga.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/saga.js
 
 .PHONY: e2e-session
 e2e-session: ## Refresh rotation, reuse detection, logout (compose A4/A5)
-	GATE=$(or $(GATE),compose) k6 run scripts/k6/session.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/session.js
 
 .PHONY: e2e-staff
 e2e-staff: ## The /protected/ Backoffice surface (compose A17-A19, A21)
-	GATE=$(or $(GATE),compose) k6 run scripts/k6/staff.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/staff.js
 
 .PHONY: e2e-operator
 e2e-operator: ## Operator resolve of a parked order (compose A20)
-	GATE=$(or $(GATE),compose) k6 run scripts/k6/operator.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/operator.js
 
 .PHONY: e2e-conformance
 e2e-conformance: ## Row C22: stop Weaver's live-check, save its report, fail on a violation (needs compose.weaver.yaml)
@@ -152,15 +156,15 @@ e2e-observability: ## Datasources, dashboards, panel path, scrape targets (compo
 
 .PHONY: e2e-ratelimit
 e2e-ratelimit: ## Drive under and over the edge ceiling; 429 must be well-formed
-	GATE=$(or $(GATE),kind) k6 run scripts/k6/ratelimit.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/ratelimit.js
 
 .PHONY: e2e-load
 e2e-load: ## Order load; reports the Temporal backlog it built
-	GATE=$(or $(GATE),kind) k6 run scripts/k6/load.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/load.js
 
 .PHONY: e2e-restock
 e2e-restock: ## Top demo stock back up to the seed baseline (make seed cannot -- ON CONFLICT DO NOTHING)
-	GATE=$(or $(GATE),kind) k6 run scripts/k6/restock.js
+	GATE=$(E2E_GATE) k6 run scripts/k6/restock.js
 
 .PHONY: db-isolation
 db-isolation: ## pg_hba isolation sweep against the live databases (RFC-0012 P4)

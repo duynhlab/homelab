@@ -1,7 +1,7 @@
 # BackendTrafficPolicy — local rate limit + request body size cap.
 #
 # What this exposes: the two edge protections worth exercising locally, applied
-# to all 12 routes by one policy.
+# to all 18 routes by one policy.
 #
 # ONE policy, not several, and that is a correctness point rather than tidiness.
 # `targetRefs` is namespace-scoped, so a policy can only name routes in its own

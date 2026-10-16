@@ -19,7 +19,10 @@ spec:
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
-    db_secret: "product-db-cart-secret"
+    # RFC-0029: the service runs as cart_runtime through PgDog; the migrate
+    # init container logs in as cart_migrator, which becomes cart_owner.
+    db_runtime_secret: "product-db-cart-runtime-secret"
+    db_migrator_secret: "product-db-cart-migrator-secret"
     db_sslmode: "disable"
     pool_max: "30"
     # Internal gRPC server (:9090) — checkout reads the cart over cart.v1

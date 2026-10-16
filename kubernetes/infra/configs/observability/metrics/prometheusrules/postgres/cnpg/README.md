@@ -30,6 +30,16 @@ helm template x cnpg/cluster --version 0.6.0 -n product \
 | `cluster-zone_spread-warning.yaml` | Zone spread |
 | `cluster-logical_replication_*.yaml` | Logical replication |
 
+## Local deviations from the chart
+
+Re-apply these after every re-render:
+
+- `cluster-ha-critical.yaml`, `cluster-ha-warning.yaml`: both selectors add
+  `job!="product/product-db-replica"`. The DR cluster runs one instance by
+  design, so it never has a standby and the chart rule fires forever (the
+  chart's own description says to silence it). The DR cluster is watched by
+  `CNPGDRClusterOffline` and `CNPGClusterStandbyNotStreaming` instead.
+
 ## Extra CNPG rules (not in chart fragments)
 
 - `cluster-fenced.yaml` — `CnpgClusterFenced` (kept when splitting from legacy `postgres-alerts`).

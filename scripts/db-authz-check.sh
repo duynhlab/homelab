@@ -13,7 +13,7 @@
 # unless every expected CHECK came back PASS.
 set -u
 
-IMAGE="ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
+IMAGE="ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
 # service -> "cluster namespace host table migrations": one table the runtime
 # serves from, and what the runtime gets on schema_migrations. The Job denies
 # it (review); a pgroles table wildcard cannot exclude it, so pgroles-owned
@@ -96,9 +96,15 @@ spec:
         - {name: MG_USER, valueFrom: {secretKeyRef: {name: $cluster-$svc-migrator-secret, key: username}}}
         - {name: MG_PASS, valueFrom: {secretKeyRef: {name: $cluster-$svc-migrator-secret, key: password}}}
 EOF
+  # Wait in two phases: the first probe on a fresh cluster pulls the image
+  # while Flux pulls everything else (over 300 s on Kind), then the SQL runs.
+  local deadline=$((SECONDS + 900))
+  while [ "$(kubectl get "pod/$pod" -n "$ns" -o jsonpath='{.status.phase}' 2>/dev/null)" = Pending ] \
+    && [ "$SECONDS" -lt "$deadline" ]; do sleep 5; done
   kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$pod" -n "$ns" --timeout=120s >/dev/null 2>&1
-  local out rows=0
+  local out rows=0 phase
   out=$(kubectl logs "pod/$pod" -n "$ns" 2>/dev/null)
+  phase=$(kubectl get "pod/$pod" -n "$ns" -o jsonpath='{.status.phase} {.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null)
   kubectl delete "pod/$pod" -n "$ns" --wait=false >/dev/null 2>&1
 
   local tag name verdict rest
@@ -109,7 +115,7 @@ EOF
     [ "$verdict" = PASS ] || FAIL=1
   done <<<"$out"
   if [ "$rows" -ne "$EXPECTED_CHECKS" ]; then
-    printf "FAIL  %-8s parsed %s checks, expected %s\n" "$svc" "$rows" "$EXPECTED_CHECKS"
+    printf "FAIL  %-8s parsed %s checks, expected %s (pod: %s)\n" "$svc" "$rows" "$EXPECTED_CHECKS" "${phase:-gone}"
     FAIL=1
   fi
 }

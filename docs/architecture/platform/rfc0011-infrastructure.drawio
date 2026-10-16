@@ -23,13 +23,13 @@
           <mxGeometry x="285" y="450" width="290" height="85" as="geometry" />
         </mxCell>
         <mxCell id="node1" value="&lt;b&gt;Mini PC / Node 1&lt;/b&gt;&lt;br&gt;Phase 1 • one physical host&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
-          <mxGeometry x="30" y="48" width="220" height="85" as="geometry" />
+          <mxGeometry x="540" y="48" width="220" height="85" as="geometry" />
         </mxCell>
         <mxCell id="node2" value="&lt;b&gt;Mini PC / Node 2&lt;/b&gt;&lt;br&gt;Phase 2 • expansion candidate&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
           <mxGeometry x="280" y="48" width="220" height="85" as="geometry" />
         </mxCell>
         <mxCell id="node3" value="&lt;b&gt;Mini PC / Node 3&lt;/b&gt;&lt;br&gt;Phase 2 • expansion candidate&lt;br&gt;planned" style="rounded=1;dashed=1;absoluteArcSize=1;arcSize=10;shadow=0;whiteSpace=wrap;html=1;align=left;spacingLeft=12;fillColor=#EDE9FE;strokeColor=#7C3AED;strokeWidth=1.5;fontColor=#4C1D95;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="cluster">
-          <mxGeometry x="540" y="48" width="220" height="85" as="geometry" />
+          <mxGeometry x="30" y="48" width="220" height="85" as="geometry" />
         </mxCell>
         <mxCell id="wan" value="WAN (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="internet" target="router">
           <mxGeometry relative="1" as="geometry" x="-0.68">
@@ -47,13 +47,11 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="n1" value="Ethernet (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="switch" target="node1">
-          <mxGeometry relative="1" as="geometry" x="-0.92">
+        <mxCell id="n1" value="Ethernet (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.78;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="switch" target="node1">
+          <mxGeometry relative="1" as="geometry" x="0.64">
             <Array as="points">
-              <mxPoint x="386.56" y="560" />
-              <mxPoint x="326.56" y="560" />
-              <mxPoint x="326.56" y="612" />
-              <mxPoint x="180" y="612" />
+              <mxPoint x="511.56" y="560" />
+              <mxPoint x="690" y="560" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -65,11 +63,13 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="n3" value="Ethernet (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.78;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="switch" target="node3">
-          <mxGeometry relative="1" as="geometry" x="0.64">
+        <mxCell id="n3" value="Ethernet (planned)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#64748B;strokeWidth=1.5;endArrow=open;dashed=1;fontFamily=Helvetica;fontSize=10;fontColor=#334155;labelBackgroundColor=#FFFFFF;endSize=6;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="switch" target="node3">
+          <mxGeometry relative="1" as="geometry" x="-0.92">
             <Array as="points">
-              <mxPoint x="511.56" y="560" />
-              <mxPoint x="690" y="560" />
+              <mxPoint x="386.56" y="560" />
+              <mxPoint x="326.56" y="560" />
+              <mxPoint x="326.56" y="612" />
+              <mxPoint x="180" y="612" />
             </Array>
           </mxGeometry>
         </mxCell>

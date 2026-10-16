@@ -223,8 +223,8 @@ Per-alert runbooks: [`runbooks/postgresql/README.md`](../runbooks/postgresql/REA
 | CNPGClusterOffline | critical | `cnpg_collector_up` ready instances = 0 | DB fully down — total outage + data-loss risk | 5m | [CNPGClusterOffline](../runbooks/postgresql/CNPGClusterOffline.md) |
 | CNPGDRClusterOffline | critical | `cnpg_collector_up` for `product-db-replica` absent/zero | DR layer and promotion target unavailable | 5m | [CNPGDRClusterOffline](../runbooks/postgresql/CNPGDRClusterOffline.md) |
 | CnpgClusterFenced | critical | `cnpg_collector_fencing_on==1` | All writes blocked (split-brain guard) | 1m | [CnpgClusterFenced](../runbooks/postgresql/CnpgClusterFenced.md) |
-| CNPGClusterHACritical | critical | streaming replicas <1 | No standby — primary failure = data loss | 5m | [CNPGClusterHACritical](../runbooks/postgresql/CNPGClusterHACritical.md) |
-| CNPGClusterHAWarning | warning | streaming replicas <2 | Degraded HA redundancy | 5m | [CNPGClusterHAWarning](../runbooks/postgresql/CNPGClusterHAWarning.md) |
+| CNPGClusterHACritical | critical | streaming replicas <1 (excludes the 1-instance `product-db-replica`) | No standby — primary failure = data loss | 5m | [CNPGClusterHACritical](../runbooks/postgresql/CNPGClusterHACritical.md) |
+| CNPGClusterHAWarning | warning | streaming replicas <2 (excludes the 1-instance `product-db-replica`) | Degraded HA redundancy | 5m | [CNPGClusterHAWarning](../runbooks/postgresql/CNPGClusterHAWarning.md) |
 | CNPGOperatorDown | critical | `up{namespace="cloudnative-pg"}==0` | Operator down — no cluster management | 5m | [CNPGOperatorDown](../runbooks/postgresql/CNPGOperatorDown.md) |
 | CNPGControllerReconcileErrorsSpiking | warning | `increase(controller_runtime_reconcile_errors_total[10m])>5` | Cluster management degrading | 10m | [CNPGControllerReconcileErrorsSpiking](../runbooks/postgresql/CNPGControllerReconcileErrorsSpiking.md) |
 | CNPGClusterHighConnectionsCritical | critical | `cnpg_backends_total` / `max_connections` >95% | New connections refused | 5m | [CNPGClusterHighConnectionsCritical](../runbooks/postgresql/CNPGClusterHighConnectionsCritical.md) |

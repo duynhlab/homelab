@@ -103,15 +103,16 @@ it shares the same Kubernetes environment and object-storage failure domain.
 - Platform services use the CNPG PgBouncer transaction pooler. Temporal and
   Keycloak connect directly because their session and prepared-statement
   semantics are outside the pilot.
-- Product, cart, order, checkout, and inventory use PgDog. PgDog routes writes
-  to `product-db-rw` and eligible reads to `product-db-r`.
+- Product, cart, order, checkout, and inventory use PgDog. PgDog sends reads
+  and writes to `product-db-rw`; no database lists a replica (ADR-089).
 - Payment currently connects directly to `product-db-rw` with TLS, unverified
   (`sslmode=require`: encrypted, but the server certificate is not checked).
 - Migration jobs connect directly to the primary so schema changes are not
   multiplexed or read-routed.
 
-Read routing is not a consistency guarantee. A client that reads through a
-replica immediately after writing to the primary may observe replication lag.
+No application path reads from a replica today. A replica read is not a
+consistency guarantee: a read right after a primary commit may observe
+replication lag. That is why a replica profile will be an explicit opt-in.
 
 ## Database inventory
 

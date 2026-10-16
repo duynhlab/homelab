@@ -464,7 +464,7 @@ and extend Adoption instead.
 | [ADR-086](ADR-086-guard-membership-options/) | Guard PostgreSQL Membership Options with a CNPG Monitoring Query | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-087](ADR-087-homelab-private-and-web-access/) | Separate Private Administration from Published Web Access | Proposed | Not started | [RFC-0011](../rfc/RFC-0011/) |
 | [ADR-088](ADR-088-platform-owns-database-authorization/) | Apply Database Authorization from the Platform, Not from Service Code | Accepted | Partial (`platform-db`) | [RFC-0029](../rfc/RFC-0029/) |
-| [ADR-089](ADR-089-postgresql-access-contract/) | Define the PostgreSQL Access Contract Between Applications and the Platform | Accepted | Not started | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-089](ADR-089-postgresql-access-contract/) | Define the PostgreSQL Access Contract Between Applications and the Platform | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
 
 Principles:
 

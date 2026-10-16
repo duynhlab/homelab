@@ -1925,29 +1925,40 @@ missing = sorted({'user','product','inventory','cart','order','review','shipping
 print('C12 OTLP log streams:', 'OK all 10 services' if not missing else 'FAIL missing=' + ','.join(missing))"
 # want every service Phase A drove.
 
-# C13. EDGE ACCESS LOGS, OTLP leg. The second-most important row in this phase:
-#      the edge's JSON access log is the only structured record of what the edge
-#      did, and the field set is contracted in gateway/eg/envoyproxy.yaml.
+# C13. EDGE ACCESS LOGS, in ClickHouse. The second-most important row in this
+#      phase: the edge's JSON access log is the only structured record of what
+#      the edge did, and the field set is contracted in gateway/eg/envoyproxy.yaml.
 #
-#      THE STREAM MOVED. Until ADR-060 (#886, 2026-08-24) this row read the Vector
-#      leg, `_stream:{service="gateway"}`. That leg now carries ZERO lines — the
-#      access log goes out over OTLP instead, landing under
-#      `_stream:{"service.name"="platform.envoy-gateway"}` with the same field set.
-#      Measured on the 2026-08-25 gate run: Vector leg 0, OTLP leg 1540, every one
-#      of them carrying `upstream_cluster` and `route_name`. The old query could
-#      only ever fail, which is exactly the "an expression that cannot pass reads
-#      as coverage" failure this audit exists to catch.
+#      THE STORE MOVED TWICE. ADR-060 (2026-08-24) moved the access log from the
+#      Vector leg to OTLP. ADR-061 then made it ClickHouse-only on the cluster:
+#      the collector's filter/drop_edge_logs keeps it out of VictoriaLogs, where
+#      attributes-only records (no _msg) were invisible to free-text LogsQL anyway.
+#      local-stack carries the same filter since 2026-10-16, so this row reads
+#      ClickHouse and also asserts VictoriaLogs holds NONE — a non-zero count
+#      there means the filter is gone and the stack no longer matches the cluster.
 #
 #      `upstream_cluster` and `route_name` exist only on access-log lines, so
 #      requiring both still discriminates them from the control plane's own logs.
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT count() FROM otel.otel_logs
+  WHERE Timestamp > now() - INTERVAL 45 MINUTE
+    AND ServiceName = 'platform.envoy-gateway'
+    AND mapContains(LogAttributes, 'upstream_cluster')
+    AND mapContains(LogAttributes, 'route_name')" \
+  | python3 -c "import sys; n=int(sys.stdin.read().strip() or 0); \
+    print('C13 edge access logs (ClickHouse):', 'OK %d' % n if n > 0 else 'FAIL 0')"
 curl -s "$VL" --data-urlencode \
-  'query=_time:45m _stream:{"service.name"="platform.envoy-gateway"} upstream_cluster:* route_name:* | count()' \
+  'query=_time:45m _stream:{"service.name"="platform.envoy-gateway"} upstream_cluster:* | count()' \
   | python3 -c "import json,sys; n=int(json.load(sys.stdin)['count(*)']); \
-    print('C13 edge access logs:', 'OK %d' % n if n > 0 else 'FAIL 0')"
+    print('C13 edge access logs kept out of VictoriaLogs:', 'OK 0' if n == 0 else 'FAIL %d' % n)"
 # Then pin the specific request driven in C0:
-curl -s "$VL" --data-urlencode \
-  "query=_time:45m _stream:{\"service.name\"=\"platform.envoy-gateway\"} upstream_cluster:* uri:\"audit=$TAG\"" \
-  --data-urlencode 'limit=1' | python3 -c "
+curl -s "$CH" -u default:otel --data-binary "
+  SELECT toJSONString(LogAttributes) FROM otel.otel_logs
+  WHERE ServiceName = 'platform.envoy-gateway'
+    AND LogAttributes['uri'] LIKE '%audit=$TAG%'
+  LIMIT 1
+  SETTINGS output_format_json_escape_forward_slashes = 0
+  FORMAT TSVRaw" | python3 -c "
 import json,sys
 lines = [json.loads(l) for l in sys.stdin.read().splitlines() if l]
 d = lines[0] if lines else {}
@@ -1957,17 +1968,17 @@ ok = lines and not missing and d['status'] == '200' and d['method'] == 'GET' \
      and d['upstream_cluster'].endswith('/api-product/rule/0')
 print('C13 tagged access log:', 'OK CR field set, %s %s -> %s' % (d.get('method'), d.get('status'), d.get('upstream_cluster'))
       if ok else 'FAIL lines=%d missing=%s' % (len(lines), missing))"
-# want ONE line whose parsed fields are the CR's contract:
+# TSVRaw and the slash setting matter: plain TSV escapes the backslashes that
+# toJSONString puts before every `/`, and upstream_cluster then reads
+# `httproute\/…`, which never matches.
+# want ONE row whose attribute names are the CR's contract:
 #   uri=/product/v1/public/products?audit=$TAG  status=200  method=GET
 #   upstream_cluster=httproute/envoy-gateway-system/api-product/rule/0
 #   route_name=.../match/0/*  upstream=<ip:8080>  duration=<ms>  request_id=<uuid>
-# `host` (the authority, `localhost:8080`) and `trace_id` arrive too since the
-# OTLP move; the Vector-era note that `del(.host)` ate the authority no longer
-# applies. Neither is asserted — they are not part of what this row guards.
-# Read those FIELD NAMES, not just the values: with the EnvoyProxy CR unattached
+# Read those NAMES, not just the values: with the EnvoyProxy CR unattached
 # Envoy falls back to its built-in JSON, which reports the same facts as
-# `x-envoy-origin-path`, `response_code` and `upstream_host` — every Vector-parsed
-# edge panel breaks on that rename while this row would still find "a log line".
+# `x-envoy-origin-path`, `response_code` and `upstream_host` — every edge panel
+# breaks on that rename while this row would still find "a log line".
 
 # C14. Vector is tailing NON-app containers too — the half of the log estate that
 #      has no OTel SDK at all. `frontend` is the right witness: it is the SPA's
@@ -2271,7 +2282,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | C10 | Temporal metrics, both halves | SDK: latency histograms + `temporal_workflow_completed_total`, worker slots, pollers have series (`_total` on the SDK counters since ADR-063 — the cluster rules and the Temporal dashboard query that name); server: `up{job="temporal"}` is 1 and `service_requests` / `persistence_requests` rate — the :8000 listener `PROMETHEUS_ENDPOINT` enables |
 | C11 | DB client p95 | real ms-scale value (< 500ms), not bucket-collapse garbage |
 | C12 | App logs (OTLP leg) | `_stream:{"service.name"="cart"}` non-empty in VictoriaLogs, and the stream-field enumeration lists every service Phase A drove |
-| C13 | Edge access logs (OTLP leg, ADR-060) | `_stream:{"service.name"="platform.envoy-gateway"}` filtered on `upstream_cluster:*` + `route_name:*` (the discriminator against the control plane's own logs) is non-empty, and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` — with `GET 200` to the `api-product` cluster, not Envoy's built-in fallback names |
+| C13 | Edge access logs (ClickHouse only, ADR-060 + ADR-061) | `otel.otel_logs` rows for `platform.envoy-gateway` carrying `upstream_cluster` + `route_name` (the discriminator against the control plane's own logs) are non-empty, VictoriaLogs holds **0** of them (the collector's `filter/drop_edge_logs`, as on the cluster), and the tagged request is findable **under the CR's field names** — `uri`, `status`, `method`, `upstream`, `upstream_cluster`, `route_name`, `duration`, `request_id` — with `GET 200` to the `api-product` cluster, not Envoy's built-in fallback names |
 | C14 | Vector infra tailing | a non-application container's logs are present, e.g. `_stream:{service="frontend"}`, and the stream enumeration covers the infra containers. C14 empty while C12 and C13 are healthy = the Vector leg is down |
 | C15 | Log↔trace correlation | `otel.otel_logs` rows with a non-empty `TraceId` > 0 |
 | C16 | Profiling | Pyroscope's `service_name` label values cover the 10 applications (Connect-RPC `LabelValues` with `matchers` and an explicit ms time range); `pyroscope` itself is expected, `auth` must be absent |
@@ -2285,8 +2296,8 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 Any failed row blocks the release tag. **C14** empty while C12 and C13 are
 healthy means the Vector leg is down, not that the services' logging regressed —
 check `vector` per the container-runtime note in Preconditions, recreate the
-stack, and rerun. (C13 used to share that cause; it reads the OTLP leg since
-ADR-060.)
+stack, and rerun. (C13 used to share that cause; since ADR-060/ADR-061 it reads
+ClickHouse.)
 
 Phase C rows print one `Cn OK …` or `Cn FAIL …` verdict each, except the
 enumerations marked "read, not asserted". A row that prints raw data and no
@@ -2366,43 +2377,3 @@ a passing decision, continue with the
 - [Canonical API contracts](../../docs/api/README.md)
 - [Application delivery](../../docs/platform/application-delivery.md)
 - [Agent workflow](../../AGENTS.md#engineering-skills-workflow)
-
-_Last updated: 2026-10-02 — A15 is runnable on compose and passed on Temporal 1.32.0; its header now says so, names the manual fresh-checkout step, and its teardown check expects A10's abandonment watch. Previously 2026-10-01 — A6 no longer calls the auth-service cluster retirement pending: RFC-0024 P5 removed it. Earlier the same day — every Phase C row prints an `OK`/`FAIL` verdict; C13 and C15 had been hidden by VictoriaLogs answers that end without a newline, and C13's notes now describe the OTLP access log. Previously 2026-09-18 — C10 queries `temporal_workflow_completed_total`: ADR-063 (temporalx v0.39.0) renders the SDK counters with `_total`, so the bare name returned no series on the 2026-09-18 pkg-floor audit while the cluster rules and dashboard already used the suffixed name. Previously 2026-08-15 — realigns **Phase B** with the storefront rebuilt by
-RFC-0025: the header's "Sign in" is a link to
-`/login` carrying `?redirect=`, the sign-out control reads "Sign out", and the
-storage assertion now names the legitimate residents (`theme`, and a
-`checkoutIdemKey:<uuid>` during a checkout) while still failing on anything
-JWT-shaped. B3 changes what it asserts, not how strictly: a private route after
-sign-out renders a sign-in prompt **in place** rather than bouncing to `/login`,
-so the row now checks the property that mattered — that no order data from the
-previous session survives — instead of the redirect that used to carry it. A10
-gains a spent-cap row: a promo whose redemptions are used up answers `409
-PROMO_EXHAUSTED`, which it did not before checkout-service 0.7.1. The evidence
-table's Phase A line said `A1–A14 + A16`, three rows behind the audit itself._
-
-_Previously, 2026-08-12 — makes a from-scratch stack recreation mandatory for
-every run and rewrites the two phases that had drifted from reality. **Phase B**
-is rebuilt around the browser's real identity flow: the SPA has no credential
-form, so B1 asserts the redirect to the realm's own login page, that no
-JWT-shaped value exists in either web storage, and the realm claims of the token
-actually in use; B2 observes the keycloak-js pre-emptive refresh inside a bounded
-window using a temporary 60s client-level token lifespan; B3 asserts the
-end-session GET redirect and that no service participates in sign-out. **Phase C**
-grows from 6 rows to 19 so no telemetry leg is sampled by proxy — the edge span as
-the trace root (with the derived `service.name` discovered at runtime), edge→service
-trace continuity, per-service span coverage, spanmetrics, app semconv metrics,
-Temporal SDK metrics, both VictoriaLogs ingest legs with the access-log
-discriminator, log↔trace correlation, profiling, datasource health, and panels
-actually returning data. A3/A4/A5 no longer carry "confirm on the first run"
-placeholders: the `www-authenticate` challenge, realm family revocation, and
-idempotent logout were measured and are asserted. A9 asserts its 201 and A12
-asserts the outbox epoch against the workflow id instead of printing both.
-The gate now runs against local-stack's post-auth-service end state: A6 asserts
-the `auth` DATABASE is gone rather than a table inside it, A7 drops the retired
-`auth/v1/public/login` alias, and the trace/profile coverage sets are the ten
-remaining applications plus the edge (the cluster surface retires in RFC-0024 P5).
-Preconditions carry the podman bring-up (`compose.podman.yaml` — resolved socket,
-`userns_mode: keep-id`, `label=disable`) without which the Vector log leg is
-silently absent. Envoy's admin and proxy Prometheus endpoints, and the collector's
-unpublished gRPC receiver, are documented as out of scope with reasons so nothing
-reads as forgotten._

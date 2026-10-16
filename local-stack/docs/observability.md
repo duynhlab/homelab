@@ -99,7 +99,9 @@ flowchart LR
 Every signal has a home, and the collector fan-out matches the cluster
 (`victorialogs`, `victoriatraces`, `victoriametrics`, `clickhouse`, `debug`).
 The edge is a first-class span producer (its `ingress` span is the trace root —
-audit C2/C3) and contributes its JSON access log through Vector (C13). The
+audit C2/C3), and its JSON access log goes over OTLP to ClickHouse only: the
+collector's `filter/drop_edge_logs` keeps it out of VictoriaLogs, as on the
+cluster (ADR-060, ADR-061; audit C13). The
 scrape column is what makes `up` a real signal here: without it, a dead backend
 only ever showed up as somebody else's export failures. Six static jobs cover
 the engines that cannot push: ClickHouse (`:9363`), the collector's
@@ -153,7 +155,7 @@ Keycloak alert set.
 |---|---|---|---|
 | Which service is slow / erroring? | VictoriaMetrics | `spanmetrics` connector | identical both stacks |
 | Where did a request go? | VictoriaTraces | `otlphttp/victoriatraces` | identical |
-| Full-text log search / correlation | VictoriaLogs | `otlphttp/victorialogs` + Vector | identical sink; edge contributes access logs via Vector only |
+| Full-text log search / correlation | VictoriaLogs | `otlphttp/victorialogs` + Vector | identical sink; edge access logs are ClickHouse-only on both (ADR-061) |
 | Long-retention SQL over logs+traces | ClickHouse | `clickhouse` exporter | **schema owner differs**: local keeps `create_schema: true` (single node, no race to have); the cluster runs `create_schema: false` with a bootstrap Job owning the DDL — RFC-0028. **Storage tier differs too**: compose is PVC-only (no RustFS or MinIO in the stack); the cluster moves `otel_logs` / `otel_traces` parts older than 7 d to RustFS and drops at 90 d. Same columns and keys either way |
 | Continuous profiles | Pyroscope | pushed by services | identical |
 | Is the collector / ClickHouse itself up? | VictoriaMetrics | **vmagent scrape** | cluster: operator CRs · local: static config |
@@ -191,8 +193,8 @@ and local-stack stays single-node with no keeper, a deliberate divergence.
 
 ### 5B. vmagent + vmalert
 
-Two Compose services on the local VM pin (`v1.152.0` — ahead of the cluster's
-operator default `v1.148.0`; see the skew note in
+Two Compose services on the local VM pin (`v1.154.0`, the same tag the cluster
+pins; see the skew note in
 [`docs/observability/README.md`](../../docs/observability/README.md)):
 
 - **vmagent** (`:8429`) scrapes six jobs — `clickhouse:9363`,
@@ -358,8 +360,3 @@ The pinned tag is in
 - [`RFC-0019`](../../docs/proposals/rfc/RFC-0019/) ·
   [`ADR-023`](../../docs/proposals/adr/ADR-023-clickhouse-observability-olap/)
 - [`local-stack/README.md`](../README.md) · [`e2e-audit.md`](e2e-audit.md)
-
-_Last updated: 2026-10-01 — Tempo marked retired on the cluster, the ClickHouse alert counts and the restored InsertsRejected/Failing cluster rules re-read from the manifests, local VM pin v1.152.0, operator chart 0.27.4. Earlier the same day — VictoriaLogs datasource 0.32.0 with the line limit pinned to 50. Earlier: 2026-08-18 — temporal server scrape, VictoriaLogs datasource,
-collector-health + RFC-0021 boards, Gateway-board divergences recorded;
-previously 2026-08-13 — engine-health slice shipped (metrics.xml, vmagent,
-vmalert, ported rules, dual-target dashboard, audit rows C20/C21)._

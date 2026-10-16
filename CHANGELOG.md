@@ -211,8 +211,9 @@ Skeleton (copy what you need):
   (ADR-089).** The five domain ResourceSets set `PGAPPNAME` to the service
   name on the main container and `<name>-migrate` on the `migrate` init
   container; `order-worker` and `checkout-worker` use their own names, and
-  local-stack sets the same values. pgx reads `PGAPPNAME`, so no service code
-  changes. Through PgDog the name replaces `PgDog` on product-db sessions.
+  local-stack sets the same values. Demo seeds run as `<name>-seed` (local-stack
+  and `make seed`), and local-stack's grant jobs as `db-authz`. pgx reads
+  `PGAPPNAME`, so no service code changes. Through PgDog the name replaces `PgDog` on product-db sessions.
   Platform consumers (`db-authz`, Keycloak, Temporal, OpenBAO, pgroles) follow
   later.
 

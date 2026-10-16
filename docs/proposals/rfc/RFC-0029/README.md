@@ -294,6 +294,7 @@ does not change. Confirm with `SHOW application_name` from a pod at rollout.
 | API of each service | domain ResourceSet, main container | `PGAPPNAME: << inputs.name >>` | `user`, `review`, `shipping`, `notification`, `product`, `cart`, `order`, `checkout`, `inventory`, `payment` |
 | Migration of each service | domain ResourceSet, `migrate` init container | `PGAPPNAME: << inputs.name >>-migrate` | `user-migrate` … `payment-migrate` |
 | Workers | `order-worker.yaml`, `checkout-worker.yaml` | `PGAPPNAME` | `order-worker`, `checkout-worker` |
+| Demo seed of each service | `local-stack/compose.yaml` `*-seed`, `scripts/kind-seed.sh` | `PGAPPNAME` | `<name>-seed` |
 | Local-stack | `local-stack/compose.yaml`, per service | `PGAPPNAME` | same values as the cluster |
 | Role catalog Job and CronJob | `platform-db/authz/job.yaml` | `PGAPPNAME` (psql) | `db-authz` |
 | Keycloak | Keycloak Deployment | JDBC URL property `ApplicationName` | `keycloak` |

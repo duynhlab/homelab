@@ -134,7 +134,7 @@ services:
   # duynhlab-platform; redirect URIs point at the localhost dev origins. --import-realm only imports when a realm does not
   # exist yet — `docker compose down -v` re-converges to this state.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    image: quay.io/keycloak/keycloak:26.8.1@sha256:79c623a22abacf3fe6c00a5fb30f5b7843d717b234033b80995891c06116d244
     mem_limit: 1280m
     command: ["start-dev", "--import-realm"]
     environment:

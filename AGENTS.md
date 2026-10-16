@@ -1,23 +1,24 @@
 # AGENTS.md
 
-Source of truth for **repository facts** AI agents need in homelab — layout,
-build commands, admission rules, Flux gotchas, docs conventions. **Operating
-procedure** (role, API trust, domains, RFC/ADR, commits, IDE skill map) lives in
-the project skill:
+Source of truth for **repository facts and shared contribution gates** AI
+agents need in homelab: layout, build commands, admission rules, Flux gotchas,
+documentation conventions, PR workflow and Git/GitHub identity.
 
-**→ [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md)**
+Read [platform-engineer](.agents/skills/platform-engineer/SKILL.md) before any
+non-trivial task for operating procedure, API trust, domain routing and
+RFC/ADR decisions. For commit messages and branch names, follow the skill
+routing in [Contribution workflow](#contribution-workflow).
 
-Read that skill before any non-trivial task. Generic workflows
-([addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)) stay in
-the agent IDE; **this repo's platform-engineer skill** lives under
-`.agents/skills/` (Agent Skills standard — Cursor reads it natively, Claude Code
-through the `.claude/skills/platform-engineer` symlink; one file, no copies).
+Repository skills live under `.agents/skills/`; Claude Code discovers them
+through matching `.claude/skills/` symlinks. Keep one source per skill.
+Generic IDE skills supplement these instructions; repository conventions
+take precedence when they differ.
 
 This repo (`homelab`) is the platform's **Infrastructure, GitOps,
 Observability, and Docs** hub; application code lives in separate repos — see
 [`docs/README.md` § Repositories](docs/README.md#repositories). API contracts:
 [`docs/api/README.md`](docs/api/README.md) (trust over service-repo READMEs;
-details in the skill, not duplicated here).
+details in platform-engineer, not duplicated here).
 
 ## Project overview
 
@@ -142,17 +143,11 @@ Every manifest applied to the cluster must satisfy admission:
 
 ## Contribution workflow
 
-**Commits**
-
-- **No attribution trailers** (`Signed-off-by`, `Co-authored-by`, `Assisted-by`,
-  `Generated-by`, etc.).
-- **Subject:** ≤50 chars, capitalised, imperative, no trailing period.
-- **Body:** what + why, wrap 72; no `Fixes #123` or @-mentions in commits.
-
-**Branches**
+When writing or reviewing commit messages, squash messages, or branch names,
+read [the git-commits skill](.agents/skills/git-commits/SKILL.md), the source
+of truth for their conventions.
 
 - **Never push to `main`.** Branch → PR → squash-merge.
-- Prefix: `feat/` `fix/` `chore/` `docs/` `refactor/` `ci/`.
 - `git config user.email` = duynhlab identity; **`gh auth switch --user duynhne`**
   for PRs.
 
@@ -282,6 +277,7 @@ reference style.
 | Topic | Start here |
 |-------|-----------|
 | Agent operating procedure | [`.agents/skills/platform-engineer/SKILL.md`](.agents/skills/platform-engineer/SKILL.md) |
+| Commit messages and branch names | [git-commits](.agents/skills/git-commits/SKILL.md) |
 | Docs index | [`docs/README.md`](docs/README.md) |
 | Setup / commands | [`docs/platform/setup.md`](docs/platform/setup.md) |
 | API (shared rules and service contracts) | [`docs/api/api.md`](docs/api/api.md), [`docs/api/README.md`](docs/api/README.md#service-contracts) |

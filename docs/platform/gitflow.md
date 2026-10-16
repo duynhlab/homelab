@@ -1,5 +1,10 @@
 # Git Branching & Release Standard
 
+> **Working in homelab:** use the [git-commits skill](../../.agents/skills/git-commits/SKILL.md)
+> for commit messages and branch names, and [AGENTS.md](../../AGENTS.md#contribution-workflow)
+> for the current PR workflow. The `feature/` branches and Conventional Commits
+> examples below belong to the microservice target model, not homelab conventions.
+
 > **Deployed vs target:** This document defines the **org-wide branching policy** for
 > microservice repos. **Today:** homelab runs a single **Kind local** cluster
 > (`kubernetes/clusters/local/`); `kubernetes/clusters/production/` is a stub — no prod
@@ -637,7 +642,11 @@ EOF
 
 ## 8. Commit Message Convention
 
-Use [Conventional Commits](https://www.conventionalcommits.org/) for automated changelog and version detection:
+For homelab, use [git-commits](../../.agents/skills/git-commits/SKILL.md).
+
+The microservice **target model** uses Conventional Commits for automated
+changelog and version detection. The format and version impacts below describe
+that target; they do not establish current release automation in homelab:
 
 ```
 <type>(<scope>): <description>

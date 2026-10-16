@@ -96,9 +96,11 @@ spec:
         - {name: MG_USER, valueFrom: {secretKeyRef: {name: $cluster-$svc-migrator-secret, key: username}}}
         - {name: MG_PASS, valueFrom: {secretKeyRef: {name: $cluster-$svc-migrator-secret, key: password}}}
 EOF
-  kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$pod" -n "$ns" --timeout=120s >/dev/null 2>&1
-  local out rows=0
+  # 300s: on a fresh cluster the first probe also pulls the image.
+  kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$pod" -n "$ns" --timeout=300s >/dev/null 2>&1
+  local out rows=0 phase
   out=$(kubectl logs "pod/$pod" -n "$ns" 2>/dev/null)
+  phase=$(kubectl get "pod/$pod" -n "$ns" -o jsonpath='{.status.phase} {.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null)
   kubectl delete "pod/$pod" -n "$ns" --wait=false >/dev/null 2>&1
 
   local tag name verdict rest
@@ -109,7 +111,7 @@ EOF
     [ "$verdict" = PASS ] || FAIL=1
   done <<<"$out"
   if [ "$rows" -ne "$EXPECTED_CHECKS" ]; then
-    printf "FAIL  %-8s parsed %s checks, expected %s\n" "$svc" "$rows" "$EXPECTED_CHECKS"
+    printf "FAIL  %-8s parsed %s checks, expected %s (pod: %s)\n" "$svc" "$rows" "$EXPECTED_CHECKS" "${phase:-gone}"
     FAIL=1
   fi
 }

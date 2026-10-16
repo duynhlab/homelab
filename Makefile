@@ -110,22 +110,27 @@ e2e: e2e-saga e2e-smoke e2e-staff e2e-operator ## Run the k6 gate suite (set GAT
 
 .PHONY: e2e-smoke
 e2e-smoke: ## Functional + telemetry rows as checks with thresholds
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/smoke.js
 
 .PHONY: e2e-saga
 e2e-saga: ## An order completes, Pinned, on the Current build id
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/saga.js
 
 .PHONY: e2e-session
 e2e-session: ## Refresh rotation, reuse detection, logout (compose A4/A5)
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/session.js
 
 .PHONY: e2e-staff
 e2e-staff: ## The /protected/ Backoffice surface (compose A17-A19, A21)
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/staff.js
 
 .PHONY: e2e-operator
 e2e-operator: ## Operator resolve of a parked order (compose A20)
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/operator.js
 
 .PHONY: e2e-conformance
@@ -152,18 +157,22 @@ semconv-catalog-check: ## docs/api/logs.md event catalog == the registry's (name
 
 .PHONY: e2e-observability
 e2e-observability: ## Datasources, dashboards, panel path, scrape targets (compose C17-C20)
+	@mkdir -p scripts/k6/out
 	GATE=compose k6 run scripts/k6/observability.js
 
 .PHONY: e2e-ratelimit
 e2e-ratelimit: ## Drive under and over the edge ceiling; 429 must be well-formed
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/ratelimit.js
 
 .PHONY: e2e-load
 e2e-load: ## Order load; reports the Temporal backlog it built
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/load.js
 
 .PHONY: e2e-restock
 e2e-restock: ## Top demo stock back up to the seed baseline (make seed cannot -- ON CONFLICT DO NOTHING)
+	@mkdir -p scripts/k6/out
 	GATE=$(E2E_GATE) k6 run scripts/k6/restock.js
 
 .PHONY: db-isolation

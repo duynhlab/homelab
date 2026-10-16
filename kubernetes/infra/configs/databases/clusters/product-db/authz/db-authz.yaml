@@ -1,0 +1,69 @@
+# db_authz: the login that applies database authorization (ADR-088). It holds
+# no attribute of its own; it SET ROLEs to authz_admin (bootstrap SQL in
+# instance.yaml), which creates and administers every catalog role. One per
+# cluster; same shape as platform-db/authz/db-authz.yaml.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-db-authz-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-db-authz-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-db-authz-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-db-authz-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/db-authz
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/db-authz
+        property: password
+---
+# inRoles never grows: catalog memberships belong to authz_admin, which CNPG
+# does not manage, so CNPG never revokes them.
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-db-authz
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: db_authz
+  comment: "Applies database authorization as authz_admin (ADR-088)"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  # The Job (one session) plus the pgroles operator's pooled connections, one
+  # pool per PostgresPolicy.
+  connectionLimit: 10
+  inRoles: [authz_admin]
+  passwordSecret:
+    name: product-db-db-authz-secret
+  databaseRoleReclaimPolicy: retain

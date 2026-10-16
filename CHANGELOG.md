@@ -211,6 +211,32 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **product and inventory move to the owner / migrator / runtime split
+  (RFC-0029 product-db wave 1, ADR-088).** product-db gets the platform-db
+  shape:
+  - `authz_admin` in the bootstrap SQL and a `db_authz` login.
+  - A role catalog Job + CronJob (`product-db/authz/`), sharing platform-db's
+    `apply.sh` and `roles.sql`, with `PGHOST` picking the cluster.
+  - One pgroles policy per service, with host `product-db-rw.product.svc`.
+  - Runtime and migrator ExternalSecrets seeded per cluster in OpenBAO, and
+    `Database` objects owned by `<svc>_owner`.
+  - `pg_hba` lines for the runtime, migrator and `db_authz`, and a
+    `pgroles-system` network policy.
+  - Guard queries for the role membership and role config, and default
+    privileges in both databases. The `*GuardMissing` alerts now name the
+    cluster they fire for.
+
+  PgDog lists `product_runtime` and `inventory_runtime` (ADR-014 indices kept),
+  and both services read `db_runtime_secret` / `db_migrator_secret`. The
+  bootstrap database keeps its name `product`; its initdb role `product` is now
+  NOLOGIN with no `pg_hba` line, and CNPG hands the database to
+  `product_owner`. `db-authz-check.sh`, the isolation sweep, `smoke.js` K3.7 and
+  local-stack (`init.sql`, `product-authz` / `inventory-authz`, A23) cover the
+  two services. The database topology diagram now shows PgDog as primary-only
+  and the authorization executors. product moves to `1.16.2`, whose migration
+  000006 checks the table ACL instead of effective privilege (product-service#241),
+  which the split needs.
+
 - **Platform clients name themselves too (ADR-089).** The role catalog Job and
   CronJob run as `db-authz` (`PGAPPNAME`), `db-authz-check` as `db-authz-check`,
   Keycloak as `keycloak` (`ApplicationName` in the JDBC URL, also in local-stack),

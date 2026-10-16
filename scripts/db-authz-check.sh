@@ -21,15 +21,18 @@ IMAGE="ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
 # converted.
 declare_service() {
   local pdb="platform-db platform platform-db-rw.platform.svc.cluster.local"
+  local rdb="product-db product product-db-rw.product.svc.cluster.local"
   case "$1" in
     review)       echo "$pdb reviews denied" ;;
     user)         echo "$pdb user_profiles ok" ;;
     shipping)     echo "$pdb shipments ok" ;;
     notification) echo "$pdb notifications ok" ;;
+    product)      echo "$rdb products ok" ;;
+    inventory)    echo "$rdb inventory_balances ok" ;;
     *) return 1 ;;
   esac
 }
-CONVERTED=(review user shipping notification)
+CONVERTED=(review user shipping notification product inventory)
 EXPECTED_CHECKS=12
 FAIL=0
 

@@ -57,11 +57,22 @@ spec:
     # exception to "never touch instance.yaml" — HBA is cluster infra).
     pg_hba:
       - hostssl payment payment all scram-sha-256
-      - host    product product all scram-sha-256
+      # Converted services (RFC-0029): each database admits its runtime and
+      # migrator only; <svc>_owner never logs in, and the bootstrap role
+      # `product` has no line at all.
+      - host    product   product_runtime    all scram-sha-256
+      - host    product   product_migrator   all scram-sha-256
+      - host    inventory inventory_runtime  all scram-sha-256
+      - host    inventory inventory_migrator all scram-sha-256
+      # db_authz applies the role catalog in `postgres` and each converted
+      # database's grants, as the Job or as pgroles (ADR-088). One line per
+      # database it manages.
+      - host    postgres  db_authz all scram-sha-256
+      - host    product   db_authz all scram-sha-256
+      - host    inventory db_authz all scram-sha-256
       - host    cart    cart    all scram-sha-256
       - host    order   order   all scram-sha-256
       - host    checkout checkout all scram-sha-256
-      - host    inventory inventory all scram-sha-256
       - host    all     all     all reject
 
     synchronous:
@@ -179,6 +190,8 @@ spec:
 
   bootstrap:
     initdb:
+      # The bootstrap role `product` is NOLOGIN and owns nothing once the
+      # Database CR hands `product` to product_owner (services/product.yaml).
       database: product
       owner: product
       secret:
@@ -188,6 +201,12 @@ spec:
       encoding: "UTF8"
       localeCType: "C"
       localeCollate: "C"
+      postInitSQL:
+        # Creator of every catalog role (ADR-088). Unmanaged by CNPG on purpose:
+        # CNPG revokes undeclared memberships of the roles it manages, and this
+        # role is a member of every role it creates. db_authz reaches it via SET
+        # ROLE. An existing cluster runs this once by hand (runbook).
+        - CREATE ROLE authz_admin NOLOGIN CREATEROLE INHERIT
 
   # Roles live in per-service DatabaseRole CRs under services/ (RFC-0012,
   # ADR-013) — do not re-add an inline managed.roles entry except as the

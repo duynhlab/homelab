@@ -1,17 +1,117 @@
-# product — per-service database triplet (RFC-0012, ADR-013).
+# product — runtime login + database (RFC-0029, ADR-084, ADR-088).
+# product_owner and product_migrator are created by the role catalog Job
+# (../authz), which also reads the migrator Secret below; its pgroles policy
+# (../authz/policies/product.yaml) owns the grants; CNPG keeps the runtime
+# login and the Database. Conventions: docs/databases/authorization.md.
 #
-# product is special in exactly one way: its Secret and role/database are
-# ALSO what bootstrap.initdb (instance.yaml) uses on a fresh cluster. The
-# initdb fields are structural placeholders; this triplet adopts the
-# initdb-created role and database declaratively, so a from-scratch build
-# and a backup restore converge to the same state. The DatabaseRole and
-# bootstrap.initdb.secret MUST keep pointing at the SAME Secret
-# (product-db-secret) — two sources for one password would fight.
-#
-# ExternalSecret for product-db bootstrap credentials (product DB owner).
-# OpenBAO path: secret/data/local/databases/product-db/product
-# basic-auth: required by CNPG bootstrap/app secrets and the DatabaseRole;
-# also feeds the PgDog valuesFrom (users[0]).
+# product is also the cluster's bootstrap database: bootstrap.initdb
+# (instance.yaml) creates database `product` owned by role `product` from
+# product-db-secret. That role is bootstrap-only now: NOLOGIN, no pg_hba line,
+# and the Database CR below hands the database to product_owner. The
+# DatabaseRole and bootstrap.initdb.secret keep pointing at the SAME Secret, or
+# two sources for one password would fight.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-product-runtime-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-product-runtime-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-product-runtime-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-product-runtime-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/product-runtime
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/product-runtime
+        property: password
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-product-migrator-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-product-migrator-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-product-migrator-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-product-migrator-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/product-migrator
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/product-migrator
+        property: password
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: product-db-role-product-runtime
+  namespace: product
+spec:
+  cluster:
+    name: product-db
+  name: product_runtime
+  comment: "product: the service; CRUD only"
+  login: true
+  superuser: false
+  createdb: false
+  createrole: false
+  inherit: true
+  replication: false
+  bypassrls: false
+  connectionLimit: -1
+  inRoles: []
+  passwordSecret:
+    name: product-db-product-runtime-secret
+  databaseRoleReclaimPolicy: retain
+---
+# product-db-secret: bootstrap.initdb's owner credential (instance.yaml).
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -52,8 +152,8 @@ spec:
         property: password
 ---
 # Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
-# Adopts the role initdb created; CNPG's app-secret sync and this CR read
-# the same Secret, so they can never disagree.
+# Adopts the role initdb created and keeps it unable to log in: it owns nothing
+# once the Database CR moves the database to product_owner.
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
@@ -63,8 +163,8 @@ spec:
   cluster:
     name: product-db
   name: product
-  comment: "product-service application role (RFC-0012)"
-  login: true
+  comment: "Bootstrap owner of the initdb database only; never logs in (RFC-0029)"
+  login: false
   superuser: false
   createdb: false
   createrole: false
@@ -77,7 +177,9 @@ spec:
     name: product-db-secret
   databaseRoleReclaimPolicy: retain
 ---
-# Product Database extensions (moved from extensions.yaml).
+# product_owner owns the database, which on PostgreSQL 15+ is what gives it
+# CREATE on the public schema. CNPG retries until the catalog Job creates it,
+# then reassigns the initdb-created database from the bootstrap role.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
@@ -85,7 +187,7 @@ metadata:
   namespace: product
 spec:
   name: product
-  owner: product
+  owner: product_owner
   cluster:
     name: product-db
   extensions:

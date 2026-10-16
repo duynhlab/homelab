@@ -44,15 +44,21 @@ spec:
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="shipping_migrator", parent="shipping_owner"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="notification_migrator", parent="notification_owner"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="db_authz", parent="authz_admin"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="product_migrator", parent="product_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="inventory_migrator", parent="inventory_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="db_authz", parent="authz_admin"})
       for: 15m
       labels:
         severity: warning
-        cnpg_cluster: platform-db
+        # absent() keeps the equality matchers as labels, so each firing series
+        # names its own cluster.
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
       annotations:
-        summary: Role membership guard is not reporting (platform-db)
+        summary: Role membership guard is not reporting ({{ $labels.cnpg_io_cluster }})
         description: >-
           cnpg_pg_role_membership_drift has no series for {{ $labels.member }} →
-          {{ $labels.parent }} on platform-db, so drift on that edge would go unseen.
+          {{ $labels.parent }} on {{ $labels.cnpg_io_cluster }}, so drift on that
+          edge would go unseen.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGRoleMembershipGuardMissing.md"
     - alert: CNPGRoleConfigDrift
       expr: max by (cnpg_io_cluster, role) (cnpg_pg_role_config_drift) > 0
@@ -100,13 +106,21 @@ spec:
         or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="notification", objtype="r"})
         or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="notification", objtype="S"})
         or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="platform-db", datname="notification", objtype="f"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="product_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="inventory_migrator"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="product", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="product", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="product", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="f"})
       for: 15m
       labels:
         severity: warning
-        cnpg_cluster: platform-db
+        cnpg_cluster: "{{ $labels.cnpg_io_cluster }}"
       annotations:
-        summary: Database authorization guard is not reporting (platform-db)
+        summary: Database authorization guard is not reporting ({{ $labels.cnpg_io_cluster }})
         description: >-
           A pg_role_config or pg_default_privileges series is missing on
-          platform-db, so drift there would go unseen.
+          {{ $labels.cnpg_io_cluster }}, so drift there would go unseen.
         runbook_url: "https://github.com/duynhlab/homelab/blob/main/docs/observability/runbooks/postgresql/CNPGAuthorizationGuardMissing.md"

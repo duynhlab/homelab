@@ -1151,7 +1151,8 @@ audit_curl -s -o /dev/null -w '%{http_code}\n' \
   -H "Authorization: Bearer $KCT_STAFF"   # 400
 
 # A23. THE SPLIT SERVICES' THREE DATABASE ROLES (RFC-0029, ADR-088,
-#      docs/databases/authorization.md): review, user, shipping, notification.
+#      docs/databases/authorization.md): review, user, shipping, notification,
+#      product, inventory.
 #      Run as the real logins over TCP (password auth), not as postgres: the
 #      runtime reads but cannot change the schema; the migrator IS the owner
 #      from login (role=, set by the platform) and stays the owner after RESET
@@ -1163,7 +1164,8 @@ a23() { # $1 database, $2 login, $3 SQL
   docker compose exec -T postgres psql -qAtX -v ON_ERROR_STOP=1 \
     "host=127.0.0.1 dbname=$1 user=$2 password=$2-local" -c "$3" 2>&1 </dev/null | head -1
 }
-for st in review:reviews user:user_profiles shipping:shipments notification:notifications; do
+for st in review:reviews user:user_profiles shipping:shipments notification:notifications \
+          product:products inventory:inventory_balances; do
   S=${st%%:*} T=${st##*:}
   echo "A23 $S runtime reads:          $(a23 $S ${S}_runtime "SELECT count(*) >= 0 FROM $T")"       # t
   echo "A23 $S runtime CREATE:         $(a23 $S ${S}_runtime 'CREATE TABLE a23 (i int)')"             # permission denied for schema public
@@ -1185,8 +1187,8 @@ docker compose exec -T postgres psql -U postgres -qAtX -F' ' -c \
    WHERE backend_type = 'client backend' AND usename NOT IN ('postgres', 'temporal', 'keycloak')
    GROUP BY 1, 2, 3 ORDER BY 1"
 # user user_runtime user · review review_runtime review · shipping shipping_runtime shipping
-# notification notification_runtime notification · product, cart, inventory, order,
-# checkout, payment as <svc> on <svc> · order-worker order order · checkout-worker
+# notification notification_runtime notification · product product_runtime product ·
+# inventory inventory_runtime inventory · cart, order, checkout, payment as <svc> on <svc> · order-worker order order · checkout-worker
 # checkout checkout. No row with an empty first column.
 for c in $(docker compose ps -a --format '{{.Name}}' | grep -E -- '-(migrate|seed|authz)-1$'); do
   echo "A24 $c $(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$c" | grep '^PGAPPNAME=')"
@@ -2258,7 +2260,7 @@ make -C .. e2e-conformance          # from homelab/: stops Weaver, saves the rep
 | A20 | Operator resolve (train 7 / ADR-051) | a real declined refund (total's cents `07`) parks the order in **`manual_review`** through the cancellation compensation, not through SQL; the case view carries `version`, the payment/reservation/shipment truths and the transition history, with `degraded` listing only what actually failed; a customer token is **401 wrong-issuer at the edge** on the command; an empty note and a reason from another command's vocabulary are both **400**; an illegal target is **409 `INVALID_TRANSITION`**; a version the order is not at is **409 `VERSION_CONFLICT`**; the decision itself is **201 `applied:true`**, an identical retry **200 `applied:false`** with no second history row, and a further resolve **409** (no longer parked); the `OPERATOR` history row carries `WRITTEN_OFF`, the note, and duyne's staff subject **even though the body named another actor** |
 | A21 | Untracked SKU is a conflict, not an outage (ADR-053) | a published product with NO balance row carts fine, and session create answers **flat `409 ITEM_NOT_ORDERABLE`** with **no `Retry-After`** and an opaque body (the SKU ids stay in the log/span); after an operator receipt the SAME basket creates a session — the operator fix, not a retry, is what clears the state. The confirm arm's 409-with-requoted-session envelope is pinned by checkout-service's own contract tests on the same commit |
 | A22 | The attention cards' six reads (RFC-0023) | the five count queries the portal dashboard issues each answer **200** with a **numeric `total_items`** (zero is a legitimate count; a missing or non-numeric field is not), the recent-orders panel honours `page_size=5`, and a status order-service does not know is **400** — which is what proves the `manual_review` and `cancelling` cards are genuinely filtered rather than both reporting the total order count |
-| A23 | The split services' three database roles (RFC-0029) | for each of review, user, shipping and notification: as `<svc>_runtime`, reads its table, and `CREATE`, `DROP`, `SET ROLE <svc>_owner` and reading `schema_migrations` are each **refused**; as `<svc>_migrator` with no `SET ROLE` anywhere: `current_user` is `<svc>_owner` at login **and after `RESET ROLE`**, and `CREATE` succeeds; **0** relations in `public` owned by anyone but `<svc>_owner` |
+| A23 | The split services' three database roles (RFC-0029) | for each of review, user, shipping, notification, product and inventory: as `<svc>_runtime`, reads its table, and `CREATE`, `DROP`, `SET ROLE <svc>_owner` and reading `schema_migrations` are each **refused**; as `<svc>_migrator` with no `SET ROLE` anywhere: `current_user` is `<svc>_owner` at login **and after `RESET ROLE`**, and `CREATE` succeeds; **0** relations in `public` owned by anyone but `<svc>_owner` |
 | A24 | Every client names itself (ADR-089) | `pg_stat_activity` shows each of the 10 services under its own name and role, plus `order-worker` and `checkout-worker`, with **no** application session left unnamed; every `*-migrate`, `*-seed` and `*-authz` container ran with `PGAPPNAME` `<svc>-migrate`, `<svc>-seed` and `db-authz` |
 | B1 | Login through the realm | the sign-in button changes the ORIGIN to `localhost:8081` and the credentials are typed on Keycloak's page; back on the SPA the header shows signed-in state (Products, Orders, Profile, Sign out) and the URL carries no `page` param; **no JWT-shaped value in localStorage or sessionStorage** — a `theme` preference and a `checkoutIdemKey:<uuid>` are legitimate residents, a JWT-shaped value is not; the code-exchange response carries the refresh token and its access token has `iss=http://localhost:8081/realms/duynhlab` with a string UUID `sub` |
 | B2 | Adapter refresh | with a 60s client-level token lifespan, driving a private page after the token is due produces **exactly one** `POST …/openid-connect/token` with `grant_type=refresh_token` (the one `authorization_code` grant from a full page load's check-sso is expected and not counted); every `:8080` call 200; no bounce to `/login`; **the lifespan override is restored** |

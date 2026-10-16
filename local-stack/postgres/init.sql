@@ -8,18 +8,17 @@ DO $$
 DECLARE
   r text;
 BEGIN
-  FOREACH r IN ARRAY ARRAY['product','cart','order','payment','checkout',
-                           'inventory','keycloak','temporal'] LOOP
+  FOREACH r IN ARRAY ARRAY['cart','order','payment','checkout',
+                           'keycloak','temporal'] LOOP
     EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
                    r, r || '-local');
   END LOOP;
 END $$;
 
-CREATE DATABASE product OWNER product;
 CREATE DATABASE cart OWNER cart;
 CREATE DATABASE "order" OWNER "order";
--- review, user, shipping and notification use the owner / migrator / runtime
--- split (RFC-0029, ADR-088, docs/databases/authorization.md). This file plays
+-- review, user, shipping, notification, product and inventory use the owner /
+-- migrator / runtime split (RFC-0029, ADR-088, docs/databases/authorization.md). This file plays
 -- the platform: the owner owns the database and never logs in; the migrator
 -- becomes the owner at login (role=), so the service runs no SET ROLE; the
 -- runtime gets CRUD through the owner's default privileges, applied after the
@@ -28,7 +27,7 @@ DO $$
 DECLARE
   s text;
 BEGIN
-  FOREACH s IN ARRAY ARRAY['review','user','shipping','notification'] LOOP
+  FOREACH s IN ARRAY ARRAY['review','user','shipping','notification','product','inventory'] LOOP
     EXECUTE format('CREATE ROLE %I NOLOGIN', s || '_owner');
     EXECUTE format('CREATE ROLE %I LOGIN NOINHERIT PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
                    s || '_migrator', s || '_migrator-local');
@@ -43,9 +42,10 @@ CREATE DATABASE review OWNER review_owner;
 CREATE DATABASE "user" OWNER user_owner;
 CREATE DATABASE shipping OWNER shipping_owner;
 CREATE DATABASE notification OWNER notification_owner;
+CREATE DATABASE product OWNER product_owner;
+CREATE DATABASE inventory OWNER inventory_owner;
 CREATE DATABASE payment OWNER payment;
 CREATE DATABASE checkout OWNER checkout;
-CREATE DATABASE inventory OWNER inventory;
 -- Keycloak's store (RFC-0024 P3). Mirrors the cluster, where CNPG postInitSQL
 -- creates the `keycloak` database on platform-db; tables inside are managed by
 -- Keycloak itself on first start.
@@ -68,3 +68,5 @@ GRANT CONNECT ON DATABASE review TO review_runtime, review_migrator;
 GRANT CONNECT ON DATABASE "user" TO user_runtime, user_migrator;
 GRANT CONNECT ON DATABASE shipping TO shipping_runtime, shipping_migrator;
 GRANT CONNECT ON DATABASE notification TO notification_runtime, notification_migrator;
+GRANT CONNECT ON DATABASE product TO product_runtime, product_migrator;
+GRANT CONNECT ON DATABASE inventory TO inventory_runtime, inventory_migrator;

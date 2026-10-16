@@ -33,6 +33,15 @@ spec:
           port: 8000
         - protocol: TCP
           port: 5432
+    # pgroles operator (pgroles-system) → product-db primary to apply the
+    # PostgresPolicies that own in-database grants (ADR-088).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: pgroles-system
+      ports:
+        - protocol: TCP
+          port: 5432
     # Metrics scrape (VMAgent, monitoring ns) → cnpg postgres_exporter (9187)
     # + PgDog pooler openmetrics (9090).
     - from:

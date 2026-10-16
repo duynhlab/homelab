@@ -34,11 +34,12 @@ spec:
     remediation:
       retries: 3
   # Indices are positional against values.users below — keep both lists in
-  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment,
-  # [4]=checkout, [5]=inventory.
+  # the same order: [0]=product_runtime, [1]=cart, [2]=order, [3]=payment,
+  # [4]=checkout, [5]=inventory_runtime. A converted service (RFC-0029) pools
+  # its <svc>_runtime login; its migrator never goes through PgDog.
   valuesFrom:
     - kind: Secret
-      name: product-db-secret
+      name: product-db-product-runtime-secret
       valuesKey: password
       targetPath: "users[0].password"
     - kind: Secret
@@ -58,7 +59,7 @@ spec:
       valuesKey: password
       targetPath: "users[4].password"
     - kind: Secret
-      name: product-db-inventory-secret
+      name: product-db-inventory-runtime-secret
       valuesKey: password
       targetPath: "users[5].password"
   values:
@@ -117,7 +118,7 @@ spec:
     # Passwords injected per-user by spec.valuesFrom (order must match the
     # targetPath indices above).
     users:
-      - name: product
+      - name: product_runtime
         database: product
       - name: cart
         database: cart
@@ -127,7 +128,7 @@ spec:
         database: payment
       - name: checkout
         database: checkout
-      - name: inventory
+      - name: inventory_runtime
         database: inventory
 
     # The chart ships both probes commented out, so the pooler ran with none

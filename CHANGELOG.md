@@ -550,6 +550,13 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The DR replica's daily backup is no longer `immediate`** (#1285). A new
+  `product-db-replica` turns Ready while it is still replaying the source's WAL,
+  and the immediate backup's `pg_backup_start` was cancelled by the recovery
+  conflict, raising `PostgresBackupFailed` (critical) for about an hour on a
+  fresh bring-up. The first base backup is now the 03:30 run; the bootstrap
+  runbook shows how to take one by hand once replay has caught up.
+
 - **The committed `vault_rotator` database password is removed from current
   manifests and replaced with one random value per cluster.** Fresh OpenBAO
   bootstrap writes the value to KV; ESO projects one reload-labelled
@@ -562,6 +569,10 @@ Skeleton (copy what you need):
   credential to fail. The retained Job is force-replaced only after CNPG
   observes the new Secret revision; repository state alone does not claim that
   live revocation has happened.
+
+#### Services
+
+- **mockpay runs without a CPU limit** (was 50m), as the rest of the platform.
 
 #### Local-stack
 
@@ -601,6 +612,14 @@ Skeleton (copy what you need):
   credential comes from** (`docs/secrets/openbao.md`): the per-cluster KV value,
   its ESO Secret, the CNPG `DatabaseRole` and the configurator Job that reads it
   — the path #989 introduced, which the prose already described.
+
+#### CI
+
+- **Smoke K5.8 recognises a mockpay restart** (#1209). mockpay's ledger is in
+  memory, so a restart makes `PaymentReconciliationDiscrepancy` fire for about
+  an hour on `missing_provider` alone. K5.8 no longer counts it when every
+  discrepancy in the window is `missing_provider` and mockpay started at least
+  5 minutes after payment; the alert itself is unchanged.
 
 ### Dependency
 

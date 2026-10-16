@@ -136,7 +136,8 @@ spec:
         cpu: "10m"
       limits:
         memory: "64Mi"
-        cpu: "50m"
+        # No CPU limit, as elsewhere (victoriametrics/vmagent.yaml). Omit the key:
+        # the chart has no default, so `cpu: null` would render a limit of 0.
     livenessProbe:
       httpGet:
         path: /health

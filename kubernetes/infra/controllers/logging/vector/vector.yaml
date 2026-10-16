@@ -539,6 +539,8 @@ spec:
     resources:
       limits:
         # 200m: 50m throttled continuously (KubePodCPUThrottlingHigh, audit).
+        # Keep a limit: without one, catch-up reads ran at 2 CPU and OOMKilled
+        # the pod at 512Mi in a loop (Kind, 2026-10-17); it paces the backlog.
         cpu: 200m
         # 512Mi: at 256Mi three of four pods OOMKilled during a fresh bring-up
         # (2026-09-30), peaking at 220-245 MiB while the in-memory sink buffers

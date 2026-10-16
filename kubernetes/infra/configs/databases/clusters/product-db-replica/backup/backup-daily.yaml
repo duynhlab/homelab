@@ -14,6 +14,10 @@
 #
 # Once daily only: this is a spare, not the system of record. The primary's
 # schedule is what the recovery window is sized around.
+#
+# immediate: false. A new DR cluster is still replaying the source's WAL when it
+# turns Ready, and an immediate backup's pg_backup_start is cancelled by that
+# recovery conflict (#1285). The first base backup is the 03:30 run.
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
@@ -29,7 +33,7 @@ spec:
     name: product-db-replica
   target: primary
   backupOwnerReference: self
-  immediate: true
+  immediate: false
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io

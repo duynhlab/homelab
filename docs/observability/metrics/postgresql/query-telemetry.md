@@ -17,7 +17,7 @@ what is captured, how it flows, what it costs, and how to operate it.
 | Loss model | ClickHouse unreachable: events **wait in the ring** and are dropped once it is full (8192 slots ≈ 7–15 min of Kind traffic). ClickHouse reachable but rejecting the insert: that batch is **lost**. Never retried by the server, never back-pressure on PostgreSQL |
 | Cost on PostgreSQL | ~2 % CPU in the extension; up to ~11 % TPS on a lock-heavy pgbench (upstream, 32 clients); shared memory ≈ `queue_capacity` × ~520 B + `string_area_size`, i.e. 20 MB per instance here (`pg_shmem_allocations`) |
 | Health | `cnpg_pg_stat_ch_*` (custom query) → `PgStatChExportFailing`, `PgStatChDroppingEvents`, `PgStatChNotExporting` |
-| Dashboard | `postgresql-query-telemetry` (Databases folder) — Go in `duynhlab/grafana-dashboards`, delivered by the as-code OCI artifact (≥ 0.6.0), the first board on the logical `clickhouse` datasource |
+| Dashboard | `postgresql-query-telemetry` (Databases folder) — Go in `duynhlab/grafana-dashboards`, delivered by the as-code OCI artifact (≥ 0.7.0, which reads `application_name`), the first board on the logical `clickhouse` datasource |
 | Not covered | plan capture (use auto_explain), statements on the DR replica, local-stack (its Postgres is Alpine/musl; the release binary is glibc) |
 
 ## What one event holds

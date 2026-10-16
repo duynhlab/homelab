@@ -97,7 +97,11 @@ Skeleton (copy what you need):
   the client name as upstream's `app`, which is now an `EPHEMERAL` column, so
   `events_raw`, `db_app_user_1m` and `errors_recent` store and expose it as
   `application_name`. Any query that reads `app` fails. Fresh-only: Kind
-  rebuilds the store, so there is no migration.
+  rebuilds the store, so there is no migration. The as-code dashboards move to
+  `0.7.0` in the same change: its query-telemetry board reads
+  `application_name`, lists its variables from the 90-day rollup, hides PgDog's
+  and Barman's sessions under *Workload only*, and adds a table of roles whose
+  statements arrive without a name.
 
 ### Feature
 

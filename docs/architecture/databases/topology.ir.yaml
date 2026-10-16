@@ -5,8 +5,8 @@
 # the PgDog HelmRelease (primary only, ADR-089) and PgBouncer Pooler,
 # configs/databases/clusters/*/authz/ (role catalog Job + CronJob, pgroles policies),
 # controllers/keycloak/deployment.yaml, controllers/temporal/helmrelease.yaml and
-# platform-db/{openbao-db-config,vault-rotator}.yaml. 2026-10-16 (RFC-0029 wave 2,
-# configured, not yet run on Kind): payment's runtime goes through PgDog with
+# platform-db/{openbao-db-config,vault-rotator}.yaml. 2026-10-16 (RFC-0029 wave 2):
+# payment's runtime goes through PgDog with
 # client TLS (product-db/poolers/certificate.yaml, sslmode=require).
 diagram:
   id: databases
@@ -39,10 +39,11 @@ boundaries:
 
 nodes:
   # Listed in the order dot starts from: the fewest crossings of ~600
-  # orderings measured with validate.py on 2026-09-28; c_authz first was the
-  # best of its 7 positions (2026-10-16, 11 crossings).
-  - {id: c_authz, label: "Authorization executors\nauthz Job + CronJob per cluster\npgroles · as db_authz", role: platform, layer: clients, parent: f_clients}
+  # orderings measured with validate.py on 2026-09-28. With payment on PgDog,
+  # all 5040 client orders were measured (2026-10-16): 14 crossings is the
+  # floor, and this is that order.
   - {id: c_temporal, label: "Temporal server (temporal)\ntemporal · temporal_visibility", role: platform, layer: clients, parent: f_clients, icon: temporal}
+  - {id: c_authz, label: "Authorization executors\nauthz Job + CronJob per cluster\npgroles · as db_authz", role: platform, layer: clients, parent: f_clients}
   - {id: c_migrate, label: "Migration Jobs\nevery service, before rollout", role: worker, layer: clients, parent: f_clients}
   - {id: c_platform, label: "user · notification\nshipping · review", role: service, layer: clients, parent: f_clients, icon: go}
   - {id: c_keycloak, label: "Keycloak (identity)\nJDBC, long-lived pool", role: platform, layer: clients, parent: f_clients, icon: keycloak}

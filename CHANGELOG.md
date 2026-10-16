@@ -233,8 +233,9 @@ Skeleton (copy what you need):
   `product_owner`. `db-authz-check.sh`, the isolation sweep, `smoke.js` K3.7 and
   local-stack (`init.sql`, `product-authz` / `inventory-authz`, A23) cover the
   two services. The database topology diagram now shows PgDog as primary-only
-  and the authorization executors. Needs product-service's migration fix
-  (product-service#241).
+  and the authorization executors. product moves to `1.16.2`, whose migration
+  000006 checks the table ACL instead of effective privilege (product-service#241),
+  which the split needs.
 
 - **Platform clients name themselves too (ADR-089).** The role catalog Job and
   CronJob run as `db-authz` (`PGAPPNAME`), `db-authz-check` as `db-authz-check`,

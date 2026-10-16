@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-16 |
+| Implemented | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-16 |
 
 > **Don't forget: every decision is a tradeoff.** The cost of the leading
 > direction is more Secrets, more HBA pairs and a coordinated consumer cutover
@@ -31,12 +31,15 @@ original service-owned authorization design. Its catalog Job creates owner and
 migrator roles and sets owner-at-login; the Job or pgroles applies grants, with
 one controller per concern. Services call `migratex.Run` without role options.
 
-**Adoption:** D1 (`review`) and D2 (`user`, `shipping`, `notification`) have
-recorded evidence on `platform-db`; see Implementation History. The expanded
-access contract below is **planned**, accepted on 2026-10-15 as
-[ADR-089](../../adr/ADR-089-postgresql-access-contract/).
-Documentation review is not evidence that TLS, attribution or new consumer
-profiles have been deployed. Remaining fleet adoption stays pending.
+**Adoption:** complete for authorization. All ten services on `platform-db`
+and `product-db` run on the owner / migrator / runtime split with the platform
+applying roles and grants (ADR-084, ADR-086 and ADR-088 are `Complete`); the
+fleet gate of 2026-10-16 is in Implementation History. The access contract
+[ADR-089](../../adr/ADR-089-postgresql-access-contract/) stays `Partial`:
+`application_name`, primary-only pooling and payment's TLS hop to PgDog are
+deployed; verified TLS, certificate renewal, `passthrough_auth`, rotation
+delivery and the replica and CDC profiles are tracked in
+[#1283](https://github.com/duynhlab/homelab/issues/1283).
 
 ## Motivation
 
@@ -463,9 +466,9 @@ databases at once:
 
 | Wave | Consumers | Notes |
 |---|---|---|
-| product-db, catalog (wave 1) | product, inventory | **Done in PR** (#1279). First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014). The bootstrap database keeps its name `product`; its initdb role `product` becomes NOLOGIN with no `pg_hba` line |
-| product-db, checkout (wave 2) | cart, order, checkout, payment, order-worker, checkout-worker | **Done in PR**, Kind gate passed 2026-10-16. Workers share their service's runtime role. payment's runtime moves behind PgDog with client TLS (`pgdog-product-tls`, `homelab-ca`, `sslmode=require`, not verified); its migrate stays direct over `hostssl` (ADR-089) |
-| Close | — | Fleet gate on a fresh bring-up, ADR-084/086/088 adoption complete |
+| product-db, catalog (wave 1) | product, inventory | **Merged** (#1279, 2026-10-16). First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014). The bootstrap database keeps its name `product`; its initdb role `product` becomes NOLOGIN with no `pg_hba` line |
+| product-db, checkout (wave 2) | cart, order, checkout, payment, order-worker, checkout-worker | **Merged** (#1282, 2026-10-16). Workers share their service's runtime role. payment's runtime moves behind PgDog with client TLS (`pgdog-product-tls`, `homelab-ca`, `sslmode=require`, not verified); its migrate stays direct over `hostssl` (ADR-089) |
+| Close | — | **Done 2026-10-16**: fleet gate passed, ADR-084/086/088 adoption `Complete`, RFC `Implemented`; ADR-089 obligations in #1283 |
 
 Carried into the next fresh bring-up from the #1265 audit: re-run the
 `pg_stat_ch` rows for the schema Job, both clusters filling the rollups and
@@ -585,10 +588,21 @@ Resolved before the access contract and still in force unless noted:
   pgroles policies. PGR-10: pgroles cannot leave `schema_migrations` out of a
   table wildcard; the owner accepted that those runtimes hold it. Fresh
   Kind: K3.4 105/105, K3.8 48/48, three policies Ready, drift drill green.
-- 2026-10-16 — product-db wave 2 in PR: cart, order, checkout and payment on
-  the split (catalog Job, pgroles policies, guards), so all ten services are
-  converted; payment's runtime behind PgDog with client TLS (`require`, not
-  verified). Kind gate passed; the RFC stays `Accepted` until the close PR.
+- 2026-10-16 — product-db wave 1 merged (#1279, product-service `v1.16.2`
+  after migration 000006 read the table ACL) and wave 2 merged (#1282): cart,
+  order, checkout and payment on the split, both workers on their service's
+  runtime login, payment's runtime behind PgDog with client TLS (`require`,
+  not verified). All ten services are converted.
+- 2026-10-16 — **Implemented.** Fleet gate on Kind at the merged manifests
+  (`fe508871`): 31/31 Kustomizations Ready, `db-authz-check` 120/120,
+  isolation sweep PASS, both role catalog Jobs `authz applied`, 9 pgroles
+  policies Ready with every plan Applied, no guard alert firing, a revoked
+  grant restored in 26 s, `pg_stat_ch` names every service, worker, migrate
+  and seed under the expected role, e2e saga 9/9, staff 59/59, operator
+  26/26, smoke 54/55 (K5.8, the DR replica's HA alert). Local-stack on the
+  same tree: k6 17/17, A23 for all ten, A24. ADR-084, ADR-086 and ADR-088
+  Adoption `Complete`; ADR-089 stays `Partial` with its obligations in
+  [#1283](https://github.com/duynhlab/homelab/issues/1283).
 
 ## Related
 

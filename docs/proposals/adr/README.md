@@ -459,11 +459,11 @@ and extend Adoption instead.
 | [ADR-081](ADR-081-agent-leases-and-reconciliation/) | Serialize Agent Work with Leases and Reconciliation | Accepted | Not started | [RFC-0033](../rfc/RFC-0033/) |
 | [ADR-082](ADR-082-agent-evaluation-gates/) | Promote Agent Autonomy through Measured Evaluation Gates | Accepted | Not started | [RFC-0033](../rfc/RFC-0033/) |
 | [ADR-083](ADR-083-documentation-steward/) | Govern Platform Documentation through a Documentation Steward | Accepted | Not started | [RFC-0033](../rfc/RFC-0033/) |
-| [ADR-084](ADR-084-split-service-database-roles/) | Split Each Service Database Identity into Owner, Migrator and Runtime Roles | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-084](ADR-084-split-service-database-roles/) | Split Each Service Database Identity into Owner, Migrator and Runtime Roles | Accepted | Complete | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-085](ADR-085-service-migrations-own-authorization/) | Own Object ACLs and Default Privileges in Service Migrations | Superseded | Superseded by [ADR-088](ADR-088-platform-owns-database-authorization/) | [RFC-0029](../rfc/RFC-0029/) |
-| [ADR-086](ADR-086-guard-membership-options/) | Guard PostgreSQL Membership Options with a CNPG Monitoring Query | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-086](ADR-086-guard-membership-options/) | Guard PostgreSQL Membership Options with a CNPG Monitoring Query | Accepted | Complete | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-087](ADR-087-homelab-private-and-web-access/) | Separate Private Administration from Published Web Access | Proposed | Not started | [RFC-0011](../rfc/RFC-0011/) |
-| [ADR-088](ADR-088-platform-owns-database-authorization/) | Apply Database Authorization from the Platform, Not from Service Code | Accepted | Partial (`platform-db`) | [RFC-0029](../rfc/RFC-0029/) |
+| [ADR-088](ADR-088-platform-owns-database-authorization/) | Apply Database Authorization from the Platform, Not from Service Code | Accepted | Complete | [RFC-0029](../rfc/RFC-0029/) |
 | [ADR-089](ADR-089-postgresql-access-contract/) | Define the PostgreSQL Access Contract Between Applications and the Platform | Accepted | Partial | [RFC-0029](../rfc/RFC-0029/) |
 
 Principles:

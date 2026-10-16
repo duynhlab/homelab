@@ -431,6 +431,13 @@ Skeleton (copy what you need):
 
 #### Proposals
 
+- **RFC-0029 is Implemented.** Every service on `platform-db` and `product-db`
+  runs on the owner / migrator / runtime split with the platform applying roles
+  and grants; the fleet gate of 2026-10-16 is recorded in the Kind audit.
+  ADR-084, ADR-086 and ADR-088 Adoption `Complete`; ADR-089 stays `Partial`,
+  with its remaining obligations (verified TLS on both poolers, PgDog
+  certificate renewal, `passthrough_auth`, rotation delivery, replica and CDC
+  profiles) tracked in #1283.
 - Align RFC-0029 with ADR-088 platform-owned authorization and accept the
   access contract as ADR-089: direct migrations, pooled consumers with native
   per-instance monitoring and recovery exceptions, verify-full TLS on both

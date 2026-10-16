@@ -22,7 +22,7 @@
 | **Supersedes** | [ADR-085](../ADR-085-service-migrations-own-authorization/) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029: D1 (`review`, Job) · D2 (`user`, `shipping`, `notification`, pgroles) · product-db after |
-| **Adoption** | Partial: `review` (D1, 2026-10-15), `user`, `shipping`, `notification` (D2) on `platform-db`; `product-db` next |
+| **Adoption** | Complete (2026-10-16): `platform-db` (D1 `review` on the Job, D2 `user`, `shipping`, `notification` on pgroles) and `product-db` (waves 1–2, all six databases on pgroles) |
 
 ## Context
 
@@ -231,3 +231,4 @@ JOB-03/JOB-04 (2026-10-15, the D1 gate):
 | 2026-10-12 | Accepted / Not started | Owner paused RFC-0029 Phase 3 (2026-10-09), chose the platform-owned model, then Job for roles and pgroles for in-database grants after the lab |
 | 2026-10-14 | Accepted / Not started | D1 opened: executor split into `authz_admin` + `db_authz` (CNPG-10); review on the catalog Job; pkg `migratex/v0.39.0`, review-service `#208` |
 | 2026-10-15 | Accepted / Partial | D1 merged (#1267, review 2.6.0). D2: user, shipping, notification on the catalog Job + pgroles policies; neutral `platform` bootstrap database; `notification_runtime` rotated by OpenBAO; PGR-10 accepted (runtime holds `schema_migrations` in pgroles-owned databases) |
+| 2026-10-16 | Accepted / Complete | product-db waves merged (#1279 product + inventory, #1282 cart, order, checkout, payment). Fleet gate: both catalog Jobs end with `authz applied`, 9 pgroles policies Ready with every plan Applied, a revoked grant on `payments` restored in 26 s, `db-authz-check` 120/120. RFC-0029 `Implemented` |

@@ -21,7 +21,7 @@
 | **Supersedes** | — (amends [ADR-013](../ADR-013-per-service-db-triplet/): the triplet keeps its shape, its single login/owner role becomes three roles) |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029 Phase 2 (canary `review`) and Phase 3 |
-| **Adoption** | Partial |
+| **Adoption** | Complete (2026-10-16) |
 
 ## Context
 
@@ -231,3 +231,4 @@ requires a new ADR that supersedes this one.
 | 2026-10-06 | Accepted / Not started | **Amended** (owner, RFC-0029 Phase 1): greenfield cutover. The legacy `<svc>` login is never created, there is no compatibility window, rollback is `git revert` + a fresh `make up`, and the ownership transfer for existing data is reference only. Conventions in [`authorization.md`](../../../databases/authorization.md) |
 | 2026-10-08 | Accepted / Partial | Canary `review` converted (RFC-0029 Phase 2): three DatabaseRoles, `review_owner` owns the database, `pg_hba` admits runtime and migrator only, random per-cluster Secrets, review-service `v2.5.0`. Fresh Kind: sweep 84/84, K3.8–K3.9 10/10, `make e2e` 146/146; local-stack mirrors the roles (A23). The rest of the fleet is Phase 3 |
 | 2026-10-14 | Accepted / Partial | **Amended** by [ADR-088](../ADR-088-platform-owns-database-authorization/): the platform creates the owner and migrator (role catalog Job as `authz_admin`), the migrator becomes the owner at login (`role=`), CNPG keeps only the runtime `DatabaseRole`; services receive credentials only |
+| 2026-10-16 | Accepted / Complete | All ten services on both clusters run as `<svc>_owner` / `<svc>_migrator` / `<svc>_runtime` (product-db waves #1279 and #1282). Fleet gate: `db-authz-check` 120/120, isolation sweep PASS, every database owned by its `<svc>_owner`, no single-role login or Secret left. RFC-0029 `Implemented` |

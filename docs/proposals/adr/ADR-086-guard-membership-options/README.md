@@ -20,7 +20,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | RFC-0029 Phase 0 step 6, then each ADR-084 cutover |
-| **Adoption** | Partial |
+| **Adoption** | Complete (2026-10-16) |
 
 ## Context
 
@@ -189,3 +189,4 @@ requires a new ADR that supersedes this one.
 | 2026-10-08 | Accepted / Partial | Second guarded edge `review_migrator → review_owner` = `f/f/t`: query row, `absent()` branch and K3.7 (`GUARDED_EDGES`). On a fresh Kind cluster a flipped `INHERIT` fired at 05:24:50 UTC and resolved at 05:26:32 after the repair |
 | 2026-10-14 | Accepted / Partial | **Extended** by [ADR-088](../ADR-088-platform-owns-database-authorization/): edge `db_authz → authz_admin`, and two sibling queries `pg_role_config` (migrator `role=`) and `pg_default_privileges` (owner defaults) with `CNPGRoleConfigDrift`, `CNPGDefaultPrivilegesDrift` and `CNPGAuthorizationGuardMissing` |
 | 2026-10-15 | Accepted / Partial | RFC-0029 D2: the first edge is now `vault_rotator → notification_runtime` (the notification login was split into three roles), plus `user_migrator`, `shipping_migrator` and `notification_migrator` → their owners at `f/f/t`. Still open: the `product-db` twin |
+| 2026-10-16 | Accepted / Complete | Every `<svc>_migrator → <svc>_owner` edge (ten services), `vault_rotator → notification_runtime` and `db_authz → authz_admin` are guarded with `pg_role_membership`, `pg_role_config` and `pg_default_privileges` on both clusters, each with its `absent()` selector. Fleet gate 2026-10-16: no guard alert firing, K3.7 green in `smoke.js`. RFC-0029 `Implemented` |

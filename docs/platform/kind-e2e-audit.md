@@ -1328,6 +1328,12 @@ sleep 45   # OTLP export is 15s; give the collector and the stores a flush
     the row. Before this, every re-run inside the window failed K5.8. Together
     with the 4xx `error-rate` SLO, which mop 0.19.0 removed, that made a second
     run within about 6h fail.
+  - `PaymentReconciliationDiscrepancy` (critical) for about an hour after a
+    `mockpay` restart, which empties its in-memory ledger (#1209). K5.8 prints
+    `attributed to a mockpay restart` and does not count it only when every
+    discrepancy in the 1h window is `missing_provider` and mockpay started at
+    least 5 minutes after payment. Any other class, or a fresh bring-up where
+    both start together, keeps it urgent.
   - Sloth **`severity: ticket`** alerts (the slow-burn variants, 2h/1d and 6h/3d
     windows) firing while the cluster is younger than the window. On 2026-08-21 a
     cluster **1h51m** old had `CheckoutHighLatency`, `KeycloakLoginHighErrorRate`

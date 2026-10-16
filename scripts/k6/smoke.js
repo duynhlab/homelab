@@ -478,17 +478,28 @@ const UNITS = [
       const gateTrap = firing.some((r) => r.name === 'CheckoutAvailabilityUnknownSKU')
         ? unknownSkuFromGateTrap()
         : null;
+      const mockpay = firing.some((r) => r.name === 'PaymentReconciliationDiscrepancy')
+        ? discrepancyFromMockpayRestart()
+        : null;
       const urgent = firing.filter(
         (r) =>
           r.labels &&
           (r.labels.severity === 'page' || r.labels.severity === 'critical') &&
-          !(gateTrap && gateTrap.attributed && r.name === 'CheckoutAvailabilityUnknownSKU')
+          !(gateTrap && gateTrap.attributed && r.name === 'CheckoutAvailabilityUnknownSKU') &&
+          !(mockpay && mockpay.attributed && r.name === 'PaymentReconciliationDiscrepancy')
       );
       if (gateTrap) {
         console.log(
           `${id} CheckoutAvailabilityUnknownSKU: ${gateTrap.events} unknown_sku event(s) in 15m, ` +
             `${gateTrap.traps} A21 trap product(s) in 20m -> ` +
             (gateTrap.attributed ? 'attributed to the gate' : 'NOT the gate: counted as urgent')
+        );
+      }
+      if (mockpay) {
+        console.log(
+          `${id} PaymentReconciliationDiscrepancy: missing_provider=${mockpay.missing}, ` +
+            `other classes=${mockpay.other}, mockpay started ${mockpay.lagSec}s after payment -> ` +
+            (mockpay.attributed ? 'attributed to a mockpay restart' : 'NOT a mockpay restart: counted as urgent')
         );
       }
       // Deliberately no total-rule count: the alert catalog marks a subset
@@ -531,6 +542,29 @@ function unknownSkuFromGateTrap() {
     return m && Number(m[1]) >= since;
   }).length;
   return { events, traps, attributed: events !== null && traps > 0 && events <= traps };
+}
+
+// mockpay keeps its ledger in memory, so a restart makes every payment still in
+// the reconciler's 1h lookback read missing_provider for about an hour (#1209).
+// That is attributed only when nothing but missing_provider was counted and
+// mockpay started at least 5 minutes after payment, i.e. it restarted under a
+// running payment. A fresh bring-up starts both together and is never exempt.
+function discrepancyFromMockpayRestart() {
+  const inc = (cls) =>
+    promqlScalar(target.vm, `sum(increase(payment_reconciliation_discrepancies_total{class${cls}}[1h])) or vector(0)`);
+  const missing = inc('="missing_provider"');
+  const other = inc('!="missing_provider"');
+  const lagSec = promqlScalar(
+    target.vm,
+    'max(kube_pod_start_time{exported_namespace="payment", exported_pod=~"mockpay-.*"})' +
+      ' - min(kube_pod_start_time{exported_namespace="payment", exported_pod=~"payment-.*"})'
+  );
+  return {
+    missing,
+    other,
+    lagSec: lagSec === null ? null : Math.round(lagSec),
+    attributed: missing > 0 && other === 0 && lagSec !== null && lagSec >= 300,
+  };
 }
 
 // --- wiring ----------------------------------------------------------------

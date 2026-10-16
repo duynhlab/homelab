@@ -23,8 +23,8 @@ what is captured, how it flows, what it costs, and how to operate it.
 ## What one event holds
 
 Every statement — DML, DDL, utility, and statements that *failed* — becomes a
-fixed set of 44 columns: start time and duration, `db_name`, `db_user`, `app`
-(`application_name`), `client_addr`, `pid`, the `query_id` fingerprint that
+fixed set of 44 columns: start time and duration, `db_name`, `db_user`,
+`application_name`, `client_addr`, `pid`, the `query_id` fingerprint that
 `pg_stat_statements` and the auto_explain plans stream also carry
 (`compute_query_id`), the normalised text (literals → `$N`, cut at 2 KB),
 rows, shared/local/temp buffer counters, block read/write wait
@@ -33,6 +33,11 @@ timings, parallel workers planned vs launched, and on failure the SQLSTATE,
 elevel and message. `db_name` is the cluster key on this platform because
 every database name is unique across `platform-db` and `product-db`; the
 extension's own instance columns are only filled on its Arrow/OTel path.
+The extension inserts the client name as upstream's `app`; since clickhouse-ddl
+2.0.0 that is an `EPHEMERAL` column, so ClickHouse stores the value as
+`application_name` and `app` cannot be queried. Each workload sets it through
+`PGAPPNAME` (ADR-089); a role whose statements arrive without one shows on the
+dashboard's *Statements without application_name* table.
 
 ## How it flows
 

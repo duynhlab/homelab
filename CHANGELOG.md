@@ -88,6 +88,17 @@ Skeleton (copy what you need):
 
 ## [Unreleased]
 
+### Breaking Change
+
+#### Observability
+
+- **Query telemetry stores `application_name`, not `app`.** The ClickHouse
+  schema Job pins clickhouse-ddl 2.0.0. The pg_stat_ch extension still inserts
+  the client name as upstream's `app`, which is now an `EPHEMERAL` column, so
+  `events_raw`, `db_app_user_1m` and `errors_recent` store and expose it as
+  `application_name`. Any query that reads `app` fails. Fresh-only: Kind
+  rebuilds the store, so there is no migration.
+
 ### Feature
 
 #### GitOps
@@ -195,6 +206,15 @@ Skeleton (copy what you need):
   ownership conflict.
 
 #### Databases
+
+- **Every service, migration and worker sets `application_name`
+  (ADR-089).** The five domain ResourceSets set `PGAPPNAME` to the service
+  name on the main container and `<name>-migrate` on the `migrate` init
+  container; `order-worker` and `checkout-worker` use their own names, and
+  local-stack sets the same values. pgx reads `PGAPPNAME`, so no service code
+  changes. Through PgDog the name replaces `PgDog` on product-db sessions.
+  Platform consumers (`db-authz`, Keycloak, Temporal, OpenBAO, pgroles) follow
+  later.
 
 - **user, shipping and notification run on three database roles (RFC-0029
   D2, ADR-088).** The role catalog Job now owns `<svc>_owner` and

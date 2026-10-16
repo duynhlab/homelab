@@ -154,6 +154,10 @@ spec:
               value: "6432"
             - name: DB_NAME
               value: checkout
+            # ADR-089: pgx reads PGAPPNAME as application_name, which names the
+            # session in pg_stat_activity and pg_stat_ch.
+            - name: PGAPPNAME
+              value: checkout-worker
             - name: DB_USER
               value: checkout
             - name: DB_PASSWORD

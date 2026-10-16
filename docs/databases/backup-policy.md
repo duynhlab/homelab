@@ -52,7 +52,10 @@ The operational clusters archive WAL continuously and set `immediate: true` on
 both schedules. Each also declares an initial on-demand `Backup`. The DR replica
 archives WAL to its own destination so it can keep archiving after promotion,
 and takes one daily base backup of its own so that destination is a restorable
-chain rather than loose WAL.
+chain rather than loose WAL. Its schedule is not `immediate`: a new DR cluster
+is still replaying the source's WAL when it turns Ready, and a backup started
+then is cancelled by the recovery conflict, so the first base backup is the
+03:30 run (#1285).
 
 `30d` and `7d` are Barman **recovery windows**, not plain retention periods.
 Barman keeps the first valid base backup taken before the point of

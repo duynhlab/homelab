@@ -135,10 +135,9 @@ Design **before** building when the change is substantial or contested.
 
 ## Contribution workflow
 
-Commit and branch rules (no attribution trailers, subject/body shape, never
-push to `main`, branch prefixes, duynhlab identity) live in
-[AGENTS.md § Contribution workflow](../../../AGENTS.md#contribution-workflow) —
-one owner, no copies.
+When writing or reviewing commit messages, squash messages, or branch names,
+read [git-commits](../git-commits/SKILL.md). The PR workflow and Git/GitHub
+identity remain in [AGENTS.md § Contribution workflow](../../../AGENTS.md#contribution-workflow).
 
 ## IDE skills map
 

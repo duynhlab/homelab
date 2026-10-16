@@ -326,6 +326,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- **Git commit conventions have one owner.** The `git-commits` skill defines
+  homelab messages and branch names; agent instructions and documentation link
+  to it and distinguish the microservice Gitflow target from current practice.
+
 - `docs/databases/extensions.md` compares the PostgreSQL query-telemetry tools
   (`pg_stat_statements`, `auto_explain`, `pg_stat_monitor`, `pg_tracing`, the
   OTel `postgresql` receiver, `pg_stat_ch`) by collection model, history,

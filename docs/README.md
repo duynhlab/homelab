@@ -479,7 +479,7 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 - [Application Delivery](./platform/application-delivery.md) - ResourceSet patterns & templates
 - [cert-manager + Flux](./secrets/cert-manager.md) - TLS with Let's Encrypt, HelmRelease, and trust-manager CA bundle distribution (§11)
 - [CI/CD](./platform/cicd.md) - CI/CD pipelines, workflows, **and the standard/policy** (action SHA-pinning, least-privilege permissions, image signing/verification, required-checks matrix, GoReleaser binary releases)
-- [Git Branching & Release](./platform/gitflow.md) - Hybrid Enterprise Gitflow standard (dev/uat/main + immutable tags)
+- [Git Branching & Release](./platform/gitflow.md) - Microservice target model (dev/uat/main + immutable tags); homelab conventions live in the [git-commits skill](../.agents/skills/git-commits/SKILL.md)
 - [SonarCloud](./platform/sonarcloud.md) - SonarCloud integration
 - [Envoy Gateway](./platform/envoy-gateway.md) - The platform edge: Gateway API resource model, policy attachment, Kubernetes vs standalone providers, edge JWT, and the telemetry the proxy itself produces
 - [Worker Autoscaling](./platform/worker-autoscaling.md) - How a versioned Temporal worker gets its replica count (KEDA + Worker Controller), and five mechanics a Kind drill exposed: the two-writer replica trap, API-poll vs scrape latency, the 17-series backlog metric, why `up == 0` cannot see a vanished target, and sunset delays that add
@@ -544,4 +544,5 @@ most of what the rest of the platform does; all are `Accepted` and adopted.
 ## Additional Resources
 
 - **[AGENTS.md](../AGENTS.md)** - AI agent guide for navigating the codebase
+- **[Git commits](../.agents/skills/git-commits/SKILL.md)** - Homelab commit messages, squash messages and branch names
 - **[README.md](../README.md)** - Project overview and quick start

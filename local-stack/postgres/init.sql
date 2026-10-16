@@ -1,4 +1,4 @@
--- One login role and one database per unsplit consumer, each database OWNED
+-- One login role and one database per unsplit consumer (Keycloak, Temporal), each database OWNED
 -- by its role — the cluster's per-service triplet (RFC-0012, ADR-013): a non-superuser
 -- role, `owner: <role>` on the Database, and the role confined to its own
 -- database (pg_hba on the cluster; REVOKE CONNECT FROM PUBLIC here). The
@@ -8,17 +8,14 @@ DO $$
 DECLARE
   r text;
 BEGIN
-  FOREACH r IN ARRAY ARRAY['cart','order','payment','checkout',
-                           'keycloak','temporal'] LOOP
+  FOREACH r IN ARRAY ARRAY['keycloak','temporal'] LOOP
     EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
                    r, r || '-local');
   END LOOP;
 END $$;
 
-CREATE DATABASE cart OWNER cart;
-CREATE DATABASE "order" OWNER "order";
--- review, user, shipping, notification, product and inventory use the owner /
--- migrator / runtime split (RFC-0029, ADR-088, docs/databases/authorization.md). This file plays
+-- All ten services use the owner / migrator / runtime split (RFC-0029,
+-- ADR-088, docs/databases/authorization.md). This file plays
 -- the platform: the owner owns the database and never logs in; the migrator
 -- becomes the owner at login (role=), so the service runs no SET ROLE; the
 -- runtime gets CRUD through the owner's default privileges, applied after the
@@ -27,7 +24,8 @@ DO $$
 DECLARE
   s text;
 BEGIN
-  FOREACH s IN ARRAY ARRAY['review','user','shipping','notification','product','inventory'] LOOP
+  FOREACH s IN ARRAY ARRAY['review','user','shipping','notification','product','inventory',
+                           'cart','order','checkout','payment'] LOOP
     EXECUTE format('CREATE ROLE %I NOLOGIN', s || '_owner');
     EXECUTE format('CREATE ROLE %I LOGIN NOINHERIT PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE',
                    s || '_migrator', s || '_migrator-local');
@@ -44,8 +42,10 @@ CREATE DATABASE shipping OWNER shipping_owner;
 CREATE DATABASE notification OWNER notification_owner;
 CREATE DATABASE product OWNER product_owner;
 CREATE DATABASE inventory OWNER inventory_owner;
-CREATE DATABASE payment OWNER payment;
-CREATE DATABASE checkout OWNER checkout;
+CREATE DATABASE cart OWNER cart_owner;
+CREATE DATABASE "order" OWNER order_owner;
+CREATE DATABASE checkout OWNER checkout_owner;
+CREATE DATABASE payment OWNER payment_owner;
 -- Keycloak's store (RFC-0024 P3). Mirrors the cluster, where CNPG postInitSQL
 -- creates the `keycloak` database on platform-db; tables inside are managed by
 -- Keycloak itself on first start.
@@ -70,3 +70,7 @@ GRANT CONNECT ON DATABASE shipping TO shipping_runtime, shipping_migrator;
 GRANT CONNECT ON DATABASE notification TO notification_runtime, notification_migrator;
 GRANT CONNECT ON DATABASE product TO product_runtime, product_migrator;
 GRANT CONNECT ON DATABASE inventory TO inventory_runtime, inventory_migrator;
+GRANT CONNECT ON DATABASE cart TO cart_runtime, cart_migrator;
+GRANT CONNECT ON DATABASE "order" TO order_runtime, order_migrator;
+GRANT CONNECT ON DATABASE checkout TO checkout_runtime, checkout_migrator;
+GRANT CONNECT ON DATABASE payment TO payment_runtime, payment_migrator;

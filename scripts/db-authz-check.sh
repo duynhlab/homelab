@@ -29,10 +29,14 @@ declare_service() {
     notification) echo "$pdb notifications ok" ;;
     product)      echo "$rdb products ok" ;;
     inventory)    echo "$rdb inventory_balances ok" ;;
+    cart)         echo "$rdb cart_items ok" ;;
+    order)        echo "$rdb orders ok" ;;
+    checkout)     echo "$rdb checkout_sessions ok" ;;
+    payment)      echo "$rdb payments ok" ;;
     *) return 1 ;;
   esac
 }
-CONVERTED=(review user shipping notification product inventory)
+CONVERTED=(review user shipping notification product inventory cart order checkout payment)
 EXPECTED_CHECKS=12
 FAIL=0
 

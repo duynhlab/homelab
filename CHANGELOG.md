@@ -516,6 +516,15 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **pgroles operator 0.13.0 → 0.14.0.** Chart values are unchanged and the
+  CRDs add status fields only; Flux's `upgrade.crds: CreateReplace` applies them
+  before the controller, as the upgrade notes require. Relevant fixes: an
+  auto-approved plan the executor cannot apply now waits as one `Pending` plan
+  instead of being re-created every few seconds, and a stalled Kubernetes request
+  fails after 30 s instead of silently holding a reconcile. Membership
+  `inherit`/`admin` changes are made in place on PostgreSQL 16+. 0.14 still has no
+  `application_name` connection parameter.
+
 - Bump the PgDog chart for `product-db` from `v0.39` (PgDog 0.1.26) to
   `v0.90` (PgDog v0.1.60). The rendered `pgdog.toml` keeps the same
   effective settings; the chart no longer writes binary defaults out, and

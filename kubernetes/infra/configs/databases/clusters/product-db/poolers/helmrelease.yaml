@@ -1,6 +1,8 @@
-# PgDog Connection Pooler for product-db (product, cart, order)
-# R/W splitting: SELECTs routed to replicas, writes to primary
-# LSN monitoring: detects replication lag, bans lagging replicas
+# PgDog Connection Pooler for product-db (product, cart, order, payment,
+# checkout, inventory)
+# Primary only: no database lists a replica, so PgDog cannot split reads.
+# ADR-089 makes the primary the default; a replica read must be an explicit
+# opt-in profile (planned, docs/databases/poolers.md).
 # Prepared statements: extended mode (no prefer_simple_protocol needed)
 #
 # User passwords come from the per-service ESO basic-auth Secrets via Flux
@@ -69,72 +71,48 @@ spec:
     lsnCheckInterval: 5000
 
     databases:
-      # product DB -- primary
+      # product DB
       - name: product
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: product
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # cart DB -- primary
+      # cart DB
       - name: cart
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: cart
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # order DB -- primary
+      # order DB
       - name: order
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: order
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # payment DB -- primary
+      # payment DB
       - name: payment
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: payment
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # checkout DB -- primary
+      # checkout DB
       - name: checkout
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: checkout
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
-      # inventory DB -- primary
+      # inventory DB
       - name: inventory
         host: product-db-rw.product.svc.cluster.local
         port: 5432
         database: inventory
         poolSize: 30
         poolMode: transaction
-        replicas:
-          - host: product-db-r.product.svc.cluster.local
-            port: 5432
-            poolSize: 30
 
     # Passwords injected per-user by spec.valuesFrom (order must match the
     # targetPath indices above).

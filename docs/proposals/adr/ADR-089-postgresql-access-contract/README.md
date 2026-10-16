@@ -24,7 +24,7 @@
 | **Supersedes** | — |
 | **Superseded by** | — |
 | **Implementation tracking** | [issue #1269](https://github.com/duynhlab/homelab/issues/1269) |
-| **Adoption** | Not started |
+| **Adoption** | Partial: application `application_name` (2026-10-16), PgDog primary-only (2026-10-16) |
 
 ## Context
 
@@ -145,3 +145,4 @@ All of it is the target. Today's routes are drawn in the
 ## History
 
 - 2026-10-15 — Accepted with the RFC-0029 access-contract refactor; adoption not started.
+- 2026-10-16 — Partial: application workloads set `application_name` (#1272), and PgDog's automatic read split is off; product-db pools reach the primary only.

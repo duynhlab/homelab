@@ -15,7 +15,7 @@ covers what differs.
 | Chart | `pgdog` `v0.90` (PgDog v0.1.60) from the `pgdogdev` HelmRepository (flux-system) |
 | Ports | `6432` SQL, `9090` openmetrics (`pgdog_` prefix) |
 | Topology | 3 replicas, soft anti-affinity, PDB `minAvailable: 2` |
-| Pool mode | `transaction`; R/W splitting: SELECTs → `-r` replicas, writes → `-rw` primary; LSN lag monitoring bans lagging replicas |
+| Pool mode | `transaction`; every database points at the `-rw` primary only (ADR-089: no automatic read split) |
 | Credentials | Injected per-user via HelmRelease `spec.valuesFrom` targetPath from the per-service ESO Secrets (ADR-014) — never in values |
 
 Concepts, trade-offs, and deployed topology live in [poolers.md](../poolers.md);
@@ -40,8 +40,6 @@ Watch pool saturation (clients vs servers per database) and error counters —
 a sudden error spike is almost always auth (see rotation below) or a banned
 backend.
 
-A replica ban shows in the logs (`banned replica`) and as traffic concentrating on the primary; bans lift automatically once the replica's LSN catches up (checked every `lsnCheckInterval: 5000` ms).
-
 ## Rotate a service password
 
 Order matters — the pooler learns passwords only at Helm reconcile time:
@@ -54,7 +52,7 @@ Order matters — the pooler learns passwords only at Helm reconcile time:
 
 The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add-service-database.md); the PgDog slice of it:
 
-1. In the cluster's `poolers/helmrelease.yaml`: append a `databases:` entry (primary `-rw`, replica `-r`) **and** a `users:` entry, then a `valuesFrom` block with `targetPath: "users[N].password"`.
+1. In the cluster's `poolers/helmrelease.yaml`: append a `databases:` entry (primary `-rw` only, no `replicas:`) **and** a `users:` entry, then a `valuesFrom` block with `targetPath: "users[N].password"`.
 2. **Indices are positional** — `users[N]` must match the position in `values.users`. Keep the header comment (`[0]=product, …`) true; a mismatched index silently wires service A's password to service B's user, which surfaces as auth failures for BOTH.
 3. `make validate`, merge, reconcile. The rollout restarts pooler pods; with 3 replicas + PDB 2 the restart is rolling, but in-flight transactions on the drained pod are cut — sequence with deploys, not during load tests.
 

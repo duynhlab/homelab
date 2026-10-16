@@ -52,8 +52,9 @@ kubectl exec -n "$NAMESPACE" "services/${CLUSTER}-rw" -- psql -c "SELECT * FROM 
 kubectl top pods -n "$NAMESPACE" -l "cnpg.io/cluster=$CLUSTER"
 ```
 
-Check long queries, network, disk IO on replicas. PgDog bans lagging replicas —
-see [PgDog operations](../../../databases/runbooks/pooler-operations.md).
+Check long queries, network, disk IO on replicas. No application traffic reads
+from a replica (PgDog is primary-only, ADR-089), so lag here costs failover
+readiness, not stale application reads.
 
 ## Mitigation
 

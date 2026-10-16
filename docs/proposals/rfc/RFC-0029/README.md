@@ -89,7 +89,7 @@ Owner decisions recorded 2026-10-15, as
 | User/password | Fixed usernames; both automatic and manual password policies | Per-role policy/cadence accepted below; delivery implementation pending |
 | Role model | NOLOGIN owner; separate migration/runtime; data/CDC/monitoring/platform templates | Templates below; new consumers not yet provisioned |
 | Attribution | application_name is required | Workload-only naming accepted; implementation and telemetry gate pending |
-| Consistency/retry | Primary by default; replica reads explicit; no blind replay of ambiguous writes | PgDog splits reads today; turning that off is a rollout gate |
+| Consistency/retry | Primary by default; replica reads explicit; no blind replay of ambiguous writes | PgDog's automatic read split turned off 2026-10-16; replica profile planned |
 
 ## Proposal
 
@@ -131,7 +131,7 @@ record. Native/direct does not mean unencrypted or unauthenticated.
 
 | Consumer | Target route | Constraint |
 |---|---|---|
-| API / workers | Pooler → primary by default | Runtime identity; explicit replica profile only when stale reads are acceptable. PgDog's automatic read split is turned off first |
+| API / workers | Pooler → primary by default | Runtime identity; explicit replica profile only when stale reads are acceptable. PgDog's automatic read split is off since 2026-10-16 |
 | Migration | Direct primary (`-rw`), no pooler | Migrator identity; owner-at-login; stable backend during lock lifetime |
 | Data robot / reporting | Pooler → primary or explicit replica profile | Dataset-scoped SELECT; timeout and connection budget |
 | CDC | Replication-compatible pooler → source primary | Snapshot, replication protocol, reconnect and slot recovery must pass before adoption |
@@ -187,11 +187,11 @@ flowchart TB
     subgraph cluster["Kind cluster · homelab"]
         subgraph prod["product-db consumers"]
             pay["payment<br/>existing direct, pooled cutover planned"]:::service
-            prapi["product · cart · order · checkout · inventory<br/>order-worker · checkout-worker<br/>runtime · application_name planned"]:::service
+            prapi["product · cart · order · checkout · inventory<br/>order-worker · checkout-worker<br/>runtime · application_name set"]:::service
         end
         mig["migrate init containers · all services<br/>migrator, owner-at-login"]:::worker
         subgraph plat["platform-db consumers"]
-            papi["user · review · shipping · notification<br/>runtime · application_name planned"]:::service
+            papi["user · review · shipping · notification<br/>runtime · application_name set"]:::service
             pdirect["Keycloak · Temporal · OpenBAO<br/>existing direct, pooled cutover planned"]:::platform
         end
         pgd["PgDog<br/>pgdog-product · transaction"]:::platform
@@ -205,8 +205,8 @@ flowchart TB
     papi -->|"plaintext; planned verify-full"| pgb
     pgb -->|"verify-ca; planned verify-full"| pprim
     prapi -->|"plaintext; planned verify-full"| pgd
-    pgd -->|"writes, transactions; planned verify-full"| rprim
-    pgd -. "automatic read split today;<br/>planned: explicit stale-read profile only" .-> rrep
+    pgd -->|"all queries; planned verify-full"| rprim
+    pgd -. "planned: explicit stale-read profile only" .-> rrep
     pay -->|"require; planned via PgDog"| rprim
     pdirect -->|"direct; planned pooled profile"| pprim
     mig -->|"direct -rw, require; planned verify-full"| pprim
@@ -405,12 +405,12 @@ with a reconciler.
 
 - Default reads and writes to primary. Replica access is explicit per flow,
   with a lag tolerance; it is not an automatic optimization for every SELECT.
-- **Gap today:** PgDog sends every `SELECT` outside a transaction to
-  `product-db-r` for all six product-db databases, so a read right after a
-  committed write can be stale. Target: the default PgDog pools route to the
-  primary only, and a flow that accepts stale reads opts into a separate
-  replica profile (for example a dedicated database alias) with a declared lag
-  tolerance. Changing this is a rollout gate.
+- **Closed 2026-10-16:** PgDog used to send every `SELECT` outside a
+  transaction to `product-db-r` for all six product-db databases, so a read
+  right after a committed write could be stale. The default PgDog pools now
+  route to the primary only (no database lists a replica). A flow that accepts
+  stale reads will opt into a separate replica profile (for example a dedicated
+  database alias) with a declared lag tolerance; that profile is still planned.
 - Read-after-write stays on primary for the relevant workflow. Existing
   transaction/snapshot semantics still apply; primary routing is not a promise
   of a globally fresh snapshot inside an older transaction.
@@ -512,7 +512,7 @@ are implementation tasks, not unapproved alternatives or completed deployment:
 | CA lifecycle | Trust overlap → verified reload → cert switch → new-connection checks → remove old trust | Durations, renewal settings, component reload support and failure budget |
 | Rotation | Accepted per-role 30/90-day table and lifecycle exceptions | Single writer, owner, consumer reload and recovery; isolated 3-hour audit override |
 | Pooler profiles | Keep both products; compatible profile per consumer | Versioned TLS/session/replication matrix, particularly CDC and platform jobs; CNPG Pooler `clientTLSSecret` for the pooler Service; PgDog chart TLS values confirmed; failed gate blocks cutover |
-| Replica reads | Primary default; explicit stale-read flows only | Turn off PgDog's automatic read split; per-flow lag tolerance and fallback defined before enabling replica access |
+| Replica reads | Primary default; explicit stale-read flows only | PgDog's automatic read split off (2026-10-16, Kind gate); per-flow lag tolerance and fallback defined before enabling replica access |
 | PgDog version | Chart `v0.90` (PgDog v0.1.60); the features above exist since 0.1.26 | Re-check the chart value names on every bump |
 
 The former service `WithSetRole` design is superseded by ADR-088. Exact

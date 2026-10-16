@@ -211,6 +211,14 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **PgDog sends every query to the primary (ADR-089).** The six product-db
+  databases no longer list `product-db-r`, so PgDog cannot route a `SELECT`
+  outside a transaction to a replica, where a read right after a commit could
+  miss it. A flow that tolerates stale reads will opt in through an explicit
+  replica profile with a lag tolerance (planned). The pooler docs, architecture
+  guide, PgDog runbook and the replication-lag runbook drop the read-split and
+  replica-ban text. ADR-089 adoption moves to Partial.
+
 - **Every service, migration and worker sets `application_name`
   (ADR-089).** The five domain ResourceSets set `PGAPPNAME` to the service
   name on the main container and `<name>-migrate` on the `migrate` init

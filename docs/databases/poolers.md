@@ -6,7 +6,7 @@ pool mode determines which session behaviors remain safe.
 | Cluster | Pooler | Replicas | Endpoint | Mode | Routing |
 |---|---|---:|---|---|---|
 | `platform-db` | CNPG PgBouncer `Pooler` | 2 | `platform-db-pooler-rw.platform.svc:5432` | transaction | Primary only |
-| `product-db` | PgDog chart v0.90 (PgDog v0.1.60) | 3 | `pgdog-product.product.svc:6432` | transaction | Writes to `-rw`, reads to `-r` |
+| `product-db` | PgDog chart v0.90 (PgDog v0.1.60) | 3 | `pgdog-product.product.svc:6432` | transaction | Primary only (`-rw`) |
 
 ## Why pooling exists
 
@@ -34,8 +34,8 @@ not make concurrency free.
 ```mermaid
 flowchart LR
     ProductClients["product / cart / order<br/>checkout / inventory"] --> PgDog["PgDog :6432"]
-    PgDog -->|"writes"| ProductRW["product-db-rw :5432"]
-    PgDog -->|"reads"| ProductR["product-db-r :5432"]
+    PgDog -->|"reads and writes"| ProductRW["product-db-rw :5432"]
+    PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432"]
     Payment["payment"] -->|"direct · TLS, unverified<br/>sslmode=require"| ProductRW
 
     PlatformClients["user / notification<br/>shipping / review"] --> PgBouncer["PgBouncer :5432"]
@@ -45,12 +45,17 @@ flowchart LR
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
     class ProductClients,Payment,PlatformClients,Direct service;
-    class PgDog,PgBouncer,ProductRW,ProductR,PlatformRW platform;
+    classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+    class PgDog,PgBouncer,ProductRW,PlatformRW platform;
+    class ProductR planned;
 ```
 
-The diagram answers which clients use each deployed connection path. Read
-routing through PgDog is not read-after-write consistency: a replica may lag a
-recent primary commit.
+The diagram answers which clients use each deployed connection path. Both
+poolers send every query to the primary. PgDog used to send `SELECT`s outside a
+transaction to `product-db-r`. ADR-089 makes the primary the default, because a
+replica read right after a commit can miss it, so no PgDog database lists a
+replica any more. A flow that tolerates stale reads will opt in through a
+separate replica profile with a stated lag tolerance (**planned**, RFC-0029).
 
 PgDog declares the six product-cluster database/user pairs and receives their
 passwords through Flux `valuesFrom`. Current application manifests intentionally
@@ -69,8 +74,6 @@ outside the PgBouncer pilot.
 - PgDog has an explicit backend list and reads Secret values at Helm reconcile
   time. Rotate the database role first, refresh the Secret, then reconcile the
   HelmRelease so new clients do not use a stale pooler password.
-- PgDog can temporarily ban a lagging read replica. Monitor whether traffic
-  concentrates on the primary and whether lag recovers.
 - Pooler restarts can cut in-flight transactions. PDBs and replica counts reduce
   availability risk but do not preserve a transaction owned by a terminating
   pod.

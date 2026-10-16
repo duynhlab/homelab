@@ -34,28 +34,28 @@ spec:
     remediation:
       retries: 3
   # Indices are positional against values.users below — keep both lists in
-  # the same order: [0]=product_runtime, [1]=cart, [2]=order, [3]=payment,
-  # [4]=checkout, [5]=inventory_runtime. A converted service (RFC-0029) pools
-  # its <svc>_runtime login; its migrator never goes through PgDog.
+  # the same order: [0]=product, [1]=cart, [2]=order, [3]=payment,
+  # [4]=checkout, [5]=inventory, each the service's <svc>_runtime login
+  # (RFC-0029); migrators never go through PgDog.
   valuesFrom:
     - kind: Secret
       name: product-db-product-runtime-secret
       valuesKey: password
       targetPath: "users[0].password"
     - kind: Secret
-      name: product-db-cart-secret
+      name: product-db-cart-runtime-secret
       valuesKey: password
       targetPath: "users[1].password"
     - kind: Secret
-      name: product-db-order-secret
+      name: product-db-order-runtime-secret
       valuesKey: password
       targetPath: "users[2].password"
     - kind: Secret
-      name: product-db-payment-secret
+      name: product-db-payment-runtime-secret
       valuesKey: password
       targetPath: "users[3].password"
     - kind: Secret
-      name: product-db-checkout-secret
+      name: product-db-checkout-runtime-secret
       valuesKey: password
       targetPath: "users[4].password"
     - kind: Secret
@@ -67,6 +67,19 @@ spec:
     port: 6432
     openMetricsPort: 9090
     openMetricsNamespace: "pgdog_"
+
+    # Client-side TLS (certificate.yaml): optional for clients, required by
+    # payment's own config. Clients do not verify it yet (ADR-089 follow-up).
+    tlsCertificate: /etc/pgdog-tls/tls.crt
+    tlsPrivateKey: /etc/pgdog-tls/tls.key
+    extraVolumes:
+      - name: pgdog-tls
+        secret:
+          secretName: pgdog-product-tls
+    extraVolumeMounts:
+      - name: pgdog-tls
+        mountPath: /etc/pgdog-tls
+        readOnly: true
 
     lsnCheckDelay: 0
     lsnCheckInterval: 5000
@@ -120,13 +133,13 @@ spec:
     users:
       - name: product_runtime
         database: product
-      - name: cart
+      - name: cart_runtime
         database: cart
-      - name: order
+      - name: order_runtime
         database: order
-      - name: payment
+      - name: payment_runtime
         database: payment
-      - name: checkout
+      - name: checkout_runtime
         database: checkout
       - name: inventory_runtime
         database: inventory

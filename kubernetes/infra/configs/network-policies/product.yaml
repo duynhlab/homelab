@@ -67,8 +67,8 @@ spec:
     # App services in sibling namespaces (cart, order, payment) → PgDog pooler
     # (6432) for runtime + product-db-rw for migration initContainers (5432).
     # Without this the migration initContainer stalls in Init → apps-local
-    # times out. (Bug 13) Payment uses 5432 for runtime too (direct TLS
-    # connection — its config refuses cleartext and PgDog has no TLS yet).
+    # times out. (Bug 13) Payment's runtime also goes through PgDog, over TLS
+    # (RFC-0029 wave 2); 5432 stays for every migrate init container.
     - from:
         - namespaceSelector:
             matchLabels:

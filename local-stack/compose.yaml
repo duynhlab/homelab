@@ -390,7 +390,7 @@ services:
       clickhouse: { condition: service_healthy }
 
   victoria-traces:
-    image: victoriametrics/victoria-traces:v0.11.1
+    image: victoriametrics/victoria-traces:v0.12.0
     mem_limit: 512m
     command:
       - "-httpListenAddr=:10428"

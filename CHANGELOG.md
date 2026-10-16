@@ -211,6 +211,43 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **cart, order, checkout and payment move to the owner / migrator / runtime
+  split (RFC-0029 product-db wave 2, ADR-088).** Every one of the ten services
+  is now on the split. On product-db:
+  - The role catalog Job + CronJob own `<svc>_owner` and `<svc>_migrator` for
+    all six databases (`ROLE_SERVICES`), and one pgroles policy per database
+    owns the grants.
+  - Runtime and migrator ExternalSecrets (`product-db-<svc>-runtime-secret`,
+    `product-db-<svc>-migrator-secret`, copies in each service namespace) are
+    seeded per cluster in OpenBAO at `product-db/<svc>-runtime` / `-migrator`.
+    The single-role `product-db-<svc>-secret` Secrets, their KV seeds and
+    logins are gone.
+  - `pg_hba` admits only each database's runtime, migrator and `db_authz`
+    (`hostssl` for payment), and the guard queries and `absent()` selectors
+    cover the four new migrator edges and databases.
+
+  PgDog lists `cart_runtime`, `order_runtime`, `payment_runtime` and
+  `checkout_runtime` (ADR-014 indices kept). order-worker and checkout-worker
+  use their service's runtime Secret. `db-authz-check.sh`, the isolation sweep,
+  `smoke.js` and local-stack (`init.sql`, compose, audit rows) cover all ten
+  services. Verified on a fresh Kind bring-up 2026-10-16: authz-check 120/120,
+  isolation sweep, six policies Ready, drift restored in 26 s, e2e saga 9/9,
+  staff 59/59, operator 26/26.
+
+- **payment reaches its database through PgDog, over client TLS (ADR-089).**
+  PgDog terminates client TLS with the cert-manager `Certificate`
+  `pgdog-product-tls` (ClusterIssuer `homelab-ca`); TLS stays optional, so the
+  other services keep plaintext. payment connects with `sslmode=require`:
+  encrypted, not verified, and `verify-full` is a follow-up. PgDog reads the
+  certificate only at start, so a renewal needs a PgDog restart
+  ([pooler operations](docs/databases/runbooks/pooler-operations.md)). payment's
+  migrate stays direct to `product-db-rw` over `hostssl`; local-stack keeps
+  payment direct to PostgreSQL, with no pooler. On Kind (2026-10-16) PgDog
+  serves the `homelab-ca` certificate, every `payment_runtime` session comes
+  from a PgDog pod, and the reconciler's session advisory lease works through
+  it (7 passes completed, none failed, no lock left). The database topology
+  diagram shows the new edge.
+
 - **product and inventory move to the owner / migrator / runtime split
   (RFC-0029 product-db wave 1, ADR-088).** product-db gets the platform-db
   shape:

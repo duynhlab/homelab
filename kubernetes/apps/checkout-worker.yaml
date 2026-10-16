@@ -158,12 +158,16 @@ spec:
             # session in pg_stat_activity and pg_stat_ch.
             - name: PGAPPNAME
               value: checkout-worker
+            # Same checkout_runtime login as the service (RFC-0029).
             - name: DB_USER
-              value: checkout
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-checkout-runtime-secret
+                  key: username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: product-db-checkout-secret
+                  name: product-db-checkout-runtime-secret
                   key: password
             - name: DB_SSLMODE
               value: disable

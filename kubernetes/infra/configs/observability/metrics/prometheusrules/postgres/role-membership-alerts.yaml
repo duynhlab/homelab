@@ -46,6 +46,10 @@ spec:
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="platform-db", member="db_authz", parent="authz_admin"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="product_migrator", parent="product_owner"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="inventory_migrator", parent="inventory_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="cart_migrator", parent="cart_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="order_migrator", parent="order_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="checkout_migrator", parent="checkout_owner"})
+        or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="payment_migrator", parent="payment_owner"})
         or absent(cnpg_pg_role_membership_drift{cnpg_io_cluster="product-db", member="db_authz", parent="authz_admin"})
       for: 15m
       labels:
@@ -114,6 +118,22 @@ spec:
         or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="r"})
         or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="S"})
         or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="inventory", objtype="f"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="cart_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="order_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="checkout_migrator"})
+        or absent(cnpg_pg_role_config_drift{cnpg_io_cluster="product-db", role="payment_migrator"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="cart", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="cart", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="cart", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="order", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="order", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="order", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="checkout", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="checkout", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="checkout", objtype="f"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="payment", objtype="r"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="payment", objtype="S"})
+        or absent(cnpg_pg_default_privileges_drift{cnpg_io_cluster="product-db", datname="payment", objtype="f"})
       for: 15m
       labels:
         severity: warning

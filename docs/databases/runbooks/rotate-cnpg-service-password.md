@@ -1,15 +1,18 @@
 # Runbook: Rotate a product-db Service Password
 
-Rotate one (or all) service database passwords on `product-db` with a
+Rotate one (or all) service runtime passwords on `product-db` with a
 new-connection interruption while consumers converge; measure its duration.
 Every consumer —
 the `DatabaseRole`, the PgDog pooler, and the app pod — reads the same
-OpenBAO entry through ESO; nothing else holds the value.
+OpenBAO entry through ESO; nothing else holds the value. Each service has a
+`<svc>_runtime` and a `<svc>_migrator` login (RFC-0029,
+[authorization](../authorization.md)); the migrator is covered in
+[Rotate a migrator password](#rotate-a-migrator-password).
 
 | | |
 |---|---|
 | **Scope** | `product`, `cart`, `order`, `payment`, `checkout`, `inventory` on `product-db` |
-| **Source of truth** | OpenBAO `secret/local/databases/product-db/<svc>` (KV v2 — old versions retained) |
+| **Source of truth** | OpenBAO `secret/local/databases/product-db/<svc>-runtime` and `…/<svc>-migrator` (KV v2 — old versions retained) |
 | **Consumers** | `DatabaseRole` (`cnpg.io/reload`), PgDog HelmRelease (`valuesFrom`), app pods (env `secretKeyRef` via the app-namespace ESO copy) |
 | **Design record** | [RFC-0012](../../proposals/rfc/RFC-0012/) · [ADR-013](../../proposals/adr/ADR-013-per-service-db-triplet/) · [ADR-014](../../proposals/adr/ADR-014-pooler-credentials-valuesfrom/) |
 
@@ -37,7 +40,7 @@ including workers, before changing its credential.
 1. **New password into OpenBAO.**
    Use the normal staff OIDC login (`infra-team`) and KV write path in
    [Add a secret to a live cluster](../../secrets/runbooks/add-secret-live-cluster.md)
-   for `secret/local/databases/product-db/<svc>`, preserving `username` and
+   for `secret/local/databases/product-db/<svc>-runtime`, preserving `username` and
    replacing `password`. Record the prior KV version without recording its
    value. After login, the following Bash snippet prompts without echo and
    passes the password on stdin, not in the command arguments:
@@ -50,8 +53,8 @@ including workers, before changing its credential.
        printf '\n'
        if [ -n "$db_next_password" ]; then
          printf '%s' "$db_next_password" | bao kv put \
-           "secret/local/databases/product-db/$db_service" \
-           username="$db_service" password=-
+           "secret/local/databases/product-db/$db_service-runtime" \
+           username="${db_service}_runtime" password=-
        else
          printf 'Empty password: no write performed.\n'
        fi
@@ -76,19 +79,19 @@ including workers, before changing its credential.
    product-namespace Secret and the app-namespace copy:
 
    ```bash
-   kubectl annotate externalsecret -n product product-db-<svc>-secret \
+   kubectl annotate externalsecret -n product product-db-<svc>-runtime-secret \
      force-sync=$(date +%s) --overwrite
-   kubectl annotate externalsecret -n <svc> product-db-<svc>-secret \
+   kubectl annotate externalsecret -n <svc> product-db-<svc>-runtime-secret \
      force-sync=$(date +%s) --overwrite
    ```
 
-   (`product` uses `product-db-secret` in namespace `product` only.)
+   (`product` runs in namespace `product` and has no second copy.)
 
 3. **CNPG applies `ALTER ROLE` automatically** — the `cnpg.io/reload` label
    on the product-namespace Secret triggers it within seconds. Verify:
 
    ```bash
-   kubectl get databaserole -n product product-db-role-<svc> \
+   kubectl get databaserole -n product product-db-role-<svc>-runtime \
      -o jsonpath='{.status.applied}{" "}{.status.conditions}'
    ```
 
@@ -139,8 +142,28 @@ including workers, before changing its credential.
    ```bash
    kubectl run psql-check --rm -it --restart=Never -n product \
      --image=ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie -- \
-     psql -W "host=product-db-rw.product user=<svc> dbname=<svc>" -c 'select 1'
+     psql -W "host=product-db-rw.product user=<svc>_runtime dbname=<svc>" -c 'select 1'
    ```
+
+   (`payment` admits its logins on `hostssl` only: add `sslmode=require`.)
+
+## Rotate a migrator password
+
+`<svc>_migrator` has no `DatabaseRole`: the role catalog Job sets its password
+when the migrator can no longer log in with the Secret's value. No pooler is
+involved, and the `migrate` init container reads the Secret at its next start.
+
+1. Write `secret/local/databases/product-db/<svc>-migrator` as in step 1
+   (`username` stays `<svc>_migrator`).
+2. Force-sync `product-db-<svc>-migrator-secret` in `product` and in `<svc>`.
+3. Run the catalog now instead of waiting up to 10 minutes:
+
+   ```bash
+   kubectl -n product create job --from=cronjob/product-db-authz authz-manual-$(date +%s)
+   ```
+
+4. Verify the migrator logs in with the new value (same `psql` check as step 6
+   with `user=<svc>_migrator`).
 
 ## One-time migration note (Opaque → basic-auth)
 

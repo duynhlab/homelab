@@ -8,10 +8,10 @@ ownership of its own schema.
 
 | | |
 |---|---|
-| **Status** | **Deployed** on `platform-db` for `review`, `user`, `shipping` and `notification`, and on `product-db` for `product` and `inventory` (RFC-0029 product-db wave 1). `cart`, `order`, `checkout`, `payment` and both workers still use one login that owns its database (**planned**, wave 2) |
+| **Status** | **Deployed** on `platform-db` for `review`, `user`, `shipping` and `notification`, and on `product-db` for every product-db service (RFC-0029 product-db waves 1 and 2). Wave 2 adds `cart`, `order`, `checkout` and `payment`, with `order-worker` and `checkout-worker` on their service's runtime login: every service is on the split |
 | **Design records** | [RFC-0029](../proposals/rfc/RFC-0029/) · [ADR-084](../proposals/adr/ADR-084-split-service-database-roles/) (three roles) · [ADR-088](../proposals/adr/ADR-088-platform-owns-database-authorization/) (the platform owns authorization; supersedes ADR-085) · [ADR-086](../proposals/adr/ADR-086-guard-membership-options/) (guard) |
 | **Roles per service** | `<svc>_owner` (NOLOGIN) · `<svc>_migrator` (LOGIN, NOINHERIT, `role=<svc>_owner`) · `<svc>_runtime` (LOGIN) |
-| **Who applies what** | CNPG: runtime login, database, `pg_hba`, `db_authz` · role catalog Job + CronJob per cluster: owner, migrator, memberships, and (Job-owned services) in-database grants · pgroles: in-database grants for `user`, `shipping`, `notification`, `product`, `inventory` |
+| **Who applies what** | CNPG: runtime login, database, `pg_hba`, `db_authz` · role catalog Job + CronJob per cluster: owner, migrator, memberships, and (Job-owned services) in-database grants · pgroles: in-database grants for `user`, `shipping`, `notification` and all six product-db databases |
 | **What a service knows** | `DB_USER` / `DB_PASSWORD` for `migrate`/`seed` and for serving. No role name, no `GRANT`, no `SET ROLE` |
 | **Drift** | The CronJob re-applies every 10 minutes; `pg_role_membership`, `pg_role_config`, `pg_default_privileges` guards and their alerts; Kind gate rows |
 | **Rollout model** | Greenfield: no legacy login, no compatibility window. Rollback is `git revert` + a fresh `make up` |
@@ -38,7 +38,7 @@ repo creates tables and indexes in its migrations and nothing else:
 |---|---|
 | Runtime login, its password, the `Database` (`owner: <svc>_owner`), `pg_hba` | CNPG (`DatabaseRole`, `Database`, `instance.yaml`) |
 | Owner and migrator roles, the migrator's `role=`, the migrator → owner membership, the migrator's password | Role catalog Job + CronJob, one per cluster (`platform-db/authz/`, `product-db/authz/`; one copy of `apply.sh` and `roles.sql`) |
-| In-database grants: `CONNECT`, `USAGE`, the owner's default privileges, grants on existing objects, `REVOKE EXECUTE … FROM PUBLIC` | Role catalog Job for `review`; a pgroles `PostgresPolicy` per database for `user`, `shipping`, `notification`, `product`, `inventory` |
+| In-database grants: `CONNECT`, `USAGE`, the owner's default privileges, grants on existing objects, `REVOKE EXECUTE … FROM PUBLIC` | Role catalog Job for `review`; a pgroles `PostgresPolicy` per database for `user`, `shipping`, `notification`, `product`, `inventory`, `cart`, `order`, `checkout`, `payment` |
 | The executor those jobs run as | `authz_admin` (bootstrap SQL) reached by the `db_authz` login (CNPG) |
 
 ## Architecture
@@ -60,8 +60,8 @@ flowchart TB
             ppod["service pods<br/>as &lt;svc&gt;_runtime"]:::service
             pmig["migrate init container + seed<br/>as &lt;svc&gt;_migrator<br/>role= applies at login"]:::worker
         end
-        subgraph rapps["product-db services · product, inventory"]
-            rpod["service pods<br/>as &lt;svc&gt;_runtime"]:::service
+        subgraph rapps["product-db services · product, inventory, cart, order, checkout, payment"]
+            rpod["service pods + order/checkout workers<br/>as &lt;svc&gt;_runtime"]:::service
             rmig["migrate init container + seed<br/>as &lt;svc&gt;_migrator"]:::worker
         end
         pgr["pgroles operator · pgroles-system<br/>as db_authz → authz_admin"]:::platform
@@ -84,7 +84,7 @@ flowchart TB
     pjob --> prw
     bao --> prw
     other --> prw
-    rpod -->|"pooled"| pgdog -->|"same login"| rrw
+    rpod -->|"pooled · payment over TLS, require"| pgdog -->|"same login"| rrw
     rmig --> rrw
     rjob --> rrw
     pgr --> prw
@@ -96,10 +96,12 @@ flowchart TB
     classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
 ```
 
-PgDog lists the converted services under their `<svc>_runtime` login. The
-product-db services not yet converted (cart, order, checkout and both workers
-through PgDog, payment directly because it requires TLS) still log in with one
-role per database (**planned**, wave 2).
+PgDog lists every product-db service under its `<svc>_runtime` login; the
+order and checkout workers use their service's runtime login. payment's
+runtime reaches PgDog over client TLS (`sslmode=require`, encrypted but not
+verified; [poolers](poolers.md#tls)), and `pg_hba` admits `payment_runtime` and
+`payment_migrator` on `hostssl` lines only. The other services stay plaintext
+to PgDog.
 
 `product` is also `product-db`'s bootstrap database: `bootstrap.initdb` creates
 it owned by a role named `product`. That role is bootstrap-only. Its
@@ -127,7 +129,7 @@ flowchart LR
         subgraph writers["writers, one per object"]
             cnpg["CNPG operator · cloudnative-pg<br/>runtime DatabaseRole, db_authz,<br/>Database, pg_hba"]:::platform
             job["authz Job + CronJob, one per cluster<br/>owner, migrator, role=, memberships,<br/>review grants, schema_migrations"]:::platform
-            pgr["pgroles operator<br/>grants of user, shipping, notification,<br/>product, inventory"]:::platform
+            pgr["pgroles operator<br/>grants of user, shipping, notification<br/>and the six product-db databases"]:::platform
         end
         cat[("platform-db + product-db catalogs<br/>roles · memberships · ACLs · default ACLs")]:::data
         subgraph obs["detection"]
@@ -167,7 +169,7 @@ not appear here because they write no authorization.
 | `Database` object | `<svc>-database`, `spec.owner: <svc>_owner` | `review-database` |
 | Secrets (cluster and app namespace, same name) | `<cluster>-<svc>-runtime-secret`, `<cluster>-<svc>-migrator-secret`; the owner has none | `platform-db-review-migrator-secret` |
 | OpenBAO KV | `secret/local/databases/<cluster>/<svc>-runtime`, `…/<svc>-migrator` | `secret/local/databases/platform-db/review-runtime` |
-| `pg_hba` | `host <svc> <svc>_runtime …`, `host <svc> <svc>_migrator …`, `host <svc> db_authz …`. No line for the owner | — |
+| `pg_hba` | `host <svc> <svc>_runtime …`, `host <svc> <svc>_migrator …`, `host <svc> db_authz …` (`hostssl` for payment's runtime and migrator). No line for the owner | — |
 | Executor | `authz_admin` (NOLOGIN, CREATEROLE) and `db_authz` (LOGIN, member of `authz_admin`), one pair per CNPG cluster | KV `…/platform-db/db-authz` |
 
 Names considered and not used:
@@ -222,7 +224,7 @@ others have a pgroles policy). Each cluster has its own Job and CronJob
 same `apply.sh` and `roles.sql`; `PGHOST` picks the cluster. Today
 `platform-db` runs `ROLE_SERVICES=review user shipping notification` with
 `GRANT_SERVICES=review`, and `product-db` runs `ROLE_SERVICES=product
-inventory` with no Job-owned grants. Per service, `roles.sql`:
+inventory cart order checkout payment` with no Job-owned grants. Per service, `roles.sql`:
 
 1. creates `<svc>_owner` and `<svc>_migrator` if missing and restates
    `LOGIN`/`INHERIT`/`CREATEROLE`/`CONNECTION LIMIT` (`CREATEDB`, `REPLICATION`
@@ -345,8 +347,7 @@ the three guard queries, the `absent()` selectors and `smoke.js` in the same PR.
 ### local-stack
 
 Compose plays the platform: `local-stack/postgres/init.sql` creates the three
-roles and the migrator's `role=` for `review`, `user`, `shipping`,
-`notification`, `product` and `inventory`; each `<svc>-migrate` and `<svc>-seed` connects as the migrator
+roles and the migrator's `role=` for all ten services; each `<svc>-migrate` and `<svc>-seed` connects as the migrator
 with no role variable, and a `<svc>-authz` one-shot service runs **the
 cluster's own `grants.sql`** after the migration, standing in for pgroles for
 the pgroles-owned services. Two deliberate differences stay: local-stack

@@ -65,10 +65,9 @@ x-svc-env: &svc-env
   PORT: "8080"
   DB_HOST: postgres
   DB_PORT: "5432"
-  # DB_USER/DB_PASSWORD are per service (postgres/init.sql): review, user,
-  # shipping, notification, product and inventory run as <svc>_runtime and
-  # migrate as <svc>_migrator (RFC-0029); the other four still use one role per
-  # database.
+  # DB_USER/DB_PASSWORD are per service (postgres/init.sql): all ten services
+  # run as <svc>_runtime and migrate as <svc>_migrator (RFC-0029); order-worker
+  # and checkout-worker share their service's runtime login.
   # No TLS here, unlike the cluster (migrate and payment use require): the TLS
   # rollout of RFC-0029 brings verify-full to both together.
   DB_SSLMODE: disable
@@ -594,7 +593,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local, PGAPPNAME: cart-migrate }
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart_migrator, DB_PASSWORD: cart_migrator-local, PGAPPNAME: cart-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   order-migrate:
@@ -602,7 +601,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local, PGAPPNAME: order-migrate }
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order_migrator, DB_PASSWORD: order_migrator-local, PGAPPNAME: order-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   review-migrate:
@@ -634,7 +633,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment, DB_USER: payment, DB_PASSWORD: payment-local, PGAPPNAME: payment-migrate }
+    environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment, DB_USER: payment_migrator, DB_PASSWORD: payment_migrator-local, PGAPPNAME: payment-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
 
@@ -644,7 +643,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
-    environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout, DB_USER: checkout, DB_PASSWORD: checkout-local, PGAPPNAME: checkout-migrate }
+    environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout, DB_USER: checkout_migrator, DB_PASSWORD: checkout_migrator-local, PGAPPNAME: checkout-migrate }
     depends_on: { postgres: { condition: service_healthy } }
     restart: "no"
   inventory-migrate:
@@ -684,7 +683,7 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local, PGAPPNAME: cart-seed }
+    environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart_migrator, DB_PASSWORD: cart_migrator-local, PGAPPNAME: cart-seed }
     depends_on:
       postgres: { condition: service_healthy }
       cart-migrate: { condition: service_completed_successfully }
@@ -694,16 +693,15 @@ services:
     mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
-    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local, PGAPPNAME: order-seed }
+    environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order_migrator, DB_PASSWORD: order_migrator-local, PGAPPNAME: order-seed }
     depends_on:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
     restart: "no"
   # Play the cluster's in-database grants (ADR-088) after each migration, with
-  # the role catalog Job's own grants.sql. On the cluster user, shipping,
-  # notification, product and inventory get the same statements from pgroles,
-  # whose table wildcard also covers schema_migrations (PGR-10); here the
-  # runtime is denied it.
+  # the role catalog Job's own grants.sql. On the cluster the other services
+  # get the same statements from pgroles, whose table wildcard also covers
+  # schema_migrations (PGR-10); here the runtime is denied it.
   review-authz:
     image: postgres:18.6-trixie
     mem_limit: *oneshot-mem
@@ -775,6 +773,54 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       inventory-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  cart-authz:
+    image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "cart", "-v", "svc=cart", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      cart-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  order-authz:
+    image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "order", "-v", "svc=order", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      order-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  checkout-authz:
+    image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "checkout", "-v", "svc=checkout", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      checkout-migrate: { condition: service_completed_successfully }
+    restart: "no"
+  payment-authz:
+    image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
+    command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
+              "-d", "payment", "-v", "svc=payment", "-f", "/authz/grants.sql"]
+    environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
+    volumes:
+      - ../kubernetes/infra/configs/databases/clusters/platform-db/authz/grants.sql:/authz/grants.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      payment-migrate: { condition: service_completed_successfully }
     restart: "no"
   review-seed:
     image: local-stack/review-service:dev # built by `review`
@@ -959,12 +1005,13 @@ services:
       OTEL_SERVICE_NAME: cart
       PGAPPNAME: cart
       DB_NAME: cart
-      DB_USER: cart
-      DB_PASSWORD: cart-local
+      DB_USER: cart_runtime
+      DB_PASSWORD: cart_runtime-local
     healthcheck: *svc-healthcheck
     depends_on:
       postgres: { condition: service_healthy }
       cart-migrate: { condition: service_completed_successfully }
+      cart-authz: { condition: service_completed_successfully }
       cart-seed: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
 
@@ -1012,8 +1059,8 @@ services:
       OTEL_SERVICE_NAME: checkout
       PGAPPNAME: checkout
       DB_NAME: checkout
-      DB_USER: checkout
-      DB_PASSWORD: checkout-local
+      DB_USER: checkout_runtime
+      DB_PASSWORD: checkout_runtime-local
       CART_GRPC_ADDR: dns:///cart:9090
       PRODUCT_GRPC_ADDR: dns:///product:9090
       # P2 confirm handoff (ADR-018) + abandonment signals (ADR-019). Temporal
@@ -1033,6 +1080,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       checkout-migrate: { condition: service_completed_successfully }
+      checkout-authz: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
       cart: { condition: service_healthy }
       product: { condition: service_healthy }
@@ -1057,8 +1105,8 @@ services:
       OTEL_SERVICE_NAME: checkout-worker
       PGAPPNAME: checkout-worker
       DB_NAME: checkout
-      DB_USER: checkout
-      DB_PASSWORD: checkout-local
+      DB_USER: checkout_runtime
+      DB_PASSWORD: checkout_runtime-local
       TEMPORAL_HOSTPORT: temporal:7233
       TEMPORAL_NAMESPACE: mop
       TASK_QUEUE: checkout
@@ -1066,6 +1114,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       checkout-migrate: { condition: service_completed_successfully }
+      checkout-authz: { condition: service_completed_successfully }
       temporal-bootstrap: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy } # RFC-0024 P3: same OIDC_* env as the API service
 
@@ -1101,8 +1150,8 @@ services:
       OTEL_SERVICE_NAME: payment
       PGAPPNAME: payment
       DB_NAME: payment
-      DB_USER: payment
-      DB_PASSWORD: payment-local
+      DB_USER: payment_runtime
+      DB_PASSWORD: payment_runtime-local
       # Real provider hop: payment calls mockpay over HTTP (empty = in-memory stub).
       MOCKPAY_URL: http://mockpay:8080
       # Shared HMAC secret for verifying mockpay webhook signatures (must match
@@ -1118,6 +1167,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       payment-migrate: { condition: service_completed_successfully }
+      payment-authz: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
       mockpay: { condition: service_healthy }
 
@@ -1131,8 +1181,8 @@ services:
       OTEL_SERVICE_NAME: order
       PGAPPNAME: order
       DB_NAME: order
-      DB_USER: order
-      DB_PASSWORD: order-local
+      DB_USER: order_runtime
+      DB_PASSWORD: order_runtime-local
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_SERVICE_URL: http://shipping:8080
       # ADR-050: the protected group verifies the STAFF realm (split-horizon).
@@ -1158,6 +1208,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
+      order-authz: { condition: service_completed_successfully }
       order-seed: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy }
       cart: { condition: service_healthy }
@@ -1181,8 +1232,8 @@ services:
       OTEL_SERVICE_NAME: order-worker
       PGAPPNAME: order-worker
       DB_NAME: order
-      DB_USER: order
-      DB_PASSWORD: order-local
+      DB_USER: order_runtime
+      DB_PASSWORD: order_runtime-local
       CART_SERVICE_URL: http://cart:8080
       SHIPPING_GRPC_ADDR: dns:///shipping:9090
       NOTIFICATION_GRPC_ADDR: dns:///notification:9090
@@ -1200,6 +1251,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       order-migrate: { condition: service_completed_successfully }
+      order-authz: { condition: service_completed_successfully }
       temporal-bootstrap: { condition: service_completed_successfully }
       keycloak: { condition: service_healthy } # RFC-0024 P3: same OIDC_* env as the API service
       inventory: { condition: service_healthy }

@@ -1,20 +1,15 @@
-# order — per-service database triplet (RFC-0012, ADR-013).
-#
-# ExternalSecret for product-db order database credentials — product namespace.
-# OpenBAO path: secret/data/local/databases/product-db/order
-#
-# Rendered as kubernetes.io/basic-auth (the pre-triplet copy was Opaque):
-# this secret doubles as the passwordSecret for the DatabaseRole below, and
-# CNPG requires basic-auth there. Secret `type` is immutable — migrating a
-# live cluster requires deleting the old Opaque Secret so ESO recreates it
-# (see docs/databases/runbooks/rotate-cnpg-service-password.md).
+# order — runtime login + database (RFC-0029, ADR-084, ADR-088).
+# order_owner and order_migrator are created by the role catalog Job
+# (../authz), which also reads the migrator Secret below; its pgroles policy
+# (../authz/policies/order.yaml) owns the grants; CNPG keeps the runtime
+# login and the Database. Conventions: docs/databases/authorization.md.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: product-db-order-secret
+  name: product-db-order-runtime-secret
   namespace: product
   labels:
-    app.kubernetes.io/name: product-db-order-secret
+    app.kubernetes.io/name: product-db-order-runtime-secret
     app.kubernetes.io/component: database
     app.kubernetes.io/managed-by: external-secrets
 spec:
@@ -23,14 +18,14 @@ spec:
     name: openbao
     kind: ClusterSecretStore
   target:
-    name: product-db-order-secret
+    name: product-db-order-runtime-secret
     creationPolicy: Owner
     deletionPolicy: Retain
     template:
       type: kubernetes.io/basic-auth
       metadata:
         labels:
-          app.kubernetes.io/name: product-db-order-secret
+          app.kubernetes.io/name: product-db-order-runtime-secret
           app.kubernetes.io/component: database
           app.kubernetes.io/managed-by: external-secrets
           cnpg.io/reload: "true"
@@ -40,25 +35,62 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: secret/data/local/databases/product-db/order
+        key: secret/data/local/databases/product-db/order-runtime
         property: username
     - secretKey: password
       remoteRef:
-        key: secret/data/local/databases/product-db/order
+        key: secret/data/local/databases/product-db/order-runtime
         property: password
 ---
-# Written out IN FULL — adoption resets omitted attributes (see payment.yaml).
-# spec.name "order" is a reserved SQL word; the operator quotes identifiers.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: product-db-order-migrator-secret
+  namespace: product
+  labels:
+    app.kubernetes.io/name: product-db-order-migrator-secret
+    app.kubernetes.io/component: database
+    app.kubernetes.io/managed-by: external-secrets
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: openbao
+    kind: ClusterSecretStore
+  target:
+    name: product-db-order-migrator-secret
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      type: kubernetes.io/basic-auth
+      metadata:
+        labels:
+          app.kubernetes.io/name: product-db-order-migrator-secret
+          app.kubernetes.io/component: database
+          app.kubernetes.io/managed-by: external-secrets
+          cnpg.io/reload: "true"
+      data:
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+  data:
+    - secretKey: username
+      remoteRef:
+        key: secret/data/local/databases/product-db/order-migrator
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: secret/data/local/databases/product-db/order-migrator
+        property: password
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: DatabaseRole
 metadata:
-  name: product-db-role-order
+  name: product-db-role-order-runtime
   namespace: product
 spec:
   cluster:
     name: product-db
-  name: order
-  comment: "order-service application role (RFC-0012)"
+  name: order_runtime
+  comment: "order: the service; CRUD only"
   login: true
   superuser: false
   createdb: false
@@ -69,10 +101,11 @@ spec:
   connectionLimit: -1
   inRoles: []
   passwordSecret:
-    name: product-db-order-secret
+    name: product-db-order-runtime-secret
   databaseRoleReclaimPolicy: retain
 ---
-# Order Database extensions (moved from extensions.yaml).
+# order_owner owns the database, which on PostgreSQL 15+ is what gives it
+# CREATE on the public schema. CNPG retries until the catalog Job creates it.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
@@ -80,7 +113,7 @@ metadata:
   namespace: product
 spec:
   name: order
-  owner: order
+  owner: order_owner
   cluster:
     name: product-db
   extensions:

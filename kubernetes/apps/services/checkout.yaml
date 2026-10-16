@@ -25,7 +25,10 @@ spec:
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
-    db_secret: "product-db-checkout-secret"
+    # RFC-0029: the service runs as checkout_runtime through PgDog; the migrate
+    # init container logs in as checkout_migrator, which becomes checkout_owner.
+    db_runtime_secret: "product-db-checkout-runtime-secret"
+    db_migrator_secret: "product-db-checkout-migrator-secret"
     db_sslmode: "disable"
     pool_max: "25"
     # Client-only gRPC: use the multi-port Services below, not the absent

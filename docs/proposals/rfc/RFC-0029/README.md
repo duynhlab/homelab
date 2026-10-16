@@ -2,7 +2,7 @@
 
 | Status | Scope | Research | Created | Last updated |
 |--------|-------|----------|---------|--------------|
-| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-15 |
+| Accepted | platform-wide | [./research.md](./research.md) — gate passed 2026-10-06 | 2026-10-06 | 2026-10-16 |
 
 > **Don't forget: every decision is a tradeoff.** The cost of the leading
 > direction is more Secrets, more HBA pairs and a coordinated consumer cutover
@@ -186,7 +186,7 @@ topology in [database architecture](../../../databases/architecture.md).
 flowchart TB
     subgraph cluster["Kind cluster · homelab"]
         subgraph prod["product-db consumers"]
-            pay["payment<br/>existing direct, pooled cutover planned"]:::service
+            pay["payment<br/>via PgDog, client TLS · wave 2"]:::service
             prapi["product · cart · order · checkout · inventory<br/>order-worker · checkout-worker<br/>runtime · application_name set"]:::service
         end
         mig["migrate init containers · all services<br/>migrator, owner-at-login"]:::worker
@@ -207,7 +207,7 @@ flowchart TB
     prapi -->|"plaintext; planned verify-full"| pgd
     pgd -->|"all queries; planned verify-full"| rprim
     pgd -. "planned: explicit stale-read profile only" .-> rrep
-    pay -->|"require; planned via PgDog"| rprim
+    pay -->|"TLS require, not verified; planned verify-full"| pgd
     pdirect -->|"direct; planned pooled profile"| pprim
     mig -->|"direct -rw, require; planned verify-full"| pprim
     mig -->|"direct -rw, require; planned verify-full"| rprim
@@ -463,8 +463,8 @@ databases at once:
 
 | Wave | Consumers | Notes |
 |---|---|---|
-| product-db, catalog | product, inventory | First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014). The bootstrap database keeps its name `product`; its initdb role `product` becomes NOLOGIN with no `pg_hba` line |
-| product-db, checkout | cart, order, checkout, payment, order-worker, checkout-worker | Workers share their service's runtime role; payment also leaves its direct path when the pooled profile is ready |
+| product-db, catalog (wave 1) | product, inventory | **Done in PR** (#1279). First authz policies on product-db: FQDN host `product-db-rw.product.svc` from `pgroles-system`; PgDog user list remapped to `<svc>_runtime` (ADR-014). The bootstrap database keeps its name `product`; its initdb role `product` becomes NOLOGIN with no `pg_hba` line |
+| product-db, checkout (wave 2) | cart, order, checkout, payment, order-worker, checkout-worker | **Done in PR**, Kind gate passed 2026-10-16. Workers share their service's runtime role. payment's runtime moves behind PgDog with client TLS (`pgdog-product-tls`, `homelab-ca`, `sslmode=require`, not verified); its migrate stays direct over `hostssl` (ADR-089) |
 | Close | — | Fleet gate on a fresh bring-up, ADR-084/086/088 adoption complete |
 
 Carried into the next fresh bring-up from the #1265 audit: re-run the
@@ -585,6 +585,10 @@ Resolved before the access contract and still in force unless noted:
   pgroles policies. PGR-10: pgroles cannot leave `schema_migrations` out of a
   table wildcard; the owner accepted that those runtimes hold it. Fresh
   Kind: K3.4 105/105, K3.8 48/48, three policies Ready, drift drill green.
+- 2026-10-16 — product-db wave 2 in PR: cart, order, checkout and payment on
+  the split (catalog Job, pgroles policies, guards), so all ten services are
+  converted; payment's runtime behind PgDog with client TLS (`require`, not
+  verified). Kind gate passed; the RFC stays `Accepted` until the close PR.
 
 ## Related
 

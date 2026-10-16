@@ -52,7 +52,7 @@ spec:
             # Services whose owner/migrator roles the catalog owns, and those
             # whose in-database grants it owns (the rest use pgroles).
             - name: ROLE_SERVICES
-              value: "product inventory"
+              value: "product inventory cart order checkout payment"
             - name: GRANT_SERVICES
               value: ""
             - name: DB_AUTHZ_USER
@@ -74,6 +74,26 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: product-db-inventory-migrator-secret
+                  key: password
+            - name: CART_MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-cart-migrator-secret
+                  key: password
+            - name: ORDER_MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-order-migrator-secret
+                  key: password
+            - name: CHECKOUT_MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-checkout-migrator-secret
+                  key: password
+            - name: PAYMENT_MIGRATOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-payment-migrator-secret
                   key: password
           resources:
             requests:
@@ -146,7 +166,7 @@ spec:
                   # Services whose owner/migrator roles the catalog owns, and those
                   # whose in-database grants it owns (the rest use pgroles).
                   - name: ROLE_SERVICES
-                    value: "product inventory"
+                    value: "product inventory cart order checkout payment"
                   - name: GRANT_SERVICES
                     value: ""
                   - name: DB_AUTHZ_USER
@@ -168,6 +188,26 @@ spec:
                     valueFrom:
                       secretKeyRef:
                         name: product-db-inventory-migrator-secret
+                        key: password
+                  - name: CART_MIGRATOR_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: product-db-cart-migrator-secret
+                        key: password
+                  - name: ORDER_MIGRATOR_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: product-db-order-migrator-secret
+                        key: password
+                  - name: CHECKOUT_MIGRATOR_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: product-db-checkout-migrator-secret
+                        key: password
+                  - name: PAYMENT_MIGRATOR_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: product-db-payment-migrator-secret
                         key: password
                 resources:
                   requests:

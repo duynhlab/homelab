@@ -1,0 +1,27 @@
+# Client-side TLS for PgDog (RFC-0029 wave 2, ADR-089). payment requires TLS
+# to its database in production, so PgDog presents this certificate to
+# clients. TLS is optional for clients: the other product-db services still
+# connect in plaintext. Clients do not verify it yet (sslmode=require);
+# verify-full and the CA lifecycle are ADR-089 follow-ups.
+# PgDog reads the files at start: a renewed certificate takes effect on the
+# next pod restart (rotation runbook), well inside the 15-day renewBefore.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pgdog-product-tls
+  namespace: product
+spec:
+  secretName: pgdog-product-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+  commonName: pgdog-product.product.svc
+  dnsNames:
+    - pgdog-product.product.svc
+    - pgdog-product.product.svc.cluster.local

@@ -421,6 +421,10 @@ data:
                 OR COALESCE(bool_or(m.set_option), false) <> e.want_set)::int AS drift
                FROM (VALUES ('product_migrator', 'product_owner', false, false, true),
                             ('inventory_migrator', 'inventory_owner', false, false, true),
+                            ('cart_migrator', 'cart_owner', false, false, true),
+                            ('order_migrator', 'order_owner', false, false, true),
+                            ('checkout_migrator', 'checkout_owner', false, false, true),
+                            ('payment_migrator', 'payment_owner', false, false, true),
                             ('db_authz', 'authz_admin', false, true, true))
                  AS e(member, parent, want_admin, want_inherit, want_set)
                LEFT JOIN pg_roles mr ON mr.rolname = e.member
@@ -455,7 +459,11 @@ data:
     pg_role_config:
       query: "SELECT e.role, (COALESCE(r.rolconfig, '{}') <> e.want)::int AS drift
                FROM (VALUES ('product_migrator', ARRAY['role=product_owner']),
-                            ('inventory_migrator', ARRAY['role=inventory_owner'])) AS e(role, want)
+                            ('inventory_migrator', ARRAY['role=inventory_owner']),
+                            ('cart_migrator', ARRAY['role=cart_owner']),
+                            ('order_migrator', ARRAY['role=order_owner']),
+                            ('checkout_migrator', ARRAY['role=checkout_owner']),
+                            ('payment_migrator', ARRAY['role=payment_owner'])) AS e(role, want)
                LEFT JOIN pg_roles r ON r.rolname = e.role"
       metrics:
         - role:
@@ -486,6 +494,10 @@ data:
       target_databases:
         - "product"
         - "inventory"
+        - "cart"
+        - "order"
+        - "checkout"
+        - "payment"
       metrics:
         - datname:
             usage: "LABEL"

@@ -11,6 +11,10 @@ resources:
   - job.yaml
   - policies/product.yaml
   - policies/inventory.yaml
+  - policies/cart.yaml
+  - policies/order.yaml
+  - policies/checkout.yaml
+  - policies/payment.yaml
 
 configMapGenerator:
   - name: product-db-authz

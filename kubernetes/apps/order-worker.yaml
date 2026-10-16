@@ -136,12 +136,16 @@ spec:
             # session in pg_stat_activity and pg_stat_ch.
             - name: PGAPPNAME
               value: order-worker
+            # Same order_runtime login as the service (RFC-0029).
             - name: DB_USER
-              value: order
+              valueFrom:
+                secretKeyRef:
+                  name: product-db-order-runtime-secret
+                  key: username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: product-db-order-secret
+                  name: product-db-order-runtime-secret
                   key: password
             - name: DB_SSLMODE
               value: disable

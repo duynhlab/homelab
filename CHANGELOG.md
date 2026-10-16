@@ -514,6 +514,21 @@ Skeleton (copy what you need):
 
 ### Dependency
 
+#### Observability
+
+- **VictoriaMetrics operator chart 0.67.2 → 0.68.1 (operator v0.75.0).** The
+  cluster follows the operator's defaults, so VMSingle, VMAgent and VMAlert move
+  from v1.148.0 to v1.152.0. VictoriaLogs stays at v1.52.0, and VTSingle stays
+  pinned at v0.11.1. The release notes for v1.149–v1.152 and VictoriaLogs list no
+  breaking change for this setup: the POST-only admin endpoints have no callers,
+  and the multitenancy-header default needs a flag that is not set. The operator
+  adds the VTAgent CRD and a config-reloader argument. Local-stack stays ahead
+  at v1.154.0 / v1.53.0 by design.
+- **Pyroscope 2.3.1 → 2.4.0** (chart and image). The bundled Alloy subchart
+  moves 1.5.2 → 1.12.1, and the headless Service drops out of the ServiceMonitor.
+- **Temporal server and admin-tools pinned to 1.32.1** (chart 1.7.0 defaults to
+  1.32.0), matching local-stack and the search-attributes Job. No schema change.
+
 #### Databases
 
 - Bump the PgDog chart for `product-db` from `v0.39` (PgDog 0.1.26) to

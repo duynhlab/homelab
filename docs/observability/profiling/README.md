@@ -7,7 +7,7 @@ that ran during it.
 
 | | |
 |---|---|
-| **Backend** | Grafana Pyroscope `2.3.1`, single-binary, v2 storage — official Helm chart |
+| **Backend** | Grafana Pyroscope `2.4.0`, single-binary, v2 storage — official Helm chart |
 | **Client** | `obsx.SetupProfiling()` (`duynhlab/pkg`), `pyroscope-go` SDK — push model |
 | **Storage** | RustFS (S3) bucket `pyroscope-profiles`, 7-day retention; PVC for the v2 metastore |
 | **Datasource** | Grafana `Pyroscope` (`uid: pyroscope`, `grafana-pyroscope-datasource`) |
@@ -143,7 +143,7 @@ Verified inventory of the actual deployment:
 
 | Area | Applied |
 |---|---|
-| **Backend** | Grafana Pyroscope `2.3.1` (Helm chart `2.3.1`), single-binary, `fullnameOverride: pyroscope`, ns `monitoring` (`kubernetes/infra/controllers/profiling/pyroscope/helmrelease.yaml`) |
+| **Backend** | Grafana Pyroscope `2.4.0` (Helm chart `2.4.0`), single-binary, `fullnameOverride: pyroscope`, ns `monitoring` (`kubernetes/infra/controllers/profiling/pyroscope/helmrelease.yaml`) |
 | **Block storage** | RustFS S3 `rustfs-svc.rustfs.svc.cluster.local:9000`, bucket `pyroscope-profiles`, `force_path_style` + `insecure` (plain HTTP in-cluster), `compactor_blocks_retention_period: 168h` (7d, matches VM/VictoriaTraces) |
 | **Metastore** | PVC `10Gi` (`standard`) for the v2 raft metastore — survives restarts |
 | **Credentials** | `pyroscope-rustfs` `ClusterExternalSecret` → `pyroscope-rustfs-credentials` (from OpenBAO); bucket created at bring-up by the run-once `rustfs-setup-buckets-init` Job (idempotently kept present by the `*/30` RustFS bucket CronJob) |
@@ -152,7 +152,7 @@ Verified inventory of the actual deployment:
 | **Resources** | requests `100m` / `256Mi`, limit `512Mi` |
 | **Access** | Grafana datasource `uid: pyroscope` (`http://pyroscope.monitoring.svc.cluster.local:4040`); the `pyroscope` HTTPRoute `pyroscope.duynh.me` |
 | **Client** | `obsx.SetupProfiling` in all 10 services + both workers; **on by default** (`PROFILING_ENABLED=true`, `PYROSCOPE_ENDPOINT=http://pyroscope.monitoring.svc.cluster.local:4040`) |
-| **local-stack** | `grafana/pyroscope:2.3.1` container + Grafana Pyroscope datasource; `PROFILING_ENABLED: "true"` in the `x-svc-env` anchor; storage is an **ephemeral** volume (`pyroscope-data`), no S3 |
+| **local-stack** | `grafana/pyroscope:2.4.0` container + Grafana Pyroscope datasource; `PROFILING_ENABLED: "true"` in the `x-svc-env` anchor; storage is an **ephemeral** volume (`pyroscope-data`), no S3 |
 
 > Migrated from a hand-vendored raw manifest (`pyroscope/pyroscope:latest`, `emptyDir`
 > with 24h TTL so profiles vanished on restart, an unmounted legacy ConfigMap, no

@@ -381,9 +381,9 @@ trace pilot remains explicit so a future operator bump cannot move it silently.
 
 | Layer | Version | Pin source |
 |-------|---------|------------|
-| VM Operator | chart `0.67.2`, app `v0.74.0` | Flux `OCIRepository` |
-| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.148.0`, local-stack `v1.152.0` | operator defaults on the cluster; the three compose images are pinned explicitly and still run **ahead** — see the skew note below |
-| VictoriaLogs (`VLSingle`) | `v1.52.0` in both places | operator default on the cluster now matches the explicit compose image |
+| VM Operator | chart `0.68.1`, app `v0.75.0` | Flux `OCIRepository` |
+| VictoriaMetrics (`VMSingle`, `VMAgent`, `VMAlert`) | cluster `v1.152.0`, local-stack `v1.154.0` | operator defaults on the cluster; the three compose images are pinned explicitly and still run **ahead** — see the skew note below |
+| VictoriaLogs (`VLSingle`) | cluster `v1.52.0`, local-stack `v1.53.0` | operator default on the cluster; the compose image is pinned explicitly and runs ahead |
 | VictoriaTraces (`VTSingle`) | `v0.11.1` | explicit CR and local-stack image |
 | Grafana VM / VL datasources | `v0.26.1` / `v0.32.0` | Grafana CR and datasource CRs |
 | VM / VL MCP charts | `0.3.0` / `0.1.0` | Flux `OCIRepository` |
@@ -391,13 +391,12 @@ trace pilot remains explicit so a future operator bump cannot move it silently.
 **The local-stack VM images run ahead of the cluster on purpose.** The compose
 pins take upstream bugfixes as soon as they are gated here (v1.150.0 carries a
 vmagent persistent-queue corruption fix); the cluster follows whenever the VM
-operator's defaults move — which is exactly how VictoriaLogs converged: the
-operator bump to v0.74.0 moved the cluster's default to v1.52.0 (the LogsQL
-bare-filter-pipe fix local-stack had pinned since v1.51.0 rejected them), so
-VL now matches in both places while VM remains ahead. The trace pilot stays in
-lockstep instead — `VTSingle` is pinned by an explicit CR, so `v0.11.1` is the
-version in both places regardless of the operator's own default (v0.10.0 as of
-v0.74.0).
+operator's defaults move. The operator bump to v0.75.0 (2026-10-16) moved the
+cluster to VictoriaMetrics v1.152.0, two minors behind local-stack's v1.154.0,
+and left VictoriaLogs at v1.52.0 while local-stack runs v1.53.0. The trace pilot
+stays in lockstep instead: `VTSingle` is pinned by an explicit CR, so `v0.11.1`
+is the version in both places whatever the operator's own default (also
+v0.11.1 as of v0.75.0).
 
 The standalone `victoria-metrics-operator-crds` chart targets the same
 operator version as the operator chart, but is not installed here: the operator chart already

@@ -12,7 +12,7 @@
 # answers exactly as the matrix expects. ~1 pod per cluster, one psql loop.
 set -u
 
-IMAGE="ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie"
+IMAGE="ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
 FAIL=0
 
 # expected verdict per pair: "allow" (auth-level failure expected) | "reject"

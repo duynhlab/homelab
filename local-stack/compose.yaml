@@ -37,6 +37,15 @@
 # Vector's exclude list and the Makefile, whatever directory or worktree runs it.
 name: local-stack
 
+# Memory caps, set from `docker stats` after a full `make e2e GATE=compose`
+# (2026-10-16): Go services peaked at 23–44 MiB and Keycloak at ~1 GiB, the
+# whole stack at ~3.5 GiB. Roughly 2–3x the peak, so a leak or a runaway
+# container is killed instead of starving a host that may also run Kind.
+# ClickHouse sizes max_server_memory_usage from its cgroup limit by itself.
+x-mem-limits:
+  go: &go-mem 128m       # every Go service, worker and mockpay
+  oneshot: &oneshot-mem 128m  # migrate, seed, grant, bootstrap and wait jobs
+
 x-svc-env: &svc-env
   ENV: development
   TRACING_ENABLED: "true"
@@ -84,10 +93,14 @@ x-svc-healthcheck: &svc-healthcheck
 
 services:
   postgres:
-    # trixie (glibc), not alpine (musl): the same libc and collations as the
-    # CNPG image, so text ordering matches the cluster.
+    # trixie (glibc), not alpine (musl): the same libc as the CNPG image.
     image: postgres:18.6-trixie
+    mem_limit: 1g
     environment:
+      # The CNPG clusters initdb with localeCollate/localeCType "C"
+      # (instance.yaml); the image default is en_US.utf8, which sorts text
+      # differently. C makes ORDER BY on text match the cluster byte for byte.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
@@ -102,6 +115,7 @@ services:
 
   cache:
     image: valkey/valkey:9.1.2-alpine # the cluster chart's appVersion
+    mem_limit: 128m
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
@@ -121,8 +135,11 @@ services:
   # exist yet — `docker compose down -v` re-converges to this state.
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    mem_limit: 1280m
     command: ["start-dev", "--import-realm"]
     environment:
+      # Heap inside the 1280m container cap; the JVM default sizes from host RAM.
+      JAVA_OPTS_KC_HEAP: "-Xms128m -Xmx640m"
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
@@ -196,6 +213,7 @@ services:
   # design. Use `restart` to exercise durability.
   temporal-schema:
     image: temporalio/admin-tools:1.32.1
+    mem_limit: *oneshot-mem
     # A healthy postgres can still refuse the first connection during bring-up;
     # retry rather than failing every Temporal-dependent service behind it.
     restart: on-failure:5
@@ -223,6 +241,7 @@ services:
 
   temporal:
     image: temporalio/server:1.32.1
+    mem_limit: 512m
     # on-failure: a restart dies FATALLY after ~50s roughly half the time, when
     # ringpop cannot bootstrap ("join duration of 50.6s exceeded max 30s"). Seen
     # first in the 2026-08-13 audit: `restart temporal` (A14) answered the row,
@@ -292,6 +311,7 @@ services:
   # services on this completing, not on the server being healthy.
   temporal-bootstrap:
     image: temporalio/admin-tools:1.32.1
+    mem_limit: *oneshot-mem
     restart: on-failure:5 # the frontend can accept a TCP probe just before it serves the API
     environment:
       TEMPORAL_ADDRESS: temporal:7233
@@ -327,6 +347,7 @@ services:
   # server it talks to.
   temporal-admintools:
     image: temporalio/admin-tools:1.32.1 # default entrypoint sleeps; nothing to run
+    mem_limit: 128m
     environment:
       TEMPORAL_ADDRESS: temporal:7233
       # `mop` is the only namespace here, so default to it. Without this the CLI
@@ -338,6 +359,7 @@ services:
 
   temporal-ui:
     image: temporalio/ui:2.55.0
+    mem_limit: 128m
     environment:
       TEMPORAL_ADDRESS: temporal:7233
     ports:
@@ -355,6 +377,7 @@ services:
   # with the same spanmetrics connector as the cluster collector.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.161.0 # contrib: spanmetrics connector lives here; 0.161.0 matches cluster (OTel logs schema 1.3.0, no TimestampTime)
+    mem_limit: 512m
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
@@ -368,6 +391,7 @@ services:
 
   victoria-traces:
     image: victoriametrics/victoria-traces:v0.11.1
+    mem_limit: 512m
     command:
       - "-httpListenAddr=:10428"
       - "-storageDataPath=/victoria-traces-data"
@@ -383,6 +407,7 @@ services:
   # the exporter (create_schema). Dev: default user, no password.
   clickhouse:
     image: clickhouse/clickhouse-server:26.9
+    mem_limit: 1536m
     environment:
       CLICKHOUSE_DB: otel
       CLICKHOUSE_PASSWORD: otel # dev password (CH ≥25.3 requires one for default); cluster uses an ESO secret
@@ -415,6 +440,7 @@ services:
   # access-log sink carries those lines instead.
   victoria-logs:
     image: victoriametrics/victoria-logs:v1.53.0
+    mem_limit: 512m
     command:
       - "-httpListenAddr=:9428"
       - "-storageDataPath=/victoria-logs-data"
@@ -429,6 +455,7 @@ services:
   # observability/vector.yaml.
   vector:
     image: timberio/vector:0.59.0-alpine
+    mem_limit: 256m
     command: ["--config", "/etc/vector/vector.yaml"]
     volumes:
       - ./observability/vector.yaml:/etc/vector/vector.yaml:ro
@@ -438,6 +465,7 @@ services:
 
   victoria-metrics:
     image: victoriametrics/victoria-metrics:v1.154.0
+    mem_limit: 1g
     command:
       - "-storageDataPath=/victoria-metrics-data"
       # RFC-0014 P1 (D-1/D-2): OTLP ingest shaping. usePrometheusNaming turns
@@ -462,6 +490,7 @@ services:
   # observability/vmagent/prometheus.yml (the local ServiceMonitor analogue).
   vmagent:
     image: victoriametrics/vmagent:v1.154.0
+    mem_limit: 384m
     command:
       - "-promscrape.config=/etc/vmagent/prometheus.yml"
       - "-remoteWrite.url=http://victoria-metrics:8428/api/v1/write"
@@ -479,6 +508,7 @@ services:
   # local-stack/docs/observability.md § Non-goals.
   vmalert:
     image: victoriametrics/vmalert:v1.154.0
+    mem_limit: 128m
     command:
       - "-datasource.url=http://victoria-metrics:8428"
       - "-remoteWrite.url=http://victoria-metrics:8428"
@@ -501,6 +531,7 @@ services:
   # in x-svc-env). View flame graphs in Grafana → Explore → Pyroscope.
   pyroscope:
     image: grafana/pyroscope:2.4.0
+    mem_limit: 512m
     ports:
       - "127.0.0.1:4040:4040" # Pyroscope UI/API; services reach it in-network at pyroscope:4040
     volumes:
@@ -508,6 +539,7 @@ services:
 
   grafana:
     image: grafana/grafana:13.2.3
+    mem_limit: 768m # 338 MiB after the full gate; dashboard renders spike
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
@@ -538,6 +570,7 @@ services:
   # ---- golang-migrate migrations (one-shot, per service DB; app image `migrate`) ----
   user-migrate:
     image: local-stack/user-service:dev # built by `user`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local, PGAPPNAME: user-migrate }
@@ -545,6 +578,7 @@ services:
     restart: "no"
   product-migrate:
     image: local-stack/product-service:dev # built by `product`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local, PGAPPNAME: product-migrate }
@@ -552,6 +586,7 @@ services:
     restart: "no"
   cart-migrate:
     image: local-stack/cart-service:dev # built by `cart`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local, PGAPPNAME: cart-migrate }
@@ -559,6 +594,7 @@ services:
     restart: "no"
   order-migrate:
     image: local-stack/order-service:dev # built by `order`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local, PGAPPNAME: order-migrate }
@@ -566,6 +602,7 @@ services:
     restart: "no"
   review-migrate:
     image: local-stack/review-service:dev # built by `review`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, PGAPPNAME: review-migrate }
@@ -573,6 +610,7 @@ services:
     restart: "no"
   shipping-migrate:
     image: local-stack/shipping-service:dev # built by `shipping`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local, PGAPPNAME: shipping-migrate }
@@ -580,6 +618,7 @@ services:
     restart: "no"
   notification-migrate:
     image: local-stack/notification-service:dev # built by `notification`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local, PGAPPNAME: notification-migrate }
@@ -587,6 +626,7 @@ services:
     restart: "no"
   payment-migrate:
     image: local-stack/payment-service:dev # built by `payment`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: payment, DB_NAME: payment, DB_USER: payment, DB_PASSWORD: payment-local, PGAPPNAME: payment-migrate }
@@ -596,6 +636,7 @@ services:
   # checkout has no seed job — no demo data (RFC-0015 P1).
   checkout-migrate:
     image: local-stack/checkout-service:dev # built by `checkout`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: checkout, DB_NAME: checkout, DB_USER: checkout, DB_PASSWORD: checkout-local, PGAPPNAME: checkout-migrate }
@@ -603,6 +644,7 @@ services:
     restart: "no"
   inventory-migrate:
     image: local-stack/inventory-service:dev # built by `inventory`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["migrate"]
     environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local, PGAPPNAME: inventory-migrate }
@@ -614,6 +656,7 @@ services:
   # that service's migrate. ----
   user-seed:
     image: local-stack/user-service:dev # built by `user`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: user, DB_NAME: user, DB_USER: user_migrator, DB_PASSWORD: user_migrator-local, PGAPPNAME: user-seed }
@@ -623,6 +666,7 @@ services:
     restart: "no"
   product-seed:
     image: local-stack/product-service:dev # built by `product`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: product, DB_NAME: product, DB_USER: product, DB_PASSWORD: product-local, PGAPPNAME: product-seed }
@@ -632,6 +676,7 @@ services:
     restart: "no"
   cart-seed:
     image: local-stack/cart-service:dev # built by `cart`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: cart, DB_NAME: cart, DB_USER: cart, DB_PASSWORD: cart-local, PGAPPNAME: cart-seed }
@@ -641,6 +686,7 @@ services:
     restart: "no"
   order-seed:
     image: local-stack/order-service:dev # built by `order`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: order, DB_NAME: order, DB_USER: order, DB_PASSWORD: order-local, PGAPPNAME: order-seed }
@@ -654,6 +700,7 @@ services:
   # also covers schema_migrations (PGR-10); here the runtime is denied it.
   review-authz:
     image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "review", "-v", "svc=review", "-f", "/authz/grants.sql"]
     environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
@@ -665,6 +712,7 @@ services:
     restart: "no"
   user-authz:
     image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "user", "-v", "svc=user", "-f", "/authz/grants.sql"]
     environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
@@ -676,6 +724,7 @@ services:
     restart: "no"
   shipping-authz:
     image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "shipping", "-v", "svc=shipping", "-f", "/authz/grants.sql"]
     environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
@@ -687,6 +736,7 @@ services:
     restart: "no"
   notification-authz:
     image: postgres:18.6-trixie
+    mem_limit: *oneshot-mem
     command: ["psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "postgres",
               "-d", "notification", "-v", "svc=notification", "-f", "/authz/grants.sql"]
     environment: { PGPASSWORD: postgres, PGAPPNAME: db-authz }
@@ -698,6 +748,7 @@ services:
     restart: "no"
   review-seed:
     image: local-stack/review-service:dev # built by `review`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: review, DB_NAME: review, DB_USER: review_migrator, DB_PASSWORD: review_migrator-local, PGAPPNAME: review-seed }
@@ -707,6 +758,7 @@ services:
     restart: "no"
   shipping-seed:
     image: local-stack/shipping-service:dev # built by `shipping`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: shipping, DB_NAME: shipping, DB_USER: shipping_migrator, DB_PASSWORD: shipping_migrator-local, PGAPPNAME: shipping-seed }
@@ -716,6 +768,7 @@ services:
     restart: "no"
   notification-seed:
     image: local-stack/notification-service:dev # built by `notification`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: notification, DB_NAME: notification, DB_USER: notification_migrator, DB_PASSWORD: notification_migrator-local, PGAPPNAME: notification-seed }
@@ -725,6 +778,7 @@ services:
     restart: "no"
   inventory-seed:
     image: local-stack/inventory-service:dev # built by `inventory`
+    mem_limit: *oneshot-mem
     pull_policy: never
     command: ["seed"]
     environment: { <<: *svc-env, SERVICE_NAME: inventory, DB_NAME: inventory, DB_USER: inventory, DB_PASSWORD: inventory-local, PGAPPNAME: inventory-seed }
@@ -736,6 +790,7 @@ services:
   # ---- Backend services ----
   user:
     image: local-stack/user-service:dev
+    mem_limit: *go-mem
     build: { context: ../../user-service }
     environment:
       <<: *svc-env
@@ -758,6 +813,7 @@ services:
 
   shipping:
     image: local-stack/shipping-service:dev
+    mem_limit: *go-mem
     build: { context: ../../shipping-service }
     # gRPC ShippingService always runs on :9090; HTTP :8080 is unchanged.
     # order reaches it at dns:///shipping:9090.
@@ -783,6 +839,7 @@ services:
 
   review:
     image: local-stack/review-service:dev
+    mem_limit: *go-mem
     build: { context: ../../review-service }
     environment:
       <<: *svc-env
@@ -802,6 +859,7 @@ services:
 
   notification:
     image: local-stack/notification-service:dev
+    mem_limit: *go-mem
     build: { context: ../../notification-service }
     environment:
       <<: *svc-env
@@ -821,6 +879,7 @@ services:
 
   product:
     image: local-stack/product-service:dev
+    mem_limit: *go-mem
     build: { context: ../../product-service }
     environment:
       <<: *svc-env
@@ -861,6 +920,7 @@ services:
 
   cart:
     image: local-stack/cart-service:dev
+    mem_limit: *go-mem
     build: { context: ../../cart-service }
     environment:
       <<: *svc-env
@@ -884,6 +944,7 @@ services:
   # Keycloak dependency = the authmw JWKS verifier, like every verifying svc.
   inventory:
     image: local-stack/inventory-service:dev
+    mem_limit: *go-mem
     build: { context: ../../inventory-service }
     environment:
       <<: *svc-env
@@ -911,6 +972,7 @@ services:
   # cart.v1/GetCart and re-validates prices via product.v1/GetProducts.
   checkout:
     image: local-stack/checkout-service:dev
+    mem_limit: *go-mem
     build: { context: ../../checkout-service }
     environment:
       <<: *svc-env
@@ -951,6 +1013,7 @@ services:
   # ---- Checkout Temporal worker (AbandonedCheckoutWorkflow, ADR-019) ----
   checkout-worker:
     image: local-stack/checkout-service:dev # built by `checkout`
+    mem_limit: *go-mem
     pull_policy: never
     command: ["worker"]
     # Fail-fast like order-worker: an unreachable Temporal after the in-binary
@@ -979,6 +1042,7 @@ services:
   # port). Standalone: no DB, no migrations.
   mockpay:
     image: local-stack/payment-service:dev # built by `payment`
+    mem_limit: *go-mem
     pull_policy: never
     command: ["mockpay"]
     environment:
@@ -997,6 +1061,7 @@ services:
   payment:
     # No seed job: payments are created by flows, not demo data.
     image: local-stack/payment-service:dev
+    mem_limit: *go-mem
     build: { context: ../../payment-service }
     environment:
       <<: *svc-env
@@ -1026,6 +1091,7 @@ services:
 
   order:
     image: local-stack/order-service:dev
+    mem_limit: *go-mem
     build: { context: ../../order-service }
     environment:
       <<: *svc-env
@@ -1069,6 +1135,7 @@ services:
   # ---- Order fulfillment worker (Temporal: runs the saga's activities) ----
   order-worker:
     image: local-stack/order-service:dev # built by `order`
+    mem_limit: *go-mem
     pull_policy: never
     command: ["worker"]
     # The worker is fail-fast by design: an unreachable Temporal/downstream at
@@ -1126,6 +1193,7 @@ services:
   # `certgen && server` cannot be chained inside one container.
   gateway-certgen:
     image: envoyproxy/gateway:v1.9.2@sha256:9d67017c442a70e6ae9f1a358e6c80eb653c67c2e40823d9a991e0daf37ba926
+    mem_limit: *oneshot-mem
     command: ["certgen", "--local", "--overwrite", "--config-home", "/var/lib/eg"]
     volumes:
       - envoy-gateway-data:/var/lib/eg
@@ -1133,6 +1201,7 @@ services:
 
   gateway:
     image: envoyproxy/gateway:v1.9.2@sha256:9d67017c442a70e6ae9f1a358e6c80eb653c67c2e40823d9a991e0daf37ba926
+    mem_limit: 512m
     # The image ENTRYPOINT is /usr/local/bin/envoy-gateway, so `command` is just
     # its arguments.
     command: ["server", "--config-path", "/config/standalone.yaml"]
@@ -1181,6 +1250,7 @@ services:
   # healthcheck the distroless gateway image cannot run.
   gateway-ready:
     image: busybox:1.37
+    mem_limit: *oneshot-mem
     command: ["sh", "-c", "until wget -q -O /dev/null http://gateway:8000/product/v1/public/products; do sleep 2; done"]
     depends_on:
       gateway: { condition: service_started }
@@ -1188,6 +1258,7 @@ services:
 
   # ---- Frontend (built with the gateway origin baked in) ----
   frontend:
+    mem_limit: 64m
     build:
       context: ../../frontend
       args:
@@ -1222,6 +1293,7 @@ services:
   # which is why the realm and the CORS policy already name it; serving the
   # container on the same port keeps one origin for both ways of running it.
   admin:
+    mem_limit: 64m
     build:
       context: ../../admin-service
       args:

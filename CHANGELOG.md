@@ -294,6 +294,20 @@ Skeleton (copy what you need):
   its owner edge as `ADMIN f / INHERIT f / SET t`, which the authorization
   conventions rely on.
 
+#### Local-stack
+
+- **Lighter, closed-off bring-up.** Each service repository now builds one
+  image (`local-stack/<repo>:dev`); its migrate, seed, worker and mockpay
+  containers reuse it, so a cold build is 10 builds instead of ~31. Every
+  container has a `mem_limit` sized from measured usage (Go services peak at
+  23–44 MiB, Keycloak ~1 GiB with its heap now capped, the stack ~3.5 GiB). Every
+  published port binds `127.0.0.1`, and the project is named `local-stack`, so a
+  worktree no longer changes container names. A one-shot `gateway-ready` job
+  waits until the edge serves a route, and both SPAs wait for it. Grafana's
+  plugins persist in a volume. Valkey is pinned to `9.1.2`, the cluster chart's
+  version. `make e2e*` now requires `GATE=compose|kind`: the targets used to
+  default to different stacks.
+
 #### Docs
 
 - `docs/databases/extensions.md` compares the PostgreSQL query-telemetry tools
@@ -458,6 +472,20 @@ Skeleton (copy what you need):
   credential to fail. The retained Job is force-replaced only after CNPG
   observes the new Secret revision; repository state alone does not claim that
   live revocation has happened.
+
+#### Local-stack
+
+- **The compose gate checks what the cluster does.**
+  - Edge access logs are ClickHouse-only, as on the cluster (ADR-061). C13 now
+    reads `otel.otel_logs` and asserts VictoriaLogs holds none.
+  - Service healthchecks probe `/ready` instead of `/health`.
+  - payment heals reconciliation discrepancies (`RECON_HEAL_ENABLED`).
+  - checkout and the edge wait for inventory.
+  - PostgreSQL runs on Debian trixie and is initialised with locale `C`, like
+    the CNPG clusters, so text ordering matches. It used to be `en_US.utf8` on
+    Alpine.
+  - The README states the remaining divergences (no database TLS) and drops
+    stale claims: one role per database, edge logs through Vector, the VM pin.
 
 #### Docs
 

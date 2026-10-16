@@ -1956,7 +1956,9 @@ curl -s "$CH" -u default:otel --data-binary "
   SELECT toJSONString(LogAttributes) FROM otel.otel_logs
   WHERE ServiceName = 'platform.envoy-gateway'
     AND LogAttributes['uri'] LIKE '%audit=$TAG%'
-  LIMIT 1" | python3 -c "
+  LIMIT 1
+  SETTINGS output_format_json_escape_forward_slashes = 0
+  FORMAT TSVRaw" | python3 -c "
 import json,sys
 lines = [json.loads(l) for l in sys.stdin.read().splitlines() if l]
 d = lines[0] if lines else {}
@@ -1966,6 +1968,9 @@ ok = lines and not missing and d['status'] == '200' and d['method'] == 'GET' \
      and d['upstream_cluster'].endswith('/api-product/rule/0')
 print('C13 tagged access log:', 'OK CR field set, %s %s -> %s' % (d.get('method'), d.get('status'), d.get('upstream_cluster'))
       if ok else 'FAIL lines=%d missing=%s' % (len(lines), missing))"
+# TSVRaw and the slash setting matter: plain TSV escapes the backslashes that
+# toJSONString puts before every `/`, and upstream_cluster then reads
+# `httproute\/…`, which never matches.
 # want ONE row whose attribute names are the CR's contract:
 #   uri=/product/v1/public/products?audit=$TAG  status=200  method=GET
 #   upstream_cluster=httproute/envoy-gateway-system/api-product/rule/0

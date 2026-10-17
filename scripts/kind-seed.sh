@@ -56,7 +56,8 @@ for svc in "${SERVICES[@]}"; do
   job="${svc}-seed-${STAMP}"
   # Take image/args/env/resources/pullPolicy from container[0] and the DB_*
   # variables from the migrate init container; leave probes behind (a batch pod
-  # serves no traffic and would fail readiness forever).
+  # serves no traffic and would fail readiness forever). Drop PGSSLROOTCERT:
+  # the seed dials CNPG directly like migrate, and the pod mounts no CA file.
   if ! kubectl -n "${svc}" get deploy "${svc}" -o json |
     jq --arg job "${job}" --arg ns "${svc}" '
       .spec.template.spec.containers[0] as $c |
@@ -79,7 +80,7 @@ for svc in "${SERVICES[@]}"; do
                 imagePullPolicy: $c.imagePullPolicy,
                 args: ["seed"],
                 resources: $c.resources,
-                env: (([$c.env[] | select(.name as $n | $mnames | index($n) | not)] + $m) | map(
+                env: (([$c.env[] | select(.name as $n | ($mnames | index($n) | not) and $n != "PGSSLROOTCERT")] + $m) | map(
                   if .name == "ENV" then { name: "ENV", value: "development" }
                   elif .name == "PGAPPNAME" then { name: "PGAPPNAME", value: ($ns + "-seed") }
                   else . end

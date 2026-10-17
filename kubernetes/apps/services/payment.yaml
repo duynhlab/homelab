@@ -31,8 +31,8 @@ spec:
     # scale — 000007 is the blocker to clear first.
     replicaCount: 1
     # Payment's config refuses cleartext DB in production, so its runtime pool
-    # goes through PgDog's client TLS (pgdog-product-tls, homelab-ca;
-    # sslmode=require, not verified). Migrate stays direct on CNPG.
+    # goes through PgDog's client TLS and verifies it (verify-full) against
+    # the CA in db_ca_secret. Migrate stays direct on CNPG with require.
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"
@@ -40,7 +40,8 @@ spec:
     # init container logs in as payment_migrator, which becomes payment_owner.
     db_runtime_secret: "product-db-payment-runtime-secret"
     db_migrator_secret: "product-db-payment-migrator-secret"
-    db_sslmode: "require"
+    db_sslmode: "verify-full"
+    db_ca_secret: "payment-db-ca-trust"
     pool_max: "25"
     # Internal gRPC server (:9090) — the order saga's money transport. The domain
     # template adds a grpc:9090 port to the payment Service.

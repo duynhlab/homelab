@@ -52,7 +52,9 @@ authentication does not continue down the list looking for another method.
 - `host` permits either TLS or plaintext. It does not prove a connection uses
   plaintext, and it does not enforce encryption.
 - `hostssl` requires TLS, but does not make the client verify the server identity.
-  Payment uses this rule and `sslmode=require`: encrypted, unverified.
+  Payment's migration uses this rule with `sslmode=require`: encrypted,
+  unverified. Its runtime verifies PgDog (`verify-full`,
+  [poolers](poolers.md#tls)).
 - PgDog's upstream TLS and each application's pooler hop are separate. Inspect
   active sessions and client settings rather than inferring them from HBA.
 - The OpenBAO database configuration Job currently declares `sslmode=disable`
@@ -61,8 +63,9 @@ authentication does not continue down the list looking for another method.
 
 Verified TLS needs trusted CA material and hostname validation at the client
 (for libpq, `verify-full`), with certificates covering the chosen endpoint.
-Changing an HBA rule alone cannot deliver that. Transport improvements are
-tracked by [RFC-0020](../proposals/rfc/RFC-0020/); do not describe them as deployed.
+Changing an HBA rule alone cannot deliver that. Today only payment → PgDog
+does it ([poolers](poolers.md#tls)); the other hops are tracked by
+[RFC-0020](../proposals/rfc/RFC-0020/) and ADR-089, and are not deployed.
 
 ### Credentials and reconciliation
 

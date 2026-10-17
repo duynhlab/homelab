@@ -84,7 +84,7 @@ flowchart TB
     pjob --> prw
     bao --> prw
     other --> prw
-    rpod -->|"pooled · payment over TLS, require"| pgdog -->|"same login"| rrw
+    rpod -->|"pooled · payment over TLS, verify-full"| pgdog -->|"same login"| rrw
     rmig --> rrw
     rjob --> rrw
     pgr --> prw
@@ -98,8 +98,8 @@ flowchart TB
 
 PgDog lists every product-db service under its `<svc>_runtime` login; the
 order and checkout workers use their service's runtime login. payment's
-runtime reaches PgDog over client TLS (`sslmode=require`, encrypted but not
-verified; [poolers](poolers.md#tls)), and `pg_hba` admits `payment_runtime` and
+runtime reaches PgDog over client TLS (`sslmode=verify-full`;
+[poolers](poolers.md#tls)), and `pg_hba` admits `payment_runtime` and
 `payment_migrator` on `hostssl` lines only. The other services stay plaintext
 to PgDog.
 

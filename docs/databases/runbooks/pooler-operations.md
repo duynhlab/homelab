@@ -106,7 +106,7 @@ The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add
 | New connections fail after a password rotation | `valuesFrom` read at reconcile time only | `flux reconcile helmrelease pgdog-<cluster>` (step 2 above) |
 | Auth failures for two services at once after adding a backend | positional `users[N]` mismatch | re-align `valuesFrom` targetPath indices with `values.users` order |
 | App migrations hang in Init | migrations connect **direct** to `<cluster>-rw:5432`, not the pooler — NetworkPolicy must admit the app namespace to 5432 | check the cluster namespace's netpol app-services rule |
-| payment cannot connect, TLS errors | payment's runtime requires TLS to PgDog (`sslmode=require`); PgDog serves `pgdog-product-tls` from `/etc/pgdog-tls` | `kubectl get certificate pgdog-product-tls -n product` must be Ready; after a renewal the pods roll on their own (above). payment's `migrate` goes direct to `product-db-rw:5432` |
+| payment cannot connect, TLS errors | payment's runtime verifies PgDog (`sslmode=verify-full`) against `ca.crt` from `payment-db-ca-trust`; PgDog serves `pgdog-product-tls` from `/etc/pgdog-tls` | Both Certificates must be Ready (`kubectl get certificate -n product pgdog-product-tls`, `-n payment payment-db-ca-trust`). `does not match host name`: `db_host` must be one of the certificate's DNS names. `certificate verify failed`: the two are not from the same `homelab-ca`. payment's `migrate` goes direct to `product-db-rw:5432` |
 | `up{job=~"pgdog.*"}` empty | ServiceMonitor scrape broken | `kubectl get servicemonitor -n <ns>`; port 9090 must be admitted from the monitoring namespace in the netpol |
 
 ## References

@@ -34,7 +34,7 @@ not make concurrency free.
 ```mermaid
 flowchart LR
     ProductClients["product / cart / order<br/>checkout / inventory"] -->|"plaintext"| PgDog["PgDog :6432"]
-    Payment["payment"] -->|"client TLS, not verified<br/>sslmode=require"| PgDog
+    Payment["payment"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgDog
     PgDog -->|"reads and writes"| ProductRW["product-db-rw :5432"]
     PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432"]
 
@@ -72,16 +72,31 @@ PgDog terminates client TLS with the cert-manager `Certificate`
 
 | Client | To PgDog | Notes |
 |---|---|---|
-| payment runtime | TLS, `sslmode=require` | Encrypted, but the client does not check the certificate. payment's config refuses cleartext in production |
+| payment runtime | TLS, `sslmode=verify-full` | Checks the chain against `homelab-ca` and the host name. The CA comes from `payment-db-ca-trust` at `/etc/db/ca/ca.crt` (`PGSSLROOTCERT`). payment's config refuses cleartext in production |
 | product, cart, order, checkout, inventory, workers | plaintext, `sslmode=disable` | TLS is optional at PgDog |
 | payment `migrate` | direct to `product-db-rw:5432`, `sslmode=require` | CNPG's own certificate; `pg_hba` admits `payment_runtime` and `payment_migrator` on `hostssl` lines only |
 
 Verified on Kind on 2026-10-16 (RFC-0029 wave 2, ADR-089): PgDog presents
 `CN=pgdog-product.product.svc` issued by `homelab-ca` with both DNS names, every
 `payment_runtime` server session originates from a PgDog pod, and payment's
-session advisory lease (reconciler) acquires and releases through PgDog. `verify-full` against `homelab-ca` is a follow-up
-(ADR-089, RFC-0020). local-stack has no pooler and keeps payment direct to
-PostgreSQL without TLS.
+session advisory lease (reconciler) acquires and releases through PgDog.
+local-stack has no pooler and keeps payment direct to PostgreSQL without TLS.
+
+**payment verifies PgDog.** The CA comes from `payment-db-ca-trust`, a
+Certificate in `payment` issued by the live `homelab-ca` ClusterIssuer, read
+only for its `ca.crt`. The trust-manager bundle is not used because it holds a
+static CA copy that a rebuilt cluster no longer matches. The template mounts
+it and sets `PGSSLROOTCERT` on the service container only: on `migrate` a root
+certificate would turn `require` into `verify-ca` against CNPG's own CA.
+Verified on Kind on 2026-10-17 with `psql` from the `payment` namespace
+(`sslmode=verify-full`): both DNS names connect as `payment_runtime`, the
+Service IP fails with `server certificate ... does not match host name`, and
+the system CA bundle fails with `certificate verify failed`. A renewal of
+`pgdog-product-tls` rolled PgDog in about 80 s while payment stayed Ready with
+no TLS error, since the CA does not change. PgDog still accepts plaintext, so
+a client that drops TLS is not refused by the server; requiring client TLS
+waits until every product-db service speaks it (ADR-089,
+[#1283](https://github.com/duynhlab/homelab/issues/1283)).
 
 **A renewal rolls PgDog.** cert-manager renews the Secret on schedule. The
 Secret's `reconcile.fluxcd.io/watch` label makes helm-controller reconcile, and

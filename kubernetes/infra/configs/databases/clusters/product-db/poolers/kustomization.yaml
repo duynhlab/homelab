@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - certificate.yaml
   - helmrelease.yaml
+  - payment-ca-trust.yaml

@@ -59,9 +59,10 @@ spec:
   inherit: true
   replication: false
   bypassrls: false
-  # The Job (one session) plus the pgroles operator's pooled connections, one
-  # pool per PostgresPolicy.
-  connectionLimit: 10
+  # pgroles keeps one pool per PostgresPolicy and holds ~3 idle connections in
+  # each (0.14.0 has no knob for it), plus the Job's session: 3 x 3 policies
+  # + 1, with slack. Too low and the last policies time out (#1293).
+  connectionLimit: 15
   inRoles: [authz_admin]
   passwordSecret:
     name: platform-db-db-authz-secret

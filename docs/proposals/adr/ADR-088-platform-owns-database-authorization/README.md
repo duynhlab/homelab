@@ -147,8 +147,9 @@ membership fails when the role is created in the same plan.
 - `authz_admin` holds `ADMIN` on every catalog role and inherits every owner:
   whoever holds `db_authz`'s password can act as any service owner. Mitigated by
   a random per-cluster password, `pg_hba` lines only for `postgres` and the
-  managed databases, `connectionLimit: 10` (the Job plus one pgroles pool per
-  policy), and the guard on its edge.
+  managed databases, a `connectionLimit` sized to the Job plus ~3 connections
+  per pgroles policy (15 on platform-db, 25 on product-db; #1293), and the
+  guard on its edge.
 - Up to 10 minutes of drift.
 - The platform knows one name from the migration tool: the Job creates
   golang-migrate's `schema_migrations` as the owner before the first migrate,
@@ -232,3 +233,4 @@ JOB-03/JOB-04 (2026-10-15, the D1 gate):
 | 2026-10-14 | Accepted / Not started | D1 opened: executor split into `authz_admin` + `db_authz` (CNPG-10); review on the catalog Job; pkg `migratex/v0.39.0`, review-service `#208` |
 | 2026-10-15 | Accepted / Partial | D1 merged (#1267, review 2.6.0). D2: user, shipping, notification on the catalog Job + pgroles policies; neutral `platform` bootstrap database; `notification_runtime` rotated by OpenBAO; PGR-10 accepted (runtime holds `schema_migrations` in pgroles-owned databases) |
 | 2026-10-16 | Accepted / Complete | product-db waves merged (#1279 product + inventory, #1282 cart, order, checkout, payment). Fleet gate: both catalog Jobs end with `authz applied`, 9 pgroles policies Ready with every plan Applied, a revoked grant on `payments` restored in 26 s, `db-authz-check` 120/120. RFC-0029 `Implemented` |
+| 2026-10-17 | Accepted / Complete | `db_authz` connection limit sized from the policy count (15 platform-db, 25 product-db): at 10, product-db's six pgroles pools starved each other on a fresh bring-up (#1293) |

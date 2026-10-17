@@ -56,30 +56,36 @@ the migrator's server connection, and its `role=`, to other clients.
 ```mermaid
 flowchart TB
     subgraph cluster["Kind cluster · homelab"]
-        subgraph papps["platform-db services · user, shipping, notification, review"]
-            ppod["service pods<br/>as &lt;svc&gt;_runtime"]:::service
-            pmig["migrate init container + seed<br/>as &lt;svc&gt;_migrator<br/>role= applies at login"]:::worker
+        subgraph shared["cluster-wide clients"]
+            pgr["pgroles operator · pgroles-system<br/>as db_authz → authz_admin"]:::platform
+            bao["OpenBAO database engine<br/>as vault_rotator"]:::platform
+            other["Temporal · Keycloak<br/>long-lived sessions (ADR-041)"]:::service
         end
-        subgraph rapps["product-db services · product, inventory, cart, order, checkout, payment"]
-            rpod["service pods + order/checkout workers<br/>as &lt;svc&gt;_runtime"]:::service
-            rmig["migrate init container + seed<br/>as &lt;svc&gt;_migrator"]:::worker
+        subgraph pside["platform-db"]
+            subgraph papps["app namespaces"]
+                ppod["user, shipping, notification, review<br/>service pods as &lt;svc&gt;_runtime"]:::service
+                pmig["migrate init container + seed<br/>as &lt;svc&gt;_migrator<br/>role= applies at login"]:::worker
+            end
+            subgraph plat["platform namespace"]
+                pjob["authz Job + CronJob<br/>as db_authz → authz_admin"]:::platform
+                pooler["platform-db-pooler-rw<br/>PgBouncer · transaction"]:::data
+                prw[("platform-db primary · -rw :5432")]:::data
+            end
         end
-        pgr["pgroles operator · pgroles-system<br/>as db_authz → authz_admin"]:::platform
-        bao["OpenBAO database engine<br/>as vault_rotator"]:::platform
-        other["Temporal · Keycloak<br/>long-lived sessions (ADR-041)"]:::service
-        subgraph plat["platform namespace"]
-            pjob["authz Job + CronJob<br/>as db_authz → authz_admin"]:::platform
-            pooler["platform-db-pooler-rw<br/>PgBouncer · transaction"]:::data
-            prw[("platform-db primary · -rw :5432")]:::data
-        end
-        subgraph prod["product namespace"]
-            rjob["authz Job + CronJob<br/>as db_authz → authz_admin"]:::platform
-            pgdog["pgdog-product :6432<br/>PgDog · transaction"]:::data
-            rrw[("product-db primary · -rw :5432")]:::data
+        subgraph rside["product-db"]
+            subgraph rapps["app namespaces"]
+                rpod["product, inventory, cart, order,<br/>checkout, payment + order/checkout workers<br/>as &lt;svc&gt;_runtime"]:::service
+                rmig["migrate init container + seed<br/>as &lt;svc&gt;_migrator"]:::worker
+            end
+            subgraph prod["product namespace"]
+                rjob["authz Job + CronJob<br/>as db_authz → authz_admin"]:::platform
+                pgdog["pgdog-product :6432<br/>PgDog · transaction"]:::data
+                rrw[("product-db primary · -rw :5432")]:::data
+            end
         end
     end
 
-    ppod -->|"pooled"| pooler -->|"same login"| prw
+    ppod -->|"pooled · TLS, verify-full"| pooler -->|"same login"| prw
     pmig --> prw
     pjob --> prw
     bao --> prw

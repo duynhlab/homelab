@@ -129,6 +129,7 @@ tool with different day-2 mechanics — do not carry PgDog habits across.
 | Topology | `type: rw` — **all** traffic to the primary. No read/write split, no replica load-balancing (the pilot's accepted tradeoff) |
 | Credentials | None stored. CNPG configures `auth_query`: PgBouncer looks each login up in `pg_shadow` via a generated `user_search` function, authenticating itself with a TLS client certificate |
 | Metrics | `enablePodMonitor: true` → the PgBouncer exporter on `:9127` (`pgbouncer_` prefix), scraped by VMAgent |
+| Client TLS | `clientTLSSecret: platform-db-pooler-tls`, `client_tls_sslmode: require`, `server_tls_sslmode: verify-full`. Clients verify with `sslmode=verify-full` against `platform-db-ca-trust`. A renewal reloads in place, no roll ([poolers](../poolers.md#pgbouncer-platform-db)) |
 
 ### Status
 

@@ -38,8 +38,8 @@ flowchart LR
     PgDog -->|"reads and writes"| ProductRW["product-db-rw :5432"]
     PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432"]
 
-    PlatformClients["user / notification<br/>shipping / review"] --> PgBouncer["PgBouncer :5432"]
-    PgBouncer --> PlatformRW["platform-db-rw :5432"]
+    PlatformClients["user / notification<br/>shipping / review"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgBouncer["PgBouncer :5432"]
+    PgBouncer -->|"TLS, verify-full"| PlatformRW["platform-db-rw :5432"]
     Direct["Temporal / Keycloak"] -->|"direct"| PlatformRW
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
@@ -103,6 +103,31 @@ Secret's `reconcile.fluxcd.io/watch` label makes helm-controller reconcile, and
 the HelmRelease carries `tls.crt` as a pod annotation, so the new certificate
 rolls the Deployment and every pod drains first
 ([pooler operations](./runbooks/pooler-operations.md)).
+
+### PgBouncer (platform-db)
+
+The CNPG `Pooler` terminates client TLS with `platform-db-pooler-tls`
+(`homelab-ca`, ECDSA P-256, 90 days, renewed 15 days before expiry; DNS names
+`platform-db-pooler-rw.platform.svc` and `.svc.cluster.local`) through
+`spec.pgbouncer.clientTLSSecret`. Without it the pooler serves the cluster's
+certificate, which carries no pooler name. `client_tls_sslmode: require`
+refuses plaintext: every client of this pooler speaks TLS, while Temporal,
+Keycloak and OpenBao go direct. `server_tls_sslmode: verify-full` checks
+`platform-db-rw` against the cluster CA.
+
+| Client | To PgBouncer | Notes |
+|---|---|---|
+| user, notification, shipping, review runtime | TLS, `sslmode=verify-full` | CA from `platform-db-ca-trust` in each namespace at `/etc/db/ca/ca.crt` (`PGSSLROOTCERT`, service container only) |
+| their `migrate` and seed | direct to `platform-db-rw:5432`, `sslmode=require` | CNPG's own certificate, unchanged |
+
+Verified on Kind on 2026-10-17 with `psql` from the `user` namespace: both DNS
+names connect as `user_runtime` with TLS on the server session too
+(`pg_stat_ssl`), the Service IP fails with `does not match host name`, the
+system CA bundle fails with `certificate verify failed`, and `sslmode=disable`
+fails with `FATAL: SSL required`. **A renewal needs no roll:** after
+`cmctl renew platform-db-pooler-tls` both pods served the new serial within
+about 50 s with no restart (CNPG reloads PgBouncer), and the four services
+stayed Ready.
 
 CNPG generates PgBouncer authentication support through `auth_query`; it does
 not store a second application password set. Temporal and Keycloak bypass the

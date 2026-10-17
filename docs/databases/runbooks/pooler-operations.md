@@ -79,6 +79,18 @@ clients to finish. `terminationGracePeriodSeconds` is 75 so the sleep and the
 drain both fit. With 3 replicas and PDB `minAvailable: 2` a restart is
 rolling, one pod at a time.
 
+The drain does not reach the idle connections a client's pgx pool holds to the
+pod being stopped: the next statement on one gets `FATAL: PgDog is shutting
+down (SQLSTATE 57P01)`, and the service answers that request with a fail-closed
+503. Measured on Kind (2026-10-17): 5 of 1993 server requests during one
+rollout under 2 orders/s, all in checkout. A retry on a fresh connection in
+`pkg/dbx` (duynhlab/pkg#124) closes it; until then expect a few 503s per roll,
+including the automatic roll on a certificate renewal.
+
+Verified on Kind (2026-10-17): `cmctl renew` rolled the three pods in about
+87 s with no manual step, and six fresh TLS handshakes all presented the new
+serial.
+
 ## Add a database backend (new service)
 
 The full new-service flow (triplet, HBA, seeds) is [add-service-database.md](add-service-database.md); the PgDog slice of it:

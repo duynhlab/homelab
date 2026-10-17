@@ -104,8 +104,10 @@ outside the PgBouncer pilot.
 - Pooler restarts can cut in-flight transactions. PDBs and replica counts reduce
   availability risk but do not preserve a transaction owned by a terminating
   pod. PgDog drains first (a 10 s `preStop`, then up to 60 s for clients to
-  finish), so only a transaction still open after that is cut; the CNPG
-  PgBouncer Pooler has no such drain configured.
+  finish), but an idle pooled client connection to the stopping pod still gets
+  `57P01` on its next statement, so a roll costs a few fail-closed 503s until
+  `pkg/dbx` retries (duynhlab/pkg#124). The CNPG PgBouncer Pooler has no drain
+  configured.
 
 ## Operations
 

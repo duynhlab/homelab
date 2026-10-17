@@ -566,6 +566,16 @@ Skeleton (copy what you need):
 
 #### GitOps
 
+- **`databases-local` substitutes into the two CNPG Clusters only.** Its
+  `postBuild.substituteFrom` (the pg_stat_ch password) used to reach every
+  object in the wave, so each script had to opt out by hand; one missed
+  annotation would either fail the build on bash `${arr[@]}` or silently blank
+  a `${VAR}`. `configs/databases/kustomization.yaml` now opts every object out
+  with a patch and lets only `Kind: Cluster` back in, and `make validate` fails
+  if anything else is in scope or a Cluster references a variable other than
+  `${PG_STAT_CH_CLICKHOUSE_PASSWORD}`. The rendered manifests differ only in
+  that annotation.
+
 - Trim release diaries and repeated explanations in service, worker, CNPG,
   Temporal and edge manifests without changing configuration. Preserve sizing
   evidence in the owning docs and keep rollback constraints and Flux markers.
@@ -577,6 +587,13 @@ Skeleton (copy what you need):
   `service.version` said 2.5.0 while the image is 2.8.0.
 
 #### Databases
+
+- **A fresh bring-up no longer stalls on the authz policies.** `db_authz` had
+  `CONNECTION LIMIT 10`, but pgroles keeps about three idle connections per
+  PostgresPolicy. product-db's six policies needed ~18, so the last ones failed
+  with `pool timed out` and backed off 300 s, holding `databases-local`
+  (`wait: true`) Unknown for 15+ minutes. The limit is now sized from the
+  policy count: 25 on product-db, 15 on platform-db (#1293).
 
 - **`make seed` no longer copies `PGSSLROOTCERT` into the seed Job.** The
   seed dials CNPG directly like `migrate` and mounts no CA file, so pgx failed

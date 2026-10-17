@@ -48,7 +48,7 @@ flowchart TB
     PlatformApps --> PgBouncer --> Platform
     DirectPlatform --> Platform
     ProductApps --> PgDog --> Product
-    Payment -->|"client TLS · require"| PgDog
+    Payment -->|"client TLS · verify-full"| PgDog
     Platform -->|"base backups + WAL"| Store
     Product -->|"base backups + WAL"| Store
     Store -->|"continuous recovery"| DR
@@ -106,10 +106,9 @@ it shares the same Kubernetes environment and object-storage failure domain.
 - Every product-db service uses PgDog as its `<svc>_runtime` login. PgDog
   sends reads and writes to `product-db-rw`; no database lists a replica
   (ADR-089).
-- Payment reaches PgDog over client TLS, unverified (`sslmode=require`:
-  encrypted, but the certificate is not checked); the others stay plaintext.
-  Checked on Kind on 2026-10-16 (RFC-0029 wave 2;
-  [poolers](./poolers.md#tls)).
+- Payment reaches PgDog over client TLS and verifies it (`sslmode=verify-full`
+  against `homelab-ca`); the others stay plaintext. Checked on Kind on
+  2026-10-17 ([poolers](./poolers.md#tls)).
 - Migration jobs connect directly to the primary so schema changes are not
   multiplexed or read-routed.
 

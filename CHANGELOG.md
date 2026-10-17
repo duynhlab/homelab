@@ -211,6 +211,14 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **payment verifies PgDog (`sslmode=verify-full`).** A new Certificate,
+  `payment-db-ca-trust`, is issued by the live `homelab-ca` and read only for
+  its `ca.crt`. The checkout domain template mounts it and sets
+  `PGSSLROOTCERT` on the service container when an RSIP sets `db_ca_secret`;
+  `migrate` keeps `require` straight to CNPG. Verified on Kind: wrong host
+  name and wrong CA are refused, and a PgDog renewal keeps payment connected.
+  PgDog still accepts plaintext (ADR-089, #1283 row 1).
+
 - **PgDog drains on restart and rolls itself on a certificate renewal**
   (ADR-089, #1283). Each pod now has a 10 s `preStop` sleep and a 75 s grace
   period, so it leaves the Service before PgDog's 60 s shutdown drain. The

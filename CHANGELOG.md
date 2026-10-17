@@ -211,6 +211,16 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **platform-db services verify PgBouncer, and PgBouncer refuses plaintext.**
+  user, notification, shipping and review move from `sslmode=disable` to
+  `verify-full`. The CNPG Pooler serves `platform-db-pooler-tls` through
+  `clientTLSSecret`, sets `client_tls_sslmode: require` and
+  `server_tls_sslmode: verify-full`; each namespace gets a
+  `platform-db-ca-trust` Certificate. The identity, comms and catalog domain
+  templates take the `db_ca_secret` input (comms merges it with the password
+  file volume). Verified on Kind: wrong host name, foreign CA and plaintext
+  are refused, and a renewal reloads in place (ADR-089, #1283 row 1).
+
 - **payment verifies PgDog (`sslmode=verify-full`).** A new Certificate,
   `payment-db-ca-trust`, is issued by the live `homelab-ca` and read only for
   its `ca.crt`. The checkout domain template mounts it and sets
@@ -567,6 +577,10 @@ Skeleton (copy what you need):
   `service.version` said 2.5.0 while the image is 2.8.0.
 
 #### Databases
+
+- **`make seed` no longer copies `PGSSLROOTCERT` into the seed Job.** The
+  seed dials CNPG directly like `migrate` and mounts no CA file, so pgx failed
+  to parse its DSN once a service set `db_ca_secret`.
 
 - **The DR replica's daily backup is no longer `immediate`** (#1285). A new
   `product-db-replica` turns Ready while it is still replaying the source's WAL,

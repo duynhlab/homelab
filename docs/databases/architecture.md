@@ -45,7 +45,7 @@ flowchart TB
     CNPG --> Platform
     CNPG --> Product
     CNPG --> DR
-    PlatformApps --> PgBouncer --> Platform
+    PlatformApps -->|"client TLS · verify-full"| PgBouncer --> Platform
     DirectPlatform --> Platform
     ProductApps --> PgDog --> Product
     Payment -->|"client TLS · verify-full"| PgDog
@@ -100,8 +100,9 @@ it shares the same Kubernetes environment and object-storage failure domain.
 
 ## Connection paths
 
-- Platform services use the CNPG PgBouncer transaction pooler. Temporal and
-  Keycloak connect directly because their session and prepared-statement
+- Platform services use the CNPG PgBouncer transaction pooler over client TLS
+  and verify it (`sslmode=verify-full`); PgBouncer refuses plaintext. Temporal
+  and Keycloak connect directly because their session and prepared-statement
   semantics are outside the pilot.
 - Every product-db service uses PgDog as its `<svc>_runtime` login. PgDog
   sends reads and writes to `product-db-rw`; no database lists a replica

@@ -23,9 +23,16 @@ spec:
   type: rw
   pgbouncer:
     poolMode: transaction
+    # ADR-089: clients verify this certificate (verify-full) and must use TLS;
+    # the pooler verifies platform-db-rw against the cluster CA. Every client
+    # of this pooler speaks TLS; Temporal, Keycloak and OpenBao go direct.
+    clientTLSSecret:
+      name: platform-db-pooler-tls
     parameters:
       max_client_conn: "1000"
       default_pool_size: "30"
+      client_tls_sslmode: require
+      server_tls_sslmode: verify-full
   monitoring:
     enablePodMonitor: true
   template:

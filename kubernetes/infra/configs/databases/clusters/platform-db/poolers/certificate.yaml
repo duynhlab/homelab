@@ -1,0 +1,24 @@
+# Client-side TLS for PgBouncer (ADR-089). Without clientTLSSecret the pooler
+# serves the cluster's certificate, which has no pooler name, so verify-full
+# would fail. The four platform-db services verify it (sslmode=verify-full)
+# against platform-db-ca-trust, so dnsNames must keep the name they dial.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-db-pooler-tls
+  namespace: platform
+spec:
+  secretName: platform-db-pooler-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca
+  commonName: platform-db-pooler-rw.platform.svc
+  dnsNames:
+    - platform-db-pooler-rw.platform.svc
+    - platform-db-pooler-rw.platform.svc.cluster.local

@@ -63,6 +63,22 @@ spec:
         podLabels:
           app.kubernetes.io/component: api
           platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
+        <<- if (index inputs "db_ca_secret") >>
+        # ADR-089: the CA that sslmode=verify-full checks the pooler against.
+        # Main container only: on migrate, a root cert would turn its direct
+        # require into verify-ca.
+        volumes:
+          - name: db-ca
+            secret:
+              secretName: << inputs.db_ca_secret >>
+              items:
+                - key: ca.crt
+                  path: ca.crt
+        volumeMounts:
+          - name: db-ca
+            mountPath: /etc/db/ca
+            readOnly: true
+        <<- end >>
         env:
           - name: SERVICE_NAME
             value: << inputs.name >>
@@ -169,6 +185,11 @@ spec:
           <<- end >>
           - name: DB_SSLMODE
             value: << index inputs "db_sslmode" | default "require" >>
+          <<- if (index inputs "db_ca_secret") >>
+          # pgx reads the root certificate path from PGSSLROOTCERT.
+          - name: PGSSLROOTCERT
+            value: /etc/db/ca/ca.crt
+          <<- end >>
           - name: DB_POOL_MAX_CONNECTIONS
             value: << inputs.pool_max | quote >>
           - name: DB_POOL_MODE

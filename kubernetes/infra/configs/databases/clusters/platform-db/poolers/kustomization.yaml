@@ -4,3 +4,5 @@ kind: Kustomization
 resources:
   # platform-db pooler = CNPG-native PgBouncer (ADR-026 pilot). product-db still PgDog.
   - pooler.yaml
+  - certificate.yaml
+  - ca-trust.yaml

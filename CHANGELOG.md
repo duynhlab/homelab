@@ -211,6 +211,16 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **PgDog drains on restart and rolls itself on a certificate renewal**
+  (ADR-089, #1283). Each pod now has a 10 s `preStop` sleep and a 75 s grace
+  period, so it leaves the Service before PgDog's 60 s shutdown drain. The
+  `pgdog-product-tls` Secret carries `reconcile.fluxcd.io/watch`, and the
+  HelmRelease copies `tls.crt` into a pod annotation, so a renewal rolls the
+  Deployment with no manual step. Verified on Kind with `cmctl renew`: the pods
+  rolled in about 87 s and served the new serial. A roll still costs a few
+  fail-closed 503s (5 of 1993 requests under load), because idle pooled client
+  connections get `57P01`; the client retry is duynhlab/pkg#124.
+
 - **cart, order, checkout and payment move to the owner / migrator / runtime
   split (RFC-0029 product-db wave 2, ADR-088).** Every one of the ten services
   is now on the split. On product-db:

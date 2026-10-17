@@ -62,6 +62,15 @@ spec:
       name: product-db-inventory-runtime-secret
       valuesKey: password
       targetPath: "users[5].password"
+    # Not positional. The serving certificate as a pod annotation: a renewal
+    # changes the pod template, so the pods roll onto it (the Secret carries
+    # reconcile.fluxcd.io/watch). Optional: cert-manager may not have issued
+    # it yet on the first install.
+    - kind: Secret
+      name: pgdog-product-tls
+      valuesKey: tls.crt
+      targetPath: "podAnnotations.pgdog-tls-crt"
+      optional: true
   values:
     replicas: 3
     port: 6432
@@ -80,6 +89,12 @@ spec:
       - name: pgdog-tls
         mountPath: /etc/pgdog-tls
         readOnly: true
+
+    # Drain on rollout: preStop keeps the pod serving while the Service drops
+    # it, then SIGINT lets clients finish (shutdown_timeout 60s). Grace covers
+    # both, since the chart's default (shutdown + 5s) ignores the preStop.
+    preStopSleepSeconds: 10
+    terminationGracePeriodSeconds: 75
 
     lsnCheckDelay: 0
     lsnCheckInterval: 5000

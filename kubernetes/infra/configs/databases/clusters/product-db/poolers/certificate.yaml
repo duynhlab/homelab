@@ -3,8 +3,8 @@
 # clients. TLS is optional for clients: the other product-db services still
 # connect in plaintext. Clients do not verify it yet (sslmode=require);
 # verify-full and the CA lifecycle are ADR-089 follow-ups.
-# PgDog reads the files at start: a renewed certificate takes effect on the
-# next pod restart (rotation runbook), well inside the 15-day renewBefore.
+# A renewal rolls PgDog: the watch label makes helm-controller reconcile on a
+# Secret change, and the HelmRelease puts tls.crt in a pod annotation.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -12,6 +12,9 @@ metadata:
   namespace: product
 spec:
   secretName: pgdog-product-tls
+  secretTemplate:
+    labels:
+      reconcile.fluxcd.io/watch: Enabled
   duration: 2160h # 90 days
   renewBefore: 360h # 15 days
   privateKey:

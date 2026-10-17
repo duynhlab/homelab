@@ -204,11 +204,13 @@ joins an event to `pg_stat_statements` and to an auto_explain plan.
   carry `${PG_STAT_CH_CLICKHOUSE_PASSWORD}`, and `databases-local` substitutes
   it at apply time (`postBuild.substituteFrom`) from the Secret ESO lands in
   `flux-system` — one OpenBAO path (`secret/local/infra/clickhouse/pg_stat_ch`)
-  feeds both that Secret and the CHI's. Substitution covers every object the
-  wave renders, so anything carrying shell `${...}` must opt out: the
-  `platform-db-authz` ConfigMap (`apply.sh`) is generated with
-  `kustomize.toolkit.fluxcd.io/substitute: disabled`, and a new script in
-  `configs/databases` needs the same annotation.
+  feeds both that Secret and the CHI's. Flux would substitute into every
+  object the wave renders, so `configs/databases/kustomization.yaml` patches
+  `kustomize.toolkit.fluxcd.io/substitute: disabled` onto all of them except
+  the two `Cluster`s; a new script there needs nothing. `make validate` fails
+  if any other object is in scope, or if a Cluster references a variable other
+  than `${PG_STAT_CH_CLICKHOUSE_PASSWORD}` (Flux turns an undefined one into an
+  empty string).
 - **Sized for 1 Gi pods.** Upstream defaults (131072 slots, 64 MiB string
   area) are for tens of thousands of statements per second. The clusters run
   `queue_capacity: 8192`, `string_area_size: 16`, `flush_interval_ms: 1000`,

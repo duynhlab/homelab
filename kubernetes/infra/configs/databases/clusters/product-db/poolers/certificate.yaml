@@ -1,8 +1,8 @@
 # Client-side TLS for PgDog (RFC-0029 wave 2, ADR-089). payment requires TLS
 # to its database in production, so PgDog presents this certificate to
 # clients. TLS is optional for clients: the other product-db services still
-# connect in plaintext. Clients do not verify it yet (sslmode=require);
-# verify-full and the CA lifecycle are ADR-089 follow-ups.
+# connect in plaintext. payment verifies it (sslmode=verify-full) against
+# payment-db-ca-trust, so dnsNames must keep the name payment dials.
 # A renewal rolls PgDog: the watch label makes helm-controller reconcile on a
 # Secret change, and the HelmRelease puts tls.crt in a pod annotation.
 apiVersion: cert-manager.io/v1

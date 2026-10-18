@@ -490,6 +490,23 @@ validate_databases_substitution_scope() {
   echo "  in scope: $(tr '\n' ' ' <<<"${kinds}")"
 }
 
+validate_dr_replica_pg_hba() {
+  # A promoted product-db-replica takes product-db's clients, so it must admit
+  # them exactly as product-db does (ADR-015, ADR-089). Two copies of the list
+  # exist because each Cluster is its own manifest; fail when they drift.
+  local dir="kubernetes/infra/configs/databases/clusters"
+  local want got
+  echo "INFO - Checking product-db-replica pg_hba matches product-db"
+  want=$(yq '.spec.postgresql.pg_hba[]' "${dir}/product-db/instance.yaml" | tr -s ' ')
+  got=$(yq '.spec.postgresql.pg_hba[]' "${dir}/product-db-replica/instance.yaml" | tr -s ' ')
+  if [[ "${want}" != "${got}" ]]; then
+    echo "ERROR - product-db-replica pg_hba differs from product-db (< product-db, > replica):" >&2
+    diff <(echo "${want}") <(echo "${got}") >&2 || true
+    exit 1
+  fi
+  echo "  $(wc -l <<<"${want}") lines, identical"
+}
+
 validate_rustfs_bucket_lists() {
   echo "INFO - Validating RustFS bucket lists agree"
   local job="kubernetes/infra/controllers/storage/rustfs/job-setup-buckets.yaml"
@@ -513,6 +530,7 @@ validate_clickhouse_embedded_xml
 validate_clickhouse_replica_count
 validate_rustfs_bucket_lists
 validate_databases_substitution_scope
+validate_dr_replica_pg_hba
 validate_service_namespaces
 validate_deny_all_single_owner
 validate_platform_image_references

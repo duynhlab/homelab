@@ -18,18 +18,24 @@ set -u
 IMAGE="ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
 FAIL=0
 
-# label|client namespace|service|service namespace|port|database|user|CA Secret|plaintext refusal text
+# label|client namespace|service|service namespace|port|database|user|CA Secret|plaintext refusal text|optional
+# An optional hop is skipped when its Service does not exist: the DR replica is
+# absent when the databases-cnpg-dr wave is turned off.
 HOPS="
-pgdog|product|pgdog-product|product|6432|product|product_runtime|product-db-ca-trust|only TLS connections are allowed
-pgbouncer|user|platform-db-pooler-rw|platform|5432|user|user_runtime|platform-db-ca-trust|SSL required
-product-rw|product|product-db-rw|product|5432|product|product_migrator|product-db-ca-trust|pg_hba.conf rejects connection
-platform-rw|user|platform-db-rw|platform|5432|user|user_migrator|platform-db-ca-trust|pg_hba.conf rejects connection
+pgdog|product|pgdog-product|product|6432|product|product_runtime|product-db-ca-trust|only TLS connections are allowed|
+pgbouncer|user|platform-db-pooler-rw|platform|5432|user|user_runtime|platform-db-ca-trust|SSL required|
+product-rw|product|product-db-rw|product|5432|product|product_migrator|product-db-ca-trust|pg_hba.conf rejects connection|
+platform-rw|user|platform-db-rw|platform|5432|user|user_migrator|platform-db-ca-trust|pg_hba.conf rejects connection|
+product-rep|product|product-db-replica-rw|product|5432|product|product_migrator|product-db-ca-trust|pg_hba.conf rejects connection|optional
 "
 
 check_hop() {
-  local label="$1" ns="$2" svc="$3" svcns="$4" port="$5" db="$6" user="$7" ca="$8" plain="$9"
+  local label="$1" ns="$2" svc="$3" svcns="$4" port="$5" db="$6" user="$7" ca="$8" plain="$9" optional="${10}"
   local host="$svc.$svcns.svc.cluster.local" ip
   ip=$(kubectl get svc "$svc" -n "$svcns" -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
+  if [ -z "$ip" ] && [ "$optional" = optional ]; then
+    printf "SKIP  %-11s Service %s/%s not found (optional hop)\n" "$label" "$svcns" "$svc"; return
+  fi
   if [ -z "$ip" ]; then
     printf "FAIL  %-11s Service %s/%s not found\n" "$label" "$svcns" "$svc"; FAIL=1; return
   fi
@@ -79,10 +85,10 @@ check_hop() {
   fi
 }
 
-while IFS='|' read -r label ns svc svcns port db user ca plain; do
+while IFS='|' read -r label ns svc svcns port db user ca plain optional; do
   [ -n "$label" ] || continue
   echo "== $label ($svc.$svcns:$port from ns $ns)"
-  check_hop "$label" "$ns" "$svc" "$svcns" "$port" "$db" "$user" "$ca" "$plain"
+  check_hop "$label" "$ns" "$svc" "$svcns" "$port" "$db" "$user" "$ca" "$plain" "$optional"
 done <<<"$HOPS"
 
 echo

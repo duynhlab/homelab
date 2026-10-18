@@ -211,6 +211,15 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **The DR cluster verifies and isolates like product-db.**
+  `product-db-replica` serves a `homelab-ca` certificate
+  (`product-db-replica-server-tls`) and carries product-db's `pg_hba`
+  instead of CNPG's self-signed CA and default `host all all all` rule, so
+  after a promotion PgDog and `migrate` connect with `verify-full` and only
+  the host changes. `make validate` fails when the two `pg_hba` lists
+  differ, and `make db-tls` checks the replica hop when the DR wave is on
+  (#1307).
+
 - **PgDog authenticates by passthrough and keeps no passwords.** The
   `pgdog-product` HelmRelease drops its six `users[]` entries and their
   positional password `valuesFrom` (ADR-014, now superseded) and sets

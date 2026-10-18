@@ -5,6 +5,7 @@ kind: Kustomization
 # Continuously recovers from product-db WAL archive via object store
 resources:
   - objectstore.yaml
+  - server-tls.yaml
   - instance.yaml
   - monitoring/podmonitor.yaml
   - backup/backup-daily.yaml

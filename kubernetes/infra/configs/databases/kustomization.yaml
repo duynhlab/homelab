@@ -7,3 +7,23 @@ resources:
   - clusters/platform-db/
   - clusters/product-db/
   # product-db-replica: see configs/databases-cnpg-dr/ (Flux databases-cnpg-dr-local, dependsOn databases-local)
+
+# databases-local substitutes ${PG_STAT_CH_CLICKHOUSE_PASSWORD} (postBuild) into
+# every object it applies. Opt everything out, then let only the CNPG Clusters
+# back in, so a script with shell ${...} can never be rewritten or break the
+# build. scripts/flux-validate.sh fails if this scope widens.
+patches:
+  - target:
+      kind: ".*"
+    patch: |-
+      apiVersion: any
+      kind: any
+      metadata:
+        name: any
+        annotations:
+          kustomize.toolkit.fluxcd.io/substitute: disabled
+  - target:
+      kind: Cluster
+    patch: |-
+      - op: remove
+        path: /metadata/annotations/kustomize.toolkit.fluxcd.io~1substitute

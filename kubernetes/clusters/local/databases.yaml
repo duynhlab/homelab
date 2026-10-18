@@ -24,10 +24,9 @@ spec:
   # only takes as a literal in Cluster.spec.postgresql.parameters. Flux fills
   # ${PG_STAT_CH_CLICKHOUSE_PASSWORD} at apply time from the Secret ESO lands in
   # flux-system (configs/secrets/cluster-external-secrets/clickhouse-pg-stat-ch.yaml),
-  # so no manifest carries the value. Only the ${var} form is substituted; the
-  # shell scripts under configs/databases use $VAR and are untouched (checked
-  # 2026-10-13: no other ${ in this path). An undefined ${var} becomes an empty
-  # string, which is why the Secret is not optional.
+  # so no manifest carries the value. configs/databases/kustomization.yaml opts
+  # every object except the two Clusters out of substitution. An undefined
+  # ${var} becomes an empty string, which is why the Secret is not optional.
   postBuild:
     substituteFrom:
       - kind: Secret

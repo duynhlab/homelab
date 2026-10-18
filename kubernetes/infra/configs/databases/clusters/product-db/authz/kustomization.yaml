@@ -22,8 +22,3 @@ configMapGenerator:
     files:
       - apply.sh=../../platform-db/authz/apply.sh
       - roles.sql=../../platform-db/authz/roles.sql
-    # apply.sh is bash full of ${...}; keep databases-local's postBuild
-    # substitution (pg_stat_ch password) off it, or the wave fails to build.
-    options:
-      annotations:
-        kustomize.toolkit.fluxcd.io/substitute: disabled

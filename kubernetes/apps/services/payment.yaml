@@ -41,7 +41,7 @@ spec:
     db_runtime_secret: "product-db-payment-runtime-secret"
     db_migrator_secret: "product-db-payment-migrator-secret"
     db_sslmode: "verify-full"
-    db_ca_secret: "payment-db-ca-trust"
+    db_ca_secret: "product-db-ca-trust"
     pool_max: "25"
     # Internal gRPC server (:9090) — the order saga's money transport. The domain
     # template adds a grpc:9090 port to the payment Service.

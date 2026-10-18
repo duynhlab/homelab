@@ -27,7 +27,9 @@ spec:
     # init container logs in as product_migrator, which becomes product_owner.
     db_runtime_secret: "product-db-product-runtime-secret"
     db_migrator_secret: "product-db-product-migrator-secret"
-    db_sslmode: "disable"
+    # ADR-089: verify PgDog's certificate and host name; PgDog refuses plaintext.
+    db_sslmode: "verify-full"
+    db_ca_secret: "product-db-ca-trust"
     pool_max: "50"
     cache_enabled: "true"
     review_grpc_addr: "dns:///review.review.svc.cluster.local:9090"

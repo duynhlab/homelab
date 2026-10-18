@@ -169,8 +169,11 @@ spec:
                 secretKeyRef:
                   name: product-db-checkout-runtime-secret
                   key: password
+            # ADR-089: verify PgDog against the CA in product-db-ca-trust.
             - name: DB_SSLMODE
-              value: disable
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/db/ca/ca.crt
             - name: DB_POOL_MAX_CONNECTIONS
               value: "10"
             - name: DB_POOL_MODE
@@ -204,3 +207,14 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "300m"
+          volumeMounts:
+            - name: db-ca
+              mountPath: /etc/db/ca
+              readOnly: true
+      volumes:
+        - name: db-ca
+          secret:
+            secretName: product-db-ca-trust
+            items:
+              - key: ca.crt
+                path: ca.crt

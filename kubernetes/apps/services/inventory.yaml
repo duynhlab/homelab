@@ -29,7 +29,9 @@ spec:
     # init container logs in as inventory_migrator, which becomes inventory_owner.
     db_runtime_secret: "product-db-inventory-runtime-secret"
     db_migrator_secret: "product-db-inventory-migrator-secret"
-    db_sslmode: "disable"
+    # ADR-089: verify PgDog's certificate and host name; PgDog refuses plaintext.
+    db_sslmode: "verify-full"
+    db_ca_secret: "product-db-ca-trust"
     pool_max: "25"
     # Internal gRPC server (:9090) — inventory reservations for the checkout
     # confirm path and the order saga (RFC-0021). The domain template adds a

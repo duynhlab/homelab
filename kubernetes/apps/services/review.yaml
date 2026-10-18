@@ -22,8 +22,8 @@ spec:
     db_migration_host: "platform-db-rw.platform.svc.cluster.local"
     db_runtime_secret: "platform-db-review-runtime-secret"
     db_migrator_secret: "platform-db-review-migrator-secret"
-    # ADR-089: TLS to PgBouncer, verified against the CA in db_ca_secret
-    # (migrate keeps require straight to CNPG).
+    # ADR-089: TLS to PgBouncer, and from migrate to the primary, verified
+    # against the CA in db_ca_secret.
     db_sslmode: "verify-full"
     db_ca_secret: "platform-db-ca-trust"
     pool_max: "30"

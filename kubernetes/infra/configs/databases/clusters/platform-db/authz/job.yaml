@@ -43,6 +43,11 @@ spec:
           image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
           command: ["bash", "/authz/apply.sh"]
           env:
+            # ADR-089: verify the primary (CNPG serves a homelab-ca certificate).
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /etc/db/ca/ca.crt
             # ADR-089: names every session apply.sh opens (psql reads PGAPPNAME).
             - name: PGAPPNAME
               value: db-authz
@@ -98,10 +103,19 @@ spec:
             - name: authz
               mountPath: /authz
               readOnly: true
+            - name: db-ca
+              mountPath: /etc/db/ca
+              readOnly: true
       volumes:
         - name: authz
           configMap:
             name: platform-db-authz
+        - name: db-ca
+          secret:
+            secretName: platform-db-ca-trust
+            items:
+              - key: ca.crt
+                path: ca.crt
 ---
 # Re-applies the same SQL to undo drift. A failed run is the drift signal for
 # what the executor may not repair (docs/databases/authorization.md).
@@ -145,6 +159,11 @@ spec:
                 image: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
                 command: ["bash", "/authz/apply.sh"]
                 env:
+                  # ADR-089: verify the primary (CNPG serves a homelab-ca certificate).
+                  - name: PGSSLMODE
+                    value: verify-full
+                  - name: PGSSLROOTCERT
+                    value: /etc/db/ca/ca.crt
                   - name: PGAPPNAME
                     value: db-authz
                   # Services whose owner/migrator roles the catalog owns, and those
@@ -199,7 +218,16 @@ spec:
                   - name: authz
                     mountPath: /authz
                     readOnly: true
+                  - name: db-ca
+                    mountPath: /etc/db/ca
+                    readOnly: true
             volumes:
               - name: authz
                 configMap:
                   name: platform-db-authz
+              - name: db-ca
+                secret:
+                  secretName: platform-db-ca-trust
+                  items:
+                    - key: ca.crt
+                      path: ca.crt

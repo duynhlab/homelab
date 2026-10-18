@@ -51,12 +51,20 @@ authentication does not continue down the list looking for another method.
 
 - `host` permits either TLS or plaintext. It does not prove a connection uses
   plaintext, and it does not enforce encryption.
-- `hostssl` requires TLS, but does not make the client verify the server identity.
-  Payment's migration uses this rule with `sslmode=require`: encrypted,
-  unverified. Its runtime verifies PgDog (`verify-full`,
-  [poolers](poolers.md#tls)).
-- PgDog's upstream TLS and each application's pooler hop are separate. Inspect
-  active sessions and client settings rather than inferring them from HBA.
+- `hostssl` requires TLS, but does not make the client verify the server identity;
+  verification is the client's `sslmode=verify-full`. Every service, worker,
+  pooler, migration, seed and authz login is on `hostssl` and verifies the
+  server. On platform-db only `temporal`, `keycloak` and `vault_rotator` keep
+  `host` ([#1296](https://github.com/duynhlab/homelab/issues/1296)).
+- Both clusters serve a server certificate from `homelab-ca`
+  (`<cluster>-server-tls`, cert-manager, 90 days, renewed 15 days before
+  expiry) through `spec.certificates.serverTLSSecret` and `serverCASecret`,
+  instead of CNPG's self-signed CA. Its DNS names cover `<cluster>-rw`, `-ro`
+  and `-r`. Clients verify it with the same `*-db-ca-trust` CA they use for
+  the poolers. CNPG's instances check only the CA between themselves, and the
+  operator still issues the replication client certificates. The Secret
+  carries `cnpg.io/reload`, so a renewal reloads PostgreSQL without a
+  restart.
 - The OpenBAO database configuration Job currently declares `sslmode=disable`
   for its direct notification-database connection. This is a current limitation,
   not the recommended transport for production.
@@ -64,10 +72,11 @@ authentication does not continue down the list looking for another method.
 Verified TLS needs trusted CA material and hostname validation at the client
 (for libpq, `verify-full`), with certificates covering the chosen endpoint.
 Changing an HBA rule alone cannot deliver that. Today every service → pooler
-hop does it, on PgDog and on PgBouncer ([poolers](poolers.md#tls)); the
-other hops (migrations, PgDog's own upstream, Temporal, Keycloak and OpenBAO)
-are tracked by [RFC-0020](../proposals/rfc/RFC-0020/), ADR-089 and
-[#1296](https://github.com/duynhlab/homelab/issues/1296), and are not deployed.
+hop, both poolers → primary, and migrations, seeds and the authz Jobs → primary
+do it ([poolers](poolers.md#tls)). pgroles stays `sslMode: require`: its
+policy has no root-certificate field and its chart cannot mount a CA. Temporal,
+Keycloak and OpenBAO are tracked by
+[#1296](https://github.com/duynhlab/homelab/issues/1296).
 
 ### Credentials and reconciliation
 

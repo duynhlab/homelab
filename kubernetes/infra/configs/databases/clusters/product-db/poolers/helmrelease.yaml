@@ -82,13 +82,25 @@ spec:
     tlsClientRequired: true
     tlsCertificate: /etc/pgdog-tls/tls.crt
     tlsPrivateKey: /etc/pgdog-tls/tls.key
+    # Upstream: verify product-db-rw's homelab-ca certificate and host name.
+    tlsVerify: verify_full
+    tlsServerCaCertificate: /etc/pgdog-server-ca/ca.crt
     extraVolumes:
       - name: pgdog-tls
         secret:
           secretName: pgdog-product-tls
+      - name: pgdog-server-ca
+        secret:
+          secretName: product-db-ca-trust
+          items:
+            - key: ca.crt
+              path: ca.crt
     extraVolumeMounts:
       - name: pgdog-tls
         mountPath: /etc/pgdog-tls
+        readOnly: true
+      - name: pgdog-server-ca
+        mountPath: /etc/pgdog-server-ca
         readOnly: true
 
     # Drain on rollout: preStop keeps the pod serving while the Service drops

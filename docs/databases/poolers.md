@@ -73,7 +73,8 @@ PgDog terminates client TLS with the cert-manager `Certificate`
 |---|---|---|
 | Every product-db runtime and both workers | TLS, `sslmode=verify-full` | Checks the chain against `homelab-ca` and the host name. The CA comes from `product-db-ca-trust` in the client's namespace at `/etc/db/ca/ca.crt` (`PGSSLROOTCERT`) |
 | Any plaintext client | refused | `tls_client_required = true`: PgDog answers `only TLS connections are allowed` before authentication |
-| payment `migrate` | direct to `product-db-rw:5432`, `sslmode=require` | CNPG's own certificate; `pg_hba` admits `payment_runtime` and `payment_migrator` on `hostssl` lines only |
+| `migrate`, seed | direct to `product-db-rw:5432`, `sslmode=verify-full` | Same `product-db-ca-trust` CA: the cluster serves `product-db-server-tls` from `homelab-ca`. Every product-db allow line in `pg_hba` is `hostssl` |
+| PgDog → PostgreSQL | `tls_verify = verify_full` | Verifies `product-db-rw.product.svc.cluster.local` against `product-db-ca-trust`, mounted at `/etc/pgdog-server-ca` |
 
 Verified on Kind on 2026-10-16 (RFC-0029 wave 2, ADR-089): PgDog presents
 `CN=pgdog-product.product.svc` issued by `homelab-ca` with both DNS names, every
@@ -86,8 +87,8 @@ Certificate in each client namespace (product, inventory, cart, order,
 checkout, payment) issued by the live `homelab-ca` ClusterIssuer, read only
 for its `ca.crt`. The trust-manager bundle is not used because it holds a
 static CA copy that a rebuilt cluster no longer matches. The template mounts
-it and sets `PGSSLROOTCERT` on the service container only: on `migrate` a root
-certificate would turn `require` into `verify-ca` against CNPG's own CA.
+it and sets `PGSSLROOTCERT` on the service container and on `migrate`, which
+verifies the primary with the same CA.
 Verified on Kind on 2026-10-17 with `psql` from the `payment` namespace
 (`sslmode=verify-full`): both DNS names connect as `payment_runtime`, the
 Service IP fails with `server certificate ... does not match host name`, and
@@ -113,12 +114,13 @@ The CNPG `Pooler` terminates client TLS with `platform-db-pooler-tls`
 certificate, which carries no pooler name. `client_tls_sslmode: require`
 refuses plaintext: every client of this pooler speaks TLS, while Temporal,
 Keycloak and OpenBao go direct. `server_tls_sslmode: verify-full` checks
-`platform-db-rw` against the cluster CA.
+`platform-db-rw` against the cluster's server CA, which is `homelab-ca`
+(`platform-db-server-tls`).
 
 | Client | To PgBouncer | Notes |
 |---|---|---|
-| user, notification, shipping, review runtime | TLS, `sslmode=verify-full` | CA from `platform-db-ca-trust` in each namespace at `/etc/db/ca/ca.crt` (`PGSSLROOTCERT`, service container only) |
-| their `migrate` and seed | direct to `platform-db-rw:5432`, `sslmode=require` | CNPG's own certificate, unchanged |
+| user, notification, shipping, review runtime | TLS, `sslmode=verify-full` | CA from `platform-db-ca-trust` in each namespace at `/etc/db/ca/ca.crt` (`PGSSLROOTCERT`) |
+| their `migrate` and seed | direct to `platform-db-rw:5432`, `sslmode=verify-full` | Same CA; the cluster serves `platform-db-server-tls` from `homelab-ca` |
 
 Verified on Kind on 2026-10-17 with `psql` from the `user` namespace: both DNS
 names connect as `user_runtime` with TLS on the server session too

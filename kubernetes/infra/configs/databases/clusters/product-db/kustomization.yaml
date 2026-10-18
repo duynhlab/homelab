@@ -18,6 +18,7 @@ resources:
   - secrets/product-db-payment-migrator-secret-payment-ns.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - objectstore.yaml
+  - server-tls.yaml
   - instance.yaml
   - authz/  # ADR-088: db_authz + role catalog Job/CronJob + pgroles policies
   - services/

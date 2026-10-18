@@ -32,7 +32,7 @@ spec:
     replicaCount: 1
     # Payment's config refuses cleartext DB in production, so its runtime pool
     # goes through PgDog's client TLS and verifies it (verify-full) against
-    # the CA in db_ca_secret. Migrate stays direct on CNPG with require.
+    # the CA in db_ca_secret; migrate verifies the primary with the same CA.
     db_host: "pgdog-product.product.svc.cluster.local"
     db_port: "6432"
     db_migration_host: "product-db-rw.product.svc.cluster.local"

@@ -13,7 +13,7 @@
 | **Owners** | `duynhne` |
 | **Deciders** | `duynhne` |
 | **Scope** | The transport and control-plane boundary from the three commerce PostgreSQL databases to ClickHouse |
-| **Affected components** | `product-db`; PeerDB; the `peerdb` Temporal namespace; the `peerdb-staging` RustFS bucket; the PeerDB catalog on `platform-db`; ClickHouse commerce raw tables |
+| **Affected components** | `product-db`; PeerDB; the `peerdb` Temporal namespace; the `analytics-service-cdc` RustFS bucket; the PeerDB catalog on `platform-db`; ClickHouse commerce raw tables |
 | **Related RFC** | [RFC-0030](../../rfc/RFC-0030/) |
 | **Related research** | [research.md](../../rfc/RFC-0030/research.md) |
 | **Supersedes** | — |
@@ -69,8 +69,13 @@ destination mapping.
 PeerDB will connect with TLS to `product-db-rw.product.svc:5432`. Logical
 decoding will never traverse PgDog or a read-only Service. PeerDB may reuse the
 existing Temporal, RustFS, and `platform-db` capabilities only through a
-dedicated `peerdb` namespace, `peerdb-staging` bucket and identity, and catalog
+dedicated `peerdb` namespace, `analytics-service-cdc` bucket and identity, and catalog
 database and role. PeerDB control APIs and UI stay cluster-internal.
+
+Resource names follow [RFC-0030](../../rfc/RFC-0030/README.md#resource-naming):
+the destination peer is `analytics_service`, the ClickHouse database is
+`analytics`, and the ingest identity is `analytics_ingest`. The bucket identity
+is separate from the API reader and from the platform backup/cold-tier identities.
 
 ### Decision rules
 
@@ -90,8 +95,8 @@ flowchart LR
     O[("order DB")] -->|"mirror + slot"| P["PeerDB<br/>self-hosted"]
     C[("checkout DB")] -->|"mirror + slot"| P
     M[("payment DB")] -->|"mirror + slot"| P
-    P -->|"staging"| R[("RustFS<br/>peerdb-staging")]
-    P -->|"raw versions + tombstones"| CH[("ClickHouse<br/>commerce raw")]
+    P -->|"staging"| R[("RustFS — Analytics CDC files<br/>analytics-service-cdc")]
+    P -->|"raw versions + tombstones"| CH[("ClickHouse<br/>analytics raw tables")]
     P -.->|"isolated workflow/catalog"| D["Temporal + platform-db"]
 
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;

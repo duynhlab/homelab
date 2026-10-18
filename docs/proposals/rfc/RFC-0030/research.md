@@ -16,6 +16,8 @@ Repository baseline checked on 2026-10-13: manifests now select PostgreSQL 18.6,
 ClickHouse 26.9 and Kind 1.35.8. This refresh is repository evidence, not a
 repeat of the September upstream/runtime qualification.
 
+Resource identifiers follow the accepted [RFC naming contract](./README.md#resource-naming).
+
 ## Table of contents
 
 1. [Problem statement](#problem-statement)
@@ -108,7 +110,7 @@ and heartbeats are database-local even though `order`, `checkout`, and
 | PeerDB control API/server | Mirror lifecycle; cluster-internal only | planned — not deployed |
 | PeerDB catalog | Dedicated database/role on `platform-db` | planned — not deployed |
 | Temporal namespace `peerdb` | Isolated workflows on the deployed Temporal server | planned — not deployed |
-| RustFS `peerdb-staging` | Dedicated bucket, identity, quota, lifecycle | planned — not deployed |
+| RustFS `analytics-service-cdc` | Dedicated bucket, identity, quota, lifecycle | planned — not deployed |
 | ClickHouse raw tables | PeerDB versions and tombstones | planned — not deployed |
 | ClickHouse serving model | Latest-live rows and commerce aggregates | planned — not deployed |
 | `analytics-service` | Staff read API and reconciliation command | planned — not deployed |
@@ -141,7 +143,7 @@ flowchart LR
     CTRL["flow API / server<br/>planned"]
     CAT[("catalog<br/>platform-db — planned")]
     TEMP["Temporal<br/>namespace peerdb — planned"]
-    STAGE[("RustFS<br/>peerdb-staging — planned")]
+    STAGE[("RustFS — Analytics CDC files<br/>analytics-service-cdc — planned")]
   end
 
   subgraph CH["ClickHouse — deployed engine"]
@@ -198,7 +200,7 @@ SELECT
   id,
   argMax(status, _peerdb_version) AS status,
   argMax(_peerdb_is_deleted, _peerdb_version) AS is_deleted
-FROM commerce_raw.orders
+FROM analytics.order_orders
 GROUP BY id
 HAVING is_deleted = 0
 ```
@@ -493,7 +495,7 @@ no `cron` schema administration.
 | PeerDB login ×3 | Connect, replication, selected-table snapshot | Ownership, DDL, business writes |
 | `analytics_heartbeat` role | Three fixed-row UPSERT jobs and own run-history cleanup | Business-table access and cron administration outside its own jobs |
 | Catalog role | Its `platform-db` catalog only | Other databases |
-| Staging identity | `peerdb-staging` only | Backup/cold-tier buckets |
+| Staging identity | `analytics-service-cdc` only | Backup/cold-tier buckets |
 | ClickHouse ingest | Mapped raw objects | Staff/source access |
 | ClickHouse read | Serving objects | Raw writes/source access |
 | Analytics API | Bounded read after staff auth | Source/catalog/staging credentials |

@@ -12,6 +12,31 @@ cluster rollout. A working Compose pipeline is not CNPG qualification.
 | Heartbeat | pg_cron 1.6.8, every 30 seconds, observed in ClickHouse |
 | API / UI | Not implemented in Phase 0 |
 
+## Resource naming and existing projects
+
+Use the [RFC naming contract](./README.md#resource-naming): bucket and CDC
+identity `analytics-service-cdc`, ClickHouse database `analytics`, reader
+`analytics_reader`, destination peer `analytics_service`, and mirrors
+`analytics_service_<source>` for order, checkout and payment. RustFS runs as
+`analytics-service-cdc-storage`; bucket initialization runs as
+`analytics-service-cdc-bootstrap`. Compose credentials remain disposable
+fixtures, not production secret values or proof of bucket-scoped IAM.
+
+This naming revision requires a fresh disposable `rfc0030-phase0` project and
+volumes. Bootstrap includes the naming revision in its contract fingerprint
+and refuses old state before changing source grants, publications or mirrors.
+Archive the old evidence and explicitly retire the old disposable project
+using the cleanup procedure below before starting a new run. Do not reuse its
+PostgreSQL, PeerDB catalog, ClickHouse or RustFS volumes, rename a live mirror,
+or drop a live replication slot to apply this change. Existing slots are not
+modified; a fresh snapshot creates `peerflow_slot_analytics_service_<source>`.
+Source publication names remain `analytics_<source>`.
+
+Historical reports in issue #1266 refer to their original SHAs and names.
+They do not qualify this revision. Re-run snapshot, insert/update/delete,
+freshness, reader-denial, RustFS recovery and DDL recovery gates on Linux with
+the new names. The API route and table names are unchanged.
+
 ## Run on Mac or Linux Compose
 
 Use the sibling service checkouts expected by local-stack. Record their SHAs

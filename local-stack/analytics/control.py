@@ -183,7 +183,8 @@ def bootstrap():
     wait_for(api_ready, 'flow API')
     mappings = source_mappings()
     contract = hashlib.sha256(json.dumps({'maps': mappings, 'nullable': True,
-        'peerdb': 'v0.37.5', 'retained_snapshot_staging': True}, sort_keys=True).encode()).hexdigest()
+        'peerdb': 'v0.37.5', 'retained_snapshot_staging': True,
+        'resource_naming': 'analytics-service-v1'}, sort_keys=True).encode()).hexdigest()
     pg('postgres', 'CREATE TABLE IF NOT EXISTS analytics_phase0_contract (id int PRIMARY KEY CHECK(id=1), fingerprint text NOT NULL)')
     old = pg('postgres', 'SELECT fingerprint FROM analytics_phase0_contract WHERE id=1')
     if old and old != contract:
@@ -193,27 +194,27 @@ def bootstrap():
     pg('postgres', f"INSERT INTO analytics_phase0_contract VALUES (1,'{contract}') ON CONFLICT DO NOTHING")
     source_setup()
     fixtures()
-    ch("""CREATE DATABASE IF NOT EXISTS commerce;
+    ch("""CREATE DATABASE IF NOT EXISTS analytics;
 CREATE USER IF NOT EXISTS analytics_ingest IDENTIFIED WITH sha256_password BY 'analytics-ingest-local';
-GRANT ALL ON commerce.* TO analytics_ingest;
+GRANT ALL ON analytics.* TO analytics_ingest;
 GRANT CREATE TEMPORARY TABLE, S3 ON *.* TO analytics_ingest;
-CREATE USER IF NOT EXISTS analytics_read IDENTIFIED WITH sha256_password BY 'analytics-read-local';""")
-    create_peer('commerce', 'CLICKHOUSE', {'host': 'clickhouse', 'port': 9000,
-        'user': 'analytics_ingest', 'password': 'analytics-ingest-local', 'database': 'commerce',
-        'disableTls': True, 's3Path': 's3://peerdb-staging', 'accessKeyId': 'analytics-local',
-        'secretAccessKey': 'analytics-local-secret', 'region': 'us-east-1',
-        'endpoint': 'http://analytics-staging:9000'})
+CREATE USER IF NOT EXISTS analytics_reader IDENTIFIED WITH sha256_password BY 'analytics-reader-local';""")
+    create_peer('analytics_service', 'CLICKHOUSE', {'host': 'clickhouse', 'port': 9000,
+        'user': 'analytics_ingest', 'password': 'analytics-ingest-local', 'database': 'analytics',
+        'disableTls': True, 's3Path': 's3://analytics-service-cdc', 'accessKeyId': 'analytics-service-cdc',
+        'secretAccessKey': 'analytics-service-cdc-local-secret', 'region': 'us-east-1',
+        'endpoint': 'http://analytics-service-cdc-storage:9000'})
     for db, maps in mappings.items():
         create_peer(db, 'POSTGRES', {'host': 'postgres', 'port': 5432,
             'user': 'peerdb_' + db, 'password': 'peerdb_' + db + '-local',
             'database': db, 'disableTls': True})
-        name = 'analytics_' + db
+        name = 'analytics_service_' + db
         new_mirror = pg('peerdb_catalog', f'SELECT count(*) FROM flows WHERE name={quote(name)}') == '0'
         with concurrent_snapshot_writes(db == 'order' and new_mirror):
             if new_mirror:
                 result = api('/v1/flows/cdc/create', {'connectionConfigs': {
-                    'flowJobName': name, 'sourceName': db, 'destinationName': 'commerce',
-                    'tableMappings': maps, 'publicationName': name,
+                    'flowJobName': name, 'sourceName': db, 'destinationName': 'analytics_service',
+                    'tableMappings': maps, 'publicationName': 'analytics_' + db,
                     'doInitialSnapshot': True, 'snapshotNumRowsPerPartition': 10000,
                     'snapshotMaxParallelWorkers': 1, 'snapshotNumTablesInParallel': 1,
                     'maxBatchSize': 10000, 'idleTimeoutSeconds': 10,
@@ -225,13 +226,13 @@ CREATE USER IF NOT EXISTS analytics_read IDENTIFIED WITH sha256_password BY 'ana
                 if not result.get('workflowId'):
                     raise RuntimeError('No workflow returned for ' + name)
             # Admit one source at a time; lifecycle RUNNING alone is insufficient.
-            wait_for(lambda: int(ch(f'SELECT count() FROM commerce.{db}_analytics_cdc_heartbeat')) > 0,
+            wait_for(lambda: int(ch(f'SELECT count() FROM analytics.{db}_analytics_cdc_heartbeat')) > 0,
                      db + ' snapshot and normalized heartbeat', 300)
             if new_mirror:
                 for table in ALLOW[db]:
                     expected = pg(db, f'SELECT count(*) FROM {table}')
                     wait_for(lambda table=table, expected=expected:
-                             ch(f'SELECT uniqExact(id) FROM commerce.{db}_{table}') == expected,
+                             ch(f'SELECT uniqExact(id) FROM analytics.{db}_{table}') == expected,
                              db + '.' + table + ' initial copy', 300)
     serving()
 
@@ -244,13 +245,13 @@ def serving():
             name = db + '_' + table
             # A tuple preserves NULLs from the latest row; per-column argMax would skip NULL.
             fields = ','.join(f'latest.{i+1} AS {c}' for i, c in enumerate(columns))
-            ch(f'''GRANT SELECT ON commerce.{name} TO analytics_view_owner;
- CREATE OR REPLACE VIEW commerce.{name}_live
+            ch(f'''GRANT SELECT ON analytics.{name} TO analytics_view_owner;
+ CREATE OR REPLACE VIEW analytics.{name}_live
  DEFINER = analytics_view_owner SQL SECURITY DEFINER AS
  SELECT {fields} FROM (
  SELECT id,argMax(tuple({','.join(columns)},_peerdb_is_deleted),_peerdb_version) AS latest
- FROM commerce.{name} GROUP BY id) WHERE latest.{len(columns)+1}=0;
- GRANT SELECT ON commerce.{name}_live TO analytics_read;''')
+ FROM analytics.{name} GROUP BY id) WHERE latest.{len(columns)+1}=0;
+ GRANT SELECT ON analytics.{name}_live TO analytics_reader;''')
 
 
 def freshness_state(lags):
@@ -279,9 +280,9 @@ def gate():
             for table in tables:
                 expected = pg(db, f'SELECT count(*) FROM {table}')
                 wait_for(lambda db=db, table=table, expected=expected:
-                         ch(f'SELECT count() FROM commerce.{db}_{table}_live') == expected,
+                         ch(f'SELECT count() FROM analytics.{db}_{table}_live') == expected,
                          f'{db}.{table} snapshot count')
-        assert_true(ch('SELECT sum(amount_minor) FROM commerce.payment_ledger_entries_live') ==
+        assert_true(ch('SELECT sum(amount_minor) FROM analytics.payment_ledger_entries_live') ==
                     pg('payment', 'SELECT sum(amount_minor) FROM ledger_entries'), 'ledger amount checksum')
     def source_privileges():
         for db, tables in ALLOW.items():
@@ -294,11 +295,11 @@ def gate():
     def reader_privileges():
         def read(sql):
             return compose('exec', '-T', 'clickhouse', 'clickhouse-client',
-                           '--user', 'analytics_read', '--password', 'analytics-read-local', sql=sql)
-        assert_true(int(read('SELECT count() FROM commerce.order_orders_live')) > 0,
+                           '--user', 'analytics_reader', '--password', 'analytics-reader-local', sql=sql)
+        assert_true(int(read('SELECT count() FROM analytics.order_orders_live')) > 0,
                     'serving view not readable')
-        for sql in ['SELECT count() FROM commerce.order_orders',
-                    'INSERT INTO commerce.order_orders (id) VALUES (-39999)']:
+        for sql in ['SELECT count() FROM analytics.order_orders',
+                    'INSERT INTO analytics.order_orders (id) VALUES (-39999)']:
             try:
                 read(sql)
             except RuntimeError as error:
@@ -310,38 +311,38 @@ def gate():
         for db, tables in ALLOW.items():
             for table, columns in tables.items():
                 name = db + '_' + table
-                actual = set(ch(f"SELECT name FROM system.columns WHERE database='commerce' AND table='{name}'").splitlines())
+                actual = set(ch(f"SELECT name FROM system.columns WHERE database='analytics' AND table='{name}'").splitlines())
                 assert_true(actual == set(columns) | {'_peerdb_version','_peerdb_is_deleted','_peerdb_synced_at'}, name + ': unexpected raw columns')
-                assert_true('RFC0030_FORBIDDEN_PII' not in ch(f'SELECT * FROM commerce.{name} FORMAT JSONEachRow'), name + ': PII marker')
+                assert_true('RFC0030_FORBIDDEN_PII' not in ch(f'SELECT * FROM analytics.{name} FORMAT JSONEachRow'), name + ': PII marker')
     def freshness(after=0):
         for db in ALLOW:
-            wait_for(lambda db=db: 0 <= float(ch(f'SELECT dateDiff(\'second\',max(emitted_at),now()) FROM commerce.{db}_analytics_cdc_heartbeat_live')) <= 120,
+            wait_for(lambda db=db: 0 <= float(ch(f'SELECT dateDiff(\'second\',max(emitted_at),now()) FROM analytics.{db}_analytics_cdc_heartbeat_live')) <= 120,
                      db + ' target freshness', 150)
-            wait_for(lambda db=db: float(ch(f'SELECT toUnixTimestamp64Milli(max(emitted_at))/1000 FROM commerce.{db}_analytics_cdc_heartbeat_live')) > after, db + ' new heartbeat', 150)
+            wait_for(lambda db=db: float(ch(f'SELECT toUnixTimestamp64Milli(max(emitted_at))/1000 FROM analytics.{db}_analytics_cdc_heartbeat_live')) > after, db + ' new heartbeat', 150)
     def update_delete():
         pg('order', 'DELETE FROM order_items WHERE id=-30002')
-        wait_for(lambda: ch('SELECT count() FROM commerce.order_order_items_live WHERE id=-30002') == '0', 'CDC insert precondition')
+        wait_for(lambda: ch('SELECT count() FROM analytics.order_order_items_live WHERE id=-30002') == '0', 'CDC insert precondition')
         pg('order', "INSERT INTO order_items(id,order_id,product_id,product_name,quantity,price,subtotal) VALUES(-30002,-30000,1,'CDC-only product',1,1000,1000)")
-        wait_for(lambda: ch('SELECT count() FROM commerce.order_order_items_live WHERE id=-30002') == '1', 'CDC insert')
+        wait_for(lambda: ch('SELECT count() FROM analytics.order_order_items_live WHERE id=-30002') == '1', 'CDC insert')
         pg('order', "UPDATE orders SET status='confirmed',version=version+1 WHERE id=-30000")
-        wait_for(lambda: ch('SELECT status FROM commerce.order_orders_live WHERE id=-30000') == 'confirmed', 'update')
+        wait_for(lambda: ch('SELECT status FROM analytics.order_orders_live WHERE id=-30000') == 'confirmed', 'update')
         pg('order', 'UPDATE orders SET completed_at=now() WHERE id=-30000')
-        wait_for(lambda: ch('SELECT isNotNull(completed_at) FROM commerce.order_orders_live WHERE id=-30000') == '1', 'non-null update')
+        wait_for(lambda: ch('SELECT isNotNull(completed_at) FROM analytics.order_orders_live WHERE id=-30000') == '1', 'non-null update')
         pg('order', 'UPDATE orders SET completed_at=NULL WHERE id=-30000')
-        wait_for(lambda: ch('SELECT isNull(completed_at) FROM commerce.order_orders_live WHERE id=-30000') == '1', 'NULL update')
-        ch('INSERT INTO commerce.order_orders SELECT * FROM commerce.order_orders WHERE id=-30000 ORDER BY _peerdb_version DESC LIMIT 1')
-        assert_true(ch('SELECT count() FROM commerce.order_orders_live WHERE id=-30000') == '1', 'replayed row not deduplicated')
+        wait_for(lambda: ch('SELECT isNull(completed_at) FROM analytics.order_orders_live WHERE id=-30000') == '1', 'NULL update')
+        ch('INSERT INTO analytics.order_orders SELECT * FROM analytics.order_orders WHERE id=-30000 ORDER BY _peerdb_version DESC LIMIT 1')
+        assert_true(ch('SELECT count() FROM analytics.order_orders_live WHERE id=-30000') == '1', 'replayed row not deduplicated')
         pg('order', 'DELETE FROM order_items WHERE id IN (-30000,-30002)')
-        wait_for(lambda: ch('SELECT count() FROM commerce.order_order_items_live WHERE id IN (-30000,-30002)') == '0', 'tombstone')
+        wait_for(lambda: ch('SELECT count() FROM analytics.order_order_items_live WHERE id IN (-30000,-30002)') == '0', 'tombstone')
     def restart():
         start = float(pg('postgres', 'SELECT extract(epoch FROM clock_timestamp())'))
         compose('restart', 'analytics-flow-worker')
         freshness(after=start)
-        assert_true(ch('SELECT count() FROM commerce.order_orders_live WHERE id=-30000') == '1', 'duplicate live order')
+        assert_true(ch('SELECT count() FROM analytics.order_orders_live WHERE id=-30000') == '1', 'duplicate live order')
     def staging():
         data = json.loads(compose('run', '--rm', '--no-deps', '--entrypoint', 'aws',
-            'analytics-staging-bootstrap', '--endpoint-url', 'http://analytics-staging:9000',
-            's3api', 'list-objects-v2', '--bucket', 'peerdb-staging', '--output', 'json'))
+            'analytics-service-cdc-bootstrap', '--endpoint-url', 'http://analytics-service-cdc-storage:9000',
+            's3api', 'list-objects-v2', '--bucket', 'analytics-service-cdc', '--output', 'json'))
         keys = [x['Key'] for x in data.get('Contents', []) if x['Key'].endswith('.avro')]
         assert_true(bool(keys), 'no retained Avro artifacts to inspect')
         inspected = set()
@@ -349,11 +350,11 @@ def gate():
             match = [(db, table, cols) for db, tables in ALLOW.items() for table, cols in tables.items()
                      if f'clone_analytics_{db}_public_{table}_' in key]
             if not match:
-                fn = f"s3({quote('http://analytics-staging:9000/peerdb-staging/' + key)},'analytics-local','analytics-local-secret','Avro')"
+                fn = f"s3({quote('http://analytics-service-cdc-storage:9000/analytics-service-cdc/' + key)},'analytics-service-cdc','analytics-service-cdc-local-secret','Avro')"
                 assert_true('RFC0030_FORBIDDEN_PII' not in ch('SELECT * FROM ' + fn + ' FORMAT JSONEachRow'), 'PII in CDC staging')
                 continue
             db, table, cols = match[0]
-            fn = f"s3({quote('http://analytics-staging:9000/peerdb-staging/' + key)},'analytics-local','analytics-local-secret','Avro')"
+            fn = f"s3({quote('http://analytics-service-cdc-storage:9000/analytics-service-cdc/' + key)},'analytics-service-cdc','analytics-service-cdc-local-secret','Avro')"
             # PeerDB Avro field names encode source ordinal: completed_at_5.
             names = {re.sub(r'_\d+$', '', line.split('\t')[0])
                      for line in ch('DESCRIBE TABLE ' + fn).splitlines()}
@@ -368,7 +369,7 @@ def gate():
             for age, expected in [(180, 'stale'), (360, 'unavailable')]:
                 pg('payment', f"UPDATE analytics_cdc_heartbeat SET emitted_at=clock_timestamp()-interval '{age} seconds'")
                 def observed():
-                    lags = [float(ch(f"SELECT dateDiff('second',max(emitted_at),now()) FROM commerce.{db}_analytics_cdc_heartbeat_live")) for db in ALLOW]
+                    lags = [float(ch(f"SELECT dateDiff('second',max(emitted_at),now()) FROM analytics.{db}_analytics_cdc_heartbeat_live")) for db in ALLOW]
                     return freshness_state(lags) == expected
                 wait_for(observed, expected + ' observed target state', 90)
             assert_true(freshness_state([None, 0, 0]) == 'unavailable', 'unknown progress')
@@ -386,7 +387,7 @@ def gate():
             assert_true(pg('postgres', 'SHOW max_slot_wal_keep_size') == '1GB', 'WAL cap missing')
         finally:
             compose('start', service)
-        wait_for(lambda: ch('SELECT version FROM commerce.order_orders_live WHERE id=-30000') == version, service + ' catch-up', 180)
+        wait_for(lambda: ch('SELECT version FROM analytics.order_orders_live WHERE id=-30000') == version, service + ' catch-up', 180)
         freshness(after=start)
     check('snapshot counts and ledger sum', snapshot_counts)
     check('source roles and cron jobs', source_privileges)
@@ -397,7 +398,7 @@ def gate():
     check('CDC updates, NULLs and deletes', update_delete)
     check('worker restart and latest-row uniqueness', restart)
     check('target stale and unavailable classification', response_states)
-    for service in ['analytics-staging', 'clickhouse']:
+    for service in ['analytics-service-cdc-storage', 'clickhouse']:
         check(service + ' outage and catch-up', lambda service=service: outage(service))
     check('post-recovery raw PII exclusion', schema)
     check('post-CDC staging PII exclusion', staging)

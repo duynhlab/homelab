@@ -8,11 +8,11 @@ x-peerdb-env: &peerdb-env
   PEERDB_CATALOG_DATABASE: peerdb_catalog
   TEMPORAL_HOST_PORT: temporal:7233
   PEERDB_TEMPORAL_NAMESPACE: peerdb
-  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ACCESS_KEY_ID: analytics-local
-  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_SECRET_ACCESS_KEY: analytics-local-secret
+  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ACCESS_KEY_ID: analytics-service-cdc
+  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_SECRET_ACCESS_KEY: analytics-service-cdc-local-secret
   PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_REGION: us-east-1
-  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ENDPOINT_URL_S3: http://analytics-staging:9000
-  PEERDB_CLICKHOUSE_AWS_S3_BUCKET_NAME: peerdb-staging
+  PEERDB_CLICKHOUSE_AWS_CREDENTIALS_AWS_ENDPOINT_URL_S3: http://analytics-service-cdc-storage:9000
+  PEERDB_CLICKHOUSE_AWS_S3_BUCKET_NAME: analytics-service-cdc
 
 services:
   clickhouse:
@@ -79,35 +79,35 @@ services:
       postgres: { condition: service_healthy }
     restart: "no"
 
-  analytics-staging:
+  analytics-service-cdc-storage:
     image: rustfs/rustfs:1.0.1@sha256:1803faef57627e2d9c2e7d89d655d712ddded5389040054987163043fecb6a3c
     environment:
-      RUSTFS_ACCESS_KEY: analytics-local
-      RUSTFS_SECRET_KEY: analytics-local-secret
+      RUSTFS_ACCESS_KEY: analytics-service-cdc
+      RUSTFS_SECRET_KEY: analytics-service-cdc-local-secret
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: ":9000"
       RUSTFS_CONSOLE_ENABLE: "false"
       RUSTFS_OBS_LOGGER_LEVEL: warn
     volumes:
-      - analytics-staging:/data
+      - analytics-service-cdc-storage:/data
 
-  analytics-staging-bootstrap:
+  analytics-service-cdc-bootstrap:
     image: amazon/aws-cli:2.37.12@sha256:ce44b800602264c12298bbf3399055a4cefdb9ed4a098abe564afe26e7071bce
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         n=0
-        until aws --endpoint-url http://analytics-staging:9000 s3api list-buckets >/dev/null 2>&1; do
+        until aws --endpoint-url http://analytics-service-cdc-storage:9000 s3api list-buckets >/dev/null 2>&1; do
           n=$$((n + 1)); [ "$$n" -lt 60 ] || exit 1; sleep 2
         done
-        aws --endpoint-url http://analytics-staging:9000 s3api head-bucket --bucket peerdb-staging 2>/dev/null ||
-          aws --endpoint-url http://analytics-staging:9000 s3api create-bucket --bucket peerdb-staging
+        aws --endpoint-url http://analytics-service-cdc-storage:9000 s3api head-bucket --bucket analytics-service-cdc 2>/dev/null ||
+          aws --endpoint-url http://analytics-service-cdc-storage:9000 s3api create-bucket --bucket analytics-service-cdc
     environment:
-      AWS_ACCESS_KEY_ID: analytics-local
-      AWS_SECRET_ACCESS_KEY: analytics-local-secret
+      AWS_ACCESS_KEY_ID: analytics-service-cdc
+      AWS_SECRET_ACCESS_KEY: analytics-service-cdc-local-secret
       AWS_DEFAULT_REGION: us-east-1
     depends_on:
-      analytics-staging: { condition: service_started }
+      analytics-service-cdc-storage: { condition: service_started }
     restart: "no"
 
   analytics-flow-api:
@@ -117,7 +117,7 @@ services:
     depends_on:
       analytics-catalog-migrate: { condition: service_completed_successfully }
       analytics-temporal-bootstrap: { condition: service_completed_successfully }
-      analytics-staging-bootstrap: { condition: service_completed_successfully }
+      analytics-service-cdc-bootstrap: { condition: service_completed_successfully }
 
   analytics-flow-worker:
     image: ghcr.io/peerdb-io/flow-worker:stable-v0.37.5@sha256:2f284658fb57a35cd92ab35205f0158a04971373ce1c96332b1d315026a04078
@@ -132,4 +132,4 @@ services:
       analytics-flow-api: { condition: service_started }
 
 volumes:
-  analytics-staging:
+  analytics-service-cdc-storage:

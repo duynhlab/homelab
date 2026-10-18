@@ -344,6 +344,10 @@ Skeleton (copy what you need):
 
 #### Docs
 
+- Align RFC-0030 resource names with analytics-service across the CDC prototype,
+  SQL access contract, RFC and ADRs. Require fresh disposable qualification
+  state; historical evidence remains tied to its original commits.
+
 - Remove accumulated editorial footers from docs; keep unique historical
   verification evidence beside its owning claims and preserve RFC/ADR metadata.
   Align the edge 429 catalog with the deployed `enforced` counter.

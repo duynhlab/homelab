@@ -102,13 +102,18 @@ security and runtime gates are tracked in
 | **Failure behavior** | Stale and unknown data are explicit; the service never fabricates freshness or converts an unavailable pipeline into zero |
 | **Compatibility** | Commands remain direct under ADR-048; exact payload becomes authoritative in `docs/api/analytics.md` only after implementation |
 
+The read-only database identity is `analytics_reader`, with SELECT on reviewed
+`analytics.*_live` views only. Resource names follow the
+[RFC-0030 naming contract](../../rfc/RFC-0030/README.md#resource-naming); the
+`/analytics/v1/protected/commerce/overview` API route is unchanged.
+
 ### Decision view
 
 ```mermaid
 flowchart LR
     A["Admin Portal<br/>staff token"] -->|"bounded protected GET"| E["Envoy Gateway"]
     E --> S["analytics-service<br/>read only"]
-    S -->|"serving queries"| CH[("ClickHouse<br/>commerce serving")]
+    S -->|"serving queries"| CH[("ClickHouse<br/>analytics serving views")]
     A -->|"commands remain direct"| OWN["Owning services"]
     S -.->|"must not proxy writes"| OWN
 

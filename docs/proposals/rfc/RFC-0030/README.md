@@ -33,7 +33,7 @@ Qualification runbook: [Phase 0](./phase0.md). Results and remaining work:
 
 Self-host PeerDB to continuously replicate an explicit PostgreSQL base-table
 and column allowlist from the `order`, `checkout`, and `payment` databases
-into an isolated ClickHouse `commerce` database. Three database-local mirrors
+into an isolated ClickHouse `analytics` database. Three database-local mirrors
 feed versioned raw tables; serving views deduplicate with `argMax` and remove
 tombstones. A thin read-only `analytics-service` exposes one staff endpoint,
 and the Admin Portal consumes it from a lazy `/analytics` page.
@@ -106,7 +106,7 @@ owned lifecycle.
    Service.
 2. Run three PeerDB mirrors—one per database, publication, and slot. Reuse
    existing Temporal through a dedicated `peerdb` namespace, RustFS through a
-   dedicated `peerdb-staging` bucket/identity, and `platform-db` through a
+   dedicated `analytics-service-cdc` bucket/identity, and `platform-db` through a
    dedicated PeerDB catalog database/role.
 3. Package `postgresql-18-cron` in a digest-pinned custom CNPG system image,
    deploy that compatible image to `product-db` and `product-db-replica`, then
@@ -154,6 +154,40 @@ risk, broad-read credentials on selected tables, full initial snapshots, an
 owned custom PostgreSQL image/preload lifecycle, and several upstream behaviors
 that the acceptance prototype must verify.
 
+
+## Resource naming
+
+Resources use the `analytics-service` workload name; commerce remains the
+business domain and API route. These names describe the planned cluster
+contract and the opt-in Compose implementation, not deployed cluster resources.
+
+| Resource | Name |
+|---|---|
+| RustFS bucket and CDC identity | `analytics-service-cdc` |
+| Compose RustFS service and volume | `analytics-service-cdc-storage` |
+| Compose bucket bootstrap | `analytics-service-cdc-bootstrap` |
+| PeerDB destination peer | `analytics_service` |
+| PeerDB mirrors | `analytics_service_order`, `analytics_service_checkout`, `analytics_service_payment` |
+| ClickHouse database | `analytics` |
+| ClickHouse ingest / API reader | `analytics_ingest` / `analytics_reader` |
+| Non-login serving-view owner | `analytics_view_owner` |
+
+PeerDB v0.37.5 requires lowercase letters, digits and underscores for
+[mirror names](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/ui/app/mirrors/create/schema.ts)
+and [peer names](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/ui/app/peers/create/%5BpeerType%5D/schema.ts).
+The underscore spelling is the protocol-compatible form of the workload name.
+The source publications stay `analytics_order`, `analytics_checkout` and
+`analytics_payment`. New mirrors generate slots named
+`peerflow_slot_analytics_service_<source>`; this does not rename existing slots.
+The `peerdb` Temporal namespace and catalog identity remain unchanged.
+
+RustFS holds intermediate CDC files written by PeerDB and read by ClickHouse.
+The API reader has no bucket credentials. “Staging” remains the upstream term
+for this mechanism, not an environment designation or a backup guarantee.
+See the [qualification runbook](./phase0.md#resource-naming-and-existing-projects)
+for the fresh-project requirement and historical-evidence boundary.
+
+
 ## Architecture
 
 This diagram answers one question: **what is the planned trust and data path?**
@@ -178,12 +212,12 @@ flowchart LR
     APICTL["flow API / control"]
     CAT[("catalog on platform-db")]
     TEMP["Temporal namespace peerdb"]
-    STAGE[("RustFS peerdb-staging")]
+    STAGE[("RustFS — Analytics CDC files<br/>analytics-service-cdc")]
   end
 
   subgraph CH["ClickHouse — deployed engine"]
-    RAW[("commerce raw<br/>planned")]
-    SERVE[("commerce serving<br/>planned")]
+    RAW[("analytics raw tables<br/>planned")]
+    SERVE[("analytics serving views<br/>planned")]
   end
 
   ANA["analytics-service<br/>planned — read only"]
@@ -425,7 +459,7 @@ Roll out in dependency order, with each phase blocked on its evidence:
    seven-day run-history cleanup job, and mirror exclusions. Require
    `status.applied=true` at the observed generation before creating a mirror.
 4. **Isolated dependencies:** create the `peerdb` Temporal namespace,
-   `peerdb-staging` RustFS bucket/identity, and dedicated PeerDB catalog
+   `analytics-service-cdc` RustFS bucket/identity, and dedicated PeerDB catalog
    database/role in `platform-db`.
 5. **Analytical storage:** create least-privilege ClickHouse identities and
    replicated raw/serving objects through a dedicated schema wave.

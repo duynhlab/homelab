@@ -9,7 +9,7 @@ bounded-eventual and never handles commands.
 | Availability | **Planned — draft Go implementation; not deployed or runtime-qualified** |
 | Repository | [analytics-service](https://github.com/duynhlab/analytics-service) |
 | Consumer | [Backoffice portal](./admin.md); isolated preview only |
-| Storage access | Native ClickHouse, restricted `analytics_read`, reviewed `commerce.*_live` views only |
+| Storage access | Native ClickHouse, restricted `analytics_reader`, reviewed `analytics.*_live` views only |
 | Design | [RFC-0030](../proposals/rfc/RFC-0030/), [ADR-069](../proposals/adr/ADR-069-serve-commerce-analytics-through-read-only-service/) |
 | Verification | [Linux handoff #1266](https://github.com/duynhlab/homelab/issues/1266) |
 

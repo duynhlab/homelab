@@ -33,7 +33,7 @@ def copy(version, columns):
     actual = pg('order', f"SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='{SOURCE}'").splitlines()
     pg('order', f'ALTER PUBLICATION {PUBLICATION} SET TABLE public.{SOURCE} ({",".join(columns)})')
     result = api('/v1/flows/cdc/create', {'connectionConfigs': {
-        'flowJobName': name, 'sourceName': 'ddl_source', 'destinationName': 'commerce',
+        'flowJobName': name, 'sourceName': 'ddl_source', 'destinationName': 'analytics_service',
         'publicationName': PUBLICATION, 'doInitialSnapshot': True,
         'snapshotMaxParallelWorkers': 1, 'snapshotNumTablesInParallel': 1,
         'snapshotNumRowsPerPartition': 10000, 'maxBatchSize': 1000, 'idleTimeoutSeconds': 10,
@@ -43,15 +43,15 @@ def copy(version, columns):
             'destinationTableIdentifier': table, 'exclude': [c for c in actual if c not in columns]}]}})
     if not result.get('workflowId'):
         raise RuntimeError('DDL mirror creation did not return a workflow')
-    wait_for(lambda: ch(f'SELECT count() FROM commerce.{table}') == '1', name + ' snapshot', 300)
-    actual_target = set(ch(f"SELECT name FROM system.columns WHERE database='commerce' AND table='{table}'").splitlines())
+    wait_for(lambda: ch(f'SELECT count() FROM analytics.{table}') == '1', name + ' snapshot', 300)
+    actual_target = set(ch(f"SELECT name FROM system.columns WHERE database='analytics' AND table='{table}'").splitlines())
     if actual_target != set(columns) | {'_peerdb_version', '_peerdb_is_deleted', '_peerdb_synced_at'}:
         raise RuntimeError('Resnapshot produced an unexpected schema')
-    if ch(f'SELECT id FROM commerce.{table}') != '-1':
+    if ch(f'SELECT id FROM analytics.{table}') != '-1':
         raise RuntimeError('Resnapshot changed the source identity')
-    if 'product_name' in columns and ch(f'SELECT product_name FROM commerce.{table}') != 'Before DDL':
+    if 'product_name' in columns and ch(f'SELECT product_name FROM analytics.{table}') != 'Before DDL':
         raise RuntimeError('Type migration changed the source value')
-    if 'RFC0030_FORBIDDEN_PII' in ch(f'SELECT * FROM commerce.{table} FORMAT JSONEachRow'):
+    if 'RFC0030_FORBIDDEN_PII' in ch(f'SELECT * FROM analytics.{table} FORMAT JSONEachRow'):
         raise RuntimeError('Resnapshot leaked the excluded fixture')
     wait_for(lambda: pg('order', f"SELECT count(*) FROM pg_replication_slots WHERE slot_name='peerflow_slot_{name}'") == '1',
              name + ' source slot', 180)

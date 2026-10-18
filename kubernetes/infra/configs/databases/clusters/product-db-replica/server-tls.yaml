@@ -1,0 +1,39 @@
+# ADR-089: the DR cluster serves a homelab-ca certificate like product-db
+# (../product-db/server-tls.yaml), so after a promotion PgDog and migrate verify
+# it with the same product-db-ca-trust CA and only the host name changes.
+# cnpg.io/reload reloads a renewed certificate without a restart.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: product-db-replica-server-tls
+  namespace: product
+spec:
+  secretName: product-db-replica-server-tls
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  commonName: product-db-replica-rw.product.svc
+  dnsNames:
+    - product-db-replica-rw
+    - product-db-replica-rw.product
+    - product-db-replica-rw.product.svc
+    - product-db-replica-rw.product.svc.cluster.local
+    - product-db-replica-ro
+    - product-db-replica-ro.product
+    - product-db-replica-ro.product.svc
+    - product-db-replica-ro.product.svc.cluster.local
+    - product-db-replica-r
+    - product-db-replica-r.product
+    - product-db-replica-r.product.svc
+    - product-db-replica-r.product.svc.cluster.local
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - server auth
+  issuerRef:
+    kind: ClusterIssuer
+    name: homelab-ca

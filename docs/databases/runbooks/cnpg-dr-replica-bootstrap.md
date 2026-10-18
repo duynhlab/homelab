@@ -175,3 +175,7 @@ from the then-current primary.
 single instance to keep the spare cheap (2026-09-29), so a promoted cluster
 would otherwise be a single point of failure with no quorum. CNPG adds the two
 standbys by streaming from the new primary; they do not need the object store.
+
+TLS and connection isolation need no promotion step: the replica already serves
+a `homelab-ca` certificate (`product-db-replica-server-tls`) and the same
+`pg_hba` as product-db, which `make validate` keeps identical.

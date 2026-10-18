@@ -36,7 +36,10 @@ shape as `cart` or `inventory`:
 3. **pg_hba (connection isolation is live — RFC-0012 P4):** add the service's
    runtime, migrator and `db_authz` allow rules in `instance.yaml` above the
    trailing reject — the one exception to "never touch instance.yaml",
-   because HBA is cluster infrastructure, not a service definition.
+   because HBA is cluster infrastructure, not a service definition. On
+   product-db add the same lines to `product-db-replica/instance.yaml`; the DR
+   cluster must admit the same clients, and `make validate` fails when the two
+   lists differ.
 
 4. **Validate and ship** — `make validate`, PR, merge. Flux converges:
    ESO renders the Secrets → the catalog Job creates the owner and migrator →

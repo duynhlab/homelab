@@ -56,9 +56,9 @@ authentication does not continue down the list looking for another method.
   pooler, migration, seed and authz login is on `hostssl` and verifies the
   server. On platform-db only `temporal`, `keycloak` and `vault_rotator` keep
   `host` ([#1296](https://github.com/duynhlab/homelab/issues/1296)).
-- Both clusters serve a server certificate from `homelab-ca`
-  (`<cluster>-server-tls`, cert-manager, 90 days, renewed 15 days before
-  expiry) through `spec.certificates.serverTLSSecret` and `serverCASecret`,
+- Both clusters, and the DR cluster `product-db-replica`, serve a server
+  certificate from `homelab-ca` (`<cluster>-server-tls`, cert-manager, 90
+  days, renewed 15 days before expiry) through `spec.certificates.serverTLSSecret` and `serverCASecret`,
   instead of CNPG's self-signed CA. Its DNS names cover `<cluster>-rw`, `-ro`
   and `-r`. Clients verify it with the same `*-db-ca-trust` CA they use for
   the poolers. CNPG's instances check only the CA between themselves, and the

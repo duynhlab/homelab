@@ -64,9 +64,8 @@ spec:
           app.kubernetes.io/component: api
           platform.duynhlab.dev/otlp-logs: << index inputs "otel_logs_enabled" | default "true" | quote >>
         <<- if (index inputs "db_ca_secret") >>
-        # ADR-089: the CA that sslmode=verify-full checks the pooler against.
-        # Main container only: on migrate, a root cert would turn its direct
-        # require into verify-ca.
+        # ADR-089: the CA that sslmode=verify-full checks the pooler and, from
+        # migrate, the primary against.
         volumes:
           - name: db-ca
             secret:
@@ -299,6 +298,12 @@ spec:
             image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
             imagePullPolicy: IfNotPresent
             args: ["migrate"]
+            <<- if (index inputs "db_ca_secret") >>
+            volumeMounts:
+              - name: db-ca
+                mountPath: /etc/db/ca
+                readOnly: true
+            <<- end >>
             resources:
               requests:
                 cpu: "50m"
@@ -314,8 +319,17 @@ spec:
                 value: << inputs.name >>
               - name: PGAPPNAME
                 value: << inputs.name >>-migrate
+              <<- if (index inputs "db_ca_secret") >>
+              # ADR-089: CNPG serves a homelab-ca certificate, so the direct
+              # hop verifies the primary with the same CA as the pooler.
+              - name: DB_SSLMODE
+                value: verify-full
+              - name: PGSSLROOTCERT
+                value: /etc/db/ca/ca.crt
+              <<- else >>
               - name: DB_SSLMODE
                 value: "require"
+              <<- end >>
               # RFC-0029 / ADR-088: the migrator login becomes <name>_owner at login.
               <<- if (index inputs "db_migrator_secret") >>
               - name: DB_USER

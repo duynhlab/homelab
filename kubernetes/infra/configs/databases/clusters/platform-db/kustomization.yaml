@@ -17,6 +17,7 @@ resources:
   - secrets/platform-db-keycloak-secret-identity-ns.yaml
   # pg-backup-rustfs-credentials: managed by ClusterExternalSecret (configs/secrets/cluster-external-secrets/)
   - objectstore.yaml
+  - server-tls.yaml
   - instance.yaml
   - vault-rotator.yaml
   - authz/  # ADR-088: db_authz + role catalog Job/CronJob

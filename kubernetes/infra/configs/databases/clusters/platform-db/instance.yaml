@@ -12,6 +12,11 @@ metadata:
   namespace: platform
 spec:
   instances: 3
+  # ADR-089: serve the homelab-ca certificate (server-tls.yaml); the operator
+  # keeps managing the replication client certificates.
+  certificates:
+    serverTLSSecret: platform-db-server-tls
+    serverCASecret: platform-db-server-tls
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie
 
   plugins:
@@ -41,23 +46,27 @@ spec:
 
     pg_hba:
       # Each app database admits its runtime and migrator only; <svc>_owner
-      # never logs in (RFC-0029, docs/databases/authorization.md).
-      - host user         user_runtime          all scram-sha-256
-      - host user         user_migrator         all scram-sha-256
-      - host notification notification_runtime  all scram-sha-256
-      - host notification notification_migrator all scram-sha-256
-      - host shipping     shipping_runtime      all scram-sha-256
-      - host shipping     shipping_migrator     all scram-sha-256
-      - host review       review_runtime        all scram-sha-256
-      - host review       review_migrator       all scram-sha-256
+      # never logs in (RFC-0029, docs/databases/authorization.md). hostssl:
+      # PgBouncer and migrate both verify this server (ADR-089), so a
+      # plaintext login falls through to the reject.
+      - hostssl user         user_runtime          all scram-sha-256
+      - hostssl user         user_migrator         all scram-sha-256
+      - hostssl notification notification_runtime  all scram-sha-256
+      - hostssl notification notification_migrator all scram-sha-256
+      - hostssl shipping     shipping_runtime      all scram-sha-256
+      - hostssl shipping     shipping_migrator     all scram-sha-256
+      - hostssl review       review_runtime        all scram-sha-256
+      - hostssl review       review_migrator       all scram-sha-256
       # db_authz applies the role catalog in `postgres` and each service's
       # in-database grants, as the Job or as pgroles (ADR-088). One line per
       # database it manages.
-      - host postgres     db_authz     all scram-sha-256
-      - host user         db_authz     all scram-sha-256
-      - host notification db_authz     all scram-sha-256
-      - host shipping     db_authz     all scram-sha-256
-      - host review       db_authz     all scram-sha-256
+      - hostssl postgres     db_authz     all scram-sha-256
+      - hostssl user         db_authz     all scram-sha-256
+      - hostssl notification db_authz     all scram-sha-256
+      - hostssl shipping     db_authz     all scram-sha-256
+      - hostssl review       db_authz     all scram-sha-256
+      # Still `host`: Temporal and OpenBAO connect in plaintext and Keycloak
+      # does not verify (#1296).
       - host temporal            temporal all scram-sha-256
       - host temporal_visibility temporal all scram-sha-256
       # Keycloak connects direct to :5432 like temporal — its Agroal pool needs

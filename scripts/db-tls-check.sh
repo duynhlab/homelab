@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ADR-089: prove each pooled PostgreSQL hop verifies its server and refuses
-# plaintext. For every hop below, one pod in the client's namespace mounts the
+# ADR-089: prove each PostgreSQL hop (pooled, and migrate's direct hop to the
+# primary) verifies its server and refuses plaintext. For every hop below, one pod in the client's namespace mounts the
 # hop's CA Secret and runs four psql logins with a deliberately wrong password:
 #
 #   ok         verify-full, DNS name, right CA -> fails at authentication
@@ -22,6 +22,8 @@ FAIL=0
 HOPS="
 pgdog|product|pgdog-product|product|6432|product|product_runtime|product-db-ca-trust|only TLS connections are allowed
 pgbouncer|user|platform-db-pooler-rw|platform|5432|user|user_runtime|platform-db-ca-trust|SSL required
+product-rw|product|product-db-rw|product|5432|product|product_migrator|product-db-ca-trust|pg_hba.conf rejects connection
+platform-rw|user|platform-db-rw|platform|5432|user|user_migrator|platform-db-ca-trust|pg_hba.conf rejects connection
 "
 
 check_hop() {
@@ -29,7 +31,7 @@ check_hop() {
   local host="$svc.$svcns.svc.cluster.local" ip
   ip=$(kubectl get svc "$svc" -n "$svcns" -o jsonpath='{.spec.clusterIP}' 2>/dev/null)
   if [ -z "$ip" ]; then
-    printf "FAIL  %-9s Service %s/%s not found\n" "$label" "$svcns" "$svc"; FAIL=1; return
+    printf "FAIL  %-11s Service %s/%s not found\n" "$label" "$svcns" "$svc"; FAIL=1; return
   fi
   local base="port=$port dbname=$db user=$user password=wrong-on-purpose connect_timeout=5"
   local script=""
@@ -61,16 +63,16 @@ check_hop() {
     esac
     rows=$((rows + 1))
     if [[ "$verdict" == *"$want"* ]] || { [ "$case" = ok ] && [[ "$verdict" == *"authentication failed"* ]]; }; then
-      printf "PASS  %-9s %-9s %s\n" "$label" "$case" "$verdict"
+      printf "PASS  %-11s %-9s %s\n" "$label" "$case" "$verdict"
     else
-      printf "FAIL  %-9s %-9s want=\"%s\" got=\"%s\"\n" "$label" "$case" "$want" "$verdict"
+      printf "FAIL  %-11s %-9s want=\"%s\" got=\"%s\"\n" "$label" "$case" "$want" "$verdict"
       FAIL=1
     fi
   done <<<"$out"
 
   # Silence is not success: no cluster or a pod that never ran yields 0 rows.
   if [ "$rows" -ne 4 ]; then
-    printf "FAIL  %-9s parsed %s of 4 cases (is the cluster up, and does %s exist in %s?)\n" "$label" "$rows" "$ca" "$ns"
+    printf "FAIL  %-11s parsed %s of 4 cases (is the cluster up, and does %s exist in %s?)\n" "$label" "$rows" "$ca" "$ns"
     FAIL=1
   fi
 }

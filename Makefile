@@ -180,7 +180,7 @@ db-isolation: ## pg_hba isolation sweep against the live databases (RFC-0012 P4)
 	./scripts/db-isolation-sweep.sh
 
 .PHONY: db-tls
-db-tls: ## Pooled hops verify the server and refuse plaintext (ADR-089)
+db-tls: ## DB hops verify the server and refuse plaintext (ADR-089)
 	./scripts/db-tls-check.sh
 
 .PHONY: edge-isolation

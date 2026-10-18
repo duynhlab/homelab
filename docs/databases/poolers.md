@@ -33,8 +33,7 @@ not make concurrency free.
 
 ```mermaid
 flowchart LR
-    ProductClients["product / cart / order<br/>checkout / inventory"] -->|"plaintext"| PgDog["PgDog :6432"]
-    Payment["payment"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgDog
+    ProductClients["product / cart / order / checkout<br/>inventory / payment + 2 workers"] -->|"client TLS, verified<br/>sslmode=verify-full"| PgDog["PgDog :6432"]
     PgDog -->|"reads and writes"| ProductRW["product-db-rw :5432"]
     PgDog -.->|"planned: explicit<br/>replica profile"| ProductR["product-db-r :5432"]
 
@@ -44,7 +43,7 @@ flowchart LR
 
     classDef service fill:#cffafe,color:#164e63,stroke:#0891b2;
     classDef platform fill:#ede9fe,color:#4c1d95,stroke:#7c3aed;
-    class ProductClients,Payment,PlatformClients,Direct service;
+    class ProductClients,PlatformClients,Direct service;
     classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
     class PgDog,PgBouncer,ProductRW,PlatformRW platform;
     class ProductR planned;
@@ -72,8 +71,8 @@ PgDog terminates client TLS with the cert-manager `Certificate`
 
 | Client | To PgDog | Notes |
 |---|---|---|
-| payment runtime | TLS, `sslmode=verify-full` | Checks the chain against `homelab-ca` and the host name. The CA comes from `payment-db-ca-trust` at `/etc/db/ca/ca.crt` (`PGSSLROOTCERT`). payment's config refuses cleartext in production |
-| product, cart, order, checkout, inventory, workers | plaintext, `sslmode=disable` | TLS is optional at PgDog |
+| Every product-db runtime and both workers | TLS, `sslmode=verify-full` | Checks the chain against `homelab-ca` and the host name. The CA comes from `product-db-ca-trust` in the client's namespace at `/etc/db/ca/ca.crt` (`PGSSLROOTCERT`) |
+| Any plaintext client | refused | `tls_client_required = true`: PgDog answers `only TLS connections are allowed` before authentication |
 | payment `migrate` | direct to `product-db-rw:5432`, `sslmode=require` | CNPG's own certificate; `pg_hba` admits `payment_runtime` and `payment_migrator` on `hostssl` lines only |
 
 Verified on Kind on 2026-10-16 (RFC-0029 wave 2, ADR-089): PgDog presents
@@ -82,9 +81,10 @@ Verified on Kind on 2026-10-16 (RFC-0029 wave 2, ADR-089): PgDog presents
 session advisory lease (reconciler) acquires and releases through PgDog.
 local-stack has no pooler and keeps payment direct to PostgreSQL without TLS.
 
-**payment verifies PgDog.** The CA comes from `payment-db-ca-trust`, a
-Certificate in `payment` issued by the live `homelab-ca` ClusterIssuer, read
-only for its `ca.crt`. The trust-manager bundle is not used because it holds a
+**Every client verifies PgDog.** The CA comes from `product-db-ca-trust`, a
+Certificate in each client namespace (product, inventory, cart, order,
+checkout, payment) issued by the live `homelab-ca` ClusterIssuer, read only
+for its `ca.crt`. The trust-manager bundle is not used because it holds a
 static CA copy that a rebuilt cluster no longer matches. The template mounts
 it and sets `PGSSLROOTCERT` on the service container only: on `migrate` a root
 certificate would turn `require` into `verify-ca` against CNPG's own CA.
@@ -93,10 +93,10 @@ Verified on Kind on 2026-10-17 with `psql` from the `payment` namespace
 Service IP fails with `server certificate ... does not match host name`, and
 the system CA bundle fails with `certificate verify failed`. A renewal of
 `pgdog-product-tls` rolled PgDog in about 80 s while payment stayed Ready with
-no TLS error, since the CA does not change. PgDog still accepts plaintext, so
-a client that drops TLS is not refused by the server; requiring client TLS
-waits until every product-db service speaks it (ADR-089,
-[#1283](https://github.com/duynhlab/homelab/issues/1283)).
+no TLS error, since the CA does not change. Since every client speaks TLS,
+PgDog sets `tls_client_required`, so a client that drops TLS is refused.
+`make db-tls` (`scripts/db-tls-check.sh`) re-runs the positive case, the
+host-name and CA negatives and the plaintext refusal for each pooled hop.
 
 **A renewal rolls PgDog.** cert-manager renews the Secret on schedule. The
 Secret's `reconcile.fluxcd.io/watch` label makes helm-controller reconcile, and

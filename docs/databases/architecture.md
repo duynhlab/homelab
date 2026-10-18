@@ -107,9 +107,9 @@ it shares the same Kubernetes environment and object-storage failure domain.
 - Every product-db service uses PgDog as its `<svc>_runtime` login. PgDog
   sends reads and writes to `product-db-rw`; no database lists a replica
   (ADR-089).
-- Payment reaches PgDog over client TLS and verifies it (`sslmode=verify-full`
-  against `homelab-ca`); the others stay plaintext. Checked on Kind on
-  2026-10-17 ([poolers](./poolers.md#tls)).
+- Every product-db service and both workers reach PgDog over client TLS and
+  verify it (`sslmode=verify-full` against `homelab-ca`); PgDog refuses
+  plaintext ([poolers](./poolers.md#tls)).
 - Migration jobs connect directly to the primary so schema changes are not
   multiplexed or read-routed.
 

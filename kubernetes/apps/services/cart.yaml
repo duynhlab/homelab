@@ -23,7 +23,9 @@ spec:
     # init container logs in as cart_migrator, which becomes cart_owner.
     db_runtime_secret: "product-db-cart-runtime-secret"
     db_migrator_secret: "product-db-cart-migrator-secret"
-    db_sslmode: "disable"
+    # ADR-089: verify PgDog's certificate and host name; PgDog refuses plaintext.
+    db_sslmode: "verify-full"
+    db_ca_secret: "product-db-ca-trust"
     pool_max: "30"
     # Internal gRPC server (:9090) — checkout reads the cart over cart.v1
     # (RFC-0015). The domain template adds a grpc:9090 port to the cart Service.

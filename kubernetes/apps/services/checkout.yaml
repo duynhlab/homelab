@@ -29,7 +29,9 @@ spec:
     # init container logs in as checkout_migrator, which becomes checkout_owner.
     db_runtime_secret: "product-db-checkout-runtime-secret"
     db_migrator_secret: "product-db-checkout-migrator-secret"
-    db_sslmode: "disable"
+    # ADR-089: verify PgDog's certificate and host name; PgDog refuses plaintext.
+    db_sslmode: "verify-full"
+    db_ca_secret: "product-db-ca-trust"
     pool_max: "25"
     # Client-only gRPC: use the multi-port Services below, not the absent
     # <service>-grpc Services assumed by old application defaults.

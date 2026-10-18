@@ -30,7 +30,9 @@ spec:
     # init container logs in as order_migrator, which becomes order_owner.
     db_runtime_secret: "product-db-order-runtime-secret"
     db_migrator_secret: "product-db-order-migrator-secret"
-    db_sslmode: "disable"
+    # ADR-089: verify PgDog's certificate and host name; PgDog refuses plaintext.
+    db_sslmode: "verify-full"
+    db_ca_secret: "product-db-ca-trust"
     pool_max: "30"
     # The API calls shipping over gRPC (headless :9090). It does not call
     # notification: only the worker does (apps/order-worker.yaml sets its own

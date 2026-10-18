@@ -211,6 +211,16 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **Every product-db client verifies PgDog, and PgDog refuses plaintext.**
+  product, inventory, cart, order, checkout and both Temporal workers move from
+  `sslmode=disable` to `verify-full`, joining payment. Each namespace gets a
+  `product-db-ca-trust` Certificate on the live `homelab-ca` (payment's
+  `payment-db-ca-trust` is renamed to it), and `fulfillment-rs` learns
+  `db_ca_secret`. PgDog sets `tls_client_required`, so a plaintext login gets
+  `only TLS connections are allowed`. `make db-tls` (`scripts/db-tls-check.sh`)
+  checks each pooled hop: the right host and CA reach authentication, the
+  Service IP and a foreign CA fail the handshake, and plaintext is refused.
+
 - **platform-db services verify PgBouncer, and PgBouncer refuses plaintext.**
   user, notification, shipping and review move from `sslmode=disable` to
   `verify-full`. The CNPG Pooler serves `platform-db-pooler-tls` through

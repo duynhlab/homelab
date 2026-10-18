@@ -77,8 +77,9 @@ spec:
     openMetricsPort: 9090
     openMetricsNamespace: "pgdog_"
 
-    # Client-side TLS (certificate.yaml): optional for clients, required by
-    # payment's own config. Clients do not verify it yet (ADR-089 follow-up).
+    # Client-side TLS (certificate.yaml). Every client verifies it with
+    # verify-full (ADR-089), and a plaintext login is refused.
+    tlsClientRequired: true
     tlsCertificate: /etc/pgdog-tls/tls.crt
     tlsPrivateKey: /etc/pgdog-tls/tls.key
     extraVolumes:

@@ -63,11 +63,11 @@ authentication does not continue down the list looking for another method.
 
 Verified TLS needs trusted CA material and hostname validation at the client
 (for libpq, `verify-full`), with certificates covering the chosen endpoint.
-Changing an HBA rule alone cannot deliver that. Today payment → PgDog and
-the four platform-db services → PgBouncer do it ([poolers](poolers.md#tls));
-the other hops (migrations, the remaining product-db services, the poolers'
-own upstream on product-db) are tracked by [RFC-0020](../proposals/rfc/RFC-0020/)
-and ADR-089, and are not deployed.
+Changing an HBA rule alone cannot deliver that. Today every service → pooler
+hop does it, on PgDog and on PgBouncer ([poolers](poolers.md#tls)); the
+other hops (migrations, PgDog's own upstream, Temporal, Keycloak and OpenBAO)
+are tracked by [RFC-0020](../proposals/rfc/RFC-0020/), ADR-089 and
+[#1296](https://github.com/duynhlab/homelab/issues/1296), and are not deployed.
 
 ### Credentials and reconciliation
 

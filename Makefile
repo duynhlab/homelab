@@ -179,6 +179,10 @@ e2e-restock: ## Top demo stock back up to the seed baseline (make seed cannot --
 db-isolation: ## pg_hba isolation sweep against the live databases (RFC-0012 P4)
 	./scripts/db-isolation-sweep.sh
 
+.PHONY: db-tls
+db-tls: ## Pooled hops verify the server and refuse plaintext (ADR-089)
+	./scripts/db-tls-check.sh
+
 .PHONY: edge-isolation
 edge-isolation: ## Edge NetworkPolicy allow-list sweep (ARGS=--live probes the cluster)
 	./scripts/edge-isolation-sweep.sh $(ARGS)

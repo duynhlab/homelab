@@ -31,10 +31,10 @@ shape as `cart` or `inventory`:
      `targetPath: "users[<N>].password"` where `<N>` is the new **last**
      index. Indices are positional — always append at the end, never insert
      mid-list ([ADR-014](../../proposals/adr/ADR-014-pooler-credentials-valuesfrom/)).
-   - A service that requires TLS to its database connects to PgDog with
-     `sslmode=require` (PgDog's client certificate,
-     [poolers](../poolers.md#tls)) and gets `hostssl` lines in step 3, like
-     payment.
+   - The service connects to PgDog with `sslmode=verify-full` and
+     `db_ca_secret: product-db-ca-trust`; add a `product-db-ca-trust`
+     Certificate for its namespace in `poolers/ca-trust.yaml`
+     ([poolers](../poolers.md#tls)). PgDog refuses plaintext.
 
 3. **pg_hba (connection isolation is live — RFC-0012 P4):** add the service's
    runtime, migrator and `db_authz` allow rules in `instance.yaml` above the
@@ -70,8 +70,8 @@ authorization](../authorization.md)):
    `owner: <svc>_owner`. No owner or migrator `DatabaseRole`: the catalog
    creates them, and CNPG retries the `Database` until the owner exists.
 3. **App-namespace copies** of both Secrets (`secrets/…-<svc>-ns.yaml`).
-4. **`pg_hba`:** `host <svc> <svc>_runtime`, `host <svc> <svc>_migrator`,
-   `host <svc> db_authz`, above the reject.
+4. **`pg_hba`:** `hostssl <svc> <svc>_runtime`, `hostssl <svc> <svc>_migrator`,
+   `hostssl <svc> db_authz`, above the reject.
 5. **Role catalog** (`authz/job.yaml`, both the Job and the CronJob): add `<svc>`
    to `ROLE_SERVICES`, add the `<SVC>_MIGRATOR_PASSWORD` env from the migrator
    Secret, and either add `<svc>` to `GRANT_SERVICES` or give it a pgroles

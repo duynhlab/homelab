@@ -111,7 +111,9 @@ it shares the same Kubernetes environment and object-storage failure domain.
   verify it (`sslmode=verify-full` against `homelab-ca`); PgDog refuses
   plaintext ([poolers](./poolers.md#tls)).
 - Migration jobs connect directly to the primary so schema changes are not
-  multiplexed or read-routed.
+  multiplexed or read-routed. They verify it (`sslmode=verify-full`): both
+  clusters serve a `homelab-ca` server certificate, so one CA covers the
+  poolers and the primary ([security](./security-and-access.md)).
 
 No application path reads from a replica today. A replica read is not a
 consistency guarantee: a read right after a primary commit may observe

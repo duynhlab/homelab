@@ -145,7 +145,7 @@ including workers, before changing its credential.
      psql -W "host=product-db-rw.product user=<svc>_runtime dbname=<svc>" -c 'select 1'
    ```
 
-   (`payment` admits its logins on `hostssl` only: add `sslmode=require`.)
+   (Every login is `hostssl`: add `sslmode=require` to the connection string.)
 
 ## Rotate a migrator password
 

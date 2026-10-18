@@ -211,6 +211,17 @@ Skeleton (copy what you need):
 
 #### Databases
 
+- **Both clusters serve a homelab-ca certificate, and every direct hop
+  verifies it.** `platform-db` and `product-db` take their server certificate
+  from a cert-manager `<cluster>-server-tls` (`spec.certificates`), so
+  clients verify the primary with the same `*-db-ca-trust` CA they use for
+  the poolers. `migrate`, the seed Job, both authz Jobs and CronJobs and
+  PgDog's upstream (`tls_verify = verify_full`) move from `require`/`prefer`
+  to `verify-full`, and every service, migrator and `db_authz` line in
+  `pg_hba` becomes `hostssl`. `temporal`, `keycloak` and `vault_rotator` keep
+  `host` (#1296); pgroles stays `require` (no root-certificate field).
+  `make db-tls` adds the two direct hops.
+
 - **Every product-db client verifies PgDog, and PgDog refuses plaintext.**
   product, inventory, cart, order, checkout and both Temporal workers move from
   `sslmode=disable` to `verify-full`, joining payment. Each namespace gets a

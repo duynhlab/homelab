@@ -105,9 +105,9 @@ flowchart TB
 PgDog lists every product-db service under its `<svc>_runtime` login; the
 order and checkout workers use their service's runtime login. Every runtime
 reaches PgDog over client TLS (`sslmode=verify-full`;
-[poolers](poolers.md#tls)) and PgDog refuses plaintext. `pg_hba` admits
-`payment_runtime` and `payment_migrator` on `hostssl` lines only; the other
-pairs keep `host` until PgDog verifies its upstream hop.
+[poolers](poolers.md#tls)) and PgDog refuses plaintext. PgDog, `migrate` and
+the authz Job verify the primary too, so every product-db allow line is
+`hostssl`.
 
 `product` is also `product-db`'s bootstrap database: `bootstrap.initdb` creates
 it owned by a role named `product`. That role is bootstrap-only. Its
@@ -175,7 +175,7 @@ not appear here because they write no authorization.
 | `Database` object | `<svc>-database`, `spec.owner: <svc>_owner` | `review-database` |
 | Secrets (cluster and app namespace, same name) | `<cluster>-<svc>-runtime-secret`, `<cluster>-<svc>-migrator-secret`; the owner has none | `platform-db-review-migrator-secret` |
 | OpenBAO KV | `secret/local/databases/<cluster>/<svc>-runtime`, `…/<svc>-migrator` | `secret/local/databases/platform-db/review-runtime` |
-| `pg_hba` | `host <svc> <svc>_runtime …`, `host <svc> <svc>_migrator …`, `host <svc> db_authz …` (`hostssl` for payment's runtime and migrator). No line for the owner | — |
+| `pg_hba` | `hostssl <svc> <svc>_runtime …`, `hostssl <svc> <svc>_migrator …`, `hostssl <svc> db_authz …`. No line for the owner | — |
 | Executor | `authz_admin` (NOLOGIN, CREATEROLE) and `db_authz` (LOGIN, member of `authz_admin`), one pair per CNPG cluster | KV `…/platform-db/db-authz` |
 
 Names considered and not used:

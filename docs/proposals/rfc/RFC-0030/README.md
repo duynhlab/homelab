@@ -102,8 +102,9 @@ owned lifecycle.
 1. Declare one CNPG `Publication` resource with explicit table/column objects
    and reclaim policy `retain` for each source database. Grant a dedicated
    PeerDB login `LOGIN`, `REPLICATION`, and `SELECT` only on the selected
-   tables. Connect over TLS to `product-db-rw`, never PgDog or a read-only
-   Service.
+   tables. Connect through a replication-compatible CDC pooler profile to
+   the source primary, with verify-full semantics on both hops, as required
+   by RFC-0029. Never use a replica or silently fall back to direct access.
 2. Run three PeerDB mirrors—one per database, publication, and slot. Reuse
    existing Temporal through a dedicated `peerdb` namespace, RustFS through a
    dedicated `analytics-service-cdc` bucket/identity, and `platform-db` through a
@@ -224,7 +225,9 @@ flowchart LR
   PAGE["Admin /analytics<br/>planned"]
 
   CRON -.->|"planned 30-second UPSERT"| ORD & CHECK & PAY
-  ORD & CHECK & PAY -.->|"planned direct TLS CDC"| FLOW
+  CDCPOOL["CDC pooler profile<br/>planned — not qualified"]
+  ORD & CHECK & PAY -.->|"planned verified TLS / primary only"| CDCPOOL
+  CDCPOOL -.->|"planned snapshot + WAL / verified TLS"| FLOW
   SNAP --- FLOW
   FLOW --- APICTL & CAT & TEMP
   FLOW -.->|"planned staged load"| STAGE
@@ -239,6 +242,7 @@ flowchart LR
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef external fill:#f1f5f9,color:#334155,stroke:#64748b;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+  class CDCPOOL planned;
   class STAFF external;
   class EDGE edge;
   class PG,CH data;
@@ -320,6 +324,56 @@ explicitly accepted security drawback, bounded by exact-table grants, HBA,
 NetworkPolicy, Secret isolation, audit, and no `BYPASSRLS`. It must never gain
 `SELECT ON ALL TABLES IN SCHEMA`.
 
+### Source access contract
+
+**Accepted direction:** PeerDB → platform-owned CDC pooler profile → source
+primary. This follows [RFC-0029](../RFC-0029/) and
+[ADR-089](https://github.com/duynhlab/homelab/blob/main/docs/proposals/adr/ADR-089-postgresql-access-contract/README.md).
+The application receives the logical endpoint, database, credentials and CA;
+platform owns backend discovery, routing, authentication and pooler settings.
+Both metadata/snapshot SQL and the replication connection use this access
+contract. Migration and native CNPG replication exceptions do not grant PeerDB
+a direct-access exception.
+
+**Not yet qualified:** product, version, endpoint and concrete settings for the
+CDC profile. Preserve both PgDog and PgBouncer in the platform. PgBouncer is a
+qualification candidate with upstream replication-connection support; PgDog
+must separately prove external-client replication forwarding. Neither product's
+ordinary runtime profile is automatically approved for CDC. Start qualification
+with session affinity for snapshot SQL and a dedicated backend for each
+replication connection; do not multiplex an active WAL stream. A session-mode
+setting alone does not prove replication-protocol compatibility.
+
+The profile must be primary-only, preserve snapshot/transaction state and startup
+parameters, isolate CDC connection capacity from runtime traffic, and keep
+streaming connections alive under declared timeout/drain settings. Failover
+requires connector reconnect and verified slot/offset recovery; it does not
+transparently move an established stream or an exported snapshot to another
+backend. A failed gate blocks rollout; there is no automatic direct fallback.
+
+Require verify-full semantics on client → pooler and pooler → PostgreSQL.
+For pinned PeerDB v0.37.5, supply the pooler's DNS hostname and trusted `rootCa`,
+set `disableTls=false` and `skipCertVerification=false`, and verify that the
+certificate SAN matches the hostname (`tlsHost`, if used, must name the intended
+server). Do not substitute an IP without an explicit verified TLS hostname:
+this build's IP path can verify the chain without verifying the hostname.
+The literal `sslmode=require` in its generated URI is not proof of the final
+TLS behavior: its custom TLS configuration must also be inspected and tested.
+
+Source roles, exact database HBA rules, workload attribution and credential
+rotation follow RFC-0029. Preserve PeerDB's own `peerdb` application-name prefix
+until a tested connector mapping is recorded; do not claim it already emits
+`analytics-service`. CDC starts with manual 90-day rotation and monthly review;
+automatic rotation requires the reconnect/recovery gate.
+
+[Issue #1305](https://github.com/duynhlab/homelab/issues/1305) owns profile
+qualification and [#1266](https://github.com/duynhlab/homelab/issues/1266) owns the
+RFC-0030 integration handoff. The direct, plaintext disposable Compose prototype
+is a historical baseline, not an implementation or approval of this target.
+Switch the prototype only together with a concrete pooler/TLS profile and its
+gates; changing a hostname alone is insufficient. Source review and versioned
+references are in [research](./research.md#pooled-source-access-review).
+
 ## Data model and metric semantics
 
 - Payment ledger transactions and their `merchant_revenue` leg own capture,
@@ -400,8 +454,10 @@ visible UTC/freshness labels, and accessible table equivalents for charts.
   `shared_preload_libraries`; a missing library prevents PostgreSQL startup.
 - Install `pg_cron` only in `postgres`, use UTC and background workers, cap its
   concurrent jobs, and retain seven days of `cron.job_run_details`.
-- Connect PeerDB directly to `product-db-rw.product.svc:5432` using TLS.
-  Logical decoding cannot use PgDog or `product-db-ro`.
+- Route PeerDB snapshot, metadata SQL and logical replication through the
+  platform-owned CDC pooler profile to the source primary. Require verified
+  CA and hostname on both hops; deny plaintext and direct fallback.
+  Pooler/version qualification is pending; see [source access](#source-access-contract).
 - Separate PeerDB control, catalog, staging, ClickHouse ingest, ClickHouse read,
   and the heartbeat execution role. OpenBAO/ESO delivers credentials that still
   require Secrets; background-worker heartbeats require none.
@@ -454,7 +510,8 @@ Roll out in dependency order, with each phase blocked on its evidence:
    switchover, promotion, and worker headroom.
 3. **Source safety:** size `max_replication_slots`, `max_wal_senders`,
    `max_slot_wal_keep_size`, connections, and WAL storage. Create roles, exact
-   HBA/TLS/NetworkPolicy, heartbeat tables, CNPG column-list `Publication`
+   qualified CDC pooler routing and two-hop TLS, HBA/NetworkPolicy, heartbeat
+   tables, CNPG column-list `Publication`
    resources with reclaim `retain`, named 30-second cron jobs, a daily
    seven-day run-history cleanup job, and mirror exclusions. Require
    `status.applied=true` at the observed generation before creating a mirror.
@@ -560,6 +617,11 @@ service rollup in `docs/api/README.md`, the Admin consumer index
 relevant feature ownership in `docs/api/microservices.md`.
 
 ## Implementation history
+
+- 2026-10-18 — Owner aligned the source-access target with RFC-0029: snapshot
+  SQL and replication use a qualified pooler profile with verified TLS on both
+  hops. The direct Compose baseline remains unqualified for this path; issue
+  #1305 owns the compatibility and recovery gates.
 
 - 2026-10-14 — Draft Go reader and isolated UI align on USD-only v1, exact money
   strings, event-date ledger totals and checkout-created cohorts. The

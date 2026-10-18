@@ -18,6 +18,47 @@ repeat of the September upstream/runtime qualification.
 
 Resource identifiers follow the accepted [RFC naming contract](./README.md#resource-naming).
 
+## Pooled source access review
+
+Repository/source review on 2026-10-18; **no runtime CDC or pooler test**.
+RFC-0029 and ADR-089 on homelab main `2f1bb81a` require CDC through a compatible
+pooler and prohibit silent direct fallback. This replaces the earlier direct
+source target in RFC-0030; the existing Compose prototype remains direct and
+plaintext, with disposable credentials. Its results do not qualify the new path.
+
+| Component | Source finding | Implication |
+|---|---|---|
+| PgBouncer | Replication connections were added in 1.23.0; later releases include replication/auth fixes | A pooled CDC path is feasible in principle. Pin a maintained release and qualify it; do not infer compatibility from `pool_mode` alone |
+| PgDog | Main pins chart v0.92, whose chart metadata selects app v0.1.61; upstream documents internal logical replication for resharding | Internal replication is not proof that the external PeerDB startup/snapshot/stream path works. Keep external-client compatibility unqualified |
+| PeerDB v0.37.5 | Separate normal SQL and replication connections; custom TLS configuration, startup/session settings, snapshot coordination and connector-generated `application_name` | Qualify the whole connector lifecycle, not just a login or `SELECT 1` |
+| TLS | With a DNS host and verification enabled, PeerDB sets the TLS server name and accepts a supplied root CA; the raw-IP branch can skip hostname verification | Use pooler DNS plus CA and negative hostname/CA tests; URI `sslmode=require` alone is not the security verdict |
+
+Qualification starts with session affinity for snapshot SQL and a dedicated
+backend for each replication connection. It must cover exported snapshot
+lifetime and parallel readers, `replication=database`, slot creation,
+`START_REPLICATION`, bidirectional keepalive/status traffic, reconnect, drain,
+password/CA rotation and primary promotion. Pooler failover does not itself
+preserve a PostgreSQL snapshot or create a failover-capable slot.
+
+Do not rewrite the connector's application name blindly: the pinned build uses
+`peerdb` or `peerdb_<mirror>` and some connection-inspection queries match that
+prefix. Record the accepted attribution mapping as part of the access gate.
+The concrete pooler/version/profile remains open in issue #1305; the accepted
+route and fail-closed requirement are in the
+[source-access contract](./README.md#source-access-contract).
+
+Versioned sources and upstream documentation:
+
+- [PgBouncer replication support and fixes](https://www.pgbouncer.org/changelog.html)
+- [PgBouncer 1.26.1 pool-mode and startup-parameter configuration](https://github.com/pgbouncer/pgbouncer/blob/pgbouncer_1_26_1/doc/config.md)
+- [PgDog logical replication scope](https://docs.pgdog.dev/features/sharding/internals/logical-replication/)
+- [PgDog v0.1.61 startup parameter handling](https://github.com/pgdogdev/pgdog/blob/v0.1.61/pgdog/src/net/parameter.rs)
+- [PeerDB v0.37.5 connection and TLS setup](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/flow/connectors/postgres/postgres.go)
+- [PeerDB v0.37.5 TLS verification](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/flow/pkg/common/tls.go)
+- [PeerDB v0.37.5 application name](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/flow/internal/postgres.go)
+- [PeerDB v0.37.5 snapshot lifecycle](https://github.com/PeerDB-io/peerdb/blob/v0.37.5/flow/workflows/snapshot_flow.go)
+
+
 ## Table of contents
 
 1. [Problem statement](#problem-statement)
@@ -155,7 +196,9 @@ flowchart LR
 
   CRON -.->|"30-second UPSERT<br/>planned"| ORD & CHECK & PAY
   ORD & CHECK & PAY -.->|"database-local pgoutput<br/>planned"| RW
-  RW -.->|"direct TLS<br/>planned"| FLOW
+  CP["CDC pooler profile<br/>planned — not qualified"]
+  RW -.->|"primary-only / verified TLS<br/>planned"| CP
+  CP -.->|"snapshot + WAL / verified TLS<br/>planned"| FLOW
   SNAP -.->|"snapshot coordination<br/>planned"| FLOW
   FLOW -.->|"control and workflow state<br/>planned"| CTRL & CAT & TEMP
   FLOW -.->|"stage batches<br/>planned"| STAGE
@@ -167,6 +210,7 @@ flowchart LR
 
   classDef data fill:#dcfce7,color:#14532d,stroke:#16a34a;
   classDef planned fill:#fff,color:#475569,stroke:#64748b,stroke-dasharray:5 5;
+  class CP planned;
   class RW,PG,CH data;
   class CRON,ORD,CHECK,PAY,FLOW,SNAP,CTRL,CAT,TEMP,STAGE,RAW,SERVE,API planned;
 ```
@@ -449,9 +493,9 @@ and the API returns `503`.
 
 | Aspect | Platform today | Candidate delta |
 |--------|----------------|-----------------|
-| Product DB | CNPG PostgreSQL 18.6, three instances, synchronous `ANY 1` | Three direct-primary PeerDB connections |
+| Product DB | CNPG PostgreSQL 18.6, three instances, synchronous `ANY 1` | Three database-local mirrors through a qualified primary-only CDC pooler profile |
 | Logical settings | `wal_level=logical`, `max_wal_senders=10`, slot sync settings enabled | Size slots/senders/WAL cap; prove external slot failover |
-| HBA/pooling | Exact pairs then reject-all; PgDog for app traffic | Exact PeerDB pairs; CDC bypasses PgDog; background-worker heartbeat adds no HBA pair |
+| HBA/pooling | Exact pairs then reject-all; PgDog for app traffic | Exact PeerDB pairs; CDC pooler profile pending qualification; background-worker heartbeat adds no HBA pair |
 | Temporal | Deployed with PostgreSQL persistence | Dedicated namespace `peerdb` |
 | RustFS | Backups and ClickHouse cold tier | Dedicated staging bucket/identity |
 | `platform-db` | Hosts platform databases | Dedicated PeerDB catalog DB/role |

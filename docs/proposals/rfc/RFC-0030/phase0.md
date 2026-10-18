@@ -3,6 +3,14 @@
 Phase 0 tests the accepted [RFC-0030](./README.md) architecture before any
 cluster rollout. A working Compose pipeline is not CNPG qualification.
 
+**Source-access gap:** this executable prototype still connects PeerDB directly
+to Compose PostgreSQL with TLS disabled. The accepted target is now
+[pooled source access](./README.md#source-access-contract) under RFC-0029.
+Do not treat these commands as the final production route or pooler evidence.
+A future implementation must add the selected CDC profile, verified TLS on
+both hops, credential delivery and the gates below together; do not merely
+change the source hostname.
+
 | Quick facts | Value |
 |---|---|
 | State | Mac prototype gates recorded; full regression blocked; Linux gates pending |
@@ -191,12 +199,13 @@ NOINHERIT and restricted runtime privileges when fixing that wiring.
 | Image supply chain | Two clean builds, scan, signed release and exact digest | Pending; no release published |
 | CNPG image lifecycle | Library load, activation, restored backup, rollback, every instance compatible | Pending |
 | Scheduler promotion | Primary-only execution after switchover/failover; job/history/worker bounds | Pending |
-| Source access | TLS, HBA, exact grants, Publication `status.applied` at observed generation | Pending |
+| Source access | Qualified primary-only pooler for snapshot SQL and replication; verify-full both hops; exact HBA/grants and Publication `status.applied` | Pending; direct plaintext Compose baseline is not evidence |
+| Pooler lifecycle | Concurrent snapshot writes, exported snapshot/parallel readers, streaming keepalives, restart/drain, reconnect, primary promotion, slot/offset recovery and retained-WAL bounds | Pending; #1305 blocks cutover |
 | Consumer slots | Resume without gaps or explicit resync through promotion and WAL invalidation | Pending |
 | Kubernetes boundary | Secrets, NetworkPolicy, resource/probe/admission checks, Flux ordering | Pending |
 | DDL evolution | Add/drop/type changes and recovery on the pinned build | Pending |
 | Failure coverage | API/catalog/Temporal and network outages, large transactions, WAL invalidation/resync | Pending; Compose covers worker restart and short RustFS/ClickHouse interruptions only |
-| Credential lifecycle | Rotation, TLS connection denial, source/target permissions under cluster policies | Pending; Compose uses disposable identities |
+| Credential lifecycle | New password accepted and old password refused on fresh connections; stream recovers at verified offset; wrong CA/hostname and plaintext denied on both hops; CA overlap/reload | Pending; Compose uses disposable identities |
 | Data exclusion | Trace payload inspection and wider representative PII fixtures | Pending; Compose inspects allowlisted raw/staging data and PeerDB logs |
 | Native capacity | Full snapshot, WAL/staging bounds, one million facts; 7/30/90-day checksums | Pending |
 | Query performance | p95 ≤500 ms, peak memory ≤512 MiB, no pod restart | Pending |

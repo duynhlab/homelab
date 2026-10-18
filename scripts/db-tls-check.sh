@@ -3,15 +3,16 @@
 # plaintext. For every hop below, one pod in the client's namespace mounts the
 # hop's CA Secret and runs four psql logins with a deliberately wrong password:
 #
-#   ok         verify-full, Service DNS name, right CA  -> fails at the PASSWORD
-#   wronghost  verify-full, Service ClusterIP           -> host name mismatch
-#   wrongca    verify-full, system CA bundle            -> certificate verify failed
-#   plaintext  sslmode=disable                          -> refused before auth
+#   ok         verify-full, DNS name, right CA -> fails at authentication
+#   wronghost  verify-full, Service ClusterIP  -> host name mismatch
+#   wrongca    verify-full, system CA bundle   -> certificate verify failed
+#   plaintext  sslmode=disable                 -> refused before auth
 #
-# A password error on "ok" means the TLS handshake and the host-name check both
-# passed; the other three must fail before authentication. No Secret value is
-# read. Same harness shape as db-isolation-sweep.sh: logs, not attach, and the
-# row count is an assertion.
+# An authentication error on "ok" (PgDog: "password ... is wrong", PgBouncer:
+# "SASL authentication failed") means the TLS handshake and the host-name
+# check both passed; the other three must fail before authentication. No
+# Secret value is read. Same harness shape as db-isolation-sweep.sh: logs,
+# not attach, and the row count is an assertion.
 set -u
 
 IMAGE="ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
@@ -59,7 +60,7 @@ check_hop() {
       *)         continue ;;
     esac
     rows=$((rows + 1))
-    if [[ "$verdict" == *"$want"* ]]; then
+    if [[ "$verdict" == *"$want"* ]] || { [ "$case" = ok ] && [[ "$verdict" == *"authentication failed"* ]]; }; then
       printf "PASS  %-9s %-9s %s\n" "$label" "$case" "$verdict"
     else
       printf "FAIL  %-9s %-9s want=\"%s\" got=\"%s\"\n" "$label" "$case" "$want" "$verdict"

@@ -148,6 +148,12 @@ read [the git-commits skill](.agents/skills/git-commits/SKILL.md), the source
 of truth for their conventions.
 
 - **Never push to `main`.** Branch → PR → squash-merge.
+- **PR body** follows `.github/pull_request_template.md`: `Part of #<sub-issue>`
+  (or `Closes #N`), the tradeoffs made, and the gate evidence as counts. Work
+  under an ADR hangs off that ADR's tracking issue (issue type `ADR`, one
+  sub-issue per obligation); tradeoffs the ADR did not settle go on that
+  issue, not only in the PR
+  ([`docs/proposals/adr/README.md` § Working log](docs/proposals/adr/README.md#working-log)).
 - `git config user.email` = duynhlab identity; **`gh auth switch --user duynhne`**
   for PRs.
 
